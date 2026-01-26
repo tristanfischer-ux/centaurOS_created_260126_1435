@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card'
+import Link from 'next/link'
 import { CreateObjectiveDialog } from './create-objective-dialog' // Component we will create
 
 export default async function ObjectivesPage() {
@@ -52,21 +53,23 @@ export default async function ObjectivesPage() {
 
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
                 {objectives?.map((obj) => (
-                    <Card key={obj.id} className="bg-white border-slate-200 hover:border-amber-500 transition-all group shadow-sm">
-                        <CardHeader>
-                            <CardTitle className="text-xl text-slate-900 group-hover:text-amber-600 transition-colors">
-                                {obj.title}
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <p className="text-slate-600 text-sm line-clamp-3">
-                                {obj.description || "No description provided."}
-                            </p>
-                        </CardContent>
-                        <CardFooter className="text-xs text-slate-400 border-t border-slate-100 pt-4 mt-auto">
-                            Created {new Date(obj.created_at!).toLocaleDateString()}
-                        </CardFooter>
-                    </Card>
+                    <Link href={`/objectives/${obj.id}`} key={obj.id} className="block group">
+                        <Card className="bg-white border-slate-200 hover:border-amber-500 transition-all shadow-sm h-full flex flex-col">
+                            <CardHeader>
+                                <CardTitle className="text-xl text-slate-900 group-hover:text-amber-600 transition-colors">
+                                    {obj.title}
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent className="flex-1">
+                                <p className="text-slate-600 text-sm line-clamp-3">
+                                    {obj.description || "No description provided."}
+                                </p>
+                            </CardContent>
+                            <CardFooter className="text-xs text-slate-400 border-t border-slate-100 pt-4">
+                                Created {new Date(obj.created_at!).toLocaleDateString()}
+                            </CardFooter>
+                        </Card>
+                    </Link>
                 ))}
 
                 {count === 0 && (
