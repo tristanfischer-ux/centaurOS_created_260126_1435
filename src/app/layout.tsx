@@ -3,6 +3,7 @@ import { Outfit } from "next/font/google"; // Premium modern font
 import "./globals.css";
 import { Sidebar } from "@/components/Sidebar";
 import { MobileNav } from "@/components/MobileNav";
+import { Toaster } from "@/components/ui/sonner";
 
 const outfit = Outfit({
   subsets: ["latin"],
@@ -33,6 +34,7 @@ export default function RootLayout({
           {children}
         </main>
         <MobileNav />
+        <Toaster />
       </body>
     </html>
   );

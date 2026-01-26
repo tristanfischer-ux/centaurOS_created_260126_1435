@@ -30,7 +30,13 @@ export default async function TasksPage() {
                 {/* Fetch data for the dialog */}
                 <CreateTaskDialog
                     objectives={await supabase.from('objectives').select('id, title').then(r => r.data || [])}
-                    members={await supabase.from('profiles').select('id, full_name, role').then(r => r.data || [])}
+                    members={await supabase.from('profiles').select('id, full_name, role').then(r =>
+                        (r.data || []).map(p => ({
+                            id: p.id,
+                            full_name: p.full_name || 'Unknown',
+                            role: p.role
+                        }))
+                    )}
                 />
             </div>
 

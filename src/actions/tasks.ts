@@ -10,7 +10,13 @@ async function getFoundryId() {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return null
-    return user.app_metadata.foundry_id
+
+    // First try metadata
+    if (user.app_metadata.foundry_id) return user.app_metadata.foundry_id
+
+    // Fallback: Fetch from public.profiles
+    const { data: profile } = await supabase.from('profiles').select('foundry_id').eq('id', user.id).single()
+    return profile?.foundry_id
 }
 
 async function logSystemEvent(taskId: string, message: string, userId: string) {
