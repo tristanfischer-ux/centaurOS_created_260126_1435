@@ -13,7 +13,7 @@ const supabase = createClient(supabaseUrl, supabaseKey)
 Deno.serve(async (req) => {
     try {
         const payload = await req.json()
-        const { record, type } = payload
+        const { record } = payload
 
         // Only process INSERT or UPDATE where assignee_id changed
         if (!record.assignee_id) {

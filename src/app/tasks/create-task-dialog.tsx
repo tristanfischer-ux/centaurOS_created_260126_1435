@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
-import { Plus, Check, Loader2, CalendarIcon } from "lucide-react"
+import { Plus, Loader2, CalendarIcon } from "lucide-react"
 import {
     Dialog,
     DialogContent,
@@ -36,9 +36,10 @@ import {
 interface CreateTaskDialogProps {
     objectives: { id: string; title: string }[]
     members: { id: string; full_name: string; role: string }[]
+    currentUserId: string
 }
 
-export function CreateTaskDialog({ objectives, members }: CreateTaskDialogProps) {
+export function CreateTaskDialog({ objectives, members, currentUserId }: CreateTaskDialogProps) {
     const [open, setOpen] = useState(false)
     const [isLoading, setIsLoading] = useState(false)
     const [date, setDate] = useState<Date>()
@@ -65,10 +66,25 @@ export function CreateTaskDialog({ objectives, members }: CreateTaskDialogProps)
         setIsLoading(false)
     }
 
-    // Sort members: Executives, then AI, then others
+    // Helper to format role for display
+    const getRoleLabel = (role: string) => {
+        if (role === 'AI_Agent') return '🤖 AI'
+        if (role === 'Founder') return 'Founder'
+        if (role === 'Executive') return 'Executive'
+        if (role === 'Apprentice') return 'Apprentice'
+        return role
+    }
+
+    // Sort members: Current user first, then AI agents, then others alphabetically
     const sortedMembers = [...members].sort((a, b) => {
-        if (a.role === 'AI_Agent') return -1 // AI first!
-        return a.full_name?.localeCompare(b.full_name || '')
+        // Current user always first
+        if (a.id === currentUserId) return -1
+        if (b.id === currentUserId) return 1
+        // AI agents second
+        if (a.role === 'AI_Agent' && b.role !== 'AI_Agent') return -1
+        if (b.role === 'AI_Agent' && a.role !== 'AI_Agent') return 1
+        // Then alphabetically
+        return (a.full_name || '').localeCompare(b.full_name || '')
     })
 
     return (
@@ -110,8 +126,16 @@ export function CreateTaskDialog({ objectives, members }: CreateTaskDialogProps)
                                     <SelectContent className="bg-white border-slate-200 z-50">
                                         {sortedMembers.map(member => (
                                             <SelectItem key={member.id} value={member.id}>
-                                                {member.full_name}
-                                                {member.role === 'AI_Agent' && ' 🤖'}
+                                                <span className="flex items-center gap-2">
+                                                    {member.id === currentUserId ? (
+                                                        <span className="font-medium">Myself</span>
+                                                    ) : (
+                                                        <span>{member.full_name}</span>
+                                                    )}
+                                                    <span className="text-xs text-slate-500">
+                                                        ({getRoleLabel(member.role)})
+                                                    </span>
+                                                </span>
                                             </SelectItem>
                                         ))}
                                     </SelectContent>

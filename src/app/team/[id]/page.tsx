@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
-import { Mail, Briefcase, Calendar, Shield, Award } from 'lucide-react'
+import { Mail, Briefcase, Shield, Award } from 'lucide-react'
 import { Badge } from "@/components/ui/badge"
 
 export default async function ProfilePage({ params }: { params: Promise<{ id: string }> }) {

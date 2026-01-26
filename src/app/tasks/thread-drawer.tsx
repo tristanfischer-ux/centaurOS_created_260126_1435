@@ -5,17 +5,25 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "
 import { createClient } from "@/lib/supabase/client"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { formatDistanceToNow } from "date-fns"
-import { Loader2, Send } from "lucide-react"
+import { Loader2, Send, Check, X, Forward, Clock } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
-import { addTaskComment } from "@/actions/tasks"
+import { Badge } from "@/components/ui/badge"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { addTaskComment, acceptTask, rejectTask, completeTask } from "@/actions/tasks"
 import { toast } from "sonner"
+import { useRouter } from "next/navigation"
 
 interface ThreadDrawerProps {
     open: boolean
     onOpenChange: (open: boolean) => void
     taskId: string
     taskTitle: string
+    taskStatus?: string
+    taskDescription?: string
+    assigneeName?: string
+    isAssignee?: boolean
+    isCreator?: boolean
 }
 
 interface Comment {
@@ -27,11 +35,31 @@ interface Comment {
     user?: { full_name: string; role: string }
 }
 
-export function ThreadDrawer({ open, onOpenChange, taskId, taskTitle }: ThreadDrawerProps) {
+const statusColors: Record<string, string> = {
+    'Pending': 'bg-gray-100 text-gray-700',
+    'Accepted': 'bg-blue-100 text-blue-700',
+    'Rejected': 'bg-red-100 text-red-700',
+    'Completed': 'bg-green-100 text-green-700',
+    'Amended_Pending_Approval': 'bg-orange-100 text-orange-700',
+}
+
+export function ThreadDrawer({
+    open,
+    onOpenChange,
+    taskId,
+    taskTitle,
+    taskStatus = 'Pending',
+    taskDescription,
+    assigneeName,
+    isAssignee = false,
+    isCreator = false,
+}: ThreadDrawerProps) {
+    const router = useRouter()
     const [comments, setComments] = useState<Comment[]>([])
     const [loading, setLoading] = useState(true)
     const [newComment, setNewComment] = useState("")
     const [sending, setSending] = useState(false)
+    const [actionLoading, setActionLoading] = useState(false)
     const supabase = createClient()
 
     useEffect(() => {
@@ -49,7 +77,7 @@ export function ThreadDrawer({ open, onOpenChange, taskId, taskTitle }: ThreadDr
             setLoading(false)
         }
 
-        if (open) {
+        if (open && taskId) {
             fetchComments()
         }
     }, [open, taskId, supabase])
@@ -64,10 +92,6 @@ export function ThreadDrawer({ open, onOpenChange, taskId, taskTitle }: ThreadDr
             toast.error(result.error)
         } else {
             setNewComment("")
-            // We need to re-fetch here. Since fetchComments is inside useEffect, we can't call it. 
-            // Better to trigger a re-fetch via a dependency or just duplicate the simple fetch logic here for responsiveness.
-            // Actually, let's just cheat and flip a "refresh" trigger or refactor. 
-            // Refactoring to keep it clean:
             const { data } = await supabase
                 .from('task_comments')
                 .select('*, user:user_id(full_name, role)')
@@ -78,21 +102,130 @@ export function ThreadDrawer({ open, onOpenChange, taskId, taskTitle }: ThreadDr
         setSending(false)
     }
 
+    const handleAccept = async () => {
+        setActionLoading(true)
+        const result = await acceptTask(taskId)
+        if (result?.error) {
+            toast.error(result.error)
+        } else {
+            toast.success("Task accepted")
+            router.refresh()
+            onOpenChange(false)
+        }
+        setActionLoading(false)
+    }
+
+    const handleReject = async () => {
+        const reason = prompt("Reason for rejection:")
+        if (!reason) return
+
+        setActionLoading(true)
+        const result = await rejectTask(taskId, reason)
+        if (result?.error) {
+            toast.error(result.error)
+        } else {
+            toast.success("Task rejected")
+            router.refresh()
+            onOpenChange(false)
+        }
+        setActionLoading(false)
+    }
+
+    const handleComplete = async () => {
+        setActionLoading(true)
+        const result = await completeTask(taskId)
+        if (result?.error) {
+            toast.error(result.error)
+        } else {
+            toast.success("Task completed!")
+            router.refresh()
+            onOpenChange(false)
+        }
+        setActionLoading(false)
+    }
+
     return (
         <Sheet open={open} onOpenChange={onOpenChange}>
-            <SheetContent side="right" className="w-[400px] sm:w-[540px] flex flex-col h-full">
+            <SheetContent side="right" className="w-[400px] sm:w-[540px] flex flex-col h-full bg-white">
                 <SheetHeader>
-                    <SheetTitle>Task Thread</SheetTitle>
-                    <SheetDescription>History for &quot;{taskTitle}&quot;</SheetDescription>
+                    <SheetTitle className="text-slate-900">{taskTitle}</SheetTitle>
+                    <SheetDescription className="flex items-center gap-2">
+                        <Badge className={statusColors[taskStatus] || statusColors['Pending']}>
+                            {taskStatus?.replace(/_/g, ' ')}
+                        </Badge>
+                        {assigneeName && (
+                            <span className="text-slate-500">• {assigneeName}</span>
+                        )}
+                    </SheetDescription>
                 </SheetHeader>
 
-                <div className="flex-1 overflow-hidden mt-6 relative">
+                {/* Task Actions */}
+                {(isAssignee || isCreator) && (
+                    <div className="flex flex-wrap gap-2 mt-4 p-3 bg-slate-50 rounded-lg border border-slate-100">
+                        {/* Assignee can Accept/Reject if Pending */}
+                        {isAssignee && taskStatus === 'Pending' && (
+                            <>
+                                <Button
+                                    size="sm"
+                                    onClick={handleAccept}
+                                    disabled={actionLoading}
+                                    className="bg-green-500 hover:bg-green-600 text-white"
+                                >
+                                    <Check className="h-4 w-4 mr-1" /> Accept
+                                </Button>
+                                <Button
+                                    size="sm"
+                                    variant="destructive"
+                                    onClick={handleReject}
+                                    disabled={actionLoading}
+                                >
+                                    <X className="h-4 w-4 mr-1" /> Reject
+                                </Button>
+                            </>
+                        )}
+
+                        {/* Assignee can Complete if Accepted */}
+                        {isAssignee && taskStatus === 'Accepted' && (
+                            <Button
+                                size="sm"
+                                onClick={handleComplete}
+                                disabled={actionLoading}
+                                className="bg-green-500 hover:bg-green-600 text-white"
+                            >
+                                <Check className="h-4 w-4 mr-1" /> Mark Complete
+                            </Button>
+                        )}
+
+                        {/* Show status indicator if no actions available */}
+                        {taskStatus === 'Completed' && (
+                            <div className="flex items-center gap-2 text-green-600 text-sm font-medium">
+                                <Check className="h-4 w-4" /> Task Completed
+                            </div>
+                        )}
+                        {taskStatus === 'Rejected' && (
+                            <div className="flex items-center gap-2 text-red-600 text-sm font-medium">
+                                <X className="h-4 w-4" /> Task Rejected
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {/* Description */}
+                {taskDescription && (
+                    <div className="mt-4 p-3 bg-slate-50 rounded-lg border border-slate-100">
+                        <p className="text-sm text-slate-600 whitespace-pre-wrap">{taskDescription}</p>
+                    </div>
+                )}
+
+                {/* Comments Thread */}
+                <div className="flex-1 overflow-hidden mt-4 relative">
+                    <h4 className="text-sm font-medium text-slate-500 mb-3">Activity Log</h4>
                     {loading ? (
                         <div className="flex items-center justify-center h-full text-slate-400">
                             <Loader2 className="h-6 w-6 animate-spin mr-2" /> Loading history...
                         </div>
                     ) : (
-                        <ScrollArea className="h-[calc(100vh-200px)] pr-4">
+                        <ScrollArea className="h-[calc(100vh-400px)] pr-4">
                             <div className="space-y-4">
                                 {comments.length === 0 && (
                                     <p className="text-center text-slate-400 py-8 text-sm">No history yet.</p>
@@ -125,6 +258,7 @@ export function ThreadDrawer({ open, onOpenChange, taskId, taskTitle }: ThreadDr
                     )}
                 </div>
 
+                {/* Comment Input */}
                 <div className="pt-4 border-t border-slate-100 mt-auto">
                     <form onSubmit={handleSend} className="flex gap-2">
                         <Input
@@ -132,6 +266,7 @@ export function ThreadDrawer({ open, onOpenChange, taskId, taskTitle }: ThreadDr
                             onChange={(e) => setNewComment(e.target.value)}
                             placeholder="Type a note..."
                             disabled={sending}
+                            className="bg-white border-slate-200"
                         />
                         <Button type="submit" size="icon" disabled={sending || !newComment.trim()}>
                             {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}

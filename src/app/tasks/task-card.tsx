@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
-import { Check, X, ArrowRight, Edit, MessageSquare } from "lucide-react"
+import { Check, X, ArrowRight, Edit, MessageSquare, Clock } from "lucide-react"
 import { acceptTask, rejectTask, forwardTask, amendTask, completeTask } from "@/actions/tasks"
 import {
     Dialog,
@@ -15,7 +15,7 @@ import {
     DialogTitle,
     DialogTrigger,
 } from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
+
 import { Textarea } from "@/components/ui/textarea"
 import {
     Select,
@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/select"
 
 import { ThreadDrawer } from "./thread-drawer"
+import { formatDistanceToNow, differenceInDays, format } from "date-fns"
 
 type Task = Database["public"]["Tables"]["tasks"]["Row"]
 
@@ -36,13 +37,54 @@ interface TaskCardProps {
     members: { id: string; full_name: string; role: string }[]
 }
 
+// Calculate progress based on status
+function getProgress(status: string | null): number {
+    switch (status) {
+        case 'Pending': return 10
+        case 'Accepted': return 50
+        case 'Completed': return 100
+        case 'Rejected': return 0
+        case 'Amended_Pending_Approval': return 30
+        default: return 0
+    }
+}
+
+// Get progress bar color based on status
+function getProgressColor(status: string | null): string {
+    switch (status) {
+        case 'Completed': return 'bg-green-500'
+        case 'Accepted': return 'bg-blue-500'
+        case 'Rejected': return 'bg-red-500'
+        case 'Amended_Pending_Approval': return 'bg-orange-500'
+        default: return 'bg-gray-400'
+    }
+}
+
 export function TaskCard({ task, currentUserId, userRole, members }: TaskCardProps) {
     const isAssignee = task.assignee_id === currentUserId
+    const isCreator = task.creator_id === currentUserId
     const [loading, setLoading] = useState(false)
     const [rejectOpen, setRejectOpen] = useState(false)
     const [forwardOpen, setForwardOpen] = useState(false)
     const [amendOpen, setAmendOpen] = useState(false)
     const [threadOpen, setThreadOpen] = useState(false)
+
+    const progress = getProgress(task.status)
+    const progressColor = getProgressColor(task.status)
+
+    // Format date nicely
+    const formatDate = (dateStr: string | null) => {
+        if (!dateStr) return null
+        const date = new Date(dateStr)
+        const now = new Date()
+        const daysAway = differenceInDays(date, now)
+
+        if (daysAway < 0) return `${Math.abs(daysAway)}d overdue`
+        if (daysAway === 0) return 'Due today'
+        if (daysAway === 1) return 'Tomorrow'
+        if (daysAway < 7) return `${daysAway}d left`
+        return format(date, 'MMM d')
+    }
 
     // Handlers for actions
     const handleAccept = async () => {
@@ -77,7 +119,6 @@ export function TaskCard({ task, currentUserId, userRole, members }: TaskCardPro
     const handleAmend = async (formData: FormData) => {
         setLoading(true)
         const notes = formData.get('amendment_notes') as string
-        // Just sending notes for MVP "handshake" demo
         await amendTask(task.id, { amendment_notes: notes })
         setLoading(false)
         setAmendOpen(false)
@@ -86,11 +127,11 @@ export function TaskCard({ task, currentUserId, userRole, members }: TaskCardPro
     // Status Badge Logic
     const getStatusColor = (status: string | null) => {
         switch (status) {
-            case 'Accepted': return 'bg-green-600'
-            case 'Completed': return 'bg-slate-800'
+            case 'Accepted': return 'bg-blue-600'
+            case 'Completed': return 'bg-green-600'
             case 'Rejected': return 'bg-red-600'
             case 'Amended_Pending_Approval': return 'bg-orange-500'
-            default: return 'bg-gray-500' // Pending
+            default: return 'bg-gray-500'
         }
     }
 
@@ -99,6 +140,8 @@ export function TaskCard({ task, currentUserId, userRole, members }: TaskCardPro
         return a.full_name?.localeCompare(b.full_name || '')
     })
 
+    const dueInfo = formatDate(task.end_date)
+
     return (
         <Card className="bg-white border-slate-200 hover:border-slate-300 hover:shadow-md transition-all">
             <CardHeader className="pb-3">
@@ -106,12 +149,16 @@ export function TaskCard({ task, currentUserId, userRole, members }: TaskCardPro
                     <div>
                         <CardTitle className="text-lg text-slate-900 font-medium">{task.title || "Untitled Task"}</CardTitle>
                         <CardDescription className="text-xs text-slate-500 mt-1 flex items-center gap-2">
-                            <span>ID: {task.id.slice(0, 8)}</span>
                             {/* @ts-expect-error joined data */}
                             {task.assignee && (
                                 <span className="flex items-center gap-1 bg-slate-100 px-2 py-0.5 rounded-full text-slate-600">
                                     {/* @ts-expect-error joined data */}
                                     {task.assignee.role === "AI_Agent" ? "🤖" : "👤"} {task.assignee.full_name}
+                                </span>
+                            )}
+                            {dueInfo && (
+                                <span className={`flex items-center gap-1 ${dueInfo.includes('overdue') ? 'text-red-500' : 'text-slate-500'}`}>
+                                    <Clock className="h-3 w-3" /> {dueInfo}
                                 </span>
                             )}
                         </CardDescription>
@@ -120,11 +167,20 @@ export function TaskCard({ task, currentUserId, userRole, members }: TaskCardPro
                 </div>
             </CardHeader>
             <CardContent>
-                <p className="text-slate-600 text-sm mb-4">{task.description || "No description."}</p>
+                <p className="text-slate-600 text-sm mb-3 line-clamp-2">{task.description || "No description."}</p>
 
-                <div className="flex gap-4 text-xs text-slate-500 mb-2">
-                    <div>StartDate: {task.start_date || "N/A"}</div>
-                    <div>EndDate: {task.end_date || "N/A"}</div>
+                {/* Progress Bar */}
+                <div className="mb-3">
+                    <div className="flex justify-between items-center text-xs text-slate-500 mb-1">
+                        <span>Progress</span>
+                        <span>{progress}%</span>
+                    </div>
+                    <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                        <div
+                            className={`h-full ${progressColor} transition-all duration-300`}
+                            style={{ width: `${progress}%` }}
+                        />
+                    </div>
                 </div>
 
                 {task.status === 'Amended_Pending_Approval' && (
@@ -184,10 +240,10 @@ export function TaskCard({ task, currentUserId, userRole, members }: TaskCardPro
                                     <div className="grid gap-2">
                                         <label className="text-sm font-medium">New Assignee</label>
                                         <Select name="new_assignee_id" required>
-                                            <SelectTrigger>
+                                            <SelectTrigger className="bg-white border-slate-200">
                                                 <SelectValue placeholder="Select person..." />
                                             </SelectTrigger>
-                                            <SelectContent>
+                                            <SelectContent className="bg-white border-slate-200 z-50">
                                                 {sortedMembers.map(member => (
                                                     <SelectItem key={member.id} value={member.id}>
                                                         {member.full_name}
@@ -237,6 +293,12 @@ export function TaskCard({ task, currentUserId, userRole, members }: TaskCardPro
                 onOpenChange={setThreadOpen}
                 taskId={task.id}
                 taskTitle={task.title}
+                taskStatus={task.status || 'Pending'}
+                taskDescription={task.description || undefined}
+                /* @ts-expect-error joined data */
+                assigneeName={task.assignee?.full_name}
+                isAssignee={isAssignee}
+                isCreator={isCreator}
             />
         </Card>
     )
