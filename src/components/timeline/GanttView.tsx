@@ -4,12 +4,14 @@ import { useState, useMemo } from "react"
 import { Gantt, Task as GanttTask, ViewMode } from "gantt-task-react"
 import "gantt-task-react/dist/index.css"
 import { Database } from "@/types/database.types"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { MultiSelect } from "@/components/ui/multi-select"
+
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { updateTaskDates } from "@/actions/tasks"
 import { toast } from "sonner"
 import { useRouter } from "next/navigation"
+import { format } from "date-fns"
 
 // Types for joined data
 export type JoinedTask = Database["public"]["Tables"]["tasks"]["Row"] & {
@@ -23,26 +25,103 @@ export type GanttViewProps = {
     profiles: Database["public"]["Tables"]["profiles"]["Row"][]
 }
 
+// Extended GanttTask with task number for sorting
+interface ExtendedGanttTask extends GanttTask {
+    taskNumber?: number
+}
+
+// Custom Header Component
+function CustomTaskListHeader({ headerHeight }: { headerHeight: number }) {
+    return (
+        <div
+            className="flex items-center border-b border-slate-200 bg-slate-50 text-xs font-medium text-slate-600"
+            style={{ height: headerHeight }}
+        >
+            <div className="w-10 px-2 text-center">#</div>
+            <div className="flex-1 px-2 min-w-[120px]">Name</div>
+            <div className="w-20 px-2 text-center">From</div>
+            <div className="w-20 px-2 text-center">To</div>
+        </div>
+    )
+}
+
+// Custom Table Row Component
+function CustomTaskListTable({
+    tasks,
+    rowHeight,
+    onExpanderClick
+}: {
+    tasks: ExtendedGanttTask[]
+    rowHeight: number
+    onExpanderClick: (task: GanttTask) => void
+}) {
+    return (
+        <div>
+            {tasks.map(task => {
+                // Extract task number from name if present (e.g., "Task 19: Review" -> 19)
+                const taskNumMatch = task.name.match(/^Task (\d+):/i)
+                const taskNum = task.taskNumber || (taskNumMatch ? taskNumMatch[1] : '-')
+                const displayName = task.name.replace(/^Task \d+:\s*/i, '')
+
+                return (
+                    <div
+                        key={task.id}
+                        className="flex items-center border-b border-slate-100 hover:bg-slate-50 text-sm"
+                        style={{ height: rowHeight }}
+                        onClick={() => onExpanderClick(task)}
+                    >
+                        <div className="w-10 px-2 text-center text-slate-400 text-xs font-mono">{taskNum}</div>
+                        <div className="flex-1 px-2 min-w-[120px] text-slate-900 truncate">{displayName}</div>
+                        <div className="w-20 px-2 text-center text-slate-500 text-xs">
+                            {format(task.start, 'd MMM')}
+                        </div>
+                        <div className="w-20 px-2 text-center text-slate-500 text-xs">
+                            {format(task.end, 'd MMM')}
+                        </div>
+                    </div>
+                )
+            })}
+        </div>
+    )
+}
+
 export function GanttView({ tasks, objectives, profiles }: GanttViewProps) {
     const router = useRouter()
     const [viewMode, setViewMode] = useState<ViewMode>(ViewMode.Day)
-    const [filterObjective, setFilterObjective] = useState<string>("all")
-    const [filterAssignee, setFilterAssignee] = useState<string>("all")
+    const [selectedObjectives, setSelectedObjectives] = useState<string[]>([])
+    const [selectedMembers, setSelectedMembers] = useState<string[]>([])
 
-    // Filter Logic
+    // Optimistic local state for task dates (prevents "bounce back")
+    const [localDateOverrides, setLocalDateOverrides] = useState<Record<string, { start: Date, end: Date }>>({})
+
+    // Transform options for multi-select
+    const objectiveOptions = objectives.map(obj => ({
+        value: obj.id,
+        label: obj.title || 'Untitled'
+    }))
+
+    const memberOptions = profiles.map(p => ({
+        value: p.id,
+        label: p.full_name || 'Unknown',
+        icon: p.role === 'AI_Agent' ? '🤖' : '👤'
+    }))
+
+    // Filter Logic (empty selection = show all)
     const filteredTasks = tasks.filter(task => {
-        if (filterObjective !== "all" && task.objective_id !== filterObjective) return false
-        if (filterAssignee !== "all" && task.assignee_id !== filterAssignee) return false
+        if (selectedObjectives.length > 0 && !selectedObjectives.includes(task.objective_id || '')) return false
+        if (selectedMembers.length > 0 && !selectedMembers.includes(task.assignee_id || '')) return false
         return true
     })
 
-    // Transform to Gantt Library Format
+    // Transform to Gantt Library Format (with optimistic overrides)
     const ganttTasks: GanttTask[] = useMemo(() => {
         return filteredTasks
             .slice(0, 50)
             .map(task => {
-                const startDate = task.start_date ? new Date(task.start_date) : new Date()
-                const endDate = task.end_date ? new Date(task.end_date) : new Date(startDate.getTime() + 86400000 * 2)
+                // Check for optimistic override first
+                const override = localDateOverrides[task.id]
+                const startDate = override?.start ?? (task.start_date ? new Date(task.start_date) : new Date())
+                const endDate = override?.end ?? (task.end_date ? new Date(task.end_date) : new Date(startDate.getTime() + 86400000 * 2))
 
                 if (endDate <= startDate) {
                     endDate.setDate(startDate.getDate() + 1)
@@ -70,10 +149,16 @@ export function GanttView({ tasks, objectives, profiles }: GanttViewProps) {
                     }
                 }
             })
-    }, [filteredTasks])
+    }, [filteredTasks, localDateOverrides])
 
     // Handler: When task bar is dragged or resized
     const handleDateChange = async (task: GanttTask) => {
+        // Apply optimistic update FIRST (prevents bounce-back)
+        setLocalDateOverrides(prev => ({
+            ...prev,
+            [task.id]: { start: task.start, end: task.end }
+        }))
+
         try {
             const result = await updateTaskDates(
                 task.id,
@@ -81,12 +166,33 @@ export function GanttView({ tasks, objectives, profiles }: GanttViewProps) {
                 task.end.toISOString()
             )
             if (result.error) {
+                // Revert optimistic update on error
+                setLocalDateOverrides(prev => {
+                    const next = { ...prev }
+                    delete next[task.id]
+                    return next
+                })
                 toast.error(result.error)
             } else {
                 toast.success(`Rescheduled: ${task.name}`)
+                // Clear the override after successful server update and refresh
                 router.refresh()
+                // Keep override until refresh completes, then clear after a short delay
+                setTimeout(() => {
+                    setLocalDateOverrides(prev => {
+                        const next = { ...prev }
+                        delete next[task.id]
+                        return next
+                    })
+                }, 500)
             }
         } catch {
+            // Revert optimistic update on error
+            setLocalDateOverrides(prev => {
+                const next = { ...prev }
+                delete next[task.id]
+                return next
+            })
             toast.error("Failed to update task dates")
         }
     }
@@ -116,30 +222,22 @@ export function GanttView({ tasks, objectives, profiles }: GanttViewProps) {
             </div>
             {/* Control Bar */}
             <Card className="p-4 bg-white border-slate-200 flex flex-wrap gap-4 items-center justify-between shadow-sm">
-                <div className="flex gap-4">
-                    <Select value={filterObjective} onValueChange={setFilterObjective}>
-                        <SelectTrigger className="w-[200px] bg-slate-50 border-slate-200 text-slate-900">
-                            <SelectValue placeholder="Filter by Objective" />
-                        </SelectTrigger>
-                        <SelectContent className="bg-white border-slate-200 text-slate-900">
-                            <SelectItem value="all">All Objectives</SelectItem>
-                            {objectives.map(obj => (
-                                <SelectItem key={obj.id} value={obj.id}>{obj.title}</SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
+                <div className="flex gap-4 flex-wrap">
+                    <MultiSelect
+                        options={objectiveOptions}
+                        selected={selectedObjectives}
+                        onChange={setSelectedObjectives}
+                        placeholder="All Objectives"
+                        emptyMessage="No objectives found"
+                    />
 
-                    <Select value={filterAssignee} onValueChange={setFilterAssignee}>
-                        <SelectTrigger className="w-[200px] bg-slate-50 border-slate-200 text-slate-900">
-                            <SelectValue placeholder="Filter by Member" />
-                        </SelectTrigger>
-                        <SelectContent className="bg-white border-slate-200 text-slate-900">
-                            <SelectItem value="all">All Members</SelectItem>
-                            {profiles.map(p => (
-                                <SelectItem key={p.id} value={p.id}>{p.full_name}</SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
+                    <MultiSelect
+                        options={memberOptions}
+                        selected={selectedMembers}
+                        onChange={setSelectedMembers}
+                        placeholder="All Members"
+                        emptyMessage="No members found"
+                    />
                 </div>
 
                 <div className="flex gap-1 bg-slate-100 p-1 rounded-lg border border-slate-200">
@@ -175,12 +273,14 @@ export function GanttView({ tasks, objectives, profiles }: GanttViewProps) {
                 <Gantt
                     tasks={ganttTasks}
                     viewMode={viewMode}
-                    listCellWidth="180px"
+                    listCellWidth="260px"
                     columnWidth={viewMode === ViewMode.Month ? 300 : viewMode === ViewMode.Week ? 150 : 65}
                     barFill={60}
                     onDateChange={handleDateChange}
                     onDoubleClick={handleDoubleClick}
                     onClick={handleClick}
+                    TaskListHeader={CustomTaskListHeader}
+                    TaskListTable={CustomTaskListTable}
                 />
             </div>
         </div>

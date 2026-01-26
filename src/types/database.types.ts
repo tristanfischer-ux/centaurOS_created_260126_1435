@@ -395,6 +395,112 @@ export type Database = {
                     },
                 ]
             }
+            task_assignees: {
+                Row: {
+                    id: string
+                    task_id: string
+                    profile_id: string
+                    team_id: string | null
+                    created_at: string | null
+                }
+                Insert: {
+                    id?: string
+                    task_id: string
+                    profile_id: string
+                    team_id?: string | null
+                    created_at?: string | null
+                }
+                Update: {
+                    id?: string
+                    task_id?: string
+                    profile_id?: string
+                    team_id?: string | null
+                    created_at?: string | null
+                }
+                Relationships: [
+                    {
+                        foreignKeyName: "task_assignees_task_id_fkey"
+                        columns: ["task_id"]
+                        isOneToOne: false
+                        referencedRelation: "tasks"
+                        referencedColumns: ["id"]
+                    },
+                    {
+                        foreignKeyName: "task_assignees_profile_id_fkey"
+                        columns: ["profile_id"]
+                        isOneToOne: false
+                        referencedRelation: "profiles"
+                        referencedColumns: ["id"]
+                    },
+                    {
+                        foreignKeyName: "task_assignees_team_id_fkey"
+                        columns: ["team_id"]
+                        isOneToOne: false
+                        referencedRelation: "teams"
+                        referencedColumns: ["id"]
+                    },
+                ]
+            }
+            teams: {
+                Row: {
+                    id: string
+                    name: string
+                    foundry_id: string
+                    is_auto_generated: boolean | null
+                    created_at: string | null
+                    updated_at: string | null
+                }
+                Insert: {
+                    id?: string
+                    name: string
+                    foundry_id: string
+                    is_auto_generated?: boolean | null
+                    created_at?: string | null
+                    updated_at?: string | null
+                }
+                Update: {
+                    id?: string
+                    name?: string
+                    foundry_id?: string
+                    is_auto_generated?: boolean | null
+                    created_at?: string | null
+                    updated_at?: string | null
+                }
+                Relationships: []
+            }
+            team_members: {
+                Row: {
+                    team_id: string
+                    profile_id: string
+                    created_at: string | null
+                }
+                Insert: {
+                    team_id: string
+                    profile_id: string
+                    created_at?: string | null
+                }
+                Update: {
+                    team_id?: string
+                    profile_id?: string
+                    created_at?: string | null
+                }
+                Relationships: [
+                    {
+                        foreignKeyName: "team_members_team_id_fkey"
+                        columns: ["team_id"]
+                        isOneToOne: false
+                        referencedRelation: "teams"
+                        referencedColumns: ["id"]
+                    },
+                    {
+                        foreignKeyName: "team_members_profile_id_fkey"
+                        columns: ["profile_id"]
+                        isOneToOne: false
+                        referencedRelation: "profiles"
+                        referencedColumns: ["id"]
+                    },
+                ]
+            }
             tasks: {
                 Row: {
                     amendment_notes: string | null

@@ -1,9 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
+import { TeamComparisonView } from './team-comparison-view'
 import { AddMemberDialog } from './add-member-dialog'
-import { Avatar, AvatarFallback } from "@/components/ui/avatar" // Need to install avatar and select
-import { Badge } from "@/components/ui/badge" // Need to install badge
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import Link from "next/link"
 
 export default async function TeamPage() {
     const supabase = await createClient()
@@ -13,6 +10,7 @@ export default async function TeamPage() {
         return <div className="p-8 text-red-500">Unauthenticated. Please login.</div>
     }
 
+    // Fetch profiles
     const { data: profiles, error } = await supabase
         .from('profiles')
         .select('*')
@@ -22,86 +20,36 @@ export default async function TeamPage() {
         return <div className="text-red-500">Error loading team</div>
     }
 
-    const executives = profiles?.filter(p => p.role === 'Executive') || []
-    const apprentices = profiles?.filter(p => p.role === 'Apprentice') || []
+    // Fetch all tasks for task metrics
+    const { data: tasks } = await supabase
+        .from('tasks')
+        .select('assignee_id, status')
+
+    // Calculate metrics per member
+    const membersWithMetrics = profiles?.map(profile => {
+        const memberTasks = tasks?.filter(t => t.assignee_id === profile.id) || []
+        return {
+            id: profile.id,
+            full_name: profile.full_name,
+            email: profile.email,
+            role: profile.role,
+            activeTasks: memberTasks.filter(t => t.status === 'Accepted').length,
+            completedTasks: memberTasks.filter(t => t.status === 'Completed').length,
+            pendingTasks: memberTasks.filter(t => t.status === 'Pending').length,
+            rejectedTasks: memberTasks.filter(t => t.status === 'Rejected').length,
+        }
+    }) || []
+
+    const executives = membersWithMetrics.filter(p => p.role === 'Executive')
+    const apprentices = membersWithMetrics.filter(p => p.role === 'Apprentice')
 
     return (
-        <div className="space-y-8">
-            <div className="flex items-center justify-between">
-                <div>
-                    <h1 className="text-3xl font-bold tracking-tight text-white mb-2">Foundry Roster</h1>
-                    <p className="text-gray-400">Manage your Executives and Apprentices.</p>
-                </div>
+        <div className="relative">
+            {/* Add Member button in top right */}
+            <div className="absolute top-0 right-0">
                 <AddMemberDialog />
             </div>
-
-            {/* Executives Section */}
-            <section className="space-y-4">
-                <h2 className="text-xl font-semibold text-amber-600 uppercase tracking-wider border-b border-slate-200 pb-2">
-                    Executives (Assessors)
-                </h2>
-                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                    {executives.map(member => (
-                        <Link href={`/team/${member.id}`} key={member.id} className="block group">
-                            <Card className="bg-white border-slate-200 shadow-sm group-hover:border-amber-400 transition-all cursor-pointer">
-                                <CardHeader className="flex flex-row items-center gap-4 pb-2">
-                                    <Avatar className="h-12 w-12 border-2 border-amber-500">
-                                        <AvatarFallback className="bg-amber-100 text-amber-700 font-bold">
-                                            {member.full_name?.substring(0, 2).toUpperCase()}
-                                        </AvatarFallback>
-                                    </Avatar>
-                                    <div>
-                                        <CardTitle className="text-lg text-slate-900">{member.full_name}</CardTitle>
-                                        <Badge variant="outline" className="text-amber-600 border-amber-200 text-[10px] mt-1 bg-amber-50">
-                                            Executive
-                                        </Badge>
-                                    </div>
-                                </CardHeader>
-                                <CardContent className="text-sm text-slate-500">
-                                    <p>ID: {member.id.substring(0, 8)}...</p>
-                                </CardContent>
-                            </Card>
-                        </Link>
-                    ))}
-                    {executives.length === 0 && (
-                        <div className="col-span-full py-8 text-center text-gray-500 italic">No executives listed.</div>
-                    )}
-                </div>
-            </section>
-
-            {/* Apprentices Section */}
-            <section className="space-y-4">
-                <h2 className="text-xl font-semibold text-blue-600 uppercase tracking-wider border-b border-slate-200 pb-2">
-                    Apprentices (Executors)
-                </h2>
-                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                    {apprentices.map(member => (
-                        <Link href={`/team/${member.id}`} key={member.id} className="block group">
-                            <Card className="bg-white border-slate-200 shadow-sm group-hover:border-blue-400 transition-all cursor-pointer">
-                                <CardHeader className="flex flex-row items-center gap-4 pb-2">
-                                    <Avatar className="h-10 w-10 border border-slate-200">
-                                        <AvatarFallback className="bg-slate-100 text-slate-500">
-                                            {member.full_name?.substring(0, 2).toUpperCase()}
-                                        </AvatarFallback>
-                                    </Avatar>
-                                    <div>
-                                        <CardTitle className="text-md text-slate-900">{member.full_name}</CardTitle>
-                                        <Badge variant="secondary" className="bg-slate-100 text-slate-600 hover:bg-slate-200 text-[10px] mt-1">
-                                            Apprentice
-                                        </Badge>
-                                    </div>
-                                </CardHeader>
-                                <CardContent className="text-sm text-slate-500">
-                                    <p>ID: {member.id.substring(0, 8)}...</p>
-                                </CardContent>
-                            </Card>
-                        </Link>
-                    ))}
-                    {apprentices.length === 0 && (
-                        <div className="col-span-full py-8 text-center text-gray-500 italic">No apprentices listed.</div>
-                    )}
-                </div>
-            </section>
+            <TeamComparisonView executives={executives} apprentices={apprentices} />
         </div>
     )
 }

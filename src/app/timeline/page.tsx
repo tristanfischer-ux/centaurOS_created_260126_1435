@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { GanttView, JoinedTask } from '@/components/timeline/GanttView'
 import { TimelineListView } from '@/components/timeline/TimelineListView'
+import { CreateTaskDialog } from '@/app/tasks/create-task-dialog'
 
 export default async function TimelinePage() {
     const supabase = await createClient()
@@ -30,11 +31,31 @@ export default async function TimelinePage() {
         return <div className="text-red-500">Error loading timeline data</div>
     }
 
+    // Format members for CreateTaskDialog
+    const members = (profiles || []).map(p => ({
+        id: p.id,
+        full_name: p.full_name || 'Unnamed',
+        role: p.role || 'Apprentice'
+    }))
+
+    // Format objectives for CreateTaskDialog
+    const objectivesList = (objectives || []).map(o => ({
+        id: o.id,
+        title: o.title || 'Untitled'
+    }))
+
     return (
         <div className="space-y-6 h-full flex flex-col">
-            <div className="flex-none">
-                <h1 className="text-3xl font-bold tracking-tight text-white mb-2">Campaign Timeline</h1>
-                <p className="text-gray-400">Visualizing the Foundry&apos;s execution vector.</p>
+            <div className="flex-none flex items-center justify-between flex-wrap gap-4">
+                <div>
+                    <h1 className="text-3xl font-bold tracking-tight text-white mb-2">Campaign Timeline</h1>
+                    <p className="text-gray-400">Visualizing the Foundry&apos;s execution vector.</p>
+                </div>
+                <CreateTaskDialog
+                    objectives={objectivesList}
+                    members={members}
+                    currentUserId={user.id}
+                />
             </div>
 
             {/* Desktop: Gantt Chart */}
