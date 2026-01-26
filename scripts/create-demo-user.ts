@@ -66,6 +66,47 @@ async function createDemoUser() {
             console.log('ℹ️ Public Profile already exists')
         }
     }
+
+    // ---------------------------------------------------------
+    // 3. Create Alice (Apprentice)
+    // ---------------------------------------------------------
+    console.log('👤 Creating Apprentice User (Alice)...')
+    const aliceEmail = 'alice@centauros.app'
+    let aliceId;
+
+    const { data: aliceData, error: aliceCreateError } = await supabase.auth.admin.createUser({
+        email: aliceEmail,
+        password: password,
+        email_confirm: true,
+        user_metadata: { full_name: 'Alice Apprentice' }
+    })
+
+    if (aliceCreateError && aliceCreateError.message.includes('already been registered')) {
+        console.log('ℹ️ Alice already exists, fetching ID...')
+        const { data: users } = await supabase.auth.admin.listUsers()
+        const existingAlice = users.users.find(u => u.email === aliceEmail)
+        if (existingAlice) aliceId = existingAlice.id
+    } else if (aliceData.user) {
+        aliceId = aliceData.user.id
+        console.log(`✅ Auth User Created: ${aliceEmail}`)
+    }
+
+    if (aliceId) {
+        const { data: profile } = await supabase.from('profiles').select('*').eq('id', aliceId).single()
+        if (!profile) {
+            await supabase.from('profiles').insert({
+                id: aliceId,
+                email: aliceEmail,
+                full_name: 'Alice Apprentice',
+                role: 'Apprentice',
+                foundry_id: 'foundry-demo', // Same foundry!
+                created_at: new Date().toISOString()
+            })
+            console.log('✅ Alice Profile Created')
+        } else {
+            console.log('ℹ️ Alice Profile already exists')
+        }
+    }
 }
 
 createDemoUser()
