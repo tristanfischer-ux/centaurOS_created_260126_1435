@@ -1,12 +1,15 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useTransition } from "react"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
-import { Check, X, GitCompare } from "lucide-react"
+import { Check, X, GitCompare, Users } from "lucide-react"
+import { createTeam } from "@/actions/team"
 import Link from "next/link"
 
 interface Member {
@@ -30,8 +33,26 @@ export function TeamComparisonView({ executives, apprentices }: TeamComparisonVi
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
     const [showComparison, setShowComparison] = useState(false)
 
+    // Drag-and-drop team creation state
+    const [draggedMemberId, setDraggedMemberId] = useState<string | null>(null)
+    const [dropTargetId, setDropTargetId] = useState<string | null>(null)
+    const [showQuickTeamDialog, setShowQuickTeamDialog] = useState(false)
+    const [quickTeamMemberIds, setQuickTeamMemberIds] = useState<string[]>([])
+    const [teamName, setTeamName] = useState("")
+    const [teamError, setTeamError] = useState<string | null>(null)
+    const [isPending, startTransition] = useTransition()
+
     const allMembers = [...executives, ...apprentices]
     const selectedMembers = allMembers.filter(m => selectedIds.has(m.id))
+    const quickTeamMembers = allMembers.filter(m => quickTeamMemberIds.includes(m.id))
+
+    // Helper: get initials from full name
+    const getInitials = (name: string | null) => {
+        if (!name) return '?'
+        const parts = name.trim().split(/\s+/)
+        if (parts.length === 1) return parts[0].charAt(0).toUpperCase()
+        return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase()
+    }
 
     const toggleSelection = (id: string) => {
         const newSet = new Set(selectedIds)
@@ -50,6 +71,59 @@ export function TeamComparisonView({ executives, apprentices }: TeamComparisonVi
         setCompareMode(!compareMode)
     }
 
+    // Drag-and-drop handlers
+    const handleDragStart = (e: React.DragEvent, memberId: string) => {
+        setDraggedMemberId(memberId)
+        e.dataTransfer.effectAllowed = 'move'
+    }
+
+    const handleDragOver = (e: React.DragEvent, memberId: string) => {
+        e.preventDefault()
+        if (draggedMemberId && draggedMemberId !== memberId) {
+            setDropTargetId(memberId)
+        }
+    }
+
+    const handleDragLeave = () => {
+        setDropTargetId(null)
+    }
+
+    const handleDrop = (e: React.DragEvent, targetMemberId: string) => {
+        e.preventDefault()
+        if (draggedMemberId && draggedMemberId !== targetMemberId) {
+            // Open quick team creation dialog with both members
+            setQuickTeamMemberIds([draggedMemberId, targetMemberId])
+            setTeamName("")
+            setTeamError(null)
+            setShowQuickTeamDialog(true)
+        }
+        setDraggedMemberId(null)
+        setDropTargetId(null)
+    }
+
+    const handleDragEnd = () => {
+        setDraggedMemberId(null)
+        setDropTargetId(null)
+    }
+
+    const handleCreateQuickTeam = () => {
+        if (!teamName.trim()) {
+            setTeamError("Team name is required")
+            return
+        }
+        setTeamError(null)
+        startTransition(async () => {
+            const result = await createTeam(teamName.trim(), quickTeamMemberIds)
+            if (result.error) {
+                setTeamError(result.error)
+            } else {
+                setShowQuickTeamDialog(false)
+                setQuickTeamMemberIds([])
+                setTeamName("")
+            }
+        })
+    }
+
     // Comparison attribute rows
     const comparisonRows = [
         { label: "Role", getValue: (m: Member) => m.role },
@@ -63,12 +137,16 @@ export function TeamComparisonView({ executives, apprentices }: TeamComparisonVi
     const MemberCard = ({ member, type }: { member: Member, type: 'executive' | 'apprentice' }) => {
         const isSelected = selectedIds.has(member.id)
         const isExecutive = type === 'executive'
+        const isDragging = draggedMemberId === member.id
+        const isDropTarget = dropTargetId === member.id && draggedMemberId !== member.id
 
         const cardContent = (
             <Card className={`
                 bg-white border-slate-200 shadow-sm transition-all cursor-pointer relative
                 ${isExecutive ? 'group-hover:border-amber-400' : 'group-hover:border-blue-400'}
                 ${compareMode && isSelected ? (isExecutive ? 'ring-2 ring-amber-500 border-amber-500' : 'ring-2 ring-blue-500 border-blue-500') : ''}
+                ${isDragging ? 'opacity-50 scale-95' : ''}
+                ${isDropTarget ? 'ring-2 ring-green-500 border-green-500 bg-green-50' : ''}
             `}>
                 {compareMode && (
                     <div className={`absolute top-2 right-2 h-6 w-6 rounded-full flex items-center justify-center text-white text-xs
@@ -77,10 +155,18 @@ export function TeamComparisonView({ executives, apprentices }: TeamComparisonVi
                         {isSelected ? <Check className="h-4 w-4" /> : null}
                     </div>
                 )}
+                {isDropTarget && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-green-500/10 rounded-lg">
+                        <div className="bg-green-600 text-white px-3 py-1 rounded-full text-xs font-medium flex items-center gap-1">
+                            <Users className="h-3 w-3" />
+                            Create Team
+                        </div>
+                    </div>
+                )}
                 <CardHeader className="flex flex-row items-center gap-4 pb-2">
                     <Avatar className={`h-12 w-12 ${isExecutive ? 'border-2 border-amber-500' : 'border border-slate-200'}`}>
                         <AvatarFallback className={isExecutive ? 'bg-amber-100 text-amber-700 font-bold' : 'bg-slate-100 text-slate-500'}>
-                            {member.full_name?.substring(0, 2).toUpperCase()}
+                            {getInitials(member.full_name)}
                         </AvatarFallback>
                     </Avatar>
                     <div>
@@ -103,6 +189,7 @@ export function TeamComparisonView({ executives, apprentices }: TeamComparisonVi
             </Card>
         )
 
+        // In compare mode, don't allow drag-drop
         if (compareMode) {
             return (
                 <div className="block group" onClick={() => toggleSelection(member.id)}>
@@ -111,10 +198,25 @@ export function TeamComparisonView({ executives, apprentices }: TeamComparisonVi
             )
         }
 
+        // Normal mode: draggable cards with link functionality
         return (
-            <Link href={`/team/${member.id}`} className="block group">
-                {cardContent}
-            </Link>
+            <div
+                draggable={true}
+                onDragStart={(e) => handleDragStart(e, member.id)}
+                onDragOver={(e) => handleDragOver(e, member.id)}
+                onDragLeave={handleDragLeave}
+                onDrop={(e) => handleDrop(e, member.id)}
+                onDragEnd={handleDragEnd}
+                className="block group cursor-grab active:cursor-grabbing"
+            >
+                <Link
+                    href={`/team/${member.id}`}
+                    draggable={false}
+                    onClick={(e) => { if (draggedMemberId) e.preventDefault() }}
+                >
+                    {cardContent}
+                </Link>
+            </div>
         )
     }
 
@@ -246,6 +348,71 @@ export function TeamComparisonView({ executives, apprentices }: TeamComparisonVi
                                 ))}
                             </tbody>
                         </table>
+                    </div>
+                </DialogContent>
+            </Dialog>
+
+            {/* Quick Team Creation Dialog (from drag-drop) */}
+            <Dialog open={showQuickTeamDialog} onOpenChange={setShowQuickTeamDialog}>
+                <DialogContent className="sm:max-w-[400px] bg-white">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2 text-slate-900">
+                            <Users className="h-5 w-5 text-green-600" />
+                            Create Team
+                        </DialogTitle>
+                        <DialogDescription>
+                            Name your new team with these members
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    <div className="space-y-4 pt-2">
+                        {/* Show the two members being combined */}
+                        <div className="flex items-center justify-center gap-4 py-4">
+                            {quickTeamMembers.map((member, idx) => (
+                                <div key={member.id} className="flex flex-col items-center">
+                                    <Avatar className="h-14 w-14 border-2 border-green-500">
+                                        <AvatarFallback className="bg-green-100 text-green-700 font-bold">
+                                            {getInitials(member.full_name)}
+                                        </AvatarFallback>
+                                    </Avatar>
+                                    <span className="text-sm font-medium text-slate-900 mt-2">{member.full_name?.split(' ')[0]}</span>
+                                    {idx < quickTeamMembers.length - 1 && (
+                                        <span className="absolute text-2xl text-green-600">+</span>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label htmlFor="quickTeamName">Team Name</Label>
+                            <Input
+                                id="quickTeamName"
+                                placeholder="e.g., Project Alpha, Design Squad..."
+                                value={teamName}
+                                onChange={(e) => setTeamName(e.target.value)}
+                                onKeyDown={(e) => { if (e.key === 'Enter') handleCreateQuickTeam() }}
+                                autoFocus
+                            />
+                        </div>
+
+                        {teamError && (
+                            <div className="text-sm text-red-600 bg-red-50 p-3 rounded-lg">
+                                {teamError}
+                            </div>
+                        )}
+
+                        <div className="flex justify-end gap-3 pt-2">
+                            <Button variant="outline" onClick={() => setShowQuickTeamDialog(false)}>
+                                Cancel
+                            </Button>
+                            <Button
+                                onClick={handleCreateQuickTeam}
+                                disabled={isPending || !teamName.trim()}
+                                className="bg-green-600 hover:bg-green-700"
+                            >
+                                {isPending ? "Creating..." : "Create Team"}
+                            </Button>
+                        </div>
                     </div>
                 </DialogContent>
             </Dialog>

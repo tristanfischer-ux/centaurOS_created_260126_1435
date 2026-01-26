@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
 import { Mail, Briefcase, Shield, Award } from 'lucide-react'
 import { Badge } from "@/components/ui/badge"
+import { CompareToDialog } from './compare-to-dialog'
 
 export default async function ProfilePage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = await params
@@ -18,12 +19,39 @@ export default async function ProfilePage({ params }: { params: Promise<{ id: st
         notFound()
     }
 
-    // Fetch assigned tasks
+    // Fetch assigned tasks for this profile
     const { data: tasks } = await supabase
         .from('tasks')
         .select('*')
         .eq('assignee_id', profile.id)
         .order('created_at', { ascending: false })
+
+    // Fetch ALL profiles for comparison feature
+    const { data: allProfiles } = await supabase
+        .from('profiles')
+        .select('*')
+
+    // Fetch ALL tasks for metrics calculation
+    const { data: allTasks } = await supabase
+        .from('tasks')
+        .select('assignee_id, status')
+
+    // Calculate metrics for ALL members (for comparison)
+    const allMembersWithMetrics = allProfiles?.map(p => {
+        const memberTasks = allTasks?.filter(t => t.assignee_id === p.id) || []
+        return {
+            id: p.id,
+            full_name: p.full_name,
+            email: p.email,
+            role: p.role,
+            activeTasks: memberTasks.filter(t => t.status === 'Accepted').length,
+            completedTasks: memberTasks.filter(t => t.status === 'Completed').length,
+            pendingTasks: memberTasks.filter(t => t.status === 'Pending').length,
+            rejectedTasks: memberTasks.filter(t => t.status === 'Rejected').length,
+        }
+    }) || []
+
+    const currentMemberMetrics = allMembersWithMetrics.find(m => m.id === profile.id)!
 
     return (
         <div className="space-y-8">
@@ -41,9 +69,15 @@ export default async function ProfilePage({ params }: { params: Promise<{ id: st
                                 <span>{profile.email}</span>
                             </div>
                         </div>
-                        <Badge variant="outline" className="text-lg px-4 py-1 bg-slate-50">
-                            {profile.role}
-                        </Badge>
+                        <div className="flex items-center gap-3">
+                            <CompareToDialog
+                                currentMember={currentMemberMetrics}
+                                allMembers={allMembersWithMetrics}
+                            />
+                            <Badge variant="outline" className="text-lg px-4 py-1 bg-slate-50">
+                                {profile.role}
+                            </Badge>
+                        </div>
                     </div>
 
                     <div className="grid grid-cols-3 gap-6 mt-8 border-t border-slate-100 pt-6">

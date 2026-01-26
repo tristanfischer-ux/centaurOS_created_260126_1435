@@ -26,7 +26,14 @@ export function PersonCard({
     compact = false
 }: PersonCardProps) {
     const isAI = role === 'AI_Agent'
-    const initials = full_name?.substring(0, 2).toUpperCase() || '?'
+    // Get proper initials: first letter of first name + first letter of last name
+    const getInitials = (name: string | null) => {
+        if (!name) return '?'
+        const parts = name.trim().split(/\s+/)
+        if (parts.length === 1) return parts[0].charAt(0).toUpperCase()
+        return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase()
+    }
+    const initials = getInitials(full_name)
 
     if (compact) {
         return (

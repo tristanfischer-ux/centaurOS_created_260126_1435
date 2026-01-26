@@ -391,6 +391,7 @@ export function GanttView({ tasks, objectives, profiles }: GanttViewProps) {
                     <Gantt
                         tasks={ganttTasks}
                         viewMode={viewMode}
+                        viewDate={dateOffset}
                         listCellWidth="260px"
                         columnWidth={viewMode === ViewMode.Month ? 300 : viewMode === ViewMode.Week ? 150 : 65}
                         barFill={60}

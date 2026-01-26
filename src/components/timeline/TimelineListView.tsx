@@ -60,17 +60,32 @@ function InitialsAvatar({
 }
 
 // Group tasks by DUE DATE (end_date)
+// Tasks with due dates before today are grouped as "Overdue"
 function groupTasksByDueDate(tasks: JoinedTask[]) {
     const groups: Record<string, JoinedTask[]> = {}
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
 
     tasks.forEach(task => {
-        // Use end_date (due date) for grouping
-        const date = task.end_date
-            ? new Date(task.end_date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
-            : 'No Due Date'
+        let groupKey: string
 
-        if (!groups[date]) groups[date] = []
-        groups[date].push(task)
+        if (!task.end_date) {
+            groupKey = 'No Due Date'
+        } else {
+            const dueDate = new Date(task.end_date)
+            dueDate.setHours(0, 0, 0, 0)
+
+            if (dueDate < today && task.status !== 'Completed') {
+                // Overdue: due date before today AND not completed
+                groupKey = '⚠️ Overdue'
+            } else {
+                // Normal: show the due date
+                groupKey = new Date(task.end_date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+            }
+        }
+
+        if (!groups[groupKey]) groups[groupKey] = []
+        groups[groupKey].push(task)
     })
 
     return groups
@@ -201,8 +216,13 @@ export function TimelineListView({ tasks }: TimelineListViewProps) {
 
     const groupedTasks = groupTasksByDueDate(tasks)
     const dateKeys = Object.keys(groupedTasks).sort((a, b) => {
+        // Overdue always first (most urgent)
+        if (a === '⚠️ Overdue') return -1
+        if (b === '⚠️ Overdue') return 1
+        // No Due Date always last
         if (a === 'No Due Date') return 1
         if (b === 'No Due Date') return -1
+        // Rest sorted chronologically
         return new Date(a).getTime() - new Date(b).getTime()
     })
 
