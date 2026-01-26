@@ -44,7 +44,6 @@ export function ThreadDrawer({ open, onOpenChange, taskId, taskTitle }: ThreadDr
                 .order('created_at', { ascending: true })
 
             if (!error && data) {
-                // @ts-expect-error join type
                 setComments(data as Comment[])
             }
             setLoading(false)
