@@ -241,3 +241,23 @@ export async function completeTask(taskId: string) {
     revalidatePath('/tasks')
     return { success: true }
 }
+
+export async function updateTaskDates(taskId: string, startDate: string, endDate: string) {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return { error: 'Unauthorized' }
+
+    const { error } = await supabase.from('tasks')
+        .update({
+            start_date: startDate,
+            end_date: endDate
+        })
+        .eq('id', taskId)
+
+    if (error) return { error: error.message }
+
+    await logSystemEvent(taskId, `Task rescheduled: ${startDate.split('T')[0]} → ${endDate.split('T')[0]}`, user.id)
+    revalidatePath('/timeline')
+    revalidatePath('/tasks')
+    return { success: true }
+}

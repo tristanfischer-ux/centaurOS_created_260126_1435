@@ -7,6 +7,9 @@ import { Database } from "@/types/database.types"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
+import { updateTaskDates } from "@/actions/tasks"
+import { toast } from "sonner"
+import { useRouter } from "next/navigation"
 
 // Types for joined data
 export type JoinedTask = Database["public"]["Tables"]["tasks"]["Row"] & {
@@ -21,6 +24,7 @@ export type GanttViewProps = {
 }
 
 export function GanttView({ tasks, objectives, profiles }: GanttViewProps) {
+    const router = useRouter()
     const [viewMode, setViewMode] = useState<ViewMode>(ViewMode.Day)
     const [filterObjective, setFilterObjective] = useState<string>("all")
     const [filterAssignee, setFilterAssignee] = useState<string>("all")
@@ -33,10 +37,9 @@ export function GanttView({ tasks, objectives, profiles }: GanttViewProps) {
     })
 
     // Transform to Gantt Library Format
-    // Memoize transformation and limit to 100 tasks for performance (Virtualization fallback)
     const ganttTasks: GanttTask[] = useMemo(() => {
         return filteredTasks
-            .slice(0, 50) // Optimization: Only render top 50 matches to prevent DOM freeze
+            .slice(0, 50)
             .map(task => {
                 const startDate = task.start_date ? new Date(task.start_date) : new Date()
                 const endDate = task.end_date ? new Date(task.end_date) : new Date(startDate.getTime() + 86400000 * 2)
@@ -45,23 +48,58 @@ export function GanttView({ tasks, objectives, profiles }: GanttViewProps) {
                     endDate.setDate(startDate.getDate() + 1)
                 }
 
-                let color = "#6b7280"
-                if (task.status === "Accepted") color = "#2563eb"
-                if (task.status === "Rejected") color = "#dc2626"
-                if (task.status === "Amended" || task.status === "Amended_Pending_Approval") color = "#ea580c"
+                let color = "#6b7280" // Pending - gray
+                let progress = 0
+                if (task.status === "Accepted") { color = "#2563eb"; progress = 50 }
+                if (task.status === "Completed") { color = "#16a34a"; progress = 100 }
+                if (task.status === "Rejected") { color = "#dc2626"; progress = 0 }
+                if (task.status === "Amended" || task.status === "Amended_Pending_Approval") { color = "#ea580c"; progress = 25 }
 
                 return {
                     start: startDate,
                     end: endDate,
                     name: task.title || "Untitled Task",
                     id: task.id,
-                    type: "task",
-                    progress: task.status === "Accepted" ? 50 : 0,
-                    isDisabled: true,
-                    styles: { progressColor: color, progressSelectedColor: color }
+                    type: "task" as const,
+                    progress,
+                    isDisabled: false, // ENABLED for drag-drop!
+                    styles: {
+                        progressColor: color,
+                        progressSelectedColor: color,
+                        backgroundColor: color + "40", // 25% opacity background
+                    }
                 }
             })
     }, [filteredTasks])
+
+    // Handler: When task bar is dragged or resized
+    const handleDateChange = async (task: GanttTask) => {
+        try {
+            const result = await updateTaskDates(
+                task.id,
+                task.start.toISOString(),
+                task.end.toISOString()
+            )
+            if (result.error) {
+                toast.error(result.error)
+            } else {
+                toast.success(`Rescheduled: ${task.name}`)
+                router.refresh()
+            }
+        } catch {
+            toast.error("Failed to update task dates")
+        }
+    }
+
+    // Handler: Double-click opens task detail
+    const handleDoubleClick = (task: GanttTask) => {
+        router.push(`/tasks?highlight=${task.id}`)
+    }
+
+    // Handler: Click shows task info
+    const handleClick = (task: GanttTask) => {
+        toast.info(`${task.name} • ${task.start.toLocaleDateString()} → ${task.end.toLocaleDateString()}`)
+    }
 
     if (ganttTasks.length === 0) {
         return (
@@ -74,7 +112,7 @@ export function GanttView({ tasks, objectives, profiles }: GanttViewProps) {
     return (
         <div className="space-y-4">
             <div className="text-xs text-slate-400 text-right px-1">
-                Displaying top {ganttTasks.length} most recent filtered tasks (Optimized)
+                Drag to reschedule • Resize to change duration • Double-click to view
             </div>
             {/* Control Bar */}
             <Card className="p-4 bg-white border-slate-200 flex flex-wrap gap-4 items-center justify-between shadow-sm">
@@ -121,21 +159,28 @@ export function GanttView({ tasks, objectives, profiles }: GanttViewProps) {
                     >
                         Week
                     </Button>
+                    <Button
+                        variant={viewMode === ViewMode.Month ? "default" : "ghost"}
+                        size="sm"
+                        onClick={() => setViewMode(ViewMode.Month)}
+                        className={viewMode === ViewMode.Month ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-900"}
+                    >
+                        Month
+                    </Button>
                 </div>
             </Card>
 
             {/* Gantt Chart Wrapper */}
-            <div className="bg-white rounded-lg overflow-hidden border border-foundry-800 text-black">
-                {/* Library renders light mode by default, easier to wrap in white container or heavily override CSS. 
-                    For MVP, putting it in a contrast container is safest to ensure legibility of text/grid.
-                    If dark mode is strictly required, global CSS overrides for ._3eZ... classes are needed.
-                */}
+            <div className="bg-white rounded-lg overflow-hidden border border-slate-200 text-black shadow-sm">
                 <Gantt
                     tasks={ganttTasks}
                     viewMode={viewMode}
-                    listCellWidth="155px"
-                    columnWidth={65}
-                    barFill={50}
+                    listCellWidth="180px"
+                    columnWidth={viewMode === ViewMode.Month ? 300 : viewMode === ViewMode.Week ? 150 : 65}
+                    barFill={60}
+                    onDateChange={handleDateChange}
+                    onDoubleClick={handleDoubleClick}
+                    onClick={handleClick}
                 />
             </div>
         </div>

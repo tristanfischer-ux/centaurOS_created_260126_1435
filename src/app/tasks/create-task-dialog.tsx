@@ -78,7 +78,7 @@ export function CreateTaskDialog({ objectives, members }: CreateTaskDialogProps)
                     <Plus className="mr-2 h-4 w-4" /> New Task
                 </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[525px]">
+            <DialogContent className="sm:max-w-[525px] bg-white text-slate-900 border-slate-200">
                 <form onSubmit={onSubmit}>
                     <DialogHeader>
                         <DialogTitle>Create New Task</DialogTitle>
