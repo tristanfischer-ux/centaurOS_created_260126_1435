@@ -28,7 +28,7 @@ export default async function TasksPage() {
         <div className="space-y-6">
             <div className="flex items-center justify-between">
                 <div>
-                    <h1 className="text-3xl font-bold tracking-tight text-slate-900 mb-2">Task Engine</h1>
+                    <h1 className="text-3xl font-bold tracking-tight text-slate-900 mb-2">Tasks</h1>
                     <p className="text-slate-500">Democratic workflow management.</p>
                 </div>
                 {/* Fetch data for the dialog */}
