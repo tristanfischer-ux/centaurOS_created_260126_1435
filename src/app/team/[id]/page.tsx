@@ -3,14 +3,15 @@ import { notFound } from 'next/navigation'
 import { Mail, Briefcase, Calendar, Shield, Award } from 'lucide-react'
 import { Badge } from "@/components/ui/badge"
 
-export default async function ProfilePage({ params }: { params: { id: string } }) {
+export default async function ProfilePage({ params }: { params: Promise<{ id: string }> }) {
+    const { id } = await params
     const supabase = await createClient()
 
     // Fetch profile
     const { data: profile } = await supabase
         .from('profiles')
         .select('*')
-        .eq('id', params.id)
+        .eq('id', id)
         .single()
 
     if (!profile) {

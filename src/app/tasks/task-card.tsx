@@ -135,10 +135,10 @@ export function TaskCard({ task, currentUserId, userRole, members }: TaskCardPro
                 )}
             </CardContent>
             <Separator className="bg-slate-100" />
-            <CardFooter className="pt-3 flex justify-between">
+            <CardFooter className="pt-3 flex flex-wrap gap-2 items-center">
                 {/* Action Buttons: Visible to Assignee OR Executives (Managers) */}
                 {(isAssignee || userRole === 'Executive') && (
-                    <div className="flex gap-2 w-full">
+                    <div className="flex flex-wrap gap-2 flex-1 min-w-0">
                         {/* Pending Actions */}
                         {task.status === 'Pending' && (
                             <>
@@ -225,7 +225,7 @@ export function TaskCard({ task, currentUserId, userRole, members }: TaskCardPro
                 <Button
                     variant="ghost"
                     size="sm"
-                    className="text-slate-500 hover:text-amber-600 ml-auto"
+                    className="text-slate-500 hover:text-amber-600 shrink-0"
                     onClick={() => setThreadOpen(true)}
                 >
                     <MessageSquare className="h-4 w-4 mr-1" /> Thread
