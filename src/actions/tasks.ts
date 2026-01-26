@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { Database } from '@/types/database.types'
+import { runAIWorker } from '@/lib/ai-worker'
 
 export type TaskStatus = Database["public"]["Enums"]["task_status"]
 
@@ -66,6 +67,11 @@ export async function createTask(formData: FormData) {
 
     // Log Creation
     await logSystemEvent(data.id, `Task created by User`, user.id)
+
+    // Trigger AI Worker (Fire and forget - sort of, Next.js server actions might wait, but that's okay for demo)
+    // Actually, we must await it if we want to ensure it runs before lambda dies in some envs.
+    // For Vercel, ideally we use 'experimental_after' or similar, but await is safest for MVP.
+    await runAIWorker(data.id, assigneeId)
 
     revalidatePath('/tasks')
     return { success: true }
@@ -148,6 +154,10 @@ export async function forwardTask(taskId: string, newAssigneeId: string, reason:
 
     // Log with names ideally, but IDs for now
     await logSystemEvent(taskId, `Task forwarded to new assignee. Reason: ${reason}`, user.id)
+
+    // Trigger AI Worker
+    await runAIWorker(taskId, newAssigneeId)
+
     revalidatePath('/tasks')
     return { success: true }
 }
