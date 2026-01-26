@@ -18,6 +18,8 @@ import {
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 
+import { ThreadDrawer } from "./thread-drawer"
+
 type Task = Database["public"]["Tables"]["tasks"]["Row"]
 
 export function TaskCard({ task, currentUserId, userRole }: { task: Task, currentUserId: string, userRole?: string }) {
@@ -26,6 +28,7 @@ export function TaskCard({ task, currentUserId, userRole }: { task: Task, curren
     const [rejectOpen, setRejectOpen] = useState(false)
     const [forwardOpen, setForwardOpen] = useState(false)
     const [amendOpen, setAmendOpen] = useState(false)
+    const [threadOpen, setThreadOpen] = useState(false)
 
     // Handlers for actions
     const handleAccept = async () => {
@@ -166,10 +169,22 @@ export function TaskCard({ task, currentUserId, userRole }: { task: Task, curren
                 )}
 
                 {/* View Thread Button */}
-                <Button variant="ghost" size="sm" className="text-slate-500 hover:text-amber-600 ml-auto">
+                <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-slate-500 hover:text-amber-600 ml-auto"
+                    onClick={() => setThreadOpen(true)}
+                >
                     <MessageSquare className="h-4 w-4 mr-1" /> Thread
                 </Button>
             </CardFooter>
+
+            <ThreadDrawer
+                open={threadOpen}
+                onOpenChange={setThreadOpen}
+                taskId={task.id}
+                taskTitle={task.title}
+            />
         </Card>
     )
 }
