@@ -27,7 +27,11 @@ export default async function TasksPage() {
                     <h1 className="text-3xl font-bold tracking-tight text-slate-900 mb-2">Task Engine</h1>
                     <p className="text-slate-500">Democratic workflow management.</p>
                 </div>
-                <CreateTaskDialog />
+                {/* Fetch data for the dialog */}
+                <CreateTaskDialog
+                    objectives={await supabase.from('objectives').select('id, title').then(r => r.data || [])}
+                    members={await supabase.from('profiles').select('id, full_name, role').then(r => r.data || [])}
+                />
             </div>
 
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
