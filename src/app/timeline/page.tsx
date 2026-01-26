@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { GanttView, JoinedTask } from '@/components/timeline/GanttView'
+import { TimelineListView } from '@/components/timeline/TimelineListView'
 
 export default async function TimelinePage() {
     const supabase = await createClient()
@@ -36,12 +37,18 @@ export default async function TimelinePage() {
                 <p className="text-gray-400">Visualizing the Foundry&apos;s execution vector.</p>
             </div>
 
-            <div className="flex-1 min-h-[500px]">
+            {/* Desktop: Gantt Chart */}
+            <div className="flex-1 min-h-[500px] hidden md:block">
                 <GanttView
                     tasks={tasks as unknown as JoinedTask[]}
                     objectives={objectives || []}
                     profiles={profiles || []}
                 />
+            </div>
+
+            {/* Mobile: List Timeline View */}
+            <div className="md:hidden">
+                <TimelineListView tasks={tasks as unknown as JoinedTask[]} />
             </div>
         </div>
     )

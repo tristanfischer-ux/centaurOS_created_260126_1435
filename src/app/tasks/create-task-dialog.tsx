@@ -104,10 +104,10 @@ export function CreateTaskDialog({ objectives, members }: CreateTaskDialogProps)
                             <div className="grid gap-2">
                                 <Label htmlFor="assignee">Assignee</Label>
                                 <Select name="assignee_id" required>
-                                    <SelectTrigger>
+                                    <SelectTrigger className="bg-white border-slate-200">
                                         <SelectValue placeholder="Select person..." />
                                     </SelectTrigger>
-                                    <SelectContent>
+                                    <SelectContent className="bg-white border-slate-200 z-50">
                                         {sortedMembers.map(member => (
                                             <SelectItem key={member.id} value={member.id}>
                                                 {member.full_name}
@@ -120,10 +120,10 @@ export function CreateTaskDialog({ objectives, members }: CreateTaskDialogProps)
                             <div className="grid gap-2">
                                 <Label htmlFor="objective">Objective</Label>
                                 <Select name="objective_id" required>
-                                    <SelectTrigger>
+                                    <SelectTrigger className="bg-white border-slate-200">
                                         <SelectValue placeholder="Link to objective..." />
                                     </SelectTrigger>
-                                    <SelectContent>
+                                    <SelectContent className="bg-white border-slate-200 z-50">
                                         {objectives.map(obj => (
                                             <SelectItem key={obj.id} value={obj.id}>
                                                 {obj.title}
@@ -148,12 +148,13 @@ export function CreateTaskDialog({ objectives, members }: CreateTaskDialogProps)
                                         {date ? format(date, "PPP") : <span>Pick a date</span>}
                                     </Button>
                                 </PopoverTrigger>
-                                <PopoverContent className="w-auto p-0">
+                                <PopoverContent className="w-auto p-0 bg-white border-slate-200 z-[100]">
                                     <Calendar
                                         mode="single"
                                         selected={date}
                                         onSelect={setDate}
                                         initialFocus
+                                        className="bg-white"
                                     />
                                 </PopoverContent>
                             </Popover>
