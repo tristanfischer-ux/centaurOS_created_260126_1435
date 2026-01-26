@@ -4,27 +4,40 @@ import { useState, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Mic, Square, Loader2 } from "lucide-react"
 import { toast } from "sonner"
-
 import { useRouter } from "next/navigation"
 
 export function VoiceRecorder() {
     const router = useRouter()
     const [isRecording, setIsRecording] = useState(false)
     const [isProcessing, setIsProcessing] = useState(false)
+    const [recordingDuration, setRecordingDuration] = useState(0)
     const mediaRecorderRef = useRef<MediaRecorder | null>(null)
     const chunksRef = useRef<Blob[]>([])
+    const timerRef = useRef<NodeJS.Timeout | null>(null)
 
     const startRecording = async () => {
         try {
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
             mediaRecorderRef.current = new MediaRecorder(stream)
             chunksRef.current = []
+            setRecordingDuration(0)
+
+            // Start recording duration timer
+            timerRef.current = setInterval(() => {
+                setRecordingDuration(prev => prev + 1)
+            }, 1000)
 
             mediaRecorderRef.current.ondataavailable = (e) => {
                 if (e.data.size > 0) chunksRef.current.push(e.data)
             }
 
             mediaRecorderRef.current.onstop = async () => {
+                // Clear timer
+                if (timerRef.current) {
+                    clearInterval(timerRef.current)
+                    timerRef.current = null
+                }
+
                 const audioBlob = new Blob(chunksRef.current, { type: "audio/webm" })
                 await processAudio(audioBlob)
                 // Stop all tracks
@@ -33,9 +46,10 @@ export function VoiceRecorder() {
 
             mediaRecorderRef.current.start()
             setIsRecording(true)
+            toast.info("Recording... Speak your task command")
         } catch (error) {
             console.error("Error accessing microphone:", error)
-            toast.error("Could not access microphone.")
+            toast.error("Could not access microphone. Please check permissions.")
         }
     }
 
@@ -48,6 +62,8 @@ export function VoiceRecorder() {
 
     const processAudio = async (audioBlob: Blob) => {
         setIsProcessing(true)
+        toast.info("Processing your voice command...")
+
         const formData = new FormData()
         formData.append("file", audioBlob, "recording.webm")
 
@@ -63,19 +79,43 @@ export function VoiceRecorder() {
                 throw new Error(data.error || "Failed to process voice command")
             }
 
-            toast.success("Task created from voice command!")
-            toast.success("Task created from voice command!")
+            // Show success with task title
+            toast.success(`Task created: "${data.task?.title || 'New Task'}"`, {
+                description: data.transcript ? `"${data.transcript.slice(0, 80)}..."` : undefined,
+                duration: 5000,
+            })
             router.refresh()
         } catch (error) {
             console.error("Voice processing error:", error)
-            toast.error("Failed to create task from voice.")
+            toast.error("Failed to create task from voice. Please try again.")
         } finally {
             setIsProcessing(false)
+            setRecordingDuration(0)
         }
     }
 
+    const formatDuration = (seconds: number) => {
+        const mins = Math.floor(seconds / 60)
+        const secs = seconds % 60
+        return `${mins}:${secs.toString().padStart(2, '0')}`
+    }
+
     return (
-        <div className="fixed bottom-24 right-6 md:bottom-8 md:right-8 z-50">
+        <div className="fixed bottom-24 right-6 md:bottom-8 md:right-8 z-50 flex flex-col items-end gap-2">
+            {/* Recording indicator */}
+            {isRecording && (
+                <div className="bg-red-500 text-white px-3 py-1.5 rounded-full text-sm font-medium animate-pulse shadow-lg">
+                    🎙️ {formatDuration(recordingDuration)}
+                </div>
+            )}
+
+            {/* Processing indicator */}
+            {isProcessing && (
+                <div className="bg-amber-500 text-white px-3 py-1.5 rounded-full text-sm font-medium shadow-lg">
+                    🧠 Analyzing...
+                </div>
+            )}
+
             <Button
                 size="icon"
                 className={`h-14 w-14 rounded-full shadow-lg transition-all duration-300 ${isRecording
