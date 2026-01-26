@@ -2,3 +2,4 @@ node_modules/
 .next/
 .env
 mcp_config.json
+.vercel

@@ -1,0 +1,64 @@
+"use client"
+
+import Link from "next/link"
+import { usePathname } from "next/navigation"
+import { cn } from "@/lib/utils"
+// We'll replace these with Lucide icons later if needed, or maintain text/emoji
+import { LayoutDashboard, Users, CheckSquare, Calendar, ShoppingBag, Settings } from "lucide-react"
+
+const navigation = [
+    { name: "Objectives", href: "/objectives", icon: LayoutDashboard },
+    { name: "Team", href: "/team", icon: Users },
+    { name: "Tasks", href: "/tasks", icon: CheckSquare },
+    { name: "Timeline", href: "/timeline", icon: Calendar },
+    { name: "Marketplace", href: "/marketplace", icon: ShoppingBag },
+    { name: "Settings", href: "/settings", icon: Settings },
+]
+
+export function Sidebar() {
+    const pathname = usePathname()
+
+    return (
+        <div className="hidden md:flex h-screen w-64 flex-col bg-slate-50 text-slate-900 border-r border-slate-200">
+            <div className="flex h-16 items-center justify-center border-b border-slate-200 font-bold text-xl tracking-wider uppercase text-amber-600">
+                CentaurOS
+            </div>
+            <nav className="flex-1 space-y-1 px-2 py-4">
+                {navigation.map((item) => {
+                    const isActive = pathname.startsWith(item.href)
+                    return (
+                        <Link
+                            key={item.name}
+                            href={item.href}
+                            className={cn(
+                                isActive
+                                    ? "bg-white text-amber-600 shadow-sm border border-slate-200"
+                                    : "text-slate-500 hover:bg-white hover:text-slate-900 hover:shadow-sm",
+                                "group flex items-center rounded-md px-2 py-2 text-sm font-medium transition-all"
+                            )}
+                        >
+                            <item.icon
+                                className={cn(
+                                    isActive ? "text-amber-500" : "text-slate-400 group-hover:text-amber-500",
+                                    "mr-3 h-5 w-5 flex-shrink-0"
+                                )}
+                                aria-hidden="true"
+                            />
+                            {item.name}
+                        </Link>
+                    )
+                })}
+            </nav>
+            <div className="border-t border-slate-200 p-4">
+                <div className="flex items-center">
+                    {/* Placeholder for user profile */}
+                    <div className="h-8 w-8 rounded-full bg-slate-200"></div>
+                    <div className="ml-3">
+                        <p className="text-sm font-medium text-slate-900">User</p>
+                        <p className="text-xs text-slate-500">Foundry Member</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    )
+}
