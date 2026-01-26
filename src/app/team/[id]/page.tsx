@@ -25,7 +25,7 @@ export default async function MemberPage({ params }: { params: { id: string } })
     const { data: tasks } = await supabase
         .from('tasks')
         .select('*, assignee:assignee_id(id, full_name, role)')
-        .eq('assignee_id', profiles.id)
+        .eq('assignee_id', profile.id)
         .order('created_at', { ascending: false })
 
     // Fetch Stats (Mocked for now or simple count)
