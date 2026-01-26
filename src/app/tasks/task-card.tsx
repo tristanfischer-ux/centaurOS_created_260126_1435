@@ -20,7 +20,7 @@ import { Textarea } from "@/components/ui/textarea"
 
 type Task = Database["public"]["Tables"]["tasks"]["Row"]
 
-export function TaskCard({ task, currentUserId }: { task: Task, currentUserId: string }) {
+export function TaskCard({ task, currentUserId, userRole }: { task: Task, currentUserId: string, userRole?: string }) {
     const isAssignee = task.assignee_id === currentUserId
     const [loading, setLoading] = useState(false)
     const [rejectOpen, setRejectOpen] = useState(false)
@@ -107,8 +107,8 @@ export function TaskCard({ task, currentUserId }: { task: Task, currentUserId: s
             </CardContent>
             <Separator className="bg-slate-100" />
             <CardFooter className="pt-3 flex justify-between">
-                {/* Action Buttons for Assignee */}
-                {isAssignee && task.status === 'Pending' && (
+                {/* Action Buttons: Visible to Assignee OR Executives (Managers) */}
+                {(isAssignee || userRole === 'Executive') && task.status === 'Pending' && (
                     <div className="flex gap-2 w-full">
                         <Button size="sm" onClick={handleAccept} disabled={loading} className="bg-green-600 hover:bg-green-700 flex-1 text-white shadow-sm">
                             <Check className="h-4 w-4 mr-1" /> Accept

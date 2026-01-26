@@ -20,6 +20,10 @@ export default async function TasksPage() {
         return <div className="text-red-500">Error loading tasks</div>
     }
 
+    // Fetch current user's profile to get role
+    const { data: currentUserProfile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+    const currentUserRole = currentUserProfile?.role
+
     return (
         <div className="space-y-6">
             <div className="flex items-center justify-between">
@@ -42,7 +46,7 @@ export default async function TasksPage() {
 
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
                 {tasks?.map(task => (
-                    <TaskCard key={task.id} task={task} currentUserId={user.id} />
+                    <TaskCard key={task.id} task={task} currentUserId={user.id} userRole={currentUserRole} />
                 ))}
                 {tasks?.length === 0 && (
                     <div className="col-span-full py-12 text-center border-2 border-dashed border-slate-200 rounded-lg text-slate-500">
