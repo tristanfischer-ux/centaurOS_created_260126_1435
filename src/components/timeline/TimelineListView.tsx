@@ -59,14 +59,15 @@ function InitialsAvatar({
     )
 }
 
-// Group tasks by date
-function groupTasksByDate(tasks: JoinedTask[]) {
+// Group tasks by DUE DATE (end_date)
+function groupTasksByDueDate(tasks: JoinedTask[]) {
     const groups: Record<string, JoinedTask[]> = {}
 
     tasks.forEach(task => {
-        const date = task.start_date
-            ? new Date(task.start_date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
-            : 'No Date'
+        // Use end_date (due date) for grouping
+        const date = task.end_date
+            ? new Date(task.end_date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+            : 'No Due Date'
 
         if (!groups[date]) groups[date] = []
         groups[date].push(task)
@@ -181,11 +182,27 @@ function MiniTimelineBar({ task, windowStart, windowEnd }: {
 
 export function TimelineListView({ tasks }: TimelineListViewProps) {
     const [expandedDate, setExpandedDate] = useState<string | null>(null)
+    const [collapsedTasks, setCollapsedTasks] = useState<Set<string>>(new Set())
 
-    const groupedTasks = groupTasksByDate(tasks)
+    // Toggle individual task collapse/expand
+    const toggleTaskCollapse = (taskId: string, e: React.MouseEvent) => {
+        e.preventDefault() // Prevent navigation
+        e.stopPropagation()
+        setCollapsedTasks(prev => {
+            const newSet = new Set(prev)
+            if (newSet.has(taskId)) {
+                newSet.delete(taskId)
+            } else {
+                newSet.add(taskId)
+            }
+            return newSet
+        })
+    }
+
+    const groupedTasks = groupTasksByDueDate(tasks)
     const dateKeys = Object.keys(groupedTasks).sort((a, b) => {
-        if (a === 'No Date') return 1
-        if (b === 'No Date') return -1
+        if (a === 'No Due Date') return 1
+        if (b === 'No Due Date') return -1
         return new Date(a).getTime() - new Date(b).getTime()
     })
 
@@ -279,16 +296,19 @@ export function TimelineListView({ tasks }: TimelineListViewProps) {
                         {/* Task List */}
                         {isExpanded && (
                             <div className="border-t border-slate-100">
-                                {dateTasks.map((task, idx) => (
-                                    <Link
-                                        key={task.id}
-                                        href={`/tasks?highlight=${task.id}`}
-                                        className="block"
-                                    >
-                                        <div className={`p-4 hover:bg-slate-50 transition-colors ${idx !== dateTasks.length - 1 ? 'border-b border-slate-50' : ''}`}>
-                                            {/* Task Header Row */}
-                                            <div className="flex items-start gap-3 mb-2">
-                                                {/* Avatar instead of status dot */}
+                                {dateTasks.map((task, idx) => {
+                                    const isTaskCollapsed = collapsedTasks.has(task.id)
+                                    return (
+                                        <div
+                                            key={task.id}
+                                            className={`${idx !== dateTasks.length - 1 ? 'border-b border-slate-50' : ''}`}
+                                        >
+                                            {/* Task Header - Always Visible, Clickable to Collapse */}
+                                            <div
+                                                className="p-4 hover:bg-slate-50 transition-colors cursor-pointer flex items-start gap-3"
+                                                onClick={(e) => toggleTaskCollapse(task.id, e)}
+                                            >
+                                                {/* Avatar */}
                                                 <InitialsAvatar
                                                     name={task.profiles?.full_name}
                                                     size="md"
@@ -306,22 +326,32 @@ export function TimelineListView({ tasks }: TimelineListViewProps) {
                                                         </Badge>
                                                     </div>
 
+                                                    {/* Compact info when collapsed */}
                                                     <div className="flex items-center gap-3 mt-1 text-sm text-slate-500 flex-wrap">
-                                                        {/* Objective */}
-                                                        {task.objectives && (
-                                                            <span className="flex items-center gap-1">
-                                                                <Target className="h-3 w-3 text-amber-500" />
-                                                                <span className="truncate max-w-[120px]">{task.objectives.title}</span>
-                                                            </span>
-                                                        )}
-                                                        {/* Assignee name */}
                                                         {task.profiles && (
                                                             <span className="flex items-center gap-1">
                                                                 {task.profiles.full_name}
                                                                 {task.profiles.role === 'AI_Agent' && ' 🤖'}
                                                             </span>
                                                         )}
-                                                        {/* Due date */}
+                                                    </div>
+                                                </div>
+
+                                                {/* Collapse Chevron */}
+                                                <ChevronDown className={`h-4 w-4 text-slate-400 shrink-0 mt-1 transition-transform ${isTaskCollapsed ? '-rotate-90' : ''}`} />
+                                            </div>
+
+                                            {/* Expandable Details */}
+                                            {!isTaskCollapsed && (
+                                                <div className="px-4 pb-4 -mt-2">
+                                                    {/* Extra info */}
+                                                    <div className="ml-9 mb-2 text-sm text-slate-500 flex flex-wrap gap-3">
+                                                        {task.objectives && (
+                                                            <span className="flex items-center gap-1">
+                                                                <Target className="h-3 w-3 text-amber-500" />
+                                                                <span className="truncate max-w-[140px]">{task.objectives.title}</span>
+                                                            </span>
+                                                        )}
                                                         {task.end_date && (
                                                             <span className="flex items-center gap-1">
                                                                 <Clock className="h-3 w-3" />
@@ -329,22 +359,29 @@ export function TimelineListView({ tasks }: TimelineListViewProps) {
                                                             </span>
                                                         )}
                                                     </div>
+
+                                                    {/* Mini Timeline Bar */}
+                                                    <div className="ml-9">
+                                                        <MiniTimelineBar
+                                                            task={task}
+                                                            windowStart={windowStart}
+                                                            windowEnd={windowEnd}
+                                                        />
+                                                    </div>
+
+                                                    {/* View Details Link */}
+                                                    <Link
+                                                        href={`/tasks?highlight=${task.id}`}
+                                                        className="ml-9 mt-2 inline-flex items-center text-xs text-amber-600 hover:text-amber-700"
+                                                        onClick={(e) => e.stopPropagation()}
+                                                    >
+                                                        View Details <ChevronRight className="h-3 w-3 ml-1" />
+                                                    </Link>
                                                 </div>
-
-                                                <ChevronRight className="h-4 w-4 text-slate-300 shrink-0 mt-1" />
-                                            </div>
-
-                                            {/* Mini Timeline Bar */}
-                                            <div className="ml-6">
-                                                <MiniTimelineBar
-                                                    task={task}
-                                                    windowStart={windowStart}
-                                                    windowEnd={windowEnd}
-                                                />
-                                            </div>
+                                            )}
                                         </div>
-                                    </Link>
-                                ))}
+                                    )
+                                })}
                             </div>
                         )}
                     </div>

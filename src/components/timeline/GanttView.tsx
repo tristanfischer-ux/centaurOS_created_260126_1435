@@ -8,10 +8,11 @@ import { MultiSelect } from "@/components/ui/multi-select"
 
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
+import { ChevronLeft, ChevronRight, CalendarDays } from "lucide-react"
 import { updateTaskDates } from "@/actions/tasks"
 import { toast } from "sonner"
 import { useRouter } from "next/navigation"
-import { format } from "date-fns"
+import { format, addDays, subDays, addWeeks, subWeeks, addMonths, subMonths } from "date-fns"
 
 // Types for joined data
 export type JoinedTask = Database["public"]["Tables"]["tasks"]["Row"] & {
@@ -25,9 +26,54 @@ export type GanttViewProps = {
     profiles: Database["public"]["Tables"]["profiles"]["Row"][]
 }
 
-// Extended GanttTask with task number for sorting
+// Extended GanttTask with task number and assignee for avatars
 interface ExtendedGanttTask extends GanttTask {
     taskNumber?: number
+    assigneeName?: string | null
+    assigneeRole?: string | null
+}
+
+// Get initials from full name
+function getInitials(fullName: string | null | undefined): string {
+    if (!fullName) return "?"
+    const parts = fullName.trim().split(/\s+/)
+    if (parts.length === 1) return parts[0].charAt(0).toUpperCase()
+    return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase()
+}
+
+// Avatar color based on name (consistent color per person)
+function getAvatarColor(name: string | null | undefined): string {
+    if (!name) return "bg-slate-400"
+    const colors = [
+        "bg-blue-500", "bg-green-500", "bg-purple-500", "bg-pink-500",
+        "bg-indigo-500", "bg-teal-500", "bg-orange-500", "bg-cyan-500"
+    ]
+    let hash = 0
+    for (let i = 0; i < name.length; i++) {
+        hash = name.charCodeAt(i) + ((hash << 5) - hash)
+    }
+    return colors[Math.abs(hash) % colors.length]
+}
+
+// Initials Avatar Component
+function InitialsAvatar({
+    name,
+    size = "sm",
+    isAI = false
+}: {
+    name: string | null | undefined
+    size?: "xs" | "sm"
+    isAI?: boolean
+}) {
+    const initials = getInitials(name)
+    const bgColor = isAI ? "bg-amber-500" : getAvatarColor(name)
+    const sizeClasses = size === "xs" ? "h-5 w-5 text-[9px]" : "h-6 w-6 text-[10px]"
+
+    return (
+        <div className={`${sizeClasses} ${bgColor} rounded-full flex items-center justify-center text-white font-semibold shrink-0`}>
+            {isAI ? "🤖" : initials}
+        </div>
+    )
 }
 
 // Custom Header Component
@@ -66,12 +112,19 @@ function CustomTaskListTable({
                 return (
                     <div
                         key={task.id}
-                        className="flex items-center border-b border-slate-100 hover:bg-slate-50 text-sm"
+                        className="flex items-center border-b border-slate-100 hover:bg-slate-50 text-sm cursor-pointer"
                         style={{ height: rowHeight }}
                         onClick={() => onExpanderClick(task)}
                     >
                         <div className="w-10 px-2 text-center text-slate-400 text-xs font-mono">{taskNum}</div>
-                        <div className="flex-1 px-2 min-w-[120px] text-slate-900 truncate">{displayName}</div>
+                        <div className="flex-1 px-2 min-w-[120px] flex items-center gap-2">
+                            <InitialsAvatar
+                                name={task.assigneeName}
+                                size="xs"
+                                isAI={task.assigneeRole === 'AI_Agent'}
+                            />
+                            <span className="text-slate-900 truncate">{displayName}</span>
+                        </div>
                         <div className="w-20 px-2 text-center text-slate-500 text-xs">
                             {format(task.start, 'd MMM')}
                         </div>
@@ -94,11 +147,35 @@ export function GanttView({ tasks, objectives, profiles }: GanttViewProps) {
     // Optimistic local state for task dates (prevents "bounce back")
     const [localDateOverrides, setLocalDateOverrides] = useState<Record<string, { start: Date, end: Date }>>({})
 
-    // Transform options for multi-select
-    const objectiveOptions = objectives.map(obj => ({
-        value: obj.id,
-        label: obj.title || 'Untitled'
-    }))
+    // Date navigation offset
+    const [dateOffset, setDateOffset] = useState<Date>(new Date())
+
+    // Navigate dates left/right
+    const navigateDate = (direction: 'prev' | 'next') => {
+        setDateOffset(prev => {
+            if (viewMode === ViewMode.Day) {
+                return direction === 'next' ? addDays(prev, 7) : subDays(prev, 7)
+            } else if (viewMode === ViewMode.Week) {
+                return direction === 'next' ? addWeeks(prev, 4) : subWeeks(prev, 4)
+            } else {
+                return direction === 'next' ? addMonths(prev, 2) : subMonths(prev, 2)
+            }
+        })
+    }
+
+    const goToToday = () => setDateOffset(new Date())
+
+    // Transform options for multi-select (shorten objective titles)
+    const objectiveOptions = objectives.map((obj, idx) => {
+        // Remove "Strategic Objective X:" prefix if present
+        const shortTitle = (obj.title || 'Untitled').replace(/^Strategic Objective \d+:\s*/i, '')
+        // Truncate if still too long
+        const label = shortTitle.length > 20 ? shortTitle.substring(0, 18) + '...' : shortTitle
+        return {
+            value: obj.id,
+            label: `${idx + 1}. ${label}`
+        }
+    })
 
     const memberOptions = profiles.map(p => ({
         value: p.id,
@@ -113,10 +190,17 @@ export function GanttView({ tasks, objectives, profiles }: GanttViewProps) {
         return true
     })
 
-    // Transform to Gantt Library Format (with optimistic overrides)
-    const ganttTasks: GanttTask[] = useMemo(() => {
+    // Transform to Gantt Library Format (with optimistic overrides and assignee info)
+    // SORTED BY DEADLINE (end_date) - tasks due sooner appear first
+    const ganttTasks: ExtendedGanttTask[] = useMemo(() => {
         return filteredTasks
             .slice(0, 50)
+            // Sort by deadline (end_date) - soonest first
+            .sort((a, b) => {
+                const aEnd = a.end_date ? new Date(a.end_date).getTime() : Infinity
+                const bEnd = b.end_date ? new Date(b.end_date).getTime() : Infinity
+                return aEnd - bEnd
+            })
             .map(task => {
                 // Check for optimistic override first
                 const override = localDateOverrides[task.id]
@@ -146,7 +230,10 @@ export function GanttView({ tasks, objectives, profiles }: GanttViewProps) {
                         progressColor: color,
                         progressSelectedColor: color,
                         backgroundColor: color + "40", // 25% opacity background
-                    }
+                    },
+                    // Assignee info for avatar
+                    assigneeName: task.profiles?.full_name,
+                    assigneeRole: task.profiles?.role
                 }
             })
     }, [filteredTasks, localDateOverrides])
@@ -207,13 +294,7 @@ export function GanttView({ tasks, objectives, profiles }: GanttViewProps) {
         toast.info(`${task.name} • ${task.start.toLocaleDateString()} → ${task.end.toLocaleDateString()}`)
     }
 
-    if (ganttTasks.length === 0) {
-        return (
-            <div className="text-center py-20 text-gray-500 border border-dashed border-foundry-800 rounded-lg">
-                No tasks match current filters.
-            </div>
-        )
-    }
+
 
     return (
         <div className="space-y-4">
@@ -266,23 +347,61 @@ export function GanttView({ tasks, objectives, profiles }: GanttViewProps) {
                         Month
                     </Button>
                 </div>
+
+                {/* Date Navigation */}
+                <div className="flex items-center gap-2">
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => navigateDate('prev')}
+                        className="h-8 w-8 p-0"
+                        title="Previous"
+                    >
+                        <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={goToToday}
+                        className="h-8 px-3 text-xs"
+                        title="Go to today"
+                    >
+                        <CalendarDays className="h-3 w-3 mr-1" />
+                        Today
+                    </Button>
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => navigateDate('next')}
+                        className="h-8 w-8 p-0"
+                        title="Next"
+                    >
+                        <ChevronRight className="h-4 w-4" />
+                    </Button>
+                </div>
             </Card>
 
-            {/* Gantt Chart Wrapper */}
-            <div className="bg-white rounded-lg overflow-hidden border border-slate-200 text-black shadow-sm">
-                <Gantt
-                    tasks={ganttTasks}
-                    viewMode={viewMode}
-                    listCellWidth="260px"
-                    columnWidth={viewMode === ViewMode.Month ? 300 : viewMode === ViewMode.Week ? 150 : 65}
-                    barFill={60}
-                    onDateChange={handleDateChange}
-                    onDoubleClick={handleDoubleClick}
-                    onClick={handleClick}
-                    TaskListHeader={CustomTaskListHeader}
-                    TaskListTable={CustomTaskListTable}
-                />
-            </div>
+            {/* Gantt Chart or Empty State */}
+            {ganttTasks.length === 0 ? (
+                <div className="bg-white rounded-lg border border-slate-200 text-center py-16 text-slate-500">
+                    No tasks match current filters.
+                </div>
+            ) : (
+                <div className="bg-white rounded-lg overflow-hidden border border-slate-200 text-black shadow-sm">
+                    <Gantt
+                        tasks={ganttTasks}
+                        viewMode={viewMode}
+                        listCellWidth="260px"
+                        columnWidth={viewMode === ViewMode.Month ? 300 : viewMode === ViewMode.Week ? 150 : 65}
+                        barFill={60}
+                        onDateChange={handleDateChange}
+                        onDoubleClick={handleDoubleClick}
+                        onClick={handleClick}
+                        TaskListHeader={CustomTaskListHeader}
+                        TaskListTable={CustomTaskListTable}
+                    />
+                </div>
+            )}
         </div>
     )
 }

@@ -1,16 +1,17 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useRef } from "react"
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet"
 import { createClient } from "@/lib/supabase/client"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { formatDistanceToNow } from "date-fns"
-import { Loader2, Send, Check, X, Forward, Clock } from "lucide-react"
+import { Loader2, Send, Check, X, Forward, Clock, Paperclip } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { addTaskComment, acceptTask, rejectTask, completeTask } from "@/actions/tasks"
+import { uploadTaskAttachment } from "@/actions/attachments"
 import { toast } from "sonner"
 import { useRouter } from "next/navigation"
 
@@ -60,6 +61,8 @@ export function ThreadDrawer({
     const [newComment, setNewComment] = useState("")
     const [sending, setSending] = useState(false)
     const [actionLoading, setActionLoading] = useState(false)
+    const [uploading, setUploading] = useState(false)
+    const fileInputRef = useRef<HTMLInputElement>(null)
     const supabase = createClient()
 
     useEffect(() => {
@@ -142,6 +145,31 @@ export function ThreadDrawer({
             onOpenChange(false)
         }
         setActionLoading(false)
+    }
+
+    const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0]
+        if (!file) return
+
+        setUploading(true)
+        const formData = new FormData()
+        formData.append('file', file)
+
+        const result = await uploadTaskAttachment(taskId, formData)
+        if (result.error) {
+            toast.error(result.error)
+        } else {
+            toast.success(`Uploaded ${file.name}`)
+            // Refresh comments to show the attachment log
+            const { data } = await supabase
+                .from('task_comments')
+                .select('*, user:user_id(full_name, role)')
+                .eq('task_id', taskId)
+                .order('created_at', { ascending: true })
+            setComments((data || []) as Comment[])
+        }
+        setUploading(false)
+        if (fileInputRef.current) fileInputRef.current.value = ''
     }
 
     return (
@@ -261,6 +289,22 @@ export function ThreadDrawer({
                 {/* Comment Input */}
                 <div className="pt-4 border-t border-slate-100 mt-auto">
                     <form onSubmit={handleSend} className="flex gap-2">
+                        <input
+                            type="file"
+                            ref={fileInputRef}
+                            onChange={handleFileUpload}
+                            className="hidden"
+                        />
+                        <Button
+                            type="button"
+                            size="icon"
+                            variant="outline"
+                            disabled={uploading}
+                            onClick={() => fileInputRef.current?.click()}
+                            className="shrink-0 border-slate-200"
+                        >
+                            {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Paperclip className="h-4 w-4" />}
+                        </Button>
                         <Input
                             value={newComment}
                             onChange={(e) => setNewComment(e.target.value)}

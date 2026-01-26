@@ -350,6 +350,54 @@ export type Database = {
                 }
                 Relationships: []
             }
+            task_files: {
+                Row: {
+                    id: string
+                    task_id: string
+                    file_name: string
+                    file_path: string
+                    file_size: number | null
+                    mime_type: string | null
+                    uploaded_by: string | null
+                    created_at: string | null
+                }
+                Insert: {
+                    id?: string
+                    task_id: string
+                    file_name: string
+                    file_path: string
+                    file_size?: number | null
+                    mime_type?: string | null
+                    uploaded_by?: string | null
+                    created_at?: string | null
+                }
+                Update: {
+                    id?: string
+                    task_id?: string
+                    file_name?: string
+                    file_path?: string
+                    file_size?: number | null
+                    mime_type?: string | null
+                    uploaded_by?: string | null
+                    created_at?: string | null
+                }
+                Relationships: [
+                    {
+                        foreignKeyName: "task_files_task_id_fkey"
+                        columns: ["task_id"]
+                        isOneToOne: false
+                        referencedRelation: "tasks"
+                        referencedColumns: ["id"]
+                    },
+                    {
+                        foreignKeyName: "task_files_uploaded_by_fkey"
+                        columns: ["uploaded_by"]
+                        isOneToOne: false
+                        referencedRelation: "profiles"
+                        referencedColumns: ["id"]
+                    },
+                ]
+            }
             task_comments: {
                 Row: {
                     content: string
@@ -513,6 +561,7 @@ export type Database = {
                     foundry_id: string
                     id: string
                     objective_id: string | null
+                    progress: number | null
                     start_date: string | null
                     status: Database["public"]["Enums"]["task_status"] | null
                     title: string
@@ -529,6 +578,7 @@ export type Database = {
                     foundry_id: string
                     id?: string
                     objective_id?: string | null
+                    progress?: number | null
                     start_date?: string | null
                     status?: Database["public"]["Enums"]["task_status"] | null
                     title: string
@@ -545,6 +595,7 @@ export type Database = {
                     foundry_id?: string
                     id?: string
                     objective_id?: string | null
+                    progress?: number | null
                     start_date?: string | null
                     status?: Database["public"]["Enums"]["task_status"] | null
                     title?: string

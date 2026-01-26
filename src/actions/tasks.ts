@@ -44,20 +44,33 @@ export async function createTask(formData: FormData) {
     const description = formData.get('description') as string
     const objectiveId = formData.get('objective_id') as string
     const assigneeId = formData.get('assignee_id') as string
+    const assigneeIdsJson = formData.get('assignee_ids') as string
     const startDate = formData.get('start_date') as string
     const endDate = formData.get('end_date') as string
+    const fileCount = parseInt(formData.get('file_count') as string || '0')
 
     if (!title || !objectiveId || !assigneeId) {
         return { error: 'Missing required fields' }
     }
 
+    // Parse multiple assignees (if provided)
+    let assigneeIds: string[] = [assigneeId]
+    if (assigneeIdsJson) {
+        try {
+            assigneeIds = JSON.parse(assigneeIdsJson)
+        } catch {
+            // Fall back to single assignee
+        }
+    }
+
+    // Create the task (with primary assignee for backward compatibility)
     const { data, error } = await supabase.from('tasks').insert({
         foundry_id,
         title,
         description,
         objective_id: objectiveId,
         creator_id: user.id,
-        assignee_id: assigneeId,
+        assignee_id: assigneeIds[0], // Primary assignee
         start_date: startDate || null,
         end_date: endDate || null,
         status: 'Pending'
@@ -65,13 +78,49 @@ export async function createTask(formData: FormData) {
 
     if (error) return { error: error.message }
 
+    // Insert additional assignees into task_assignees table
+    if (assigneeIds.length > 0) {
+        const assigneeRecords = assigneeIds.map(profileId => ({
+            task_id: data.id,
+            profile_id: profileId
+        }))
+        await supabase.from('task_assignees').insert(assigneeRecords)
+    }
+
+    // Handle file uploads
+    if (fileCount > 0) {
+        for (let i = 0; i < fileCount; i++) {
+            const file = formData.get(`file_${i}`) as File
+            if (!file) continue
+
+            // Upload to Supabase Storage
+            const filePath = `${foundry_id}/${data.id}/${Date.now()}_${file.name}`
+            const { error: uploadError } = await supabase.storage
+                .from('task-files')
+                .upload(filePath, file)
+
+            if (uploadError) {
+                console.error('File upload error:', uploadError)
+                continue // Skip failed uploads but don't fail the whole task
+            }
+
+            // Record in task_files table
+            await supabase.from('task_files').insert({
+                task_id: data.id,
+                file_name: file.name,
+                file_path: filePath,
+                file_size: file.size,
+                mime_type: file.type,
+                uploaded_by: user.id
+            })
+        }
+    }
+
     // Log Creation
     await logSystemEvent(data.id, `Task created by User`, user.id)
 
-    // Trigger AI Worker (Fire and forget - sort of, Next.js server actions might wait, but that's okay for demo)
-    // Actually, we must await it if we want to ensure it runs before lambda dies in some envs.
-    // For Vercel, ideally we use 'experimental_after' or similar, but await is safest for MVP.
-    await runAIWorker(data.id, assigneeId)
+    // Trigger AI Worker for primary assignee
+    await runAIWorker(data.id, assigneeIds[0])
 
     revalidatePath('/tasks')
     return { success: true }
@@ -260,4 +309,55 @@ export async function updateTaskDates(taskId: string, startDate: string, endDate
     revalidatePath('/timeline')
     revalidatePath('/tasks')
     return { success: true }
+}
+
+export async function triggerAIWorker(taskId: string) {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return { error: 'Unauthorized' }
+
+    // Fetch task to get assignee
+    const { data: task } = await supabase
+        .from('tasks')
+        .select('assignee_id')
+        .eq('id', taskId)
+        .single()
+
+    if (!task) return { error: 'Task not found' }
+    if (!task.assignee_id) return { error: 'No assignee on this task' }
+
+    // Verify assignee is AI
+    const { data: assignee } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', task.assignee_id)
+        .single()
+
+    if (!assignee || assignee.role !== 'AI_Agent') {
+        return { error: 'Task is not assigned to an AI agent' }
+    }
+
+    // Run the AI worker
+    await runAIWorker(taskId, task.assignee_id)
+
+    revalidatePath('/tasks')
+    return { success: true }
+}
+
+export async function updateTaskProgress(taskId: string, progress: number) {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return { error: 'Unauthorized' }
+
+    // Clamp progress between 0 and 100
+    const clampedProgress = Math.max(0, Math.min(100, Math.round(progress)))
+
+    const { error } = await supabase.from('tasks')
+        .update({ progress: clampedProgress })
+        .eq('id', taskId)
+
+    if (error) return { error: error.message }
+
+    revalidatePath('/tasks')
+    return { success: true, progress: clampedProgress }
 }
