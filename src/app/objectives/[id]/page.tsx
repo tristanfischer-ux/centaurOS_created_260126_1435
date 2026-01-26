@@ -23,7 +23,7 @@ export default async function ObjectiveDetailPage({ params }: { params: Promise<
     // Fetch Linked Tasks
     const { data: tasks } = await supabase
         .from('tasks')
-        .select('*, assignee:assignee_id(id, full_name, role)')
+        .select('*, assignee:profiles!assignee_id(id, full_name, role)')
         .eq('objective_id', id)
         .order('created_at', { ascending: false })
 

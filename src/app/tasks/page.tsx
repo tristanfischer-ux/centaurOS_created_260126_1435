@@ -1,7 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
-import { TaskCard } from './task-card'
-import { CreateTaskDialog } from './create-task-dialog'
 import { VoiceRecorder } from '@/components/tasks/voice-recorder'
+import { TasksView } from './tasks-view'
 
 export default async function TasksPage() {
     const supabase = await createClient()
@@ -13,7 +12,7 @@ export default async function TasksPage() {
 
     const { data: tasks, error } = await supabase
         .from('tasks')
-        .select('*, assignee:assignee_id(id, full_name, role, email)')
+        .select('*, assignee:profiles!assignee_id(id, full_name, role, email)')
         .order('created_at', { ascending: false })
 
     if (error) {
@@ -24,37 +23,32 @@ export default async function TasksPage() {
     const { data: currentUserProfile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
     const currentUserRole = currentUserProfile?.role
 
-    return (
-        <div className="space-y-6">
-            <div className="flex items-center justify-between">
-                <div>
-                    <h1 className="text-3xl font-bold tracking-tight text-slate-900 mb-2">Tasks</h1>
-                    <p className="text-slate-500">Democratic workflow management.</p>
-                </div>
-                {/* Fetch data for the dialog */}
-                <CreateTaskDialog
-                    objectives={await supabase.from('objectives').select('id, title').then(r => r.data || [])}
-                    members={await supabase.from('profiles').select('id, full_name, role').then(r =>
-                        (r.data || []).map(p => ({
-                            id: p.id,
-                            full_name: p.full_name || 'Unknown',
-                            role: p.role
-                        }))
-                    )}
-                />
-            </div>
+    // Fetch data for the dialog and cards
+    const objectives = await supabase.from('objectives').select('id, title').then(r => r.data || [])
+    const membersData = await supabase.from('profiles').select('id, full_name, role, email')
+    const members = (membersData.data || []).map(p => ({
+        id: p.id,
+        full_name: p.full_name || 'Unknown',
+        role: p.role,
+        email: p.email
+    }))
 
-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                {tasks?.map(task => (
-                    <TaskCard key={task.id} task={task} currentUserId={user.id} userRole={currentUserRole} />
-                ))}
-                {tasks?.length === 0 && (
-                    <div className="col-span-full py-12 text-center border-2 border-dashed border-slate-200 rounded-lg text-slate-500">
-                        No active tasks. Create one to start the engine.
-                    </div>
-                )}
-            </div>
+    // Join tasks with assignees
+    const tasksWithAssignees = tasks?.map(task => ({
+        ...task,
+        assignee: Array.isArray(task.assignee) ? task.assignee[0] : task.assignee
+    })) || []
+
+    return (
+        <>
+            <TasksView
+                tasks={tasksWithAssignees}
+                objectives={objectives}
+                members={members}
+                currentUserId={user.id}
+                currentUserRole={currentUserRole}
+            />
             <VoiceRecorder />
-        </div>
+        </>
     )
 }

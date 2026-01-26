@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { Check, X, ArrowRight, Edit, MessageSquare } from "lucide-react"
-import { acceptTask, rejectTask, forwardTask, amendTask } from "@/actions/tasks"
+import { acceptTask, rejectTask, forwardTask, amendTask, completeTask } from "@/actions/tasks"
 import {
     Dialog,
     DialogContent,
@@ -17,12 +17,26 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select"
 
 import { ThreadDrawer } from "./thread-drawer"
 
 type Task = Database["public"]["Tables"]["tasks"]["Row"]
 
-export function TaskCard({ task, currentUserId, userRole }: { task: Task, currentUserId: string, userRole?: string }) {
+interface TaskCardProps {
+    task: Task
+    currentUserId: string
+    userRole?: string
+    members: { id: string; full_name: string; role: string }[]
+}
+
+export function TaskCard({ task, currentUserId, userRole, members }: TaskCardProps) {
     const isAssignee = task.assignee_id === currentUserId
     const [loading, setLoading] = useState(false)
     const [rejectOpen, setRejectOpen] = useState(false)
@@ -37,6 +51,12 @@ export function TaskCard({ task, currentUserId, userRole }: { task: Task, curren
         setLoading(false)
     }
 
+    const handleComplete = async () => {
+        setLoading(true)
+        await completeTask(task.id)
+        setLoading(false)
+    }
+
     const handleReject = async (formData: FormData) => {
         setLoading(true)
         const reason = formData.get('reason') as string
@@ -47,7 +67,7 @@ export function TaskCard({ task, currentUserId, userRole }: { task: Task, curren
 
     const handleForward = async (formData: FormData) => {
         setLoading(true)
-        const newAssigneeId = formData.get('new_assignee_id') as string // In real app, this would be a Select
+        const newAssigneeId = formData.get('new_assignee_id') as string
         const reason = formData.get('reason') as string
         await forwardTask(task.id, newAssigneeId, reason)
         setLoading(false)
@@ -67,11 +87,17 @@ export function TaskCard({ task, currentUserId, userRole }: { task: Task, curren
     const getStatusColor = (status: string | null) => {
         switch (status) {
             case 'Accepted': return 'bg-green-600'
+            case 'Completed': return 'bg-slate-800'
             case 'Rejected': return 'bg-red-600'
             case 'Amended_Pending_Approval': return 'bg-orange-500'
             default: return 'bg-gray-500' // Pending
         }
     }
+
+    const sortedMembers = [...(members || [])].sort((a, b) => {
+        if (a.role === 'AI_Agent') return -1
+        return a.full_name?.localeCompare(b.full_name || '')
+    })
 
     return (
         <Card className="bg-white border-slate-200 hover:border-slate-300 hover:shadow-md transition-all">
@@ -111,29 +137,41 @@ export function TaskCard({ task, currentUserId, userRole }: { task: Task, curren
             <Separator className="bg-slate-100" />
             <CardFooter className="pt-3 flex justify-between">
                 {/* Action Buttons: Visible to Assignee OR Executives (Managers) */}
-                {(isAssignee || userRole === 'Executive') && task.status === 'Pending' && (
+                {(isAssignee || userRole === 'Executive') && (
                     <div className="flex gap-2 w-full">
-                        <Button size="sm" onClick={handleAccept} disabled={loading} className="bg-green-600 hover:bg-green-700 flex-1 text-white shadow-sm">
-                            <Check className="h-4 w-4 mr-1" /> Accept
-                        </Button>
-
-                        {/* Reject Dialog */}
-                        <Dialog open={rejectOpen} onOpenChange={setRejectOpen}>
-                            <DialogTrigger asChild>
-                                <Button size="sm" variant="destructive" disabled={loading} className="flex-1 shadow-sm">
-                                    <X className="h-4 w-4 mr-1" /> Reject
+                        {/* Pending Actions */}
+                        {task.status === 'Pending' && (
+                            <>
+                                <Button size="sm" onClick={handleAccept} disabled={loading} className="bg-green-600 hover:bg-green-700 flex-1 text-white shadow-sm">
+                                    <Check className="h-4 w-4 mr-1" /> Accept
                                 </Button>
-                            </DialogTrigger>
-                            <DialogContent className="bg-white border-slate-200 text-slate-900">
-                                <DialogHeader><DialogTitle>Reject Task</DialogTitle></DialogHeader>
-                                <form action={handleReject} className="space-y-4">
-                                    <Textarea name="reason" placeholder="Reason for rejection..." required className="bg-slate-50 border-slate-200" />
-                                    <Button type="submit" variant="destructive">Confirm Rejection</Button>
-                                </form>
-                            </DialogContent>
-                        </Dialog>
 
-                        {/* Forward Dialog */}
+                                {/* Reject Dialog */}
+                                <Dialog open={rejectOpen} onOpenChange={setRejectOpen}>
+                                    <DialogTrigger asChild>
+                                        <Button size="sm" variant="destructive" disabled={loading} className="flex-1 shadow-sm">
+                                            <X className="h-4 w-4 mr-1" /> Reject
+                                        </Button>
+                                    </DialogTrigger>
+                                    <DialogContent className="bg-white border-slate-200 text-slate-900">
+                                        <DialogHeader><DialogTitle>Reject Task</DialogTitle></DialogHeader>
+                                        <form action={handleReject} className="space-y-4">
+                                            <Textarea name="reason" placeholder="Reason for rejection..." required className="bg-slate-50 border-slate-200" />
+                                            <Button type="submit" variant="destructive">Confirm Rejection</Button>
+                                        </form>
+                                    </DialogContent>
+                                </Dialog>
+                            </>
+                        )}
+
+                        {/* Accepted Actions */}
+                        {task.status === 'Accepted' && (
+                            <Button size="sm" onClick={handleComplete} disabled={loading} className="bg-slate-900 hover:bg-slate-800 flex-1 text-white shadow-sm">
+                                <Check className="h-4 w-4 mr-1" /> Complete Task
+                            </Button>
+                        )}
+
+                        {/* Forward Dialog (Always available if owned/exec) */}
                         <Dialog open={forwardOpen} onOpenChange={setForwardOpen}>
                             <DialogTrigger asChild>
                                 <Button size="sm" variant="outline" disabled={loading} className="border-slate-200 text-slate-600 hover:bg-slate-50 flex-1">
@@ -143,7 +181,22 @@ export function TaskCard({ task, currentUserId, userRole }: { task: Task, curren
                             <DialogContent className="bg-white border-slate-200 text-slate-900">
                                 <DialogHeader><DialogTitle>Forward Task</DialogTitle></DialogHeader>
                                 <form action={handleForward} className="space-y-4">
-                                    <Input name="new_assignee_id" placeholder="New Assignee UUID (Mock)" required className="bg-slate-50 border-slate-200" />
+                                    <div className="grid gap-2">
+                                        <label className="text-sm font-medium">New Assignee</label>
+                                        <Select name="new_assignee_id" required>
+                                            <SelectTrigger>
+                                                <SelectValue placeholder="Select person..." />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {sortedMembers.map(member => (
+                                                    <SelectItem key={member.id} value={member.id}>
+                                                        {member.full_name}
+                                                        {member.role === 'AI_Agent' && ' 🤖'}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
                                     <Textarea name="reason" placeholder="Handover notes..." required className="bg-slate-50 border-slate-200" />
                                     <Button type="submit" className="bg-amber-500 text-white hover:bg-amber-600">Forward</Button>
                                 </form>

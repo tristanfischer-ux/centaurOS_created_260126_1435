@@ -538,6 +538,7 @@ export type Database = {
             | "Rejected"
             | "Amended"
             | "Amended_Pending_Approval"
+            | "Completed"
         }
         CompositeTypes: {
             [_ in never]: never

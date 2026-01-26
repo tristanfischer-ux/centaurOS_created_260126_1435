@@ -107,6 +107,47 @@ async function createDemoUser() {
             console.log('ℹ️ Alice Profile already exists')
         }
     }
+
+    // ---------------------------------------------------------
+    // 4. Create Ghost (AI Agent)
+    // ---------------------------------------------------------
+    console.log('🤖 Creating AI Agent (Ghost)...')
+    const ghostEmail = 'ghost@centauros.app'
+    let ghostId;
+
+    const { data: ghostData, error: ghostCreateError } = await supabase.auth.admin.createUser({
+        email: ghostEmail,
+        password: password,
+        email_confirm: true,
+        user_metadata: { full_name: 'Ghost AI' }
+    })
+
+    if (ghostCreateError && ghostCreateError.message.includes('already been registered')) {
+        console.log('ℹ️ Ghost already exists, fetching ID...')
+        const { data: users } = await supabase.auth.admin.listUsers()
+        const existingGhost = users.users.find(u => u.email === ghostEmail)
+        if (existingGhost) ghostId = existingGhost.id
+    } else if (ghostData.user) {
+        ghostId = ghostData.user.id
+        console.log(`✅ Auth User Created: ${ghostEmail}`)
+    }
+
+    if (ghostId) {
+        const { data: profile } = await supabase.from('profiles').select('*').eq('id', ghostId).single()
+        if (!profile) {
+            await supabase.from('profiles').insert({
+                id: ghostId,
+                email: ghostEmail,
+                full_name: 'Ghost AI',
+                role: 'AI_Agent', // Logic checks for this role
+                foundry_id: 'foundry-demo',
+                created_at: new Date().toISOString()
+            })
+            console.log('✅ Ghost AI Profile Created')
+        } else {
+            console.log('ℹ️ Ghost AI Profile already exists')
+        }
+    }
 }
 
 createDemoUser()

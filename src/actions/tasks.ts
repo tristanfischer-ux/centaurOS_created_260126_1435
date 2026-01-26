@@ -225,3 +225,19 @@ export async function addTaskComment(taskId: string, content: string) {
     revalidatePath('/tasks')
     return { success: true }
 }
+
+export async function completeTask(taskId: string) {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return { error: 'Unauthorized' }
+
+    const { error } = await supabase.from('tasks')
+        .update({ status: 'Completed', end_date: new Date().toISOString() }) // Auto-set end date?
+        .eq('id', taskId)
+
+    if (error) return { error: error.message }
+
+    await logSystemEvent(taskId, 'Task mark as Completed', user.id)
+    revalidatePath('/tasks')
+    return { success: true }
+}
