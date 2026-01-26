@@ -1,0 +1,23 @@
+# /docker-compose.yml
+version: '3.8'
+
+services:
+  centauros-app:
+    container_name: centauros_mvp
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      # Supabase Connection (These will be injected from your secure .env file)
+      - NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
+      - NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+    restart: unless-stopped
+    networks:
+      - centauros-network
+
+networks:
+  centauros-network:
+    driver: bridge
