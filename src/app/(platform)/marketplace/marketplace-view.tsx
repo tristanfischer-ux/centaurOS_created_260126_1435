@@ -33,7 +33,7 @@ export function MarketplaceView({ providers, aiTools, rfqs, initialStack = [] }:
     const [searchQuery, setSearchQuery] = useState("")
     const [isUpdating, setIsUpdating] = useState(false)
 
-    const toggleStack = async (id: string) => {
+    const toggleStack = async (id: string, type: 'provider' | 'tool' = 'provider') => {
         if (isUpdating) return
         setIsUpdating(true)
 
@@ -45,8 +45,8 @@ export function MarketplaceView({ providers, aiTools, rfqs, initialStack = [] }:
 
         try {
             const result = isAdding
-                ? await addToStack(id)
-                : await removeFromStack(id)
+                ? await addToStack(id, type)
+                : await removeFromStack(id, type)
 
             if (result.error) {
                 // Revert on error
@@ -72,6 +72,11 @@ export function MarketplaceView({ providers, aiTools, rfqs, initialStack = [] }:
     const filteredProviders = providers.filter(p =>
         p.company_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         p.provider_type.toLowerCase().includes(searchQuery.toLowerCase())
+    )
+
+    const filteredTools = aiTools.filter(t =>
+        t.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        t.category.toLowerCase().includes(searchQuery.toLowerCase())
     )
 
     return (
@@ -114,7 +119,7 @@ export function MarketplaceView({ providers, aiTools, rfqs, initialStack = [] }:
                             <p className="text-sm text-slate-500">Select multiple verified profiles to bundle into a fractional team.</p>
                         </div>
                         <Badge variant="outline" className="text-amber-600 border-amber-200 bg-amber-50">
-                            {selectedStack.length} Selected
+                            {selectedStack.filter(id => providers.some(p => p.id === id)).length} Selected
                         </Badge>
                     </div>
 
@@ -141,7 +146,6 @@ export function MarketplaceView({ providers, aiTools, rfqs, initialStack = [] }:
                                         <CardContent>
                                             <div className="text-sm text-slate-500 mb-4">
                                                 Top-tier {provider.provider_type} services for scaling startups.
-                                                {/* In a real app, we'd describe services from JSONB */}
                                             </div>
                                             {services && (
                                                 <div className="flex flex-wrap gap-1 mb-2">
@@ -158,7 +162,7 @@ export function MarketplaceView({ providers, aiTools, rfqs, initialStack = [] }:
                                             <Button
                                                 variant={selectedStack.includes(provider.id) ? "secondary" : "default"}
                                                 className="w-full"
-                                                onClick={() => toggleStack(provider.id)}
+                                                onClick={() => toggleStack(provider.id, 'provider')}
                                                 disabled={isUpdating}
                                             >
                                                 {selectedStack.includes(provider.id) ? "In Stack" : "Add to Stack"}
@@ -173,7 +177,7 @@ export function MarketplaceView({ providers, aiTools, rfqs, initialStack = [] }:
 
                 {/* AI Tools Tab */}
                 <TabsContent value="ai-tools" className="space-y-4">
-                    <div className="rounded-lg bg-gradient-to-r from-purple-50 to-indigo-50 border border-indigo-100 p-6 mb-6">
+                    <div className="rounded-lg bg-gradient-to-r from-purple-50 to-indigo-50 border border-indigo-100 p-6 mb-6 flex justify-between items-center">
                         <div className="flex items-center gap-4">
                             <div className="bg-white p-3 rounded-full shadow-sm">
                                 <Bot className="h-6 w-6 text-indigo-600" />
@@ -183,11 +187,14 @@ export function MarketplaceView({ providers, aiTools, rfqs, initialStack = [] }:
                                 <p className="text-sm text-indigo-700">Deploy specialized autonomous agents to your workforce.</p>
                             </div>
                         </div>
+                        <Badge variant="outline" className="text-indigo-600 border-indigo-200 bg-white shadow-sm">
+                            {selectedStack.filter(id => aiTools.some(t => t.id === id)).length} Active
+                        </Badge>
                     </div>
 
                     <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                        {aiTools.map(tool => (
-                            <Card key={tool.id} className="bg-white border-slate-200 shadow-sm hover:border-indigo-300 transition-all">
+                        {filteredTools.map(tool => (
+                            <Card key={tool.id} className={`bg-white border-slate-200 shadow-sm hover:border-indigo-300 transition-all ${selectedStack.includes(tool.id) ? 'border-indigo-500 ring-1 ring-indigo-500' : ''}`}>
                                 <CardHeader>
                                     <div className="flex justify-between items-center mb-2">
                                         <Badge variant="outline" className="text-indigo-600 border-indigo-200 bg-indigo-50">
@@ -202,8 +209,14 @@ export function MarketplaceView({ providers, aiTools, rfqs, initialStack = [] }:
                                     <p className="text-sm text-slate-600">{tool.description}</p>
                                 </CardContent>
                                 <CardFooter>
-                                    <Button size="sm" className="w-full bg-slate-900 text-white hover:bg-slate-800">
-                                        Deploy Agent
+                                    <Button
+                                        size="sm"
+                                        variant={selectedStack.includes(tool.id) ? "secondary" : "default"}
+                                        className={selectedStack.includes(tool.id) ? "w-full" : "w-full bg-slate-900 text-white hover:bg-slate-800"}
+                                        onClick={() => toggleStack(tool.id, 'tool')}
+                                        disabled={isUpdating}
+                                    >
+                                        {selectedStack.includes(tool.id) ? "Agent Active" : "Deploy Agent"}
                                     </Button>
                                 </CardFooter>
                             </Card>

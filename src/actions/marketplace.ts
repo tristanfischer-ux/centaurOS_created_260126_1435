@@ -5,7 +5,12 @@ import { revalidatePath } from "next/cache"
 
 
 
-export async function addToStack(providerId: string) {
+export async function addToStack(id: string, type: 'provider' | 'tool' = 'provider') {
+    if (type === 'tool') {
+        return { error: "AI Agents cannot be added to stack yet (Database update pending)" }
+    }
+
+    const providerId = id
     const supabase = await createClient()
 
     // 1. Get current user profile to determine foundry_id
@@ -40,7 +45,12 @@ export async function addToStack(providerId: string) {
     return { success: true }
 }
 
-export async function removeFromStack(providerId: string) {
+export async function removeFromStack(id: string, type: 'provider' | 'tool' = 'provider') {
+    if (type === 'tool') {
+        return { error: "AI Agents cannot be removed from stack yet" }
+    }
+
+    const providerId = id
     const supabase = await createClient()
 
     const { data: { user } } = await supabase.auth.getUser()

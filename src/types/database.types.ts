@@ -208,6 +208,7 @@ export type Database = {
                     },
                 ]
             }
+
             foundry_stack: {
                 Row: {
                     created_at: string | null
@@ -716,6 +717,24 @@ export type Database = {
                     },
                 ]
             }
+            foundries: {
+                Row: {
+                    id: string
+                    name: string
+                    created_at: string | null
+                }
+                Insert: {
+                    id: string
+                    name: string
+                    created_at?: string | null
+                }
+                Update: {
+                    id?: string
+                    name?: string
+                    created_at?: string | null
+                }
+                Relationships: []
+            },
             objective_packs: {
                 Row: {
                     id: string

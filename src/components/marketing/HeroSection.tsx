@@ -56,12 +56,14 @@ export function HeroSection() {
                     </p>
 
                     <div className="flex flex-col md:flex-row items-center justify-center space-y-4 md:space-y-0 md:space-x-6 pt-8">
-                        <Button
-                            size="lg"
-                            className="bg-international-orange hover:bg-[#e03e00] text-white rounded-none px-8 py-6 text-lg tracking-widest font-mono shadow-xl shadow-orange-500/20 transition-all hover:scale-105"
-                        >
-                            DEPLOY A TEAM
-                        </Button>
+                        <Link href="/objectives">
+                            <Button
+                                size="lg"
+                                className="bg-international-orange hover:bg-[#e03e00] text-white rounded-none px-8 py-6 text-lg tracking-widest font-mono shadow-xl shadow-orange-500/20 transition-all hover:scale-105"
+                            >
+                                DEPLOY A TEAM
+                            </Button>
+                        </Link>
 
                         <Link href="/guild" className="group flex items-center space-x-2 text-slate-900 hover:text-electric-blue transition-colors text-lg tracking-wider font-display font-medium">
                             <span>ENTER THE GUILD</span>

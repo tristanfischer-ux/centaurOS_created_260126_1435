@@ -26,7 +26,9 @@ export default async function MarketplacePage() {
             .eq('foundry_id', profileResult.data.foundry_id)
 
         if (stack) {
-            stack.forEach(item => stackProviders.add(item.provider_id))
+            stack.forEach(item => {
+                if (item.provider_id) stackProviders.add(item.provider_id)
+            })
         }
     }
 
