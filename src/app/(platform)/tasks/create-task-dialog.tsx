@@ -35,7 +35,6 @@ import {
     CommandItem,
     CommandList,
 } from "@/components/ui/command"
-import { Check, ChevronsUpDown } from "lucide-react"
 import { MultiSelect } from "@/components/ui/multi-select"
 import { createTask } from "@/actions/tasks"
 import { toast } from "sonner"

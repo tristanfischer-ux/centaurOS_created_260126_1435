@@ -17,7 +17,6 @@ import { Textarea } from "@/components/ui/textarea"
 import { submitRFQ } from "@/actions/marketplace"
 import { Loader2, ChevronDown, ChevronUp } from "lucide-react"
 import { toast } from "sonner" // Assuming sonner is used, or I'll use a basic alert if not available
-import { Button } from "@/components/ui/button"
 
 export function CreateRFQDialog() {
     const [open, setOpen] = useState(false)
