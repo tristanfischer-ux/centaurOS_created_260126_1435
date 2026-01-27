@@ -159,7 +159,16 @@ export function CreateObjectiveDialog({ disabled }: { disabled?: boolean }) {
                     <TabsContent value="manual" className="flex-1 overflow-hidden flex flex-col mt-0 h-full">
                         <ScrollArea className="flex-1 pr-4">
                             <form action={clientAction} className="space-y-4 pb-6 pt-2 h-full">
-                                <Input name="title" placeholder="e.g. Expand Market Share" className="bg-slate-50 border-slate-200" />
+                                <Input
+                                    name="title"
+                                    placeholder="e.g. Expand Market Share"
+                                    className="bg-slate-50 border-slate-200"
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter') {
+                                            e.preventDefault();
+                                        }
+                                    }}
+                                />
                                 <Textarea name="description" placeholder="Success criteria and scope..." className="bg-slate-50 border-slate-200" />
 
                                 <div className="space-y-2">
