@@ -338,14 +338,22 @@ export async function forwardTask(taskId: string, newAssigneeId: string, reason:
 
     if (error) return { error: error.message }
 
-    // Sync task_assignees table atomically using RPC function to prevent race conditions
-    const { error: rpcError } = await supabase.rpc('transfer_task_assignee', {
-        p_task_id: taskId,
-        p_new_assignee_id: newAssigneeId
-    })
+    // Sync task_assignees table: delete old assignees and insert new one
+    const { error: deleteError } = await supabase
+        .from('task_assignees')
+        .delete()
+        .eq('task_id', taskId)
     
-    if (rpcError) {
-        console.error('Failed to transfer task assignee:', rpcError)
+    if (deleteError) {
+        console.error('Failed to delete old task assignees:', deleteError)
+    }
+
+    const { error: insertError } = await supabase
+        .from('task_assignees')
+        .insert({ task_id: taskId, profile_id: newAssigneeId })
+    
+    if (insertError) {
+        console.error('Failed to insert new task assignee:', insertError)
         return { error: 'Failed to update task assignees' }
     }
 
