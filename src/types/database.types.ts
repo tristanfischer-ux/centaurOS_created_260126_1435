@@ -716,6 +716,83 @@ export type Database = {
                     },
                 ]
             }
+            objective_packs: {
+                Row: {
+                    id: string
+                    title: string
+                    description: string | null
+                    category: string | null
+                    difficulty: string | null
+                    estimated_duration: string | null
+                    icon_name: string | null
+                    created_at: string | null
+                    updated_at: string | null
+                }
+                Insert: {
+                    id?: string
+                    title: string
+                    description?: string | null
+                    category?: string | null
+                    difficulty?: string | null
+                    estimated_duration?: string | null
+                    icon_name?: string | null
+                    created_at?: string | null
+                    updated_at?: string | null
+                }
+                Update: {
+                    id?: string
+                    title?: string
+                    description?: string | null
+                    category?: string | null
+                    difficulty?: string | null
+                    estimated_duration?: string | null
+                    icon_name?: string | null
+                    created_at?: string | null
+                    updated_at?: string | null
+                }
+                Relationships: []
+            }
+            pack_items: {
+                Row: {
+                    id: string
+                    pack_id: string
+                    title: string
+                    description: string | null
+                    role: Database["public"]["Enums"]["member_role"]
+                    order_index: number
+                    created_at: string | null
+                    updated_at: string | null
+                }
+                Insert: {
+                    id?: string
+                    pack_id: string
+                    title: string
+                    description?: string | null
+                    role: Database["public"]["Enums"]["member_role"]
+                    order_index?: number
+                    created_at?: string | null
+                    updated_at?: string | null
+                }
+                Update: {
+                    id?: string
+                    pack_id?: string
+                    title?: string
+                    description?: string | null
+                    role?: Database["public"]["Enums"]["member_role"]
+                    order_index?: number
+                    created_at?: string | null
+                    updated_at?: string | null
+                }
+                Relationships: [
+                    {
+                        foreignKeyName: "pack_items_pack_id_fkey"
+                        columns: ["pack_id"]
+                        isOneToOne: false
+                        referencedRelation: "objective_packs"
+                        referencedColumns: ["id"]
+                    }
+                ]
+            }
         }
         Views: {
             [_ in never]: never

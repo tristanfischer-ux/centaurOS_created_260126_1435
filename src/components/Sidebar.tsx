@@ -15,13 +15,23 @@ const navigation = [
     { name: "Settings", href: "/settings", icon: Settings },
 ]
 
-export function Sidebar() {
+export function Sidebar({ foundryName, foundryId }: { foundryName?: string; foundryId?: string }) {
     const pathname = usePathname()
 
     return (
         <div className="hidden md:flex h-screen w-64 flex-col bg-slate-50 text-slate-900 border-r border-slate-200">
-            <div className="flex h-16 items-center justify-center border-b border-slate-200 font-bold text-xl tracking-wider uppercase text-amber-600">
-                CentaurOS
+            <div className="flex flex-col h-24 items-center justify-center border-b border-slate-200 bg-white">
+                <div className="font-bold text-xl tracking-wider uppercase text-amber-600">
+                    Centaur App
+                </div>
+                <div className="mt-2 text-center">
+                    <div className="text-xs font-semibold text-slate-700 uppercase tracking-wide px-2 truncate max-w-[200px]">
+                        {foundryName || "Centaur Inc."}
+                    </div>
+                    <div className="text-[10px] text-slate-400 font-mono">
+                        {foundryId || "ID: Loading..."}
+                    </div>
+                </div>
             </div>
             <nav className="flex-1 space-y-1 px-2 py-4">
                 {navigation.map((item) => {
