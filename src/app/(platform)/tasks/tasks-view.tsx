@@ -78,7 +78,7 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
     // Sort Logic
     const sortedTasks = [...filteredTasks].sort((a, b) => {
         if (sortBy === 'created_desc') {
-            return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+            return new Date(b.created_at ?? 0).getTime() - new Date(a.created_at ?? 0).getTime()
         }
         if (sortBy === 'due_date_asc') {
             if (!a.end_date) return 1
