@@ -170,8 +170,8 @@ export function CreateObjectiveDialog({ disabled }: { disabled?: boolean }) {
                             </TabsList>
                         </div>
 
-                        <ScrollArea className="flex-1 px-6">
-                            <TabsContent value="manual" className="mt-0 space-y-4 pb-6">
+                        <div className="flex-1 overflow-y-auto px-6 min-h-0">
+                            <TabsContent value="manual" className="mt-0 space-y-4 pb-6 h-full block">
                                 <div className="grid gap-4 py-2">
                                     <div className="grid gap-2">
                                         <Label htmlFor="title">Objective Title</Label>
@@ -270,7 +270,7 @@ export function CreateObjectiveDialog({ disabled }: { disabled?: boolean }) {
                                 </div>
                             </TabsContent>
 
-                            <TabsContent value="import" className="mt-0 space-y-4 pb-6">
+                            <TabsContent value="import" className="mt-0 space-y-4 pb-6 h-full block">
                                 {!analyzedObjectives.length && !analyzing && (
                                     <div className="border-2 border-dashed border-slate-200 rounded-lg p-10 flex flex-col items-center justify-center text-center space-y-4 hover:bg-slate-50 transition-colors">
                                         <div className="bg-blue-50 p-4 rounded-full">
@@ -388,7 +388,7 @@ export function CreateObjectiveDialog({ disabled }: { disabled?: boolean }) {
                                     </div>
                                 )}
                             </TabsContent>
-                        </ScrollArea>
+                        </div>
                     </Tabs>
 
                     <DialogFooter className="p-6 pt-2 shrink-0 border-t border-slate-100 bg-white z-10">

@@ -10,8 +10,10 @@ import { Badge } from "@/components/ui/badge"
 import { format } from "date-fns"
 import { ThreadDrawer } from "./thread-drawer"
 
+// Task type update
 type Task = Database["public"]["Tables"]["tasks"]["Row"] & {
     assignee?: { id: string, full_name: string | null, role: string, email: string }
+    task_number?: number
 }
 
 type Objective = {
@@ -88,15 +90,16 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                 </div>
 
                 {viewMode === 'grid' ? (
-                    <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                    <div className="columns-1 md:columns-2 lg:columns-3 gap-6 space-y-6 block">
                         {tasks.map(task => (
-                            <TaskCard
-                                key={task.id}
-                                task={task}
-                                currentUserId={currentUserId}
-                                userRole={currentUserRole}
-                                members={members}
-                            />
+                            <div key={task.id} className="break-inside-avoid mb-6">
+                                <TaskCard
+                                    task={task}
+                                    currentUserId={currentUserId}
+                                    userRole={currentUserRole}
+                                    members={members}
+                                />
+                            </div>
                         ))}
                         {tasks.length === 0 && (
                             <div className="col-span-full py-12 text-center border-2 border-dashed border-slate-200 rounded-lg text-slate-500">

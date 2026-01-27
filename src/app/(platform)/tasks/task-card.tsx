@@ -37,6 +37,7 @@ import { toast } from "sonner"
 
 type Task = Database["public"]["Tables"]["tasks"]["Row"] & {
     assignee?: { id: string, full_name: string | null, role: string, email: string } | null
+    task_number?: number
 }
 
 type Member = {
@@ -166,6 +167,9 @@ export function TaskCard({ task, currentUserId, userRole, members }: TaskCardPro
                 <div className="flex justify-between items-start gap-2">
                     <div className="space-y-1 flex-1">
                         <div className="flex items-center gap-2">
+                            <span className="text-xs font-mono text-slate-400">
+                                #{task.task_number ?? '...'}
+                            </span>
                             <Badge className={`${getStatusColor(task.status)} text-white hover:${getStatusColor(task.status)} border-0`}>
                                 {task.status || 'Pending'}
                             </Badge>
@@ -179,10 +183,12 @@ export function TaskCard({ task, currentUserId, userRole, members }: TaskCardPro
                             {task.title}
                         </h3>
                     </div>
-                    <Avatar className="h-8 w-8 border border-slate-200">
-                        <AvatarImage src={`https://avatar.vercel.sh/${task.assignee?.email || 'unassigned'}`} />
-                        <AvatarFallback>{task.assignee?.full_name?.substring(0, 2) || "??"}</AvatarFallback>
-                    </Avatar>
+                    <div title={task.assignee ? `Assignee: ${task.assignee.full_name}` : "Unassigned"}>
+                        <Avatar className="h-8 w-8 border border-slate-200">
+                            <AvatarImage src={`https://avatar.vercel.sh/${task.assignee?.email || 'unassigned'}`} />
+                            <AvatarFallback>{task.assignee?.full_name?.substring(0, 2) || "??"}</AvatarFallback>
+                        </Avatar>
+                    </div>
                 </div>
 
                 <div className="flex items-center justify-between text-xs text-slate-500 pt-1">
@@ -199,10 +205,17 @@ export function TaskCard({ task, currentUserId, userRole, members }: TaskCardPro
                 </div>
 
                 {!expanded && (
-                    <div className="flex items-center gap-4 text-xs text-slate-400 pb-2">
-                        <div className="flex items-center gap-1">
-                            <CalendarIcon className="w-3 h-3" />
-                            <span>{task.end_date ? format(new Date(task.end_date), "MMM d") : "-"}</span>
+                    <div className="space-y-2 pb-2">
+                        {task.description && (
+                            <p className="text-xs text-slate-500 line-clamp-2 leading-relaxed">
+                                {task.description}
+                            </p>
+                        )}
+                        <div className="flex items-center gap-4 text-xs text-slate-400">
+                            <div className="flex items-center gap-1">
+                                <CalendarIcon className="w-3 h-3" />
+                                <span>{task.end_date ? format(new Date(task.end_date), "MMM d") : "-"}</span>
+                            </div>
                         </div>
                     </div>
                 )}
