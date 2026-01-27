@@ -47,10 +47,12 @@ export async function createObjective(formData: FormData) {
 
     // A. From Playbook
     if (playbookId && playbookId !== 'none') {
-        const playbook = OBJECTIVE_PLAYBOOKS.find(pb => pb.id === playbookId)
-        if (playbook) {
+        const { getPackDetails } = await import('@/actions/packs')
+        const { pack } = await getPackDetails(playbookId)
+
+        if (pack && pack.items) {
             // Filter tasks based on selection
-            const tasksFromBook = playbook.tasks.filter(t => selectedTaskIds.includes(t.id))
+            const tasksFromBook = pack.items.filter(t => selectedTaskIds.includes(t.id))
 
             // Find AI Agent if needed
             let aiAgentId = null
@@ -67,7 +69,7 @@ export async function createObjective(formData: FormData) {
                 ...tasksToInsert,
                 ...tasksFromBook.map(task => ({
                     title: task.title,
-                    description: task.description,
+                    description: task.description || '',
                     objective_id: objective.id,
                     creator_id: user.id,
                     foundry_id: profile.foundry_id,
