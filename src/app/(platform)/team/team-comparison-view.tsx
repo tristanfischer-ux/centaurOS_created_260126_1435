@@ -26,7 +26,6 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { EmptyState } from "@/components/ui/empty-state"
-import { Users } from "lucide-react"
 import {
     AlertDialog,
     AlertDialogAction,
