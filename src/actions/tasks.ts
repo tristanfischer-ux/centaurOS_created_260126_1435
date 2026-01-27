@@ -110,25 +110,30 @@ export async function createTask(formData: FormData) {
     }
 
     // Create the task (with primary assignee for backward compatibility)
-    const { data, error } = await withRetry(async () => {
-        const result = await supabase.from('tasks').insert({
-            foundry_id,
-            title: validatedTitle.trim(),
-            description: validatedDescription || null,
-            objective_id: validatedObjectiveId || null,
-            creator_id: user.id,
-            assignee_id: validatedAssigneeIds[0], // Primary assignee
-            start_date: startDate || null,
-            end_date: deadline || null,
-            status: 'Pending',
-            risk_level: riskLevel,
-            client_visible: false // Always hidden initially
-        }).select().single()
-        if (result.error) throw result.error
-        return result
-    })
+    let data
+    try {
+        data = await withRetry(async () => {
+            const result = await supabase.from('tasks').insert({
+                foundry_id,
+                title: validatedTitle.trim(),
+                description: validatedDescription || null,
+                objective_id: validatedObjectiveId || null,
+                creator_id: user.id,
+                assignee_id: validatedAssigneeIds[0], // Primary assignee
+                start_date: startDate || null,
+                end_date: deadline || null,
+                status: 'Pending',
+                risk_level: riskLevel,
+                client_visible: false // Always hidden initially
+            }).select().single()
+            if (result.error) throw result.error
+            return result.data
+        })
+    } catch (error) {
+        return { error: error instanceof Error ? error.message : 'Failed to create task' }
+    }
 
-    if (error) return { error: error.message }
+    if (!data) return { error: 'Failed to create task' }
 
     // Insert additional assignees into task_assignees table
     if (validatedAssigneeIds.length > 0) {
@@ -543,6 +548,129 @@ export async function approveTask(taskId: string) {
 
     revalidatePath('/tasks')
     return { success: true }
+}
+
+// Get all tasks pending executive approval
+export async function getPendingApprovals() {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return { error: 'Unauthorized', data: [] }
+
+    // Check if user is Executive or Founder
+    const { data: profile } = await supabase.from('profiles').select('role, foundry_id').eq('id', user.id).single()
+    if (!profile || (profile.role !== 'Executive' && profile.role !== 'Founder')) {
+        return { error: 'Only Executives and Founders can view pending approvals', data: [] }
+    }
+
+    const { data: tasks, error } = await supabase
+        .from('tasks')
+        .select(`
+            id,
+            title,
+            description,
+            status,
+            risk_level,
+            created_at,
+            end_date,
+            assignee:profiles!assignee_id(id, full_name, role),
+            objective:objectives!objective_id(id, title),
+            creator:profiles!created_by(id, full_name)
+        `)
+        .in('status', ['Pending_Executive_Approval', 'Amended_Pending_Approval'])
+        .order('created_at', { ascending: false })
+
+    if (error) return { error: error.message, data: [] }
+
+    return { data: tasks || [] }
+}
+
+// Batch approve multiple tasks
+export async function batchApproveTasks(taskIds: string[]) {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return { error: 'Unauthorized' }
+
+    if (!taskIds || taskIds.length === 0) return { error: 'No tasks provided' }
+
+    // Check if user is Executive or Founder
+    const { data: approver } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+    if (!approver || (approver.role !== 'Executive' && approver.role !== 'Founder')) {
+        return { error: 'Only Executives and Founders can batch approve tasks' }
+    }
+
+    // Update all tasks at once
+    const { error } = await supabase.from('tasks')
+        .update({
+            status: 'Completed',
+            client_visible: true,
+            end_date: new Date().toISOString()
+        })
+        .in('id', taskIds)
+
+    if (error) return { error: error.message }
+
+    // Log events for each task
+    for (const taskId of taskIds) {
+        try {
+            await logSystemEvent(taskId, `Task Batch Approved & Released by ${approver.role}`, user.id)
+            await logTaskHistory(taskId, 'COMPLETED', user.id, {
+                approver_role: approver.role,
+                via_batch_approval: true,
+                batch_size: taskIds.length
+            })
+        } catch (logError) {
+            console.error('Failed to log task:', logError)
+        }
+    }
+
+    revalidatePath('/tasks')
+    revalidatePath('/dashboard')
+    return { success: true, approvedCount: taskIds.length }
+}
+
+// Batch reject multiple tasks
+export async function batchRejectTasks(taskIds: string[], reason: string) {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return { error: 'Unauthorized' }
+
+    if (!taskIds || taskIds.length === 0) return { error: 'No tasks provided' }
+    if (!reason?.trim()) return { error: 'Rejection reason is required' }
+
+    // Check if user is Executive or Founder
+    const { data: approver } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+    if (!approver || (approver.role !== 'Executive' && approver.role !== 'Founder')) {
+        return { error: 'Only Executives and Founders can batch reject tasks' }
+    }
+
+    // Update all tasks at once - send back to Pending status
+    const { error } = await supabase.from('tasks')
+        .update({
+            status: 'Pending',
+            rejection_reason: reason.trim()
+        })
+        .in('id', taskIds)
+
+    if (error) return { error: error.message }
+
+    // Log events for each task
+    for (const taskId of taskIds) {
+        try {
+            await logSystemEvent(taskId, `Task Batch Rejected by ${approver.role}: ${reason}`, user.id)
+            await logTaskHistory(taskId, 'REJECTED', user.id, {
+                approver_role: approver.role,
+                via_batch_rejection: true,
+                reason,
+                batch_size: taskIds.length
+            })
+        } catch (logError) {
+            console.error('Failed to log task:', logError)
+        }
+    }
+
+    revalidatePath('/tasks')
+    revalidatePath('/dashboard')
+    return { success: true, rejectedCount: taskIds.length }
 }
 
 export async function nudgeTask(taskId: string) {
