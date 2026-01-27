@@ -261,29 +261,35 @@ export function GanttView({ tasks, objectives, profiles }: GanttViewProps) {
     const goToToday = () => setDateOffset(new Date())
 
     // Transform options for multi-select (shorten objective titles)
-    const objectiveOptions = objectives.map((obj, idx) => {
-        // Remove "Strategic Objective X:" prefix if present
-        const shortTitle = (obj.title || 'Untitled').replace(/^Strategic Objective \d+:\s*/i, '')
-        // Truncate if still too long
-        const label = shortTitle.length > 20 ? shortTitle.substring(0, 18) + '...' : shortTitle
-        return {
-            value: obj.id,
-            label: `${idx + 1}. ${label}`
-        }
-    })
+    const objectiveOptions = useMemo(() => {
+        return objectives.map((obj, idx) => {
+            // Remove "Strategic Objective X:" prefix if present
+            const shortTitle = (obj.title || 'Untitled').replace(/^Strategic Objective \d+:\s*/i, '')
+            // Truncate if still too long
+            const label = shortTitle.length > 20 ? shortTitle.substring(0, 18) + '...' : shortTitle
+            return {
+                value: obj.id,
+                label: `${idx + 1}. ${label}`
+            }
+        })
+    }, [objectives])
 
-    const memberOptions = profiles.map(p => ({
-        value: p.id,
-        label: p.full_name || 'Unknown',
-        icon: p.role === 'AI_Agent' ? '🤖' : '👤'
-    }))
+    const memberOptions = useMemo(() => {
+        return profiles.map(p => ({
+            value: p.id,
+            label: p.full_name || 'Unknown',
+            icon: p.role === 'AI_Agent' ? '🤖' : '👤'
+        }))
+    }, [profiles])
 
     // Filter Logic (empty selection = show all)
-    const filteredTasks = tasks.filter(task => {
-        if (selectedObjectives.length > 0 && !selectedObjectives.includes(task.objective_id || '')) return false
-        if (selectedMembers.length > 0 && !selectedMembers.includes(task.assignee_id || '')) return false
-        return true
-    })
+    const filteredTasks = useMemo(() => {
+        return tasks.filter(task => {
+            if (selectedObjectives.length > 0 && !selectedObjectives.includes(task.objective_id || '')) return false
+            if (selectedMembers.length > 0 && !selectedMembers.includes(task.assignee_id || '')) return false
+            return true
+        })
+    }, [tasks, selectedObjectives, selectedMembers])
 
     // Transform to Gantt Library Format (with optimistic overrides and assignee info)
     // SORTED BY DEADLINE (end_date) - tasks due sooner appear first

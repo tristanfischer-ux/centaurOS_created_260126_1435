@@ -3,6 +3,7 @@
 import { createClient } from "@/lib/supabase/server"
 import { revalidatePath } from "next/cache"
 import { Database } from "@/types/database.types"
+import { createRFQSchema, validate } from "@/lib/validations"
 
 
 
@@ -95,12 +96,26 @@ export async function submitRFQ(formData: {
 
     if (!profile) return { error: "Profile not found" }
 
+    // Validate using Zod schema
+    const rawData = {
+        title: formData.title || '',
+        specifications: formData.specifications?.trim() || undefined,
+        budgetRange: formData.budget_range?.trim() || undefined
+    }
+
+    const validation = validate(createRFQSchema, rawData)
+    if (!validation.success) {
+        return { error: validation.error }
+    }
+
+    const { title: validatedTitle, specifications: validatedSpecifications, budgetRange: validatedBudgetRange } = validation.data
+
     const { error } = await supabase
         .from("manufacturing_rfqs")
         .insert({
-            title: formData.title,
-            specifications: formData.specifications?.trim() || null,
-            budget_range: formData.budget_range?.trim() || null,
+            title: validatedTitle,
+            specifications: validatedSpecifications || null,
+            budget_range: validatedBudgetRange || null,
             foundry_id: profile.foundry_id,
             created_by: user.id,
             status: "Open"

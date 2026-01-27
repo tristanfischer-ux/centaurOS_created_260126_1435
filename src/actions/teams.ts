@@ -2,17 +2,8 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
-
-async function getFoundryId() {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return null
-
-    if (user.app_metadata.foundry_id) return user.app_metadata.foundry_id
-
-    const { data: profile } = await supabase.from('profiles').select('foundry_id').eq('id', user.id).single()
-    return profile?.foundry_id
-}
+import { updateTeamNameSchema, validate } from '@/lib/validations'
+import { getFoundryIdCached } from '@/lib/supabase/foundry-context'
 
 export async function deleteTeam(teamId: string) {
     const supabase = await createClient()
@@ -22,7 +13,7 @@ export async function deleteTeam(teamId: string) {
     }
 
     // Verify team exists and user has access
-    const foundry_id = await getFoundryId()
+    const foundry_id = await getFoundryIdCached()
     if (!foundry_id) {
         return { error: 'Missing Foundry ID' }
     }
@@ -85,17 +76,16 @@ export async function updateTeamName(teamId: string, name: string) {
         return { error: 'Unauthorized' }
     }
 
-    // Validate input
-    if (!name || !name.trim()) {
-        return { error: 'Team name is required' }
+    // Validate using Zod schema
+    const validation = validate(updateTeamNameSchema, { teamId, name: name || '' })
+    if (!validation.success) {
+        return { error: validation.error }
     }
 
-    if (name.trim().length > 100) {
-        return { error: 'Team name must be 100 characters or less' }
-    }
+    const { name: validatedName } = validation.data
 
     // Verify team exists and user has access
-    const foundry_id = await getFoundryId()
+    const foundry_id = await getFoundryIdCached()
     if (!foundry_id) {
         return { error: 'Missing Foundry ID' }
     }
@@ -128,7 +118,7 @@ export async function updateTeamName(teamId: string, name: string) {
 
     const { error } = await supabase
         .from('teams')
-        .update({ name: name.trim() })
+        .update({ name: validatedName.trim() })
         .eq('id', teamId)
 
     if (error) {

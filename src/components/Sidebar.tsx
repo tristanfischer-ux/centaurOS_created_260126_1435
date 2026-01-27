@@ -4,7 +4,8 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 // We'll replace these with Lucide icons later if needed, or maintain text/emoji
-import { LayoutDashboard, Users, CheckSquare, Calendar, ShoppingBag, Settings, Target } from "lucide-react"
+import { LayoutDashboard, Users, CheckSquare, Calendar, ShoppingBag, Settings, Target, HelpCircle } from "lucide-react"
+import { NotificationCenter } from "@/components/NotificationCenter"
 
 const navigation = [
     { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
@@ -13,6 +14,7 @@ const navigation = [
     { name: "Tasks", href: "/tasks", icon: CheckSquare },
     { name: "Timeline", href: "/timeline", icon: Calendar },
     { name: "Marketplace", href: "/marketplace", icon: ShoppingBag },
+    { name: "Help", href: "/help", icon: HelpCircle },
     { name: "Settings", href: "/settings", icon: Settings },
 ]
 
@@ -22,8 +24,11 @@ export function Sidebar({ foundryName, foundryId, userName, userRole }: { foundr
     return (
         <div className="hidden md:flex h-screen w-64 flex-col bg-slate-50 text-slate-900 border-r border-slate-200">
             <div className="flex flex-col h-24 items-center justify-center border-b border-slate-200 bg-white">
-                <div className="font-bold text-xl tracking-wider uppercase text-amber-600">
-                    Centaur App
+                <div className="flex items-center justify-between w-full px-4">
+                    <div className="font-bold text-xl tracking-wider uppercase text-amber-600">
+                        Centaur App
+                    </div>
+                    <NotificationCenter />
                 </div>
                 <div className="mt-2 text-center">
                     <div className="text-xs font-semibold text-slate-700 uppercase tracking-wide px-2 truncate max-w-[200px]">

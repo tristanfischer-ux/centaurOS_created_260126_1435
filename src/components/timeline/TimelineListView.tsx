@@ -242,7 +242,7 @@ export function TimelineListView({ tasks, members, currentUserId }: TimelineList
         })
     }
 
-    const groupedTasks = groupTasksByDueDate(tasks)
+    const groupedTasks = useMemo(() => groupTasksByDueDate(tasks), [tasks])
     const dateKeys = Object.keys(groupedTasks).sort((a, b) => {
         // Overdue always first (most urgent)
         if (a === '⚠️ Overdue') return -1

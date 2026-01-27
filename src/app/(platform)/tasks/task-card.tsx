@@ -1,11 +1,12 @@
 "use client"
 
-import { useState } from "react"
+import { useState, memo } from "react"
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Markdown } from "@/components/ui/markdown"
 import {
     Dialog,
     DialogContent,
@@ -74,7 +75,7 @@ interface TaskCardProps {
     onToggleSelection?: () => void
 }
 
-export function TaskCard(props: TaskCardProps) {
+export const TaskCard = memo(function TaskCard(props: TaskCardProps) {
     const { task, currentUserId, userRole, members } = props
     const isAssignee = task.assignees?.some(a => a.id === currentUserId) || task.assignee_id === currentUserId
     const isCreator = currentUserId === task.creator_id
@@ -462,9 +463,9 @@ export function TaskCard(props: TaskCardProps) {
                 {!expanded && (
                     <div className="space-y-2 pb-2">
                         {task.description && (
-                            <p className="text-xs text-slate-500 line-clamp-2 leading-relaxed">
-                                {task.description}
-                            </p>
+                            <div className="text-xs text-slate-500 line-clamp-2 leading-relaxed">
+                                <Markdown content={task.description} className="text-xs" />
+                            </div>
                         )}
                         <div className="flex items-center gap-4 text-xs text-slate-400">
                             <div className="flex items-center gap-1">
@@ -483,9 +484,13 @@ export function TaskCard(props: TaskCardProps) {
                             {/* Full Description */}
                             <div className="space-y-1">
                                 <h4 className="text-xs font-semibold text-slate-900 uppercase tracking-wider">Description</h4>
-                                <p className="text-slate-700 text-sm leading-relaxed whitespace-pre-wrap">
-                                    {task.description || "No specific details provided."}
-                                </p>
+                                {task.description ? (
+                                    <div className="text-slate-700 text-sm leading-relaxed">
+                                        <Markdown content={task.description} className="text-sm" />
+                                    </div>
+                                ) : (
+                                    <p className="text-slate-700 text-sm leading-relaxed">No specific details provided.</p>
+                                )}
                             </div>
 
                             {/* Detailed Dates - Now Interactive */}
@@ -791,4 +796,4 @@ export function TaskCard(props: TaskCardProps) {
             )}
         </Card>
     )
-}
+})

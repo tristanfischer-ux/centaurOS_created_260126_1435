@@ -4,6 +4,10 @@ import { PWARegister } from "@/components/PWARegister";
 import { DragDropPolyfill } from "@/components/DragDropPolyfill";
 import { CommandPalette } from "@/components/CommandPalette";
 import { KeyboardShortcutsDialog } from "@/components/KeyboardShortcutsDialog";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { OfflineIndicator } from "@/components/OfflineIndicator";
+import { OnboardingModal } from "@/components/OnboardingModal";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 
@@ -46,16 +50,22 @@ export default async function PlatformLayout({
     }
 
     return (
-        <div className="flex h-screen overflow-hidden">
-            <CommandPalette />
-            <KeyboardShortcutsDialog />
-            <Sidebar foundryName={foundryName} foundryId={foundryId} userName={profile?.full_name || user.email || "User"} userRole={profile?.role || "Member"} />
-            <main className="flex-1 overflow-y-auto bg-white p-4 sm:p-6 lg:p-8 pb-32 lg:pb-8">
-                {children}
-            </main>
-            <MobileNav />
-            <PWARegister />
-            <DragDropPolyfill />
-        </div>
+        <TooltipProvider>
+            <div className="flex h-screen overflow-hidden">
+                <CommandPalette />
+                <KeyboardShortcutsDialog />
+                <Sidebar foundryName={foundryName} foundryId={foundryId} userName={profile?.full_name || user.email || "User"} userRole={profile?.role || "Member"} />
+                <main className="flex-1 overflow-y-auto bg-white p-4 sm:p-6 lg:p-8 pb-32 lg:pb-8">
+                    <ErrorBoundary>
+                        {children}
+                    </ErrorBoundary>
+                </main>
+                <MobileNav />
+                <PWARegister />
+                <DragDropPolyfill />
+                <OfflineIndicator />
+                <OnboardingModal />
+            </div>
+        </TooltipProvider>
     );
 }

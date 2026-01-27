@@ -5,6 +5,9 @@ import { revalidatePath } from 'next/cache'
 import { Database } from '@/types/database.types'
 import { runAIWorker } from '@/lib/ai-worker'
 import { logTaskHistory } from '@/lib/audit'
+import { createTaskSchema, updateTaskDatesSchema, addCommentSchema, validate } from '@/lib/validations'
+import { getFoundryIdCached } from '@/lib/supabase/foundry-context'
+import { withRetry } from '@/lib/retry'
 
 // Nudge cooldown duration (1 hour)
 const NUDGE_COOLDOWN_MS = 60 * 60 * 1000
@@ -12,23 +15,9 @@ const NUDGE_COOLDOWN_MS = 60 * 60 * 1000
 export type TaskStatus = Database["public"]["Enums"]["task_status"]
 export type RiskLevel = Database["public"]["Enums"]["risk_level"]
 
-
-async function getFoundryId() {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return null
-
-    // First try metadata
-    if (user.app_metadata.foundry_id) return user.app_metadata.foundry_id
-
-    // Fallback: Fetch from public.profiles
-    const { data: profile } = await supabase.from('profiles').select('foundry_id').eq('id', user.id).single()
-    return profile?.foundry_id
-}
-
 async function logSystemEvent(taskId: string, message: string, userId: string) {
     const supabase = await createClient()
-    const foundry_id = await getFoundryId()
+    const foundry_id = await getFoundryIdCached()
     if (!foundry_id) return
 
     await supabase.from('task_comments').insert({
@@ -42,7 +31,7 @@ async function logSystemEvent(taskId: string, message: string, userId: string) {
 
 export async function createTask(formData: FormData) {
     const supabase = await createClient()
-    const foundry_id = await getFoundryId()
+    const foundry_id = await getFoundryIdCached()
     const { data: { user } } = await supabase.auth.getUser()
     if (!foundry_id || !user) return { error: 'Unauthorized' }
 
@@ -55,37 +44,6 @@ export async function createTask(formData: FormData) {
     const endDate = formData.get('end_date') as string
     const riskLevelRaw = formData.get('risk_level') as string
     const fileCountRaw = formData.get('file_count') as string || '0'
-
-    // Validate required fields
-    if (!title || !objectiveId || !assigneeId) {
-        return { error: 'Missing required fields: title, objective_id, and assignee_id are required' }
-    }
-
-    // Validate title length (1-500 characters)
-    const titleTrimmed = title.trim()
-    if (titleTrimmed.length === 0) {
-        return { error: 'Title cannot be empty' }
-    }
-    if (titleTrimmed.length > 500) {
-        return { error: 'Title must be 500 characters or less' }
-    }
-
-    // Validate description length (max 10,000 characters)
-    if (description && description.length > 10000) {
-        return { error: 'Description must be 10,000 characters or less' }
-    }
-
-    // Validate riskLevel enum
-    const validRiskLevels: RiskLevel[] = ['Low', 'Medium', 'High']
-    const riskLevel: RiskLevel = (validRiskLevels.includes(riskLevelRaw as RiskLevel) 
-        ? riskLevelRaw 
-        : 'Low') as RiskLevel
-
-    // Validate and parse fileCount (handle NaN)
-    const fileCount = parseInt(fileCountRaw, 10)
-    if (isNaN(fileCount) || fileCount < 0) {
-        return { error: 'Invalid file count: must be a non-negative number' }
-    }
 
     // Parse multiple assignees (if provided)
     let assigneeIds: string[] = [assigneeId]
@@ -127,31 +85,54 @@ export async function createTask(formData: FormData) {
         }
     }
 
-    // Ensure we have at least one assignee
-    if (assigneeIds.length === 0 || !assigneeIds[0]) {
+    // Validate using Zod schema
+    // Convert empty strings to null/undefined for optional fields
+    const rawData = {
+        title: title || '',
+        description: description?.trim() || undefined,
+        objectiveId: objectiveId?.trim() || undefined,
+        assigneeIds: assigneeIds.filter(id => id), // Filter out empty strings
+        deadline: endDate?.trim() ? endDate.trim() : null,
+        riskLevel: (riskLevelRaw as RiskLevel) || 'Medium',
+        fileCount: parseInt(fileCountRaw, 10) || 0
+    }
+
+    const validation = validate(createTaskSchema, rawData)
+    if (!validation.success) {
+        return { error: validation.error }
+    }
+
+    const { title: validatedTitle, description: validatedDescription, assigneeIds: validatedAssigneeIds, objectiveId: validatedObjectiveId, deadline, riskLevel, fileCount } = validation.data
+
+    // Ensure we have at least one assignee after validation
+    if (validatedAssigneeIds.length === 0 || !validatedAssigneeIds[0]) {
         return { error: 'At least one assignee is required' }
     }
 
     // Create the task (with primary assignee for backward compatibility)
-    const { data, error } = await supabase.from('tasks').insert({
-        foundry_id,
-        title: titleTrimmed,
-        description: description || null,
-        objective_id: objectiveId,
-        creator_id: user.id,
-        assignee_id: assigneeIds[0], // Primary assignee
-        start_date: startDate || null,
-        end_date: endDate || null,
-        status: 'Pending',
-        risk_level: riskLevel,
-        client_visible: false // Always hidden initially
-    }).select().single()
+    const { data, error } = await withRetry(async () => {
+        const result = await supabase.from('tasks').insert({
+            foundry_id,
+            title: validatedTitle.trim(),
+            description: validatedDescription || null,
+            objective_id: validatedObjectiveId || null,
+            creator_id: user.id,
+            assignee_id: validatedAssigneeIds[0], // Primary assignee
+            start_date: startDate || null,
+            end_date: deadline || null,
+            status: 'Pending',
+            risk_level: riskLevel,
+            client_visible: false // Always hidden initially
+        }).select().single()
+        if (result.error) throw result.error
+        return result
+    })
 
     if (error) return { error: error.message }
 
     // Insert additional assignees into task_assignees table
-    if (assigneeIds.length > 0) {
-        const assigneeRecords = assigneeIds.map(profileId => ({
+    if (validatedAssigneeIds.length > 0) {
+        const assigneeRecords = validatedAssigneeIds.map(profileId => ({
             task_id: data.id,
             profile_id: profileId
         }))
@@ -205,8 +186,8 @@ export async function createTask(formData: FormData) {
     
     try {
         await logTaskHistory(data.id, 'CREATED', user.id, {
-            title,
-            assignee_id: assigneeIds[0],
+            title: validatedTitle,
+            assignee_id: validatedAssigneeIds[0],
             initial_status: 'Pending',
             risk_level: riskLevel
         })
@@ -217,7 +198,7 @@ export async function createTask(formData: FormData) {
 
     // Trigger AI Worker for primary assignee
     try {
-        await runAIWorker(data.id, assigneeIds[0])
+        await runAIWorker(data.id, validatedAssigneeIds[0])
     } catch (error) {
         console.error('Failed to trigger AI worker:', error)
         // Continue - AI worker failure shouldn't fail task creation
@@ -440,16 +421,24 @@ export async function approveAmendment(taskId: string) {
 
 export async function addTaskComment(taskId: string, content: string) {
     const supabase = await createClient()
-    const foundry_id = await getFoundryId()
+    const foundry_id = await getFoundryIdCached()
     const { data: { user } } = await supabase.auth.getUser()
 
     if (!user || !foundry_id) return { error: 'Unauthorized' }
+
+    // Validate using Zod schema
+    const validation = validate(addCommentSchema, { taskId, content })
+    if (!validation.success) {
+        return { error: validation.error }
+    }
+
+    const { content: validatedContent } = validation.data
 
     const { error } = await supabase.from('task_comments').insert({
         task_id: taskId,
         foundry_id: foundry_id,
         user_id: user.id,
-        content,
+        content: validatedContent,
         is_system_log: false
     })
 
@@ -597,7 +586,7 @@ export async function nudgeTask(taskId: string) {
 // --- LIVE PULSE METRICS ---
 export async function getPulseMetrics() {
     const supabase = await createClient()
-    const foundry_id = await getFoundryId()
+    const foundry_id = await getFoundryIdCached()
 
     if (!foundry_id) return { actions: 0 }
 
@@ -629,41 +618,32 @@ export async function updateTaskDates(taskId: string, startDate: string, endDate
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return { error: 'Unauthorized' }
 
-    // Validate input
-    if (!startDate || !endDate) {
-        return { error: 'Start date and end date are required' }
+    // Validate using Zod schema
+    // Convert empty strings to null for optional date fields
+    const validation = validate(updateTaskDatesSchema, {
+        taskId,
+        startDate: startDate?.trim() ? startDate.trim() : null,
+        endDate: endDate?.trim() ? endDate.trim() : null
+    })
+    if (!validation.success) {
+        return { error: validation.error }
     }
 
-    // Validate dates are valid ISO strings
-    const startDateObj = new Date(startDate)
-    const endDateObj = new Date(endDate)
-
-    if (isNaN(startDateObj.getTime())) {
-        return { error: 'Invalid start date format. Please use ISO date format (YYYY-MM-DD or YYYY-MM-DDTHH:mm:ss)' }
-    }
-
-    if (isNaN(endDateObj.getTime())) {
-        return { error: 'Invalid end date format. Please use ISO date format (YYYY-MM-DD or YYYY-MM-DDTHH:mm:ss)' }
-    }
-
-    // Validate startDate < endDate
-    if (startDateObj >= endDateObj) {
-        return { error: 'Start date must be before end date' }
-    }
+    const { startDate: validatedStartDate, endDate: validatedEndDate } = validation.data
 
     const { error } = await supabase.from('tasks')
         .update({
-            start_date: startDate,
-            end_date: endDate
+            start_date: validatedStartDate,
+            end_date: validatedEndDate
         })
         .eq('id', taskId)
 
     if (error) return { error: error.message }
 
     try {
-        // Safely format dates for logging (startDate and endDate are validated above but add null checks for safety)
-        const startDateFormatted = startDate ? startDate.split('T')[0] : 'N/A'
-        const endDateFormatted = endDate ? endDate.split('T')[0] : 'N/A'
+        // Safely format dates for logging (validatedStartDate and validatedEndDate are validated above but add null checks for safety)
+        const startDateFormatted = validatedStartDate ? validatedStartDate.split('T')[0] : 'N/A'
+        const endDateFormatted = validatedEndDate ? validatedEndDate.split('T')[0] : 'N/A'
         await logSystemEvent(taskId, `Task rescheduled: ${startDateFormatted} → ${endDateFormatted}`, user.id)
     } catch (logError) {
         console.error('Failed to log system event:', logError)
@@ -672,8 +652,8 @@ export async function updateTaskDates(taskId: string, startDate: string, endDate
     try {
         await logTaskHistory(taskId, 'UPDATED', user.id, {
             field: 'dates',
-            new_start: startDate,
-            new_end: endDate
+            new_start: validatedStartDate,
+            new_end: validatedEndDate
         })
     } catch (logError) {
         console.error('Failed to log task history:', logError)
@@ -743,7 +723,7 @@ export async function updateTaskProgress(taskId: string, progress: number) {
 
 export async function duplicateTask(originalTaskId: string) {
     const supabase = await createClient()
-    const foundry_id = await getFoundryId()
+    const foundry_id = await getFoundryIdCached()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user || !foundry_id) return { error: 'Unauthorized' }
 
@@ -914,7 +894,7 @@ export async function updateTaskAssignees(taskId: string, assigneeIds: string[])
 
 export async function uploadTaskAttachment(taskId: string, formData: FormData) {
     const supabase = await createClient()
-    const foundry_id = await getFoundryId()
+    const foundry_id = await getFoundryIdCached()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user || !foundry_id) return { error: 'Unauthorized' }
 

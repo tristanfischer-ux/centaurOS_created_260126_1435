@@ -1,5 +1,6 @@
 'use client'
 
+import { memo } from "react"
 import { MarketplaceListing } from "@/actions/marketplace"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -14,7 +15,7 @@ interface MarketCardProps {
     onToggleSelect: (id: string) => void
 }
 
-export function MarketCard({ listing, isSelected, onToggleSelect }: MarketCardProps) {
+export const MarketCard = memo(function MarketCard({ listing, isSelected, onToggleSelect }: MarketCardProps) {
     // Aesthetic variants based on category - now unified to white, using badges for color
     const categoryBadgeStyles = {
         'People': 'bg-stone-100 text-stone-700 border-stone-200',
@@ -86,4 +87,4 @@ export function MarketCard({ listing, isSelected, onToggleSelect }: MarketCardPr
             </CardFooter>
         </Card>
     )
-}
+})

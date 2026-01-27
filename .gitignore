@@ -3,3 +3,8 @@ node_modules/
 .env
 mcp_config.json
 .vercel
+
+# Playwright
+/playwright-report/
+/test-results/
+/e2e/.auth/

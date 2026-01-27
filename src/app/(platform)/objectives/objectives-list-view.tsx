@@ -7,6 +7,7 @@ import { ChevronDown, ChevronRight, Target, CheckCircle2, Clock, AlertCircle, Ar
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
+import { Markdown } from "@/components/ui/markdown"
 import Link from "next/link"
 import { deleteObjective } from "@/actions/objectives"
 import { toast } from "sonner"
@@ -349,7 +350,9 @@ export function ObjectivesListView({ objectives, objectivesForDialog, members, t
                                         )}
                                     </div>
                                     {objective.description && (
-                                        <p className="text-sm text-slate-500 truncate">{objective.description}</p>
+                                        <div className="text-sm text-slate-500 truncate">
+                                            <Markdown content={objective.description} className="text-sm text-muted-foreground" />
+                                        </div>
                                     )}
                                 </div>
 

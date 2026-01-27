@@ -1,5 +1,6 @@
 "use client"
 
+import { memo } from "react"
 import Link from "next/link"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -16,7 +17,7 @@ interface PersonCardProps {
     compact?: boolean
 }
 
-export function PersonCard({
+export const PersonCard = memo(function PersonCard({
     id,
     full_name,
     email,
@@ -97,4 +98,4 @@ export function PersonCard({
             </Card>
         </Link>
     )
-}
+})

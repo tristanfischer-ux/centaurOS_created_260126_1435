@@ -12,6 +12,9 @@ import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
 import { Textarea } from "@/components/ui/textarea"
+import { Markdown } from "@/components/ui/markdown"
+import { MentionInput } from "@/components/ui/mention-input"
+import { MentionText } from "@/components/ui/mention-text"
 import { addTaskComment, acceptTask, rejectTask, completeTask, forwardTask, triggerAIWorker } from "@/actions/tasks"
 import { uploadTaskAttachment } from "@/actions/attachments"
 import { toast } from "sonner"
@@ -35,6 +38,7 @@ interface Member {
     id: string
     full_name: string | null
     role: string | null
+    email?: string
 }
 
 interface ThreadDrawerProps {
@@ -500,9 +504,15 @@ export function ThreadDrawer({
                                                     {formatDistanceToNow(new Date(comment.created_at), { addSuffix: true })}
                                                 </span>
                                             </div>
-                                            <p className="text-slate-700 whitespace-pre-wrap leading-relaxed">
-                                                {comment.content}
-                                            </p>
+                                            <div className="text-slate-700 leading-relaxed">
+                                                <MentionText 
+                                                    content={comment.content} 
+                                                    members={members.filter(m => m.full_name !== null).map(m => ({
+                                                        id: m.id,
+                                                        full_name: m.full_name!
+                                                    }))}
+                                                />
+                                            </div>
                                         </div>
                                     </div>
                                 ))}
@@ -545,17 +555,27 @@ export function ThreadDrawer({
                     />
                     <form onSubmit={handleSend} className="flex gap-2">
                         <div className="flex-1">
-                            <Input
+                            <MentionInput
                                 value={newComment}
-                                onChange={(e) => {
-                                    setNewComment(e.target.value)
+                                onChange={(value) => {
+                                    setNewComment(value)
                                     setCommentError(null)
                                 }}
-                                placeholder="Type a note..."
-                                disabled={isSending}
+                                members={members.filter(m => m.full_name !== null && m.email).map(m => ({
+                                    id: m.id,
+                                    full_name: m.full_name!,
+                                    email: m.email!
+                                }))}
+                                placeholder="Type a note... Use @ to mention someone"
+                                onSubmit={() => {
+                                    if (!newComment.trim()) {
+                                        setCommentError("Comment cannot be empty")
+                                        return
+                                    }
+                                    const fakeEvent = { preventDefault: () => {} } as React.FormEvent
+                                    handleSend(fakeEvent)
+                                }}
                                 className={`bg-white border-slate-200 ${commentError ? 'border-red-500' : ''}`}
-                                aria-describedby={commentError ? "comment-error" : undefined}
-                                aria-invalid={!!commentError}
                             />
                             {commentError && (
                                 <p id="comment-error" className="text-sm text-red-600 mt-1" role="alert">

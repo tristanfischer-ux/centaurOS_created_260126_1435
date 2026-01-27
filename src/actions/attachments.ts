@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { uploadAttachmentSchema, validate } from '@/lib/validations'
 
 export async function uploadTaskAttachment(taskId: string, formData: FormData) {
     const supabase = await createClient()
@@ -10,6 +11,17 @@ export async function uploadTaskAttachment(taskId: string, formData: FormData) {
 
     const file = formData.get('file') as File
     if (!file) return { error: 'No file provided' }
+
+    // Validate using Zod schema
+    const validation = validate(uploadAttachmentSchema, {
+        taskId,
+        fileName: file.name,
+        fileSize: file.size,
+        fileType: file.type
+    })
+    if (!validation.success) {
+        return { error: validation.error }
+    }
 
     // Get user's foundry_id
     const { data: profile, error: profileError } = await supabase

@@ -3,6 +3,9 @@
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { Database } from '@/types/database.types'
+import { createObjectiveSchema, validate } from '@/lib/validations'
+import { getFoundryIdCached } from '@/lib/supabase/foundry-context'
+import { withRetry } from '@/lib/retry'
 
 
 
@@ -30,15 +33,32 @@ export async function createObjective(formData: FormData) {
     // AI Import tasks (JSON strings)
     const aiTasksJson = formData.getAll('aiTasks') as string[]
 
-    if (!title) return { error: 'Title is required' }
+    // Validate using Zod schema
+    const rawData = {
+        title: title || '',
+        description: description || undefined,
+        playbookId: playbookId && playbookId !== 'none' ? playbookId : undefined,
+        selectedTaskIds: selectedTaskIds.length > 0 ? selectedTaskIds : undefined
+    }
+
+    const validation = validate(createObjectiveSchema, rawData)
+    if (!validation.success) {
+        return { error: validation.error }
+    }
+
+    const { title: validatedTitle, description: validatedDescription, playbookId: validatedPlaybookId, selectedTaskIds: validatedSelectedTaskIds } = validation.data
 
     // 2. Create the objective
-    const { data: objective, error } = await supabase.from('objectives').insert({
-        title,
-        description,
-        creator_id: user.id,
-        foundry_id: profile.foundry_id
-    }).select().single()
+    const { data: objective, error } = await withRetry(async () => {
+        const result = await supabase.from('objectives').insert({
+            title: validatedTitle,
+            description: validatedDescription || null,
+            creator_id: user.id,
+            foundry_id: profile.foundry_id
+        }).select().single()
+        if (result.error) throw result.error
+        return result
+    })
 
     if (error) return { error: error.message }
     if (!objective) return { error: 'Failed to create objective' }
@@ -47,13 +67,13 @@ export async function createObjective(formData: FormData) {
     let tasksToInsert: Database['public']['Tables']['tasks']['Insert'][] = []
 
     // A. From Playbook
-    if (playbookId && playbookId !== 'none' && selectedTaskIds.length > 0) {
+    if (validatedPlaybookId && validatedSelectedTaskIds && validatedSelectedTaskIds.length > 0) {
         // Optimize query: only fetch selected pack items
         const { data: packItems, error: packError } = await supabase
             .from('pack_items')
             .select('*')
-            .eq('pack_id', playbookId)
-            .in('id', selectedTaskIds)
+            .eq('pack_id', validatedPlaybookId)
+            .in('id', validatedSelectedTaskIds)
 
         // Handle pack fetch errors
         if (packError) {
@@ -74,7 +94,7 @@ export async function createObjective(formData: FormData) {
 
         // Validate that we got the expected pack items
         if (!packItems || packItems.length === 0) {
-            console.warn(`No pack items found for pack_id: ${playbookId} with selected IDs: ${selectedTaskIds.join(', ')}`)
+            console.warn(`No pack items found for pack_id: ${validatedPlaybookId} with selected IDs: ${validatedSelectedTaskIds.join(', ')}`)
             // Don't fail here - user might have selected invalid items, but objective should still be created
         } else {
             // Validate that all pack items have required fields
@@ -186,7 +206,11 @@ export async function createObjective(formData: FormData) {
     }
 
     if (tasksToInsert.length > 0) {
-        const { error: taskError } = await supabase.from('tasks').insert(tasksToInsert)
+        const { error: taskError } = await withRetry(async () => {
+            const result = await supabase.from('tasks').insert(tasksToInsert)
+            if (result.error) throw result.error
+            return result
+        })
         if (taskError) {
             console.error('Error creating tasks:', taskError)
             // Delete the objective to prevent partial creation

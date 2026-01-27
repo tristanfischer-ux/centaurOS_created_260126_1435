@@ -2,17 +2,8 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
-
-async function getFoundryId() {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return null
-
-    if (user.app_metadata.foundry_id) return user.app_metadata.foundry_id
-
-    const { data: profile } = await supabase.from('profiles').select('foundry_id').eq('id', user.id).single()
-    return profile?.foundry_id
-}
+import { createTeamSchema, inviteMemberSchema, validate } from '@/lib/validations'
+import { getFoundryIdCached } from '@/lib/supabase/foundry-context'
 
 // ============ MEMBER ACTIONS ============
 
@@ -27,11 +18,21 @@ export async function createMember(formData: FormData) {
 
     const email = formData.get('email') as string
     const full_name = formData.get('full_name') as string
-    const role_type = formData.get('role_type') as "Executive" | "Apprentice" | "AI_Agent"
+    const role_type = formData.get('role_type') as "Executive" | "Apprentice" | "AI_Agent" | "Founder"
 
-    if (!email) return { error: 'Email is required' }
-    if (!full_name) return { error: 'Full name is required' }
-    if (!role_type) return { error: 'Role is required' }
+    // Validate using Zod schema
+    const rawData = {
+        email: email || '',
+        name: full_name || '',
+        role: role_type || 'Apprentice'
+    }
+
+    const validation = validate(inviteMemberSchema, rawData)
+    if (!validation.success) {
+        return { error: validation.error }
+    }
+
+    const { email: validatedEmail, name: validatedName, role: validatedRole } = validation.data
 
     const id = crypto.randomUUID()
 
@@ -39,9 +40,9 @@ export async function createMember(formData: FormData) {
         .from('profiles')
         .insert({
             id,
-            email,
-            full_name,
-            role: role_type,
+            email: validatedEmail,
+            full_name: validatedName,
+            role: validatedRole,
             foundry_id: foundry_id
         })
 
@@ -104,16 +105,26 @@ export async function createTeam(name: string, memberIds: string[]) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return { error: 'Unauthorized' }
 
-    const foundry_id = await getFoundryId()
+    const foundry_id = await getFoundryIdCached()
     if (!foundry_id) return { error: 'Missing Foundry ID' }
 
-    if (!name.trim()) return { error: 'Team name is required' }
-    if (memberIds.length < 2) return { error: 'Team must have at least 2 members' }
+    // Validate using Zod schema
+    const rawData = {
+        name: name || '',
+        memberIds: memberIds || []
+    }
+
+    const validation = validate(createTeamSchema, rawData)
+    if (!validation.success) {
+        return { error: validation.error }
+    }
+
+    const { name: validatedName, memberIds: validatedMemberIds } = validation.data
 
     const { data: team, error: teamError } = await supabase
         .from('teams')
         .insert({
-            name: name.trim(),
+            name: validatedName.trim(),
             foundry_id,
             is_auto_generated: false
         })
@@ -122,7 +133,7 @@ export async function createTeam(name: string, memberIds: string[]) {
 
     if (teamError) return { error: teamError.message }
 
-    const memberInserts = memberIds.map(profileId => ({
+    const memberInserts = validatedMemberIds.map(profileId => ({
         team_id: team.id,
         profile_id: profileId
     }))
@@ -141,7 +152,7 @@ export async function getOrCreateAutoTeam(memberIds: string[]): Promise<{ teamId
     if (memberIds.length < 2) return { teamId: null }
 
     const supabase = await createClient()
-    const foundry_id = await getFoundryId()
+    const foundry_id = await getFoundryIdCached()
     if (!foundry_id) return { teamId: null, error: 'Missing Foundry ID' }
 
     const sortedIds = [...memberIds].sort()
@@ -210,7 +221,7 @@ export async function addTeamMember(teamId: string, profileId: string) {
     }
 
     // Verify team exists and user has access
-    const foundry_id = await getFoundryId()
+    const foundry_id = await getFoundryIdCached()
     if (!foundry_id) {
         return { error: 'Missing Foundry ID' }
     }
@@ -289,7 +300,7 @@ export async function removeTeamMember(teamId: string, profileId: string) {
     }
 
     // Verify team exists and user has access
-    const foundry_id = await getFoundryId()
+    const foundry_id = await getFoundryIdCached()
     if (!foundry_id) {
         return { error: 'Missing Foundry ID' }
     }
@@ -448,7 +459,7 @@ export async function deleteMember(memberId: string) {
 
 export async function getTeamsForFoundry() {
     const supabase = await createClient()
-    const foundry_id = await getFoundryId()
+    const foundry_id = await getFoundryIdCached()
     if (!foundry_id) return { teams: [], error: 'Missing Foundry ID' }
 
     const { data: teams, error } = await supabase

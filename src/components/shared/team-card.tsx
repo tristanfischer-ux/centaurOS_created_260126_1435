@@ -1,5 +1,6 @@
 "use client"
 
+import { memo } from "react"
 import Link from "next/link"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -22,7 +23,7 @@ interface TeamCardProps {
     compact?: boolean
 }
 
-export function TeamCard({
+export const TeamCard = memo(function TeamCard({
     id,
     name,
     is_auto_generated = false,
@@ -121,4 +122,4 @@ export function TeamCard({
             </Card>
         </Link>
     )
-}
+})

@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { EmptyState } from "@/components/ui/empty-state"
 import { Skeleton } from "@/components/ui/skeleton"
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
 import { CreateTaskDialog } from "../tasks/create-task-dialog"
 import { CreateObjectiveDialog } from "../objectives/create-objective-dialog"
 import Link from "next/link"
@@ -21,7 +22,8 @@ import {
     ShoppingBag,
     AlertCircle,
     MessageSquare,
-    CheckCircle2
+    CheckCircle2,
+    HelpCircle
 } from "lucide-react"
 import { formatDistanceToNow } from "date-fns"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
@@ -218,7 +220,17 @@ export default async function DashboardPage() {
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2">
                                 <CheckSquare className="h-5 w-5 text-slate-600" />
-                                <CardTitle>My Tasks</CardTitle>
+                                <CardTitle className="flex items-center gap-2">
+                                    My Tasks
+                                    <Tooltip>
+                                        <TooltipTrigger>
+                                            <HelpCircle className="h-4 w-4 text-muted-foreground" />
+                                        </TooltipTrigger>
+                                        <TooltipContent>
+                                            Tasks assigned to you that need action
+                                        </TooltipContent>
+                                    </Tooltip>
+                                </CardTitle>
                             </div>
                             <Link href="/tasks">
                                 <Button variant="ghost" size="sm">
@@ -351,7 +363,17 @@ export default async function DashboardPage() {
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2">
                                 <Calendar className="h-5 w-5 text-slate-600" />
-                                <CardTitle>Upcoming Deadlines</CardTitle>
+                                <CardTitle className="flex items-center gap-2">
+                                    Upcoming Deadlines
+                                    <Tooltip>
+                                        <TooltipTrigger>
+                                            <HelpCircle className="h-4 w-4 text-muted-foreground" />
+                                        </TooltipTrigger>
+                                        <TooltipContent>
+                                            Tasks due in the next 7 days, including overdue items
+                                        </TooltipContent>
+                                    </Tooltip>
+                                </CardTitle>
                             </div>
                             <Link href="/tasks">
                                 <Button variant="ghost" size="sm">
@@ -450,7 +472,17 @@ export default async function DashboardPage() {
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2">
                                 <Target className="h-5 w-5 text-slate-600" />
-                                <CardTitle>Objectives</CardTitle>
+                                <CardTitle className="flex items-center gap-2">
+                                    Objectives
+                                    <Tooltip>
+                                        <TooltipTrigger>
+                                            <HelpCircle className="h-4 w-4 text-muted-foreground" />
+                                        </TooltipTrigger>
+                                        <TooltipContent>
+                                            Active objectives and their completion progress
+                                        </TooltipContent>
+                                    </Tooltip>
+                                </CardTitle>
                             </div>
                             <Link href="/objectives">
                                 <Button variant="ghost" size="sm">
@@ -504,7 +536,17 @@ export default async function DashboardPage() {
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2">
                                 <MessageSquare className="h-5 w-5 text-slate-600" />
-                                <CardTitle>Recent Activity</CardTitle>
+                                <CardTitle className="flex items-center gap-2">
+                                    Recent Activity
+                                    <Tooltip>
+                                        <TooltipTrigger>
+                                            <HelpCircle className="h-4 w-4 text-muted-foreground" />
+                                        </TooltipTrigger>
+                                        <TooltipContent>
+                                            Latest task updates and comments from your team
+                                        </TooltipContent>
+                                    </Tooltip>
+                                </CardTitle>
                             </div>
                             <Link href="/tasks">
                                 <Button variant="ghost" size="sm">
