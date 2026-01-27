@@ -158,18 +158,102 @@ export async function createObjective(formData: FormData) {
     return { success: true }
 }
 
+
+// Admin client for bypassing RLS during deletions (cascading)
+import { createClient as createAdminClient } from '@supabase/supabase-js'
+
+const getAdminClient = () => {
+    const sbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const sbServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+
+    if (!sbUrl || !sbServiceRoleKey) {
+        throw new Error('Missing Supabase Service Role configuration')
+    }
+
+    return createAdminClient<Database>(sbUrl, sbServiceRoleKey, {
+        auth: {
+            autoRefreshToken: false,
+            persistSession: false
+        }
+    })
+}
+
 export async function deleteObjective(id: string) {
     const supabase = await createClient()
-    const { error } = await supabase.from('objectives').delete().eq('id', id)
-    if (error) return { error: error.message }
+    const { data: { user } } = await supabase.auth.getUser()
+
+    if (!user) return { error: 'Unauthorized' }
+
+    // 1. Verify ownership
+    const { data: objective, error: fetchError } = await supabase
+        .from('objectives')
+        .select('creator_id')
+        .eq('id', id)
+        .single()
+
+    if (fetchError || !objective) return { error: 'Objective not found' }
+    if (objective.creator_id !== user.id) return { error: 'Unauthorized: Only the creator can delete this objective' }
+
+    // 2. Perform delete with Admin Client to bypass RLS on child tables (tasks, history, comments)
+    try {
+        const adminClient = getAdminClient()
+        const { error: deleteError } = await adminClient
+            .from('objectives')
+            .delete()
+            .eq('id', id)
+
+        if (deleteError) {
+            console.error('Delete error:', deleteError)
+            return { error: deleteError.message }
+        }
+    } catch (e) {
+        console.error('Admin client error:', e)
+        return { error: 'Server configuration error preventing deletion' }
+    }
+
     revalidatePath('/objectives')
     return { success: true }
 }
 
 export async function deleteObjectives(ids: string[]) {
     const supabase = await createClient()
-    const { error } = await supabase.from('objectives').delete().in('id', ids)
-    if (error) return { error: error.message }
+    const { data: { user } } = await supabase.auth.getUser()
+
+    if (!user) return { error: 'Unauthorized' }
+
+    // 1. Verify ownership of ALL objectives
+    // We only delete the ones the user owns to be safe, or fail if they don't own all?
+    // Let's delete only what they own.
+    const { data: objectives, error: fetchError } = await supabase
+        .from('objectives')
+        .select('id, creator_id')
+        .in('id', ids)
+
+    if (fetchError) return { error: fetchError.message }
+
+    const idsToDelete = objectives
+        .filter(o => o.creator_id === user.id)
+        .map(o => o.id)
+
+    if (idsToDelete.length === 0) return { error: 'No authorized objectives to delete' }
+
+    // 2. Perform delete with Admin Client
+    try {
+        const adminClient = getAdminClient()
+        const { error: deleteError } = await adminClient
+            .from('objectives')
+            .delete()
+            .in('id', idsToDelete)
+
+        if (deleteError) {
+            console.error('Bulk delete error:', deleteError)
+            return { error: deleteError.message }
+        }
+    } catch (e) {
+        console.error('Admin client error:', e)
+        return { error: 'Server configuration error preventing deletion' }
+    }
+
     revalidatePath('/objectives')
     return { success: true }
 }
