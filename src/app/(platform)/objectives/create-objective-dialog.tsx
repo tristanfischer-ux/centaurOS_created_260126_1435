@@ -484,7 +484,7 @@ export function CreateObjectiveDialog() {
                     >
                         {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                         {!loading && <Plus className="mr-2 h-4 w-4" />}
-                        {mode === 'manual' ? 'Create Objective' : 'Initialize'}
+                        {mode === 'manual' ? 'Create Objective' : 'Add Objective and Tasks'}
                     </Button>
                 </DialogFooter>
             </DialogContent>

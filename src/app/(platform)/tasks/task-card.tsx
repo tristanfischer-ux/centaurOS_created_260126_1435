@@ -52,6 +52,7 @@ type Task = Database["public"]["Tables"]["tasks"]["Row"] & {
     assignees?: { id: string, full_name: string | null, role: string, email: string, avatar_url?: string | null }[]
     task_number?: number
     task_files?: { id: string }[]
+    objective?: { id: string, title: string } | null
 }
 
 type Member = {
@@ -249,6 +250,11 @@ export function TaskCard({ task, currentUserId, userRole, members }: TaskCardPro
                                 </span>
                             )}
                         </div>
+                        {task.objective && (
+                            <div className="text-[10px] font-semibold text-blue-600/80 uppercase tracking-wide truncate max-w-[200px] mb-1" title={task.objective.title}>
+                                {task.objective.title}
+                            </div>
+                        )}
                         <h3 className="font-semibold text-slate-900 leading-tight group-hover/card:text-blue-700 transition-colors">
                             {task.title}
                         </h3>
