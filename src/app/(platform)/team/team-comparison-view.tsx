@@ -48,6 +48,12 @@ interface Member {
     rejectedTasks: number
     paired_ai_id?: string | null
     pairedAI?: { id: string, full_name: string | null, avatar_url: string | null, role: string }[] | null
+    taskTitles?: {
+        active: string[]
+        completed: string[]
+        pending: string[]
+        rejected: string[]
+    }
 }
 
 interface TeamMember {
