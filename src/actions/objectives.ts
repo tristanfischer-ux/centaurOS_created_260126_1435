@@ -3,7 +3,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 
-import { OBJECTIVE_PLAYBOOKS } from '@/lib/playbooks'
+
 
 export async function createObjective(formData: FormData) {
     const supabase = await createClient()
