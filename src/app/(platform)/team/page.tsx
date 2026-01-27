@@ -9,22 +9,36 @@ export default async function TeamPage() {
         return <div className="p-8 text-red-500">Unauthenticated. Please login.</div>
     }
 
-    const foundry_id = user.app_metadata.foundry_id
+    // Get current user profile to get foundry_id
+    const { data: currentUserProfile } = await supabase
+        .from('profiles')
+        .select('foundry_id')
+        .eq('id', user.id)
+        .single()
+
+    const foundry_id = currentUserProfile?.foundry_id || user.app_metadata?.foundry_id
+
+    if (!foundry_id) {
+        return <div className="p-8 text-red-500">Error: No Foundry associated with your account.</div>
+    }
 
     // Fetch profiles
     const { data: profiles, error } = await supabase
         .from('profiles')
         .select('*, paired_ai:profiles!paired_ai_id(id, full_name, avatar_url, role)')
+        .eq('foundry_id', foundry_id)
         .order('created_at', { ascending: false })
 
     if (error) {
-        return <div className="text-red-500">Error loading team</div>
+        console.error("Error fetching profiles:", error)
+        return <div className="text-red-500">Error loading team members</div>
     }
 
     // Fetch all tasks for task metrics
     const { data: tasks } = await supabase
         .from('tasks')
         .select('assignee_id, status')
+        .eq('foundry_id', foundry_id)
 
     // Fetch teams with members
     const { data: teamsData, error: teamsError } = await supabase
@@ -35,26 +49,28 @@ export default async function TeamPage() {
                 profile:profiles(id, full_name, role, email, paired_ai_id)
             )
         `)
+        .eq('foundry_id', foundry_id)
         .order('created_at', { ascending: false })
 
     if (teamsError) {
         console.error("Error fetching teams:", teamsError)
     }
 
-    // Transform teams data
+    // Transform teams data with defensive mapping
     const teams = teamsData?.map(team => ({
         id: team.id,
         name: team.name,
         is_auto_generated: team.is_auto_generated,
         created_at: team.created_at,
-        members: (team.members as unknown as Array<{ profile: { id: string; full_name: string | null; role: string | null; email: string | null; paired_ai_id: string | null } }>)
-            .map(m => ({
+        members: (team.members as any)
+            ?.filter((m: any) => m.profile)
+            .map((m: any) => ({
                 id: m.profile.id,
                 full_name: m.profile.full_name,
                 role: m.profile.role,
                 email: m.profile.email,
                 paired_ai_id: m.profile.paired_ai_id
-            }))
+            })) || []
     })) || []
 
     interface MemberMetrics {
@@ -70,16 +86,16 @@ export default async function TeamPage() {
         rejectedTasks: number
     }
 
-    // Calculate metrics per member
-    const membersWithMetrics: MemberMetrics[] = (profiles as any)?.map((profile: any) => {
-        const memberTasks = tasks?.filter(t => t.assignee_id === profile.id) || []
+    // Calculate metrics per member with defensive checks
+    const membersWithMetrics: MemberMetrics[] = (profiles as any[])?.map((profile: any) => {
+        const memberTasks = (tasks || []).filter(t => t.assignee_id === profile.id)
         return {
             id: profile.id,
             full_name: profile.full_name || 'Unknown',
             email: profile.email || '',
             role: profile.role || 'Apprentice',
             paired_ai_id: profile.paired_ai_id,
-            pairedAI: profile.paired_ai, // Joined data
+            pairedAI: profile.paired_ai ? [profile.paired_ai] : [], // Pass as array to match component props
             activeTasks: memberTasks.filter(t => t.status === 'Accepted').length,
             completedTasks: memberTasks.filter(t => t.status === 'Completed').length,
             pendingTasks: memberTasks.filter(t => t.status === 'Pending').length,

@@ -19,39 +19,53 @@ export default async function ProfilePage({ params }: { params: Promise<{ id: st
         notFound()
     }
 
+    const foundry_id = profile.foundry_id
+
+    if (!foundry_id) {
+        return <div className="p-8 text-red-500">Error: This profile is not correctly associated with a Foundry.</div>
+    }
+
     // Fetch assigned tasks for this profile
     const { data: tasks } = await supabase
         .from('tasks')
         .select('*')
         .eq('assignee_id', profile.id)
+        .eq('foundry_id', foundry_id)
         .order('created_at', { ascending: false })
 
     // Fetch ALL profiles for comparison feature
     const { data: allProfiles } = await supabase
         .from('profiles')
         .select('*')
+        .eq('foundry_id', foundry_id)
 
     // Fetch ALL tasks for metrics calculation
     const { data: allTasks } = await supabase
         .from('tasks')
         .select('assignee_id, status')
+        .eq('foundry_id', foundry_id)
 
     // Calculate metrics for ALL members (for comparison)
-    const allMembersWithMetrics = allProfiles?.map(p => {
-        const memberTasks = allTasks?.filter(t => t.assignee_id === p.id) || []
+    const allMembersWithMetrics = (allProfiles || [])?.map(p => {
+        const memberTasks = (allTasks || []).filter(t => t.assignee_id === p.id)
         return {
             id: p.id,
-            full_name: p.full_name,
-            email: p.email,
+            full_name: p.full_name || 'Unknown',
+            email: p.email || '',
             role: p.role,
             activeTasks: memberTasks.filter(t => t.status === 'Accepted').length,
             completedTasks: memberTasks.filter(t => t.status === 'Completed').length,
             pendingTasks: memberTasks.filter(t => t.status === 'Pending').length,
             rejectedTasks: memberTasks.filter(t => t.status === 'Rejected').length,
         }
-    }) || []
+    })
 
-    const currentMemberMetrics = allMembersWithMetrics.find(m => m.id === profile.id)!
+    const currentMemberMetrics = allMembersWithMetrics.find(m => m.id === profile.id)
+
+    if (!currentMemberMetrics) {
+        // Fallback if not found in the list (e.g. newly joined)
+        return <div className="p-8 text-amber-600 bg-amber-50 rounded-lg">Profile metadata sync in progress. Please refresh in a moment.</div>
+    }
 
     return (
         <div className="space-y-8">
