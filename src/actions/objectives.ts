@@ -82,7 +82,7 @@ export async function createObjective(formData: FormData) {
                         creator_id: user.id,
                         foundry_id: profile.foundry_id,
                         status: 'Pending' as const,
-                        assignee_id: task.role === 'AI_Agent' ? aiAgentId : null,
+                        assignee_id: task.role === 'AI_Agent' ? aiAgentId : user.id, // Assign to creator by default if not AI
                         start_date: now.toISOString(),
                         end_date: nextWeek.toISOString(),
                         risk_level: 'Low' as const,
@@ -114,7 +114,7 @@ export async function createObjective(formData: FormData) {
                 creator_id: user.id,
                 foundry_id: profile.foundry_id,
                 status: 'Pending' as const,
-                assignee_id: task.role === 'AI_Agent' ? aiAgentId : null,
+                assignee_id: task.role === 'AI_Agent' ? aiAgentId : user.id, // Assign to creator by default
                 risk_level: 'Low' as const,
                 client_visible: true
             }))
@@ -125,6 +125,11 @@ export async function createObjective(formData: FormData) {
         const { error: taskError } = await supabase.from('tasks').insert(tasksToInsert)
         if (taskError) {
             console.error('Error creating tasks:', taskError)
+            // We should probably return this error, or at least a warning. 
+            // But since the objective was created, we might want to return { success: true, warning: 'Tasks failed' } 
+            // or fail completely? 
+            // For now, let's return the error so the user knows.
+            return { error: `Objective created, but tasks failed: ${taskError.message}` }
         }
     }
 
