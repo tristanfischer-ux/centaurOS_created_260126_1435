@@ -1,153 +1,118 @@
 "use client"
 
-import { useState, useTransition } from "react"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog"
+import { useState } from "react"
 import { Button } from "@/components/ui/button"
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
+} from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { Plus, Users, Check } from "lucide-react"
 import { createTeam } from "@/actions/team"
+import { Plus } from "lucide-react"
+import { toast } from "sonner"
 
 interface Member {
     id: string
     full_name: string | null
-    role: string | null
-    email: string | null
+    role: string
 }
 
-interface CreateTeamDialogProps {
-    members: Member[]
-}
-
-export function CreateTeamDialog({ members }: CreateTeamDialogProps) {
+export function CreateTeamDialog({ members }: { members: Member[] }) {
     const [open, setOpen] = useState(false)
-    const [teamName, setTeamName] = useState("")
+    const [name, setName] = useState("")
     const [selectedMembers, setSelectedMembers] = useState<string[]>([])
-    const [isPending, startTransition] = useTransition()
-    const [error, setError] = useState<string | null>(null)
+    const [loading, setLoading] = useState(false)
 
-    const toggleMember = (memberId: string) => {
+    const handleCreate = async (e: React.FormEvent) => {
+        e.preventDefault()
+        if (!name.trim()) return
+        if (selectedMembers.length < 2) {
+            toast.error("Select at least 2 members")
+            return
+        }
+
+        setLoading(true)
+        const result = await createTeam(name, selectedMembers)
+        setLoading(false)
+
+        if (result.error) {
+            toast.error(result.error)
+        } else {
+            toast.success("Team created")
+            setOpen(false)
+            setName("")
+            setSelectedMembers([])
+        }
+    }
+
+    const toggleMember = (id: string) => {
         setSelectedMembers(prev =>
-            prev.includes(memberId)
-                ? prev.filter(id => id !== memberId)
-                : [...prev, memberId]
+            prev.includes(id)
+                ? prev.filter(m => m !== id)
+                : [...prev, id]
         )
     }
-
-    const handleSubmit = () => {
-        if (!teamName.trim()) {
-            setError("Team name is required")
-            return
-        }
-        if (selectedMembers.length < 2) {
-            setError("Select at least 2 members")
-            return
-        }
-
-        setError(null)
-        startTransition(async () => {
-            const result = await createTeam(teamName, selectedMembers)
-            if (result.error) {
-                setError(result.error)
-            } else {
-                setOpen(false)
-                setTeamName("")
-                setSelectedMembers([])
-            }
-        })
-    }
-
-    // Filter out AI agents for team creation
-    const availableMembers = members.filter(m => m.role !== 'AI_Agent')
 
     return (
         <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
-                <Button className="bg-amber-600 hover:bg-amber-700">
+                <Button className="bg-green-600 hover:bg-green-700 text-white">
                     <Plus className="h-4 w-4 mr-2" />
-                    Create Team
+                    New Team
                 </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[500px]">
+            <DialogContent className="sm:max-w-[425px] bg-white text-slate-900 border-slate-200">
                 <DialogHeader>
-                    <DialogTitle className="flex items-center gap-2">
-                        <Users className="h-5 w-5 text-amber-600" />
-                        Create New Team
-                    </DialogTitle>
+                    <DialogTitle>Create New Team</DialogTitle>
                     <DialogDescription>
-                        Create a team to group people working together. Select at least 2 members.
+                        Group apprentices into a specialized unit.
                     </DialogDescription>
                 </DialogHeader>
-
-                <div className="space-y-6 pt-4">
+                <form onSubmit={handleCreate} className="space-y-4 py-4">
                     <div className="space-y-2">
-                        <Label htmlFor="teamName">Team Name</Label>
+                        <Label htmlFor="name">Team Name</Label>
                         <Input
-                            id="teamName"
-                            placeholder="e.g., Product Team, Design Squad..."
-                            value={teamName}
-                            onChange={(e) => setTeamName(e.target.value)}
+                            id="name"
+                            value={name}
+                            onChange={(e) => setName(e.target.value)}
+                            placeholder="e.g. Frontend Squad"
+                            className="bg-white border-slate-300"
                         />
                     </div>
-
                     <div className="space-y-2">
-                        <Label>Select Members ({selectedMembers.length} selected)</Label>
-                        <div className="border border-slate-200 rounded-lg max-h-[250px] overflow-y-auto">
-                            {availableMembers.map((member) => {
-                                const isSelected = selectedMembers.includes(member.id)
-                                return (
-                                    <button
-                                        key={member.id}
-                                        type="button"
-                                        onClick={() => toggleMember(member.id)}
-                                        className={`w-full flex items-center gap-3 p-3 hover:bg-slate-50 transition-colors border-b border-slate-100 last:border-0 ${isSelected ? 'bg-amber-50' : ''
-                                            }`}
+                        <Label>Select Members (Min 2)</Label>
+                        <div className="border border-slate-200 rounded-md max-h-[200px] overflow-y-auto p-2 space-y-2">
+                            {members.map(member => (
+                                <div key={member.id} className="flex items-center space-x-2">
+                                    <input
+                                        type="checkbox"
+                                        id={member.id}
+                                        checked={selectedMembers.includes(member.id)}
+                                        onChange={() => toggleMember(member.id)}
+                                        className="h-4 w-4 rounded border-slate-300 text-green-600 focus:ring-green-600"
+                                    />
+                                    <label
+                                        htmlFor={member.id}
+                                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer w-full py-1"
                                     >
-                                        <Avatar className="h-8 w-8">
-                                            <AvatarFallback className="text-xs bg-slate-100">
-                                                {member.full_name?.substring(0, 2).toUpperCase() || '?'}
-                                            </AvatarFallback>
-                                        </Avatar>
-                                        <div className="flex-1 text-left">
-                                            <div className="font-medium text-slate-900">{member.full_name}</div>
-                                            <div className="text-xs text-slate-500">{member.role}</div>
-                                        </div>
-                                        {isSelected && (
-                                            <div className="h-6 w-6 rounded-full bg-amber-500 flex items-center justify-center">
-                                                <Check className="h-4 w-4 text-white" />
-                                            </div>
-                                        )}
-                                    </button>
-                                )
-                            })}
-                            {availableMembers.length === 0 && (
-                                <div className="p-4 text-center text-slate-500 italic">
-                                    No members available
+                                        {member.full_name} <span className="text-xs text-slate-500">({member.role})</span>
+                                    </label>
                                 </div>
-                            )}
+                            ))}
                         </div>
                     </div>
-
-                    {error && (
-                        <div className="text-sm text-red-600 bg-red-50 p-3 rounded-lg">
-                            {error}
-                        </div>
-                    )}
-
-                    <div className="flex justify-end gap-3">
-                        <Button variant="outline" onClick={() => setOpen(false)}>
-                            Cancel
+                    <DialogFooter>
+                        <Button type="submit" disabled={loading} className="bg-green-600 hover:bg-green-700">
+                            {loading ? "Creating..." : "Create Team"}
                         </Button>
-                        <Button
-                            onClick={handleSubmit}
-                            disabled={isPending || selectedMembers.length < 2}
-                            className="bg-amber-600 hover:bg-amber-700"
-                        >
-                            {isPending ? "Creating..." : "Create Team"}
-                        </Button>
-                    </div>
-                </div>
+                    </DialogFooter>
+                </form>
             </DialogContent>
         </Dialog>
     )

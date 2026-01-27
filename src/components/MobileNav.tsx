@@ -7,10 +7,10 @@ import { LayoutDashboard, Users, CheckSquare, Calendar, ShoppingBag } from "luci
 
 const navigation = [
     { name: "Objectives", href: "/objectives", icon: LayoutDashboard },
+    { name: "Roster", href: "/team", icon: Users },
     { name: "Tasks", href: "/tasks", icon: CheckSquare },
-    { name: "Guild", href: "/guild", icon: Users }, // Guild focus on mobile
     { name: "Timeline", href: "/timeline", icon: Calendar },
-    { name: "Bazaar", href: "/marketplace", icon: ShoppingBag },
+    { name: "Marketplace", href: "/marketplace", icon: ShoppingBag },
 ]
 
 export function MobileNav() {

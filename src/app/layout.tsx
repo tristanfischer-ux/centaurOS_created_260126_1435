@@ -4,6 +4,8 @@ import "./globals.css";
 import { Sidebar } from "@/components/Sidebar";
 import { MobileNav } from "@/components/MobileNav";
 import { Toaster } from "@/components/ui/sonner";
+import { PWARegister } from "@/components/PWARegister";
+import { DragDropPolyfill } from "@/components/DragDropPolyfill";
 
 const outfit = Outfit({
   subsets: ["latin"],
@@ -14,6 +16,15 @@ const outfit = Outfit({
 export const metadata: Metadata = {
   title: "CentaurOS",
   description: "Operating System for Fractional Foundries",
+  manifest: "/manifest.json",
+  icons: {
+    apple: "/icons/icon-192x192.png",
+  },
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "CentaurOS",
+  },
 };
 export default function RootLayout({
   children,
@@ -35,6 +46,8 @@ export default function RootLayout({
         </main>
         <MobileNav />
         <Toaster />
+        <PWARegister />
+        <DragDropPolyfill />
       </body>
     </html>
   );

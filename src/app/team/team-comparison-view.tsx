@@ -7,10 +7,29 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
-import { Check, X, GitCompare, Users } from "lucide-react"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
+import { Check, X, GitCompare, Users, MoreHorizontal, Pencil, Trash2, Loader2, AlertTriangle } from "lucide-react"
 import { createTeam } from "@/actions/team"
+import { deleteTeam, updateTeamName } from "@/actions/teams"
 import Link from "next/link"
+import { CreateTeamDialog } from "./create-team-dialog"
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+
 
 interface Member {
     id: string
@@ -23,12 +42,29 @@ interface Member {
     rejectedTasks: number
 }
 
-interface TeamComparisonViewProps {
-    executives: Member[]
-    apprentices: Member[]
+interface TeamMember {
+    id: string
+    full_name: string | null
+    role: string | null
+    email: string | null
 }
 
-export function TeamComparisonView({ executives, apprentices }: TeamComparisonViewProps) {
+interface Team {
+    id: string
+    name: string
+    is_auto_generated: boolean | null
+    created_at: string | null
+    members: TeamMember[]
+}
+
+interface TeamComparisonViewProps {
+    founders: Member[]
+    executives: Member[]
+    apprentices: Member[]
+    teams: Team[]
+}
+
+export function TeamComparisonView({ founders, executives, apprentices, teams }: TeamComparisonViewProps) {
     const [compareMode, setCompareMode] = useState(false)
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
     const [showComparison, setShowComparison] = useState(false)
@@ -41,6 +77,11 @@ export function TeamComparisonView({ executives, apprentices }: TeamComparisonVi
     const [teamName, setTeamName] = useState("")
     const [teamError, setTeamError] = useState<string | null>(null)
     const [isPending, startTransition] = useTransition()
+
+    // Edit/Delete Team State
+    const [teamToEdit, setTeamToEdit] = useState<{ id: string, name: string } | null>(null)
+    const [teamToDelete, setTeamToDelete] = useState<string | null>(null)
+    const [newName, setNewName] = useState("")
 
     const allMembers = [...executives, ...apprentices]
     const selectedMembers = allMembers.filter(m => selectedIds.has(m.id))
@@ -74,12 +115,17 @@ export function TeamComparisonView({ executives, apprentices }: TeamComparisonVi
     // Drag-and-drop handlers
     const handleDragStart = (e: React.DragEvent, memberId: string) => {
         setDraggedMemberId(memberId)
+        // Use text/plain for Safari compatibility
+        e.dataTransfer.setData('text/plain', memberId)
         e.dataTransfer.effectAllowed = 'move'
     }
 
     const handleDragOver = (e: React.DragEvent, memberId: string) => {
         e.preventDefault()
-        if (draggedMemberId && draggedMemberId !== memberId) {
+        e.dataTransfer.dropEffect = 'move'
+        // Get the dragged ID from dataTransfer for Safari
+        const draggedId = draggedMemberId || e.dataTransfer.getData('text/plain')
+        if (draggedId && draggedId !== memberId) {
             setDropTargetId(memberId)
         }
     }
@@ -90,9 +136,11 @@ export function TeamComparisonView({ executives, apprentices }: TeamComparisonVi
 
     const handleDrop = (e: React.DragEvent, targetMemberId: string) => {
         e.preventDefault()
-        if (draggedMemberId && draggedMemberId !== targetMemberId) {
+        // Get the dragged ID from dataTransfer (more reliable for Safari)
+        const draggedId = e.dataTransfer.getData('text/plain') || draggedMemberId
+        if (draggedId && draggedId !== targetMemberId) {
             // Open quick team creation dialog with both members
-            setQuickTeamMemberIds([draggedMemberId, targetMemberId])
+            setQuickTeamMemberIds([draggedId, targetMemberId])
             setTeamName("")
             setTeamError(null)
             setShowQuickTeamDialog(true)
@@ -104,6 +152,33 @@ export function TeamComparisonView({ executives, apprentices }: TeamComparisonVi
     const handleDragEnd = () => {
         setDraggedMemberId(null)
         setDropTargetId(null)
+    }
+
+    const handleUpdateName = async () => {
+        if (!teamToEdit || !newName.trim()) return
+
+        startTransition(async () => {
+            try {
+                await updateTeamName(teamToEdit.id, newName)
+                setTeamToEdit(null)
+                setNewName("")
+            } catch (error) {
+                console.error(error)
+            }
+        })
+    }
+
+    const handleDeleteTeam = async () => {
+        if (!teamToDelete) return
+
+        startTransition(async () => {
+            try {
+                await deleteTeam(teamToDelete)
+                setTeamToDelete(null)
+            } catch (error) {
+                console.error(error)
+            }
+        })
     }
 
     const handleCreateQuickTeam = () => {
@@ -134,23 +209,52 @@ export function TeamComparisonView({ executives, apprentices }: TeamComparisonVi
         { label: "Rejected", getValue: (m: Member) => m.rejectedTasks, caution: true },
     ]
 
-    const MemberCard = ({ member, type }: { member: Member, type: 'executive' | 'apprentice' }) => {
+    const MemberCard = ({ member, type }: { member: Member, type: 'founder' | 'executive' | 'apprentice' }) => {
         const isSelected = selectedIds.has(member.id)
+        const isFounder = type === 'founder'
         const isExecutive = type === 'executive'
         const isDragging = draggedMemberId === member.id
         const isDropTarget = dropTargetId === member.id && draggedMemberId !== member.id
 
+        // Determine styles based on type
+        let borderClass = 'border-slate-200'
+        let ringClass = 'ring-blue-500 border-blue-500'
+        let hoverBorderClass = 'group-hover:border-blue-400'
+        let bgCheckClass = 'bg-blue-500'
+        let avatarBorderClass = 'border border-slate-200'
+        let avatarBgClass = 'bg-slate-100 text-slate-500'
+        let badgeClass = 'bg-slate-100 text-slate-600'
+
+        if (isFounder) {
+            borderClass = 'border-purple-200'
+            ringClass = 'ring-purple-500 border-purple-500'
+            hoverBorderClass = 'group-hover:border-purple-400'
+            bgCheckClass = 'bg-purple-500'
+            avatarBorderClass = 'border-2 border-purple-500'
+            avatarBgClass = 'bg-purple-100 text-purple-700 font-bold'
+            badgeClass = 'text-purple-600 border-purple-200 bg-purple-50'
+        } else if (isExecutive) {
+            borderClass = 'border-amber-200'
+            ringClass = 'ring-amber-500 border-amber-500'
+            hoverBorderClass = 'group-hover:border-amber-400'
+            bgCheckClass = 'bg-amber-500'
+            avatarBorderClass = 'border-2 border-amber-500'
+            avatarBgClass = 'bg-amber-100 text-amber-700 font-bold'
+            badgeClass = 'text-amber-600 border-amber-200 bg-amber-50'
+        }
+
         const cardContent = (
             <Card className={`
-                bg-white border-slate-200 shadow-sm transition-all cursor-pointer relative
-                ${isExecutive ? 'group-hover:border-amber-400' : 'group-hover:border-blue-400'}
-                ${compareMode && isSelected ? (isExecutive ? 'ring-2 ring-amber-500 border-amber-500' : 'ring-2 ring-blue-500 border-blue-500') : ''}
+                bg-white border shadow-sm transition-all cursor-pointer relative
+                ${borderClass}
+                ${hoverBorderClass}
+                ${compareMode && isSelected ? `ring-2 ${ringClass}` : ''}
                 ${isDragging ? 'opacity-50 scale-95' : ''}
                 ${isDropTarget ? 'ring-2 ring-green-500 border-green-500 bg-green-50' : ''}
             `}>
                 {compareMode && (
                     <div className={`absolute top-2 right-2 h-6 w-6 rounded-full flex items-center justify-center text-white text-xs
-                        ${isSelected ? (isExecutive ? 'bg-amber-500' : 'bg-blue-500') : 'bg-slate-200'}
+                        ${isSelected ? bgCheckClass : 'bg-slate-200'}
                     `}>
                         {isSelected ? <Check className="h-4 w-4" /> : null}
                     </div>
@@ -164,8 +268,8 @@ export function TeamComparisonView({ executives, apprentices }: TeamComparisonVi
                     </div>
                 )}
                 <CardHeader className="flex flex-row items-center gap-4 pb-2">
-                    <Avatar className={`h-12 w-12 ${isExecutive ? 'border-2 border-amber-500' : 'border border-slate-200'}`}>
-                        <AvatarFallback className={isExecutive ? 'bg-amber-100 text-amber-700 font-bold' : 'bg-slate-100 text-slate-500'}>
+                    <Avatar className={`h-12 w-12 ${avatarBorderClass}`}>
+                        <AvatarFallback className={avatarBgClass}>
                             {getInitials(member.full_name)}
                         </AvatarFallback>
                     </Avatar>
@@ -173,7 +277,7 @@ export function TeamComparisonView({ executives, apprentices }: TeamComparisonVi
                         <CardTitle className="text-lg text-slate-900">{member.full_name}</CardTitle>
                         <Badge
                             variant="outline"
-                            className={`text-[10px] mt-1 ${isExecutive ? 'text-amber-600 border-amber-200 bg-amber-50' : 'bg-slate-100 text-slate-600'}`}
+                            className={`text-[10px] mt-1 ${badgeClass}`}
                         >
                             {member.role}
                         </Badge>
@@ -229,6 +333,8 @@ export function TeamComparisonView({ executives, apprentices }: TeamComparisonVi
                     <p className="text-gray-400">Manage your Executives and Apprentices.</p>
                 </div>
                 <div className="flex items-center gap-2">
+                    <CreateTeamDialog members={[...executives, ...apprentices]} />
+
                     {compareMode && selectedIds.size >= 2 && (
                         <Button
                             onClick={() => setShowComparison(true)}
@@ -254,6 +360,20 @@ export function TeamComparisonView({ executives, apprentices }: TeamComparisonVi
                     Select 2-4 team members to compare. Click a card to select.
                     {selectedIds.size > 0 && ` (${selectedIds.size} selected)`}
                 </div>
+            )}
+
+            {/* Founders Section */}
+            {founders.length > 0 && (
+                <section className="space-y-4">
+                    <h2 className="text-xl font-semibold text-purple-600 uppercase tracking-wider border-b border-slate-200 pb-2">
+                        Founders (Visionaries)
+                    </h2>
+                    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                        {founders.map(member => (
+                            <MemberCard key={member.id} member={member} type="founder" />
+                        ))}
+                    </div>
+                </section>
             )}
 
             {/* Executives Section */}
@@ -285,6 +405,75 @@ export function TeamComparisonView({ executives, apprentices }: TeamComparisonVi
                     )}
                 </div>
             </section>
+
+            {/* Teams Section */}
+            {teams.length > 0 && (
+                <section className="space-y-4">
+                    <h2 className="text-xl font-semibold text-green-600 uppercase tracking-wider border-b border-slate-200 pb-2">
+                        Teams
+                    </h2>
+                    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                        {teams.map(team => (
+                            <Card key={team.id} className="bg-white border-slate-200 shadow-sm hover:border-green-400 transition-all group relative">
+                                <CardHeader className="pb-2">
+                                    <div className="flex items-center justify-between">
+                                        <CardTitle className="text-lg text-slate-900 truncate pr-6">{team.name}</CardTitle>
+
+                                        <div className="flex items-center gap-2">
+                                            {team.is_auto_generated && (
+                                                <Badge variant="outline" className="text-[10px] text-slate-400">Auto</Badge>
+                                            )}
+
+                                            {/* Team Actions Dropdown */}
+                                            <DropdownMenu>
+                                                <DropdownMenuTrigger asChild>
+                                                    <Button variant="ghost" className="h-8 w-8 p-0 text-slate-400 hover:text-slate-600">
+                                                        <MoreHorizontal className="h-4 w-4" />
+                                                    </Button>
+                                                </DropdownMenuTrigger>
+                                                <DropdownMenuContent align="end" className="w-[160px] bg-white border-slate-200">
+                                                    <DropdownMenuItem onClick={() => {
+                                                        setTeamToEdit({ id: team.id, name: team.name })
+                                                        setNewName(team.name)
+                                                    }}>
+                                                        <Pencil className="mr-2 h-4 w-4" /> Rename
+                                                    </DropdownMenuItem>
+                                                    <DropdownMenuItem
+                                                        onClick={() => setTeamToDelete(team.id)}
+                                                        className="text-red-600 focus:text-red-600 focus:bg-red-50"
+                                                    >
+                                                        <Trash2 className="mr-2 h-4 w-4" /> Delete
+                                                    </DropdownMenuItem>
+                                                </DropdownMenuContent>
+                                            </DropdownMenu>
+                                        </div>
+                                    </div>
+                                </CardHeader>
+                                <CardContent>
+                                    <div className="flex items-center gap-2">
+                                        {/* Member avatars */}
+                                        <div className="flex -space-x-2">
+                                            {(team.members || []).slice(0, 4).map(member => (
+                                                <Avatar key={member.id} className="h-8 w-8 border-2 border-white">
+                                                    <AvatarFallback className="bg-green-100 text-green-700 text-xs font-bold">
+                                                        {getInitials(member.full_name)}
+                                                    </AvatarFallback>
+                                                </Avatar>
+                                            ))}
+                                            {(team.members || []).length > 4 && (
+                                                <div className="h-8 w-8 rounded-full bg-slate-200 border-2 border-white flex items-center justify-center text-xs text-slate-600">
+                                                    +{(team.members || []).length - 4}
+                                                </div>
+                                            )}
+                                        </div>
+                                        <span className="text-sm text-slate-500 ml-2">{(team.members || []).length} members</span>
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        ))}
+                    </div>
+                </section>
+            )}
 
             {/* Comparison Dialog */}
             <Dialog open={showComparison} onOpenChange={setShowComparison}>
@@ -327,7 +516,6 @@ export function TeamComparisonView({ executives, apprentices }: TeamComparisonVi
                                             const allValues = selectedMembers.map(m => row.getValue(m))
                                             const numericValues = allValues.filter(v => typeof v === 'number') as number[]
                                             const maxVal = Math.max(...numericValues)
-                                            const minVal = Math.min(...numericValues)
                                             const isBest = isNumeric && row.good && value === maxVal
                                             const isWorst = isNumeric && row.caution && value === maxVal && value > 0
 
@@ -416,6 +604,61 @@ export function TeamComparisonView({ executives, apprentices }: TeamComparisonVi
                     </div>
                 </DialogContent>
             </Dialog>
+            {/* Rename Team Dialog */}
+            <Dialog open={!!teamToEdit} onOpenChange={(open) => !open && setTeamToEdit(null)}>
+                <DialogContent className="sm:max-w-[425px] bg-white text-slate-900 border-slate-200">
+                    <DialogHeader>
+                        <DialogTitle>Rename Team</DialogTitle>
+                    </DialogHeader>
+                    <div className="py-4 space-y-4">
+                        <div className="space-y-2">
+                            <Label htmlFor="edit-team-name">Team Name</Label>
+                            <Input
+                                id="edit-team-name"
+                                value={newName}
+                                onChange={(e) => setNewName(e.target.value)}
+                                placeholder="Team Name"
+                                autoFocus
+                                className="bg-white border-slate-300"
+                            />
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setTeamToEdit(null)}>Cancel</Button>
+                        <Button onClick={handleUpdateName} disabled={isPending || !newName.trim()} className="bg-blue-600 hover:bg-blue-700 text-white">
+                            {isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : "Save Changes"}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Delete Confirmation Dialog */}
+            <AlertDialog open={!!teamToDelete} onOpenChange={(open) => !open && setTeamToDelete(null)}>
+                <AlertDialogContent className="bg-white text-slate-900 border-slate-200">
+                    <AlertDialogHeader>
+                        <AlertDialogTitle className="flex items-center gap-2 text-red-600">
+                            <AlertTriangle className="h-5 w-5" />
+                            Delete Team?
+                        </AlertDialogTitle>
+                        <AlertDialogDescription className="text-slate-500">
+                            This will permanently remove this team. This action cannot be undone.
+                            Members will remain in the User Roster.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel className="bg-slate-100 hover:bg-slate-200 text-slate-900">Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={handleDeleteTeam}
+                            disabled={isPending}
+                            className="bg-red-600 hover:bg-red-700 text-white"
+                        >
+                            {isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <><Trash2 className="h-4 w-4 mr-2" /> Delete Team</>}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </div>
     )
 }
+
+

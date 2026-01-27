@@ -681,7 +681,7 @@ export type Database = {
             [_ in never]: never
         }
         Enums: {
-            member_role: "Executive" | "Apprentice" | "AI_Agent"
+            member_role: "Founder" | "Executive" | "Apprentice" | "AI_Agent"
             provider_type:
             | "Legal"
             | "Financial"

@@ -12,7 +12,12 @@ export default async function TasksPage() {
 
     const { data: tasks, error } = await supabase
         .from('tasks')
-        .select('*, assignee:profiles!assignee_id(id, full_name, role, email)')
+        .select(`
+            *,
+            assignee:profiles!assignee_id(id, full_name, role, email),
+            creator:profiles!creator_id(id, full_name, role),
+            objective:objectives!objective_id(id, title)
+        `)
         .order('created_at', { ascending: false })
 
     if (error) {
@@ -33,16 +38,18 @@ export default async function TasksPage() {
         email: p.email
     }))
 
-    // Join tasks with assignees
-    const tasksWithAssignees = tasks?.map(task => ({
+    // Join tasks with related data
+    const tasksWithData = tasks?.map(task => ({
         ...task,
-        assignee: Array.isArray(task.assignee) ? task.assignee[0] : task.assignee
+        assignee: Array.isArray(task.assignee) ? task.assignee[0] : task.assignee,
+        creator: Array.isArray(task.creator) ? task.creator[0] : task.creator,
+        objective: Array.isArray(task.objective) ? task.objective[0] : task.objective
     })) || []
 
     return (
         <>
             <TasksView
-                tasks={tasksWithAssignees}
+                tasks={tasksWithData}
                 objectives={objectives}
                 members={members}
                 currentUserId={user.id}

@@ -2,11 +2,11 @@
 
 import { useState } from "react"
 import { Database } from "@/types/database.types"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
-import { Check, X, ArrowRight, Edit, MessageSquare, Clock, ChevronDown, Bot } from "lucide-react"
+import { Check, X, ArrowRight, Edit, MessageSquare, Clock, ChevronDown, Bot, Target } from "lucide-react"
 import { acceptTask, rejectTask, forwardTask, amendTask, completeTask, triggerAIWorker, updateTaskProgress } from "@/actions/tasks"
 import {
     Dialog,
@@ -26,12 +26,19 @@ import {
 } from "@/components/ui/select"
 
 import { ThreadDrawer } from "./thread-drawer"
-import { formatDistanceToNow, differenceInDays, format } from "date-fns"
+import { differenceInDays, format } from "date-fns"
 
 type Task = Database["public"]["Tables"]["tasks"]["Row"]
 
+// Extended Task type to include joined data
+interface TaskWithData extends Task {
+    assignee?: { id: string; full_name: string | null; role: string | null; email: string | null } | null
+    creator?: { id: string; full_name: string | null; role: string | null } | null
+    objective?: { id: string; title: string | null } | null
+}
+
 interface TaskCardProps {
-    task: Task
+    task: TaskWithData
     currentUserId: string
     userRole?: string
     members: { id: string; full_name: string; role: string }[]
@@ -72,7 +79,6 @@ export function TaskCard({ task, currentUserId, userRole, members }: TaskCardPro
     const [aiRunning, setAiRunning] = useState(false)
 
     // Check if task is assigned to AI
-    // @ts-expect-error joined data
     const isAITask = task.assignee?.role === 'AI_Agent'
 
     const progress = getProgress(task.status)
@@ -171,27 +177,81 @@ export function TaskCard({ task, currentUserId, userRole, members }: TaskCardPro
                 className="pb-3 cursor-pointer"
                 onClick={() => setExpanded(!expanded)}
             >
-                <div className="flex justify-between items-start gap-2">
-                    <div className="flex-1 min-w-0">
-                        <CardTitle className="text-lg text-slate-900 font-medium truncate">{task.title || "Untitled Task"}</CardTitle>
-                        <CardDescription className="text-xs text-slate-500 mt-1 flex items-center gap-2 flex-wrap">
-                            {/* @ts-expect-error joined data */}
-                            {task.assignee && (
-                                <span className="flex items-center gap-1 bg-slate-100 px-2 py-0.5 rounded-full text-slate-600">
-                                    {/* @ts-expect-error joined data */}
-                                    {task.assignee.role === "AI_Agent" ? "🤖" : "👤"} {task.assignee.full_name}
-                                </span>
+                <div className="flex flex-col gap-3">
+                    {/* Top Row: Objective & Status */}
+                    <div className="flex justify-between items-start">
+                        <div className="flex-1 min-w-0 pr-2">
+                            {task.objective && (
+                                <div className="text-xs font-semibold text-amber-600 mb-1 flex items-center gap-1">
+                                    <Target className="h-3 w-3" />
+                                    {task.objective.title}
+                                </div>
                             )}
-                            {dueInfo && (
-                                <span className={`flex items-center gap-1 ${dueInfo.includes('overdue') ? 'text-red-500' : 'text-slate-500'}`}>
-                                    <Clock className="h-3 w-3" /> {dueInfo}
-                                </span>
+                            <CardTitle className="text-lg text-slate-900 font-bold leading-tight line-clamp-2">
+                                {task.title || "Untitled Task"}
+                            </CardTitle>
+                        </div>
+                        <div className="flex flex-col items-end gap-1 shrink-0">
+                            <Badge className={`${getStatusColor(task.status)} text-white border-0 shadow-sm whitespace-nowrap`}>
+                                {task.status}
+                            </Badge>
+                            {task.assignee?.role === 'AI_Agent' && (
+                                <Badge variant="outline" className="text-[10px] border-purple-200 bg-purple-50 text-purple-700">
+                                    <Bot className="h-3 w-3 mr-1" /> AI Agent
+                                </Badge>
                             )}
-                        </CardDescription>
+                        </div>
                     </div>
-                    <div className="flex items-center gap-2 shrink-0">
-                        <Badge className={`${getStatusColor(task.status)} text-white border-0 shadow-sm`}>{task.status}</Badge>
-                        <ChevronDown className={`h-4 w-4 text-slate-400 transition-transform ${expanded ? 'rotate-180' : ''}`} />
+
+                    {/* Description - Expanded to 3 lines */}
+                    {task.description && (
+                        <p className="text-sm text-slate-600 line-clamp-3 leading-relaxed">
+                            {task.description}
+                        </p>
+                    )}
+
+                    {/* Metadata Grid */}
+                    <div className="grid grid-cols-2 gap-y-2 gap-x-4 text-xs mt-1">
+                        {task.assignee && (
+                            <div className="flex items-center gap-1.5 text-slate-600">
+                                <div className="h-5 w-5 rounded-full bg-slate-100 flex items-center justify-center text-[10px] font-bold">
+                                    {task.assignee.full_name?.charAt(0)}
+                                </div>
+                                <span className="truncate max-w-[100px]" title={task.assignee.full_name || ''}>
+                                    {task.assignee.full_name}
+                                </span>
+                            </div>
+                        )}
+
+                        {dueInfo && (
+                            <div className={`flex items-center gap-1.5 justify-end ${dueInfo.includes('overdue') ? 'text-red-600 font-medium' : 'text-slate-500'}`}>
+                                <Clock className="h-3.5 w-3.5" />
+                                {dueInfo}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Progress Bar */}
+                    <div className="pt-2">
+                        <div className="flex justify-between items-center text-[10px] text-slate-400 mb-1.5 uppercase tracking-wider font-medium">
+                            <span>Progress</span>
+                            <span>{displayProgress}%</span>
+                        </div>
+                        <div
+                            className="h-2 bg-slate-100 rounded-full overflow-hidden cursor-pointer hover:ring-2 hover:ring-amber-300 transition-all"
+                            onClick={(e) => { e.stopPropagation(); handleProgressClick(e); }}
+                            title="Click to set progress"
+                        >
+                            <div
+                                className={`h-full ${progressColor} transition-all duration-300`}
+                                style={{ width: `${displayProgress}%` }}
+                            />
+                        </div>
+                    </div>
+
+                    {/* Expand Indicator */}
+                    <div className="flex justify-center pt-1">
+                        <ChevronDown className={`h-4 w-4 text-slate-300 transition-transform duration-300 ${expanded ? 'rotate-180' : ''}`} />
                     </div>
                 </div>
             </CardHeader>
@@ -344,10 +404,12 @@ export function TaskCard({ task, currentUserId, userRole, members }: TaskCardPro
                         taskTitle={task.title}
                         taskStatus={task.status || 'Pending'}
                         taskDescription={task.description || undefined}
-                        /* @ts-expect-error joined data */
-                        assigneeName={task.assignee?.full_name}
+                        assigneeName={task.assignee?.full_name || undefined}
+                        assigneeId={task.assignee_id || undefined}
+                        assigneeRole={task.assignee?.role || undefined}
                         isAssignee={isAssignee}
                         isCreator={isCreator}
+                        members={members}
                     />
                 </>
             )}

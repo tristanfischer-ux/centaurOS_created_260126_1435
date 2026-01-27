@@ -8,7 +8,7 @@ import { LayoutDashboard, Users, CheckSquare, Calendar, ShoppingBag, Settings } 
 
 const navigation = [
     { name: "Objectives", href: "/objectives", icon: LayoutDashboard },
-    { name: "Team", href: "/team", icon: Users },
+    { name: "Roster", href: "/team", icon: Users },
     { name: "Tasks", href: "/tasks", icon: CheckSquare },
     { name: "Timeline", href: "/timeline", icon: Calendar },
     { name: "Marketplace", href: "/marketplace", icon: ShoppingBag },

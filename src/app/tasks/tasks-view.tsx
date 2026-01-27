@@ -219,8 +219,11 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                 taskStatus={selectedTask?.status || 'Pending'}
                 taskDescription={selectedTask?.description || undefined}
                 assigneeName={selectedTask?.assignee?.full_name || undefined}
+                assigneeId={selectedTask?.assignee_id || undefined}
+                assigneeRole={selectedTask?.assignee?.role}
                 isAssignee={selectedTask?.assignee_id === currentUserId}
                 isCreator={selectedTask?.creator_id === currentUserId}
+                members={members}
             />
         </>
     )

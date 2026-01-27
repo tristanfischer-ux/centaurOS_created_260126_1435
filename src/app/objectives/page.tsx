@@ -1,7 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
-import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card'
-import Link from 'next/link'
-import { CreateObjectiveDialog } from './create-objective-dialog' // Component we will create
+import { CreateObjectiveDialog } from './create-objective-dialog'
+import { ObjectivesListView } from './objectives-list-view'
 
 export default async function ObjectivesPage() {
     const supabase = await createClient()
@@ -11,7 +10,7 @@ export default async function ObjectivesPage() {
         return <div className="p-8 text-red-500">Unauthenticated. Please login.</div>
     }
 
-    // We rely on RLS, but fetching requires the session to be present.
+    // Fetch objectives
     const { data: objectives, error } = await supabase
         .from('objectives')
         .select('*')
@@ -21,6 +20,30 @@ export default async function ObjectivesPage() {
         console.error(error)
         return <div className="text-red-500">Error loading objectives</div>
     }
+
+    // Fetch tasks with assignee info for all objectives
+    const { data: tasks } = await supabase
+        .from('tasks')
+        .select(`
+            id,
+            title,
+            status,
+            assignee_id,
+            end_date,
+            objective_id,
+            assignee:profiles!tasks_assignee_id_fkey(full_name, role)
+        `)
+        .not('objective_id', 'is', null)
+        .order('end_date', { ascending: true })
+
+    // Group tasks by objective
+    const objectivesWithTasks = objectives?.map(obj => ({
+        ...obj,
+        tasks: tasks?.filter(t => t.objective_id === obj.id).map(t => ({
+            ...t,
+            assignee: t.assignee as unknown as { full_name: string | null; role: string | null } | null
+        })) || []
+    })) || []
 
     const count = objectives?.length || 0
     const maxObjectives = 10
@@ -51,33 +74,7 @@ export default async function ObjectivesPage() {
                 </div>
             </div>
 
-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                {objectives?.map((obj) => (
-                    <Link href={`/objectives/${obj.id}`} key={obj.id} className="block group">
-                        <Card className="bg-white border-slate-200 hover:border-amber-500 transition-all shadow-sm h-full flex flex-col">
-                            <CardHeader>
-                                <CardTitle className="text-xl text-slate-900 group-hover:text-amber-600 transition-colors">
-                                    {obj.title}
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent className="flex-1">
-                                <p className="text-slate-600 text-sm line-clamp-3">
-                                    {obj.description || "No description provided."}
-                                </p>
-                            </CardContent>
-                            <CardFooter className="text-xs text-slate-400 border-t border-slate-100 pt-4">
-                                Created {new Date(obj.created_at!).toLocaleDateString()}
-                            </CardFooter>
-                        </Card>
-                    </Link>
-                ))}
-
-                {count === 0 && (
-                    <div className="col-span-full py-12 text-center border-2 border-dashed border-slate-200 rounded-lg text-slate-500">
-                        No objectives set. Define your mission.
-                    </div>
-                )}
-            </div>
+            <ObjectivesListView objectives={objectivesWithTasks} />
         </div>
     )
 }
