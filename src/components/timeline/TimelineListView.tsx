@@ -22,7 +22,6 @@ import { Calendar as CalendarComponent } from "@/components/ui/calendar"
 import { updateTaskAssignees, updateTaskDates } from "@/actions/tasks"
 import { toast } from "sonner"
 import { format } from "date-fns"
-import { format } from "date-fns"
 
 // Types for joined data
 type JoinedTask = Database["public"]["Tables"]["tasks"]["Row"] & {
@@ -266,7 +265,7 @@ export function TimelineListView({ tasks, members, currentUserId }: TimelineList
     windowEnd.setHours(23, 59, 59, 999)
 
     // Generate date markers for the timeline header
-    const dateMarkers = useMemo(() => {
+    const dateMarkers = (() => {
         const markers: { label: string; isToday: boolean }[] = []
         const current = new Date(windowStart)
         while (current <= windowEnd) {
@@ -278,7 +277,7 @@ export function TimelineListView({ tasks, members, currentUserId }: TimelineList
             current.setDate(current.getDate() + 1)
         }
         return markers
-    }, []) // Dependency array empty as windowStart/End are derived from 'now' which is effectively constant for render pass
+    })()
 
     // Handlers
     const handleAssigneeToggle = async (taskId: string, currentAssignees: { id: string }[], memberId: string) => {
@@ -394,7 +393,6 @@ export function TimelineListView({ tasks, members, currentUserId }: TimelineList
 
                                     const isAssignee = currentAssignees.some(a => a.id === currentUserId)
                                     const isCreator = task.creator_id === currentUserId
-                                    const canEdit = isAssignee || isCreator
 
                                     return (
                                         <div

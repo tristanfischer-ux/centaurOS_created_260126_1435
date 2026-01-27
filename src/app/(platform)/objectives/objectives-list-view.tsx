@@ -145,7 +145,7 @@ export function ObjectivesListView({ objectives }: ObjectivesListViewProps) {
                                 <div className="flex items-center gap-4 shrink-0">
                                     <div className="text-right">
                                         <span className="text-sm font-medium text-slate-700">{completedCount}/{taskCount}</span>
-                                        <span className="text-xs text-slate-400 ml-1">tasks</span>
+                                        <span className="text-xs text-slate-400 ml-1">completed</span>
                                     </div>
                                     <Progress value={progress} className="w-24 h-2 bg-slate-100" />
                                     <Badge variant="outline" className="text-xs">
