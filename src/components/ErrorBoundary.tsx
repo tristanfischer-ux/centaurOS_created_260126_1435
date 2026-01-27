@@ -45,7 +45,7 @@ export class ErrorBoundary extends Component<Props, State> {
           <p className="text-muted-foreground mb-6 max-w-md">
             We encountered an unexpected error. Your work has been saved. Please try refreshing the page.
           </p>
-          <div className="flex gap-3">
+          <div className="flex gap-4">
             <Button variant="outline" onClick={() => this.setState({ hasError: false })}>
               Try Again
             </Button>

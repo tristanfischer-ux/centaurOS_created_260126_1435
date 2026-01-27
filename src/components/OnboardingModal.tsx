@@ -118,7 +118,7 @@ export function OnboardingModal() {
               {step.description}
             </p>
 
-            <div className="flex gap-3 justify-center">
+            <div className="flex gap-4 justify-center">
               {currentStep > 0 && (
                 <Button
                   variant="outline"

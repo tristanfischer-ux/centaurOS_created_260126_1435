@@ -243,7 +243,7 @@ export default async function DashboardPage() {
                     <CardContent>
                         {!myTasks || myTasks.length === 0 ? (
                             <EmptyState
-                                icon={<CheckSquare className="h-8 w-8" />}
+                                icon={<CheckSquare className="h-12 w-12" />}
                                 title="No tasks assigned"
                                 description="You don't have any pending or accepted tasks at the moment."
                                 action={
@@ -275,7 +275,7 @@ export default async function DashboardPage() {
                                         <Link 
                                             key={task.id} 
                                             href={`/tasks`}
-                                            className="block p-3 rounded-lg border border-slate-200 hover:border-slate-300 hover:bg-slate-50 transition-colors"
+                                            className="block p-3 rounded-lg border border-slate-200 hover:border-slate-300 hover:bg-slate-50 active:bg-slate-100 transition-colors"
                                         >
                                             <div className="flex items-start justify-between gap-2">
                                                 <div className="flex-1 min-w-0">
@@ -406,7 +406,7 @@ export default async function DashboardPage() {
                                                     <Link 
                                                         key={task.id} 
                                                         href={`/tasks`}
-                                                        className="block p-3 rounded-lg border border-red-200 bg-red-50 hover:bg-red-100 transition-colors"
+                                                        className="block p-3 rounded-lg border border-red-200 bg-red-50 hover:bg-red-100 active:bg-red-200 transition-colors"
                                                     >
                                                         <div className="flex items-start justify-between gap-2">
                                                             <div className="flex-1 min-w-0">
@@ -440,7 +440,7 @@ export default async function DashboardPage() {
                                                 <Link 
                                                     key={task.id} 
                                                     href={`/tasks`}
-                                                    className="block p-3 rounded-lg border border-slate-200 hover:border-slate-300 hover:bg-slate-50 transition-colors"
+                                                    className="block p-3 rounded-lg border border-slate-200 hover:border-slate-300 hover:bg-slate-50 active:bg-slate-100 transition-colors"
                                                 >
                                                     <div className="flex items-start justify-between gap-2">
                                                         <div className="flex-1 min-w-0">
@@ -495,7 +495,7 @@ export default async function DashboardPage() {
                     <CardContent>
                         {!objectives || objectives.length === 0 ? (
                             <EmptyState
-                                icon={<Target className="h-8 w-8" />}
+                                icon={<Target className="h-12 w-12" />}
                                 title="No active objectives"
                                 description="Create an objective to track your progress."
                                 action={
@@ -559,7 +559,7 @@ export default async function DashboardPage() {
                     <CardContent>
                         {recentActivity.length === 0 ? (
                             <EmptyState
-                                icon={<MessageSquare className="h-8 w-8" />}
+                                icon={<MessageSquare className="h-12 w-12" />}
                                 title="No recent activity"
                                 description="Activity will appear here as tasks are updated and commented on."
                             />
@@ -571,7 +571,7 @@ export default async function DashboardPage() {
                                         <Link 
                                             key={`${activity.type}-${activity.id}`} 
                                             href={`/tasks`}
-                                            className="flex items-start gap-3 p-3 rounded-lg border border-slate-200 hover:border-slate-300 hover:bg-slate-50 transition-colors"
+                                            className="flex items-start gap-3 p-3 rounded-lg border border-slate-200 hover:border-slate-300 hover:bg-slate-50 active:bg-slate-100 transition-colors"
                                         >
                                             <Avatar className="h-8 w-8 shrink-0">
                                                 <AvatarFallback className="text-xs bg-slate-100 text-slate-600">

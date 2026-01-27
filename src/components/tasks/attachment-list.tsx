@@ -84,12 +84,13 @@ export function AttachmentList({ taskId, attachments, canDelete = false, onDelet
                     
                     return (
                         <div key={file.id} className="flex items-center justify-between p-2 bg-slate-50 border border-slate-100 rounded-md group hover:border-slate-200 transition-colors">
-                            <div className="flex items-center gap-3 min-w-0 flex-1">
+                            <div className="flex items-center gap-4 min-w-0 flex-1">
                                 {fileType === 'image' ? (
                                     <div className="w-10 h-10 rounded overflow-hidden bg-slate-100 flex-shrink-0">
                                         <img 
                                             src={fileUrl} 
                                             alt={file.file_name}
+                                            loading="lazy"
                                             className="w-full h-full object-cover cursor-pointer"
                                             onClick={() => setPreviewFile(file)}
                                         />
@@ -157,6 +158,7 @@ export function AttachmentList({ taskId, attachments, canDelete = false, onDelet
                                 <img 
                                     src={getFileUrl(previewFile.file_path)} 
                                     alt={previewFile.file_name}
+                                    loading="lazy"
                                     className="w-full h-auto max-h-[80vh] object-contain rounded"
                                 />
                             )}

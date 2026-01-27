@@ -18,6 +18,7 @@ import { useEffect, useState } from "react"
 import { getTaskHistory } from "@/actions/tasks"
 import { Loader2, History } from "lucide-react"
 import { Database } from "@/types/database.types"
+import { getStatusColor } from "@/lib/status-colors"
 
 interface HistoryDrawerProps {
     open: boolean
@@ -60,18 +61,20 @@ export function HistoryDrawer({ open, onOpenChange, taskId, taskTitle }: History
 
     const getActionBadges = (item: TaskHistoryItem) => {
         switch (item.action_type) {
-            case 'CREATED': return <Badge variant="outline" className="text-blue-600 border-blue-200 bg-blue-50">Created</Badge>
+            case 'CREATED': return <Badge variant="info">Created</Badge>
             case 'COMPLETED': return <Badge className="bg-slate-900 border-slate-900 text-white hover:bg-slate-800">Completed</Badge>
             case 'STATUS_CHANGE':
                 if (item.changes && typeof item.changes === 'object' && 'new_status' in item.changes) {
                     const changes = item.changes as { new_status?: string }
-                    if (changes.new_status === 'Accepted') return <Badge className="bg-green-600 hover:bg-green-700 border-0 text-white">Accepted</Badge>
-                    if (changes.new_status === 'Rejected') return <Badge className="bg-red-600 hover:bg-red-700 border-0 text-white">Rejected</Badge>
+                    if (changes.new_status) {
+                        const statusColor = getStatusColor(changes.new_status)
+                        return <Badge className={`${statusColor.bar} hover:opacity-90 border-0 text-white`}>{changes.new_status.replace(/_/g, ' ')}</Badge>
+                    }
                 }
                 return <Badge variant="secondary">Status Change</Badge>
-            case 'ASSIGNED': return <Badge variant="outline" className="text-purple-600 border-purple-200 bg-purple-50">Assigned</Badge>
-            case 'FORWARDED': return <Badge variant="outline" className="text-amber-600 border-amber-200 bg-amber-50">Forwarded</Badge>
-            case 'UPDATED': return <Badge variant="outline" className="text-slate-500">Updated</Badge>
+            case 'ASSIGNED': return <Badge variant="secondary">Assigned</Badge>
+            case 'FORWARDED': return <Badge variant="warning">Forwarded</Badge>
+            case 'UPDATED': return <Badge variant="outline">Updated</Badge>
             default: return <Badge variant="outline">{item.action_type}</Badge>
         }
     }

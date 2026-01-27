@@ -20,6 +20,7 @@ import {
 import { toast } from "sonner"
 import { useRouter } from "next/navigation"
 import { format, addDays, subDays, addWeeks, subWeeks, addMonths, subMonths } from "date-fns"
+import { getStatusHex } from "@/lib/status-colors"
 
 // Types for joined data
 export type JoinedTask = Database["public"]["Tables"]["tasks"]["Row"] & {
@@ -103,14 +104,8 @@ function getBarColor(task: { status: string | null, end_date: string | null }): 
         return '#f59e0b' // amber-500
     }
     
-    // Status-based colors
-    if (task.status === "Completed") return '#22c55e' // green-500
-    if (task.status === "Accepted") return '#3b82f6' // blue-500
-    if (task.status === "Rejected") return '#ef4444' // red-500
-    if (task.status === "Amended" || task.status === "Amended_Pending_Approval") return '#f97316' // orange-500
-    
-    // Default: pending
-    return '#64748b' // slate-500
+    // Status-based colors using centralized utility
+    return getStatusHex(task.status)
 }
 
 // Initials Avatar Component
@@ -420,7 +415,7 @@ export function GanttView({ tasks, objectives, profiles }: GanttViewProps) {
 
             </div>
             {/* Control Bar */}
-            <Card className="p-4 bg-white border-slate-200 flex flex-wrap gap-4 items-center justify-between shadow-sm">
+            <Card className="p-4 flex flex-wrap gap-4 items-center justify-between shadow-sm">
                 <div className="flex gap-4 flex-wrap">
                     <MultiSelect
                         options={objectiveOptions}
@@ -442,7 +437,7 @@ export function GanttView({ tasks, objectives, profiles }: GanttViewProps) {
                 <div className="flex items-center gap-2">
                     <Select value={sortBy} onValueChange={(v) => setSortBy(v as 'start_date' | 'end_date')}>
                         <SelectTrigger className="w-[140px] h-8 text-xs">
-                            <ArrowUpDown className="w-3 h-3 mr-2 text-slate-400" />
+                            <ArrowUpDown className="w-3 h-3 mr-2 text-muted-foreground" />
                             <SelectValue placeholder="Sort by" />
                         </SelectTrigger>
                         <SelectContent>
@@ -451,12 +446,12 @@ export function GanttView({ tasks, objectives, profiles }: GanttViewProps) {
                         </SelectContent>
                     </Select>
 
-                    <div className="flex gap-1 bg-slate-100 p-1 rounded-lg border border-slate-200">
+                    <div className="flex gap-1 bg-muted p-1 rounded-lg border border-border">
                         <Button
                             variant={viewMode === ViewMode.Day ? "default" : "ghost"}
                             size="sm"
                             onClick={() => setViewMode(ViewMode.Day)}
-                            className={viewMode === ViewMode.Day ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-900"}
+                            className={viewMode === ViewMode.Day ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}
                         >
                             Day
                         </Button>
@@ -464,7 +459,7 @@ export function GanttView({ tasks, objectives, profiles }: GanttViewProps) {
                             variant={viewMode === ViewMode.Week ? "default" : "ghost"}
                             size="sm"
                             onClick={() => setViewMode(ViewMode.Week)}
-                            className={viewMode === ViewMode.Week ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-900"}
+                            className={viewMode === ViewMode.Week ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}
                         >
                             Week
                         </Button>
@@ -472,7 +467,7 @@ export function GanttView({ tasks, objectives, profiles }: GanttViewProps) {
                             variant={viewMode === ViewMode.Month ? "default" : "ghost"}
                             size="sm"
                             onClick={() => setViewMode(ViewMode.Month)}
-                            className={viewMode === ViewMode.Month ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-900"}
+                            className={viewMode === ViewMode.Month ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}
                         >
                             Month
                         </Button>
@@ -514,11 +509,11 @@ export function GanttView({ tasks, objectives, profiles }: GanttViewProps) {
 
             {/* Gantt Chart or Empty State */}
             {ganttTasks.length === 0 ? (
-                <div className="bg-white rounded-lg border border-slate-200 text-center py-16 text-slate-500">
+                <div className="bg-card rounded-lg border border-border text-center py-16 text-muted-foreground">
                     No tasks match current filters.
                 </div>
             ) : (
-                <div className="bg-white rounded-lg overflow-hidden border border-slate-200 text-black shadow-sm">
+                <div className="bg-card rounded-lg overflow-hidden border border-border shadow-sm">
                     <Gantt
                         tasks={ganttTasks}
                         viewMode={viewMode}

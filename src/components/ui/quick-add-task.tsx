@@ -78,7 +78,7 @@ export function QuickAddTask({ objectives, members, currentUserId, teams = [], o
     }
 
     return (
-        <form onSubmit={handleSubmit} className="flex gap-2 p-2 border-2 border-slate-200 rounded-lg bg-white shadow-sm">
+        <form onSubmit={handleSubmit} className="flex gap-2 p-2 border-2 border-border rounded-lg bg-card shadow-sm">
             <Input
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}

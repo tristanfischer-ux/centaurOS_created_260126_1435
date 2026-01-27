@@ -22,6 +22,7 @@ import { Calendar as CalendarComponent } from "@/components/ui/calendar"
 import { updateTaskAssignees, updateTaskDates } from "@/actions/tasks"
 import { toast } from "sonner"
 import { format } from "date-fns"
+import { getStatusBarClass, getStatusBadgeClass } from "@/lib/status-colors"
 
 // Types for joined data
 type JoinedTask = Database["public"]["Tables"]["tasks"]["Row"] & {
@@ -115,28 +116,6 @@ function groupTasksByDueDate(tasks: JoinedTask[]) {
 
 
 
-function getStatusBarColor(status: string | null) {
-    switch (status) {
-        case 'Accepted': return 'bg-blue-500'
-        case 'Completed': return 'bg-green-500'
-        case 'Rejected': return 'bg-red-500'
-        case 'Amended_Pending_Approval': return 'bg-orange-500'
-        case 'Amended': return 'bg-orange-500'
-        default: return 'bg-gray-400'
-    }
-}
-
-function getStatusBadge(status: string | null) {
-    const colors: Record<string, string> = {
-        'Accepted': 'bg-blue-100 text-blue-700',
-        'Completed': 'bg-green-100 text-green-700',
-        'Rejected': 'bg-red-100 text-red-700',
-        'Amended_Pending_Approval': 'bg-orange-100 text-orange-700',
-        'Amended': 'bg-orange-100 text-orange-700',
-        'Pending': 'bg-gray-100 text-gray-700',
-    }
-    return colors[status || 'Pending'] || colors['Pending']
-}
 
 // Mini timeline bar component with avatar
 function MiniTimelineBar({ task, windowStart, windowEnd }: {
@@ -177,7 +156,7 @@ function MiniTimelineBar({ task, windowStart, windowEnd }: {
     const isAI = task.profiles?.role === 'AI_Agent'
 
     return (
-        <div className="relative w-full h-7 bg-slate-100 rounded-md overflow-hidden">
+        <div className="relative w-full h-7 bg-muted rounded-md overflow-hidden">
             {/* Today marker */}
             <div
                 className="absolute top-0 bottom-0 w-0.5 bg-amber-400 z-10"
@@ -186,7 +165,7 @@ function MiniTimelineBar({ task, windowStart, windowEnd }: {
 
             {/* Task bar background */}
             <div
-                className={`absolute top-0.5 bottom-0.5 rounded-full ${getStatusBarColor(task.status)} opacity-30`}
+                className={`absolute top-0.5 bottom-0.5 rounded-full ${getStatusBarClass(task.status)} opacity-30`}
                 style={{
                     left: `${startPercent}%`,
                     width: `${widthPercent}%`,
@@ -195,7 +174,7 @@ function MiniTimelineBar({ task, windowStart, windowEnd }: {
 
             {/* Task bar progress fill */}
             <div
-                className={`absolute top-0.5 bottom-0.5 rounded-full ${getStatusBarColor(task.status)}`}
+                className={`absolute top-0.5 bottom-0.5 rounded-full ${getStatusBarClass(task.status)}`}
                 style={{
                     left: `${startPercent}%`,
                     width: `${(widthPercent * progressPercent) / 100}%`,
@@ -321,7 +300,7 @@ export function TimelineListView({ tasks, members, currentUserId }: TimelineList
 
     if (tasks.length === 0) {
         return (
-            <div className="text-center py-12 text-slate-500">
+            <div className="text-center py-12 text-muted-foreground">
                 No tasks to display
             </div>
         )
@@ -330,18 +309,18 @@ export function TimelineListView({ tasks, members, currentUserId }: TimelineList
     return (
         <div className="space-y-3 pb-20"> {/* Add padding bottom for safe mobile scrolling */}
             {/* Timeline Header */}
-            <div className="bg-white rounded-xl border border-slate-200 p-3 sticky top-0 z-30 shadow-sm">
+            <div className="bg-card rounded-xl border border-border p-3 sticky top-0 z-30 shadow-sm">
                 <div className="flex items-center gap-2 mb-2">
                     <Calendar className="h-4 w-4 text-amber-500" />
-                    <span className="text-xs font-medium text-slate-600">2 Week Timeline</span>
+                    <span className="text-xs font-medium text-muted-foreground">2 Week Timeline</span>
                 </div>
-                <div className="relative h-6 bg-slate-100 rounded-md flex">
+                <div className="relative h-6 bg-muted rounded-md flex">
                     {dateMarkers.map((marker, idx) => (
                         <div
                             key={idx}
                             className={`flex-1 text-center text-xs ${marker.isToday
                                 ? 'text-amber-600 font-bold'
-                                : 'text-slate-400'
+                                : 'text-muted-foreground'
                                 }`}
                         >
                             {idx % 2 === 0 && marker.label}
@@ -356,34 +335,34 @@ export function TimelineListView({ tasks, members, currentUserId }: TimelineList
                 const completedCount = dateTasks.filter(t => t.status === 'Completed').length
 
                 return (
-                    <div key={dateKey} className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+                    <div key={dateKey} className="bg-card rounded-xl border border-border overflow-hidden">
                         {/* Date Header */}
                         <button
                             onClick={() => setExpandedDate(expandedDate === dateKey ? null : dateKey)}
-                            className="w-full flex items-center justify-between p-4 hover:bg-slate-50 transition-colors"
+                            className="w-full flex items-center justify-between p-4 hover:bg-muted transition-colors duration-200"
                         >
-                            <div className="flex items-center gap-3">
+                            <div className="flex items-center gap-4">
                                 <div className="h-10 w-10 rounded-full bg-amber-100 flex items-center justify-center">
                                     <Calendar className="h-5 w-5 text-amber-600" />
                                 </div>
                                 <div className="text-left">
-                                    <div className="font-semibold text-slate-900">{dateKey}</div>
-                                    <div className="text-sm text-slate-500">
+                                <div className="font-semibold text-foreground">{dateKey}</div>
+                                <div className="text-sm text-muted-foreground">
                                         {dateTasks.length} task{dateTasks.length !== 1 ? 's' : ''}
                                         {completedCount > 0 && ` • ${completedCount} done`}
                                     </div>
                                 </div>
                             </div>
                             {isExpanded ? (
-                                <ChevronDown className="h-5 w-5 text-slate-400" />
+                                <ChevronDown className="h-5 w-5 text-muted-foreground" />
                             ) : (
-                                <ChevronRight className="h-5 w-5 text-slate-400" />
+                                <ChevronRight className="h-5 w-5 text-muted-foreground" />
                             )}
                         </button>
 
                         {/* Task List */}
                         {isExpanded && (
-                            <div className="border-t border-slate-100">
+                            <div className="border-t border-border">
                                 {dateTasks.map((task, idx) => {
                                     const isTaskCollapsed = collapsedTasks.has(task.id)
                                     // Normalize assignees
@@ -397,11 +376,11 @@ export function TimelineListView({ tasks, members, currentUserId }: TimelineList
                                     return (
                                         <div
                                             key={task.id}
-                                            className={`${idx !== dateTasks.length - 1 ? 'border-b border-slate-50' : ''}`}
+                                            className={`${idx !== dateTasks.length - 1 ? 'border-b border-border' : ''}`}
                                         >
                                             {/* Task Header - Always Visible */}
                                             <div
-                                                className="p-4 hover:bg-slate-50 transition-colors cursor-pointer flex items-start gap-3"
+                                                className="p-4 hover:bg-muted transition-colors cursor-pointer flex items-start gap-4"
                                                 onClick={(e) => toggleTaskCollapse(task.id, e)}
                                             >
                                                 {/* Interactive Avatar Picker (Stop Propagation) */}
@@ -421,12 +400,12 @@ export function TimelineListView({ tasks, members, currentUserId }: TimelineList
                                                                             </div>
                                                                         ))
                                                                     ) : (
-                                                                        <div className="h-8 w-8 rounded-full bg-slate-100 border border-slate-200 border-dashed flex items-center justify-center text-slate-400">
+                                                                        <div className="h-8 w-8 rounded-full bg-muted border border-border border-dashed flex items-center justify-center text-muted-foreground">
                                                                             <Plus className="w-4 h-4" />
                                                                         </div>
                                                                     )}
                                                                     {currentAssignees.length > 3 && (
-                                                                        <div className="h-7 w-7 rounded-full bg-slate-100 border border-white flex items-center justify-center text-[10px] text-slate-500 font-medium z-0">
+                                                                        <div className="h-7 w-7 rounded-full bg-muted border border-card flex items-center justify-center text-[10px] text-muted-foreground font-medium z-0">
                                                                             +{currentAssignees.length - 3}
                                                                         </div>
                                                                     )}
@@ -469,18 +448,18 @@ export function TimelineListView({ tasks, members, currentUserId }: TimelineList
                                                             <span className="text-slate-400 font-mono text-xs mr-2">#{task.task_number}</span>
                                                             {task.title}
                                                         </h4>
-                                                        <Badge className={`shrink-0 text-xs ${getStatusBadge(task.status)}`}>
-                                                            {task.status || 'Pending'}
+                                                        <Badge className={`shrink-0 text-xs ${getStatusBadgeClass(task.status)}`}>
+                                                            {(task.status || 'Pending').replace(/_/g, ' ')}
                                                         </Badge>
                                                     </div>
 
                                                     {/* Compact info when collapsed */}
-                                                    <div className="flex items-center gap-3 mt-1 text-sm text-slate-500 flex-wrap">
+                                                    <div className="flex items-center gap-4 mt-1 text-sm text-slate-500 flex-wrap">
                                                         {/* Interactive Date (End Date) - Stop Propagation */}
                                                         <div onClick={(e) => e.stopPropagation()}>
                                                             <Popover>
                                                                 <PopoverTrigger asChild>
-                                                                    <div className={`flex items-center gap-1 cursor-pointer hover:text-amber-600 transition-colors ${!task.end_date ? 'text-slate-300' : ''}`}>
+                                                                    <div className={`flex items-center gap-1 cursor-pointer hover:text-amber-600 transition-colors duration-200 ${!task.end_date ? 'text-muted-foreground' : ''}`}>
                                                                         <Clock className="h-3 w-3" />
                                                                         {task.end_date
                                                                             ? <span>Due {format(new Date(task.end_date), "MMM d")}</span>
@@ -502,14 +481,14 @@ export function TimelineListView({ tasks, members, currentUserId }: TimelineList
                                                 </div>
 
                                                 {/* Collapse Chevron */}
-                                                <ChevronDown className={`h-4 w-4 text-slate-400 shrink-0 mt-1 transition-transform ${isTaskCollapsed ? '-rotate-90' : ''}`} />
+                                                <ChevronDown className={`h-4 w-4 text-muted-foreground shrink-0 mt-1 transition-transform duration-200 ${isTaskCollapsed ? '-rotate-90' : ''}`} />
                                             </div>
 
                                             {/* Expandable Details */}
                                             {!isTaskCollapsed && (
                                                 <div className="px-4 pb-4 -mt-2">
                                                     {/* Extra info */}
-                                                    <div className="ml-11 mb-2 text-sm text-slate-500 flex flex-wrap gap-4">
+                                                    <div className="ml-11 mb-2 text-sm text-muted-foreground flex flex-wrap gap-4">
                                                         {task.objectives && (
                                                             <span className="flex items-center gap-1">
                                                                 <Target className="h-3 w-3 text-amber-500" />
@@ -521,11 +500,11 @@ export function TimelineListView({ tasks, members, currentUserId }: TimelineList
                                                         <div onClick={(e) => e.stopPropagation()}>
                                                             <Popover>
                                                                 <PopoverTrigger asChild>
-                                                                    <div className="flex items-center gap-1 cursor-pointer hover:text-amber-600 transition-colors">
+                                                                    <div className="flex items-center gap-1 cursor-pointer hover:text-amber-600 transition-colors duration-200">
                                                                         <CalendarIcon className="h-3 w-3" />
                                                                         {task.start_date
                                                                             ? <span>Start: {format(new Date(task.start_date), "MMM d")}</span>
-                                                                            : <span className="text-slate-400">Set Start Date</span>
+                                                                            : <span className="text-muted-foreground">Set Start Date</span>
                                                                         }
                                                                     </div>
                                                                 </PopoverTrigger>

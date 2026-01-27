@@ -146,11 +146,11 @@ export function EditTaskDialog({ open, onOpenChange, task, members }: EditTaskDi
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="bg-white border-slate-200 text-slate-900 sm:max-w-xl max-h-[90vh] overflow-y-auto">
+            <DialogContent className="sm:max-w-xl max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
                     <DialogTitle className="flex items-baseline gap-2">
                         Edit Task
-                        <span className="text-sm font-mono font-normal text-slate-400">#{task.task_number}</span>
+                        <span className="text-sm font-mono font-normal text-muted-foreground">#{task.task_number}</span>
                     </DialogTitle>
                 </DialogHeader>
 
@@ -162,7 +162,7 @@ export function EditTaskDialog({ open, onOpenChange, task, members }: EditTaskDi
                             <Input
                                 value={title}
                                 onChange={(e) => setTitle(e.target.value)}
-                                className="bg-white border-slate-200"
+                                className=""
                             />
                         </div>
 
@@ -171,7 +171,7 @@ export function EditTaskDialog({ open, onOpenChange, task, members }: EditTaskDi
                             <Textarea
                                 value={description}
                                 onChange={(e) => setDescription(e.target.value)}
-                                className="bg-white border-slate-200 min-h-[100px]"
+                                className="min-h-[100px]"
                             />
                         </div>
 
@@ -183,7 +183,7 @@ export function EditTaskDialog({ open, onOpenChange, task, members }: EditTaskDi
                                         variant="outline"
                                         role="combobox"
                                         aria-expanded={assigneeOpen}
-                                        className="w-full justify-between bg-white border-slate-200"
+                                        className="w-full justify-between"
                                     >
                                         {assigneeId
                                             ? (() => {

@@ -30,9 +30,9 @@ export function ComparisonBar({ selectedItems, onClear, onCompare, onRemove }: C
                                 </div>
                                 <button
                                     onClick={() => onRemove(item.id)}
-                                    className="absolute -top-1 -right-1 bg-destructive rounded-full w-3.5 h-3.5 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                                    className="absolute -top-1 -right-1 bg-destructive rounded-full w-8 h-8 sm:w-6 sm:h-6 flex items-center justify-center sm:opacity-0 sm:group-hover:opacity-100 transition-opacity hover:bg-destructive/80 active:bg-destructive/60"
                                 >
-                                    <X className="w-2.5 h-2.5" />
+                                    <X className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
                                 </button>
                             </div>
                         ))}

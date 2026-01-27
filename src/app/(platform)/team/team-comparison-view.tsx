@@ -499,6 +499,67 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                         <span className="text-blue-600">{member.activeTasks} active</span>
                         <span className="text-slate-400">{member.pendingTasks} pending</span>
                     </div>
+
+                    {/* Touch-friendly action buttons (mobile only) */}
+                    {!compareMode && (
+                        <div className="flex gap-2 mt-2 sm:hidden pt-2 border-t border-slate-100">
+                            {member.role !== 'AI_Agent' && aiAgents.length > 0 && !isCentaur && (
+                                <Button 
+                                    variant="outline" 
+                                    size="sm" 
+                                    onClick={(e) => {
+                                        e.preventDefault()
+                                        e.stopPropagation()
+                                        // Pair with first available AI agent
+                                        const availableAI = aiAgents.find(ai => ai.id !== member.paired_ai_id)
+                                        if (availableAI) {
+                                            setPairingMemberId(member.id)
+                                            startTransition(async () => {
+                                                const res = await pairCentaur(member.id, availableAI.id)
+                                                if (res?.error) {
+                                                    toast.error(res.error)
+                                                } else {
+                                                    toast.success(`Paired ${member.full_name} with ${availableAI.full_name}`)
+                                                }
+                                                setPairingMemberId(null)
+                                            })
+                                        }
+                                    }}
+                                    disabled={isPairing || pairingMemberId === member.id}
+                                    className="flex-1 text-xs"
+                                >
+                                    {isPairing && pairingMemberId === member.id ? (
+                                        <>
+                                            <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                                            Pairing...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Zap className="h-3 w-3 mr-1" />
+                                            Pair AI
+                                        </>
+                                    )}
+                                </Button>
+                            )}
+                            <Button 
+                                variant="outline" 
+                                size="sm" 
+                                onClick={(e) => {
+                                    e.preventDefault()
+                                    e.stopPropagation()
+                                    // Open team creation dialog with this member
+                                    setQuickTeamMemberIds([member.id])
+                                    setTeamName("")
+                                    setTeamError(null)
+                                    setShowQuickTeamDialog(true)
+                                }}
+                                className="flex-1 text-xs"
+                            >
+                                <Users className="h-3 w-3 mr-1" />
+                                Add to Team
+                            </Button>
+                        </div>
+                    )}
                 </CardContent>
             </Card>
         )
@@ -794,7 +855,7 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                                     <tr>
                                         <td colSpan={5} className="py-8">
                                             <EmptyState
-                                                icon={<Users className="h-8 w-8" />}
+                                                icon={<Users className="h-12 w-12" />}
                                                 title="No executives yet"
                                                 description="Add executives to evaluate and approve work."
                                             />
@@ -873,7 +934,7 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                     {aiAgents.length === 0 ? (
                         <div className="border-2 border-dashed border-slate-200 rounded-lg">
                             <EmptyState
-                                icon={<Brain className="h-8 w-8" />}
+                                icon={<Brain className="h-12 w-12" />}
                                 title="No AI agents yet"
                                 description="Add AI agents to automate tasks and enhance productivity."
                             />
@@ -1061,7 +1122,7 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                 </DialogContent>
             </Dialog>
 
-            {/* Quick Team Creation Dialog (from drag-drop) */}
+            {/* Quick Team Creation Dialog (from drag-drop or button) */}
             <Dialog open={showQuickTeamDialog} onOpenChange={setShowQuickTeamDialog}>
                 <DialogContent className="sm:max-w-[400px] bg-white">
                     <DialogHeader>
@@ -1070,15 +1131,18 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                             Create Team
                         </DialogTitle>
                         <DialogDescription>
-                            Name your new team with these members
+                            {quickTeamMemberIds.length === 1 
+                                ? "Select additional members and name your team"
+                                : "Name your new team with these members"
+                            }
                         </DialogDescription>
                     </DialogHeader>
 
                     <div className="space-y-4 pt-2">
-                        {/* Show the two members being combined */}
-                        <div className="flex items-center justify-center gap-4 py-4">
+                        {/* Show selected members */}
+                        <div className="flex items-center justify-center gap-4 py-4 flex-wrap">
                             {quickTeamMembers.map((member, idx) => (
-                                <div key={member.id} className="flex flex-col items-center">
+                                <div key={member.id} className="flex flex-col items-center relative">
                                     <Avatar className="h-14 w-14 border-2 border-green-500">
                                         <AvatarFallback className="bg-green-100 text-green-700 font-bold">
                                             {getInitials(member.full_name)}
@@ -1086,11 +1150,43 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                                     </Avatar>
                                     <span className="text-sm font-medium text-slate-900 mt-2">{member.full_name?.split(' ')[0]}</span>
                                     {idx < quickTeamMembers.length - 1 && (
-                                        <span className="absolute text-2xl text-green-600">+</span>
+                                        <span className="absolute top-7 left-[calc(100%+0.5rem)] text-2xl text-green-600">+</span>
                                     )}
                                 </div>
                             ))}
                         </div>
+
+                        {/* Allow selecting additional members if starting with one */}
+                        {quickTeamMemberIds.length === 1 && (
+                            <div className="space-y-2">
+                                <Label>Add Members</Label>
+                                <div className="max-h-40 overflow-y-auto border border-slate-200 rounded-md p-2 space-y-1">
+                                    {allMembers
+                                        .filter(m => !quickTeamMemberIds.includes(m.id))
+                                        .map(member => (
+                                            <button
+                                                key={member.id}
+                                                type="button"
+                                                onClick={() => {
+                                                    if (quickTeamMemberIds.includes(member.id)) {
+                                                        setQuickTeamMemberIds(prev => prev.filter(id => id !== member.id))
+                                                    } else {
+                                                        setQuickTeamMemberIds(prev => [...prev, member.id])
+                                                    }
+                                                }}
+                                                className={cn(
+                                                    "w-full text-left px-2 py-1.5 rounded text-sm transition-colors",
+                                                    quickTeamMemberIds.includes(member.id)
+                                                        ? "bg-green-50 text-green-700 border border-green-200"
+                                                        : "hover:bg-slate-50"
+                                                )}
+                                            >
+                                                {member.full_name}
+                                            </button>
+                                        ))}
+                                </div>
+                            </div>
+                        )}
 
                         <div className="space-y-2">
                             <Label htmlFor="quickTeamName">Team Name</Label>
@@ -1111,12 +1207,16 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                         )}
 
                         <div className="flex justify-end gap-3 pt-2">
-                            <Button variant="outline" onClick={() => setShowQuickTeamDialog(false)}>
+                            <Button variant="outline" onClick={() => {
+                                setShowQuickTeamDialog(false)
+                                setQuickTeamMemberIds([])
+                                setTeamName("")
+                            }}>
                                 Cancel
                             </Button>
                             <Button
                                 onClick={handleCreateQuickTeam}
-                                disabled={isPending || !teamName.trim()}
+                                disabled={isPending || !teamName.trim() || quickTeamMemberIds.length < 2}
                                 className="bg-green-600 hover:bg-green-700"
                             >
                                 {isPending ? "Creating..." : "Create Team"}

@@ -26,7 +26,7 @@ export function KeyboardShortcutsDialog() {
         </DialogHeader>
         <div className="space-y-6 py-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-4">
               <kbd className={cn(
                 "px-3 py-1.5 bg-slate-100 rounded-md text-xs font-mono",
                 "border border-slate-200 shadow-sm"
@@ -35,7 +35,7 @@ export function KeyboardShortcutsDialog() {
               </kbd>
               <span className="text-sm text-slate-700">Command Palette</span>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-4">
               <kbd className={cn(
                 "px-3 py-1.5 bg-slate-100 rounded-md text-xs font-mono",
                 "border border-slate-200 shadow-sm"
@@ -44,7 +44,7 @@ export function KeyboardShortcutsDialog() {
               </kbd>
               <span className="text-sm text-slate-700">New Task</span>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-4">
               <kbd className={cn(
                 "px-3 py-1.5 bg-slate-100 rounded-md text-xs font-mono",
                 "border border-slate-200 shadow-sm"
@@ -53,7 +53,7 @@ export function KeyboardShortcutsDialog() {
               </kbd>
               <span className="text-sm text-slate-700">Show Shortcuts</span>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-4">
               <kbd className={cn(
                 "px-3 py-1.5 bg-slate-100 rounded-md text-xs font-mono",
                 "border border-slate-200 shadow-sm"

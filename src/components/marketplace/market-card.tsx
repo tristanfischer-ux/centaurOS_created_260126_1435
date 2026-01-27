@@ -26,10 +26,10 @@ export const MarketCard = memo(function MarketCard({ listing, isSelected, onTogg
 
     return (
         <Card className={cn(
-            "group relative flex flex-col justify-between rounded-xl shadow-sm hover:shadow-md transition-all duration-300 overflow-hidden",
+            "group relative flex flex-col justify-between rounded-xl shadow-sm hover:shadow-md hover:scale-[1.01] transition-all duration-200 overflow-hidden",
             isSelected && "ring-2 ring-ring border-ring"
         )}>
-            <CardContent className="p-5 relative z-10">
+            <CardContent className="p-4 relative z-10">
                 <div className="flex justify-between items-start mb-4">
                     <Badge variant="outline" className={cn("uppercase text-[10px] tracking-wider font-semibold border-0", categoryBadgeStyles[listing.category])}>
                         {listing.subcategory}

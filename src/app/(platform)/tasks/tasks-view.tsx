@@ -5,7 +5,7 @@ import { useAutoRefresh } from "@/hooks/useAutoRefresh"
 import { RefreshButton } from "@/components/RefreshButton"
 import { TaskCard } from "./task-card"
 import { Button } from "@/components/ui/button"
-import { LayoutGrid, List, X, Trash2, CheckSquare, Loader2, Check, UserPlus } from "lucide-react"
+import { LayoutGrid, List, X, Trash2, CheckSquare, Loader2, Check, UserPlus, Filter, ChevronDown } from "lucide-react"
 import { deleteTasks, acceptTask, completeTask, updateTaskAssignees } from "@/actions/tasks"
 import { toast } from "sonner"
 import { CreateTaskDialog } from "./create-task-dialog"
@@ -37,6 +37,7 @@ import {
 } from "@/components/ui/command"
 import { EmptyState } from "@/components/ui/empty-state"
 import { Inbox } from "lucide-react"
+import { getStatusBadgeClass } from "@/lib/status-colors"
 
 // Task type update
 type Task = Database["public"]["Tables"]["tasks"]["Row"] & {
@@ -80,6 +81,7 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
     const [statusFilter, setStatusFilter] = useState<string[]>([])
     const [assigneeFilter, setAssigneeFilter] = useState<string | 'unassigned' | 'all'>('all')
     const [sortBy, setSortBy] = useState<'due_date_asc' | 'due_date_desc' | 'created_desc'>('due_date_asc')
+    const [filtersOpen, setFiltersOpen] = useState(false)
     
     // Filter Presets State
     const [activePreset, setActivePreset] = useState<string | null>(null)
@@ -388,11 +390,11 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                 <div className="flex flex-col gap-4">
                     <div className="flex items-center justify-between">
                         <div>
-                            <h1 className="text-3xl font-bold tracking-tight text-slate-900 mb-2 flex items-center gap-3">
+                            <h1 className="text-3xl font-bold tracking-tight text-foreground mb-2 flex items-center gap-3">
                                 Tasks
-                                <span className="text-slate-400 font-medium text-2xl">{tasks.length}</span>
+                                <span className="text-muted-foreground font-medium text-2xl">{tasks.length}</span>
                             </h1>
-                            <p className="text-slate-500">Democratic workflow management.</p>
+                            <p className="text-muted-foreground">Democratic workflow management.</p>
                         </div>
                         <div className="flex items-center gap-2">
                             {isSelectionMode ? (
@@ -418,7 +420,7 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                                 <>
                                     <RefreshButton />
                                     <Button variant="outline" size="sm" onClick={toggleSelectionMode} className="mr-2">
-                                        <CheckSquare className="w-4 h-4 mr-2 text-slate-500" />
+                                        <CheckSquare className="w-4 h-4 mr-2 text-muted-foreground" />
                                         Select
                                     </Button>
                                 </>
@@ -457,10 +459,10 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                                 key={preset.id}
                                 onClick={() => setActivePreset(activePreset === preset.id ? null : preset.id)}
                                 className={cn(
-                                    "px-3 py-1.5 rounded-full text-sm font-medium transition-all",
+                                    "px-3 py-1.5 rounded-full text-sm font-medium transition-all duration-200",
                                     activePreset === preset.id
                                         ? "bg-slate-900 text-white"
-                                        : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                                        : "bg-slate-100 text-muted-foreground hover:bg-slate-200"
                                 )}
                             >
                                 {preset.label}
@@ -468,79 +470,102 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                         ))}
                     </div>
 
-                    {/* Filter Bar */}
-                    <div className="flex flex-wrap items-center gap-3 bg-white p-3 rounded-lg border border-slate-200 shadow-sm">
-                        <div className="flex items-center gap-2 pr-4 border-r border-slate-100">
-                            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Filter:</span>
-                            {['Pending', 'Accepted', 'Completed', 'Rejected'].map(status => (
-                                <Badge
-                                    key={status}
-                                    variant={statusFilter.includes(status) ? 'default' : 'outline'}
-                                    className={cn(
-                                        "cursor-pointer hover:opacity-80 active:opacity-70 transition-all",
-                                        statusFilter.includes(status)
-                                            ? status === 'Accepted' ? 'bg-green-600 hover:bg-green-700'
-                                                : status === 'Completed' ? 'bg-slate-800 hover:bg-slate-900'
-                                                    : status === 'Rejected' ? 'bg-red-600 hover:bg-red-700'
-                                                        : 'bg-slate-500 hover:bg-slate-600'
-                                            : "text-slate-500 bg-white hover:bg-slate-50 active:bg-slate-100"
+                    {/* Collapsible Filter Bar */}
+                    <div className="mb-4">
+                        {(() => {
+                            const activeFilterCount = statusFilter.length + (assigneeFilter !== 'all' ? 1 : 0)
+                            return (
+                                <>
+                                    <Button 
+                                        variant="outline" 
+                                        onClick={() => setFiltersOpen(!filtersOpen)}
+                                        className="mb-2"
+                                    >
+                                        <Filter className="w-4 h-4 mr-2" />
+                                        Filters
+                                        {activeFilterCount > 0 && (
+                                            <Badge className="ml-2 bg-amber-600 text-white">{activeFilterCount}</Badge>
+                                        )}
+                                        <ChevronDown className={cn("w-4 h-4 ml-2 transition-transform", filtersOpen && "rotate-180")} />
+                                    </Button>
+                                    
+                                    {filtersOpen && (
+                                        <div className="p-4 border rounded-lg bg-slate-50 space-y-4">
+                                            <div className="flex flex-wrap items-center gap-3">
+                                                <div className="flex items-center gap-2 pr-4 border-r border-slate-200">
+                                                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Status:</span>
+                                                    {['Pending', 'Accepted', 'Completed', 'Rejected'].map(status => (
+                                                        <Badge
+                                                            key={status}
+                                                            variant={statusFilter.includes(status) ? 'default' : 'outline'}
+                                                            className={cn(
+                                                                "cursor-pointer hover:opacity-80 active:opacity-70 transition-all duration-200",
+                                                                statusFilter.includes(status)
+                                                                    ? getStatusBadgeClass(status)
+                                                                    : "text-muted-foreground bg-white hover:bg-slate-50 active:bg-slate-100"
+                                                            )}
+                                                            onClick={() => toggleStatusFilter(status)}
+                                                        >
+                                                            {status}
+                                                        </Badge>
+                                                    ))}
+                                                </div>
+
+                                                <div className="flex items-center gap-2">
+                                                    <Select
+                                                        value={assigneeFilter}
+                                                        onValueChange={(val) => setAssigneeFilter(val as string)}
+                                                    >
+                                                        <SelectTrigger className="h-8 w-[180px] text-xs bg-white border-slate-200">
+                                                            <SelectValue placeholder="All Assignees" />
+                                                        </SelectTrigger>
+                                                        <SelectContent>
+                                                            <SelectItem value="all">All Assignees</SelectItem>
+                                                            <SelectItem value="unassigned">Unassigned</SelectItem>
+                                                            {members.map(m => (
+                                                                <SelectItem key={m.id} value={m.id}>{m.full_name}</SelectItem>
+                                                            ))}
+                                                        </SelectContent>
+                                                    </Select>
+
+                                                    <Select
+                                                        value={sortBy}
+                                                        onValueChange={(val) => setSortBy(val as 'due_date_asc' | 'due_date_desc' | 'created_desc')}
+                                                    >
+                                                        <SelectTrigger className="h-8 w-[160px] text-xs bg-white border-slate-200">
+                                                            <SelectValue placeholder="Sort by" />
+                                                        </SelectTrigger>
+                                                        <SelectContent>
+                                                            <SelectItem value="due_date_asc">Due Date (Earliest)</SelectItem>
+                                                            <SelectItem value="due_date_desc">Due Date (Latest)</SelectItem>
+                                                            <SelectItem value="created_desc">Newest Created</SelectItem>
+                                                        </SelectContent>
+                                                    </Select>
+
+                                                    {(statusFilter.length > 0 || assigneeFilter !== 'all') && (
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            onClick={() => {
+                                                                setStatusFilter([])
+                                                                setAssigneeFilter('all')
+                                                                setSortBy('due_date_asc')
+                                                            }}
+                                                            className="text-muted-foreground hover:text-red-500 active:text-red-600 h-8 ml-2 transition-colors duration-200"
+                                                        >
+                                                            <X className="w-3 h-3 mr-1" /> Clear
+                                                        </Button>
+                                                    )}
+                                                </div>
+                                                <div className="ml-auto text-xs text-muted-foreground">
+                                                    Showing {sortedTasks.length} tasks
+                                                </div>
+                                            </div>
+                                        </div>
                                     )}
-                                    onClick={() => toggleStatusFilter(status)}
-                                >
-                                    {status}
-                                </Badge>
-                            ))}
-                        </div>
-
-                        <div className="flex items-center gap-2">
-                            <Select
-                                value={assigneeFilter}
-                                onValueChange={(val) => setAssigneeFilter(val as string)}
-                            >
-                                <SelectTrigger className="h-8 w-[180px] text-xs bg-slate-50 border-slate-200">
-                                    <SelectValue placeholder="All Assignees" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="all">All Assignees</SelectItem>
-                                    <SelectItem value="unassigned">Unassigned</SelectItem>
-                                    {members.map(m => (
-                                        <SelectItem key={m.id} value={m.id}>{m.full_name}</SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-
-                            <Select
-                                value={sortBy}
-                                onValueChange={(val) => setSortBy(val as 'due_date_asc' | 'due_date_desc' | 'created_desc')}
-                            >
-                                <SelectTrigger className="h-8 w-[160px] text-xs bg-slate-50 border-slate-200">
-                                    <SelectValue placeholder="Sort by" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="due_date_asc">Due Date (Earliest)</SelectItem>
-                                    <SelectItem value="due_date_desc">Due Date (Latest)</SelectItem>
-                                    <SelectItem value="created_desc">Newest Created</SelectItem>
-                                </SelectContent>
-                            </Select>
-
-                            {(statusFilter.length > 0 || assigneeFilter !== 'all') && (
-                                <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => {
-                                        setStatusFilter([])
-                                        setAssigneeFilter('all')
-                                        setSortBy('due_date_asc')
-                                    }}
-                                    className="text-slate-400 hover:text-red-500 active:text-red-600 h-8 ml-2 transition-colors"
-                                >
-                                    <X className="w-3 h-3 mr-1" /> Clear
-                                </Button>
-                            )}
-                        </div>
-                        <div className="ml-auto text-xs text-slate-400">
-                            Showing {sortedTasks.length} tasks
-                        </div>
+                                </>
+                            )
+                        })()}
                     </div>
                 </div>
 
@@ -581,7 +606,7 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                             <div className="col-span-full border-2 border-dashed border-slate-200 rounded-lg bg-slate-50/50">
                                 {tasks.length === 0 ? (
                                     <EmptyState
-                                        icon={<Inbox className="h-8 w-8" />}
+                                        icon={<Inbox className="h-12 w-12" />}
                                         title="No tasks yet"
                                         description="Create your first task to get started with task management."
                                     />
@@ -629,32 +654,32 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                                         {objectiveTasks.map(task => (
                                             <div
                                                 key={task.id}
-                                                className="pl-12 pr-6 py-3 border-b border-slate-100 last:border-0 hover:bg-slate-50 active:bg-slate-100 flex items-center justify-between group gap-4 relative cursor-pointer transition-colors"
+                                                className="pl-12 pr-6 py-3 border-b border-slate-100 last:border-0 hover:bg-slate-50 active:bg-slate-100 flex items-center justify-between group gap-4 relative cursor-pointer transition-colors duration-200"
                                                 onClick={() => setSelectedTask(task)}
                                             >
-                                                <div className="absolute left-0 top-0 bottom-0 w-1 bg-transparent group-hover:bg-blue-500 transition-colors" />
+                                                <div className="absolute left-0 top-0 bottom-0 w-1 bg-transparent group-hover:bg-blue-500 transition-colors duration-200" />
                                                 <div className="flex-1 min-w-0">
                                                     <div className="flex items-center gap-2 mb-1">
-                                                        <span className="font-medium text-slate-900 truncate">{task.title}</span>
+                                                        <span className="font-medium text-foreground truncate">{task.title}</span>
                                                         <StatusBadge status={task.status} />
                                                     </div>
-                                                    <div className="flex items-center gap-4 text-xs text-slate-500">
+                                                    <div className="flex items-center gap-4 text-xs text-muted-foreground">
                                                         <span className="truncate">{task.description}</span>
                                                     </div>
                                                 </div>
 
                                                 <div className="flex items-center gap-6 flex-shrink-0 text-sm">
-                                                    <div className="flex items-center gap-1 text-slate-600 w-32">
+                                                    <div className="flex items-center gap-1 text-muted-foreground w-32">
                                                         {task.assignee ? (
                                                             <>
                                                                 {task.assignee.role === "AI_Agent" ? "🤖" : "👤"}
                                                                 <span className="truncate">{task.assignee.full_name}</span>
                                                             </>
                                                         ) : (
-                                                            <span className="text-slate-400 italic">Unassigned</span>
+                                                            <span className="text-muted-foreground italic">Unassigned</span>
                                                         )}
                                                     </div>
-                                                    <div className="text-slate-500 w-24 text-right">
+                                                    <div className="text-muted-foreground w-24 text-right">
                                                         {task.end_date ? format(new Date(task.end_date), 'MMM d') : '-'}
                                                     </div>
                                                 </div>
@@ -668,7 +693,7 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                         {orphanedTasks.length > 0 && (
                             <div className="border border-slate-200 rounded-lg overflow-hidden bg-white">
                                 <div className="bg-slate-50 px-4 py-3 border-b border-slate-200">
-                                    <h3 className="font-semibold text-slate-600 flex items-center gap-2">
+                                    <h3 className="font-semibold text-muted-foreground flex items-center gap-2">
                                         <div className="bg-slate-400 w-2 h-2 rounded-full" />
                                         General Tasks (No Objective)
                                     </h3>
@@ -677,31 +702,31 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                                     {orphanedTasks.map(task => (
                                         <div
                                             key={task.id}
-                                            className="px-6 py-3 border-b border-slate-100 last:border-0 hover:bg-slate-50 active:bg-slate-100 flex items-center justify-between group gap-4 cursor-pointer transition-colors"
+                                            className="px-6 py-3 border-b border-slate-100 last:border-0 hover:bg-slate-50 active:bg-slate-100 flex items-center justify-between group gap-4 cursor-pointer transition-colors duration-200"
                                             onClick={() => setSelectedTask(task)}
                                         >
                                             <div className="flex-1 min-w-0">
                                                 <div className="flex items-center gap-2 mb-1">
-                                                    <span className="font-medium text-slate-900 truncate">{task.title}</span>
+                                                    <span className="font-medium text-foreground truncate">{task.title}</span>
                                                     <StatusBadge status={task.status} />
                                                 </div>
-                                                <div className="flex items-center gap-4 text-xs text-slate-500">
+                                                <div className="flex items-center gap-4 text-xs text-muted-foreground">
                                                     <span className="truncate">{task.description}</span>
                                                 </div>
                                             </div>
 
                                             <div className="flex items-center gap-6 flex-shrink-0 text-sm">
-                                                <div className="flex items-center gap-1 text-slate-600 w-32">
+                                                <div className="flex items-center gap-1 text-muted-foreground w-32">
                                                     {task.assignee ? (
                                                         <>
                                                             {task.assignee.role === "AI_Agent" ? "🤖" : "👤"}
                                                             <span className="truncate">{task.assignee.full_name}</span>
                                                         </>
                                                     ) : (
-                                                        <span className="text-slate-400 italic">Unassigned</span>
+                                                        <span className="text-muted-foreground italic">Unassigned</span>
                                                     )}
                                                 </div>
-                                                <div className="text-slate-500 w-24 text-right">
+                                                <div className="text-muted-foreground w-24 text-right">
                                                     {task.end_date ? format(new Date(task.end_date), 'MMM d') : '-'}
                                                 </div>
                                             </div>
@@ -716,7 +741,7 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
 
             {/* Bulk Action Toolbar */}
             {selectedTaskIds.size > 0 && (
-                <div className="fixed bottom-4 left-1/2 -translate-x-1/2 bg-slate-900 text-white rounded-lg shadow-lg p-4 flex items-center gap-3 z-50">
+                <div className="fixed bottom-20 sm:bottom-4 left-1/2 -translate-x-1/2 bg-slate-900 text-white rounded-lg shadow-lg p-4 flex items-center gap-3 z-50">
                     <span className="text-sm font-medium">{selectedTaskIds.size} selected</span>
                     <Button 
                         size="sm" 
@@ -827,14 +852,9 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
 }
 
 function StatusBadge({ status }: { status: string | null }) {
-    let color = 'bg-gray-500'
-    if (status === 'Accepted') color = 'bg-green-600'
-    if (status === 'Completed') color = 'bg-slate-800'
-    if (status === 'Rejected') color = 'bg-red-600'
-
     return (
-        <span className={`${color} text-white text-[10px] px-1.5 py-0.5 rounded-full font-medium inline-block`}>
-            {status || 'Pending'}
+        <span className={cn('px-2 py-1 rounded-full text-xs font-medium', getStatusBadgeClass(status))}>
+            {(status || 'Pending').replace(/_/g, ' ')}
         </span>
     )
 }

@@ -37,7 +37,7 @@ export const TeamCard = memo(function TeamCard({
     if (compact) {
         return (
             <Link href={`/team?teamId=${id}`} className="block group">
-                <div className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted transition-colors">
+                <div className="flex items-center gap-4 p-2 rounded-lg hover:bg-muted transition-colors">
                     <div className="relative flex -space-x-2">
                         {displayMembers.slice(0, 3).map((member, i) => (
                             <Avatar key={member.id} className="h-6 w-6 border-2 border-background" style={{ zIndex: 3 - i }}>
@@ -68,7 +68,7 @@ export const TeamCard = memo(function TeamCard({
             <Card className="hover:border-primary hover:shadow-md transition-all">
                 <CardContent className="p-6">
                     <div className="flex items-start justify-between mb-4">
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-4">
                             <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-amber-100 to-orange-100 flex items-center justify-center">
                                 <Users className="h-6 w-6 text-amber-600" />
                             </div>

@@ -127,7 +127,7 @@ export function MentionInput({
       />
       
       {showSuggestions && suggestions.length > 0 && (
-        <div className="absolute bottom-full mb-1 left-0 w-full max-w-xs bg-white border rounded-lg shadow-lg z-50 overflow-hidden">
+        <div className="absolute bottom-full mb-1 left-0 w-full max-w-xs bg-popover border rounded-lg shadow-lg z-50 overflow-hidden">
           <div className="p-1 text-xs text-muted-foreground border-b">
             Type to filter, ↑↓ to navigate, Enter to select
           </div>

@@ -127,7 +127,7 @@ export function MarketplaceView({ initialListings }: MarketplaceViewProps) {
                     {filteredItems.length === 0 && (
                         <div className="col-span-full border-2 border-dashed border-slate-200 rounded-xl">
                             <EmptyState
-                                icon={<Store className="h-8 w-8" />}
+                                icon={<Store className="h-12 w-12" />}
                                 title={debouncedSearchQuery.trim() ? "No listings match your search" : "No listings found in this category yet"}
                                 description={debouncedSearchQuery.trim() ? "Try adjusting your search terms or browse other categories." : "Check back later or browse other categories."}
                             />

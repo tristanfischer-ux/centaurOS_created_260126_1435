@@ -160,3 +160,48 @@
 button, a, [role="button"], input, select, textarea {
   touch-action: manipulation;
 }
+
+/* Global transition defaults */
+.transition-default {
+  transition-duration: 200ms;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Animation utilities */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.5s ease-out forwards;
+}
+
+.animate-scale-in {
+  animation: scale-in 0.3s ease-out forwards;
+}
+
+/* Focus ring consistency */
+:focus-visible {
+  outline: none;
+  ring: 2px;
+  ring-color: hsl(var(--ring));
+  ring-offset: 2px;
+}

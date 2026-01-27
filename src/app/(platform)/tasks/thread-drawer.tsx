@@ -23,6 +23,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { EmptyState } from "@/components/ui/empty-state"
 import { MessageSquare } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { getStatusBadgeClass } from "@/lib/status-colors"
 
 function getInitials(name: string | null) {
     if (!name) return '??'
@@ -65,13 +66,6 @@ interface Comment {
     user?: { full_name: string; role: string }
 }
 
-const statusColors: Record<string, string> = {
-    'Pending': 'bg-gray-100 text-gray-700',
-    'Accepted': 'bg-blue-100 text-blue-700',
-    'Rejected': 'bg-red-100 text-red-700',
-    'Completed': 'bg-green-100 text-green-700',
-    'Amended_Pending_Approval': 'bg-orange-100 text-orange-700',
-}
 
 export function ThreadDrawer({
     open,
@@ -305,7 +299,7 @@ export function ThreadDrawer({
                 <SheetHeader>
                     <SheetTitle className="text-slate-900">{taskTitle}</SheetTitle>
                     <SheetDescription className="flex items-center gap-2">
-                        <Badge className={statusColors[taskStatus] || statusColors['Pending']}>
+                        <Badge className={getStatusBadgeClass(taskStatus)}>
                             {taskStatus?.replace(/_/g, ' ')}
                         </Badge>
                         {assigneeName && (
@@ -482,7 +476,7 @@ export function ThreadDrawer({
                             <Loader2 className="h-6 w-6 animate-spin mr-2" /> Loading history...
                         </div>
                     ) : (
-                        <ScrollArea className="h-[calc(100vh-400px)] pr-4">
+                        <ScrollArea className="h-[calc(100dvh-400px)] pr-4">
                             <div className="space-y-4">
                                 {comments.length === 0 && (
                                     <p className="text-center text-slate-400 py-8 text-sm">No history yet.</p>

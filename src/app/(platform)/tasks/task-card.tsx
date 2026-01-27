@@ -48,6 +48,7 @@ import { HistoryDrawer } from "@/components/tasks/history-drawer"
 import { RubberStampModal } from "@/components/smart-airlock/RubberStampModal"
 import { ClientNudgeButton } from "@/components/smart-airlock/ClientNudgeButton"
 import { Checkbox } from "@/components/ui/checkbox"
+import { getStatusColor } from "@/lib/status-colors"
 
 type Task = Database["public"]["Tables"]["tasks"]["Row"] & {
     assignee?: { id: string, full_name: string | null, role: string, email: string, avatar_url?: string | null } | null
@@ -125,22 +126,11 @@ export const TaskCard = memo(function TaskCard(props: TaskCardProps) {
         return format(new Date(dateStr), "MMM d, yyyy")
     }
 
-    const getStatusColor = (status: string | null) => {
-        switch (status) {
-            case 'Accepted': return 'bg-green-600'
-            case 'Completed': return 'bg-slate-800'
-            case 'Rejected': return 'bg-red-600'
-            case 'Amended_Pending_Approval': return 'bg-orange-500'
-            case 'Pending_Executive_Approval': return 'bg-purple-600'
-            case 'Pending_Peer_Review': return 'bg-blue-500'
-            default: return 'bg-slate-500'
-        }
-    }
 
     const getRiskBadge = (level: string | null) => {
         switch (level) {
-            case 'High': return <Badge variant="outline" className="text-red-600 border-red-200 bg-red-50 gap-1"><ShieldAlert className="w-3 h-3" /> High Risk</Badge>
-            case 'Medium': return <Badge variant="outline" className="text-amber-600 border-amber-200 bg-amber-50 gap-1"><ShieldCheck className="w-3 h-3" /> Medium Risk</Badge>
+            case 'High': return <Badge variant="destructive" className="gap-1"><ShieldAlert className="w-3 h-3" /> High Risk</Badge>
+            case 'Medium': return <Badge variant="warning" className="gap-1"><ShieldCheck className="w-3 h-3" /> Medium Risk</Badge>
             default: return null // Low risk doesn't need a badge to reduce noise? Or maybe text-green-600?
         }
     }
@@ -262,8 +252,8 @@ export const TaskCard = memo(function TaskCard(props: TaskCardProps) {
     return (
         <Card
             className={cn(
-                "bg-white border-slate-200 transition-all flex flex-col h-full group/card relative",
-                isSelectionMode ? "cursor-pointer" : "hover:border-slate-300 hover:shadow-md active:border-slate-400 active:shadow-lg transition-all",
+                "bg-white border-slate-200 transition-all duration-200 flex flex-col h-full group/card relative",
+                isSelectionMode ? "cursor-pointer" : "hover:border-slate-300 hover:bg-slate-50 hover:shadow-md hover:scale-[1.01] active:bg-slate-100 active:scale-[0.99] active:border-slate-400 active:shadow-lg transition-all duration-200",
                 isSelected && isSelectionMode ? "ring-2 ring-slate-500 border-slate-500 bg-slate-50/10" : ""
             )}
             onClick={isSelectionMode ? handleCardClick : undefined}
@@ -289,10 +279,10 @@ export const TaskCard = memo(function TaskCard(props: TaskCardProps) {
                 <div className="flex justify-between items-start gap-2">
                     <div className="space-y-1 flex-1">
                         <div className="flex items-center gap-2 flex-wrap">
-                            <span className="text-xs font-mono text-slate-400">
+                            <span className="text-xs font-mono text-muted-foreground">
                                 #{task.task_number ?? '...'}
                             </span>
-                            <Badge className={`${getStatusColor(task.status)} text-white hover:${getStatusColor(task.status)} border-0`}>
+                            <Badge className={`${getStatusColor(task.status).bar} text-white hover:${getStatusColor(task.status).bar} border-0`}>
                                 {(task.status || 'Pending').replace(/_/g, ' ')}
                             </Badge>
                             {getRiskBadge(task.risk_level)}
@@ -302,7 +292,7 @@ export const TaskCard = memo(function TaskCard(props: TaskCardProps) {
                                 </Badge>
                             )}
                             {isDueSoon && !isOverdue && (
-                                <Badge variant="outline" className="ml-2 bg-yellow-500 text-white border-yellow-600">
+                                <Badge variant="warning" className="ml-2">
                                     ⏰ Due Soon
                                 </Badge>
                             )}
@@ -312,12 +302,12 @@ export const TaskCard = memo(function TaskCard(props: TaskCardProps) {
                                 {task.objective.title}
                             </div>
                         )}
-                        <h3 className="font-semibold text-slate-900 leading-tight group-hover/card:text-blue-700 transition-colors">
+                        <h3 className="font-semibold text-foreground leading-tight group-hover/card:text-blue-700 transition-colors duration-200">
                             {task.title}
                         </h3>
 
                         {/* Summary Metadata */}
-                        <div className="flex items-center gap-3 text-xs text-slate-500 pt-1">
+                        <div className="flex items-center gap-4 text-xs text-muted-foreground pt-1">
                             {task.start_date && (
                                 <span className="flex items-center gap-1" title="Start Date">
                                     <CalendarIcon className="w-3 h-3" />
@@ -411,10 +401,10 @@ export const TaskCard = memo(function TaskCard(props: TaskCardProps) {
                     </div>
                 </div>
 
-                <div className="flex items-center justify-between text-xs text-slate-500 pt-1">
+                <div className="flex items-center justify-between text-xs text-muted-foreground pt-1">
                     <Popover>
                         <PopoverTrigger asChild>
-                            <div className="flex items-center gap-1 cursor-pointer hover:text-blue-600 active:text-blue-700 transition-colors group/assignee touch-manipulation" onClick={(e) => e.stopPropagation()}>
+                            <div className="flex items-center gap-1 cursor-pointer hover:text-blue-600 active:text-blue-700 transition-colors duration-200 group/assignee touch-manipulation" onClick={(e) => e.stopPropagation()}>
                                 {task.assignee?.role === 'AI_Agent' ? <Bot className="w-3 h-3" /> : <div className="w-3" />}
                                 <span className="truncate max-w-[100px] border-b border-transparent group-hover/assignee:border-blue-200">
                                     {task.assignee?.full_name || "Unassigned"}
@@ -463,11 +453,11 @@ export const TaskCard = memo(function TaskCard(props: TaskCardProps) {
                 {!expanded && (
                     <div className="space-y-2 pb-2">
                         {task.description && (
-                            <div className="text-xs text-slate-500 line-clamp-2 leading-relaxed">
+                            <div className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">
                                 <Markdown content={task.description} className="text-xs" />
                             </div>
                         )}
-                        <div className="flex items-center gap-4 text-xs text-slate-400">
+                        <div className="flex items-center gap-4 text-xs text-muted-foreground">
                             <div className="flex items-center gap-1">
                                 <CalendarIcon className="w-3 h-3" />
                                 <span>Due: {task.end_date ? format(new Date(task.end_date), "MMM d") : "-"}</span>
@@ -483,13 +473,13 @@ export const TaskCard = memo(function TaskCard(props: TaskCardProps) {
                         <div className="space-y-4">
                             {/* Full Description */}
                             <div className="space-y-1">
-                                <h4 className="text-xs font-semibold text-slate-900 uppercase tracking-wider">Description</h4>
+                                <h4 className="text-xs font-semibold text-foreground uppercase tracking-wider">Description</h4>
                                 {task.description ? (
-                                    <div className="text-slate-700 text-sm leading-relaxed">
+                                    <div className="text-foreground text-sm leading-relaxed">
                                         <Markdown content={task.description} className="text-sm" />
                                     </div>
                                 ) : (
-                                    <p className="text-slate-700 text-sm leading-relaxed">No specific details provided.</p>
+                                    <p className="text-foreground text-sm leading-relaxed">No specific details provided.</p>
                                 )}
                             </div>
 
@@ -499,13 +489,13 @@ export const TaskCard = memo(function TaskCard(props: TaskCardProps) {
                                 <Popover>
                                     <PopoverTrigger asChild>
                                         <div className={cn(
-                                            "bg-white p-2.5 rounded border border-slate-100 cursor-pointer hover:border-slate-300 active:border-slate-400 hover:bg-slate-50 active:bg-slate-100 transition-colors group",
+                                            "bg-white p-2.5 rounded border border-slate-100 cursor-pointer hover:border-slate-300 active:border-slate-400 hover:bg-slate-50 active:bg-slate-100 transition-colors duration-200 group",
                                             !isAssignee && !isCreator && "pointer-events-none" // Only allow edits if assignee/creator
                                         )}>
-                                            <span className="text-[10px] text-slate-400 block mb-1 group-hover:text-amber-600 transition-colors">Start Date</span>
+                                            <span className="text-[10px] text-muted-foreground block mb-1 group-hover:text-amber-600 transition-colors duration-200">Start Date</span>
                                             <div className="flex items-center gap-2">
-                                                <CalendarIcon className="h-3.5 w-3.5 text-slate-400 group-hover:text-amber-600" />
-                                                <span className="text-sm font-medium text-slate-700 group-hover:text-slate-900">
+                                                <CalendarIcon className="h-3.5 w-3.5 text-muted-foreground group-hover:text-amber-600" />
+                                                <span className="text-sm font-medium text-foreground group-hover:text-foreground">
                                                     {formatFullDate(task.start_date)}
                                                 </span>
                                             </div>
@@ -525,15 +515,15 @@ export const TaskCard = memo(function TaskCard(props: TaskCardProps) {
                                 <Popover>
                                     <PopoverTrigger asChild>
                                         <div className={cn(
-                                            "bg-white p-2.5 rounded border border-slate-100 cursor-pointer hover:border-slate-300 active:border-slate-400 hover:bg-slate-50 active:bg-slate-100 transition-colors group",
+                                            "bg-white p-2.5 rounded border border-slate-100 cursor-pointer hover:border-slate-300 active:border-slate-400 hover:bg-slate-50 active:bg-slate-100 transition-colors duration-200 group",
                                             !isAssignee && !isCreator && "pointer-events-none"
                                         )}>
-                                            <span className="text-[10px] text-slate-400 block mb-1 group-hover:text-amber-600 transition-colors">Deadline</span>
+                                            <span className="text-[10px] text-muted-foreground block mb-1 group-hover:text-amber-600 transition-colors duration-200">Deadline</span>
                                             <div className="flex items-center gap-2">
-                                                <CalendarIcon className="h-3.5 w-3.5 text-slate-400 group-hover:text-amber-600" />
+                                                <CalendarIcon className="h-3.5 w-3.5 text-muted-foreground group-hover:text-amber-600" />
                                                 <span className={cn(
-                                                    "text-sm font-medium transition-colors group-hover:text-slate-900",
-                                                    isOverdue ? "text-red-600" : "text-slate-700"
+                                                    "text-sm font-medium transition-colors duration-200 group-hover:text-foreground",
+                                                    isOverdue ? "text-red-600" : "text-foreground"
                                                 )}>
                                                     {formatFullDate(task.end_date)}
                                                 </span>
@@ -576,7 +566,7 @@ export const TaskCard = memo(function TaskCard(props: TaskCardProps) {
                     <CardFooter className="bg-slate-50 p-4 flex flex-col gap-4">
                         {/* Primary Workflow Actions */}
                         {(isAssignee || userRole === 'Executive' || isCreator) && (
-                            <div className="flex gap-3 w-full">
+                            <div className="flex gap-4 w-full">
                                 {task.status === 'Pending' && isAssignee && (
                                     <>
                                         <Button
@@ -645,7 +635,7 @@ export const TaskCard = memo(function TaskCard(props: TaskCardProps) {
                                             size="sm"
                                             onClick={() => setEditOpen(true)}
                                             disabled={isLoading}
-                                            className="text-slate-600 hover:text-blue-600 hover:bg-blue-50 active:text-blue-700 active:bg-blue-100 active:scale-[0.98] transition-all px-2"
+                                            className="text-muted-foreground hover:text-blue-600 hover:bg-blue-50 active:text-blue-700 active:bg-blue-100 active:scale-[0.98] transition-all duration-200 px-2"
                                             title="Edit Details"
                                         >
                                             <Pencil className="h-4 w-4" /> Edit
@@ -657,7 +647,7 @@ export const TaskCard = memo(function TaskCard(props: TaskCardProps) {
                                                     variant="ghost"
                                                     size="sm"
                                                     disabled={isLoading}
-                                                    className="text-slate-600 hover:text-amber-600 hover:bg-amber-50 active:text-amber-700 active:bg-amber-100 active:scale-[0.98] transition-all px-2"
+                                                    className="text-muted-foreground hover:text-amber-600 hover:bg-amber-50 active:text-amber-700 active:bg-amber-100 active:scale-[0.98] transition-all duration-200 px-2"
                                                     title="Forward or Reassign"
                                                 >
                                                     <ArrowRight className="h-4 w-4" /> Forward
@@ -702,7 +692,7 @@ export const TaskCard = memo(function TaskCard(props: TaskCardProps) {
                                             size="sm"
                                             onClick={handleDuplicate}
                                             disabled={isLoading}
-                                            className="text-slate-600 hover:text-indigo-600 hover:bg-indigo-50 active:text-indigo-700 active:bg-indigo-100 active:scale-[0.98] transition-all px-2"
+                                            className="text-muted-foreground hover:text-indigo-600 hover:bg-indigo-50 active:text-indigo-700 active:bg-indigo-100 active:scale-[0.98] transition-all duration-200 px-2"
                                             title="Duplicate Task"
                                         >
                                             <Copy className="h-4 w-4" /> Copy
@@ -716,7 +706,7 @@ export const TaskCard = memo(function TaskCard(props: TaskCardProps) {
                                 <Button
                                     variant="ghost"
                                     size="icon"
-                                    className="h-8 w-8 text-slate-400 hover:text-slate-600 active:text-slate-700 active:scale-[0.98] transition-all"
+                                    className="h-8 w-8 text-muted-foreground hover:text-muted-foreground active:text-foreground active:scale-[0.98] transition-all duration-200"
                                     onClick={() => setHistoryOpen(true)}
                                     title="View View History"
                                 >
@@ -725,7 +715,7 @@ export const TaskCard = memo(function TaskCard(props: TaskCardProps) {
                                 <Button
                                     variant="ghost"
                                     size="icon"
-                                    className="h-8 w-8 text-slate-400 hover:text-slate-600 active:text-slate-700 active:scale-[0.98] transition-all"
+                                    className="h-8 w-8 text-muted-foreground hover:text-muted-foreground active:text-foreground active:scale-[0.98] transition-all duration-200"
                                     onClick={() => setThreadOpen(true)}
                                     title="View Thread"
                                 >

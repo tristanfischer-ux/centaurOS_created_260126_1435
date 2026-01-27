@@ -309,30 +309,45 @@ export function CreateObjectiveDialog({ children }: CreateObjectiveDialogProps) 
                         </DialogDescription>
                     </DialogHeader>
 
-                    {/* Mode Selector - Only show if not deep in a sub-flow (like selected pack) to keep it clean, 
-                        OR show always for easy switching. Let's show always but disable if loading. */}
-                    {!((mode === 'pack' && selectedPack) || (mode === 'import' && analyzedObjectives.length > 0)) && (
-                        <div className="flex items-center gap-2 mt-6">
-                            {(['manual', 'pack', 'import'] as CreationMode[]).map((m) => {
-                                const Icon = getModeIcon(m)
-                                return (
-                                    <button
-                                        key={m}
-                                        onClick={() => setMode(m)}
-                                        className={cn(
-                                            "flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-all duration-200",
-                                            mode === m
-                                                ? "bg-slate-900 text-white shadow-md"
-                                                : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"
-                                        )}
-                                    >
-                                        <Icon className="w-4 h-4" />
-                                        {m.charAt(0).toUpperCase() + m.slice(1)}
-                                    </button>
-                                )
-                            })}
-                        </div>
-                    )}
+                    {/* Mode Selector - Always show, but make it smaller/less prominent when in a sub-flow */}
+                    <div className={cn(
+                        "flex items-center gap-2 mt-6 transition-all",
+                        ((mode === 'pack' && selectedPack) || (mode === 'import' && analyzedObjectives.length > 0)) && "opacity-60 scale-95"
+                    )}>
+                        {(['manual', 'pack', 'import'] as CreationMode[]).map((m) => {
+                            const Icon = getModeIcon(m)
+                            const isDisabled = (mode === 'pack' && selectedPack && m !== 'pack') || 
+                                            (mode === 'import' && analyzedObjectives.length > 0 && m !== 'import')
+                            return (
+                                <button
+                                    key={m}
+                                    onClick={() => {
+                                        if (!isDisabled) {
+                                            setMode(m)
+                                            // Reset sub-flow state when switching modes
+                                            if (m !== 'pack') setSelectedPack(null)
+                                            if (m !== 'import') {
+                                                setAnalyzedObjectives([])
+                                                setSelectedAnalysisIndex(null)
+                                                setAnalysisFile(null)
+                                            }
+                                        }
+                                    }}
+                                    disabled={isDisabled}
+                                    className={cn(
+                                        "flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-all duration-200",
+                                        mode === m
+                                            ? "bg-slate-900 text-white shadow-md"
+                                            : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200",
+                                        isDisabled && "opacity-50 cursor-not-allowed"
+                                    )}
+                                >
+                                    <Icon className="w-4 h-4" />
+                                    {m.charAt(0).toUpperCase() + m.slice(1)}
+                                </button>
+                            )
+                        })}
+                    </div>
                 </div>
 
                 {/* Main Content Area */}
@@ -462,7 +477,7 @@ export function CreateObjectiveDialog({ children }: CreateObjectiveDialogProps) 
                                             ) : packError ? (
                                                 <div className="col-span-full border-2 border-dashed border-red-200 rounded-lg">
                                                     <EmptyState
-                                                        icon={<Package className="h-8 w-8 text-red-500" />}
+                                                        icon={<Package className="h-12 w-12 text-red-500" />}
                                                         title="Failed to load packs"
                                                         description={packError}
                                                     />
@@ -470,7 +485,7 @@ export function CreateObjectiveDialog({ children }: CreateObjectiveDialogProps) 
                                             ) : packs.length === 0 ? (
                                                 <div className="col-span-full border-2 border-dashed border-slate-200 rounded-lg">
                                                     <EmptyState
-                                                        icon={<Package className="h-8 w-8" />}
+                                                        icon={<Package className="h-12 w-12" />}
                                                         title="No packs available"
                                                         description="Objective packs are not currently available. Try creating an objective manually."
                                                     />

@@ -149,7 +149,7 @@ export function NotificationCenter() {
                   )}
                   onClick={() => markAsRead(notification.id)}
                 >
-                  <div className="flex gap-3">
+                  <div className="flex gap-4">
                     <span className="text-lg">{getIcon(notification.type)}</span>
                     <div className="flex-1 min-w-0">
                       <p className={cn(

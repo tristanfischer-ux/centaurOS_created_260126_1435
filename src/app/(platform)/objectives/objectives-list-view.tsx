@@ -22,6 +22,7 @@ import {
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { CreateTaskDialog } from "@/app/(platform)/tasks/create-task-dialog"
+import { getStatusBadgeClass } from "@/lib/status-colors"
 
 
 
@@ -56,17 +57,15 @@ interface ObjectivesListViewProps {
 }
 
 function getStatusConfig(status: string | null) {
-    switch (status) {
-        case 'Completed':
-            return { color: 'bg-green-100 text-green-700', icon: CheckCircle2 }
-        case 'In_Progress':
-            return { color: 'bg-blue-100 text-blue-700', icon: ArrowRight }
-        case 'Pending':
-            return { color: 'bg-amber-100 text-amber-700', icon: Clock }
-        case 'Rejected':
-            return { color: 'bg-red-100 text-red-700', icon: AlertCircle }
-        default:
-            return { color: 'bg-slate-100 text-slate-600', icon: Clock }
+    // Map status to icon (keeping existing icon logic)
+    let icon = Clock
+    if (status === 'Completed') icon = CheckCircle2
+    if (status === 'In_Progress' || status === 'Accepted') icon = ArrowRight
+    if (status === 'Rejected') icon = AlertCircle
+    
+    return { 
+        color: getStatusBadgeClass(status), 
+        icon 
     }
 }
 
@@ -344,7 +343,7 @@ export function ObjectivesListView({ objectives, objectivesForDialog, members, t
                                             </Badge>
                                         )}
                                         {isStalled && !hasOverdueTasks && (
-                                            <Badge variant="outline" className="ml-2 bg-yellow-50 text-yellow-700 border-yellow-300">
+                                            <Badge variant="warning" className="ml-2">
                                                 ⏸️ Stalled
                                             </Badge>
                                         )}
