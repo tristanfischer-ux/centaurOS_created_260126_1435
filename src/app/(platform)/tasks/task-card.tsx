@@ -349,7 +349,7 @@ export function TaskCard(props: TaskCardProps) {
                                 </PopoverTrigger>
                                 <PopoverContent className="w-[240px] p-0" align="end" onClick={(e) => e.stopPropagation()}>
                                     <Command>
-                                        <CommandInput placeholder="Assign to member..." className="h-9" />
+                                        <CommandInput placeholder="Assign to member..." />
                                         <CommandList>
                                             <CommandEmpty>No members found.</CommandEmpty>
                                             <CommandGroup>
@@ -362,11 +362,10 @@ export function TaskCard(props: TaskCardProps) {
                                                             onSelect={() => handleAssigneeToggle(member.id)}
                                                         >
                                                             <div className="flex items-center gap-2 w-full">
-                                                                <Avatar className="h-6 w-6 relative">
-                                                                    <AvatarFallback className="text-[10px]">
+                                                                <Avatar className="h-6 w-6 relative border border-slate-200 shrink-0">
+                                                                    <AvatarFallback className="text-[10px] bg-indigo-50 text-indigo-700 font-medium flex items-center justify-center">
                                                                         {getInitials(member.full_name)}
                                                                     </AvatarFallback>
-                                                                    {/* Simple online indicator if needed, but keeping simple */}
                                                                 </Avatar>
                                                                 <span className="truncate flex-1">{member.full_name}</span>
                                                                 {isSelected && (
@@ -397,7 +396,7 @@ export function TaskCard(props: TaskCardProps) {
                         </PopoverTrigger>
                         <PopoverContent className="w-[240px] p-0" align="start" onClick={(e) => e.stopPropagation()}>
                             <Command>
-                                <CommandInput placeholder="Assign to member..." className="h-9" />
+                                <CommandInput placeholder="Assign to member..." />
                                 <CommandList>
                                     <CommandEmpty>No members found.</CommandEmpty>
                                     <CommandGroup>
@@ -410,8 +409,8 @@ export function TaskCard(props: TaskCardProps) {
                                                     onSelect={() => handleAssigneeToggle(member.id)}
                                                 >
                                                     <div className="flex items-center gap-2 w-full">
-                                                        <Avatar className="h-6 w-6 relative">
-                                                            <AvatarFallback className="text-[10px]">
+                                                        <Avatar className="h-6 w-6 relative border border-slate-200 shrink-0">
+                                                            <AvatarFallback className="text-[10px] bg-indigo-50 text-indigo-700 font-medium flex items-center justify-center">
                                                                 {getInitials(member.full_name)}
                                                             </AvatarFallback>
                                                         </Avatar>
@@ -643,8 +642,17 @@ export function TaskCard(props: TaskCardProps) {
                                                             <SelectContent className="bg-white border-slate-200 z-50">
                                                                 {sortedMembers.map(member => (
                                                                     <SelectItem key={member.id} value={member.id}>
-                                                                        {member.full_name}
-                                                                        {member.role === 'AI_Agent' && ' 🤖'}
+                                                                        <div className="flex items-center gap-2">
+                                                                            <Avatar className="h-5 w-5 border border-slate-200 shrink-0">
+                                                                                <AvatarFallback className="text-[9px] bg-indigo-50 text-indigo-700 font-medium flex items-center justify-center">
+                                                                                    {getInitials(member.full_name)}
+                                                                                </AvatarFallback>
+                                                                            </Avatar>
+                                                                            <span>
+                                                                                {member.full_name}
+                                                                                {member.role === 'AI_Agent' && ' 🤖'}
+                                                                            </span>
+                                                                        </div>
                                                                     </SelectItem>
                                                                 ))}
                                                             </SelectContent>

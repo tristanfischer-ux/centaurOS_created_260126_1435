@@ -14,6 +14,17 @@ import { addTaskComment, acceptTask, rejectTask, completeTask, forwardTask, trig
 import { uploadTaskAttachment } from "@/actions/attachments"
 import { toast } from "sonner"
 import { useRouter } from "next/navigation"
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+
+function getInitials(name: string | null) {
+    if (!name) return '??'
+    return name
+        .split(' ')
+        .map(n => n[0])
+        .slice(0, 2)
+        .join('')
+        .toUpperCase()
+}
 
 interface Member {
     id: string
@@ -331,7 +342,17 @@ export function ThreadDrawer({
                                         .filter(m => m.id !== assigneeId) // Exclude current assignee
                                         .map(member => (
                                             <SelectItem key={member.id} value={member.id}>
-                                                {member.full_name || 'Unknown'} {member.role === 'AI_Agent' ? '🤖' : ''}
+                                                <div className="flex items-center gap-2">
+                                                    <Avatar className="h-5 w-5 border border-slate-200 shrink-0">
+                                                        <AvatarFallback className="text-[9px] bg-indigo-50 text-indigo-700 font-medium flex items-center justify-center">
+                                                            {getInitials(member.full_name)}
+                                                        </AvatarFallback>
+                                                    </Avatar>
+                                                    <span>
+                                                        {member.full_name || 'Unknown'}
+                                                        {member.role === 'AI_Agent' && ' 🤖'}
+                                                    </span>
+                                                </div>
                                             </SelectItem>
                                         ))}
                                 </SelectContent>

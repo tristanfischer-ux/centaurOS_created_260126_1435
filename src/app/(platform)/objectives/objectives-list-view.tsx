@@ -323,26 +323,26 @@ export function ObjectivesListView({ objectives }: ObjectivesListViewProps) {
                                                 const StatusIcon = statusConfig.icon
 
                                                 return (
-                                                    <div key={task.id} className="flex items-center gap-4 p-3 pl-14 hover:bg-white transition-colors">
-                                                        <StatusIcon className={`h-4 w-4 ${statusConfig.color.split(' ')[1]}`} />
+                                                    <div key={task.id} className="flex items-center gap-2 sm:gap-4 p-3 pl-8 sm:pl-14 hover:bg-white transition-colors">
+                                                        <StatusIcon className={`h-4 w-4 shrink-0 ${statusConfig.color.split(' ')[1]}`} />
 
-                                                        <Link href={`/tasks?task=${task.id}`} className="flex-1 text-sm text-slate-700 hover:text-amber-600">
+                                                        <Link href={`/tasks?task=${task.id}`} className="flex-1 min-w-0 text-sm text-slate-700 hover:text-amber-600 truncate">
                                                             {task.title}
                                                         </Link>
 
-                                                        <Badge className={`${statusConfig.color} border-0 text-xs`}>
+                                                        <Badge className={`${statusConfig.color} border-0 text-xs shrink-0 hidden sm:inline-flex`}>
                                                             {task.status?.replace('_', ' ') || 'Pending'}
                                                         </Badge>
 
-                                                        <div className="flex items-center gap-3">
+                                                        <div className="flex items-center gap-2 sm:gap-3 shrink-0">
                                                             {task.assignee?.full_name && (
-                                                                <span className="text-xs text-slate-400 max-w-[120px] truncate">
+                                                                <span className="text-xs text-slate-400 max-w-[80px] sm:max-w-[120px] truncate hidden sm:inline">
                                                                     {task.assignee.full_name}
                                                                 </span>
                                                             )}
 
                                                             {/* Meta Icons */}
-                                                            <div className="flex items-center gap-2">
+                                                            <div className="flex items-center gap-1 sm:gap-2">
                                                                 {(task.notesCount || 0) > 0 && (
                                                                     <div className="flex items-center text-slate-400" title={`${task.notesCount} notes`}>
                                                                         <MessageSquare className="h-3.5 w-3.5 mr-1" />
@@ -358,7 +358,7 @@ export function ObjectivesListView({ objectives }: ObjectivesListViewProps) {
                                                             </div>
 
                                                             {task.end_date && (
-                                                                <span className="text-xs text-slate-400">
+                                                                <span className="text-xs text-slate-400 hidden md:inline">
                                                                     Due {new Date(task.end_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                                                                 </span>
                                                             )}

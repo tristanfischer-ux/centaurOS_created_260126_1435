@@ -28,11 +28,22 @@ import { toast } from "sonner"
 import { format } from "date-fns"
 import { cn } from "@/lib/utils"
 import { Calendar } from "@/components/ui/calendar"
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import {
     Popover,
     PopoverContent,
     PopoverTrigger,
 } from "@/components/ui/popover"
+
+function getInitials(name: string | null) {
+    if (!name) return '??'
+    return name
+        .split(' ')
+        .map(n => n[0])
+        .slice(0, 2)
+        .join('')
+        .toUpperCase()
+}
 import { VoiceRecorder } from "@/components/tasks/voice-recorder"
 
 interface CreateTaskDialogProps {
@@ -63,6 +74,16 @@ export function CreateTaskDialog({ objectives, members, teams = [], currentUserI
     const titleObjRef = useRef<HTMLInputElement>(null)
     const descRef = useRef<HTMLTextAreaElement>(null)
     const fileInputRef = useRef<HTMLInputElement>(null)
+
+    // Mobile-specific dialog handler for iOS compatibility
+    const handleMobileClick = (e: React.MouseEvent) => {
+        if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
+            e.preventDefault()
+            e.stopPropagation()
+            setOpen(true)
+        }
+    }
+
 
     async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
         event.preventDefault()
@@ -155,7 +176,13 @@ export function CreateTaskDialog({ objectives, members, teams = [], currentUserI
         ...sortedMembers.map(m => ({
             value: m.id,
             label: m.id === currentUserId ? 'Myself' : (m.full_name || 'Unknown'),
-            icon: getRoleLabel(m.role)
+            icon: (
+                <Avatar className="h-4 w-4 border border-slate-200 shrink-0">
+                    <AvatarFallback className="text-[8px] bg-indigo-50 text-indigo-700 font-medium flex items-center justify-center">
+                        {getInitials(m.full_name)}
+                    </AvatarFallback>
+                </Avatar>
+            )
         }))
     ]
 
@@ -199,7 +226,12 @@ export function CreateTaskDialog({ objectives, members, teams = [], currentUserI
     return (
         <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
-                <Button size="sm" className="bg-slate-900 text-white hover:bg-slate-800">
+                <Button
+                    size="sm"
+                    className="bg-slate-900 text-white hover:bg-slate-800 touch-manipulation"
+                    type="button"
+                    onClick={handleMobileClick}
+                >
                     <Plus className="mr-2 h-4 w-4" /> New Task
                 </Button>
             </DialogTrigger>

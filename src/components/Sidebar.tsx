@@ -15,7 +15,7 @@ const navigation = [
     { name: "Settings", href: "/settings", icon: Settings },
 ]
 
-export function Sidebar({ foundryName, foundryId }: { foundryName?: string; foundryId?: string }) {
+export function Sidebar({ foundryName, foundryId, userName, userRole }: { foundryName?: string; foundryId?: string; userName?: string; userRole?: string }) {
     const pathname = usePathname()
 
     return (
@@ -30,6 +30,15 @@ export function Sidebar({ foundryName, foundryId }: { foundryName?: string; foun
                     </div>
                     <div className="text-[10px] text-slate-400 font-mono">
                         {foundryId || "ID: Loading..."}
+                    </div>
+                    {/* Current User */}
+                    <div className="mt-2 pt-2 border-t border-slate-200">
+                        <div className="text-xs font-medium text-slate-900 truncate px-2">
+                            {userName}
+                        </div>
+                        <div className="text-[10px] text-slate-500">
+                            {userRole}
+                        </div>
                     </div>
                 </div>
             </div>

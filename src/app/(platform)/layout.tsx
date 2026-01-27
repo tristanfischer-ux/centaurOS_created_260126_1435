@@ -20,10 +20,10 @@ export default async function PlatformLayout({
         redirect("/login");
     }
 
-    // Fetch profile to get foundry_id
+    // Fetch profile to get foundry_id and user info
     const { data: profile } = await supabase
         .from("profiles")
-        .select("foundry_id")
+        .select("foundry_id, full_name, role")
         .eq("id", user.id)
         .single();
 
@@ -45,8 +45,8 @@ export default async function PlatformLayout({
 
     return (
         <div className="flex h-screen overflow-hidden">
-            <Sidebar foundryName={foundryName} foundryId={foundryId} />
-            <main className="flex-1 overflow-y-auto bg-white p-8 pb-32 lg:pb-8">
+            <Sidebar foundryName={foundryName} foundryId={foundryId} userName={profile?.full_name || user.email || "User"} userRole={profile?.role || "Member"} />
+            <main className="flex-1 overflow-y-auto bg-white p-4 sm:p-6 lg:p-8 pb-32 lg:pb-8">
                 {children}
             </main>
             <MobileNav />
