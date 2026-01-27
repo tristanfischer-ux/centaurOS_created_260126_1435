@@ -6,7 +6,12 @@ import { Mic, Square, Loader2 } from "lucide-react"
 import { toast } from "sonner"
 import { useRouter } from "next/navigation"
 
-export function VoiceRecorder() {
+interface VoiceRecorderProps {
+    onTaskParsed?: (data: { title: string; description: string; assignee_type: string; due_date?: string }) => void
+    className?: string
+}
+
+export function VoiceRecorder({ onTaskParsed, className }: VoiceRecorderProps) {
     const router = useRouter()
     const [isRecording, setIsRecording] = useState(false)
     const [isProcessing, setIsProcessing] = useState(false)
@@ -62,10 +67,15 @@ export function VoiceRecorder() {
 
     const processAudio = async (audioBlob: Blob) => {
         setIsProcessing(true)
-        toast.info("Processing your voice command...")
+        toast.info(onTaskParsed ? "Analyzing voice command..." : "Processing your voice command...")
 
         const formData = new FormData()
         formData.append("file", audioBlob, "recording.webm")
+
+        // If we have a callback, use 'parse' mode to get JSON back without creating DB record
+        if (onTaskParsed) {
+            formData.append("mode", "parse")
+        }
 
         try {
             const response = await fetch("/api/voice-to-task", {
@@ -79,15 +89,22 @@ export function VoiceRecorder() {
                 throw new Error(data.error || "Failed to process voice command")
             }
 
-            // Show success with task title
-            toast.success(`Task created: "${data.task?.title || 'New Task'}"`, {
-                description: data.transcript ? `"${data.transcript.slice(0, 80)}..."` : undefined,
-                duration: 5000,
-            })
-            router.refresh()
+            if (onTaskParsed && data.task) {
+                // parsing mode
+                onTaskParsed(data.task)
+                toast.success("Voice command analyzed!")
+            } else {
+                // direct creation mode
+                toast.success(`Task created: "${data.task?.title || 'New Task'}"`, {
+                    description: data.transcript ? `"${data.transcript.slice(0, 80)}..."` : undefined,
+                    duration: 5000,
+                })
+                router.refresh()
+            }
+
         } catch (error) {
             console.error("Voice processing error:", error)
-            toast.error("Failed to create task from voice. Please try again.")
+            toast.error("Failed to process voice. Please try again.")
         } finally {
             setIsProcessing(false)
             setRecordingDuration(0)
@@ -100,38 +117,74 @@ export function VoiceRecorder() {
         return `${mins}:${secs.toString().padStart(2, '0')}`
     }
 
+    // Default Fixed Style (Legacy / Floating)
+    if (!className && !onTaskParsed) {
+        return (
+            <div className="fixed bottom-24 right-6 md:bottom-8 md:right-8 z-50 flex flex-col items-end gap-2">
+                {/* Recording indicator */}
+                {isRecording && (
+                    <div className="bg-red-500 text-white px-3 py-1.5 rounded-full text-sm font-medium animate-pulse shadow-lg">
+                        🎙️ {formatDuration(recordingDuration)}
+                    </div>
+                )}
+
+                {/* Processing indicator */}
+                {isProcessing && (
+                    <div className="bg-amber-500 text-white px-3 py-1.5 rounded-full text-sm font-medium shadow-lg">
+                        🧠 Analyzing...
+                    </div>
+                )}
+
+                <Button
+                    size="icon"
+                    className={`h-14 w-14 rounded-full shadow-lg transition-all duration-300 ${isRecording
+                        ? "bg-red-500 hover:bg-red-600 animate-pulse ring-4 ring-red-200"
+                        : "bg-amber-500 hover:bg-amber-600 text-white"
+                        }`}
+                    onClick={isRecording ? stopRecording : startRecording}
+                    disabled={isProcessing}
+                >
+                    {isProcessing ? (
+                        <Loader2 className="h-6 w-6 animate-spin text-white" />
+                    ) : isRecording ? (
+                        <Square className="h-6 w-6 text-white fill-current" />
+                    ) : (
+                        <Mic className="h-7 w-7 text-white" />
+                    )}
+                </Button>
+            </div>
+        )
+    }
+
+    // Flexible Component Style (Embedded)
     return (
-        <div className="fixed bottom-24 right-6 md:bottom-8 md:right-8 z-50 flex flex-col items-end gap-2">
-            {/* Recording indicator */}
+        <div className={className || "flex items-center gap-2"}>
             {isRecording && (
-                <div className="bg-red-500 text-white px-3 py-1.5 rounded-full text-sm font-medium animate-pulse shadow-lg">
-                    🎙️ {formatDuration(recordingDuration)}
-                </div>
+                <span className="text-red-500 text-xs font-mono animate-pulse mr-2">
+                    {formatDuration(recordingDuration)}
+                </span>
             )}
-
-            {/* Processing indicator */}
             {isProcessing && (
-                <div className="bg-amber-500 text-white px-3 py-1.5 rounded-full text-sm font-medium shadow-lg">
-                    🧠 Analyzing...
-                </div>
+                <span className="text-amber-500 text-xs font-mono animate-pulse mr-2">
+                    Analyzing...
+                </span>
             )}
-
             <Button
-                size="icon"
-                className={`h-14 w-14 rounded-full shadow-lg transition-all duration-300 ${isRecording
-                    ? "bg-red-500 hover:bg-red-600 animate-pulse ring-4 ring-red-200"
-                    : "bg-amber-500 hover:bg-amber-600 text-white"
-                    }`}
+                type="button" // Important so it doesn't submit parent forms
+                size="sm"
+                variant={isRecording ? "destructive" : "outline"}
+                className={`${isRecording ? "animate-pulse" : ""} ${className}`}
                 onClick={isRecording ? stopRecording : startRecording}
                 disabled={isProcessing}
             >
                 {isProcessing ? (
-                    <Loader2 className="h-6 w-6 animate-spin text-white" />
+                    <Loader2 className="h-4 w-4 animate-spin" />
                 ) : isRecording ? (
-                    <Square className="h-6 w-6 text-white fill-current" />
+                    <Square className="h-4 w-4 fill-current" />
                 ) : (
-                    <Mic className="h-7 w-7 text-white" />
+                    <Mic className="h-4 w-4" />
                 )}
+                <span className="ml-2">{isRecording ? "Stop" : "Voice Fill"}</span>
             </Button>
         </div>
     )

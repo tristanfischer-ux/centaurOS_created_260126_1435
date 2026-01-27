@@ -1,12 +1,24 @@
 "use client"
 
 import { useState } from "react"
-import { ChevronDown, ChevronRight, Target, CheckCircle2, Clock, AlertCircle, ArrowRight, Trash2 } from "lucide-react"
+import { ChevronDown, ChevronRight, Target, CheckCircle2, Clock, AlertCircle, ArrowRight, Trash2, Trash } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Progress } from "@/components/ui/progress"
 import Link from "next/link"
 import { deleteObjective } from "@/actions/objectives"
 import { toast } from "sonner"
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+    AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 
 interface Task {
     id: string
@@ -49,6 +61,19 @@ function getStatusConfig(status: string | null) {
 
 export function ObjectivesListView({ objectives }: ObjectivesListViewProps) {
     const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
+    const [isDeleting, setIsDeleting] = useState(false)
+
+    const handleDelete = async (id: string) => {
+        setIsDeleting(true)
+        const result = await deleteObjective(id)
+        setIsDeleting(false)
+
+        if (result?.error) {
+            toast.error(result.error)
+        } else {
+            toast.success("Objective deleted")
+        }
+    }
 
     const toggleExpand = (id: string) => {
         const newSet = new Set(expandedIds)
@@ -122,34 +147,44 @@ export function ObjectivesListView({ objectives }: ObjectivesListViewProps) {
                                         <span className="text-sm font-medium text-slate-700">{completedCount}/{taskCount}</span>
                                         <span className="text-xs text-slate-400 ml-1">tasks</span>
                                     </div>
-                                    <div className="w-24 h-2 bg-slate-100 rounded-full overflow-hidden">
-                                        <div
-                                            className="h-full bg-green-500 transition-all"
-                                            style={{ width: `${progress}%` }}
-                                        />
-                                    </div>
+                                    <Progress value={progress} className="w-24 h-2 bg-slate-100" />
                                     <Badge variant="outline" className="text-xs">
                                         {progress}%
                                     </Badge>
 
-                                    <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        className="h-8 w-8 text-slate-400 hover:text-red-600 hover:bg-red-50"
-                                        onClick={async (e) => {
-                                            e.stopPropagation()
-                                            if (confirm("Are you sure you want to delete this objective? This will also delete all associated tasks.")) {
-                                                const res = await deleteObjective(objective.id)
-                                                if (res?.success) {
-                                                    toast.success("Objective deleted")
-                                                } else {
-                                                    toast.error(res?.error || "Failed to delete objective")
-                                                }
-                                            }
-                                        }}
-                                    >
-                                        <Trash2 className="h-4 w-4" />
-                                    </Button>
+                                    <AlertDialog>
+                                        <AlertDialogTrigger asChild>
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                className="h-8 w-8 text-slate-400 hover:text-red-600 hover:bg-red-50"
+                                                onClick={(e) => e.stopPropagation()}
+                                            >
+                                                <Trash className="h-4 w-4" />
+                                            </Button>
+                                        </AlertDialogTrigger>
+                                        <AlertDialogContent onClick={(e) => e.stopPropagation()}>
+                                            <AlertDialogHeader>
+                                                <AlertDialogTitle>Delete Objective?</AlertDialogTitle>
+                                                <AlertDialogDescription>
+                                                    This will permanently delete this objective and all associated tasks.
+                                                    This action cannot be undone.
+                                                </AlertDialogDescription>
+                                            </AlertDialogHeader>
+                                            <AlertDialogFooter>
+                                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                                <AlertDialogAction
+                                                    className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation()
+                                                        handleDelete(objective.id)
+                                                    }}
+                                                >
+                                                    Delete
+                                                </AlertDialogAction>
+                                            </AlertDialogFooter>
+                                        </AlertDialogContent>
+                                    </AlertDialog>
                                 </div>
                             </div>
 

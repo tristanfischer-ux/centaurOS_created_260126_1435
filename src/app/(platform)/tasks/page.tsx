@@ -1,5 +1,4 @@
 import { createClient } from '@/lib/supabase/server'
-import { VoiceRecorder } from '@/components/tasks/voice-recorder'
 import { TasksView } from './tasks-view'
 
 export default async function TasksPage() {
@@ -47,15 +46,12 @@ export default async function TasksPage() {
     })) || []
 
     return (
-        <>
-            <TasksView
-                tasks={tasksWithData}
-                objectives={objectives}
-                members={members}
-                currentUserId={user.id}
-                currentUserRole={currentUserRole}
-            />
-            <VoiceRecorder />
-        </>
+        <TasksView
+            tasks={tasksWithData}
+            objectives={objectives}
+            members={members}
+            currentUserId={user.id}
+            currentUserRole={currentUserRole}
+        />
     )
 }

@@ -28,6 +28,7 @@ export async function POST(req: NextRequest) {
 
         const formData = await req.formData();
         const file = formData.get("file") as File;
+        const mode = formData.get("mode") as string | null; // check for 'parse' mode
 
         if (!file) {
             return NextResponse.json({ error: "No file provided" }, { status: 400 });
@@ -68,6 +69,11 @@ export async function POST(req: NextRequest) {
 
         if (!taskData) {
             throw new Error("Failed to parse task data");
+        }
+
+        // If mode is 'parse', return the data immediately without saving
+        if (mode === 'parse') {
+            return NextResponse.json({ success: true, task: taskData, transcript: transcriptText });
         }
 
         // 3. Resolve Assignee ID

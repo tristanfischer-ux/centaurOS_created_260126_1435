@@ -9,9 +9,12 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Checkbox } from "@/components/ui/checkbox"
+import { Label } from "@/components/ui/label"
 import {
     Dialog,
     DialogContent,
+    DialogDescription,
+    DialogFooter,
     DialogHeader,
     DialogTitle,
     DialogTrigger,
@@ -23,7 +26,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 export function CreateObjectiveDialog({ disabled }: { disabled?: boolean }) {
     const [open, setOpen] = useState(false)
     const [loading, setLoading] = useState(false)
-    const formRef = useRef<HTMLFormElement>(null)
 
     // Manual / Pack Mode State
     const [packs, setPacks] = useState<ObjectivePack[]>([])
@@ -115,8 +117,11 @@ export function CreateObjectiveDialog({ disabled }: { disabled?: boolean }) {
         setAiTasksSelected(next)
     }
 
-    async function clientAction(formData: FormData) {
+    async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
+        event.preventDefault()
         setLoading(true)
+        const formData = new FormData(event.currentTarget)
+
         try {
             const res = await createObjective(formData)
             if (res?.error) {
@@ -146,28 +151,47 @@ export function CreateObjectiveDialog({ disabled }: { disabled?: boolean }) {
                     <Plus className="mr-2 h-4 w-4" /> New Objective
                 </Button>
             </DialogTrigger>
-            <DialogContent className="bg-white text-slate-900 border-slate-200 h-[85vh] flex flex-col p-0 gap-0 sm:max-w-2xl">
-                <DialogHeader className="p-6 pb-2">
-                    <DialogTitle>Define Strategic Objective</DialogTitle>
-                </DialogHeader>
+            <DialogContent className="sm:max-w-[550px] bg-white text-slate-900 border-slate-200 max-h-[90vh] overflow-y-auto">
+                <form onSubmit={onSubmit}>
+                    <DialogHeader>
+                        <DialogTitle>Define Strategic Objective</DialogTitle>
+                        <DialogDescription>
+                            Create a new strategic objective to align your team.
+                        </DialogDescription>
+                    </DialogHeader>
 
-                <Tabs defaultValue="manual" className="flex-1 flex flex-col px-6">
-                    <TabsList className="grid w-full grid-cols-2 mb-4">
-                        <TabsTrigger value="manual">Manual / Pack</TabsTrigger>
-                        <TabsTrigger value="import">Import Business Plan</TabsTrigger>
-                    </TabsList>
+                    <Tabs defaultValue="manual" className="w-full mt-4">
+                        <TabsList className="grid w-full grid-cols-2 mb-4">
+                            <TabsTrigger value="manual">Manual / Pack</TabsTrigger>
+                            <TabsTrigger value="import">Import Business Plan</TabsTrigger>
+                        </TabsList>
 
-                    <TabsContent value="manual" className="flex-1 overflow-hidden flex flex-col mt-0 h-full">
-                        <ScrollArea className="flex-1 pr-4">
-                            <form ref={formRef} action={clientAction} className="space-y-4 pb-6 pt-2 h-full">
-                                <Input name="title" placeholder="e.g. Expand Market Share" className="bg-slate-50 border-slate-200" />
-                                <Textarea name="description" placeholder="Success criteria and scope..." className="bg-slate-50 border-slate-200" />
+                        <TabsContent value="manual" className="mt-0 space-y-4">
+                            <div className="grid gap-4 py-4">
+                                <div className="grid gap-2">
+                                    <Label htmlFor="title">Objective Title</Label>
+                                    <Input
+                                        id="title"
+                                        name="title"
+                                        placeholder="e.g. Expand Market Share"
+                                        required
+                                    />
+                                </div>
+                                <div className="grid gap-2">
+                                    <Label htmlFor="description">Description</Label>
+                                    <Textarea
+                                        id="description"
+                                        name="description"
+                                        placeholder="Success criteria and scope..."
+                                        className="h-24"
+                                    />
+                                </div>
 
-                                <div className="space-y-2">
-                                    <label className="text-sm font-medium text-slate-700 flex items-center gap-2">
+                                <div className="grid gap-2">
+                                    <Label className="flex items-center gap-2">
                                         <BookTemplate className="h-4 w-4" />
                                         Use Objective Pack (Optional)
-                                    </label>
+                                    </Label>
                                     <Select name="playbookId" onValueChange={(val) => {
                                         setSelectedPackId(val)
                                         if (val === "none") {
@@ -175,7 +199,7 @@ export function CreateObjectiveDialog({ disabled }: { disabled?: boolean }) {
                                             setSelectedItems(new Set())
                                         }
                                     }} value={selectedPackId}>
-                                        <SelectTrigger className="bg-slate-50 border-slate-200">
+                                        <SelectTrigger className="bg-white border-slate-200">
                                             <SelectValue placeholder="Select a pack..." />
                                         </SelectTrigger>
                                         <SelectContent>
@@ -204,7 +228,7 @@ export function CreateObjectiveDialog({ disabled }: { disabled?: boolean }) {
                                                     )}
                                                 </div>
                                             </div>
-                                            <div className="space-y-2">
+                                            <div className="space-y-2 max-h-[200px] overflow-y-auto">
                                                 {selectedPack.items.map(item => (
                                                     <div key={item.id} className="flex items-start space-x-2 group">
                                                         <Checkbox
@@ -223,7 +247,7 @@ export function CreateObjectiveDialog({ disabled }: { disabled?: boolean }) {
                                                         <div className="grid gap-1.5 leading-none">
                                                             <label
                                                                 htmlFor={item.id}
-                                                                className="text-sm font-medium leading-tight peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer group-hover:text-slate-900 text-slate-700"
+                                                                className="text-sm font-medium leading-tight cursor-pointer group-hover:text-slate-900 text-slate-700"
                                                             >
                                                                 {item.title}
                                                             </label>
@@ -238,22 +262,20 @@ export function CreateObjectiveDialog({ disabled }: { disabled?: boolean }) {
                                         </div>
                                     )}
                                 </div>
-
+                            </div>
+                            <DialogFooter>
                                 <Button
-                                    type="button"
-                                    onClick={() => formRef.current?.requestSubmit()}
+                                    type="submit"
                                     disabled={loading}
-                                    className="w-full bg-slate-900 text-white"
+                                    className="bg-slate-900 text-white"
                                 >
                                     {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                                     Initialize Objective
                                 </Button>
-                            </form>
-                        </ScrollArea>
-                    </TabsContent>
+                            </DialogFooter>
+                        </TabsContent>
 
-                    <TabsContent value="import" className="flex-1 overflow-hidden flex flex-col mt-0 h-full">
-                        <ScrollArea className="flex-1 pr-4">
+                        <TabsContent value="import" className="mt-0 space-y-4">
                             {!analyzedObjectives.length && !analyzing && (
                                 <div className="border-2 border-dashed border-slate-200 rounded-lg p-10 flex flex-col items-center justify-center text-center space-y-4 hover:bg-slate-50 transition-colors">
                                     <div className="bg-blue-50 p-4 rounded-full">
@@ -284,8 +306,7 @@ export function CreateObjectiveDialog({ disabled }: { disabled?: boolean }) {
                             )}
 
                             {analyzedObjectives.length > 0 && selectedObjectiveIndex !== null && (
-                                <form action={clientAction} className="space-y-4 pb-6 pt-2">
-                                    {/* Objective Selection (if multiple) */}
+                                <div className="space-y-4 pb-0 pt-2">
                                     {analyzedObjectives.length > 1 && (
                                         <div className="mb-4">
                                             <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2">Detailed Objectives Found</h4>
@@ -310,16 +331,22 @@ export function CreateObjectiveDialog({ disabled }: { disabled?: boolean }) {
 
                                     <div className="bg-slate-50 p-4 rounded-md border border-slate-200 mb-4">
                                         <h3 className="text-sm font-semibold text-slate-900 mb-1">Selected Objective Details</h3>
-                                        <Input
-                                            name="title"
-                                            defaultValue={analyzedObjectives[selectedObjectiveIndex].title}
-                                            className="bg-white border-slate-300 mb-2 font-medium"
-                                        />
-                                        <Textarea
-                                            name="description"
-                                            defaultValue={analyzedObjectives[selectedObjectiveIndex].description}
-                                            className="bg-white border-slate-300 text-sm"
-                                        />
+                                        <div className="grid gap-2">
+                                            <Label>Title</Label>
+                                            <Input
+                                                name="title_ai"
+                                                defaultValue={analyzedObjectives[selectedObjectiveIndex].title}
+                                                className="bg-white border-slate-300 font-medium"
+                                            />
+                                        </div>
+                                        <div className="grid gap-2 mt-2">
+                                            <Label>Description</Label>
+                                            <Textarea
+                                                name="description_ai"
+                                                defaultValue={analyzedObjectives[selectedObjectiveIndex].description}
+                                                className="bg-white border-slate-300 text-sm"
+                                            />
+                                        </div>
                                     </div>
 
                                     <div className="space-y-2">
@@ -335,7 +362,7 @@ export function CreateObjectiveDialog({ disabled }: { disabled?: boolean }) {
                                             </div>
                                         </div>
 
-                                        <div className="border border-slate-200 rounded-md divide-y divide-slate-100">
+                                        <div className="border border-slate-200 rounded-md divide-y divide-slate-100 max-h-[200px] overflow-y-auto">
                                             {analyzedObjectives[selectedObjectiveIndex].tasks.map((task, idx) => (
                                                 <div key={idx} className="flex items-start p-3 hover:bg-slate-50 transition-colors">
                                                     <Checkbox
@@ -344,13 +371,9 @@ export function CreateObjectiveDialog({ disabled }: { disabled?: boolean }) {
                                                         onCheckedChange={() => toggleAiTask(idx)}
                                                         className="mt-1"
                                                     />
-                                                    {/* Hidden Inputs for Task Data */}
                                                     {aiTasksSelected.has(idx) && (
-                                                        <>
-                                                            <input type="hidden" name="aiTasks" value={JSON.stringify(task)} />
-                                                        </>
+                                                        <input type="hidden" name="aiTasks" value={JSON.stringify(task)} />
                                                     )}
-
                                                     <div className="ml-3 grid gap-1">
                                                         <label
                                                             htmlFor={`ai-task-${idx}`}
@@ -368,23 +391,23 @@ export function CreateObjectiveDialog({ disabled }: { disabled?: boolean }) {
                                         </div>
                                     </div>
 
-                                    <div className="pt-2 flex gap-2">
-                                        <Button type="button" variant="outline" className="flex-1" onClick={() => {
+                                    <DialogFooter>
+                                        <Button type="button" variant="outline" onClick={() => {
                                             setAnalyzedObjectives([])
                                             setAnalyzing(false)
                                         }}>
                                             Cancel
                                         </Button>
-                                        <Button type="submit" disabled={loading} className="flex-[2] bg-slate-900 text-white">
+                                        <Button type="submit" disabled={loading} className="bg-slate-900 text-white">
                                             {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Check className="mr-2 h-4 w-4" />}
                                             Create Objective
                                         </Button>
-                                    </div>
-                                </form>
+                                    </DialogFooter>
+                                </div>
                             )}
-                        </ScrollArea>
-                    </TabsContent>
-                </Tabs>
+                        </TabsContent>
+                    </Tabs>
+                </form>
             </DialogContent>
         </Dialog>
     )

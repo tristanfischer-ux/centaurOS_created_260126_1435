@@ -2,7 +2,7 @@
 
 import { useState, useRef } from "react"
 import { Button } from "@/components/ui/button"
-import { Plus, Loader2, CalendarIcon, Upload, X, FileIcon } from "lucide-react"
+import { Plus, Loader2, CalendarIcon, Upload, X, FileIcon, Volume2 } from "lucide-react"
 import {
     Dialog,
     DialogContent,
@@ -33,6 +33,7 @@ import {
     PopoverContent,
     PopoverTrigger,
 } from "@/components/ui/popover"
+import { VoiceRecorder } from "@/components/tasks/voice-recorder"
 
 interface CreateTaskDialogProps {
     objectives: { id: string; title: string }[]
@@ -56,6 +57,10 @@ export function CreateTaskDialog({ objectives, members, currentUserId }: CreateT
     const [date, setDate] = useState<Date>()
     const [selectedAssignees, setSelectedAssignees] = useState<string[]>([])
     const [files, setFiles] = useState<File[]>([])
+
+    // Form Refs for manual value setting
+    const titleObjRef = useRef<HTMLInputElement>(null)
+    const descRef = useRef<HTMLTextAreaElement>(null)
     const fileInputRef = useRef<HTMLInputElement>(null)
 
     async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -95,6 +100,30 @@ export function CreateTaskDialog({ objectives, members, currentUserId }: CreateT
             setFiles([])
         }
         setIsLoading(false)
+    }
+
+    const handleVoiceFill = (data: { title: string; description: string; assignee_type: string; due_date?: string }) => {
+        if (titleObjRef.current) titleObjRef.current.value = data.title;
+        if (descRef.current) descRef.current.value = data.description;
+
+        // Try to set date
+        if (data.due_date) {
+            const parsed = new Date(data.due_date);
+            if (!isNaN(parsed.getTime())) {
+                setDate(parsed);
+            }
+        }
+
+        // Try to map assignee
+        if (data.assignee_type === "Self") {
+            setSelectedAssignees([currentUserId]);
+        } else if (data.assignee_type === "Legal_AI") {
+            const ai = members.find(m => m.role === 'AI_Agent' && m.full_name?.toLowerCase().includes('legal')); // Heuristic
+            if (ai) setSelectedAssignees([ai.id]);
+        } else if (data.assignee_type === "General_AI") {
+            const ai = members.find(m => m.role === 'AI_Agent' && !m.full_name?.toLowerCase().includes('legal'));
+            if (ai) setSelectedAssignees([ai.id]);
+        }
     }
 
     // Helper to format role for display
@@ -166,18 +195,32 @@ export function CreateTaskDialog({ objectives, members, currentUserId }: CreateT
                     <Plus className="mr-2 h-4 w-4" /> New Task
                 </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[550px] bg-white text-slate-900 border-slate-200 max-h-[90vh] overflow-y-auto">
+            <DialogContent className="sm:max-w-[600px] bg-white text-slate-900 border-slate-200 max-h-[90vh] overflow-y-auto">
                 <form onSubmit={onSubmit}>
                     <DialogHeader>
-                        <DialogTitle>Create New Task</DialogTitle>
-                        <DialogDescription>
-                            Assign a new task. Assign to an AI Agent for auto-execution.
-                        </DialogDescription>
+                        <div className="flex items-center justify-between pr-8">
+                            <div>
+                                <DialogTitle>Create New Task</DialogTitle>
+                                <DialogDescription>
+                                    Assign a new task. Assign to an AI Agent for auto-execution.
+                                </DialogDescription>
+                            </div>
+                            <VoiceRecorder
+                                onTaskParsed={handleVoiceFill}
+                                className="flex items-center gap-2"
+                            />
+                        </div>
                     </DialogHeader>
                     <div className="grid gap-4 py-4">
                         <div className="grid gap-2">
                             <Label htmlFor="title">Task Title</Label>
-                            <Input id="title" name="title" placeholder="Review contract drafts..." required />
+                            <Input
+                                id="title"
+                                name="title"
+                                placeholder="Review contract drafts..."
+                                required
+                                ref={titleObjRef}
+                            />
                         </div>
                         <div className="grid gap-2">
                             <Label htmlFor="description">Description</Label>
@@ -186,6 +229,7 @@ export function CreateTaskDialog({ objectives, members, currentUserId }: CreateT
                                 name="description"
                                 placeholder="Provide specific details so the assignee knows what to do."
                                 className="h-24"
+                                ref={descRef}
                             />
                         </div>
 
