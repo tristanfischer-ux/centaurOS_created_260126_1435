@@ -14,6 +14,9 @@ import { deleteTeam, updateTeamName } from "@/actions/teams"
 import Link from "next/link"
 import { CreateTeamDialog } from "./create-team-dialog"
 import { InviteMemberDialog } from "./invite-member-dialog"
+import { pairCentaur, unpairCentaur } from "@/actions/team"
+import { Brain, Unplug, Zap } from "lucide-react"
+import { toast } from "sonner"
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -41,6 +44,8 @@ interface Member {
     completedTasks: number
     pendingTasks: number
     rejectedTasks: number
+    paired_ai_id?: string | null
+    pairedAI?: { id: string, full_name: string | null, avatar_url: string | null, role: string }[] | null
 }
 
 interface TeamMember {
@@ -62,10 +67,11 @@ interface TeamComparisonViewProps {
     founders: Member[]
     executives: Member[]
     apprentices: Member[]
+    aiAgents: Member[]
     teams: Team[]
 }
 
-export function TeamComparisonView({ founders, executives, apprentices, teams }: TeamComparisonViewProps) {
+export function TeamComparisonView({ founders, executives, apprentices, aiAgents, teams }: TeamComparisonViewProps) {
     const [compareMode, setCompareMode] = useState(false)
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
     const [showComparison, setShowComparison] = useState(false)
@@ -139,6 +145,36 @@ export function TeamComparisonView({ founders, executives, apprentices, teams }:
         e.preventDefault()
         // Get the dragged ID from dataTransfer (more reliable for Safari)
         const draggedId = e.dataTransfer.getData('text/plain') || draggedMemberId
+
+        // --- Centaur Pairing Logic ---
+        const draggedMember = [...allMembers, ...aiAgents].find(m => m.id === draggedId)
+        const targetMember = [...allMembers, ...aiAgents].find(m => m.id === targetMemberId)
+
+        if (draggedMember && targetMember) {
+            // Case 1: Dragging AI onto Human
+            if (draggedMember.role === 'AI_Agent' && targetMember.role !== 'AI_Agent') {
+                startTransition(async () => {
+                    const res = await pairCentaur(targetMember.id, draggedMember.id)
+                    if (res?.error) toast.error(res.error)
+                    else toast.success(`Paired ${targetMember.full_name} with ${draggedMember.full_name}`)
+                })
+                setDraggedMemberId(null)
+                setDropTargetId(null)
+                return
+            }
+            // Case 2: Dragging Human onto AI
+            if (draggedMember.role !== 'AI_Agent' && targetMember.role === 'AI_Agent') {
+                startTransition(async () => {
+                    const res = await pairCentaur(draggedMember.id, targetMember.id)
+                    if (res?.error) toast.error(res.error)
+                    else toast.success(`Paired ${draggedMember.full_name} with ${targetMember.full_name}`)
+                })
+                setDraggedMemberId(null)
+                setDropTargetId(null)
+                return
+            }
+        }
+
         if (draggedId && draggedId !== targetMemberId) {
             // Open quick team creation dialog with both members
             setQuickTeamMemberIds([draggedId, targetMemberId])
@@ -210,12 +246,17 @@ export function TeamComparisonView({ founders, executives, apprentices, teams }:
         { label: "Rejected", getValue: (m: Member) => m.rejectedTasks, caution: true },
     ]
 
-    const MemberCard = ({ member, type }: { member: Member, type: 'founder' | 'executive' | 'apprentice' }) => {
+    const MemberCard = ({ member, type }: { member: Member, type: 'founder' | 'executive' | 'apprentice' | 'ai_agent' }) => {
         const isSelected = selectedIds.has(member.id)
         const isFounder = type === 'founder'
         const isExecutive = type === 'executive'
+        const isAIAgent = type === 'ai_agent'
         const isDragging = draggedMemberId === member.id
         const isDropTarget = dropTargetId === member.id && draggedMemberId !== member.id
+
+        // Centaur Status
+        const pairedAI = member.pairedAI?.[0]
+        const isCentaur = !!member.paired_ai_id && !!pairedAI
 
         // Determine styles based on type
         let borderClass = 'border-slate-200'
@@ -226,7 +267,16 @@ export function TeamComparisonView({ founders, executives, apprentices, teams }:
         let avatarBgClass = 'bg-slate-100 text-slate-500'
         let badgeClass = 'bg-slate-100 text-slate-600'
 
-        if (isFounder) {
+        if (isAIAgent) {
+            borderClass = 'border-indigo-200 bg-indigo-50/30'
+            ringClass = 'ring-indigo-500 border-indigo-500'
+            hoverBorderClass = 'group-hover:border-indigo-400'
+            bgCheckClass = 'bg-indigo-500'
+            avatarBorderClass = 'border-2 border-indigo-300'
+            avatarBgClass = 'bg-indigo-100 text-indigo-700 font-bold'
+            badgeClass = 'text-indigo-600 border-indigo-200 bg-indigo-50'
+        } else if (isFounder) {
+            // ... existing founder styles ...
             borderClass = 'border-purple-200'
             ringClass = 'ring-purple-500 border-purple-500'
             hoverBorderClass = 'group-hover:border-purple-400'
@@ -235,13 +285,22 @@ export function TeamComparisonView({ founders, executives, apprentices, teams }:
             avatarBgClass = 'bg-purple-100 text-purple-700 font-bold'
             badgeClass = 'text-purple-600 border-purple-200 bg-purple-50'
         } else if (isExecutive) {
+            // ... existing executive styles ...
             borderClass = 'border-amber-200'
             ringClass = 'ring-amber-500 border-amber-500'
+            hoverBorderClass = 'group-hover:border-amber-500'
+            // Keeping original logic for brevity in replace
             hoverBorderClass = 'group-hover:border-amber-400'
             bgCheckClass = 'bg-amber-500'
             avatarBorderClass = 'border-2 border-amber-500'
             avatarBgClass = 'bg-amber-100 text-amber-700 font-bold'
             badgeClass = 'text-amber-600 border-amber-200 bg-amber-50'
+        }
+
+        // Centaur Override
+        if (isCentaur) {
+            borderClass = 'border-amber-400 shadow-md ring-1 ring-amber-400/50'
+            hoverBorderClass = 'group-hover:border-amber-500'
         }
 
         const cardContent = (
@@ -260,28 +319,71 @@ export function TeamComparisonView({ founders, executives, apprentices, teams }:
                         {isSelected ? <Check className="h-4 w-4" /> : null}
                     </div>
                 )}
+
                 {isDropTarget && (
-                    <div className="absolute inset-0 flex items-center justify-center bg-green-500/10 rounded-lg">
-                        <div className="bg-green-600 text-white px-3 py-1 rounded-full text-xs font-medium flex items-center gap-1">
-                            <Users className="h-3 w-3" />
-                            Create Team
+                    <div className="absolute inset-0 flex items-center justify-center bg-green-500/10 rounded-lg z-10 backdrop-blur-[1px]">
+                        {/* Dynamic Drop Text based on what we are dragging */}
+                        <div className="bg-green-600 text-white px-3 py-1.5 rounded-full text-xs font-medium flex items-center gap-1 shadow-sm">
+                            <Zap className="h-3 w-3 fill-white" />
+                            {draggedMemberId && aiAgents.some(a => a.id === draggedMemberId) ? 'Pair Centaur' : 'Combine / Team'}
                         </div>
                     </div>
                 )}
-                <CardHeader className="flex flex-row items-center gap-4 pb-2">
-                    <Avatar className={`h-12 w-12 ${avatarBorderClass}`}>
-                        <AvatarFallback className={avatarBgClass}>
-                            {getInitials(member.full_name)}
-                        </AvatarFallback>
-                    </Avatar>
-                    <div>
-                        <CardTitle className="text-lg text-slate-900">{member.full_name}</CardTitle>
-                        <Badge
-                            variant="outline"
-                            className={`text-[10px] mt-1 ${badgeClass}`}
-                        >
-                            {member.role}
-                        </Badge>
+                <CardHeader className="flex flex-row items-center gap-4 pb-2 relative">
+                    {/* Main Avatar */}
+                    <div className="relative">
+                        <Avatar className={`h-12 w-12 ${avatarBorderClass}`}>
+                            <AvatarFallback className={avatarBgClass}>
+                                {isAIAgent ? <Brain className="h-6 w-6" /> : getInitials(member.full_name)}
+                            </AvatarFallback>
+                        </Avatar>
+
+                        {/* Paired AI Badge (Little Avatar) */}
+                        {isCentaur && (
+                            <div className="absolute -bottom-1 -right-2 bg-white rounded-full p-[2px] shadow-sm border border-slate-200" title={`Paired with ${pairedAI.full_name}`}>
+                                <Avatar className="h-6 w-6 border border-indigo-200">
+                                    <AvatarFallback className="bg-indigo-100 text-indigo-700 text-[8px]">
+                                        <Brain className="h-3 w-3" />
+                                    </AvatarFallback>
+                                </Avatar>
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                            <CardTitle className="text-lg text-slate-900 truncate">
+                                {member.full_name}
+                            </CardTitle>
+                            {isCentaur && (
+                                <Badge variant="secondary" className="text-[10px] bg-amber-100 text-amber-700 h-5 px-1.5 border-amber-200">
+                                    Centaur
+                                </Badge>
+                            )}
+                        </div>
+                        <div className="flex items-center gap-2 mt-1">
+                            <Badge variant="outline" className={`text-[10px] ${badgeClass}`}>
+                                {member.role}
+                            </Badge>
+                            {isCentaur && (
+                                <div className="text-[10px] text-slate-400 flex items-center gap-1" title="Unpair">
+                                    <span className="truncate max-w-[80px]">w/ {pairedAI.full_name}</span>
+                                    <button
+                                        aria-label="Unpair Centaur"
+                                        onClick={(e) => {
+                                            e.preventDefault()
+                                            startTransition(async () => {
+                                                await unpairCentaur(member.id)
+                                                toast.success("Centaur unpaired")
+                                            })
+                                        }}
+                                        className="hover:bg-red-100 hover:text-red-600 rounded p-0.5 transition-colors"
+                                    >
+                                        <Unplug className="h-3 w-3" />
+                                    </button>
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </CardHeader>
                 <CardContent className="text-sm text-slate-500">
@@ -407,6 +509,24 @@ export function TeamComparisonView({ founders, executives, apprentices, teams }:
                     )}
                 </div>
             </section>
+
+            {/* Neural Network (AI Agents) */}
+            {aiAgents.length > 0 && (
+                <section className="space-y-4">
+                    <h2 className="text-xl font-semibold text-indigo-600 uppercase tracking-wider border-b border-indigo-200 pb-2 flex items-center gap-2">
+                        <Brain className="h-5 w-5" />
+                        Neural Network (AI Agents)
+                    </h2>
+                    <p className="text-sm text-slate-500 italic pb-2">
+                        Drag an AI Agent onto a human member to form a Centaur pair.
+                    </p>
+                    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                        {aiAgents.map(member => (
+                            <MemberCard key={member.id} member={member} type="ai_agent" />
+                        ))}
+                    </div>
+                </section>
+            )}
 
             {/* Teams Section */}
             {teams.length > 0 && (

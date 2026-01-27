@@ -208,6 +208,38 @@ export type Database = {
                     },
                 ]
             }
+            foundry_stack: {
+                Row: {
+                    created_at: string | null
+                    foundry_id: string
+                    id: string
+                    provider_id: string
+                    status: string | null
+                }
+                Insert: {
+                    created_at?: string | null
+                    foundry_id: string
+                    id?: string
+                    provider_id: string
+                    status?: string | null
+                }
+                Update: {
+                    created_at?: string | null
+                    foundry_id?: string
+                    id?: string
+                    provider_id?: string
+                    status?: string | null
+                }
+                Relationships: [
+                    {
+                        foreignKeyName: "foundry_stack_provider_id_fkey"
+                        columns: ["provider_id"]
+                        isOneToOne: false
+                        referencedRelation: "service_providers"
+                        referencedColumns: ["id"]
+                    },
+                ]
+            }
             manufacturing_rfqs: {
                 Row: {
                     budget_range: string | null
@@ -301,6 +333,7 @@ export type Database = {
                     foundry_id: string
                     full_name: string | null
                     id: string
+                    paired_ai_id: string | null
                     role: Database["public"]["Enums"]["member_role"]
                     updated_at: string | null
                 }
@@ -311,6 +344,7 @@ export type Database = {
                     foundry_id: string
                     full_name?: string | null
                     id: string
+                    paired_ai_id?: string | null
                     role: Database["public"]["Enums"]["member_role"]
                     updated_at?: string | null
                 }
@@ -321,10 +355,19 @@ export type Database = {
                     foundry_id?: string
                     full_name?: string | null
                     id?: string
+                    paired_ai_id?: string | null
                     role?: Database["public"]["Enums"]["member_role"]
                     updated_at?: string | null
                 }
-                Relationships: []
+                Relationships: [
+                    {
+                        foreignKeyName: "profiles_paired_ai_id_fkey"
+                        columns: ["paired_ai_id"]
+                        isOneToOne: false
+                        referencedRelation: "profiles"
+                        referencedColumns: ["id"]
+                    },
+                ]
             }
             service_providers: {
                 Row: {

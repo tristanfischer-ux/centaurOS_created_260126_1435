@@ -7,12 +7,28 @@ export const dynamic = 'force-dynamic'
 export default async function MarketplacePage() {
     const supabase = await createClient()
 
+    const { data: { user } } = await supabase.auth.getUser()
+
     // Parallel fetch for speed
-    const [providersResult, aiToolsResult, rfqsResult] = await Promise.all([
+    const [providersResult, aiToolsResult, rfqsResult, profileResult] = await Promise.all([
         supabase.from('service_providers').select('*').eq('is_verified', true),
         supabase.from('ai_tools').select('*'),
-        supabase.from('manufacturing_rfqs').select('*').limit(5)
+        supabase.from('manufacturing_rfqs').select('*').limit(5),
+        user ? supabase.from('profiles').select('foundry_id').eq('id', user.id).single() : Promise.resolve({ data: null })
     ])
+
+    let stackProviders: Set<string> = new Set()
+
+    if (profileResult.data?.foundry_id) {
+        const { data: stack } = await supabase
+            .from('foundry_stack')
+            .select('provider_id')
+            .eq('foundry_id', profileResult.data.foundry_id)
+
+        if (stack) {
+            stack.forEach(item => stackProviders.add(item.provider_id))
+        }
+    }
 
     const providers = providersResult.data || []
     const aiTools = aiToolsResult.data || []
@@ -23,6 +39,7 @@ export default async function MarketplacePage() {
             providers={providers}
             aiTools={aiTools}
             rfqs={rfqs}
+            initialStack={Array.from(stackProviders)}
         />
     )
 }
