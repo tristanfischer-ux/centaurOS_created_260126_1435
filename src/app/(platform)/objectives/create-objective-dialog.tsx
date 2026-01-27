@@ -1,15 +1,31 @@
 "use client"
+
 import { createObjective } from "@/actions/objectives"
-import { getObjectivePacks, getPackDetails, ObjectivePack } from "@/actions/packs"
+import { getObjectivePacks, ObjectivePack } from "@/actions/packs"
 import { analyzeBusinessPlan, AnalyzedObjective } from "@/actions/analyze"
 import { toast } from "sonner"
-import { useEffect, useState, useRef } from "react"
-import { Loader2, Plus, BookTemplate, Upload, Check } from "lucide-react"
+import { useEffect, useState } from "react"
+import {
+    Loader2,
+    Plus,
+    FileText,
+    Package,
+    Upload,
+    ArrowLeft,
+    Check,
+    Briefcase,
+    Globe,
+    Scale,
+    Building,
+    Rocket,
+    Server
+} from "lucide-react"
+
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
-import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
+import { Badge } from "@/components/ui/badge"
 import {
     Dialog,
     DialogContent,
@@ -19,76 +35,74 @@ import {
     DialogTitle,
     DialogTrigger,
 } from "@/components/ui/dialog"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { cn } from "@/lib/utils"
+
+type CreationMode = 'manual' | 'pack' | 'import'
+
+const PACK_ICONS: Record<string, any> = {
+    'briefcase': Briefcase,
+    'globe': Globe,
+    'scale': Scale,
+    'building': Building,
+    'rocket': Rocket,
+    'server': Server,
+}
 
 export function CreateObjectiveDialog({ disabled }: { disabled?: boolean }) {
-    const [activeTab, setActiveTab] = useState("manual")
     const [open, setOpen] = useState(false)
+    const [mode, setMode] = useState<CreationMode>('manual')
     const [loading, setLoading] = useState(false)
 
-    // Manual / Pack Mode State
+    // Manual Data
+    const [title, setTitle] = useState("")
+    const [description, setDescription] = useState("")
+
+    // Pack Data
     const [packs, setPacks] = useState<ObjectivePack[]>([])
-    const [selectedPackId, setSelectedPackId] = useState<string>("none")
     const [selectedPack, setSelectedPack] = useState<ObjectivePack | null>(null)
-    const [loadingPack, setLoadingPack] = useState(false)
-    const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set())
+    const [packLoading, setPackLoading] = useState(false)
 
-    // AI Import Mode State
-    const [analyzedObjectives, setAnalyzedObjectives] = useState<AnalyzedObjective[]>([])
+    // Import Data
     const [analyzing, setAnalyzing] = useState(false)
-    const [selectedObjectiveIndex, setSelectedObjectiveIndex] = useState<number | null>(null)
-    const [aiTasksSelected, setAiTasksSelected] = useState<Set<number>>(new Set()) // Indices of tasks in the selected objective
+    const [analyzedObjectives, setAnalyzedObjectives] = useState<AnalyzedObjective[]>([])
+    const [selectedAnalysisIndex, setSelectedAnalysisIndex] = useState<number | null>(null)
+    const [analysisFile, setAnalysisFile] = useState<File | null>(null)
 
+    // Load packs on open
     useEffect(() => {
-        async function loadPacks() {
-            const { packs } = await getObjectivePacks()
-            if (packs) setPacks(packs)
-        }
         if (open) {
             loadPacks()
+        } else {
+            // Reset state on close
+            setTimeout(() => {
+                setMode('manual')
+                setTitle("")
+                setDescription("")
+                setSelectedPack(null)
+                setAnalyzedObjectives([])
+                setSelectedAnalysisIndex(null)
+                setAnalysisFile(null)
+            }, 300)
         }
     }, [open])
 
-    // Load Pack Details
-    useEffect(() => {
-        if (selectedPackId === "none") return
-
-        async function loadDetails() {
-            setLoadingPack(true)
-            const { pack, error } = await getPackDetails(selectedPackId)
-            setLoadingPack(false)
-            if (error) {
-                toast.error("Failed to load pack details")
-                return
-            }
-            if (pack) {
-                setSelectedPack(pack)
-                // Select all by default
-                if (pack.items) {
-                    setSelectedItems(new Set(pack.items.map(i => i.id)))
-                }
-            }
-        }
-        loadDetails()
-    }, [selectedPackId])
-
-    const toggleItem = (id: string) => {
-        const next = new Set(selectedItems)
-        if (next.has(id)) next.delete(id)
-        else next.add(id)
-        setSelectedItems(next)
+    async function loadPacks() {
+        setPackLoading(true)
+        const { packs } = await getObjectivePacks()
+        setPacks(packs || [])
+        setPackLoading(false)
     }
 
-    // AI Analysis Handler
     const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0]
         if (!file) return
 
+        setAnalysisFile(file)
         setAnalyzing(true)
         setAnalyzedObjectives([])
-        setSelectedObjectiveIndex(null)
+        setSelectedAnalysisIndex(null)
 
         const formData = new FormData()
         formData.append('file', file)
@@ -98,30 +112,48 @@ export function CreateObjectiveDialog({ disabled }: { disabled?: boolean }) {
 
         if (result.error) {
             toast.error(result.error)
+            setAnalysisFile(null)
         } else if (result.objectives && result.objectives.length > 0) {
             setAnalyzedObjectives(result.objectives)
-            // Auto-select first objective to show something
-            setSelectedObjectiveIndex(0)
-            // Auto-select all tasks for first objective
-            const allTaskIndices = new Set(result.objectives[0].tasks.map((_, i) => i))
-            setAiTasksSelected(allTaskIndices)
-            toast.success(`Found ${result.objectives.length} strategic objectives!`)
+            setSelectedAnalysisIndex(0) // Default to first
+            // Pre-fill manual fields from first result
+            setTitle(result.objectives[0].title)
+            setDescription(result.objectives[0].description)
+            toast.success(`Analysis complete: Found ${result.objectives.length} objectives`)
         } else {
-            toast.warning("No objectives found in document.")
+            toast.warning("No objectives found in document")
         }
     }
 
-    const toggleAiTask = (index: number) => {
-        const next = new Set(aiTasksSelected)
-        if (next.has(index)) next.delete(index)
-        else next.add(index)
-        setAiTasksSelected(next)
-    }
+    const handleCreate = async () => {
+        if (!title.trim()) {
+            toast.error("Objective title is required")
+            return
+        }
 
-    async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
-        event.preventDefault()
         setLoading(true)
-        const formData = new FormData(event.currentTarget)
+        const formData = new FormData()
+        formData.append('title', title)
+        formData.append('description', description)
+
+        // Add special handling for Packs
+        if (mode === 'pack' && selectedPack) {
+            formData.append('playbookId', selectedPack.id)
+            // Auto-select all items from the pack
+            selectedPack.items?.forEach(item => {
+                formData.append('selectedTaskIds', item.id)
+            })
+        }
+
+        // Add special handling for Imports
+        if (mode === 'import' && selectedAnalysisIndex !== null) {
+            const obj = analyzedObjectives[selectedAnalysisIndex]
+            // We use the 'aiTasks' mechanism from the backend
+            // The backend expects json strings for tasks
+            obj.tasks.forEach(task => {
+                formData.append('aiTasks', JSON.stringify(task))
+            })
+        }
 
         try {
             const res = await createObjective(formData)
@@ -130,13 +162,6 @@ export function CreateObjectiveDialog({ disabled }: { disabled?: boolean }) {
             } else {
                 toast.success("Objective Initiated")
                 setOpen(false)
-                // Reset selection
-                setSelectedPackId("none")
-                setSelectedPack(null)
-                setSelectedItems(new Set())
-                setAnalyzedObjectives([])
-                setSelectedObjectiveIndex(null)
-                setActiveTab("manual")
             }
         } catch (e) {
             toast.error("An unexpected error occurred")
@@ -146,277 +171,297 @@ export function CreateObjectiveDialog({ disabled }: { disabled?: boolean }) {
         }
     }
 
+    const getModeIcon = (m: CreationMode) => {
+        switch (m) {
+            case 'manual': return FileText;
+            case 'pack': return Package;
+            case 'import': return Upload;
+        }
+    }
+
     return (
         <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
-                <Button size="sm" className="bg-white text-black hover:bg-gray-200" disabled={disabled}>
+                <Button size="sm" className="bg-white text-black hover:bg-gray-200 border border-transparent shadow-sm" disabled={disabled}>
                     <Plus className="mr-2 h-4 w-4" /> New Objective
                 </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[550px] bg-white text-slate-900 border-slate-200 max-h-[90vh] flex flex-col p-0 gap-0">
-                <form onSubmit={onSubmit} className="flex flex-col h-full overflow-hidden">
-                    <DialogHeader className="p-6 pb-2 shrink-0">
-                        <DialogTitle>Define Strategic Objective</DialogTitle>
-                        <DialogDescription>
-                            Create a new strategic objective to align your team.
+            <DialogContent className="max-w-[800px] h-[600px] flex flex-col p-0 gap-0 bg-white sm:rounded-xl overflow-hidden">
+                {/* Header Section */}
+                <div className="p-6 pb-4 border-b border-slate-100 bg-slate-50/50">
+                    <DialogHeader>
+                        <DialogTitle className="text-xl font-semibold tracking-tight text-slate-900">
+                            {mode === 'manual' && "Define Strategic Objective"}
+                            {mode === 'pack' && (selectedPack ? "Configure Objective Pack" : "Select Objective Pack")}
+                            {mode === 'import' && "Import from Business Plan"}
+                        </DialogTitle>
+                        <DialogDescription className="text-slate-500">
+                            {mode === 'manual' && "Manually define your objective and success criteria."}
+                            {mode === 'pack' && !selectedPack && "Choose a pre-configured template to jumpstart your strategy."}
+                            {mode === 'pack' && selectedPack && `Review tasks included in the "${selectedPack.title}" pack.`}
+                            {mode === 'import' && "Upload a business plan to automatically generate objectives."}
                         </DialogDescription>
                     </DialogHeader>
 
-                    <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col min-h-0">
-                        <div className="px-6 shrink-0">
-                            <TabsList className="grid w-full grid-cols-2 mb-4">
-                                <TabsTrigger value="manual">Manual / Pack</TabsTrigger>
-                                <TabsTrigger value="import">Import Business Plan</TabsTrigger>
-                            </TabsList>
+                    {/* Mode Selector - Only show if not deep in a sub-flow (like selected pack) to keep it clean, 
+                        OR show always for easy switching. Let's show always but disable if loading. */}
+                    {!((mode === 'pack' && selectedPack) || (mode === 'import' && analyzedObjectives.length > 0)) && (
+                        <div className="flex items-center gap-2 mt-6">
+                            {(['manual', 'pack', 'import'] as CreationMode[]).map((m) => {
+                                const Icon = getModeIcon(m)
+                                return (
+                                    <button
+                                        key={m}
+                                        onClick={() => setMode(m)}
+                                        className={cn(
+                                            "flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-all duration-200",
+                                            mode === m
+                                                ? "bg-slate-900 text-white shadow-md"
+                                                : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"
+                                        )}
+                                    >
+                                        <Icon className="w-4 h-4" />
+                                        {m.charAt(0).toUpperCase() + m.slice(1)}
+                                    </button>
+                                )
+                            })}
                         </div>
+                    )}
+                </div>
 
-                        <div className="flex-1 overflow-y-auto px-6 min-h-0">
-                            <TabsContent value="manual" className="mt-0 space-y-4 pb-6 h-full block">
-                                <div className="grid gap-4 py-2">
-                                    <div className="grid gap-2">
-                                        <Label htmlFor="title">Objective Title</Label>
-                                        <Input
-                                            id="title"
-                                            name="title"
-                                            placeholder="e.g. Expand Market Share"
-                                            required={activeTab === 'manual'}
-                                        />
+                {/* Main Content Area */}
+                <ScrollArea className="flex-1 bg-white">
+                    <div className="p-6">
+
+                        {/* MANUAL MODE */}
+                        {mode === 'manual' && (
+                            <div className="space-y-6 max-w-2xl mx-auto pt-4">
+                                <div className="space-y-2">
+                                    <Label htmlFor="title" className="text-base font-semibold">Objective Title</Label>
+                                    <Input
+                                        id="title"
+                                        placeholder="e.g. Q1 Market Expansion"
+                                        value={title}
+                                        onChange={(e) => setTitle(e.target.value)}
+                                        className="h-12 text-lg"
+                                        autoFocus
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="description" className="text-base font-semibold">Description & Success Criteria</Label>
+                                    <Textarea
+                                        id="description"
+                                        placeholder="Define the scope, key results, and success metrics..."
+                                        value={description}
+                                        onChange={(e) => setDescription(e.target.value)}
+                                        className="min-h-[200px] text-base resize-none p-4"
+                                    />
+                                    <p className="text-xs text-slate-400 text-right">Markdown supported</p>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* PACK MODE */}
+                        {mode === 'pack' && (
+                            <div className="h-full">
+                                {!selectedPack ? (
+                                    // Pack Grid
+                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                        {packLoading ? (
+                                            <div className="col-span-full flex items-center justify-center py-20">
+                                                <Loader2 className="w-8 h-8 animate-spin text-slate-300" />
+                                            </div>
+                                        ) : packs.map((pack) => {
+                                            const Icon = pack.icon_name ? PACK_ICONS[pack.icon_name] || Package : Package
+                                            return (
+                                                <Card
+                                                    key={pack.id}
+                                                    className="cursor-pointer hover:border-blue-500 hover:shadow-md transition-all group border-slate-200"
+                                                    onClick={() => {
+                                                        setSelectedPack(pack)
+                                                        setTitle(pack.title)
+                                                        setDescription(pack.description || "")
+                                                    }}
+                                                >
+                                                    <CardHeader className="space-y-1">
+                                                        <div className="w-10 h-10 rounded-lg bg-slate-50 border border-slate-100 flex items-center justify-center mb-2 group-hover:bg-blue-50 group-hover:text-blue-600 transition-colors">
+                                                            <Icon className="w-5 h-5 text-slate-500 group-hover:text-blue-600" />
+                                                        </div>
+                                                        <CardTitle className="text-lg">{pack.title}</CardTitle>
+                                                        <CardDescription className="line-clamp-2">{pack.description}</CardDescription>
+                                                    </CardHeader>
+                                                    <CardContent>
+                                                        <div className="flex flex-wrap gap-2">
+                                                            {pack.category && <Badge variant="secondary" className="text-xs font-normal text-slate-500">{pack.category}</Badge>}
+                                                            <Badge variant="outline" className="text-xs font-normal text-slate-500">{pack.items?.length || 0} Tasks</Badge>
+                                                        </div>
+                                                    </CardContent>
+                                                </Card>
+                                            )
+                                        })}
                                     </div>
-                                    <div className="grid gap-2">
-                                        <Label htmlFor="description">Description</Label>
-                                        <Textarea
-                                            id="description"
-                                            name="description"
-                                            placeholder="Success criteria and scope..."
-                                            className="h-24"
-                                        />
-                                    </div>
+                                ) : (
+                                    // Selected Pack Details
+                                    <div className="space-y-6 max-w-3xl mx-auto">
+                                        <Button variant="ghost" size="sm" onClick={() => setSelectedPack(null)} className="mb-2 -ml-2 text-slate-500 hover:text-slate-900">
+                                            <ArrowLeft className="w-4 h-4 mr-1" /> Back to Packs
+                                        </Button>
 
-                                    <div className="grid gap-2">
-                                        <Label className="flex items-center gap-2">
-                                            <BookTemplate className="h-4 w-4" />
-                                            Use Objective Pack (Optional)
-                                        </Label>
-                                        <Select name="playbookId" onValueChange={(val) => {
-                                            setSelectedPackId(val)
-                                            if (val === "none") {
-                                                setSelectedPack(null)
-                                                setSelectedItems(new Set())
-                                            }
-                                        }} value={selectedPackId}>
-                                            <SelectTrigger className="bg-white border-slate-200">
-                                                <SelectValue placeholder="Select a pack..." />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="none">None (Empty Objective)</SelectItem>
-                                                {packs.map(pb => (
-                                                    <SelectItem key={pb.id} value={pb.id}>
-                                                        {pb.title} {pb.category ? `(${pb.category})` : ''}
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
+                                        <div className="space-y-4">
+                                            <div>
+                                                <h3 className="text-2xl font-bold text-slate-900">{selectedPack.title}</h3>
+                                                <p className="text-slate-500 mt-1 text-lg">{selectedPack.description}</p>
+                                            </div>
 
-                                        {loadingPack && <div className="text-sm text-slate-500 flex items-center py-2"><Loader2 className="h-3 w-3 animate-spin mr-2" /> Loading pack details...</div>}
-
-                                        {selectedPack && selectedPack.items && (
-                                            <div className="border border-slate-200 rounded-md p-3 bg-slate-50 space-y-3 mt-2">
-                                                <div className="flex items-center justify-between">
-                                                    <h4 className="text-sm font-semibold text-slate-800">Pack Tasks</h4>
-                                                    <div className="flex items-center gap-2">
-                                                        <span className="text-xs text-slate-500">{selectedItems.size} selected</span>
-                                                        {selectedItems.size < (selectedPack.items.length || 0) && (
-                                                            <Button size="sm" variant="ghost" className="h-auto p-0 text-xs text-blue-600" onClick={(e) => {
-                                                                e.preventDefault()
-                                                                if (selectedPack.items) setSelectedItems(new Set(selectedPack.items.map(i => i.id)))
-                                                            }}>Select All</Button>
-                                                        )}
-                                                    </div>
+                                            <div className="border rounded-xl overflow-hidden bg-slate-50">
+                                                <div className="px-4 py-3 border-b bg-white font-medium text-sm text-slate-500 flex justify-between">
+                                                    <span>Included Tasks</span>
+                                                    <span>{selectedPack.items?.length || 0} Items</span>
                                                 </div>
-                                                <div className="space-y-2 max-h-[200px] overflow-y-auto">
-                                                    {selectedPack.items.map(item => (
-                                                        <div key={item.id} className="flex items-start space-x-2 group">
-                                                            <Checkbox
-                                                                id={item.id}
-                                                                checked={selectedItems.has(item.id)}
-                                                                onCheckedChange={() => toggleItem(item.id)}
-                                                                className="mt-1"
-                                                            />
-                                                            {/* Hidden input to submit the selected IDs */}
-                                                            <input
-                                                                type="hidden"
-                                                                name="selectedTaskIds"
-                                                                value={item.id}
-                                                                disabled={!selectedItems.has(item.id)}
-                                                            />
-                                                            <div className="grid gap-1.5 leading-none">
-                                                                <label
-                                                                    htmlFor={item.id}
-                                                                    className="text-sm font-medium leading-tight cursor-pointer group-hover:text-slate-900 text-slate-700"
-                                                                >
-                                                                    {item.title}
-                                                                </label>
-                                                                <p className="text-xs text-slate-500 line-clamp-2">
-                                                                    <span className="inline-block bg-slate-200 text-slate-600 px-1 rounded text-[10px] mr-1 mb-0.5">{item.role}</span>
-                                                                    {item.description}
-                                                                </p>
+                                                <div className="divide-y divide-slate-100">
+                                                    {selectedPack.items?.map((item) => (
+                                                        <div key={item.id} className="p-4 flex items-start gap-4">
+                                                            <div className="mt-1">
+                                                                <Check className="w-4 h-4 text-green-500" />
+                                                            </div>
+                                                            <div className="space-y-1">
+                                                                <p className="font-medium text-slate-900 text-sm">{item.title}</p>
+                                                                <p className="text-sm text-slate-500">{item.description}</p>
+                                                                {item.role && <Badge variant="outline" className="text-[10px] h-5">{item.role}</Badge>}
                                                             </div>
                                                         </div>
                                                     ))}
                                                 </div>
                                             </div>
-                                        )}
-                                    </div>
-                                </div>
-                            </TabsContent>
-
-                            <TabsContent value="import" className="mt-0 space-y-4 pb-6 h-full block">
-                                {!analyzedObjectives.length && !analyzing && (
-                                    <div className="border-2 border-dashed border-slate-200 rounded-lg p-10 flex flex-col items-center justify-center text-center space-y-4 hover:bg-slate-50 transition-colors">
-                                        <div className="bg-blue-50 p-4 rounded-full">
-                                            <Upload className="h-8 w-8 text-blue-600" />
-                                        </div>
-                                        <div className="space-y-1">
-                                            <h3 className="font-semibold text-slate-900">Upload Business Plan</h3>
-                                            <p className="text-sm text-slate-500">Drag and drop your PDF or text file here, or click to browse.</p>
-                                        </div>
-                                        <Input
-                                            type="file"
-                                            accept=".pdf,.txt,.md"
-                                            className="max-w-xs cursor-pointer"
-                                            onChange={handleFileUpload}
-                                        />
-                                        <p className="text-xs text-slate-400">Supported formats: PDF, TXT, MD</p>
-                                    </div>
-                                )}
-
-                                {analyzing && (
-                                    <div className="flex flex-col items-center justify-center p-12 space-y-4">
-                                        <Loader2 className="h-10 w-10 animate-spin text-blue-600" />
-                                        <div className="text-center">
-                                            <h3 className="font-medium text-slate-900">Analyzing Strategy...</h3>
-                                            <p className="text-sm text-slate-500">Extracting objectives and actionable tasks from your plan.</p>
                                         </div>
                                     </div>
                                 )}
-
-                                {analyzedObjectives.length > 0 && selectedObjectiveIndex !== null && (
-                                    <div className="space-y-4 pb-0 pt-2">
-                                        {analyzedObjectives.length > 1 && (
-                                            <div className="mb-4">
-                                                <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2">Detailed Objectives Found</h4>
-                                                <div className="grid grid-cols-1 gap-2">
-                                                    {analyzedObjectives.map((obj, idx) => (
-                                                        <div
-                                                            key={idx}
-                                                            onClick={() => {
-                                                                setSelectedObjectiveIndex(idx)
-                                                                const allTaskIndices = new Set(obj.tasks.map((_, i) => i))
-                                                                setAiTasksSelected(allTaskIndices)
-                                                            }}
-                                                            className={`p-3 rounded-md border text-sm cursor-pointer transition-colors ${selectedObjectiveIndex === idx ? 'border-blue-600 bg-blue-50 ring-1 ring-blue-600' : 'border-slate-200 hover:bg-slate-50'}`}
-                                                        >
-                                                            <div className="font-medium text-slate-900">{obj.title}</div>
-                                                            <div className="text-slate-500 line-clamp-1 text-xs">{obj.description}</div>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            </div>
-                                        )}
-
-                                        <div className="bg-slate-50 p-4 rounded-md border border-slate-200 mb-4">
-                                            <h3 className="text-sm font-semibold text-slate-900 mb-1">Selected Objective Details</h3>
-                                            <div className="grid gap-2">
-                                                <Label>Title</Label>
-                                                <Input
-                                                    name="title_ai"
-                                                    defaultValue={analyzedObjectives[selectedObjectiveIndex].title}
-                                                    className="bg-white border-slate-300 font-medium"
-                                                />
-                                            </div>
-                                            <div className="grid gap-2 mt-2">
-                                                <Label>Description</Label>
-                                                <Textarea
-                                                    name="description_ai"
-                                                    defaultValue={analyzedObjectives[selectedObjectiveIndex].description}
-                                                    className="bg-white border-slate-300 text-sm"
-                                                />
-                                            </div>
-                                        </div>
-
-                                        <div className="space-y-2">
-                                            <div className="flex items-center justify-between">
-                                                <h4 className="text-sm font-semibold text-slate-800">Suggested Tasks</h4>
-                                                <div className="flex items-center gap-2">
-                                                    <span className="text-xs text-slate-500">{aiTasksSelected.size} selected</span>
-                                                    <Button size="sm" variant="ghost" className="h-auto p-0 text-xs text-blue-600" onClick={(e) => {
-                                                        e.preventDefault()
-                                                        const currentObj = analyzedObjectives[selectedObjectiveIndex]
-                                                        if (currentObj) setAiTasksSelected(new Set(currentObj.tasks.map((_, i) => i)))
-                                                    }}>Select All</Button>
-                                                </div>
-                                            </div>
-
-                                            <div className="border border-slate-200 rounded-md divide-y divide-slate-100 max-h-[200px] overflow-y-auto">
-                                                {analyzedObjectives[selectedObjectiveIndex].tasks.map((task, idx) => (
-                                                    <div key={idx} className="flex items-start p-3 hover:bg-slate-50 transition-colors">
-                                                        <Checkbox
-                                                            id={`ai-task-${idx}`}
-                                                            checked={aiTasksSelected.has(idx)}
-                                                            onCheckedChange={() => toggleAiTask(idx)}
-                                                            className="mt-1"
-                                                        />
-                                                        {aiTasksSelected.has(idx) && (
-                                                            <input type="hidden" name="aiTasks" value={JSON.stringify(task)} />
-                                                        )}
-                                                        <div className="ml-3 grid gap-1">
-                                                            <label
-                                                                htmlFor={`ai-task-${idx}`}
-                                                                className="text-sm font-medium leading-none cursor-pointer text-slate-900"
-                                                            >
-                                                                {task.title}
-                                                            </label>
-                                                            <p className="text-xs text-slate-500">
-                                                                <span className="inline-block bg-blue-100 text-blue-700 font-medium px-1.5 py-0.5 rounded text-[10px] mr-1.5">{task.role}</span>
-                                                                {task.description}
-                                                            </p>
-                                                        </div>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
-                            </TabsContent>
-                        </div>
-                    </Tabs>
-
-                    <DialogFooter className="p-6 pt-2 shrink-0 border-t border-slate-100 bg-white z-10">
-                        {activeTab === 'import' ? (
-                            <>
-                                <Button type="button" variant="outline" onClick={() => {
-                                    setAnalyzedObjectives([])
-                                    setAnalyzing(false)
-                                }}>
-                                    Reset
-                                </Button>
-                                <Button type="submit" disabled={loading || !analyzedObjectives.length} className="bg-slate-900 text-white">
-                                    {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Check className="mr-2 h-4 w-4" />}
-                                    Create Objective
-                                </Button>
-                            </>
-                        ) : (
-                            <Button
-                                type="submit"
-                                disabled={loading}
-                                className="bg-slate-900 text-white w-full sm:w-auto"
-                            >
-                                {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                Initialize Objective
-                            </Button>
+                            </div>
                         )}
-                    </DialogFooter>
-                </form>
+
+                        {/* IMPORT MODE */}
+                        {mode === 'import' && (
+                            <div className="max-w-2xl mx-auto pt-4 h-full flex flex-col items-center">
+                                {!analyzedObjectives.length && !analyzing ? (
+                                    <div className="w-full">
+                                        <div
+                                            className="border-2 border-dashed border-slate-200 rounded-xl p-12 flex flex-col items-center justify-center text-center space-y-4 hover:border-blue-500 hover:bg-blue-50/10 transition-all cursor-pointer group relative"
+                                        >
+                                            <Input
+                                                type="file"
+                                                accept=".pdf,.txt,.md"
+                                                className="absolute inset-0 opacity-0 cursor-pointer h-full z-10"
+                                                onChange={handleFileUpload}
+                                            />
+                                            <div className="w-16 h-16 rounded-full bg-blue-50 flex items-center justify-center group-hover:scale-110 transition-transform">
+                                                <Upload className="w-8 h-8 text-blue-600" />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <h3 className="text-lg font-semibold text-slate-900">Upload Business Plan</h3>
+                                                <p className="text-slate-500 max-w-sm mx-auto">
+                                                    Drag and drop your PDF, TXT, or MD file to automatically extract strategic objectives.
+                                                </p>
+                                            </div>
+                                            <Badge variant="secondary" className="mt-4">AI Powered Analysis</Badge>
+                                        </div>
+                                    </div>
+                                ) : analyzing ? (
+                                    <div className="flex flex-col items-center justify-center py-20 space-y-6">
+                                        <div className="relative">
+                                            <div className="w-16 h-16 border-4 border-slate-100 border-t-blue-600 rounded-full animate-spin"></div>
+                                            <div className="absolute inset-0 flex items-center justify-center">
+                                                <img src="/icons/sparkles.svg" className="w-6 h-6 opacity-20" alt="" />
+                                            </div>
+                                        </div>
+                                        <div className="text-center space-y-2">
+                                            <h3 className="text-lg font-medium text-slate-900">Analyzing Strategy...</h3>
+                                            <p className="text-slate-500">Extracting actionable objectives from {analysisFile?.name}</p>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="w-full space-y-6">
+                                        <div className="flex items-center justify-between">
+                                            <h3 className="text-lg font-semibold text-slate-900">Found {analyzedObjectives.length} Objectives</h3>
+                                            <Button variant="ghost" size="sm" onClick={() => {
+                                                setAnalyzedObjectives([])
+                                                setAnalysisFile(null)
+                                            }}>Upload Different File</Button>
+                                        </div>
+
+                                        <div className="grid gap-3">
+                                            {analyzedObjectives.map((obj, idx) => (
+                                                <div
+                                                    key={idx}
+                                                    onClick={() => {
+                                                        setSelectedAnalysisIndex(idx)
+                                                        setTitle(obj.title)
+                                                        setDescription(obj.description)
+                                                    }}
+                                                    className={cn(
+                                                        "p-4 rounded-xl border text-left cursor-pointer transition-all",
+                                                        selectedAnalysisIndex === idx
+                                                            ? "border-blue-600 bg-blue-50/30 ring-1 ring-blue-600 shadow-sm"
+                                                            : "border-slate-200 hover:border-slate-300 hover:shadow-sm bg-white"
+                                                    )}
+                                                >
+                                                    <div className="flex justify-between items-start mb-2">
+                                                        <h4 className="font-semibold text-slate-900">{obj.title}</h4>
+                                                        {selectedAnalysisIndex === idx && <Check className="w-4 h-4 text-blue-600" />}
+                                                    </div>
+                                                    <p className="text-sm text-slate-600 line-clamp-2">{obj.description}</p>
+                                                    <div className="mt-3 flex items-center gap-2 text-xs text-slate-500">
+                                                        <Badge variant="secondary" className="bg-slate-100 text-slate-600 border-slate-200">
+                                                            {obj.tasks.length} Tasks Generated
+                                                        </Badge>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+
+                                        {selectedAnalysisIndex !== null && (
+                                            <div className="space-y-4 pt-4 border-t border-slate-100">
+                                                <Label>Refine Selected Objective</Label>
+                                                <Input
+                                                    value={title}
+                                                    onChange={(e) => setTitle(e.target.value)}
+                                                    className="bg-white"
+                                                />
+                                                <Textarea
+                                                    value={description}
+                                                    onChange={(e) => setDescription(e.target.value)}
+                                                    className="resize-none h-24 bg-white"
+                                                />
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                    </div>
+                </ScrollArea>
+
+                {/* Footer Actions */}
+                <DialogFooter className="p-6 pt-4 border-t border-slate-100 bg-white items-center">
+                    <div className="flex-1 text-sm text-slate-500">
+                        {mode === 'pack' && selectedPack && "This will create 1 objective and multiple tasks."}
+                        {mode === 'import' && selectedAnalysisIndex !== null && "AI generated tasks will be created."}
+                    </div>
+
+                    <Button variant="outline" onClick={() => setOpen(false)} disabled={loading}>
+                        Cancel
+                    </Button>
+
+                    <Button
+                        onClick={handleCreate}
+                        disabled={loading || (mode === 'pack' && !selectedPack) || (mode === 'import' && selectedAnalysisIndex === null) || !title.trim()}
+                        className="bg-slate-900 text-white min-w-[120px]"
+                    >
+                        {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                        {!loading && <Plus className="mr-2 h-4 w-4" />}
+                        {mode === 'manual' ? 'Create Objective' : 'Initialize'}
+                    </Button>
+                </DialogFooter>
             </DialogContent>
         </Dialog>
     )

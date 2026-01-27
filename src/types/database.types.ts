@@ -9,6 +9,9 @@ export type Json =
 export type Database = {
     // Allows to automatically instantiate createClient with right options
     // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
+    __InternalSupabase: {
+        PostgrestVersion: "14.1"
+    }
     public: {
         Tables: {
             ai_tools: {
@@ -41,243 +44,74 @@ export type Database = {
                 }
                 Relationships: []
             }
-            apprentice_listings: {
+            foundries: {
                 Row: {
-                    availability_hours_per_week: number | null
-                    availability_status: string | null
-                    bio: string | null
                     created_at: string | null
-                    education: string | null
-                    headline: string | null
-                    hourly_rate: number | null
                     id: string
-                    is_verified: boolean | null
-                    learning_goals: string[] | null
-                    linkedin_url: string | null
-                    portfolio_url: string | null
-                    rating_average: number | null
-                    review_count: number | null
-                    skills: string[] | null
-                    timezone: string | null
-                    title: string | null
-                    updated_at: string | null
-                    user_id: string | null
-                    visibility: string | null
+                    name: string
                 }
                 Insert: {
-                    availability_hours_per_week?: number | null
-                    availability_status?: string | null
-                    bio?: string | null
                     created_at?: string | null
-                    education?: string | null
-                    headline?: string | null
-                    hourly_rate?: number | null
-                    id?: string
-                    is_verified?: boolean | null
-                    learning_goals?: string[] | null
-                    linkedin_url?: string | null
-                    portfolio_url?: string | null
-                    rating_average?: number | null
-                    review_count?: number | null
-                    skills?: string[] | null
-                    timezone?: string | null
-                    title?: string | null
-                    updated_at?: string | null
-                    user_id?: string | null
-                    visibility?: string | null
+                    id: string
+                    name: string
                 }
                 Update: {
-                    availability_hours_per_week?: number | null
-                    availability_status?: string | null
-                    bio?: string | null
                     created_at?: string | null
-                    education?: string | null
-                    headline?: string | null
-                    hourly_rate?: number | null
                     id?: string
-                    is_verified?: boolean | null
-                    learning_goals?: string[] | null
-                    linkedin_url?: string | null
-                    portfolio_url?: string | null
-                    rating_average?: number | null
-                    review_count?: number | null
-                    skills?: string[] | null
-                    timezone?: string | null
-                    title?: string | null
-                    updated_at?: string | null
-                    user_id?: string | null
-                    visibility?: string | null
+                    name?: string
                 }
                 Relationships: []
             }
-            event_attendees: {
-                Row: {
-                    event_id: string
-                    profile_id: string
-                }
-                Insert: {
-                    event_id: string
-                    profile_id: string
-                }
-                Update: {
-                    event_id?: string
-                    profile_id?: string
-                }
-                Relationships: [
-                    {
-                        foreignKeyName: "event_attendees_event_id_fkey"
-                        columns: ["event_id"]
-                        isOneToOne: false
-                        referencedRelation: "guild_events"
-                        referencedColumns: ["id"]
-                    },
-                    {
-                        foreignKeyName: "event_attendees_profile_id_fkey"
-                        columns: ["profile_id"]
-                        isOneToOne: false
-                        referencedRelation: "profiles"
-                        referencedColumns: ["id"]
-                    },
-                ]
-            }
-            foundry_integrations: {
-                Row: {
-                    config: Json | null
-                    created_at: string | null
-                    foundry_id: string
-                    id: string
-                    service_type: string
-                    updated_at: string | null
-                }
-                Insert: {
-                    config?: Json | null
-                    created_at?: string | null
-                    foundry_id: string
-                    id?: string
-                    service_type: string
-                    updated_at?: string | null
-                }
-                Update: {
-                    config?: Json | null
-                    created_at?: string | null
-                    foundry_id?: string
-                    id?: string
-                    service_type?: string
-                    updated_at?: string | null
-                }
-                Relationships: []
-            }
-            guild_events: {
-                Row: {
-                    created_by: string | null
-                    description: string | null
-                    event_date: string
-                    foundry_id: string
-                    id: string
-                    is_executive_only: boolean | null
-                    location_geo: string | null
-                    title: string
-                }
-                Insert: {
-                    created_by?: string | null
-                    description?: string | null
-                    event_date: string
-                    foundry_id: string
-                    id?: string
-                    is_executive_only?: boolean | null
-                    location_geo?: string | null
-                    title: string
-                }
-                Update: {
-                    created_by?: string | null
-                    description?: string | null
-                    event_date?: string
-                    foundry_id?: string
-                    id?: string
-                    is_executive_only?: boolean | null
-                    location_geo?: string | null
-                    title?: string
-                }
-                Relationships: [
-                    {
-                        foreignKeyName: "guild_events_created_by_fkey"
-                        columns: ["created_by"]
-                        isOneToOne: false
-                        referencedRelation: "profiles"
-                        referencedColumns: ["id"]
-                    },
-                ]
-            }
-
             foundry_stack: {
                 Row: {
                     created_at: string | null
                     foundry_id: string
                     id: string
-                    provider_id: string
+                    provider_id: string | null
+                    status: string | null
+                    tool_id: string | null
+                }
+                Insert: {
+                    created_at?: string | null
+                    foundry_id: string
+                    id?: string
+                    provider_id?: string | null
+                    status?: string | null
+                    tool_id?: string | null
+                }
+                Update: {
+                    created_at?: string | null
+                    foundry_id: string
+                    id?: string
+                    provider_id?: string | null
+                    status?: string | null
+                    tool_id?: string | null
+                }
+                Relationships: []
+            }
+            members: {
+                Row: {
+                    email: string
+                    full_name: string | null
+                    id: string
+                    role: string
                     status: string | null
                 }
                 Insert: {
-                    created_at?: string | null
-                    foundry_id: string
-                    id?: string
-                    provider_id: string
-                    status?: string | null
-                }
-                Update: {
-                    created_at?: string | null
-                    foundry_id?: string
-                    id?: string
-                    provider_id?: string
-                    status?: string | null
-                }
-                Relationships: [
-                    {
-                        foreignKeyName: "foundry_stack_provider_id_fkey"
-                        columns: ["provider_id"]
-                        isOneToOne: false
-                        referencedRelation: "service_providers"
-                        referencedColumns: ["id"]
-                    },
-                ]
-            }
-            manufacturing_rfqs: {
-                Row: {
-                    budget_range: string | null
-                    created_by: string | null
-                    foundry_id: string
+                    email: string
+                    full_name?: string | null
                     id: string
-                    specifications: string
-                    status: Database["public"]["Enums"]["rfq_status"] | null
-                    title: string
-                }
-                Insert: {
-                    budget_range?: string | null
-                    created_by?: string | null
-                    foundry_id: string
-                    id?: string
-                    specifications: string
-                    status?: Database["public"]["Enums"]["rfq_status"] | null
-                    title: string
+                    role?: string
+                    status?: string | null
                 }
                 Update: {
-                    budget_range?: string | null
-                    created_by?: string | null
-                    foundry_id?: string
+                    email?: string
+                    full_name?: string | null
                     id?: string
-                    specifications?: string
-                    status?: Database["public"]["Enums"]["rfq_status"] | null
-                    title?: string
+                    role?: string
+                    status?: string | null
                 }
-                Relationships: [
-                    {
-                        foreignKeyName: "manufacturing_rfqs_created_by_fkey"
-                        columns: ["created_by"]
-                        isOneToOne: false
-                        referencedRelation: "profiles"
-                        referencedColumns: ["id"]
-                    },
-                ]
+                Relationships: []
             }
             objectives: {
                 Row: {
@@ -288,7 +122,7 @@ export type Database = {
                     id: string
                     parent_objective_id: string | null
                     progress: number | null
-                    status: string
+                    status: string | null
                     title: string
                     updated_at: string | null
                 }
@@ -300,7 +134,7 @@ export type Database = {
                     id?: string
                     parent_objective_id?: string | null
                     progress?: number | null
-                    status?: string
+                    status?: string | null
                     title: string
                     updated_at?: string | null
                 }
@@ -312,11 +146,18 @@ export type Database = {
                     id?: string
                     parent_objective_id?: string | null
                     progress?: number | null
-                    status?: string
+                    status?: string | null
                     title?: string
                     updated_at?: string | null
                 }
                 Relationships: [
+                    {
+                        foreignKeyName: "objectives_creator_id_fkey"
+                        columns: ["creator_id"]
+                        isOneToOne: false
+                        referencedRelation: "profiles"
+                        referencedColumns: ["id"]
+                    },
                     {
                         foreignKeyName: "objectives_parent_objective_id_fkey"
                         columns: ["parent_objective_id"]
@@ -334,7 +175,6 @@ export type Database = {
                     foundry_id: string
                     full_name: string | null
                     id: string
-                    paired_ai_id: string | null
                     role: Database["public"]["Enums"]["member_role"]
                     updated_at: string | null
                 }
@@ -345,8 +185,7 @@ export type Database = {
                     foundry_id: string
                     full_name?: string | null
                     id: string
-                    paired_ai_id?: string | null
-                    role: Database["public"]["Enums"]["member_role"]
+                    role?: Database["public"]["Enums"]["member_role"]
                     updated_at?: string | null
                 }
                 Update: {
@@ -356,88 +195,40 @@ export type Database = {
                     foundry_id?: string
                     full_name?: string | null
                     id?: string
-                    paired_ai_id?: string | null
                     role?: Database["public"]["Enums"]["member_role"]
                     updated_at?: string | null
                 }
+                Relationships: []
+            }
+            task_assignees: {
+                Row: {
+                    created_at: string | null
+                    profile_id: string
+                    task_id: string
+                }
+                Insert: {
+                    created_at?: string | null
+                    profile_id: string
+                    task_id: string
+                }
+                Update: {
+                    created_at?: string | null
+                    profile_id?: string
+                    task_id?: string
+                }
                 Relationships: [
                     {
-                        foreignKeyName: "profiles_paired_ai_id_fkey"
-                        columns: ["paired_ai_id"]
+                        foreignKeyName: "task_assignees_profile_id_fkey"
+                        columns: ["profile_id"]
                         isOneToOne: false
                         referencedRelation: "profiles"
                         referencedColumns: ["id"]
                     },
-                ]
-            }
-            service_providers: {
-                Row: {
-                    company_name: string
-                    contact_info: Json | null
-                    id: string
-                    is_verified: boolean | null
-                    provider_type: Database["public"]["Enums"]["provider_type"]
-                }
-                Insert: {
-                    company_name: string
-                    contact_info?: Json | null
-                    id?: string
-                    is_verified?: boolean | null
-                    provider_type: Database["public"]["Enums"]["provider_type"]
-                }
-                Update: {
-                    company_name?: string
-                    contact_info?: Json | null
-                    id?: string
-                    is_verified?: boolean | null
-                    provider_type?: Database["public"]["Enums"]["provider_type"]
-                }
-                Relationships: []
-            }
-            task_files: {
-                Row: {
-                    id: string
-                    task_id: string
-                    file_name: string
-                    file_path: string
-                    file_size: number | null
-                    mime_type: string | null
-                    uploaded_by: string | null
-                    created_at: string | null
-                }
-                Insert: {
-                    id?: string
-                    task_id: string
-                    file_name: string
-                    file_path: string
-                    file_size?: number | null
-                    mime_type?: string | null
-                    uploaded_by?: string | null
-                    created_at?: string | null
-                }
-                Update: {
-                    id?: string
-                    task_id?: string
-                    file_name?: string
-                    file_path?: string
-                    file_size?: number | null
-                    mime_type?: string | null
-                    uploaded_by?: string | null
-                    created_at?: string | null
-                }
-                Relationships: [
                     {
-                        foreignKeyName: "task_files_task_id_fkey"
+                        foreignKeyName: "task_assignees_task_id_fkey"
                         columns: ["task_id"]
                         isOneToOne: false
                         referencedRelation: "tasks"
-                        referencedColumns: ["id"]
-                    },
-                    {
-                        foreignKeyName: "task_files_uploaded_by_fkey"
-                        columns: ["uploaded_by"]
-                        isOneToOne: false
-                        referencedRelation: "profiles"
                         referencedColumns: ["id"]
                     },
                 ]
@@ -487,106 +278,90 @@ export type Database = {
                     },
                 ]
             }
-            task_assignees: {
+            task_files: {
                 Row: {
-                    id: string
-                    task_id: string
-                    profile_id: string
-                    team_id: string | null
                     created_at: string | null
+                    file_name: string
+                    file_path: string
+                    file_size: number
+                    id: string
+                    mime_type: string
+                    task_id: string
+                    uploaded_by: string
                 }
                 Insert: {
-                    id?: string
-                    task_id: string
-                    profile_id: string
-                    team_id?: string | null
                     created_at?: string | null
+                    file_name: string
+                    file_path: string
+                    file_size: number
+                    id?: string
+                    mime_type: string
+                    task_id: string
+                    uploaded_by: string
                 }
                 Update: {
-                    id?: string
-                    task_id?: string
-                    profile_id?: string
-                    team_id?: string | null
                     created_at?: string | null
+                    file_name?: string
+                    file_path?: string
+                    file_size?: number
+                    id?: string
+                    mime_type?: string
+                    task_id?: string
+                    uploaded_by?: string
                 }
                 Relationships: [
                     {
-                        foreignKeyName: "task_assignees_task_id_fkey"
+                        foreignKeyName: "task_files_task_id_fkey"
                         columns: ["task_id"]
                         isOneToOne: false
                         referencedRelation: "tasks"
                         referencedColumns: ["id"]
                     },
                     {
-                        foreignKeyName: "task_assignees_profile_id_fkey"
-                        columns: ["profile_id"]
+                        foreignKeyName: "task_files_uploaded_by_fkey"
+                        columns: ["uploaded_by"]
                         isOneToOne: false
                         referencedRelation: "profiles"
                         referencedColumns: ["id"]
                     },
-                    {
-                        foreignKeyName: "task_assignees_team_id_fkey"
-                        columns: ["team_id"]
-                        isOneToOne: false
-                        referencedRelation: "teams"
-                        referencedColumns: ["id"]
-                    },
                 ]
             }
-            teams: {
+            task_history: {
                 Row: {
+                    action_type: string
+                    changes: Json | null
+                    created_at: string | null
                     id: string
-                    name: string
-                    foundry_id: string
-                    is_auto_generated: boolean | null
-                    created_at: string | null
-                    updated_at: string | null
+                    task_id: string
+                    user_id: string
                 }
                 Insert: {
-                    id?: string
-                    name: string
-                    foundry_id: string
-                    is_auto_generated?: boolean | null
+                    action_type: string
+                    changes?: Json | null
                     created_at?: string | null
-                    updated_at?: string | null
+                    id?: string
+                    task_id: string
+                    user_id: string
                 }
                 Update: {
+                    action_type?: string
+                    changes?: Json | null
+                    created_at?: string | null
                     id?: string
-                    name?: string
-                    foundry_id?: string
-                    is_auto_generated?: boolean | null
-                    created_at?: string | null
-                    updated_at?: string | null
-                }
-                Relationships: []
-            }
-            team_members: {
-                Row: {
-                    team_id: string
-                    profile_id: string
-                    created_at: string | null
-                }
-                Insert: {
-                    team_id: string
-                    profile_id: string
-                    created_at?: string | null
-                }
-                Update: {
-                    team_id?: string
-                    profile_id?: string
-                    created_at?: string | null
+                    task_id?: string
+                    user_id?: string
                 }
                 Relationships: [
                     {
-                        foreignKeyName: "team_members_team_id_fkey"
-                        columns: ["team_id"]
+                        foreignKeyName: "task_history_task_id_fkey"
+                        columns: ["task_id"]
                         isOneToOne: false
-                        referencedRelation: "teams"
+                        referencedRelation: "tasks"
                         referencedColumns: ["id"]
                     },
                     {
-                        foreignKeyName: "team_members_profile_id_fkey"
-                        columns: ["profile_id"]
+                        foreignKeyName: "task_history_user_id_fkey"
+                        columns: ["user_id"]
                         isOneToOne: false
                         referencedRelation: "profiles"
                         referencedColumns: ["id"]
@@ -608,6 +383,7 @@ export type Database = {
                     progress: number | null
                     start_date: string | null
                     status: Database["public"]["Enums"]["task_status"] | null
+                    task_number: number
                     title: string
                     updated_at: string | null
                 }
@@ -625,6 +401,7 @@ export type Database = {
                     progress?: number | null
                     start_date?: string | null
                     status?: Database["public"]["Enums"]["task_status"] | null
+                    task_number?: number
                     title: string
                     updated_at?: string | null
                 }
@@ -642,6 +419,7 @@ export type Database = {
                     progress?: number | null
                     start_date?: string | null
                     status?: Database["public"]["Enums"]["task_status"] | null
+                    task_number?: number
                     title?: string
                     updated_at?: string | null
                 }
@@ -669,149 +447,6 @@ export type Database = {
                     },
                 ]
             }
-            verified_reviews: {
-                Row: {
-                    comment: string | null
-                    created_at: string | null
-                    foundry_id: string
-                    id: string
-                    rating: number | null
-                    reviewer_id: string | null
-                    target_id: string | null
-                    task_id: string | null
-                }
-                Insert: {
-                    comment?: string | null
-                    created_at?: string | null
-                    foundry_id: string
-                    id?: string
-                    rating?: number | null
-                    reviewer_id?: string | null
-                    target_id?: string | null
-                    task_id?: string | null
-                }
-                Update: {
-                    comment?: string | null
-                    created_at?: string | null
-                    foundry_id?: string
-                    id?: string
-                    rating?: number | null
-                    reviewer_id?: string | null
-                    target_id?: string | null
-                    task_id?: string | null
-                }
-                Relationships: [
-                    {
-                        foreignKeyName: "verified_reviews_reviewer_id_fkey"
-                        columns: ["reviewer_id"]
-                        isOneToOne: false
-                        referencedRelation: "profiles"
-                        referencedColumns: ["id"]
-                    },
-                    {
-                        foreignKeyName: "verified_reviews_task_id_fkey"
-                        columns: ["task_id"]
-                        isOneToOne: false
-                        referencedRelation: "tasks"
-                        referencedColumns: ["id"]
-                    },
-                ]
-            }
-            foundries: {
-                Row: {
-                    id: string
-                    name: string
-                    created_at: string | null
-                }
-                Insert: {
-                    id: string
-                    name: string
-                    created_at?: string | null
-                }
-                Update: {
-                    id?: string
-                    name?: string
-                    created_at?: string | null
-                }
-                Relationships: []
-            },
-            objective_packs: {
-                Row: {
-                    id: string
-                    title: string
-                    description: string | null
-                    category: string | null
-                    difficulty: string | null
-                    estimated_duration: string | null
-                    icon_name: string | null
-                    created_at: string | null
-                    updated_at: string | null
-                }
-                Insert: {
-                    id?: string
-                    title: string
-                    description?: string | null
-                    category?: string | null
-                    difficulty?: string | null
-                    estimated_duration?: string | null
-                    icon_name?: string | null
-                    created_at?: string | null
-                    updated_at?: string | null
-                }
-                Update: {
-                    id?: string
-                    title?: string
-                    description?: string | null
-                    category?: string | null
-                    difficulty?: string | null
-                    estimated_duration?: string | null
-                    icon_name?: string | null
-                    created_at?: string | null
-                    updated_at?: string | null
-                }
-                Relationships: []
-            }
-            pack_items: {
-                Row: {
-                    id: string
-                    pack_id: string
-                    title: string
-                    description: string | null
-                    role: Database["public"]["Enums"]["member_role"]
-                    order_index: number
-                    created_at: string | null
-                    updated_at: string | null
-                }
-                Insert: {
-                    id?: string
-                    pack_id: string
-                    title: string
-                    description?: string | null
-                    role: Database["public"]["Enums"]["member_role"]
-                    order_index?: number
-                    created_at?: string | null
-                    updated_at?: string | null
-                }
-                Update: {
-                    id?: string
-                    pack_id?: string
-                    title?: string
-                    description?: string | null
-                    role?: Database["public"]["Enums"]["member_role"]
-                    order_index?: number
-                    created_at?: string | null
-                    updated_at?: string | null
-                }
-                Relationships: [
-                    {
-                        foreignKeyName: "pack_items_pack_id_fkey"
-                        columns: ["pack_id"]
-                        isOneToOne: false
-                        referencedRelation: "objective_packs"
-                        referencedColumns: ["id"]
-                    }
-                ]
-            }
         }
         Views: {
             [_ in never]: never
@@ -820,7 +455,7 @@ export type Database = {
             [_ in never]: never
         }
         Enums: {
-            member_role: "Founder" | "Executive" | "Apprentice" | "AI_Agent"
+            member_role: "Executive" | "Apprentice" | "AI_Agent" | "Founder"
             provider_type:
             | "Legal"
             | "Financial"
@@ -834,7 +469,6 @@ export type Database = {
             | "Rejected"
             | "Amended"
             | "Amended_Pending_Approval"
-            | "Completed"
         }
         CompositeTypes: {
             [_ in never]: never
@@ -842,9 +476,11 @@ export type Database = {
     }
 }
 
+type PublicSchema = Database[Extract<keyof Database, "public">]
+
 export type Tables<
     PublicTableNameOrOptions extends
-    | keyof (Database["public"]["Tables"] & Database["public"]["Views"])
+    | keyof (PublicSchema["Tables"] & PublicSchema["Views"])
     | { schema: keyof Database },
     TableName extends PublicTableNameOrOptions extends { schema: keyof Database }
     ? keyof (Database[PublicTableNameOrOptions["schema"]]["Tables"] &
@@ -857,10 +493,10 @@ export type Tables<
         }
     ? R
     : never
-    : PublicTableNameOrOptions extends keyof (Database["public"]["Tables"] &
-        Database["public"]["Views"])
-    ? (Database["public"]["Tables"] &
-        Database["public"]["Views"])[PublicTableNameOrOptions] extends {
+    : PublicTableNameOrOptions extends keyof (PublicSchema["Tables"] &
+        PublicSchema["Views"])
+    ? (PublicSchema["Tables"] &
+        PublicSchema["Views"])[PublicTableNameOrOptions] extends {
             Row: infer R
         }
     ? R
@@ -869,7 +505,7 @@ export type Tables<
 
 export type TablesInsert<
     PublicTableNameOrOptions extends
-    | keyof Database["public"]["Tables"]
+    | keyof PublicSchema["Tables"]
     | { schema: keyof Database },
     TableName extends PublicTableNameOrOptions extends { schema: keyof Database }
     ? keyof Database[PublicTableNameOrOptions["schema"]]["Tables"]
@@ -880,8 +516,8 @@ export type TablesInsert<
     }
     ? I
     : never
-    : PublicTableNameOrOptions extends keyof Database["public"]["Tables"]
-    ? Database["public"]["Tables"][PublicTableNameOrOptions] extends {
+    : PublicTableNameOrOptions extends keyof PublicSchema["Tables"]
+    ? PublicSchema["Tables"][PublicTableNameOrOptions] extends {
         Insert: infer I
     }
     ? I
@@ -890,7 +526,7 @@ export type TablesInsert<
 
 export type TablesUpdate<
     PublicTableNameOrOptions extends
-    | keyof Database["public"]["Tables"]
+    | keyof PublicSchema["Tables"]
     | { schema: keyof Database },
     TableName extends PublicTableNameOrOptions extends { schema: keyof Database }
     ? keyof Database[PublicTableNameOrOptions["schema"]]["Tables"]
@@ -901,8 +537,8 @@ export type TablesUpdate<
     }
     ? U
     : never
-    : PublicTableNameOrOptions extends keyof Database["public"]["Tables"]
-    ? Database["public"]["Tables"][PublicTableNameOrOptions] extends {
+    : PublicTableNameOrOptions extends keyof PublicSchema["Tables"]
+    ? PublicSchema["Tables"][PublicTableNameOrOptions] extends {
         Update: infer U
     }
     ? U
@@ -911,26 +547,28 @@ export type TablesUpdate<
 
 export type Enums<
     PublicEnumNameOrOptions extends
-    | keyof Database["public"]["Enums"]
+    | keyof PublicSchema["Enums"]
     | { schema: keyof Database },
     EnumName extends PublicEnumNameOrOptions extends { schema: keyof Database }
     ? keyof Database[PublicEnumNameOrOptions["schema"]]["Enums"]
     : never = never,
 > = PublicEnumNameOrOptions extends { schema: keyof Database }
     ? Database[PublicEnumNameOrOptions["schema"]]["Enums"][EnumName]
-    : PublicEnumNameOrOptions extends keyof Database["public"]["Enums"]
-    ? Database["public"]["Enums"][PublicEnumNameOrOptions]
+    : PublicEnumNameOrOptions extends keyof PublicSchema["Enums"]
+    ? PublicSchema["Enums"][PublicEnumNameOrOptions]
     : never
 
 export type CompositeTypes<
     PublicCompositeTypeNameOrOptions extends
-    | keyof Database["public"]["CompositeTypes"]
+    | keyof PublicSchema["CompositeTypes"]
     | { schema: keyof Database },
-    CompositeTypeName extends PublicCompositeTypeNameOrOptions extends { schema: keyof Database }
+    CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+        schema: keyof Database
+    }
     ? keyof Database[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
     : never = never,
 > = PublicCompositeTypeNameOrOptions extends { schema: keyof Database }
     ? Database[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
-    : PublicCompositeTypeNameOrOptions extends keyof Database["public"]["CompositeTypes"]
-    ? Database["public"]["CompositeTypes"][PublicCompositeTypeNameOrOptions]
+    : PublicCompositeTypeNameOrOptions extends keyof PublicSchema["CompositeTypes"]
+    ? PublicSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
     : never

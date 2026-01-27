@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { Database } from '@/types/database.types'
 import { runAIWorker } from '@/lib/ai-worker'
+import { logTaskHistory } from '@/lib/audit'
 
 export type TaskStatus = Database["public"]["Enums"]["task_status"]
 
@@ -118,6 +119,11 @@ export async function createTask(formData: FormData) {
 
     // Log Creation
     await logSystemEvent(data.id, `Task created by User`, user.id)
+    await logTaskHistory(data.id, 'CREATED', user.id, {
+        title,
+        assignee_id: assigneeIds[0],
+        initial_status: 'Pending'
+    })
 
     // Trigger AI Worker for primary assignee
     await runAIWorker(data.id, assigneeIds[0])
@@ -138,6 +144,10 @@ export async function acceptTask(taskId: string) {
     if (error) return { error: error.message }
 
     await logSystemEvent(taskId, 'Task Accepted', user.id)
+    await logTaskHistory(taskId, 'STATUS_CHANGE', user.id, {
+        old_status: 'Pending', // Assumption, or we could fetch
+        new_status: 'Accepted'
+    })
     revalidatePath('/tasks')
     return { success: true }
 }
@@ -156,6 +166,10 @@ export async function rejectTask(taskId: string, reason: string) {
     if (error) return { error: error.message }
 
     await logSystemEvent(taskId, `Task Rejected. Reason: ${reason}`, user.id)
+    await logTaskHistory(taskId, 'STATUS_CHANGE', user.id, {
+        new_status: 'Rejected',
+        reason
+    })
     revalidatePath('/tasks')
     return { success: true }
 }
@@ -203,6 +217,11 @@ export async function forwardTask(taskId: string, newAssigneeId: string, reason:
 
     // Log with names ideally, but IDs for now
     await logSystemEvent(taskId, `Task forwarded to new assignee. Reason: ${reason}`, user.id)
+    await logTaskHistory(taskId, 'FORWARDED', user.id, {
+        previous_assignee: task.assignee_id,
+        new_assignee: newAssigneeId,
+        reason
+    })
 
     // Trigger AI Worker
     await runAIWorker(taskId, newAssigneeId)
@@ -234,6 +253,11 @@ export async function amendTask(taskId: string, updates: {
     if (error) return { error: error.message }
 
     await logSystemEvent(taskId, `Task Amended. Notes: ${updates.amendment_notes}`, user.id)
+    await logTaskHistory(taskId, 'STATUS_CHANGE', user.id, { // Or UPDATED? It changes status too.
+        new_status: 'Amended_Pending_Approval',
+        amendment_notes: updates.amendment_notes,
+        new_dates: { start: updates.start_date, end: updates.end_date }
+    })
     revalidatePath('/tasks')
     return { success: true }
 }
@@ -250,6 +274,10 @@ export async function approveAmendment(taskId: string) {
     if (error) return { error: error.message }
 
     await logSystemEvent(taskId, 'Amendment Approved. Task is now Accepted.', user.id)
+    await logTaskHistory(taskId, 'STATUS_CHANGE', user.id, {
+        old_status: 'Amended_Pending_Approval',
+        new_status: 'Accepted'
+    })
     revalidatePath('/tasks')
     return { success: true }
 }
@@ -287,6 +315,9 @@ export async function completeTask(taskId: string) {
     if (error) return { error: error.message }
 
     await logSystemEvent(taskId, 'Task mark as Completed', user.id)
+    await logTaskHistory(taskId, 'COMPLETED', user.id, {
+        completed_at: new Date().toISOString()
+    })
     revalidatePath('/tasks')
     return { success: true }
 }
@@ -306,6 +337,11 @@ export async function updateTaskDates(taskId: string, startDate: string, endDate
     if (error) return { error: error.message }
 
     await logSystemEvent(taskId, `Task rescheduled: ${startDate.split('T')[0]} → ${endDate.split('T')[0]}`, user.id)
+    await logTaskHistory(taskId, 'UPDATED', user.id, {
+        field: 'dates',
+        new_start: startDate,
+        new_end: endDate
+    })
     revalidatePath('/timeline')
     revalidatePath('/tasks')
     return { success: true }
@@ -344,6 +380,7 @@ export async function triggerAIWorker(taskId: string) {
     return { success: true }
 }
 
+
 export async function updateTaskProgress(taskId: string, progress: number) {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
@@ -359,5 +396,217 @@ export async function updateTaskProgress(taskId: string, progress: number) {
     if (error) return { error: error.message }
 
     revalidatePath('/tasks')
+    revalidatePath(`/tasks/${taskId}`) // If detailed view exists
     return { success: true, progress: clampedProgress }
+}
+
+export async function duplicateTask(originalTaskId: string) {
+    const supabase = await createClient()
+    const foundry_id = await getFoundryId()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user || !foundry_id) return { error: 'Unauthorized' }
+
+    // 1. Fetch original task
+    const { data: originalTask, error: fetchError } = await supabase
+        .from('tasks')
+        .select('*')
+        .eq('id', originalTaskId)
+        .single()
+
+    if (fetchError || !originalTask) return { error: 'Original task not found' }
+
+    // 2. Insert new task
+    const { data: newTask, error: insertError } = await supabase.from('tasks').insert({
+        foundry_id,
+        title: originalTask.title + ' (Copy)',
+        description: originalTask.description,
+        objective_id: originalTask.objective_id,
+        creator_id: user.id,
+        assignee_id: originalTask.assignee_id, // Primary assignee
+        status: 'Pending',
+        start_date: null, // Reset dates? Or keep? Resetting is usually safer for copies.
+        end_date: null,
+        progress: 0
+    }).select().single()
+
+    if (insertError) return { error: insertError.message }
+
+    // 3. Copy Assignees (if any)
+    const { data: originalAssignees } = await supabase
+        .from('task_assignees')
+        .select('profile_id')
+        .eq('task_id', originalTaskId)
+
+    if (originalAssignees && originalAssignees.length > 0) {
+        const newAssigneeRecords = originalAssignees.map(a => ({
+            task_id: newTask.id,
+            profile_id: a.profile_id
+        }))
+        await supabase.from('task_assignees').insert(newAssigneeRecords)
+    }
+
+    // 4. Copy Attachments references ?? 
+    // Creating true copies of files in storage is expensive and complex (download/upload). 
+    // We will simple NOT copy attachments for now as usually a task copy is for the 'task' structure, not necessarily the exact file evidence of the previous one.
+    // If user wants files, they can re-upload or we can implement 'link to existing file' later.
+
+    await logSystemEvent(newTask.id, `Task duplicated from #${(originalTask as any).task_number || originalTaskId.substring(0, 4)}`, user.id)
+    await logTaskHistory(newTask.id, 'CREATED', user.id, {
+        source: 'DUPLICATION',
+        original_task_id: originalTaskId
+    })
+    revalidatePath('/tasks')
+    return { success: true }
+}
+
+export async function updateTaskDetails(taskId: string, updates: { title?: string, description?: string }) {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return { error: 'Unauthorized' }
+
+    if (!updates.title && updates.description === undefined) return { success: true } // Nothing to update
+
+    const { error } = await supabase.from('tasks')
+        .update(updates)
+        .eq('id', taskId)
+
+    if (error) return { error: error.message }
+
+    await logSystemEvent(taskId, `Task details updated`, user.id)
+    await logTaskHistory(taskId, 'UPDATED', user.id, {
+        updates // Log the raw updates object
+    })
+    revalidatePath('/tasks')
+    return { success: true }
+}
+
+export async function updateTaskAssignees(taskId: string, assigneeIds: string[]) {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return { error: 'Unauthorized' }
+
+    if (assigneeIds.length === 0) return { error: 'Must have at least one assignee' }
+
+    const primaryAssigneeId = assigneeIds[0]
+
+    // Update primary assignee on task table
+    const { error: taskError } = await supabase.from('tasks')
+        .update({ assignee_id: primaryAssigneeId })
+        .eq('id', taskId)
+
+    if (taskError) return { error: taskError.message }
+
+    // Sync task_assignees table
+    // 1. Delete existing
+    await supabase.from('task_assignees').delete().eq('task_id', taskId)
+
+    // 2. Insert new
+    const records = assigneeIds.map(id => ({
+        task_id: taskId,
+        profile_id: id
+    }))
+    const { error: assignError } = await supabase.from('task_assignees').insert(records)
+
+    if (assignError) return { error: assignError.message }
+
+    await logSystemEvent(taskId, `Assignees updated`, user.id)
+    await logTaskHistory(taskId, 'ASSIGNED', user.id, {
+        new_assignees: assigneeIds
+    })
+
+    // Potentially trigger AI worker if new primary is AI?
+    await runAIWorker(taskId, primaryAssigneeId)
+
+    revalidatePath('/tasks')
+    return { success: true }
+}
+
+export async function uploadTaskAttachment(taskId: string, formData: FormData) {
+    const supabase = await createClient()
+    const foundry_id = await getFoundryId()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user || !foundry_id) return { error: 'Unauthorized' }
+
+    const file = formData.get('file') as File
+    if (!file) return { error: 'No file provided' }
+
+    const filePath = `${foundry_id}/${taskId}/${Date.now()}_${file.name}`
+    const { error: uploadError } = await supabase.storage
+        .from('task-files')
+        .upload(filePath, file)
+
+    if (uploadError) return { error: uploadError.message }
+
+    const { error: dbError } = await supabase.from('task_files').insert({
+        task_id: taskId,
+        file_name: file.name,
+        file_path: filePath,
+        file_size: file.size,
+        mime_type: file.type,
+        uploaded_by: user.id
+    })
+
+    if (dbError) return { error: dbError.message }
+
+    await logSystemEvent(taskId, `Attachment added: ${file.name}`, user.id)
+    revalidatePath('/tasks')
+    return { success: true }
+}
+
+export async function deleteTaskAttachment(fileId: string, filePath: string, taskId: string) {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return { error: 'Unauthorized' }
+
+    // Delete from Storage
+    const { error: storageError } = await supabase.storage
+        .from('task-files')
+        .remove([filePath])
+
+    if (storageError) {
+        console.error("Storage delete failed", storageError)
+        // Proceed to delete record anyway? Or stop? 
+        // Best to clean up record even if storage file is gone or erroring.
+    }
+
+    // Delete from DB
+    const { error: dbError } = await supabase.from('task_files')
+        .delete()
+        .eq('id', fileId)
+
+    if (dbError) return { error: dbError.message }
+
+    // Log requires task ID. If we don't have it explicitly passed, we'd need to fetch before delete. 
+    // Assuming taskId passed correctly.
+    await logSystemEvent(taskId, `Attachment removed`, user.id)
+
+    revalidatePath('/tasks')
+    return { success: true }
+}
+
+export async function getTaskAttachments(taskId: string) {
+    const supabase = await createClient()
+    const { data, error } = await supabase
+        .from('task_files')
+        .select('*')
+        .eq('task_id', taskId)
+        .order('created_at', { ascending: false })
+
+    if (error) return { error: error.message }
+    return { data }
+}
+
+export async function getTaskHistory(taskId: string) {
+    const supabase = await createClient()
+    const { data, error } = await supabase
+        .from('task_history')
+        .select(`
+            *,
+            user:profiles(full_name, email, role, avatar_url)
+        `)
+        .eq('task_id', taskId)
+        .order('created_at', { ascending: false })
+
+    if (error) return { error: error.message }
+    return { data }
 }

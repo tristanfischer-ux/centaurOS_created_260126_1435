@@ -22,18 +22,20 @@ import {
 } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { format } from "date-fns"
-import { Calendar as CalendarIcon, Check, X, ArrowRight, Edit, Bot, MessageSquare, ChevronDown, ChevronUp, Clock, AlertCircle } from "lucide-react"
+import { Calendar as CalendarIcon, Check, X, ArrowRight, Edit, Bot, MessageSquare, ChevronDown, ChevronUp, AlertCircle, Copy, Pencil, History as HistoryIcon } from "lucide-react"
 import { Calendar } from "@/components/ui/calendar"
 import {
     Popover,
     PopoverContent,
     PopoverTrigger,
 } from "@/components/ui/popover"
-import { acceptTask, rejectTask, forwardTask, amendTask, completeTask, triggerAIWorker, updateTaskProgress, updateTaskDates } from "@/actions/tasks"
+import { acceptTask, rejectTask, forwardTask, amendTask, completeTask, triggerAIWorker, updateTaskDates, duplicateTask } from "@/actions/tasks"
 import { cn } from "@/lib/utils"
 import { Database } from "@/types/database.types"
 import { ThreadDrawer } from "./thread-drawer"
+import { EditTaskDialog } from "@/components/tasks/edit-task-dialog"
 import { toast } from "sonner"
+import { HistoryDrawer } from "@/components/tasks/history-drawer"
 
 type Task = Database["public"]["Tables"]["tasks"]["Row"] & {
     assignee?: { id: string, full_name: string | null, role: string, email: string } | null
@@ -68,6 +70,8 @@ export function TaskCard({ task, currentUserId, userRole, members }: TaskCardPro
     const [forwardOpen, setForwardOpen] = useState(false)
     const [amendOpen, setAmendOpen] = useState(false)
     const [threadOpen, setThreadOpen] = useState(false)
+    const [editOpen, setEditOpen] = useState(false)
+    const [historyOpen, setHistoryOpen] = useState(false)
 
     // Helper Functions
     const formatFullDate = (dateStr: string | null) => {
@@ -131,6 +135,14 @@ export function TaskCard({ task, currentUserId, userRole, members }: TaskCardPro
         setLoading(false)
         if (res.error) toast.error(res.error)
         else toast.success("Task completed")
+    }
+
+    const handleDuplicate = async () => {
+        setLoading(true)
+        const res = await duplicateTask(task.id)
+        setLoading(false)
+        if (res.error) toast.error(res.error)
+        else toast.success("Task duplicated")
     }
 
     const handleRunAI = async () => {
@@ -397,16 +409,63 @@ export function TaskCard({ task, currentUserId, userRole, members }: TaskCardPro
                             </div>
                         )}
 
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            className="text-slate-500 hover:text-amber-600 shrink-0 ml-auto"
-                            onClick={() => setThreadOpen(true)}
-                        >
-                            <MessageSquare className="h-4 w-4 mr-2" /> Thread
-                        </Button>
+                        <div className="flex items-center gap-1 ml-auto shrink-0">
+                            {(isAssignee || isCreator || userRole === 'Executive') && (
+                                <>
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-8 w-8 text-slate-500 hover:text-blue-600"
+                                        onClick={() => setEditOpen(true)}
+                                        title="Edit Task"
+                                        disabled={loading}
+                                    >
+                                        <Pencil className="h-4 w-4" />
+                                    </Button>
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-8 w-8 text-slate-500 hover:text-blue-600"
+                                        onClick={handleDuplicate}
+                                        title="Duplicate Task"
+                                        disabled={loading}
+                                    >
+                                        <Copy className="h-4 w-4" />
+                                    </Button>
+                                </>
+                            )}
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                className="text-slate-500 hover:text-blue-600 ml-1"
+                                onClick={() => setHistoryOpen(true)}
+                                title="View History"
+                            >
+                                <HistoryIcon className="h-4 w-4 mr-2" /> History
+                            </Button>
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                className="text-slate-500 hover:text-amber-600 ml-1"
+                                onClick={() => setThreadOpen(true)}
+                            >
+                                <MessageSquare className="h-4 w-4 mr-2" /> Thread
+                            </Button>
+                        </div>
                     </CardFooter>
 
+                    <EditTaskDialog
+                        open={editOpen}
+                        onOpenChange={setEditOpen}
+                        task={task}
+                        members={members}
+                    />
+                    <HistoryDrawer
+                        open={historyOpen}
+                        onOpenChange={setHistoryOpen}
+                        taskId={task.id}
+                        taskTitle={task.title}
+                    />
                     <ThreadDrawer
                         open={threadOpen}
                         onOpenChange={setThreadOpen}
