@@ -90,7 +90,7 @@ export function TaskCard(props: TaskCardProps) {
         onToggleSelection
     } = props
 
-    const [loading, setLoading] = useState(false)
+    const [isLoading, setIsLoading] = useState(false)
     const [aiRunning, setAiRunning] = useState(false)
 
     // Dialog States
@@ -101,6 +101,8 @@ export function TaskCard(props: TaskCardProps) {
     const [editOpen, setEditOpen] = useState(false)
     const [historyOpen, setHistoryOpen] = useState(false)
     const [rubberStampOpen, setRubberStampOpen] = useState(false)
+    const [assigneePopoverOpen, setAssigneePopoverOpen] = useState(false)
+    const [assigneeNamePopoverOpen, setAssigneeNamePopoverOpen] = useState(false)
 
     // Normalize assignees list (handle backward compatibility or fallback)
     const currentAssignees = task.assignees && task.assignees.length > 0
@@ -135,29 +137,29 @@ export function TaskCard(props: TaskCardProps) {
 
     // Handlers (keep existing ones...)
     const handleAccept = async () => {
-        setLoading(true)
+        setIsLoading(true)
         const res = await acceptTask(task.id)
-        setLoading(false)
+        setIsLoading(false)
         if (res.error) toast.error(res.error)
         else toast.success("Task accepted")
     }
 
     const handleReject = async (formData: FormData) => {
-        setLoading(true)
+        setIsLoading(true)
         const reason = formData.get('reason') as string
         const res = await rejectTask(task.id, reason)
-        setLoading(false)
+        setIsLoading(false)
         setRejectOpen(false)
         if (res.error) toast.error(res.error)
         else toast.success("Task rejected")
     }
 
     const handleForward = async (formData: FormData) => {
-        setLoading(true)
+        setIsLoading(true)
         const newAssigneeId = formData.get('new_assignee_id') as string
         const reason = formData.get('reason') as string
         const res = await forwardTask(task.id, newAssigneeId, reason)
-        setLoading(false)
+        setIsLoading(false)
         setForwardOpen(false)
         if (res.error) toast.error(res.error)
         else toast.success("Task forwarded")
@@ -166,9 +168,9 @@ export function TaskCard(props: TaskCardProps) {
 
 
     const handleComplete = async () => {
-        setLoading(true)
+        setIsLoading(true)
         const res = await completeTask(task.id)
-        setLoading(false)
+        setIsLoading(false)
         if (res.error) toast.error(res.error)
         else {
             if (res.newStatus === 'Completed') {
@@ -180,9 +182,9 @@ export function TaskCard(props: TaskCardProps) {
     }
 
     const handleDuplicate = async () => {
-        setLoading(true)
+        setIsLoading(true)
         const res = await duplicateTask(task.id)
-        setLoading(false)
+        setIsLoading(false)
         if (res.error) toast.error(res.error)
         else toast.success("Task duplicated")
     }
@@ -201,13 +203,13 @@ export function TaskCard(props: TaskCardProps) {
         const newDateStr = date.toISOString()
         const currentStart = task.start_date || new Date().toISOString()
         const currentEnd = task.end_date || new Date().toISOString()
-        setLoading(true)
+        setIsLoading(true)
         if (type === 'start') {
             await updateTaskDates(task.id, newDateStr, currentEnd)
         } else {
             await updateTaskDates(task.id, currentStart, newDateStr)
         }
-        setLoading(false)
+        setIsLoading(false)
         toast.success("Date updated")
     }
 
@@ -251,16 +253,21 @@ export function TaskCard(props: TaskCardProps) {
         <Card
             className={cn(
                 "bg-white border-slate-200 transition-all flex flex-col h-full group/card relative",
-                isSelectionMode ? "cursor-pointer" : "hover:border-slate-300 hover:shadow-md",
-                isSelected && isSelectionMode ? "ring-2 ring-blue-500 border-blue-500 bg-blue-50/10" : ""
+                isSelectionMode ? "cursor-pointer" : "hover:border-slate-300 hover:shadow-md active:border-slate-400 active:shadow-lg transition-all",
+                isSelected && isSelectionMode ? "ring-2 ring-slate-500 border-slate-500 bg-slate-50/10" : ""
             )}
             onClick={isSelectionMode ? handleCardClick : undefined}
         >
             {isSelectionMode && (
-                <div className="absolute top-4 right-4 z-50 pointer-events-none">
+                <div 
+                    className="absolute top-4 right-4 z-50 pointer-events-none" 
+                    role="checkbox" 
+                    aria-checked={isSelected} 
+                    aria-label={`Select task ${task.title}`}
+                >
                     <div className={cn(
                         "w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors",
-                        isSelected ? "bg-blue-500 border-blue-500" : "border-slate-300 bg-white"
+                        isSelected ? "bg-slate-900 border-slate-900" : "border-slate-300 bg-white"
                     )}>
                         {isSelected && <Check className="w-3 h-3 text-white" />}
                     </div>
@@ -320,12 +327,15 @@ export function TaskCard(props: TaskCardProps) {
 
                         {/* Assignee Avatar & Picker */}
                         <div className="relative">
-                            <Popover>
+                            <Popover open={assigneePopoverOpen} onOpenChange={setAssigneePopoverOpen}>
                                 <PopoverTrigger asChild>
                                     <div
-                                        className="cursor-pointer hover:opacity-80 transition-opacity"
+                                        className="cursor-pointer hover:opacity-80 active:opacity-70 transition-opacity touch-manipulation"
                                         title={currentAssignees.map(a => a.full_name).join(', ') || "Click to assign"}
                                         onClick={(e) => e.stopPropagation()}
+                                        aria-expanded={assigneePopoverOpen}
+                                        aria-haspopup="dialog"
+                                        aria-label="Select assignee"
                                     >
                                         <div className="flex -space-x-2">
                                             {currentAssignees.length > 0 ? (
@@ -347,7 +357,7 @@ export function TaskCard(props: TaskCardProps) {
                                         </div>
                                     </div>
                                 </PopoverTrigger>
-                                <PopoverContent className="w-[240px] p-0" align="end" onClick={(e) => e.stopPropagation()}>
+                                <PopoverContent className="w-[calc(100vw-2rem)] max-w-[240px] sm:w-[240px] overflow-y-auto max-h-[60vh] p-0" align="end" onClick={(e) => e.stopPropagation()}>
                                     <Command>
                                         <CommandInput placeholder="Assign to member..." />
                                         <CommandList>
@@ -387,14 +397,14 @@ export function TaskCard(props: TaskCardProps) {
                 <div className="flex items-center justify-between text-xs text-slate-500 pt-1">
                     <Popover>
                         <PopoverTrigger asChild>
-                            <div className="flex items-center gap-1 cursor-pointer hover:text-blue-600 transition-colors group/assignee" onClick={(e) => e.stopPropagation()}>
+                            <div className="flex items-center gap-1 cursor-pointer hover:text-blue-600 active:text-blue-700 transition-colors group/assignee touch-manipulation" onClick={(e) => e.stopPropagation()}>
                                 {task.assignee?.role === 'AI_Agent' ? <Bot className="w-3 h-3" /> : <div className="w-3" />}
                                 <span className="truncate max-w-[100px] border-b border-transparent group-hover/assignee:border-blue-200">
                                     {task.assignee?.full_name || "Unassigned"}
                                 </span>
                             </div>
                         </PopoverTrigger>
-                        <PopoverContent className="w-[240px] p-0" align="start" onClick={(e) => e.stopPropagation()}>
+                        <PopoverContent className="w-[calc(100vw-2rem)] max-w-[240px] sm:w-[240px] overflow-y-auto max-h-[60vh] p-0" align="start" onClick={(e) => e.stopPropagation()}>
                             <Command>
                                 <CommandInput placeholder="Assign to member..." />
                                 <CommandList>
@@ -468,7 +478,7 @@ export function TaskCard(props: TaskCardProps) {
                                 <Popover>
                                     <PopoverTrigger asChild>
                                         <div className={cn(
-                                            "bg-white p-2.5 rounded border border-slate-100 cursor-pointer hover:border-slate-300 transition-colors group",
+                                            "bg-white p-2.5 rounded border border-slate-100 cursor-pointer hover:border-slate-300 active:border-slate-400 hover:bg-slate-50 active:bg-slate-100 transition-colors group",
                                             !isAssignee && !isCreator && "pointer-events-none" // Only allow edits if assignee/creator
                                         )}>
                                             <span className="text-[10px] text-slate-400 block mb-1 group-hover:text-amber-600 transition-colors">Start Date</span>
@@ -494,7 +504,7 @@ export function TaskCard(props: TaskCardProps) {
                                 <Popover>
                                     <PopoverTrigger asChild>
                                         <div className={cn(
-                                            "bg-white p-2.5 rounded border border-slate-100 cursor-pointer hover:border-slate-300 transition-colors group",
+                                            "bg-white p-2.5 rounded border border-slate-100 cursor-pointer hover:border-slate-300 active:border-slate-400 hover:bg-slate-50 active:bg-slate-100 transition-colors group",
                                             !isAssignee && !isCreator && "pointer-events-none"
                                         )}>
                                             <span className="text-[10px] text-slate-400 block mb-1 group-hover:text-amber-600 transition-colors">Deadline</span>
@@ -550,20 +560,21 @@ export function TaskCard(props: TaskCardProps) {
                                     <>
                                         <Button
                                             onClick={handleAccept}
-                                            disabled={loading}
-                                            className="flex-1 bg-green-600 hover:bg-green-700 text-white shadow-sm font-medium"
+                                            variant="success"
+                                            disabled={isLoading}
+                                            className="flex-1 shadow-sm font-medium"
                                         >
-                                            <Check className="h-4 w-4 mr-2" /> Accept
+                                            <Check className="h-4 w-4" /> Accept
                                         </Button>
 
                                         <Dialog open={rejectOpen} onOpenChange={setRejectOpen}>
                                             <DialogTrigger asChild>
                                                 <Button
                                                     variant="outline"
-                                                    disabled={loading}
+                                                    disabled={isLoading}
                                                     className="flex-1 border-red-200 text-red-700 hover:bg-red-50 hover:border-red-300 shadow-sm font-medium"
                                                 >
-                                                    <X className="h-4 w-4 mr-2" /> Reject
+                                                    <X className="h-4 w-4" /> Reject
                                                 </Button>
                                             </DialogTrigger>
                                             <DialogContent className="bg-white border-slate-200 text-slate-900">
@@ -580,20 +591,21 @@ export function TaskCard(props: TaskCardProps) {
                                 {task.status === 'Accepted' && (
                                     <Button
                                         onClick={handleComplete}
-                                        disabled={loading}
+                                        disabled={isLoading}
                                         className="w-full bg-slate-900 hover:bg-slate-800 text-white shadow-sm font-medium"
                                     >
-                                        <Check className="h-4 w-4 mr-2" /> Mark Complete
+                                        <Check className="h-4 w-4" /> Mark Complete
                                     </Button>
                                 )}
 
                                 {task.status === 'Pending_Executive_Approval' && isExecutive && (
                                     <Button
                                         onClick={() => setRubberStampOpen(true)}
-                                        disabled={loading}
-                                        className="w-full bg-purple-600 hover:bg-purple-700 text-white shadow-sm font-medium"
+                                        variant="certified"
+                                        disabled={isLoading}
+                                        className="w-full shadow-sm font-medium"
                                     >
-                                        <ShieldCheck className="h-4 w-4 mr-2" /> Certify Release
+                                        <ShieldCheck className="h-4 w-4" /> Certify Release
                                     </Button>
                                 )}
                             </div>
@@ -611,11 +623,11 @@ export function TaskCard(props: TaskCardProps) {
                                             variant="ghost"
                                             size="sm"
                                             onClick={() => setEditOpen(true)}
-                                            disabled={loading}
-                                            className="text-slate-600 hover:text-blue-600 hover:bg-blue-50 h-8 px-2"
+                                            disabled={isLoading}
+                                            className="text-slate-600 hover:text-blue-600 hover:bg-blue-50 active:text-blue-700 active:bg-blue-100 active:scale-[0.98] transition-all px-2"
                                             title="Edit Details"
                                         >
-                                            <Pencil className="h-4 w-4 mr-2" /> Edit
+                                            <Pencil className="h-4 w-4" /> Edit
                                         </Button>
 
                                         <Dialog open={forwardOpen} onOpenChange={setForwardOpen}>
@@ -623,11 +635,11 @@ export function TaskCard(props: TaskCardProps) {
                                                 <Button
                                                     variant="ghost"
                                                     size="sm"
-                                                    disabled={loading}
-                                                    className="text-slate-600 hover:text-amber-600 hover:bg-amber-50 h-8 px-2"
+                                                    disabled={isLoading}
+                                                    className="text-slate-600 hover:text-amber-600 hover:bg-amber-50 active:text-amber-700 active:bg-amber-100 active:scale-[0.98] transition-all px-2"
                                                     title="Forward or Reassign"
                                                 >
-                                                    <ArrowRight className="h-4 w-4 mr-2" /> Forward
+                                                    <ArrowRight className="h-4 w-4" /> Forward
                                                 </Button>
                                             </DialogTrigger>
                                             <DialogContent className="bg-white border-slate-200 text-slate-900">
@@ -659,7 +671,7 @@ export function TaskCard(props: TaskCardProps) {
                                                         </Select>
                                                     </div>
                                                     <Textarea name="reason" placeholder="Handover notes..." required className="bg-slate-50 border-slate-200" />
-                                                    <Button type="submit" className="bg-amber-500 text-white hover:bg-amber-600 w-full">Forward Task</Button>
+                                                    <Button type="submit" variant="warning" className="w-full">Forward Task</Button>
                                                 </form>
                                             </DialogContent>
                                         </Dialog>
@@ -668,11 +680,11 @@ export function TaskCard(props: TaskCardProps) {
                                             variant="ghost"
                                             size="sm"
                                             onClick={handleDuplicate}
-                                            disabled={loading}
-                                            className="text-slate-600 hover:text-indigo-600 hover:bg-indigo-50 h-8 px-2"
+                                            disabled={isLoading}
+                                            className="text-slate-600 hover:text-indigo-600 hover:bg-indigo-50 active:text-indigo-700 active:bg-indigo-100 active:scale-[0.98] transition-all px-2"
                                             title="Duplicate Task"
                                         >
-                                            <Copy className="h-4 w-4 mr-2" /> Copy
+                                            <Copy className="h-4 w-4" /> Copy
                                         </Button>
                                     </>
                                 )}
@@ -683,7 +695,7 @@ export function TaskCard(props: TaskCardProps) {
                                 <Button
                                     variant="ghost"
                                     size="icon"
-                                    className="h-8 w-8 text-slate-400 hover:text-slate-600"
+                                    className="h-8 w-8 text-slate-400 hover:text-slate-600 active:text-slate-700 active:scale-[0.98] transition-all"
                                     onClick={() => setHistoryOpen(true)}
                                     title="View View History"
                                 >
@@ -692,7 +704,7 @@ export function TaskCard(props: TaskCardProps) {
                                 <Button
                                     variant="ghost"
                                     size="icon"
-                                    className="h-8 w-8 text-slate-400 hover:text-slate-600"
+                                    className="h-8 w-8 text-slate-400 hover:text-slate-600 active:text-slate-700 active:scale-[0.98] transition-all"
                                     onClick={() => setThreadOpen(true)}
                                     title="View Thread"
                                 >
@@ -712,7 +724,7 @@ export function TaskCard(props: TaskCardProps) {
                                         variant="secondary"
                                         className="w-full bg-purple-50 text-purple-700 hover:bg-purple-100 border border-purple-200"
                                     >
-                                        <Bot className="h-4 w-4 mr-2" /> {aiRunning ? 'AI Working...' : 'Trigger AI Agent'}
+                                        <Bot className="h-4 w-4" /> {aiRunning ? 'AI Working...' : 'Trigger AI Agent'}
                                     </Button>
                                 )}
 

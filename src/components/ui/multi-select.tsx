@@ -116,15 +116,18 @@ export function MultiSelect({
                                     key={option.value}
                                     className={cn(
                                         "flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-slate-50 transition-colors",
-                                        isSelected && "bg-amber-50"
+                                        isSelected && "bg-slate-50"
                                     )}
                                     onClick={() => handleSelect(option.value)}
+                                    role="option"
+                                    aria-selected={isSelected}
+                                    aria-label={`Select ${option.label}`}
                                 >
                                     <div
                                         className={cn(
                                             "h-4 w-4 rounded border flex items-center justify-center",
                                             isSelected
-                                                ? "bg-amber-500 border-amber-500"
+                                                ? "bg-slate-900 border-slate-900"
                                                 : "border-slate-300"
                                         )}
                                     >

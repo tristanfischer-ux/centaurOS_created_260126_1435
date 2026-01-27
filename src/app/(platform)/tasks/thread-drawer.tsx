@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useRef } from "react"
+import { useEffect, useState, useRef, useMemo } from "react"
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet"
 import { createClient } from "@/lib/supabase/client"
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -15,6 +15,8 @@ import { uploadTaskAttachment } from "@/actions/attachments"
 import { toast } from "sonner"
 import { useRouter } from "next/navigation"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { EmptyState } from "@/components/ui/empty-state"
+import { MessageSquare } from "lucide-react"
 
 function getInitials(name: string | null) {
     if (!name) return '??'
@@ -80,23 +82,26 @@ export function ThreadDrawer({
 }: ThreadDrawerProps) {
     const router = useRouter()
     const [comments, setComments] = useState<Comment[]>([])
-    const [loading, setLoading] = useState(true)
+    const [isLoading, setIsLoading] = useState(true)
     const [newComment, setNewComment] = useState("")
-    const [sending, setSending] = useState(false)
-    const [actionLoading, setActionLoading] = useState(false)
-    const [uploading, setUploading] = useState(false)
+    const [isSending, setIsSending] = useState(false)
+    const [isActionLoading, setIsActionLoading] = useState(false)
+    const [isUploading, setIsUploading] = useState(false)
     const [showForward, setShowForward] = useState(false)
     const [forwardToId, setForwardToId] = useState<string>("")
     const [forwardReason, setForwardReason] = useState("")
+    const [commentError, setCommentError] = useState<string | null>(null)
+    const [forwardError, setForwardError] = useState<string | null>(null)
+    const [actionError, setActionError] = useState<string | null>(null)
     const fileInputRef = useRef<HTMLInputElement>(null)
-    const supabase = createClient()
+    const supabase = useMemo(() => createClient(), [])
 
     // Check if assignee is AI
     const isAIAssignee = assigneeRole === 'AI_Agent'
 
     useEffect(() => {
         const fetchComments = async () => {
-            setLoading(true)
+            setIsLoading(true)
             const { data, error } = await supabase
                 .from('task_comments')
                 .select('*, user:user_id(full_name, role)')
@@ -106,7 +111,7 @@ export function ThreadDrawer({
             if (!error && data) {
                 setComments(data as Comment[])
             }
-            setLoading(false)
+            setIsLoading(false)
         }
 
         if (open && taskId) {
@@ -116,42 +121,55 @@ export function ThreadDrawer({
 
     const handleSend = async (e: React.FormEvent) => {
         e.preventDefault()
-        if (!newComment.trim()) return
-
-        setSending(true)
-        const result = await addTaskComment(taskId, newComment)
-        if (result?.error) {
-            toast.error(result.error)
-        } else {
-            setNewComment("")
-            const { data } = await supabase
-                .from('task_comments')
-                .select('*, user:user_id(full_name, role)')
-                .eq('task_id', taskId)
-                .order('created_at', { ascending: true })
-            if (data) setComments(data as Comment[])
+        if (!newComment.trim()) {
+            setCommentError("Comment cannot be empty")
+            return
         }
-        setSending(false)
+
+        setCommentError(null)
+        setIsSending(true)
+        try {
+            const result = await addTaskComment(taskId, newComment)
+            if (result?.error) {
+                setCommentError(result.error)
+                toast.error(result.error)
+            } else {
+                setNewComment("")
+                const { data } = await supabase
+                    .from('task_comments')
+                    .select('*, user:user_id(full_name, role)')
+                    .eq('task_id', taskId)
+                    .order('created_at', { ascending: true })
+                if (data) setComments(data as Comment[])
+            }
+        } finally {
+            setIsSending(false)
+        }
     }
 
     const handleAccept = async () => {
-        setActionLoading(true)
-        const result = await acceptTask(taskId)
-        if (result?.error) {
-            toast.error(result.error)
-        } else {
-            toast.success("Task accepted")
-            router.refresh()
-            onOpenChange(false)
+        setActionError(null)
+        setIsActionLoading(true)
+        try {
+            const result = await acceptTask(taskId)
+            if (result?.error) {
+                setActionError(result.error)
+                toast.error(result.error)
+            } else {
+                toast.success("Task accepted")
+                router.refresh()
+                onOpenChange(false)
+            }
+        } finally {
+            setIsActionLoading(false)
         }
-        setActionLoading(false)
     }
 
     const handleReject = async () => {
         const reason = prompt("Reason for rejection:")
         if (!reason) return
 
-        setActionLoading(true)
+        setIsActionLoading(true)
         const result = await rejectTask(taskId, reason)
         if (result?.error) {
             toast.error(result.error)
@@ -160,11 +178,11 @@ export function ThreadDrawer({
             router.refresh()
             onOpenChange(false)
         }
-        setActionLoading(false)
+        setIsActionLoading(false)
     }
 
     const handleComplete = async () => {
-        setActionLoading(true)
+        setIsActionLoading(true)
         const result = await completeTask(taskId)
         if (result?.error) {
             toast.error(result.error)
@@ -173,7 +191,7 @@ export function ThreadDrawer({
             router.refresh()
             onOpenChange(false)
         }
-        setActionLoading(false)
+        setIsActionLoading(false)
     }
 
     const handleForward = async () => {
@@ -181,7 +199,7 @@ export function ThreadDrawer({
             toast.error("Please select someone to forward to")
             return
         }
-        setActionLoading(true)
+        setIsActionLoading(true)
         const result = await forwardTask(taskId, forwardToId, forwardReason || "Reassigned via thread drawer")
         if (result?.error) {
             toast.error(result.error)
@@ -193,11 +211,11 @@ export function ThreadDrawer({
             setForwardReason("")
             onOpenChange(false)
         }
-        setActionLoading(false)
+        setIsActionLoading(false)
     }
 
     const handleTriggerAI = async () => {
-        setActionLoading(true)
+        setIsActionLoading(true)
         const result = await triggerAIWorker(taskId)
         if (result?.error) {
             toast.error(result.error)
@@ -211,14 +229,14 @@ export function ThreadDrawer({
                 .order('created_at', { ascending: true })
             setComments((data || []) as Comment[])
         }
-        setActionLoading(false)
+        setIsActionLoading(false)
     }
 
     const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0]
         if (!file) return
 
-        setUploading(true)
+        setIsUploading(true)
         const formData = new FormData()
         formData.append('file', file)
 
@@ -235,13 +253,14 @@ export function ThreadDrawer({
                 .order('created_at', { ascending: true })
             setComments((data || []) as Comment[])
         }
-        setUploading(false)
+        setIsUploading(false)
         if (fileInputRef.current) fileInputRef.current.value = ''
     }
 
     return (
         <Sheet open={open} onOpenChange={onOpenChange}>
-            <SheetContent side="right" className="w-[400px] sm:w-[540px] flex flex-col h-full bg-white">
+            <SheetContent side="right" className="w-full sm:w-[400px] md:w-[540px] flex flex-col h-full bg-white">
+                <div className="mx-auto mt-2 h-1.5 w-12 rounded-full bg-slate-300 md:hidden" />
                 <SheetHeader>
                     <SheetTitle className="text-slate-900">{taskTitle}</SheetTitle>
                     <SheetDescription className="flex items-center gap-2">
@@ -256,6 +275,11 @@ export function ThreadDrawer({
 
                 {/* Task Actions */}
                 <div className="mt-4 p-3 bg-slate-50 rounded-lg border border-slate-100 space-y-3">
+                    {actionError && (
+                        <div className="text-sm text-red-600 bg-red-50 p-2 rounded" role="alert">
+                            {actionError}
+                        </div>
+                    )}
                     {/* Status-based actions */}
                     <div className="flex flex-wrap gap-2">
                         {/* Assignee can Accept/Reject if Pending */}
@@ -264,7 +288,7 @@ export function ThreadDrawer({
                                 <Button
                                     size="sm"
                                     onClick={handleAccept}
-                                    disabled={actionLoading}
+                                    disabled={isActionLoading}
                                     className="bg-green-500 hover:bg-green-600 text-white"
                                 >
                                     <Check className="h-4 w-4 mr-1" /> Accept
@@ -273,7 +297,7 @@ export function ThreadDrawer({
                                     size="sm"
                                     variant="destructive"
                                     onClick={handleReject}
-                                    disabled={actionLoading}
+                                    disabled={isActionLoading}
                                 >
                                     <X className="h-4 w-4 mr-1" /> Reject
                                 </Button>
@@ -285,7 +309,7 @@ export function ThreadDrawer({
                             <Button
                                 size="sm"
                                 onClick={handleComplete}
-                                disabled={actionLoading}
+                                disabled={isActionLoading}
                                 className="bg-green-500 hover:bg-green-600 text-white"
                             >
                                 <Check className="h-4 w-4 mr-1" /> Mark Complete
@@ -312,7 +336,7 @@ export function ThreadDrawer({
                                 size="sm"
                                 variant="outline"
                                 onClick={() => setShowForward(true)}
-                                disabled={actionLoading}
+                                disabled={isActionLoading}
                             >
                                 <Forward className="h-4 w-4 mr-1" /> Reassign
                             </Button>
@@ -323,7 +347,7 @@ export function ThreadDrawer({
                                     size="sm"
                                     variant="outline"
                                     onClick={handleTriggerAI}
-                                    disabled={actionLoading}
+                                    disabled={isActionLoading}
                                     className="border-purple-200 text-purple-700 hover:bg-purple-50"
                                 >
                                     <Bot className="h-4 w-4 mr-1" /> Trigger AI
@@ -333,8 +357,18 @@ export function ThreadDrawer({
                     ) : (
                         <div className="pt-2 border-t border-slate-200 space-y-2">
                             <p className="text-xs text-slate-500">Forward this task to:</p>
-                            <Select value={forwardToId} onValueChange={setForwardToId}>
-                                <SelectTrigger className="w-full">
+                            <Select 
+                                value={forwardToId} 
+                                onValueChange={(value) => {
+                                    setForwardToId(value)
+                                    setForwardError(null)
+                                }}
+                            >
+                                <SelectTrigger 
+                                    className={`w-full ${forwardError ? 'border-red-500' : ''}`}
+                                    aria-describedby={forwardError ? "forward-error" : undefined}
+                                    aria-invalid={!!forwardError}
+                                >
                                     <SelectValue placeholder="Select team member..." />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -362,13 +396,18 @@ export function ThreadDrawer({
                                 value={forwardReason}
                                 onChange={(e) => setForwardReason(e.target.value)}
                             />
+                            {forwardError && (
+                                <p id="forward-error" className="text-sm text-red-600 mt-1" role="alert">
+                                    {forwardError}
+                                </p>
+                            )}
                             <div className="flex gap-2">
                                 <Button
                                     size="sm"
                                     onClick={handleForward}
-                                    disabled={actionLoading || !forwardToId}
+                                    disabled={isActionLoading || !forwardToId}
                                 >
-                                    {actionLoading ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Forward className="h-4 w-4 mr-1" />}
+                                    {isActionLoading ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Forward className="h-4 w-4 mr-1" />}
                                     Forward
                                 </Button>
                                 <Button
@@ -397,7 +436,7 @@ export function ThreadDrawer({
                 {/* Comments Thread */}
                 <div className="flex-1 overflow-hidden mt-4 relative">
                     <h4 className="text-sm font-medium text-slate-500 mb-3">Activity Log</h4>
-                    {loading ? (
+                    {isLoading ? (
                         <div className="flex items-center justify-center h-full text-slate-400">
                             <Loader2 className="h-6 w-6 animate-spin mr-2" /> Loading history...
                         </div>
@@ -448,21 +487,33 @@ export function ThreadDrawer({
                             type="button"
                             size="icon"
                             variant="outline"
-                            disabled={uploading}
+                            disabled={isUploading}
                             onClick={() => fileInputRef.current?.click()}
                             className="shrink-0 border-slate-200"
                         >
-                            {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Paperclip className="h-4 w-4" />}
+                            {isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Paperclip className="h-4 w-4" />}
                         </Button>
-                        <Input
-                            value={newComment}
-                            onChange={(e) => setNewComment(e.target.value)}
-                            placeholder="Type a note..."
-                            disabled={sending}
-                            className="bg-white border-slate-200"
-                        />
-                        <Button type="submit" size="icon" disabled={sending || !newComment.trim()}>
-                            {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                        <div className="flex-1">
+                            <Input
+                                value={newComment}
+                                onChange={(e) => {
+                                    setNewComment(e.target.value)
+                                    setCommentError(null)
+                                }}
+                                placeholder="Type a note..."
+                                disabled={isSending}
+                                className={`bg-white border-slate-200 ${commentError ? 'border-red-500' : ''}`}
+                                aria-describedby={commentError ? "comment-error" : undefined}
+                                aria-invalid={!!commentError}
+                            />
+                            {commentError && (
+                                <p id="comment-error" className="text-sm text-red-600 mt-1" role="alert">
+                                    {commentError}
+                                </p>
+                            )}
+                        </div>
+                        <Button type="submit" size="icon" disabled={isSending || !newComment.trim()}>
+                            {isSending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
                         </Button>
                     </form>
                 </div>

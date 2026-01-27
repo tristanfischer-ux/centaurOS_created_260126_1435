@@ -3,6 +3,7 @@
 import { MarketplaceListing } from "@/actions/marketplace"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardFooter } from "@/components/ui/card"
 import { Checkbox } from "@/components/ui/checkbox"
 import { cn } from "@/lib/utils"
 import { ArrowRight, ShieldCheck } from "lucide-react"
@@ -23,11 +24,11 @@ export function MarketCard({ listing, isSelected, onToggleSelect }: MarketCardPr
     }
 
     return (
-        <div className={cn(
-            "group relative flex flex-col justify-between p-5 rounded-xl border bg-white border-slate-200 shadow-sm hover:shadow-md transition-all duration-300 overflow-hidden",
-            isSelected && "ring-2 ring-primary ring-offset-2 border-primary"
+        <Card className={cn(
+            "group relative flex flex-col justify-between rounded-xl shadow-sm hover:shadow-md transition-all duration-300 overflow-hidden",
+            isSelected && "ring-2 ring-ring border-ring"
         )}>
-            <div className="relative z-10">
+            <CardContent className="p-5 relative z-10">
                 <div className="flex justify-between items-start mb-4">
                     <Badge variant="outline" className={cn("uppercase text-[10px] tracking-wider font-semibold border-0", categoryBadgeStyles[listing.category])}>
                         {listing.subcategory}
@@ -39,7 +40,7 @@ export function MarketCard({ listing, isSelected, onToggleSelect }: MarketCardPr
                     )}
                 </div>
 
-                <h3 className="text-lg font-bold tracking-tight mb-2 font-serif text-slate-900 group-hover:text-primary transition-colors">
+                <h3 className="text-lg font-bold tracking-tight mb-2 font-serif text-foreground group-hover:text-primary transition-colors">
                     {listing.title}
                 </h3>
 
@@ -52,22 +53,23 @@ export function MarketCard({ listing, isSelected, onToggleSelect }: MarketCardPr
                     {Object.entries(listing.attributes).slice(0, 3).map(([key, value]) => {
                         if (Array.isArray(value)) return null
                         return (
-                            <div key={key} className="text-xs px-2 py-1 rounded-md bg-slate-50 border border-slate-100 font-medium truncate max-w-[120px]">
+                            <div key={key} className="text-xs px-2 py-1 rounded-md bg-muted border border-border font-medium truncate max-w-[120px]">
                                 <span className="opacity-60 capitalize mr-1">{key.replace('_', ' ')}:</span>
-                                <span className="text-slate-700">{String(value)}</span>
+                                <span className="text-foreground">{String(value)}</span>
                             </div>
                         )
                     })}
                 </div>
-            </div>
+            </CardContent>
 
-            <div className="relative z-10 flex items-center justify-between pt-4 border-t border-slate-100 mt-auto">
+            <CardFooter className="relative z-10 flex items-center justify-between pt-4 border-t border-border mt-auto">
                 <div className="flex items-center gap-2">
                     <Checkbox
                         id={`compare-${listing.id}`}
                         checked={isSelected}
                         onCheckedChange={() => onToggleSelect(listing.id)}
-                        className="data-[state=checked]:bg-primary data-[state=checked]:border-primary"
+                        className="h-4 w-4 rounded border-input data-[state=checked]:bg-foreground data-[state=checked]:border-foreground text-foreground focus:ring-ring"
+                        aria-label={`Select ${listing.title} for comparison`}
                     />
                     <label
                         htmlFor={`compare-${listing.id}`}
@@ -77,11 +79,11 @@ export function MarketCard({ listing, isSelected, onToggleSelect }: MarketCardPr
                     </label>
                 </div>
 
-                <Button size="sm" variant="ghost" className="h-8 text-xs hover:bg-slate-50 group/btn">
+                <Button size="sm" variant="ghost" className="text-xs group/btn">
                     View
-                    <ArrowRight className="w-3 h-3 ml-1 group-hover/btn:translate-x-0.5 transition-transform" />
+                    <ArrowRight className="h-4 w-4 group-hover/btn:translate-x-0.5 transition-transform" />
                 </Button>
-            </div>
-        </div>
+            </CardFooter>
+        </Card>
     )
 }

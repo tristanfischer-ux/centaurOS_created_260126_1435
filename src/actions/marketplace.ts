@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server"
 import { revalidatePath } from "next/cache"
+import { Database } from "@/types/database.types"
 
 
 
@@ -128,8 +129,10 @@ export interface MarketplaceListing {
 export async function getMarketplaceListings(category?: string) {
     const supabase = await createClient()
 
+    // marketplace_listings table exists but may not be in generated Database types
+    // Type assertion needed for table name since it's not in Database['public']['Tables']
     let query = supabase
-        .from('marketplace_listings' as any)
+        .from('marketplace_listings' as never)
         .select('*')
         .order('is_verified', { ascending: false })
 
@@ -144,5 +147,6 @@ export async function getMarketplaceListings(category?: string) {
         return []
     }
 
-    return data as any as MarketplaceListing[]
+    // Properly type the result using the MarketplaceListing interface
+    return (data || []) as MarketplaceListing[]
 }

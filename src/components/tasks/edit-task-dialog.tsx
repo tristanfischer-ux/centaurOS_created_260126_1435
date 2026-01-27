@@ -23,23 +23,23 @@ interface EditTaskDialogProps {
 }
 
 export function EditTaskDialog({ open, onOpenChange, task, members }: EditTaskDialogProps) {
-    const [loading, setLoading] = useState(false)
+    const [isLoading, setIsLoading] = useState(false)
     const [title, setTitle] = useState(task.title)
     const [description, setDescription] = useState(task.description || "")
     const [assigneeId, setAssigneeId] = useState(task.assignee_id || "")
 
     // Attachments state
     const [attachments, setAttachments] = useState<any[]>([])
-    const [loadingAttachments, setLoadingAttachments] = useState(false)
-    const [uploading, setUploading] = useState(false)
+    const [isLoadingAttachments, setIsLoadingAttachments] = useState(false)
+    const [isUploading, setIsUploading] = useState(false)
 
     const loadAttachments = async () => {
-        setLoadingAttachments(true)
+        setIsLoadingAttachments(true)
         const res = await getTaskAttachments(task.id)
         if (res.data) {
             setAttachments(res.data)
         }
-        setLoadingAttachments(false)
+        setIsLoadingAttachments(false)
     }
 
     useEffect(() => {
@@ -53,14 +53,14 @@ export function EditTaskDialog({ open, onOpenChange, task, members }: EditTaskDi
     }, [open, task])
 
     const handleSavePrimary = async () => {
-        setLoading(true)
+        setIsLoading(true)
 
         // 1. Update Details
         if (title !== task.title || description !== task.description) {
             const res = await updateTaskDetails(task.id, { title, description })
             if (res.error) {
                 toast.error(res.error)
-                setLoading(false)
+                setIsLoading(false)
                 return
             }
         }
@@ -70,27 +70,27 @@ export function EditTaskDialog({ open, onOpenChange, task, members }: EditTaskDi
             const res = await updateTaskAssignees(task.id, [assigneeId])
             if (res.error) {
                 toast.error(res.error)
-                setLoading(false)
+                setIsLoading(false)
                 return
             }
         }
 
         toast.success("Task updated")
-        setLoading(false)
+        setIsLoading(false)
         onOpenChange(false)
     }
 
     const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         if (!e.target.files || e.target.files.length === 0) return
 
-        setUploading(true)
+        setIsUploading(true)
         const file = e.target.files[0]
         const formData = new FormData()
         formData.append('file', file)
 
         const res = await uploadTaskAttachment(task.id, formData)
 
-        setUploading(false)
+        setIsUploading(false)
         if (res.error) {
             toast.error(res.error)
         } else {
@@ -158,16 +158,16 @@ export function EditTaskDialog({ open, onOpenChange, task, members }: EditTaskDi
                                     aria-label="Upload attachment"
                                     className="absolute inset-0 opacity-0 cursor-pointer"
                                     onChange={handleFileUpload}
-                                    disabled={uploading}
+                                    disabled={isUploading}
                                 />
-                                <Button size="sm" variant="outline" disabled={uploading} className="h-8">
-                                    {uploading ? <Loader2 className="h-3 w-3 animate-spin mr-2" /> : <Plus className="h-3 w-3 mr-2" />}
+                                <Button size="sm" variant="outline" disabled={isUploading} className="h-8">
+                                    {isUploading ? <Loader2 className="h-3 w-3 animate-spin mr-2" /> : <Plus className="h-3 w-3 mr-2" />}
                                     Add File
                                 </Button>
                             </div>
                         </div>
 
-                        {loadingAttachments ? (
+                        {isLoadingAttachments ? (
                             <div className="flex justify-center py-4">
                                 <Loader2 className="h-5 w-5 animate-spin text-slate-400" />
                             </div>
@@ -182,12 +182,12 @@ export function EditTaskDialog({ open, onOpenChange, task, members }: EditTaskDi
                     </div>
                 </div>
 
-                <DialogFooter className="gap-2">
-                    <Button variant="outline" onClick={() => onOpenChange(false)} disabled={loading}>
+                <DialogFooter className="gap-2 pt-4 border-t border-slate-100">
+                    <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isLoading}>
                         Cancel
                     </Button>
-                    <Button onClick={handleSavePrimary} disabled={loading} className="bg-slate-900 text-white hover:bg-slate-800">
-                        {loading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                    <Button onClick={handleSavePrimary} variant="primary" disabled={isLoading}>
+                        {isLoading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                         Save Changes
                     </Button>
                 </DialogFooter>

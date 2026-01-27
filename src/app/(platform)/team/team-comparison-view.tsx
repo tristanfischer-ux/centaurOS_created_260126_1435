@@ -1,6 +1,8 @@
 "use client"
 
 import { useState, useTransition } from "react"
+import { useAutoRefresh } from "@/hooks/useAutoRefresh"
+import { RefreshButton } from "@/components/RefreshButton"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -23,6 +25,8 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { EmptyState } from "@/components/ui/empty-state"
+import { Users } from "lucide-react"
 import {
     AlertDialog,
     AlertDialogAction,
@@ -93,12 +97,17 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
     const [teamName, setTeamName] = useState("")
     const [teamError, setTeamError] = useState<string | null>(null)
     const [isPending, startTransition] = useTransition()
+    const [pairingMemberId, setPairingMemberId] = useState<string | null>(null)
+    const [deletingMemberId, setDeletingMemberId] = useState<string | null>(null)
 
     // Edit/Delete Team State
     const [teamToEdit, setTeamToEdit] = useState<{ id: string, name: string } | null>(null)
     const [teamToDelete, setTeamToDelete] = useState<string | null>(null)
     const [memberToDelete, setMemberToDelete] = useState<string | null>(null)
     const [newName, setNewName] = useState("")
+
+    // Auto-refresh using Supabase Realtime
+    useAutoRefresh({ tables: ['profiles', 'teams'] })
 
     const allMembers = [...executives, ...apprentices]
     const selectedMembers = allMembers.filter(m => selectedIds.has(m.id))
@@ -163,10 +172,15 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
         if (draggedMember && targetMember) {
             // Case 1: Dragging AI onto Human
             if (draggedMember.role === 'AI_Agent' && targetMember.role !== 'AI_Agent') {
+                setPairingMemberId(targetMember.id)
                 startTransition(async () => {
                     const res = await pairCentaur(targetMember.id, draggedMember.id)
-                    if (res?.error) toast.error(res.error)
-                    else toast.success(`Paired ${targetMember.full_name} with ${draggedMember.full_name}`)
+                    if (res?.error) {
+                        toast.error(res.error)
+                    } else {
+                        toast.success(`Paired ${targetMember.full_name} with ${draggedMember.full_name}`)
+                    }
+                    setPairingMemberId(null)
                 })
                 setDraggedMemberId(null)
                 setDropTargetId(null)
@@ -174,10 +188,15 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
             }
             // Case 2: Dragging Human onto AI
             if (draggedMember.role !== 'AI_Agent' && targetMember.role === 'AI_Agent') {
+                setPairingMemberId(draggedMember.id)
                 startTransition(async () => {
                     const res = await pairCentaur(draggedMember.id, targetMember.id)
-                    if (res?.error) toast.error(res.error)
-                    else toast.success(`Paired ${draggedMember.full_name} with ${targetMember.full_name}`)
+                    if (res?.error) {
+                        toast.error(res.error)
+                    } else {
+                        toast.success(`Paired ${draggedMember.full_name} with ${targetMember.full_name}`)
+                    }
+                    setPairingMemberId(null)
                 })
                 setDraggedMemberId(null)
                 setDropTargetId(null)
@@ -217,13 +236,12 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
 
     const handleDeleteTeam = async () => {
         if (!teamToDelete) return
-
         startTransition(async () => {
-            try {
-                await deleteTeam(teamToDelete)
+            const result = await deleteTeam(teamToDelete)
+            if (result?.error) {
+                toast.error(result.error)
+            } else {
                 setTeamToDelete(null)
-            } catch (error) {
-                console.error(error)
             }
         })
     }
@@ -231,13 +249,16 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
     const handleDeleteMember = async () => {
         if (!memberToDelete) return
 
+        setDeletingMemberId(memberToDelete)
         startTransition(async () => {
             const res = await deleteMember(memberToDelete)
-            if (res?.error) toast.error(res.error)
-            else {
+            if (res?.error) {
+                toast.error(res.error)
+            } else {
                 toast.success("Member removed")
                 setMemberToDelete(null)
             }
+            setDeletingMemberId(null)
         })
     }
 
@@ -276,6 +297,8 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
         const isAIAgent = type === 'ai_agent'
         const isDragging = draggedMemberId === member.id
         const isDropTarget = dropTargetId === member.id && draggedMemberId !== member.id
+        const isPairing = pairingMemberId === member.id
+        const isDeleting = deletingMemberId === member.id
 
         // Centaur Status
         const pairedAI = member.pairedAI?.[0]
@@ -283,38 +306,38 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
 
         // Determine styles based on type
         let borderClass = 'border-slate-200'
-        let ringClass = 'ring-blue-500 border-blue-500'
-        let hoverBorderClass = 'group-hover:border-blue-400'
-        let bgCheckClass = 'bg-blue-500'
+        let ringClass = 'ring-slate-500 border-slate-500'
+        let hoverBorderClass = 'group-hover:border-blue-400 group-active:border-blue-500'
+        let bgCheckClass = 'bg-slate-500'
         let avatarBorderClass = 'border border-slate-200'
         let avatarBgClass = 'bg-slate-100 text-slate-500'
         let badgeClass = 'bg-slate-100 text-slate-600'
 
         if (isAIAgent) {
             borderClass = 'border-indigo-200 bg-indigo-50/30'
-            ringClass = 'ring-indigo-500 border-indigo-500'
-            hoverBorderClass = 'group-hover:border-indigo-400'
-            bgCheckClass = 'bg-indigo-500'
+            ringClass = 'ring-slate-500 border-slate-500'
+            hoverBorderClass = 'group-hover:border-indigo-400 group-active:border-indigo-500'
+            bgCheckClass = 'bg-slate-500'
             avatarBorderClass = 'border-2 border-indigo-300'
             avatarBgClass = 'bg-indigo-100 text-indigo-700 font-bold'
             badgeClass = 'text-indigo-600 border-indigo-200 bg-indigo-50'
         } else if (isFounder) {
             // ... existing founder styles ...
             borderClass = 'border-purple-200'
-            ringClass = 'ring-purple-500 border-purple-500'
-            hoverBorderClass = 'group-hover:border-purple-400'
-            bgCheckClass = 'bg-purple-500'
+            ringClass = 'ring-slate-500 border-slate-500'
+            hoverBorderClass = 'group-hover:border-purple-400 group-active:border-purple-500'
+            bgCheckClass = 'bg-slate-500'
             avatarBorderClass = 'border-2 border-purple-500'
             avatarBgClass = 'bg-purple-100 text-purple-700 font-bold'
             badgeClass = 'text-purple-600 border-purple-200 bg-purple-50'
         } else if (isExecutive) {
             // ... existing executive styles ...
             borderClass = 'border-amber-200'
-            ringClass = 'ring-amber-500 border-amber-500'
-            hoverBorderClass = 'group-hover:border-amber-500'
+            ringClass = 'ring-slate-500 border-slate-500'
+            hoverBorderClass = 'group-hover:border-amber-500 group-active:border-amber-600'
             // Keeping original logic for brevity in replace
-            hoverBorderClass = 'group-hover:border-amber-400'
-            bgCheckClass = 'bg-amber-500'
+            hoverBorderClass = 'group-hover:border-amber-400 group-active:border-amber-500'
+            bgCheckClass = 'bg-slate-500'
             avatarBorderClass = 'border-2 border-amber-500'
             avatarBgClass = 'bg-amber-100 text-amber-700 font-bold'
             badgeClass = 'text-amber-600 border-amber-200 bg-amber-50'
@@ -323,7 +346,7 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
         // Centaur Override
         if (isCentaur) {
             borderClass = 'border-amber-400 shadow-md ring-1 ring-amber-400/50'
-            hoverBorderClass = 'group-hover:border-amber-500'
+            hoverBorderClass = 'group-hover:border-amber-500 group-active:border-amber-600'
         }
 
         const cardContent = (
@@ -334,6 +357,7 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                 ${compareMode && isSelected ? `ring-2 ${ringClass}` : ''}
                 ${isDragging ? 'opacity-50 scale-95' : ''}
                 ${isDropTarget ? 'ring-2 ring-green-500 border-green-500 bg-green-50' : ''}
+                ${isPairing || isDeleting ? 'opacity-60' : ''}
             `}>
                 {compareMode && (
                     <div className={`absolute top-2 right-2 h-6 w-6 rounded-full flex items-center justify-center text-white text-xs
@@ -349,6 +373,14 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                         <div className="bg-green-600 text-white px-3 py-1.5 rounded-full text-xs font-medium flex items-center gap-1 shadow-sm">
                             <Zap className="h-3 w-3 fill-white" />
                             {draggedMemberId && aiAgents.some(a => a.id === draggedMemberId) ? 'Pair Centaur' : 'Combine / Team'}
+                        </div>
+                    </div>
+                )}
+                {(isPairing || isDeleting) && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-slate-500/10 rounded-lg z-10 backdrop-blur-[1px]">
+                        <div className="bg-slate-700 text-white px-3 py-1.5 rounded-full text-xs font-medium flex items-center gap-1 shadow-sm">
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                            {isPairing ? 'Pairing...' : 'Removing...'}
                         </div>
                     </div>
                 )}
@@ -389,11 +421,13 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                                 <DropdownMenuTrigger asChild>
                                     <Button
                                         variant="ghost"
+                                        type="button"
                                         className="h-6 w-6 p-0 text-slate-400 hover:text-slate-600 opacity-0 group-hover:opacity-100 transition-opacity"
                                         onClick={(e) => {
                                             e.preventDefault()
                                             e.stopPropagation()
                                         }}
+                                        aria-label={`Actions for ${member.full_name}`}
                                     >
                                         <MoreHorizontal className="h-4 w-4" />
                                     </Button>
@@ -428,7 +462,7 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                                                 toast.success("Centaur unpaired")
                                             })
                                         }}
-                                        className="hover:bg-red-100 hover:text-red-600 rounded p-0.5 transition-colors"
+                                        className="hover:bg-red-100 hover:text-red-600 active:bg-red-200 active:text-red-700 rounded p-0.5 transition-colors"
                                     >
                                         <Unplug className="h-3 w-3" />
                                     </button>
@@ -488,7 +522,18 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                 onDragLeave={handleDragLeave}
                 onDrop={(e) => handleDrop(e, member.id)}
                 onDragEnd={handleDragEnd}
-                className="block group cursor-grab active:cursor-grabbing"
+                className="block group cursor-grab active:cursor-grabbing active:scale-[0.98] transition-transform"
+                aria-grabbed={draggedMemberId === member.id}
+                role="button"
+                tabIndex={0}
+                aria-label={`Drag ${member.full_name} to pair or create team`}
+                onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault()
+                        // For keyboard users, we could show a menu to select action
+                        // For now, just prevent default behavior
+                    }
+                }}
             >
                 <Link
                     href={`/team/${member.id}`}
@@ -521,7 +566,7 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
         }
 
         return (
-            <tr className="group hover:bg-slate-50 transition-colors border-b border-slate-100 last:border-0">
+            <tr className="group hover:bg-slate-50 active:bg-slate-100 transition-colors border-b border-slate-100 last:border-0">
                 <td className="px-4 py-3 pl-6">
                     <div className="flex items-center gap-3">
                         <Link href={`/team/${member.id}`} className="flex items-center gap-3">
@@ -530,7 +575,7 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                                     {isAIAgent ? <Brain className="h-4 w-4" /> : getInitials(member.full_name)}
                                 </AvatarFallback>
                             </Avatar>
-                            <span className="font-medium text-slate-900 group-hover:text-blue-600 transition-colors">
+                            <span className="font-medium text-slate-900 group-hover:text-blue-600 group-active:text-blue-700 transition-colors">
                                 {member.full_name}
                             </span>
                         </Link>
@@ -560,7 +605,7 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                                         toast.success("Centaur unpaired")
                                     })
                                 }}
-                                className="text-slate-300 hover:text-red-500 hover:bg-red-50 rounded p-1 transition-all opacity-0 group-hover:opacity-100"
+                                className="text-slate-300 hover:text-red-500 hover:bg-red-50 active:text-red-600 active:bg-red-100 rounded p-1 transition-all opacity-0 group-hover:opacity-100"
                             >
                                 <Unplug className="h-3 w-3" />
                             </button>
@@ -593,7 +638,9 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                         <DropdownMenuTrigger asChild>
                             <Button
                                 variant="ghost"
+                                type="button"
                                 className="h-8 w-8 p-0 text-slate-400 hover:text-slate-600 opacity-0 group-hover:opacity-100 transition-opacity"
+                                aria-label={`Actions for ${member.full_name}`}
                             >
                                 <MoreHorizontal className="h-4 w-4" />
                             </Button>
@@ -624,6 +671,7 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                     <p className="text-gray-400">Manage your Executives and Apprentices.</p>
                 </div>
                 <div className="flex items-center gap-2">
+                    <RefreshButton />
                     <InviteMemberDialog />
                     <CreateTeamDialog members={[...executives, ...apprentices]} />
 
@@ -718,7 +766,13 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                             <MemberCard key={member.id} member={member} type="executive" />
                         ))}
                         {executives.length === 0 && (
-                            <div className="col-span-full py-8 text-center text-gray-500 italic">No executives listed.</div>
+                            <div className="col-span-full border-2 border-dashed border-slate-200 rounded-lg">
+                                <EmptyState
+                                    icon={<Users className="h-8 w-8" />}
+                                    title="No executives yet"
+                                    description="Add executives to evaluate and approve work."
+                                />
+                            </div>
                         )}
                     </div>
                 ) : (
@@ -739,7 +793,13 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                                 ))}
                                 {executives.length === 0 && (
                                     <tr>
-                                        <td colSpan={5} className="py-8 text-center text-gray-500 italic">No executives listed.</td>
+                                        <td colSpan={5} className="py-8">
+                                            <EmptyState
+                                                icon={<Users className="h-8 w-8" />}
+                                                title="No executives yet"
+                                                description="Add executives to evaluate and approve work."
+                                            />
+                                        </td>
                                     </tr>
                                 )}
                             </tbody>
@@ -759,7 +819,13 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                             <MemberCard key={member.id} member={member} type="apprentice" />
                         ))}
                         {apprentices.length === 0 && (
-                            <div className="col-span-full py-8 text-center text-gray-500 italic">No apprentices listed.</div>
+                            <div className="col-span-full border-2 border-dashed border-slate-200 rounded-lg">
+                                <EmptyState
+                                    icon={<Users className="h-8 w-8" />}
+                                    title="No apprentices yet"
+                                    description="Add apprentices to execute tasks and complete work."
+                                />
+                            </div>
                         )}
                     </div>
                 ) : (
@@ -780,7 +846,13 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                                 ))}
                                 {apprentices.length === 0 && (
                                     <tr>
-                                        <td colSpan={5} className="py-8 text-center text-gray-500 italic">No apprentices listed.</td>
+                                        <td colSpan={5} className="py-8">
+                                            <EmptyState
+                                                icon={<Users className="h-8 w-8" />}
+                                                title="No apprentices yet"
+                                                description="Add apprentices to execute tasks and complete work."
+                                            />
+                                        </td>
                                     </tr>
                                 )}
                             </tbody>
@@ -799,11 +871,21 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                     <p className="text-sm text-slate-500 italic pb-2">
                         Drag an AI Agent onto a human member to form a Centaur pair.
                     </p>
-                    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                        {aiAgents.map(member => (
-                            <MemberCard key={member.id} member={member} type="ai_agent" />
-                        ))}
-                    </div>
+                    {aiAgents.length === 0 ? (
+                        <div className="border-2 border-dashed border-slate-200 rounded-lg">
+                            <EmptyState
+                                icon={<Brain className="h-8 w-8" />}
+                                title="No AI agents yet"
+                                description="Add AI agents to automate tasks and enhance productivity."
+                            />
+                        </div>
+                    ) : (
+                        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                            {aiAgents.map(member => (
+                                <MemberCard key={member.id} member={member} type="ai_agent" />
+                            ))}
+                        </div>
+                    )}
                 </section>
             )}
 
@@ -822,7 +904,7 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                                     key={team.id}
                                     className={`
                                         bg-white border-slate-200 shadow-sm transition-all group relative
-                                        ${isDropTarget ? 'ring-2 ring-green-500 border-green-500 bg-green-50' : 'hover:border-green-400'}
+                                        ${isDropTarget ? 'ring-2 ring-green-500 border-green-500 bg-green-50' : 'hover:border-green-400 active:border-green-500'}
                                     `}
                                     onDragOver={(e) => {
                                         e.preventDefault()
@@ -1110,15 +1192,22 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction onClick={handleDeleteMember} className="bg-red-600 hover:bg-red-700 focus:ring-red-600">
-                            Remove Person
+                        <AlertDialogCancel disabled={!!deletingMemberId}>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleDeleteMember} disabled={!!deletingMemberId} className="bg-red-600 hover:bg-red-700 focus:ring-red-600">
+                            {deletingMemberId ? (
+                                <>
+                                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                    Removing...
+                                </>
+                            ) : (
+                                "Remove Person"
+                            )}
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
 
-        </div >
+        </div>
     )
 }
 

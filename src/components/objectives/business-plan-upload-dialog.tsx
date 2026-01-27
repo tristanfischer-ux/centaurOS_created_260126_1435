@@ -136,7 +136,7 @@ export function BusinessPlanUploadDialog() {
                     Import Business Plan
                 </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col">
+            <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col bg-white text-slate-900 border-slate-200">
                 <DialogHeader>
                     <DialogTitle>Import Business Plan</DialogTitle>
                     <DialogDescription>
@@ -234,12 +234,15 @@ export function BusinessPlanUploadDialog() {
                     )}
                 </div>
 
-                <DialogFooter>
+                <DialogFooter className="gap-2 pt-4 border-t border-slate-100">
                     {step === 'upload' ? (
-                        <Button onClick={handleAnalyze} disabled={(!file && !text) || isAnalyzing}>
-                            {isAnalyzing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                            Analyze Plan
-                        </Button>
+                        <>
+                            <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
+                            <Button onClick={handleAnalyze} disabled={(!file && !text) || isAnalyzing}>
+                                {isAnalyzing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                Analyze Plan
+                            </Button>
+                        </>
                     ) : (
                         <>
                             <Button variant="outline" onClick={() => setStep('upload')} disabled={isCreating}>

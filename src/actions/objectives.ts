@@ -47,69 +47,106 @@ export async function createObjective(formData: FormData) {
     let tasksToInsert: Database['public']['Tables']['tasks']['Insert'][] = []
 
     // A. From Playbook
-    if (playbookId && playbookId !== 'none') {
-        const fs = require('fs');
-        const logPath = '/tmp/centaur_debug_v2.log';
-        fs.appendFileSync(logPath, `\n\n[${new Date().toISOString()}] START PROCESSING PLAYBOOK: ${playbookId}\n`);
-        fs.appendFileSync(logPath, `[${new Date().toISOString()}] Selected Task IDs Raw: ${JSON.stringify(selectedTaskIds)}\n`);
-
+    if (playbookId && playbookId !== 'none' && selectedTaskIds.length > 0) {
+        // Optimize query: only fetch selected pack items
         const { data: packItems, error: packError } = await supabase
             .from('pack_items')
             .select('*')
             .eq('pack_id', playbookId)
+            .in('id', selectedTaskIds)
 
+        // Handle pack fetch errors
         if (packError) {
-            fs.appendFileSync(logPath, `[ERROR] Supabase Fetch Error: ${JSON.stringify(packError)}\n`);
+            console.error('Error fetching pack items:', packError)
+            // Delete the objective to prevent partial creation
+            const { error: deleteError } = await supabase
+                .from('objectives')
+                .delete()
+                .eq('id', objective.id)
+            
+            if (deleteError) {
+                console.error('Failed to clean up objective after pack fetch failure:', deleteError)
+                return { error: `Failed to fetch pack items and cleanup failed. Objective ID: ${objective.id}` }
+            }
+            
+            return { error: `Failed to fetch pack items: ${packError.message}` }
         }
 
-        fs.appendFileSync(logPath, `[${new Date().toISOString()}] Pack Items Found in DB: ${packItems?.length}\n`);
-
-        if (packItems && packItems.length > 0) {
-            // Filter tasks based on selection
-            const tasksFromBook = packItems.filter(t => selectedTaskIds.includes(t.id))
-            fs.appendFileSync(logPath, `[${new Date().toISOString()}] Tasks matched from selection: ${tasksFromBook.length}\n`);
-
-            if (tasksFromBook.length === 0) {
-                fs.appendFileSync(logPath, `[WARNING] No tasks matched! Checking ID types...\n`);
-                fs.appendFileSync(logPath, `First PackItem ID: ${packItems[0].id} (${typeof packItems[0].id})\n`);
-                if (selectedTaskIds.length > 0) {
-                    fs.appendFileSync(logPath, `First Selected ID: ${selectedTaskIds[0]} (${typeof selectedTaskIds[0]})\n`);
+        // Validate that we got the expected pack items
+        if (!packItems || packItems.length === 0) {
+            console.warn(`No pack items found for pack_id: ${playbookId} with selected IDs: ${selectedTaskIds.join(', ')}`)
+            // Don't fail here - user might have selected invalid items, but objective should still be created
+        } else {
+            // Validate that all pack items have required fields
+            const invalidItems = packItems.filter(item => !item.title || item.title.trim().length === 0)
+            if (invalidItems.length > 0) {
+                console.error('Pack items with missing or empty titles:', invalidItems.map(i => i.id))
+                // Delete the objective to prevent partial creation
+                const { error: deleteError } = await supabase
+                    .from('objectives')
+                    .delete()
+                    .eq('id', objective.id)
+                
+                if (deleteError) {
+                    console.error('Failed to clean up objective after validation failure:', deleteError)
+                    return { error: `Invalid pack items detected and cleanup failed. Objective ID: ${objective.id}` }
                 }
+                
+                return { error: 'One or more pack items are missing required fields (title)' }
             }
 
-            // Find AI Agent if needed
-            let aiAgentId = null
-            if (tasksFromBook.some(t => t.role === 'AI_Agent')) {
-                const { data: aiAgents } = await supabase
+            // Check if any tasks need AI Agent assignment
+            const needsAIAgent = packItems.some(t => t.role === 'AI_Agent')
+            let aiAgentId: string | null = null
+            
+            if (needsAIAgent) {
+                const { data: aiAgents, error: aiAgentError } = await supabase
                     .from('profiles')
                     .select('id')
                     .eq('role', 'AI_Agent')
                     .limit(1)
-                aiAgentId = aiAgents?.[0]?.id || null
+                
+                if (aiAgentError) {
+                    console.error('Error fetching AI Agent:', aiAgentError)
+                    // Non-fatal: continue without AI agent assignment, will assign to creator
+                } else {
+                    aiAgentId = aiAgents?.[0]?.id || null
+                    if (!aiAgentId) {
+                        console.warn('AI Agent role tasks found but no AI Agent profile exists. Assigning to creator.')
+                    }
+                }
             }
 
-            tasksToInsert = [
-                ...tasksToInsert,
-                ...tasksFromBook.map(task => {
-                    const now = new Date()
-                    const nextWeek = new Date(now)
-                    nextWeek.setDate(now.getDate() + 7)
+            // Create task objects from pack items
+            const now = new Date()
+            const nextWeek = new Date(now)
+            nextWeek.setDate(now.getDate() + 7)
 
-                    return {
-                        title: task.title,
-                        description: task.description || '',
-                        objective_id: objective.id,
-                        creator_id: user.id,
-                        foundry_id: profile.foundry_id,
-                        status: 'Pending' as const,
-                        assignee_id: task.role === 'AI_Agent' ? aiAgentId : user.id, // Assign to creator by default if not AI
-                        start_date: now.toISOString(),
-                        end_date: nextWeek.toISOString(),
-                        risk_level: 'Low' as const,
-                        client_visible: true
-                    }
-                })
-            ]
+            const packTasks = packItems.map(item => {
+                // Validate title (should already be validated above, but double-check)
+                if (!item.title || item.title.trim().length === 0) {
+                    throw new Error(`Pack item ${item.id} has invalid title`)
+                }
+
+                // Determine assignee: AI Agent if role matches and exists, otherwise creator
+                const assigneeId = (item.role === 'AI_Agent' && aiAgentId) ? aiAgentId : user.id
+
+                return {
+                    title: item.title.trim(),
+                    description: item.description?.trim() || '',
+                    objective_id: objective.id,
+                    creator_id: user.id,
+                    foundry_id: profile.foundry_id,
+                    status: 'Pending' as const,
+                    assignee_id: assigneeId,
+                    start_date: now.toISOString(),
+                    end_date: nextWeek.toISOString(),
+                    risk_level: 'Low' as const,
+                    client_visible: true
+                }
+            })
+
+            tasksToInsert = [...tasksToInsert, ...packTasks]
         }
     }
 
@@ -124,7 +161,14 @@ export async function createObjective(formData: FormData) {
             .limit(1)
         aiAgentId = aiAgents?.[0]?.id || null
 
-        const aiTasks = aiTasksJson.map(str => JSON.parse(str))
+        const aiTasks = aiTasksJson.map(str => {
+            try {
+                return JSON.parse(str)
+            } catch (parseError) {
+                console.error('Failed to parse AI task JSON:', parseError)
+                throw new Error(`Invalid task data format: ${parseError instanceof Error ? parseError.message : 'Unknown error'}`)
+            }
+        })
         tasksToInsert = [
             ...tasksToInsert,
             ...aiTasks.map(task => ({
@@ -145,11 +189,18 @@ export async function createObjective(formData: FormData) {
         const { error: taskError } = await supabase.from('tasks').insert(tasksToInsert)
         if (taskError) {
             console.error('Error creating tasks:', taskError)
-            // We should probably return this error, or at least a warning. 
-            // But since the objective was created, we might want to return { success: true, warning: 'Tasks failed' } 
-            // or fail completely? 
-            // For now, let's return the error so the user knows.
-            return { error: `Objective created, but tasks failed: ${taskError.message}` }
+            // Delete the objective to prevent partial creation
+            const { error: deleteError } = await supabase
+                .from('objectives')
+                .delete()
+                .eq('id', objective.id)
+            
+            if (deleteError) {
+                console.error('Failed to clean up objective after task creation failure:', deleteError)
+                return { error: `Failed to create tasks and cleanup failed. Objective ID: ${objective.id}` }
+            }
+            
+            return { error: `Failed to create tasks: ${taskError.message}` }
         }
     }
 

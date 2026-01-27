@@ -5,7 +5,9 @@ import { ComparisonBar } from "@/components/marketplace/comparison-bar"
 import { ComparisonModal } from "@/components/marketplace/comparison-modal"
 import { MarketCard } from "@/components/marketplace/market-card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { useState } from "react"
+import { EmptyState } from "@/components/ui/empty-state"
+import { useState, useMemo } from "react"
+import { Loader2, Store } from "lucide-react"
 
 interface MarketplaceViewProps {
     initialListings: MarketplaceListing[]
@@ -34,7 +36,9 @@ export function MarketplaceView({ initialListings }: MarketplaceViewProps) {
     const clearSelection = () => setSelectedIds(new Set())
 
     // Filter items based on active tab
-    const filteredItems = initialListings.filter(item => item.category === activeTab)
+    const filteredItems = useMemo(() => {
+        return initialListings.filter(item => item.category === activeTab)
+    }, [initialListings, activeTab])
 
     // Sub-tab logic could go here if we want strictly separated sub-tabs
     // For now we show all in category, maybe grouping by subcategory visually
@@ -57,20 +61,30 @@ export function MarketplaceView({ initialListings }: MarketplaceViewProps) {
                         <TabsTrigger value="AI">AI</TabsTrigger>
                     </TabsList>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 animate-in fade-in duration-500">
-                        {filteredItems.map(item => (
-                            <MarketCard
-                                key={item.id}
-                                listing={item}
-                                isSelected={selectedIds.has(item.id)}
-                                onToggleSelect={toggleSelect}
-                            />
-                        ))}
-                    </div>
+                    {initialListings.length === 0 ? (
+                        <div className="flex items-center justify-center py-20">
+                            <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+                        </div>
+                    ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 animate-in fade-in duration-500">
+                            {filteredItems.map(item => (
+                                <MarketCard
+                                    key={item.id}
+                                    listing={item}
+                                    isSelected={selectedIds.has(item.id)}
+                                    onToggleSelect={toggleSelect}
+                                />
+                            ))}
+                        </div>
+                    )}
 
                     {filteredItems.length === 0 && (
-                        <div className="text-center py-20 text-muted-foreground border-2 border-dashed rounded-xl">
-                            No listings found in this category yet.
+                        <div className="col-span-full border-2 border-dashed border-slate-200 rounded-xl">
+                            <EmptyState
+                                icon={<Store className="h-8 w-8" />}
+                                title="No listings found in this category yet"
+                                description="Check back later or browse other categories."
+                            />
                         </div>
                     )}
                 </Tabs>

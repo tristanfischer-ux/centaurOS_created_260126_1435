@@ -69,6 +69,10 @@ export function CreateTaskDialog({ objectives, members, teams = [], currentUserI
     const [date, setDate] = useState<Date>()
     const [selectedAssignees, setSelectedAssignees] = useState<string[]>([])
     const [files, setFiles] = useState<File[]>([])
+    const [titleError, setTitleError] = useState<string | null>(null)
+    const [descriptionError, setDescriptionError] = useState<string | null>(null)
+    const [assigneeError, setAssigneeError] = useState<string | null>(null)
+    const [submitError, setSubmitError] = useState<string | null>(null)
 
     // Form Refs for manual value setting
     const titleObjRef = useRef<HTMLInputElement>(null)
@@ -84,12 +88,51 @@ export function CreateTaskDialog({ objectives, members, teams = [], currentUserI
         }
     }
 
+    // Handle dialog open state change with form reset
+    const handleOpenChange = (newOpen: boolean) => {
+        setOpen(newOpen)
+        if (!newOpen) {
+            // Reset state after dialog close animation
+            setTimeout(() => {
+                setDate(undefined)
+                setSelectedAssignees([])
+                setFiles([])
+                if (titleObjRef.current) titleObjRef.current.value = ''
+                if (descRef.current) descRef.current.value = ''
+            }, 300)
+        }
+    }
+
 
     async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
         event.preventDefault()
+        
+        // Reset errors
+        setTitleError(null)
+        setDescriptionError(null)
+        setAssigneeError(null)
+        setSubmitError(null)
+        
+        // Get form values
+        const form = event.currentTarget
+        const title = (form.elements.namedItem('title') as HTMLInputElement)?.value?.trim()
+        const description = (form.elements.namedItem('description') as HTMLTextAreaElement)?.value?.trim()
+        
+        // Validate title
+        if (!title) {
+            setTitleError("Task title is required")
+            return
+        }
+        
+        // Validate assignees
+        if (selectedAssignees.length === 0) {
+            setAssigneeError("At least one assignee is required")
+            return
+        }
+        
         setIsLoading(true)
 
-        const formData = new FormData(event.currentTarget)
+        const formData = new FormData(form)
 
         // Append deadline if selected
         if (date) {
@@ -109,19 +152,30 @@ export function CreateTaskDialog({ objectives, members, teams = [], currentUserI
         })
         formData.set('file_count', String(files.length))
 
-        const result = await createTask(formData)
+        try {
+            const result = await createTask(formData)
 
-        if (result?.error) {
-            toast.error(result.error)
-        } else {
-            toast.success("Task created")
-            setOpen(false)
-            // Reset state
-            setDate(undefined)
-            setSelectedAssignees([])
-            setFiles([])
+            if (result?.error) {
+                setSubmitError(result.error)
+                toast.error(result.error)
+            } else {
+                toast.success("Task created")
+                setOpen(false)
+                // Reset state
+                setDate(undefined)
+                setSelectedAssignees([])
+                setFiles([])
+                setTitleError(null)
+                setDescriptionError(null)
+                setAssigneeError(null)
+                setSubmitError(null)
+            }
+        } catch (error) {
+            setSubmitError("An unexpected error occurred")
+            toast.error("An unexpected error occurred")
+        } finally {
+            setIsLoading(false)
         }
-        setIsLoading(false)
     }
 
     const handleVoiceFill = (data: { title: string; description: string; assignee_type: string; due_date?: string }) => {
@@ -224,18 +278,19 @@ export function CreateTaskDialog({ objectives, members, teams = [], currentUserI
     }
 
     return (
-        <Dialog open={open} onOpenChange={setOpen}>
+        <Dialog open={open} onOpenChange={handleOpenChange}>
             <DialogTrigger asChild>
                 <Button
                     size="sm"
-                    className="bg-slate-900 text-white hover:bg-slate-800 touch-manipulation"
+                    variant="primary"
+                    className="touch-manipulation"
                     type="button"
                     onClick={handleMobileClick}
                 >
-                    <Plus className="mr-2 h-4 w-4" /> New Task
+                    <Plus className="h-4 w-4" /> New Task
                 </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[600px] bg-white text-slate-900 border-slate-200 max-h-[90vh] overflow-y-auto">
+            <DialogContent className="w-[calc(100vw-2rem)] sm:max-w-[600px] bg-white text-slate-900 border-slate-200 max-h-[90dvh] overflow-y-auto">
                 <form onSubmit={onSubmit}>
                     <DialogHeader>
                         <div className="flex items-center justify-between pr-8">
@@ -259,8 +314,19 @@ export function CreateTaskDialog({ objectives, members, teams = [], currentUserI
                                 name="title"
                                 placeholder="Review contract drafts..."
                                 required
+                                aria-required={true}
+                                enterKeyHint="next"
                                 ref={titleObjRef}
+                                aria-describedby={titleError ? "title-error" : undefined}
+                                aria-invalid={!!titleError}
+                                className={titleError ? "border-red-500" : ""}
+                                onChange={() => setTitleError(null)}
                             />
+                            {titleError && (
+                                <p id="title-error" className="text-sm text-red-600 mt-1" role="alert">
+                                    {titleError}
+                                </p>
+                            )}
                         </div>
                         <div className="grid gap-2">
                             <Label htmlFor="description">Description</Label>
@@ -269,6 +335,7 @@ export function CreateTaskDialog({ objectives, members, teams = [], currentUserI
                                 name="description"
                                 placeholder="Provide specific details so the assignee knows what to do."
                                 className="h-24"
+                                enterKeyHint="done"
                                 ref={descRef}
                             />
                         </div>
@@ -276,15 +343,22 @@ export function CreateTaskDialog({ objectives, members, teams = [], currentUserI
                         {/* Assignees - Multi-Select */}
                         <div className="grid gap-2">
                             <Label>Assignees</Label>
-                            <MultiSelect
-                                options={memberOptions}
-                                selected={selectedAssignees}
-                                onChange={setSelectedAssignees}
-                                placeholder="Select people..."
-                                emptyMessage="No members found"
-                            />
-                            {selectedAssignees.length === 0 && (
-                                <p className="text-xs text-red-500">At least one assignee required</p>
+                            <div aria-describedby={assigneeError ? "assignee-error" : undefined}>
+                                <MultiSelect
+                                    options={memberOptions}
+                                    selected={selectedAssignees}
+                                    onChange={(value) => {
+                                        setSelectedAssignees(value)
+                                        setAssigneeError(null)
+                                    }}
+                                    placeholder="Select people..."
+                                    emptyMessage="No members found"
+                                />
+                            </div>
+                            {assigneeError && (
+                                <p id="assignee-error" className="text-sm text-red-600 mt-1" role="alert">
+                                    {assigneeError}
+                                </p>
                             )}
                         </div>
 
@@ -292,7 +366,11 @@ export function CreateTaskDialog({ objectives, members, teams = [], currentUserI
                         <div className="grid gap-2">
                             <Label htmlFor="objective">Objective</Label>
                             <Select name="objective_id" required>
-                                <SelectTrigger className="bg-white border-slate-200">
+                                <SelectTrigger 
+                                    id="objective"
+                                    className="bg-white border-slate-200"
+                                    aria-required={true}
+                                >
                                     <SelectValue placeholder="Link to objective..." />
                                 </SelectTrigger>
                                 <SelectContent className="bg-white border-slate-200 z-50">
@@ -317,7 +395,7 @@ export function CreateTaskDialog({ objectives, members, teams = [], currentUserI
                                             !date && "text-muted-foreground"
                                         )}
                                     >
-                                        <CalendarIcon className="mr-2 h-4 w-4" />
+                                        <CalendarIcon className="h-4 w-4" />
                                         {date ? format(date, "PPP") : <span>Pick a date</span>}
                                     </Button>
                                 </PopoverTrigger>
@@ -335,10 +413,19 @@ export function CreateTaskDialog({ objectives, members, teams = [], currentUserI
 
                         {/* File Attachments */}
                         <div className="grid gap-2">
-                            <Label>Attachments (Optional)</Label>
+                            <Label htmlFor="file-upload">Attachments (Optional)</Label>
                             <div
                                 className="border-2 border-dashed border-slate-200 rounded-lg p-4 text-center cursor-pointer hover:border-slate-300 hover:bg-slate-50 transition-colors"
                                 onClick={() => fileInputRef.current?.click()}
+                                role="button"
+                                tabIndex={0}
+                                aria-label="Click to upload files or drag and drop"
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter' || e.key === ' ') {
+                                        e.preventDefault()
+                                        fileInputRef.current?.click()
+                                    }
+                                }}
                             >
                                 <Upload className="h-6 w-6 mx-auto text-slate-400 mb-2" />
                                 <p className="text-sm text-slate-500">
@@ -350,6 +437,7 @@ export function CreateTaskDialog({ objectives, members, teams = [], currentUserI
                             </div>
                             <input
                                 ref={fileInputRef}
+                                id="file-upload"
                                 type="file"
                                 multiple
                                 accept={ALLOWED_TYPES.join(',')}
@@ -384,13 +472,22 @@ export function CreateTaskDialog({ objectives, members, teams = [], currentUserI
                                 </div>
                             )}
                         </div>
+                        {submitError && (
+                            <div className="col-span-full">
+                                <p className="text-sm text-red-600" role="alert">
+                                    {submitError}
+                                </p>
+                            </div>
+                        )}
                     </div>
-                    <DialogFooter>
+                    <DialogFooter className="gap-2 pt-4 border-t border-slate-100">
+                        <Button variant="outline" onClick={() => setOpen(false)} disabled={isLoading}>Cancel</Button>
                         <Button
                             type="submit"
+                            variant="primary"
                             disabled={isLoading || selectedAssignees.length === 0}
                         >
-                            {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                            {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
                             Create Task
                         </Button>
                     </DialogFooter>

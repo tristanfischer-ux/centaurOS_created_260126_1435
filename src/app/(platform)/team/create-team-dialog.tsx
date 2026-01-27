@@ -59,15 +59,27 @@ export function CreateTeamDialog({ members }: { members: Member[] }) {
         )
     }
 
+    // Handle dialog open state change with form reset
+    const handleOpenChange = (newOpen: boolean) => {
+        setOpen(newOpen)
+        if (!newOpen) {
+            // Reset state after dialog close animation
+            setTimeout(() => {
+                setName("")
+                setSelectedMembers([])
+            }, 300)
+        }
+    }
+
     return (
-        <Dialog open={open} onOpenChange={setOpen}>
+        <Dialog open={open} onOpenChange={handleOpenChange}>
             <DialogTrigger asChild>
-                <Button className="bg-green-600 hover:bg-green-700 text-white">
+                <Button variant="primary">
                     <Plus className="h-4 w-4 mr-2" />
                     New Team
                 </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[425px] bg-white text-slate-900 border-slate-200">
+            <DialogContent className="sm:max-w-[425px]">
                 <DialogHeader>
                     <DialogTitle>Create New Team</DialogTitle>
                     <DialogDescription>
@@ -82,12 +94,11 @@ export function CreateTeamDialog({ members }: { members: Member[] }) {
                             value={name}
                             onChange={(e) => setName(e.target.value)}
                             placeholder="e.g. Frontend Squad"
-                            className="bg-white border-slate-300"
                         />
                     </div>
                     <div className="space-y-2">
                         <Label>Select Members (Min 2)</Label>
-                        <div className="border border-slate-200 rounded-md max-h-[200px] overflow-y-auto p-2 space-y-2">
+                        <div className="border border-input rounded-md max-h-[200px] overflow-y-auto p-2 space-y-2">
                             {members.map(member => (
                                 <div key={member.id} className="flex items-center space-x-2">
                                     <input
@@ -95,20 +106,22 @@ export function CreateTeamDialog({ members }: { members: Member[] }) {
                                         id={member.id}
                                         checked={selectedMembers.includes(member.id)}
                                         onChange={() => toggleMember(member.id)}
-                                        className="h-4 w-4 rounded border-slate-300 text-green-600 focus:ring-green-600"
+                                        className="h-4 w-4 rounded border-input text-foreground focus:ring-ring"
+                                        aria-label={`Select ${member.full_name}`}
                                     />
                                     <label
                                         htmlFor={member.id}
                                         className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer w-full py-1"
                                     >
-                                        {member.full_name} <span className="text-xs text-slate-500">({member.role})</span>
+                                        {member.full_name} <span className="text-xs text-muted-foreground">({member.role})</span>
                                     </label>
                                 </div>
                             ))}
                         </div>
                     </div>
-                    <DialogFooter>
-                        <Button type="submit" disabled={loading} className="bg-green-600 hover:bg-green-700">
+                    <DialogFooter className="gap-2 pt-4 border-t border-border">
+                        <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
+                        <Button type="submit" variant="primary" disabled={loading}>
                             {loading ? "Creating..." : "Create Team"}
                         </Button>
                     </DialogFooter>

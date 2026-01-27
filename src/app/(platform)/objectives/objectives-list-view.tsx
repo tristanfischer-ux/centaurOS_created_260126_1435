@@ -1,7 +1,9 @@
 "use client"
 
 import { useState } from "react"
-import { ChevronDown, ChevronRight, Target, CheckCircle2, Clock, AlertCircle, ArrowRight, Trash, MessageSquare, Paperclip } from "lucide-react"
+import { useAutoRefresh } from "@/hooks/useAutoRefresh"
+import { RefreshButton } from "@/components/RefreshButton"
+import { ChevronDown, ChevronRight, Target, CheckCircle2, Clock, AlertCircle, ArrowRight, Trash, MessageSquare, Paperclip, Loader2 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
@@ -67,22 +69,32 @@ export function ObjectivesListView({ objectives }: ObjectivesListViewProps) {
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
     const [objectiveToDelete, setObjectiveToDelete] = useState<string | null>(null)
     const [showBulkDeleteDialog, setShowBulkDeleteDialog] = useState(false)
+    const [isDeletingSingle, setIsDeletingSingle] = useState(false)
+    const [isDeletingBulk, setIsDeletingBulk] = useState(false)
+
+    // Auto-refresh using Supabase Realtime
+    useAutoRefresh({ tables: ['objectives', 'tasks'] })
 
     // Handle single deletion
     const handleDeleteSingle = async () => {
         if (!objectiveToDelete) return
 
-        const result = await deleteObjective(objectiveToDelete)
+        setIsDeletingSingle(true)
+        try {
+            const result = await deleteObjective(objectiveToDelete)
 
-        if (result?.error) {
-            toast.error(result.error)
-        } else {
-            toast.success("Objective deleted")
-            setObjectiveToDelete(null)
-            // Remove from selection if it was there
-            const newSelected = new Set(selectedIds)
-            newSelected.delete(objectiveToDelete)
-            setSelectedIds(newSelected)
+            if (result?.error) {
+                toast.error(result.error)
+            } else {
+                toast.success("Objective deleted")
+                setObjectiveToDelete(null)
+                // Remove from selection if it was there
+                const newSelected = new Set(selectedIds)
+                newSelected.delete(objectiveToDelete)
+                setSelectedIds(newSelected)
+            }
+        } finally {
+            setIsDeletingSingle(false)
         }
     }
 
@@ -90,17 +102,22 @@ export function ObjectivesListView({ objectives }: ObjectivesListViewProps) {
     const handleDeleteBulk = async () => {
         if (selectedIds.size === 0) return
 
-        const idsToDelete = Array.from(selectedIds)
-        // Dynamically import to avoid circular dependencies if they exist, or just use the imported action
-        const { deleteObjectives } = await import("@/actions/objectives")
-        const result = await deleteObjectives(idsToDelete)
+        setIsDeletingBulk(true)
+        try {
+            const idsToDelete = Array.from(selectedIds)
+            // Dynamically import to avoid circular dependencies if they exist, or just use the imported action
+            const { deleteObjectives } = await import("@/actions/objectives")
+            const result = await deleteObjectives(idsToDelete)
 
-        if (result?.error) {
-            toast.error(result.error)
-        } else {
-            toast.success(`${idsToDelete.length} objectives deleted`)
-            setSelectedIds(new Set())
-            setShowBulkDeleteDialog(false)
+            if (result?.error) {
+                toast.error(result.error)
+            } else {
+                toast.success(`${idsToDelete.length} objectives deleted`)
+                setSelectedIds(new Set())
+                setShowBulkDeleteDialog(false)
+            }
+        } finally {
+            setIsDeletingBulk(false)
         }
     }
 
@@ -145,6 +162,7 @@ export function ObjectivesListView({ objectives }: ObjectivesListViewProps) {
             {/* Controls */}
             <div className="flex items-center justify-between">
                 <div className="flex gap-2">
+                    <RefreshButton />
                     <Button variant="outline" size="sm" onClick={expandAll}>
                         Expand All
                     </Button>
@@ -177,12 +195,20 @@ export function ObjectivesListView({ objectives }: ObjectivesListViewProps) {
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogCancel disabled={isDeletingSingle}>Cancel</AlertDialogCancel>
                         <AlertDialogAction
                             className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
                             onClick={handleDeleteSingle}
+                            disabled={isDeletingSingle}
                         >
-                            Delete
+                            {isDeletingSingle ? (
+                                <>
+                                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                    Deleting...
+                                </>
+                            ) : (
+                                "Delete"
+                            )}
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
@@ -199,12 +225,20 @@ export function ObjectivesListView({ objectives }: ObjectivesListViewProps) {
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogCancel disabled={isDeletingBulk}>Cancel</AlertDialogCancel>
                         <AlertDialogAction
                             className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
                             onClick={handleDeleteBulk}
+                            disabled={isDeletingBulk}
                         >
-                            Delete {selectedIds.size} Items
+                            {isDeletingBulk ? (
+                                <>
+                                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                    Deleting...
+                                </>
+                            ) : (
+                                `Delete ${selectedIds.size} Items`
+                            )}
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
@@ -218,7 +252,7 @@ export function ObjectivesListView({ objectives }: ObjectivesListViewProps) {
                         <div className="flex items-center h-5 w-5 mr-4">
                             <input
                                 type="checkbox"
-                                className="h-4 w-4 rounded border-slate-300 text-amber-600 focus:ring-amber-500 cursor-pointer"
+                                className="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-500 cursor-pointer"
                                 checked={selectedIds.size === objectives.length && objectives.length > 0}
                                 onChange={toggleSelectAll}
                                 aria-label="Select all objectives"
@@ -238,12 +272,12 @@ export function ObjectivesListView({ objectives }: ObjectivesListViewProps) {
                     return (
                         <div
                             key={objective.id}
-                            className={`bg-white border rounded-lg shadow-sm overflow-hidden transition-all duration-200 ${isSelected ? 'border-amber-500 ring-1 ring-amber-500/20' : 'border-slate-200'
+                            className={`bg-white border rounded-lg shadow-sm overflow-hidden transition-all duration-200 ${isSelected ? 'ring-2 ring-slate-500 border-slate-500' : 'border-slate-200'
                                 }`}
                         >
                             {/* Objective Header */}
                             <div
-                                className="flex items-center gap-4 p-4 cursor-pointer hover:bg-slate-50 transition-colors"
+                                className="flex items-center gap-4 p-4 cursor-pointer hover:bg-slate-50 active:bg-slate-100 transition-colors"
                                 onClick={() => toggleExpand(objective.id)}
                             >
                                 {/* Checkbox */}
@@ -256,14 +290,18 @@ export function ObjectivesListView({ objectives }: ObjectivesListViewProps) {
                                 >
                                     <input
                                         type="checkbox"
-                                        className="h-4 w-4 rounded border-slate-300 text-amber-600 focus:ring-amber-500 cursor-pointer"
+                                        className="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-500 cursor-pointer"
                                         checked={isSelected}
                                         onChange={() => { }} // Handled by div click
                                         aria-label={`Select objective ${objective.title}`}
                                     />
                                 </div>
 
-                                <button className="shrink-0 text-slate-400 hover:text-slate-600">
+                                <button
+                                    className="shrink-0 text-slate-400 hover:text-slate-600 active:text-slate-700 transition-colors"
+                                    aria-label={isExpanded ? "Collapse objective" : "Expand objective"}
+                                    aria-expanded={isExpanded}
+                                >
                                     {isExpanded ? (
                                         <ChevronDown className="h-5 w-5" />
                                     ) : (
@@ -298,7 +336,7 @@ export function ObjectivesListView({ objectives }: ObjectivesListViewProps) {
                                     <Button
                                         variant="ghost"
                                         size="icon"
-                                        className="h-8 w-8 text-slate-400 hover:text-red-600 hover:bg-red-50"
+                                        className="h-8 w-8 text-slate-400 hover:text-red-600 hover:bg-red-50 active:text-red-700 active:bg-red-100 active:scale-[0.98] transition-all"
                                         onClick={(e) => {
                                             e.stopPropagation()
                                             setObjectiveToDelete(objective.id)
@@ -323,7 +361,7 @@ export function ObjectivesListView({ objectives }: ObjectivesListViewProps) {
                                                 const StatusIcon = statusConfig.icon
 
                                                 return (
-                                                    <div key={task.id} className="flex items-center gap-2 sm:gap-4 p-3 pl-8 sm:pl-14 hover:bg-white transition-colors">
+                                                    <div key={task.id} className="flex items-center gap-2 sm:gap-4 p-3 pl-8 sm:pl-14 hover:bg-white active:bg-slate-50 transition-colors">
                                                         <StatusIcon className={`h-4 w-4 shrink-0 ${statusConfig.color.split(' ')[1]}`} />
 
                                                         <Link href={`/tasks?task=${task.id}`} className="flex-1 min-w-0 text-sm text-slate-700 hover:text-amber-600 truncate">

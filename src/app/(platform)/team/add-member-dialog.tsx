@@ -28,7 +28,7 @@ function SubmitButton() {
     const { pending } = useFormStatus()
 
     return (
-        <Button type="submit" className="bg-accent text-foundry-950 hover:bg-accent/90" disabled={pending}>
+        <Button type="submit" variant="primary" disabled={pending}>
             {pending ? (
                 <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -55,51 +55,73 @@ export function AddMemberDialog() {
         }
     }
 
+    // Handle dialog open state change with form reset
+    const handleOpenChange = (newOpen: boolean) => {
+        setOpen(newOpen)
+        if (!newOpen) {
+            // Reset state after dialog close animation
+            setTimeout(() => {
+                setError(null)
+            }, 300)
+        }
+    }
+
     return (
-        <Dialog open={open} onOpenChange={setOpen}>
+        <Dialog open={open} onOpenChange={handleOpenChange}>
             <DialogTrigger asChild>
-                <Button className="bg-accent text-foundry-950 hover:bg-accent/90 gap-2 font-bold">
+                <Button variant="primary" className="gap-2 font-bold">
                     <UserPlus className="h-4 w-4" />
                     Add Member
                 </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[425px] bg-foundry-900 border-foundry-800 text-white">
+            <DialogContent className="sm:max-w-[425px] bg-white text-slate-900 border-slate-200">
                 <DialogHeader>
                     <DialogTitle>Add Team Member</DialogTitle>
-                    <DialogDescription className="text-gray-400">
+                    <DialogDescription>
                         Expand your Foundry roster.
                     </DialogDescription>
                 </DialogHeader>
                 <form action={clientAction}>
                     <div className="grid gap-4 py-4">
                         <div className="grid gap-2">
-                            <Label htmlFor="full_name" className="text-gray-200">Full Name</Label>
+                            <Label htmlFor="full_name">Full Name</Label>
                             <Input
                                 id="full_name"
                                 name="full_name"
                                 required
+                                aria-required={true}
                                 placeholder="John Doe"
-                                className="bg-foundry-950 border-foundry-800 text-white focus-visible:ring-accent"
+                                autoComplete="name"
+                                enterKeyHint="next"
+                                className="bg-white border-slate-200"
                             />
                         </div>
                         <div className="grid gap-2">
-                            <Label htmlFor="email" className="text-gray-200">Email Address</Label>
+                            <Label htmlFor="email">Email Address</Label>
                             <Input
                                 id="email"
                                 name="email"
                                 type="email"
+                                inputMode="email"
+                                autoComplete="email"
+                                enterKeyHint="done"
                                 required
+                                aria-required={true}
                                 placeholder="john@example.com"
-                                className="bg-foundry-950 border-foundry-800 text-white focus-visible:ring-accent"
+                                className="bg-white border-slate-200"
                             />
                         </div>
                         <div className="grid gap-2">
-                            <Label htmlFor="role_type" className="text-gray-200">Role</Label>
-                            <Select name="role_type" defaultValue="Apprentice">
-                                <SelectTrigger className="bg-foundry-950 border-foundry-800 text-white focus:ring-accent">
+                            <Label htmlFor="role_type">Role</Label>
+                            <Select name="role_type" defaultValue="Apprentice" required>
+                                <SelectTrigger 
+                                    id="role_type"
+                                    className="bg-white border-slate-200"
+                                    aria-required={true}
+                                >
                                     <SelectValue placeholder="Select a role" />
                                 </SelectTrigger>
-                                <SelectContent className="bg-foundry-900 border-foundry-800 text-white">
+                                <SelectContent className="bg-white border-slate-200">
                                     <SelectItem value="Apprentice">Apprentice</SelectItem>
                                     <SelectItem value="Executive">Executive</SelectItem>
                                 </SelectContent>
@@ -111,7 +133,8 @@ export function AddMemberDialog() {
                             </div>
                         )}
                     </div>
-                    <DialogFooter>
+                    <DialogFooter className="gap-2 pt-4 border-t border-slate-100">
+                        <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
                         <SubmitButton />
                     </DialogFooter>
                 </form>

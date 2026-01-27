@@ -46,7 +46,7 @@ export function ClientNudgeButton({ taskId, disabled, lastNudge }: ClientNudgeBu
                 (isCoolingDown || hasNudged) && "opacity-50 cursor-not-allowed"
             )}
         >
-            <PhoneCall className={cn("w-3 h-3 mr-2", isLoading && "animate-pulse")} />
+            <PhoneCall className={cn("h-4 w-4", isLoading && "animate-pulse")} />
             {isCoolingDown || hasNudged ? "Update Requested" : "Request Update"}
         </Button>
     )

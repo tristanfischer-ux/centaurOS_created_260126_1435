@@ -155,3 +155,8 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Touch optimization */
+button, a, [role="button"], input, select, textarea {
+  touch-action: manipulation;
+}

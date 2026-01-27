@@ -4,7 +4,7 @@ import { createObjective } from "@/actions/objectives"
 import { getObjectivePacks, ObjectivePack } from "@/actions/packs"
 import { analyzeBusinessPlan, AnalyzedObjective } from "@/actions/analyze"
 import { toast } from "sonner"
-import { useEffect, useState } from "react"
+import { useEffect, useState, useCallback } from "react"
 import {
     Loader2,
     Plus,
@@ -38,6 +38,7 @@ import {
 } from "@/components/ui/dialog"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import { EmptyState } from "@/components/ui/empty-state"
 import { cn } from "@/lib/utils"
 
 type CreationMode = 'manual' | 'pack' | 'import'
@@ -54,28 +55,53 @@ const PACK_ICONS: Record<string, any> = {
 export function CreateObjectiveDialog() {
     const [open, setOpen] = useState(false)
     const [mode, setMode] = useState<CreationMode>('manual')
-    const [loading, setLoading] = useState(false)
+    const [isLoading, setIsLoading] = useState(false)
 
     // Manual Data
     const [title, setTitle] = useState("")
     const [description, setDescription] = useState("")
+    const [titleError, setTitleError] = useState<string | null>(null)
+    const [descriptionError, setDescriptionError] = useState<string | null>(null)
 
     // Pack Data
     const [packs, setPacks] = useState<ObjectivePack[]>([])
     const [selectedPack, setSelectedPack] = useState<ObjectivePack | null>(null)
-    const [packLoading, setPackLoading] = useState(false)
+    const [isPackLoading, setIsPackLoading] = useState(false)
+    const [packError, setPackError] = useState<string | null>(null)
     const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([])
 
     // Import Data
-    const [analyzing, setAnalyzing] = useState(false)
+    const [isAnalyzing, setIsAnalyzing] = useState(false)
     const [analyzedObjectives, setAnalyzedObjectives] = useState<AnalyzedObjective[]>([])
     const [selectedAnalysisIndex, setSelectedAnalysisIndex] = useState<number | null>(null)
     const [analysisFile, setAnalysisFile] = useState<File | null>(null)
 
+    async function loadPacks() {
+        setIsPackLoading(true)
+        setPackError(null)
+        try {
+            const { packs, error } = await getObjectivePacks()
+            if (error) {
+                setPackError(error)
+                setPacks([])
+            } else {
+                setPacks(packs || [])
+            }
+        } catch (e) {
+            setPackError('Failed to load objective packs')
+            console.error('Pack loading error:', e)
+            setPacks([])
+        } finally {
+            setIsPackLoading(false)
+        }
+    }
+
+    const loadPacksCallback = useCallback(loadPacks, [])
+
     // Load packs on open
     useEffect(() => {
         if (open) {
-            loadPacks()
+            loadPacksCallback()
         } else {
             // Reset state on close
             setTimeout(() => {
@@ -87,23 +113,17 @@ export function CreateObjectiveDialog() {
                 setAnalyzedObjectives([])
                 setSelectedAnalysisIndex(null)
                 setAnalysisFile(null)
+                setPackError(null)
             }, 300)
         }
-    }, [open])
-
-    async function loadPacks() {
-        setPackLoading(true)
-        const { packs } = await getObjectivePacks()
-        setPacks(packs || [])
-        setPackLoading(false)
-    }
+    }, [open, loadPacksCallback])
 
     const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0]
         if (!file) return
 
         setAnalysisFile(file)
-        setAnalyzing(true)
+        setIsAnalyzing(true)
         setAnalyzedObjectives([])
         setSelectedAnalysisIndex(null)
 
@@ -111,7 +131,7 @@ export function CreateObjectiveDialog() {
         formData.append('file', file)
 
         const result = await analyzeBusinessPlan(formData)
-        setAnalyzing(false)
+        setIsAnalyzing(false)
 
         if (result.error) {
             toast.error(result.error)
@@ -129,12 +149,31 @@ export function CreateObjectiveDialog() {
     }
 
     const handleCreate = async () => {
+        // Reset errors
+        setTitleError(null)
+        setDescriptionError(null)
+
+        // Validate title
         if (!title.trim()) {
+            setTitleError("Objective title is required")
             toast.error("Objective title is required")
             return
         }
 
-        setLoading(true)
+        if (title.trim().length > 200) {
+            setTitleError("Objective title must be 200 characters or less")
+            toast.error("Objective title must be 200 characters or less")
+            return
+        }
+
+        // Validate description (optional but if provided, must meet requirements)
+        if (description && description.trim().length > 10000) {
+            setDescriptionError("Description must be 10,000 characters or less")
+            toast.error("Description must be 10,000 characters or less")
+            return
+        }
+
+        setIsLoading(true)
         const formData = new FormData()
         formData.append('title', title)
         formData.append('description', description)
@@ -161,7 +200,14 @@ export function CreateObjectiveDialog() {
         try {
             const res = await createObjective(formData)
             if (res?.error) {
-                toast.error(res.error)
+                // Set error on appropriate field or show general error
+                if (res.error.toLowerCase().includes('title')) {
+                    setTitleError(res.error)
+                } else if (res.error.toLowerCase().includes('description')) {
+                    setDescriptionError(res.error)
+                } else {
+                    toast.error(res.error)
+                }
             } else {
                 toast.success("Objective Initiated")
                 setOpen(false)
@@ -170,7 +216,7 @@ export function CreateObjectiveDialog() {
             toast.error("An unexpected error occurred")
             console.error(e)
         } finally {
-            setLoading(false)
+            setIsLoading(false)
         }
     }
 
@@ -186,10 +232,10 @@ export function CreateObjectiveDialog() {
         <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
                 <Button size="sm" className="bg-white text-black hover:bg-gray-200 border border-transparent shadow-sm">
-                    <Plus className="mr-2 h-4 w-4" /> New Objective
+                    <Plus className="h-4 w-4" /> New Objective
                 </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-[800px] h-[600px] flex flex-col p-0 gap-0 bg-white sm:rounded-xl overflow-hidden">
+            <DialogContent className="w-[calc(100vw-2rem)] sm:max-w-[800px] max-h-[90dvh] flex flex-col p-0 gap-0 bg-white sm:rounded-xl overflow-hidden">
                 {/* Header Section */}
                 <div className="p-6 pb-4 border-b border-slate-100 bg-slate-50/50">
                     <DialogHeader>
@@ -245,10 +291,25 @@ export function CreateObjectiveDialog() {
                                         id="title"
                                         placeholder="e.g. Q1 Market Expansion"
                                         value={title}
-                                        onChange={(e) => setTitle(e.target.value)}
-                                        className="h-12 text-lg"
+                                        onChange={(e) => {
+                                            setTitle(e.target.value)
+                                            setTitleError(null)
+                                        }}
+                                        className={`h-12 text-lg ${titleError ? 'border-red-500' : ''}`}
                                         autoFocus
+                                        aria-describedby={titleError ? "title-error" : undefined}
+                                        aria-invalid={!!titleError}
                                     />
+                                    {titleError && (
+                                        <p id="title-error" className="text-sm text-red-600 mt-1" role="alert">
+                                            {titleError}
+                                        </p>
+                                    )}
+                                    {!titleError && title && (
+                                        <p className="text-xs text-slate-400 text-right">
+                                            {title.length} / 200 characters
+                                        </p>
+                                    )}
                                 </div>
                                 <div className="space-y-2">
                                     <Label htmlFor="description" className="text-base font-semibold">Description & Success Criteria</Label>
@@ -256,10 +317,24 @@ export function CreateObjectiveDialog() {
                                         id="description"
                                         placeholder="Define the scope, key results, and success metrics..."
                                         value={description}
-                                        onChange={(e) => setDescription(e.target.value)}
-                                        className="min-h-[200px] text-base resize-none p-4"
+                                        onChange={(e) => {
+                                            setDescription(e.target.value)
+                                            setDescriptionError(null)
+                                        }}
+                                        className={`min-h-[200px] text-base resize-none p-4 ${descriptionError ? 'border-red-500' : ''}`}
+                                        aria-describedby={descriptionError ? "description-error" : undefined}
+                                        aria-invalid={!!descriptionError}
                                     />
-                                    <p className="text-xs text-slate-400 text-right">Markdown supported</p>
+                                    {descriptionError && (
+                                        <p id="description-error" className="text-sm text-red-600 mt-1" role="alert">
+                                            {descriptionError}
+                                        </p>
+                                    )}
+                                    {!descriptionError && (
+                                        <p className="text-xs text-slate-400 text-right">
+                                            {description.length} / 10,000 characters {description.length > 0 && '(Markdown supported)'}
+                                        </p>
+                                    )}
                                 </div>
                             </div>
                         )}
@@ -270,9 +345,25 @@ export function CreateObjectiveDialog() {
                                 {!selectedPack ? (
                                     // Pack Grid
                                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                        {packLoading ? (
+                                        {isPackLoading ? (
                                             <div className="col-span-full flex items-center justify-center py-20">
                                                 <Loader2 className="w-8 h-8 animate-spin text-slate-300" />
+                                            </div>
+                                        ) : packError ? (
+                                            <div className="col-span-full border-2 border-dashed border-red-200 rounded-lg">
+                                                <EmptyState
+                                                    icon={<Package className="h-8 w-8 text-red-500" />}
+                                                    title="Failed to load packs"
+                                                    description={packError}
+                                                />
+                                            </div>
+                                        ) : packs.length === 0 ? (
+                                            <div className="col-span-full border-2 border-dashed border-slate-200 rounded-lg">
+                                                <EmptyState
+                                                    icon={<Package className="h-8 w-8" />}
+                                                    title="No packs available"
+                                                    description="Objective packs are not currently available. Try creating an objective manually."
+                                                />
                                             </div>
                                         ) : packs.map((pack) => {
                                             const Icon = pack.icon_name ? PACK_ICONS[pack.icon_name] || Package : Package
@@ -367,7 +458,7 @@ export function CreateObjectiveDialog() {
                         {/* IMPORT MODE */}
                         {mode === 'import' && (
                             <div className="max-w-2xl mx-auto pt-4 h-full flex flex-col items-center">
-                                {!analyzedObjectives.length && !analyzing ? (
+                                {!analyzedObjectives.length && !isAnalyzing ? (
                                     <div className="w-full">
                                         <div
                                             className="border-2 border-dashed border-slate-200 rounded-xl p-12 flex flex-col items-center justify-center text-center space-y-4 hover:border-blue-500 hover:bg-blue-50/10 transition-all cursor-pointer group relative"
@@ -390,7 +481,7 @@ export function CreateObjectiveDialog() {
                                             <Badge variant="secondary" className="mt-4">AI Powered Analysis</Badge>
                                         </div>
                                     </div>
-                                ) : analyzing ? (
+                                ) : isAnalyzing ? (
                                     <div className="flex flex-col items-center justify-center py-20 space-y-6">
                                         <div className="relative">
                                             <div className="w-16 h-16 border-4 border-slate-100 border-t-blue-600 rounded-full animate-spin"></div>
@@ -448,14 +539,39 @@ export function CreateObjectiveDialog() {
                                                 <Label>Refine Selected Objective</Label>
                                                 <Input
                                                     value={title}
-                                                    onChange={(e) => setTitle(e.target.value)}
-                                                    className="bg-white"
+                                                    onChange={(e) => {
+                                                        setTitle(e.target.value)
+                                                        setTitleError(null)
+                                                    }}
+                                                    className={`bg-white ${titleError ? 'border-red-500' : ''}`}
+                                                    aria-describedby={titleError ? "title-error-import" : undefined}
+                                                    aria-invalid={!!titleError}
                                                 />
+                                                {titleError && (
+                                                    <p id="title-error-import" className="text-sm text-red-600 mt-1" role="alert">
+                                                        {titleError}
+                                                    </p>
+                                                )}
                                                 <Textarea
                                                     value={description}
-                                                    onChange={(e) => setDescription(e.target.value)}
-                                                    className="resize-none h-24 bg-white"
+                                                    onChange={(e) => {
+                                                        setDescription(e.target.value)
+                                                        setDescriptionError(null)
+                                                    }}
+                                                    className={`resize-none h-24 bg-white ${descriptionError ? 'border-red-500' : ''}`}
+                                                    aria-describedby={descriptionError ? "description-error-import" : undefined}
+                                                    aria-invalid={!!descriptionError}
                                                 />
+                                                {descriptionError && (
+                                                    <p id="description-error-import" className="text-sm text-red-600 mt-1" role="alert">
+                                                        {descriptionError}
+                                                    </p>
+                                                )}
+                                                {!descriptionError && description && (
+                                                    <p className="text-xs text-slate-400 text-right">
+                                                        {description.length} / 10,000 characters
+                                                    </p>
+                                                )}
                                             </div>
                                         )}
                                     </div>
@@ -473,17 +589,18 @@ export function CreateObjectiveDialog() {
                         {mode === 'import' && selectedAnalysisIndex !== null && "AI generated tasks will be created."}
                     </div>
 
-                    <Button variant="outline" onClick={() => setOpen(false)} disabled={loading}>
+                    <Button variant="outline" onClick={() => setOpen(false)} disabled={isLoading}>
                         Cancel
                     </Button>
 
                     <Button
                         onClick={handleCreate}
-                        disabled={loading || (mode === 'pack' && !selectedPack) || (mode === 'import' && selectedAnalysisIndex === null) || !title.trim()}
-                        className="bg-black hover:bg-slate-800 text-white min-w-[140px] shadow-sm"
+                        variant="primary"
+                        disabled={isLoading || (mode === 'pack' && !selectedPack) || (mode === 'import' && selectedAnalysisIndex === null) || !title.trim()}
+                        className="min-w-[140px] shadow-sm"
                     >
-                        {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                        {!loading && <Plus className="mr-2 h-4 w-4" />}
+                        {isLoading && <Loader2 className="h-4 w-4 animate-spin" />}
+                        {!isLoading && <Plus className="h-4 w-4" />}
                         {mode === 'manual' ? 'Create Objective' : 'Add Objective and Tasks'}
                     </Button>
                 </DialogFooter>

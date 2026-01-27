@@ -204,6 +204,70 @@ export async function addTeamMember(teamId: string, profileId: string) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return { error: 'Unauthorized' }
 
+    // Validate input
+    if (!teamId || !profileId) {
+        return { error: 'Team ID and Profile ID are required' }
+    }
+
+    // Verify team exists and user has access
+    const foundry_id = await getFoundryId()
+    if (!foundry_id) {
+        return { error: 'Missing Foundry ID' }
+    }
+
+    const { data: team } = await supabase
+        .from('teams')
+        .select('foundry_id')
+        .eq('id', teamId)
+        .single()
+
+    if (!team) {
+        return { error: 'Team not found' }
+    }
+
+    if (team.foundry_id !== foundry_id) {
+        return { error: 'Unauthorized: Team not in your Foundry' }
+    }
+
+    // Verify profile exists and is in same foundry
+    const { data: profile } = await supabase
+        .from('profiles')
+        .select('foundry_id')
+        .eq('id', profileId)
+        .single()
+
+    if (!profile) {
+        return { error: 'Profile not found' }
+    }
+
+    if (profile.foundry_id !== foundry_id) {
+        return { error: 'Unauthorized: Profile not in your Foundry' }
+    }
+
+    // Verify user is a team member (has permission to add members)
+    const { data: membership } = await supabase
+        .from('team_members')
+        .select('profile_id')
+        .eq('team_id', teamId)
+        .eq('profile_id', user.id)
+        .single()
+
+    if (!membership) {
+        return { error: 'Unauthorized: You must be a team member to add members' }
+    }
+
+    // Check if member is already in team
+    const { data: existingMember } = await supabase
+        .from('team_members')
+        .select('profile_id')
+        .eq('team_id', teamId)
+        .eq('profile_id', profileId)
+        .single()
+
+    if (existingMember) {
+        return { error: 'Member is already in this team' }
+    }
+
     const { error } = await supabase
         .from('team_members')
         .insert({ team_id: teamId, profile_id: profileId })
@@ -219,6 +283,68 @@ export async function removeTeamMember(teamId: string, profileId: string) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return { error: 'Unauthorized' }
 
+    // Validate input
+    if (!teamId || !profileId) {
+        return { error: 'Team ID and Profile ID are required' }
+    }
+
+    // Verify team exists and user has access
+    const foundry_id = await getFoundryId()
+    if (!foundry_id) {
+        return { error: 'Missing Foundry ID' }
+    }
+
+    const { data: team } = await supabase
+        .from('teams')
+        .select('foundry_id')
+        .eq('id', teamId)
+        .single()
+
+    if (!team) {
+        return { error: 'Team not found' }
+    }
+
+    if (team.foundry_id !== foundry_id) {
+        return { error: 'Unauthorized: Team not in your Foundry' }
+    }
+
+    // Verify user is a team member (has permission to remove members)
+    const { data: membership } = await supabase
+        .from('team_members')
+        .select('profile_id')
+        .eq('team_id', teamId)
+        .eq('profile_id', user.id)
+        .single()
+
+    if (!membership) {
+        return { error: 'Unauthorized: You must be a team member to remove members' }
+    }
+
+    // Verify the member to be removed exists in the team
+    const { data: memberToRemove } = await supabase
+        .from('team_members')
+        .select('profile_id')
+        .eq('team_id', teamId)
+        .eq('profile_id', profileId)
+        .single()
+
+    if (!memberToRemove) {
+        return { error: 'Member is not in this team' }
+    }
+
+    // Get current member count before deletion to prevent race conditions
+    const { data: currentMembers, error: countError } = await supabase
+        .from('team_members')
+        .select('profile_id')
+        .eq('team_id', teamId)
+
+    if (countError) return { error: countError.message }
+
+    // Verify team still has the expected number of members (prevent concurrent deletion race)
+    if (!currentMembers || currentMembers.length < 2) {
+        return { error: 'Cannot remove member: team must have at least 2 members' }
+    }
+
     const { error } = await supabase
         .from('team_members')
         .delete()
@@ -227,20 +353,36 @@ export async function removeTeamMember(teamId: string, profileId: string) {
 
     if (error) return { error: error.message }
 
-    const { data: remaining } = await supabase
+    // Re-check remaining members after deletion to ensure we still have valid count
+    const { data: remaining, error: remainingError } = await supabase
         .from('team_members')
         .select('profile_id')
         .eq('team_id', teamId)
 
+    if (remainingError) {
+        console.error('Failed to check remaining members:', remainingError)
+        // Continue - deletion succeeded, just logging failed
+    }
+
+    // Only delete auto-generated teams if we have less than 2 members AND verify team still exists
     if (!remaining || remaining.length < 2) {
-        const { data: team } = await supabase
+        const { data: teamData } = await supabase
             .from('teams')
             .select('is_auto_generated')
             .eq('id', teamId)
             .single()
 
-        if (team?.is_auto_generated) {
-            await supabase.from('teams').delete().eq('id', teamId)
+        // Double-check: verify team is still auto-generated and exists before deletion
+        if (teamData?.is_auto_generated) {
+            // Verify count one more time to prevent race condition
+            const { count: finalCount } = await supabase
+                .from('team_members')
+                .select('id', { count: 'exact', head: true })
+                .eq('team_id', teamId)
+
+            if (finalCount !== null && finalCount < 2) {
+                await supabase.from('teams').delete().eq('id', teamId)
+            }
         }
     }
 
@@ -299,22 +441,6 @@ export async function deleteMember(memberId: string) {
         .eq('id', memberId)
 
     if (deleteError) return { error: `Failed to delete profile: ${deleteError.message}` }
-
-    revalidatePath('/team')
-    return { success: true }
-}
-
-export async function deleteTeam(teamId: string) {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return { error: 'Unauthorized' }
-
-    const { error } = await supabase
-        .from('teams')
-        .delete()
-        .eq('id', teamId)
-
-    if (error) return { error: error.message }
 
     revalidatePath('/team')
     return { success: true }

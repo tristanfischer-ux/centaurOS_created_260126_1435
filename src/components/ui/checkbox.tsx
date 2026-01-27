@@ -10,20 +10,22 @@ const Checkbox = React.forwardRef<
     React.ElementRef<typeof CheckboxPrimitive.Root>,
     React.ComponentPropsWithoutRef<typeof CheckboxPrimitive.Root>
 >(({ className, ...props }, ref) => (
-    <CheckboxPrimitive.Root
-        ref={ref}
-        className={cn(
-            "peer h-4 w-4 shrink-0 rounded-sm border border-slate-900 shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 data-[state=checked]:bg-slate-900 data-[state=checked]:text-slate-50",
-            className
-        )}
-        {...props}
-    >
-        <CheckboxPrimitive.Indicator
-            className={cn("flex items-center justify-center text-current")}
+    <div className="min-h-[44px] min-w-[44px] flex items-center justify-center md:min-h-0 md:min-w-0">
+        <CheckboxPrimitive.Root
+            ref={ref}
+            className={cn(
+                "peer h-4 w-4 shrink-0 rounded-sm border border-slate-900 shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 data-[state=checked]:bg-slate-900 data-[state=checked]:text-slate-50 touch-action-manipulation",
+                className
+            )}
+            {...props}
         >
-            <Check className="h-4 w-4" />
-        </CheckboxPrimitive.Indicator>
-    </CheckboxPrimitive.Root>
+            <CheckboxPrimitive.Indicator
+                className={cn("flex items-center justify-center text-current")}
+            >
+                <Check className="h-4 w-4" />
+            </CheckboxPrimitive.Indicator>
+        </CheckboxPrimitive.Root>
+    </div>
 ))
 Checkbox.displayName = CheckboxPrimitive.Root.displayName
 

@@ -26,7 +26,7 @@ export function MobileNav() {
                             key={item.name}
                             href={item.href}
                             className={cn(
-                                "flex flex-col items-center justify-center w-full h-full space-y-1",
+                                "flex flex-col items-center justify-center w-full min-h-[44px] h-full space-y-1 touch-action-manipulation",
                                 isActive ? "text-amber-600" : "text-slate-400 hover:text-slate-600"
                             )}
                         >

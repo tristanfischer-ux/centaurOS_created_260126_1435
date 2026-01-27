@@ -1,10 +1,13 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useAutoRefresh } from "@/hooks/useAutoRefresh"
+import { RefreshButton } from "@/components/RefreshButton"
 import { TaskCard } from "./task-card"
 import { Button } from "@/components/ui/button"
-import { LayoutGrid, List, X, Trash2, CheckSquare } from "lucide-react"
+import { LayoutGrid, List, X, Trash2, CheckSquare, Loader2 } from "lucide-react"
 import { deleteTasks } from "@/actions/tasks"
+import { toast } from "sonner"
 import { CreateTaskDialog } from "./create-task-dialog"
 import { Database } from "@/types/database.types"
 import { Badge } from "@/components/ui/badge"
@@ -18,6 +21,8 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select"
+import { EmptyState } from "@/components/ui/empty-state"
+import { Inbox } from "lucide-react"
 
 // Task type update
 type Task = Database["public"]["Tables"]["tasks"]["Row"] & {
@@ -52,11 +57,15 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
     const [selectedTask, setSelectedTask] = useState<Task | null>(null)
     const [isSelectionMode, setIsSelectionMode] = useState(false)
     const [selectedTaskIds, setSelectedTaskIds] = useState<Set<string>>(new Set())
+    const [isBulkDeleting, setIsBulkDeleting] = useState(false)
 
     // Filter & Sort State
     const [statusFilter, setStatusFilter] = useState<string[]>([])
     const [assigneeFilter, setAssigneeFilter] = useState<string | 'unassigned' | 'all'>('all')
     const [sortBy, setSortBy] = useState<'due_date_asc' | 'due_date_desc' | 'created_desc'>('due_date_asc')
+
+    // Auto-refresh using Supabase Realtime
+    useAutoRefresh({ tables: ['tasks', 'task_comments', 'task_files'] })
 
     // Filter Logic
     const filteredTasks = tasks.filter(task => {
@@ -174,9 +183,19 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
         if (selectedTaskIds.size === 0) return
         if (!confirm(`Are you sure you want to delete ${selectedTaskIds.size} tasks?`)) return
 
-        await deleteTasks(Array.from(selectedTaskIds))
-        setIsSelectionMode(false)
-        setSelectedTaskIds(new Set())
+        setIsBulkDeleting(true)
+        try {
+            const result = await deleteTasks(Array.from(selectedTaskIds))
+            if (result?.error) {
+                toast.error(result.error)
+                return
+            }
+            toast.success(`${selectedTaskIds.size} tasks deleted`)
+            setIsSelectionMode(false)
+            setSelectedTaskIds(new Set())
+        } finally {
+            setIsBulkDeleting(false)
+        }
     }
 
     return (
@@ -194,19 +213,31 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                         <div className="flex items-center gap-2">
                             {isSelectionMode ? (
                                 <div className="flex items-center gap-2 mr-2">
-                                    <Button variant="destructive" size="sm" onClick={handleBulkDelete} disabled={selectedTaskIds.size === 0}>
-                                        <Trash2 className="w-4 h-4 mr-2" />
-                                        Delete ({selectedTaskIds.size})
+                                    <Button variant="destructive" size="sm" onClick={handleBulkDelete} disabled={selectedTaskIds.size === 0 || isBulkDeleting}>
+                                        {isBulkDeleting ? (
+                                            <>
+                                                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                                Deleting...
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Trash2 className="w-4 h-4 mr-2" />
+                                                Delete ({selectedTaskIds.size})
+                                            </>
+                                        )}
                                     </Button>
-                                    <Button variant="ghost" size="sm" onClick={toggleSelectionMode}>
+                                    <Button variant="ghost" size="sm" onClick={toggleSelectionMode} disabled={isBulkDeleting}>
                                         Cancel
                                     </Button>
                                 </div>
                             ) : (
-                                <Button variant="outline" size="sm" onClick={toggleSelectionMode} className="mr-2">
-                                    <CheckSquare className="w-4 h-4 mr-2 text-slate-500" />
-                                    Select
-                                </Button>
+                                <>
+                                    <RefreshButton />
+                                    <Button variant="outline" size="sm" onClick={toggleSelectionMode} className="mr-2">
+                                        <CheckSquare className="w-4 h-4 mr-2 text-slate-500" />
+                                        Select
+                                    </Button>
+                                </>
                             )}
                             <div className="bg-slate-100 p-1 rounded-lg flex items-center mr-2">
                                 <Button
@@ -244,13 +275,13 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                                     key={status}
                                     variant={statusFilter.includes(status) ? 'default' : 'outline'}
                                     className={cn(
-                                        "cursor-pointer hover:opacity-80 transition-all",
+                                        "cursor-pointer hover:opacity-80 active:opacity-70 transition-all",
                                         statusFilter.includes(status)
                                             ? status === 'Accepted' ? 'bg-green-600 hover:bg-green-700'
                                                 : status === 'Completed' ? 'bg-slate-800 hover:bg-slate-900'
                                                     : status === 'Rejected' ? 'bg-red-600 hover:bg-red-700'
                                                         : 'bg-slate-500 hover:bg-slate-600'
-                                            : "text-slate-500 bg-white hover:bg-slate-50"
+                                            : "text-slate-500 bg-white hover:bg-slate-50 active:bg-slate-100"
                                     )}
                                     onClick={() => toggleStatusFilter(status)}
                                 >
@@ -299,7 +330,7 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                                         setAssigneeFilter('all')
                                         setSortBy('due_date_asc')
                                     }}
-                                    className="text-slate-400 hover:text-red-500 h-8 ml-2"
+                                    className="text-slate-400 hover:text-red-500 active:text-red-600 h-8 ml-2 transition-colors"
                                 >
                                     <X className="w-3 h-3 mr-1" /> Clear
                                 </Button>
@@ -332,18 +363,32 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                             )
                         })}
                         {sortedTasks.length === 0 && (
-                            <div className="col-span-full py-16 text-center border-2 border-dashed border-slate-200 rounded-lg bg-slate-50/50">
-                                <div className="text-slate-400 mb-2">No tasks match your filters</div>
-                                <Button
-                                    variant="link"
-                                    onClick={() => {
-                                        setStatusFilter([])
-                                        setAssigneeFilter('all')
-                                    }}
-                                    className="text-blue-600"
-                                >
-                                    Reset Filters
-                                </Button>
+                            <div className="col-span-full border-2 border-dashed border-slate-200 rounded-lg bg-slate-50/50">
+                                {tasks.length === 0 ? (
+                                    <EmptyState
+                                        icon={<Inbox className="h-8 w-8" />}
+                                        title="No tasks yet"
+                                        description="Create your first task to get started with task management."
+                                    />
+                                ) : (
+                                    <EmptyState
+                                        icon={<Inbox className="h-8 w-8" />}
+                                        title="No tasks match your filters"
+                                        description="Try adjusting your filters to see more tasks."
+                                        action={
+                                            <Button
+                                                variant="link"
+                                                onClick={() => {
+                                                    setStatusFilter([])
+                                                    setAssigneeFilter('all')
+                                                }}
+                                                className="text-blue-600"
+                                            >
+                                                Reset Filters
+                                            </Button>
+                                        }
+                                    />
+                                )}
                             </div>
                         )}
                     </div>
@@ -368,7 +413,7 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                                         {objectiveTasks.map(task => (
                                             <div
                                                 key={task.id}
-                                                className="pl-12 pr-6 py-3 border-b border-slate-100 last:border-0 hover:bg-slate-50 flex items-center justify-between group gap-4 relative cursor-pointer"
+                                                className="pl-12 pr-6 py-3 border-b border-slate-100 last:border-0 hover:bg-slate-50 active:bg-slate-100 flex items-center justify-between group gap-4 relative cursor-pointer transition-colors"
                                                 onClick={() => setSelectedTask(task)}
                                             >
                                                 <div className="absolute left-0 top-0 bottom-0 w-1 bg-transparent group-hover:bg-blue-500 transition-colors" />
@@ -416,7 +461,7 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                                     {orphanedTasks.map(task => (
                                         <div
                                             key={task.id}
-                                            className="px-6 py-3 border-b border-slate-100 last:border-0 hover:bg-slate-50 flex items-center justify-between group gap-4 cursor-pointer"
+                                            className="px-6 py-3 border-b border-slate-100 last:border-0 hover:bg-slate-50 active:bg-slate-100 flex items-center justify-between group gap-4 cursor-pointer transition-colors"
                                             onClick={() => setSelectedTask(task)}
                                         >
                                             <div className="flex-1 min-w-0">

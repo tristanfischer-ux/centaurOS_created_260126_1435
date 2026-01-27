@@ -6,6 +6,9 @@ import { Database } from '@/types/database.types'
 import { runAIWorker } from '@/lib/ai-worker'
 import { logTaskHistory } from '@/lib/audit'
 
+// Nudge cooldown duration (1 hour)
+const NUDGE_COOLDOWN_MS = 60 * 60 * 1000
+
 export type TaskStatus = Database["public"]["Enums"]["task_status"]
 export type RiskLevel = Database["public"]["Enums"]["risk_level"]
 
@@ -50,11 +53,38 @@ export async function createTask(formData: FormData) {
     const assigneeIdsJson = formData.get('assignee_ids') as string
     const startDate = formData.get('start_date') as string
     const endDate = formData.get('end_date') as string
-    const riskLevel = (formData.get('risk_level') as RiskLevel) || 'Low' // Default to Low
-    const fileCount = parseInt(formData.get('file_count') as string || '0')
+    const riskLevelRaw = formData.get('risk_level') as string
+    const fileCountRaw = formData.get('file_count') as string || '0'
 
+    // Validate required fields
     if (!title || !objectiveId || !assigneeId) {
-        return { error: 'Missing required fields' }
+        return { error: 'Missing required fields: title, objective_id, and assignee_id are required' }
+    }
+
+    // Validate title length (1-500 characters)
+    const titleTrimmed = title.trim()
+    if (titleTrimmed.length === 0) {
+        return { error: 'Title cannot be empty' }
+    }
+    if (titleTrimmed.length > 500) {
+        return { error: 'Title must be 500 characters or less' }
+    }
+
+    // Validate description length (max 10,000 characters)
+    if (description && description.length > 10000) {
+        return { error: 'Description must be 10,000 characters or less' }
+    }
+
+    // Validate riskLevel enum
+    const validRiskLevels: RiskLevel[] = ['Low', 'Medium', 'High']
+    const riskLevel: RiskLevel = (validRiskLevels.includes(riskLevelRaw as RiskLevel) 
+        ? riskLevelRaw 
+        : 'Low') as RiskLevel
+
+    // Validate and parse fileCount (handle NaN)
+    const fileCount = parseInt(fileCountRaw, 10)
+    if (isNaN(fileCount) || fileCount < 0) {
+        return { error: 'Invalid file count: must be a non-negative number' }
     }
 
     // Parse multiple assignees (if provided)
@@ -97,11 +127,16 @@ export async function createTask(formData: FormData) {
         }
     }
 
+    // Ensure we have at least one assignee
+    if (assigneeIds.length === 0 || !assigneeIds[0]) {
+        return { error: 'At least one assignee is required' }
+    }
+
     // Create the task (with primary assignee for backward compatibility)
     const { data, error } = await supabase.from('tasks').insert({
         foundry_id,
-        title,
-        description,
+        title: titleTrimmed,
+        description: description || null,
         objective_id: objectiveId,
         creator_id: user.id,
         assignee_id: assigneeIds[0], // Primary assignee
@@ -120,7 +155,11 @@ export async function createTask(formData: FormData) {
             task_id: data.id,
             profile_id: profileId
         }))
-        await supabase.from('task_assignees').insert(assigneeRecords)
+        const { error: assigneeError } = await supabase.from('task_assignees').insert(assigneeRecords)
+        if (assigneeError) {
+            console.error('Failed to assign task assignees:', assigneeError)
+            return { error: 'Task created but failed to assign team members' }
+        }
     }
 
     // Handle file uploads
@@ -141,7 +180,7 @@ export async function createTask(formData: FormData) {
             }
 
             // Record in task_files table
-            await supabase.from('task_files').insert({
+            const { error: fileRecordError } = await supabase.from('task_files').insert({
                 task_id: data.id,
                 file_name: file.name,
                 file_path: filePath,
@@ -149,20 +188,40 @@ export async function createTask(formData: FormData) {
                 mime_type: file.type,
                 uploaded_by: user.id
             })
+            if (fileRecordError) {
+                console.error('Failed to record file in database:', fileRecordError)
+                // Continue - file is uploaded but record failed
+            }
         }
     }
 
     // Log Creation
-    await logSystemEvent(data.id, `Task created by User (Risk: ${riskLevel})`, user.id)
-    await logTaskHistory(data.id, 'CREATED', user.id, {
-        title,
-        assignee_id: assigneeIds[0],
-        initial_status: 'Pending',
-        risk_level: riskLevel
-    })
+    try {
+        await logSystemEvent(data.id, `Task created by User (Risk: ${riskLevel})`, user.id)
+    } catch (error) {
+        console.error('Failed to log system event:', error)
+        // Continue - logging failure shouldn't fail task creation
+    }
+    
+    try {
+        await logTaskHistory(data.id, 'CREATED', user.id, {
+            title,
+            assignee_id: assigneeIds[0],
+            initial_status: 'Pending',
+            risk_level: riskLevel
+        })
+    } catch (error) {
+        console.error('Failed to log task history:', error)
+        // Continue - logging failure shouldn't fail task creation
+    }
 
     // Trigger AI Worker for primary assignee
-    await runAIWorker(data.id, assigneeIds[0])
+    try {
+        await runAIWorker(data.id, assigneeIds[0])
+    } catch (error) {
+        console.error('Failed to trigger AI worker:', error)
+        // Continue - AI worker failure shouldn't fail task creation
+    }
 
     revalidatePath('/tasks')
     return { success: true }
@@ -179,11 +238,20 @@ export async function acceptTask(taskId: string) {
 
     if (error) return { error: error.message }
 
-    await logSystemEvent(taskId, 'Task Accepted', user.id)
-    await logTaskHistory(taskId, 'STATUS_CHANGE', user.id, {
-        old_status: 'Pending', // Assumption, or we could fetch
-        new_status: 'Accepted'
-    })
+    try {
+        await logSystemEvent(taskId, 'Task Accepted', user.id)
+    } catch (logError) {
+        console.error('Failed to log system event:', logError)
+    }
+    
+    try {
+        await logTaskHistory(taskId, 'STATUS_CHANGE', user.id, {
+            old_status: 'Pending', // Assumption, or we could fetch
+            new_status: 'Accepted'
+        })
+    } catch (logError) {
+        console.error('Failed to log task history:', logError)
+    }
     revalidatePath('/tasks')
     return { success: true }
 }
@@ -201,11 +269,20 @@ export async function rejectTask(taskId: string, reason: string) {
 
     if (error) return { error: error.message }
 
-    await logSystemEvent(taskId, `Task Rejected. Reason: ${reason}`, user.id)
-    await logTaskHistory(taskId, 'STATUS_CHANGE', user.id, {
-        new_status: 'Rejected',
-        reason
-    })
+    try {
+        await logSystemEvent(taskId, `Task Rejected. Reason: ${reason}`, user.id)
+    } catch (logError) {
+        console.error('Failed to log system event:', logError)
+    }
+    
+    try {
+        await logTaskHistory(taskId, 'STATUS_CHANGE', user.id, {
+            new_status: 'Rejected',
+            reason
+        })
+    } catch (logError) {
+        console.error('Failed to log task history:', logError)
+    }
     revalidatePath('/tasks')
     return { success: true }
 }
@@ -221,6 +298,11 @@ export async function forwardTask(taskId: string, newAssigneeId: string, reason:
     const { data: task } = await supabase.from('tasks').select('forwarding_history, assignee_id').eq('id', taskId).single()
     if (!task) return { error: 'Task not found' }
 
+    // Validate task has an assignee before forwarding
+    if (!task.assignee_id) {
+        return { error: 'Task has no assignee to forward from' }
+    }
+
     // Get old assignee name (optional, but good for log. Skipping for strict performance, just using IDs in history for now)
 
     interface ForwardingEvent {
@@ -229,8 +311,13 @@ export async function forwardTask(taskId: string, newAssigneeId: string, reason:
         reason: string;
         date: string;
     }
-    const history = (task.forwarding_history as unknown as ForwardingEvent[]) || []
-    const newHistory = [
+    
+    // Properly type the forwarding_history JSON field
+    const history: ForwardingEvent[] = Array.isArray(task.forwarding_history) 
+        ? (task.forwarding_history as ForwardingEvent[])
+        : []
+    
+    const newHistory: ForwardingEvent[] = [
         ...history,
         {
             from_id: task.assignee_id,
@@ -251,23 +338,41 @@ export async function forwardTask(taskId: string, newAssigneeId: string, reason:
 
     if (error) return { error: error.message }
 
-    // Sync task_assignees table (Replace all previous assignees with the new one)
-    await supabase.from('task_assignees').delete().eq('task_id', taskId)
-    await supabase.from('task_assignees').insert({
-        task_id: taskId,
-        profile_id: newAssigneeId
+    // Sync task_assignees table atomically using RPC function to prevent race conditions
+    const { error: rpcError } = await supabase.rpc('transfer_task_assignee', {
+        p_task_id: taskId,
+        p_new_assignee_id: newAssigneeId
     })
+    
+    if (rpcError) {
+        console.error('Failed to transfer task assignee:', rpcError)
+        return { error: 'Failed to update task assignees' }
+    }
 
     // Log with names ideally, but IDs for now
-    await logSystemEvent(taskId, `Task forwarded to new assignee. Reason: ${reason}`, user.id)
-    await logTaskHistory(taskId, 'FORWARDED', user.id, {
-        previous_assignee: task.assignee_id,
-        new_assignee: newAssigneeId,
-        reason
-    })
+    try {
+        await logSystemEvent(taskId, `Task forwarded to new assignee. Reason: ${reason}`, user.id)
+    } catch (logError) {
+        console.error('Failed to log system event:', logError)
+    }
+    
+    try {
+        await logTaskHistory(taskId, 'FORWARDED', user.id, {
+            previous_assignee: task.assignee_id,
+            new_assignee: newAssigneeId,
+            reason
+        })
+    } catch (logError) {
+        console.error('Failed to log task history:', logError)
+    }
 
     // Trigger AI Worker
-    await runAIWorker(taskId, newAssigneeId)
+    try {
+        await runAIWorker(taskId, newAssigneeId)
+    } catch (workerError) {
+        console.error('Failed to trigger AI worker:', workerError)
+        // Continue - AI worker failure shouldn't fail forwarding
+    }
 
     revalidatePath('/tasks')
     return { success: true }
@@ -371,7 +476,7 @@ export async function completeTask(taskId: string) {
         clientVisible = false
     }
 
-    const updates: any = { status: nextStatus }
+    const updates: Partial<Database['public']['Tables']['tasks']['Update']> = { status: nextStatus }
     // Only set end_date if actually fully completed
     if (nextStatus === 'Completed') {
         updates.end_date = new Date().toISOString()
@@ -384,12 +489,21 @@ export async function completeTask(taskId: string) {
 
     if (error) return { error: error.message }
 
-    await logSystemEvent(taskId, `Task marked as ${nextStatus} (Risk: ${task.risk_level})`, user.id)
-    await logTaskHistory(taskId, nextStatus === 'Completed' ? 'COMPLETED' : 'STATUS_CHANGE', user.id, {
-        new_status: nextStatus,
-        risk_level: task.risk_level,
-        completed_at: nextStatus === 'Completed' ? new Date().toISOString() : undefined
-    })
+    try {
+        await logSystemEvent(taskId, `Task marked as ${nextStatus} (Risk: ${task.risk_level})`, user.id)
+    } catch (logError) {
+        console.error('Failed to log system event:', logError)
+    }
+    
+    try {
+        await logTaskHistory(taskId, nextStatus === 'Completed' ? 'COMPLETED' : 'STATUS_CHANGE', user.id, {
+            new_status: nextStatus,
+            risk_level: task.risk_level,
+            completed_at: nextStatus === 'Completed' ? new Date().toISOString() : undefined
+        })
+    } catch (logError) {
+        console.error('Failed to log task history:', logError)
+    }
     revalidatePath('/tasks')
     return { success: true, newStatus: nextStatus }
 }
@@ -445,8 +559,8 @@ export async function nudgeTask(taskId: string) {
     if (task?.last_nudge_at) {
         const lastNudge = new Date(task.last_nudge_at).getTime()
         const now = Date.now()
-        if (now - lastNudge < 3600000) { // 1 hour
-            const remaining = Math.ceil((3600000 - (now - lastNudge)) / 60000)
+        if (now - lastNudge < NUDGE_COOLDOWN_MS) {
+            const remaining = Math.ceil((NUDGE_COOLDOWN_MS - (now - lastNudge)) / 60000)
             return { error: `Please wait ${remaining} minutes before nudging again.` }
         }
     }
@@ -465,7 +579,6 @@ export async function nudgeTask(taskId: string) {
     }
 
     // NOTIFICATION LOGIC
-    console.log(`[RED PHONE] Client nudged Task ${taskId}!!`)
     await logSystemEvent(taskId, "🔴 CLIENT NUDGE: Client requested an update.", user.id)
 
     revalidatePath('/tasks')
@@ -496,7 +609,7 @@ export async function getPulseMetrics() {
     // So checking "count" should automatically respect RLS and only show me history I can see (my foundry).
 
     if (error) {
-        console.error("Pulse error", error)
+        console.warn("Pulse metrics error", error)
         return { actions: 0 }
     }
 
@@ -508,6 +621,28 @@ export async function updateTaskDates(taskId: string, startDate: string, endDate
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return { error: 'Unauthorized' }
 
+    // Validate input
+    if (!startDate || !endDate) {
+        return { error: 'Start date and end date are required' }
+    }
+
+    // Validate dates are valid ISO strings
+    const startDateObj = new Date(startDate)
+    const endDateObj = new Date(endDate)
+
+    if (isNaN(startDateObj.getTime())) {
+        return { error: 'Invalid start date format. Please use ISO date format (YYYY-MM-DD or YYYY-MM-DDTHH:mm:ss)' }
+    }
+
+    if (isNaN(endDateObj.getTime())) {
+        return { error: 'Invalid end date format. Please use ISO date format (YYYY-MM-DD or YYYY-MM-DDTHH:mm:ss)' }
+    }
+
+    // Validate startDate < endDate
+    if (startDateObj >= endDateObj) {
+        return { error: 'Start date must be before end date' }
+    }
+
     const { error } = await supabase.from('tasks')
         .update({
             start_date: startDate,
@@ -517,12 +652,24 @@ export async function updateTaskDates(taskId: string, startDate: string, endDate
 
     if (error) return { error: error.message }
 
-    await logSystemEvent(taskId, `Task rescheduled: ${startDate.split('T')[0]} → ${endDate.split('T')[0]}`, user.id)
-    await logTaskHistory(taskId, 'UPDATED', user.id, {
-        field: 'dates',
-        new_start: startDate,
-        new_end: endDate
-    })
+    try {
+        // Safely format dates for logging (startDate and endDate are validated above but add null checks for safety)
+        const startDateFormatted = startDate ? startDate.split('T')[0] : 'N/A'
+        const endDateFormatted = endDate ? endDate.split('T')[0] : 'N/A'
+        await logSystemEvent(taskId, `Task rescheduled: ${startDateFormatted} → ${endDateFormatted}`, user.id)
+    } catch (logError) {
+        console.error('Failed to log system event:', logError)
+    }
+    
+    try {
+        await logTaskHistory(taskId, 'UPDATED', user.id, {
+            field: 'dates',
+            new_start: startDate,
+            new_end: endDate
+        })
+    } catch (logError) {
+        console.error('Failed to log task history:', logError)
+    }
     revalidatePath('/timeline')
     revalidatePath('/tasks')
     return { success: true }
@@ -555,7 +702,12 @@ export async function triggerAIWorker(taskId: string) {
     }
 
     // Run the AI worker
-    await runAIWorker(taskId, task.assignee_id)
+    try {
+        await runAIWorker(taskId, task.assignee_id)
+    } catch (workerError) {
+        console.error('Failed to trigger AI worker:', workerError)
+        return { error: 'Failed to trigger AI worker' }
+    }
 
     revalidatePath('/tasks')
     return { success: true }
@@ -590,7 +742,7 @@ export async function duplicateTask(originalTaskId: string) {
     // 1. Fetch original task
     const { data: originalTask, error: fetchError } = await supabase
         .from('tasks')
-        .select('*')
+        .select('*, task_number')
         .eq('id', originalTaskId)
         .single()
 
@@ -603,7 +755,7 @@ export async function duplicateTask(originalTaskId: string) {
         description: originalTask.description,
         objective_id: originalTask.objective_id,
         creator_id: user.id,
-        assignee_id: originalTask.assignee_id, // Primary assignee
+        assignee_id: originalTask.assignee_id || null, // Primary assignee (may be null)
         status: 'Pending',
         start_date: null, // Reset dates? Or keep? Resetting is usually safer for copies.
         end_date: null,
@@ -625,7 +777,11 @@ export async function duplicateTask(originalTaskId: string) {
             task_id: newTask.id,
             profile_id: a.profile_id
         }))
-        await supabase.from('task_assignees').insert(newAssigneeRecords)
+        const { error: assigneeError } = await supabase.from('task_assignees').insert(newAssigneeRecords)
+        if (assigneeError) {
+            console.error('Failed to copy assignees:', assigneeError)
+            return { error: 'Task duplicated but failed to copy assignees' }
+        }
     }
 
     // 4. Copy Attachments references ?? 
@@ -633,11 +789,25 @@ export async function duplicateTask(originalTaskId: string) {
     // We will simple NOT copy attachments for now as usually a task copy is for the 'task' structure, not necessarily the exact file evidence of the previous one.
     // If user wants files, they can re-upload or we can implement 'link to existing file' later.
 
-    await logSystemEvent(newTask.id, `Task duplicated from #${(originalTask as any).task_number || originalTaskId.substring(0, 4)}`, user.id)
-    await logTaskHistory(newTask.id, 'CREATED', user.id, {
-        source: 'DUPLICATION',
-        original_task_id: originalTaskId
-    })
+    try {
+        // Properly type task_number from the query result
+        const taskNumber = 'task_number' in originalTask && typeof originalTask.task_number === 'number' 
+            ? originalTask.task_number 
+            : null
+        const taskIdentifier = taskNumber ? `#${taskNumber}` : originalTaskId.substring(0, 4)
+        await logSystemEvent(newTask.id, `Task duplicated from ${taskIdentifier}`, user.id)
+    } catch (logError) {
+        console.error('Failed to log system event:', logError)
+    }
+    
+    try {
+        await logTaskHistory(newTask.id, 'CREATED', user.id, {
+            source: 'DUPLICATION',
+            original_task_id: originalTaskId
+        })
+    } catch (logError) {
+        console.error('Failed to log task history:', logError)
+    }
     revalidatePath('/tasks')
     return { success: true }
 }
@@ -655,10 +825,19 @@ export async function updateTaskDetails(taskId: string, updates: { title?: strin
 
     if (error) return { error: error.message }
 
-    await logSystemEvent(taskId, `Task details updated`, user.id)
-    await logTaskHistory(taskId, 'UPDATED', user.id, {
-        updates // Log the raw updates object
-    })
+    try {
+        await logSystemEvent(taskId, `Task details updated`, user.id)
+    } catch (logError) {
+        console.error('Failed to log system event:', logError)
+    }
+    
+    try {
+        await logTaskHistory(taskId, 'UPDATED', user.id, {
+            updates // Log the raw updates object
+        })
+    } catch (logError) {
+        console.error('Failed to log task history:', logError)
+    }
     revalidatePath('/tasks')
     return { success: true }
 }
@@ -681,7 +860,11 @@ export async function updateTaskAssignees(taskId: string, assigneeIds: string[])
 
     // Sync task_assignees table
     // 1. Delete existing
-    await supabase.from('task_assignees').delete().eq('task_id', taskId)
+    const { error: deleteError } = await supabase.from('task_assignees').delete().eq('task_id', taskId)
+    if (deleteError) {
+        console.error('Failed to delete old assignees:', deleteError)
+        return { error: 'Failed to update task assignees' }
+    }
 
     // 2. Insert new
     const records = assigneeIds.map(id => ({
@@ -690,15 +873,32 @@ export async function updateTaskAssignees(taskId: string, assigneeIds: string[])
     }))
     const { error: assignError } = await supabase.from('task_assignees').insert(records)
 
-    if (assignError) return { error: assignError.message }
+    if (assignError) {
+        console.error('Failed to insert new assignees:', assignError)
+        return { error: 'Failed to update task assignees' }
+    }
 
-    await logSystemEvent(taskId, `Assignees updated`, user.id)
-    await logTaskHistory(taskId, 'ASSIGNED', user.id, {
-        new_assignees: assigneeIds
-    })
+    try {
+        await logSystemEvent(taskId, `Assignees updated`, user.id)
+    } catch (logError) {
+        console.error('Failed to log system event:', logError)
+    }
+    
+    try {
+        await logTaskHistory(taskId, 'ASSIGNED', user.id, {
+            new_assignees: assigneeIds
+        })
+    } catch (logError) {
+        console.error('Failed to log task history:', logError)
+    }
 
     // Potentially trigger AI worker if new primary is AI?
-    await runAIWorker(taskId, primaryAssigneeId)
+    try {
+        await runAIWorker(taskId, primaryAssigneeId)
+    } catch (workerError) {
+        console.error('Failed to trigger AI worker:', workerError)
+        // Continue - AI worker failure shouldn't fail assignee update
+    }
 
     revalidatePath('/tasks')
     return { success: true }
@@ -731,7 +931,11 @@ export async function uploadTaskAttachment(taskId: string, formData: FormData) {
 
     if (dbError) return { error: dbError.message }
 
-    await logSystemEvent(taskId, `Attachment added: ${file.name}`, user.id)
+    try {
+        await logSystemEvent(taskId, `Attachment added: ${file.name}`, user.id)
+    } catch (logError) {
+        console.error('Failed to log system event:', logError)
+    }
     revalidatePath('/tasks')
     return { success: true }
 }
@@ -747,9 +951,8 @@ export async function deleteTaskAttachment(fileId: string, filePath: string, tas
         .remove([filePath])
 
     if (storageError) {
-        console.error("Storage delete failed", storageError)
-        // Proceed to delete record anyway? Or stop? 
-        // Best to clean up record even if storage file is gone or erroring.
+        console.warn("Storage delete failed", storageError)
+        // Proceed to delete record anyway - best to clean up record even if storage file is gone or erroring.
     }
 
     // Delete from DB
@@ -761,7 +964,11 @@ export async function deleteTaskAttachment(fileId: string, filePath: string, tas
 
     // Log requires task ID. If we don't have it explicitly passed, we'd need to fetch before delete. 
     // Assuming taskId passed correctly.
-    await logSystemEvent(taskId, `Attachment removed`, user.id)
+    try {
+        await logSystemEvent(taskId, `Attachment removed`, user.id)
+    } catch (logError) {
+        console.error('Failed to log system event:', logError)
+    }
 
     revalidatePath('/tasks')
     return { success: true }
@@ -813,7 +1020,11 @@ export async function deleteTasks(taskIds: string[]) {
     if (error) return { error: error.message }
 
     // Log event (system wide or per task? System wide summary is better for noise)
-    await logSystemEvent(taskIds[0], `Bulk deletion of ${taskIds.length} tasks`, user.id)
+    try {
+        await logSystemEvent(taskIds[0], `Bulk deletion of ${taskIds.length} tasks`, user.id)
+    } catch (logError) {
+        console.error('Failed to log system event:', logError)
+    }
 
     revalidatePath('/tasks')
     return { success: true }
