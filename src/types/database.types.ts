@@ -9,9 +9,7 @@ export type Json =
 export type Database = {
     // Allows to automatically instantiate createClient with right options
     // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
-    __InternalSupabase: {
-        PostgrestVersion: "14.1"
-    }
+
     public: {
         Tables: {
             ai_tools: {
@@ -113,6 +111,113 @@ export type Database = {
                 }
                 Relationships: []
             }
+            guild_events: {
+                Row: {
+                    created_at: string | null
+                    description: string | null
+                    event_date: string
+                    id: string
+                    is_executive_only: boolean | null
+                    location_geo: string | null
+                    title: string
+                }
+                Insert: {
+                    created_at?: string | null
+                    description?: string | null
+                    event_date: string
+                    id?: string
+                    is_executive_only?: boolean | null
+                    location_geo?: string | null
+                    title: string
+                }
+                Update: {
+                    created_at?: string | null
+                    description?: string | null
+                    event_date?: string
+                    id?: string
+                    is_executive_only?: boolean | null
+                    location_geo?: string | null
+                    title?: string
+                }
+                Relationships: []
+            }
+            manufacturing_rfqs: {
+                Row: {
+                    budget_range: string | null
+                    created_at: string | null
+                    created_by: string
+                    foundry_id: string
+                    id: string
+                    specifications: string | null
+                    status: Database["public"]["Enums"]["rfq_status"] | null
+                    title: string
+                }
+                Insert: {
+                    budget_range?: string | null
+                    created_at?: string | null
+                    created_by: string
+                    foundry_id: string
+                    id?: string
+                    specifications?: string | null
+                    status?: Database["public"]["Enums"]["rfq_status"] | null
+                    title: string
+                }
+                Update: {
+                    budget_range?: string | null
+                    created_at?: string | null
+                    created_by?: string
+                    foundry_id?: string
+                    id?: string
+                    specifications?: string | null
+                    status?: Database["public"]["Enums"]["rfq_status"] | null
+                    title?: string
+                }
+                Relationships: [
+                    {
+                        foreignKeyName: "manufacturing_rfqs_created_by_fkey"
+                        columns: ["created_by"]
+                        isOneToOne: false
+                        referencedRelation: "profiles"
+                        referencedColumns: ["id"]
+                    }
+                ]
+            }
+            objective_packs: {
+                Row: {
+                    category: string | null
+                    created_at: string | null
+                    description: string | null
+                    difficulty: string | null
+                    estimated_duration: string | null
+                    icon_name: string | null
+                    id: string
+                    title: string
+                    updated_at: string | null
+                }
+                Insert: {
+                    category?: string | null
+                    created_at?: string | null
+                    description?: string | null
+                    difficulty?: string | null
+                    estimated_duration?: string | null
+                    icon_name?: string | null
+                    id?: string
+                    title: string
+                    updated_at?: string | null
+                }
+                Update: {
+                    category?: string | null
+                    created_at?: string | null
+                    description?: string | null
+                    difficulty?: string | null
+                    estimated_duration?: string | null
+                    icon_name?: string | null
+                    id?: string
+                    title?: string
+                    updated_at?: string | null
+                }
+                Relationships: []
+            }
             objectives: {
                 Row: {
                     created_at: string | null
@@ -167,6 +272,47 @@ export type Database = {
                     },
                 ]
             }
+            pack_items: {
+                Row: {
+                    created_at: string | null
+                    description: string | null
+                    id: string
+                    order_index: number
+                    pack_id: string
+                    role: Database["public"]["Enums"]["member_role"]
+                    title: string
+                    updated_at: string | null
+                }
+                Insert: {
+                    created_at?: string | null
+                    description?: string | null
+                    id?: string
+                    order_index?: number
+                    pack_id: string
+                    role?: Database["public"]["Enums"]["member_role"]
+                    title: string
+                    updated_at?: string | null
+                }
+                Update: {
+                    created_at?: string | null
+                    description?: string | null
+                    id?: string
+                    order_index?: number
+                    pack_id?: string
+                    role?: Database["public"]["Enums"]["member_role"]
+                    title?: string
+                    updated_at?: string | null
+                }
+                Relationships: [
+                    {
+                        foreignKeyName: "pack_items_pack_id_fkey"
+                        columns: ["pack_id"]
+                        isOneToOne: false
+                        referencedRelation: "objective_packs"
+                        referencedColumns: ["id"]
+                    }
+                ]
+            }
             profiles: {
                 Row: {
                     avatar_url: string | null
@@ -175,6 +321,7 @@ export type Database = {
                     foundry_id: string
                     full_name: string | null
                     id: string
+                    paired_ai_id: string | null
                     role: Database["public"]["Enums"]["member_role"]
                     updated_at: string | null
                 }
@@ -185,6 +332,7 @@ export type Database = {
                     foundry_id: string
                     full_name?: string | null
                     id: string
+                    paired_ai_id?: string | null
                     role?: Database["public"]["Enums"]["member_role"]
                     updated_at?: string | null
                 }
@@ -195,26 +343,68 @@ export type Database = {
                     foundry_id?: string
                     full_name?: string | null
                     id?: string
+                    paired_ai_id?: string | null
                     role?: Database["public"]["Enums"]["member_role"]
                     updated_at?: string | null
+                }
+                Relationships: [
+                    {
+                        foreignKeyName: "profiles_paired_ai_id_fkey"
+                        columns: ["paired_ai_id"]
+                        isOneToOne: false
+                        referencedRelation: "profiles"
+                        referencedColumns: ["id"]
+                    }
+                ]
+            }
+            service_providers: {
+                Row: {
+                    company_name: string
+                    contact_info: Json | null
+                    id: string
+                    is_verified: boolean | null
+                    provider_type: Database["public"]["Enums"]["provider_type"]
+                    created_at: string | null
+                }
+                Insert: {
+                    company_name: string
+                    contact_info?: Json | null
+                    id?: string
+                    is_verified?: boolean | null
+                    provider_type: Database["public"]["Enums"]["provider_type"]
+                    created_at?: string | null
+                }
+                Update: {
+                    company_name?: string
+                    contact_info?: Json | null
+                    id?: string
+                    is_verified?: boolean | null
+                    provider_type?: Database["public"]["Enums"]["provider_type"]
+                    created_at?: string | null
                 }
                 Relationships: []
             }
             task_assignees: {
                 Row: {
                     created_at: string | null
+                    id: string
                     profile_id: string
                     task_id: string
+                    team_id: string | null
                 }
                 Insert: {
                     created_at?: string | null
+                    id?: string
                     profile_id: string
                     task_id: string
+                    team_id?: string | null
                 }
                 Update: {
                     created_at?: string | null
+                    id?: string
                     profile_id?: string
                     task_id?: string
+                    team_id?: string | null
                 }
                 Relationships: [
                     {
@@ -231,6 +421,13 @@ export type Database = {
                         referencedRelation: "tasks"
                         referencedColumns: ["id"]
                     },
+                    {
+                        foreignKeyName: "task_assignees_team_id_fkey"
+                        columns: ["team_id"]
+                        isOneToOne: false
+                        referencedRelation: "teams"
+                        referencedColumns: ["id"]
+                    }
                 ]
             }
             task_comments: {
@@ -458,6 +655,66 @@ export type Database = {
                         referencedColumns: ["id"]
                     },
                 ]
+            }
+            team_members: {
+                Row: {
+                    created_at: string | null
+                    profile_id: string
+                    team_id: string
+                }
+                Insert: {
+                    created_at?: string | null
+                    profile_id: string
+                    team_id: string
+                }
+                Update: {
+                    created_at?: string | null
+                    profile_id?: string
+                    team_id?: string
+                }
+                Relationships: [
+                    {
+                        foreignKeyName: "team_members_profile_id_fkey"
+                        columns: ["profile_id"]
+                        isOneToOne: false
+                        referencedRelation: "profiles"
+                        referencedColumns: ["id"]
+                    },
+                    {
+                        foreignKeyName: "team_members_team_id_fkey"
+                        columns: ["team_id"]
+                        isOneToOne: false
+                        referencedRelation: "teams"
+                        referencedColumns: ["id"]
+                    }
+                ]
+            }
+            teams: {
+                Row: {
+                    created_at: string | null
+                    foundry_id: string
+                    id: string
+                    is_auto_generated: boolean | null
+                    name: string
+                    updated_at: string | null
+                }
+                Insert: {
+                    created_at?: string | null
+                    foundry_id: string
+                    id?: string
+                    is_auto_generated?: boolean | null
+                    name: string
+                    updated_at?: string | null
+                }
+                Update: {
+                    created_at?: string | null
+                    foundry_id?: string
+                    id?: string
+                    is_auto_generated?: boolean | null
+                    name?: string
+                    updated_at?: string | null
+                }
+                Relationships: []
             }
         }
         Views: {

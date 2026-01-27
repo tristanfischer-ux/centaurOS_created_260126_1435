@@ -130,7 +130,7 @@ export function HistoryDrawer({ open, onOpenChange, taskId, taskTitle }: History
                                             <div className="flex items-center gap-2 justify-between">
                                                 <div className="flex items-center gap-2">
                                                     <span className="text-xs font-mono text-slate-400">
-                                                        {format(new Date(item.created_at), 'MMM d, HH:mm')}
+                                                        {item.created_at && format(new Date(item.created_at), 'MMM d, HH:mm')}
                                                     </span>
                                                     {getActionBadges(item)}
                                                 </div>
