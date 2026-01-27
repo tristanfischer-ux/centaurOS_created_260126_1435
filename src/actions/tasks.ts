@@ -330,7 +330,7 @@ export async function forwardTask(taskId: string, newAssigneeId: string, reason:
     const { error } = await supabase.from('tasks')
         .update({
             assignee_id: newAssigneeId,
-            forwarding_history: newHistory
+            forwarding_history: newHistory as unknown as Database['public']['Tables']['tasks']['Update']['forwarding_history']
             // Status remains Pending or whatever it was? Usually Forwarding resets to Pending for the new person to Accept? 
             // "The recipient can send the task to a third user... The task remains Pending but the assignee updates." (User Prompt)
         })
