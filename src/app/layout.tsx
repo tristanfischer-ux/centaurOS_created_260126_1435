@@ -1,31 +1,40 @@
 import type { Metadata } from "next";
-import { Outfit } from "next/font/google"; // Premium modern font
+import { Outfit, Playfair_Display, Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
-import { Sidebar } from "@/components/Sidebar";
-import { MobileNav } from "@/components/MobileNav";
 import { Toaster } from "@/components/ui/sonner";
-import { PWARegister } from "@/components/PWARegister";
-import { DragDropPolyfill } from "@/components/DragDropPolyfill";
 
 const outfit = Outfit({
   subsets: ["latin"],
   variable: "--font-outfit",
-  weight: ["300", "400", "500", "600", "700"],
+  display: "swap",
+});
+
+const playfair = Playfair_Display({
+  subsets: ["latin"],
+  variable: "--font-playfair",
+  display: "swap",
+});
+
+const inter = Inter({
+  subsets: ["latin"],
+  variable: "--font-inter",
+  display: "swap",
+});
+
+const jetbrains = JetBrains_Mono({
+  subsets: ["latin"],
+  variable: "--font-jetbrains",
+  display: "swap",
 });
 
 export const metadata: Metadata = {
-  title: "CentaurOS",
-  description: "Operating System for Fractional Foundries",
-  manifest: "/manifest.json",
+  title: "Centaur Dynamics",
+  description: "The Renaissance of Industry",
   icons: {
     apple: "/icons/icon-192x192.png",
   },
-  appleWebApp: {
-    capable: true,
-    statusBarStyle: "default",
-    title: "CentaurOS",
-  },
 };
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -38,16 +47,10 @@ export default function RootLayout({
         <meta name="theme-color" content="#FFFFFF" />
       </head>
       <body
-        className={`${outfit.variable} antialiased bg-white text-slate-900 flex h-screen overflow-hidden font-sans`}
+        className={`${outfit.variable} ${playfair.variable} ${inter.variable} ${jetbrains.variable} antialiased bg-white text-slate-900 font-sans`}
       >
-        <Sidebar />
-        <main className="flex-1 overflow-y-auto bg-white p-8 pb-32 lg:pb-8"> {/* pb-32 for mobile nav space */}
-          {children}
-        </main>
-        <MobileNav />
+        {children}
         <Toaster />
-        <PWARegister />
-        <DragDropPolyfill />
       </body>
     </html>
   );

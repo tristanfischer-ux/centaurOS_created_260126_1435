@@ -2,9 +2,8 @@
 
 import { createClient } from "@/lib/supabase/server"
 import { revalidatePath } from "next/cache"
-import { Database } from "@/types/database.types"
 
-type RFQStatus = Database["public"]["Enums"]["rfq_status"]
+
 
 export async function addToStack(providerId: string) {
     const supabase = await createClient()

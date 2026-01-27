@@ -48,6 +48,15 @@
   /* Slate 50 - previously darker bg, now sidebar */
   --color-foundry-950: #ffffff;
   /* White - previously darkest, now main bg */
+
+  /* Centaur Dynamics Brand Colors */
+  --color-international-orange: #ff4500;
+  --color-electric-blue: #3b82f6;
+  
+  /* Typography */
+  --font-display: var(--font-playfair), serif;
+  --font-sans: var(--font-inter), sans-serif;
+  --font-mono: var(--font-jetbrains), monospace;
 }
 
 /*

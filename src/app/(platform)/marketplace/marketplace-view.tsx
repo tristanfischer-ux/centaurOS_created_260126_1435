@@ -5,7 +5,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardTitle, CardHeader, CardFooter } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Briefcase, Factory, Hexagon, Bot, Search, Filter } from "lucide-react"
+import { Briefcase, Factory, Hexagon, Bot, Search } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Database } from "@/types/database.types"
 
@@ -13,20 +13,61 @@ type ServiceProvider = Database["public"]["Tables"]["service_providers"]["Row"]
 type AITool = Database["public"]["Tables"]["ai_tools"]["Row"]
 type ManufacturingRFQ = Database["public"]["Tables"]["manufacturing_rfqs"]["Row"]
 
+import { addToStack, removeFromStack } from "@/actions/marketplace"
+import { CreateRFQDialog } from "./create-rfq-dialog"
+import { toast } from "sonner"
+
 interface MarketplaceViewProps {
     providers: ServiceProvider[]
     aiTools: AITool[]
     rfqs: ManufacturingRFQ[]
+    initialStack?: string[]
 }
 
-export function MarketplaceView({ providers, aiTools, rfqs }: MarketplaceViewProps) {
-    const [selectedStack, setSelectedStack] = useState<string[]>([])
-    const [searchQuery, setSearchQuery] = useState("")
+interface ProviderContactInfo {
+    services?: string[];
+    [key: string]: any;
+}
 
-    const toggleStack = (id: string) => {
+export function MarketplaceView({ providers, aiTools, rfqs, initialStack = [] }: MarketplaceViewProps) {
+    const [selectedStack, setSelectedStack] = useState<string[]>(initialStack)
+    const [searchQuery, setSearchQuery] = useState("")
+    const [isUpdating, setIsUpdating] = useState(false)
+
+    const toggleStack = async (id: string) => {
+        if (isUpdating) return
+        setIsUpdating(true)
+
+        // Optimistic update
+        const isAdding = !selectedStack.includes(id)
         setSelectedStack(prev =>
-            prev.includes(id) ? prev.filter(p => p !== id) : [...prev, id]
+            isAdding ? [...prev, id] : prev.filter(p => p !== id)
         )
+
+        try {
+            const result = isAdding
+                ? await addToStack(id)
+                : await removeFromStack(id)
+
+            if (result.error) {
+                // Revert on error
+                setSelectedStack(prev =>
+                    isAdding ? prev.filter(p => p !== id) : [...prev, id]
+                )
+                toast.error(result.error)
+            } else {
+                toast.success(isAdding ? "Added to stack" : "Removed from stack")
+            }
+        } catch (error) {
+            // Revert on error
+            setSelectedStack(prev =>
+                isAdding ? prev.filter(p => p !== id) : [...prev, id]
+            )
+            toast.error("Something went wrong")
+            console.error(error)
+        } finally {
+            setIsUpdating(false)
+        }
     }
 
     const filteredProviders = providers.filter(p =>
@@ -82,46 +123,51 @@ export function MarketplaceView({ providers, aiTools, rfqs }: MarketplaceViewPro
                         {filteredProviders.length === 0 ? (
                             <div className="col-span-full py-12 text-center text-gray-500">No providers found matching your search.</div>
                         ) : (
-                            filteredProviders.map(provider => (
-                                <Card key={provider.id} className={`bg-white border-slate-200 shadow-sm transition-all hover:shadow-md ${selectedStack.includes(provider.id) ? 'border-amber-500 ring-1 ring-amber-500' : ''}`}>
-                                    <CardHeader>
-                                        <div className="flex justify-between items-start">
-                                            <Badge variant="secondary" className="bg-slate-100 text-slate-600">
-                                                {provider.provider_type}
-                                            </Badge>
-                                            {provider.is_verified && (
-                                                <Badge className="bg-blue-50 text-blue-600 border border-blue-200 hover:bg-blue-100 px-2 py-0.5 shadow-none">Verified</Badge>
-                                            )}
-                                        </div>
-                                        <CardTitle className="text-slate-900 mt-2">{provider.company_name}</CardTitle>
-                                    </CardHeader>
-                                    <CardContent>
-                                        <div className="text-sm text-slate-500 mb-4">
-                                            Top-tier {provider.provider_type} services for scaling startups.
-                                            {/* In a real app, we'd describe services from JSONB */}
-                                        </div>
-                                        {((provider.contact_info as any)?.services as string[]) && (
-                                            <div className="flex flex-wrap gap-1 mb-2">
-                                                {((provider.contact_info as any).services as string[]).slice(0, 2).map((s, i) => (
-                                                    <span key={i} className="text-xs bg-slate-50 text-slate-500 px-2 py-1 rounded-sm border border-slate-100">{s}</span>
-                                                ))}
-                                                {((provider.contact_info as any).services as string[]).length > 2 && (
-                                                    <span className="text-xs text-slate-400 px-1 py-1">+{((provider.contact_info as any).services as string[]).length - 2} more</span>
+                            filteredProviders.map(provider => {
+                                const services = (provider.contact_info as unknown as ProviderContactInfo)?.services;
+
+                                return (
+                                    <Card key={provider.id} className={`bg-white border-slate-200 shadow-sm transition-all hover:shadow-md ${selectedStack.includes(provider.id) ? 'border-amber-500 ring-1 ring-amber-500' : ''}`}>
+                                        <CardHeader>
+                                            <div className="flex justify-between items-start">
+                                                <Badge variant="secondary" className="bg-slate-100 text-slate-600">
+                                                    {provider.provider_type}
+                                                </Badge>
+                                                {provider.is_verified && (
+                                                    <Badge className="bg-blue-50 text-blue-600 border border-blue-200 hover:bg-blue-100 px-2 py-0.5 shadow-none">Verified</Badge>
                                                 )}
                                             </div>
-                                        )}
-                                    </CardContent>
-                                    <CardFooter>
-                                        <Button
-                                            variant={selectedStack.includes(provider.id) ? "default" : "outline"}
-                                            className={`w-full ${selectedStack.includes(provider.id) ? 'bg-amber-500 text-white hover:bg-amber-600' : 'border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-900'}`}
-                                            onClick={() => toggleStack(provider.id)}
-                                        >
-                                            {selectedStack.includes(provider.id) ? "In Stack" : "Add to Stack"}
-                                        </Button>
-                                    </CardFooter>
-                                </Card>
-                            ))
+                                            <CardTitle className="text-slate-900 mt-2">{provider.company_name}</CardTitle>
+                                        </CardHeader>
+                                        <CardContent>
+                                            <div className="text-sm text-slate-500 mb-4">
+                                                Top-tier {provider.provider_type} services for scaling startups.
+                                                {/* In a real app, we'd describe services from JSONB */}
+                                            </div>
+                                            {services && (
+                                                <div className="flex flex-wrap gap-1 mb-2">
+                                                    {services.slice(0, 2).map((s, i) => (
+                                                        <span key={i} className="text-xs bg-slate-50 text-slate-500 px-2 py-1 rounded-sm border border-slate-100">{s}</span>
+                                                    ))}
+                                                    {services.length > 2 && (
+                                                        <span className="text-xs text-slate-400 px-1 py-1">+{services.length - 2} more</span>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </CardContent>
+                                        <CardFooter>
+                                            <Button
+                                                variant={selectedStack.includes(provider.id) ? "secondary" : "default"}
+                                                className="w-full"
+                                                onClick={() => toggleStack(provider.id)}
+                                                disabled={isUpdating}
+                                            >
+                                                {selectedStack.includes(provider.id) ? "In Stack" : "Add to Stack"}
+                                            </Button>
+                                        </CardFooter>
+                                    </Card>
+                                )
+                            })
                         )}
                     </div>
                 </TabsContent>
@@ -172,7 +218,7 @@ export function MarketplaceView({ providers, aiTools, rfqs }: MarketplaceViewPro
                         <div className="md:col-span-2 space-y-4">
                             <div className="flex justify-between items-center">
                                 <h3 className="text-lg font-medium text-slate-900">Open RFQs</h3>
-                                <Button size="sm" className="bg-slate-900 text-white">Create RFQ</Button>
+                                <CreateRFQDialog />
                             </div>
 
                             {rfqs.length === 0 ? (
@@ -231,3 +277,4 @@ export function MarketplaceView({ providers, aiTools, rfqs }: MarketplaceViewPro
         </div>
     )
 }
+

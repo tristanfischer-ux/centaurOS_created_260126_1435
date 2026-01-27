@@ -10,7 +10,7 @@ SELECT foundry_id FROM public.profiles WHERE id = auth.uid()
 $$ LANGUAGE sql STABLE SECURITY DEFINER;
 
 -- =============================================
--- 2. DROP INSECURE POLICIES
+-- 2. DROP INSECURE POLICIES & PREPARE FOR NEW ONES
 -- =============================================
 -- Drop broad "authenticated" policies that allow cross-tenant access
 
@@ -21,20 +21,20 @@ DROP POLICY IF EXISTS "Users can view comments" ON public.task_comments;
 DROP POLICY IF EXISTS "Users can view all teams" ON public.teams;
 DROP POLICY IF EXISTS "Users can view team members" ON public.team_members;
 DROP POLICY IF EXISTS "Users can view task assignees" ON public.task_assignees;
+DROP POLICY IF EXISTS "Users can manage teams" ON public.teams; -- Potential legacy name
 
 -- =============================================
 -- 3. PROFILES: Strict Foundry Isolation
 -- =============================================
 -- Users can see profiles only within their own Foundry.
 
+DROP POLICY IF EXISTS "Users can view profiles in their foundry" ON public.profiles;
 CREATE POLICY "Users can view profiles in their foundry" ON public.profiles
     FOR SELECT USING (
         foundry_id = (SELECT foundry_id FROM public.profiles WHERE id = auth.uid()) 
-        -- Optimization: OR (auth.uid() = id) is redundant but safe
     );
 
 -- Users can only update their OWN profile
--- (Existing policy "Users can update own profile" is likely already correct, but ensuring here)
 DROP POLICY IF EXISTS "Users can update own profile" ON public.profiles;
 CREATE POLICY "Users can update own profile" ON public.profiles
     FOR UPDATE USING (auth.uid() = id);
@@ -43,11 +43,13 @@ CREATE POLICY "Users can update own profile" ON public.profiles
 -- 4. OBJECTIVES: Strict Foundry Isolation
 -- =============================================
 
+DROP POLICY IF EXISTS "Users can view objectives in their foundry" ON public.objectives;
 CREATE POLICY "Users can view objectives in their foundry" ON public.objectives
     FOR SELECT USING (
         foundry_id = get_my_foundry_id()
     );
 
+DROP POLICY IF EXISTS "Users can create objectives in their foundry" ON public.objectives;
 CREATE POLICY "Users can create objectives in their foundry" ON public.objectives
     FOR INSERT WITH CHECK (
         foundry_id = get_my_foundry_id()
@@ -57,16 +59,19 @@ CREATE POLICY "Users can create objectives in their foundry" ON public.objective
 -- 5. TASKS: Strict Foundry Isolation
 -- =============================================
 
+DROP POLICY IF EXISTS "Users can view tasks in their foundry" ON public.tasks;
 CREATE POLICY "Users can view tasks in their foundry" ON public.tasks
     FOR SELECT USING (
         foundry_id = get_my_foundry_id()
     );
 
+DROP POLICY IF EXISTS "Users can insert tasks in their foundry" ON public.tasks;
 CREATE POLICY "Users can insert tasks in their foundry" ON public.tasks
     FOR INSERT WITH CHECK (
         foundry_id = get_my_foundry_id()
     );
 
+DROP POLICY IF EXISTS "Users can update tasks in their foundry" ON public.tasks;
 CREATE POLICY "Users can update tasks in their foundry" ON public.tasks
     FOR UPDATE USING (
         foundry_id = get_my_foundry_id()
@@ -76,11 +81,13 @@ CREATE POLICY "Users can update tasks in their foundry" ON public.tasks
 -- 6. TASK COMMENTS: Strict Foundry Isolation
 -- =============================================
 
+DROP POLICY IF EXISTS "Users can view comments in their foundry" ON public.task_comments;
 CREATE POLICY "Users can view comments in their foundry" ON public.task_comments
     FOR SELECT USING (
         foundry_id = get_my_foundry_id()
     );
 
+DROP POLICY IF EXISTS "Users can insert comments in their foundry" ON public.task_comments;
 CREATE POLICY "Users can insert comments in their foundry" ON public.task_comments
     FOR INSERT WITH CHECK (
         foundry_id = get_my_foundry_id()
@@ -90,11 +97,13 @@ CREATE POLICY "Users can insert comments in their foundry" ON public.task_commen
 -- 7. TEAMS: Strict Foundry Isolation
 -- =============================================
 
+DROP POLICY IF EXISTS "Users can view teams in their foundry" ON public.teams;
 CREATE POLICY "Users can view teams in their foundry" ON public.teams
     FOR SELECT USING (
         foundry_id = get_my_foundry_id()
     );
 
+DROP POLICY IF EXISTS "Users can manage teams in their foundry" ON public.teams;
 CREATE POLICY "Users can manage teams in their foundry" ON public.teams
     FOR ALL USING (
         foundry_id = get_my_foundry_id()
@@ -104,7 +113,8 @@ CREATE POLICY "Users can manage teams in their foundry" ON public.teams
 -- 8. JUNCTION TABLES (Inherited Security)
 -- =============================================
 
--- TEAM MEMBERS: Viewable if you can view the Team
+-- TEAM MEMBERS
+DROP POLICY IF EXISTS "Users can view team members in their foundry" ON public.team_members;
 CREATE POLICY "Users can view team members in their foundry" ON public.team_members
     FOR SELECT USING (
         EXISTS (
@@ -114,6 +124,7 @@ CREATE POLICY "Users can view team members in their foundry" ON public.team_memb
         )
     );
 
+DROP POLICY IF EXISTS "Users can manage team members in their foundry" ON public.team_members;
 CREATE POLICY "Users can manage team members in their foundry" ON public.team_members
     FOR ALL USING (
         EXISTS (
@@ -123,7 +134,8 @@ CREATE POLICY "Users can manage team members in their foundry" ON public.team_me
         )
     );
 
--- TASK ASSIGNEES: Viewable if you can view the Task
+-- TASK ASSIGNEES
+DROP POLICY IF EXISTS "Users can view task assignees in their foundry" ON public.task_assignees;
 CREATE POLICY "Users can view task assignees in their foundry" ON public.task_assignees
     FOR SELECT USING (
         EXISTS (
@@ -133,6 +145,7 @@ CREATE POLICY "Users can view task assignees in their foundry" ON public.task_as
         )
     );
 
+DROP POLICY IF EXISTS "Users can manage task assignees in their foundry" ON public.task_assignees;
 CREATE POLICY "Users can manage task assignees in their foundry" ON public.task_assignees
     FOR ALL USING (
         EXISTS (
@@ -146,24 +159,28 @@ CREATE POLICY "Users can manage task assignees in their foundry" ON public.task_
 -- 9. MARKETPLACE (Public Read / Restricted Write)
 -- =============================================
 
--- SERVICE PROVIDERS: Global Read
+-- SERVICE PROVIDERS
 ALTER TABLE public.service_providers ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Global Read for Service Providers" ON public.service_providers;
 CREATE POLICY "Global Read for Service Providers" ON public.service_providers
     FOR SELECT USING (auth.role() = 'authenticated');
 
--- AI TOOLS: Global Read
+-- AI TOOLS
 ALTER TABLE public.ai_tools ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Global Read for AI Tools" ON public.ai_tools;
 CREATE POLICY "Global Read for AI Tools" ON public.ai_tools
     FOR SELECT USING (auth.role() = 'authenticated');
 
--- MANUFACTURING RFQS: Private to Foundry
+-- MANUFACTURING RFQS
 ALTER TABLE public.manufacturing_rfqs ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Users can view own RFQs" ON public.manufacturing_rfqs;
 CREATE POLICY "Users can view own RFQs" ON public.manufacturing_rfqs
     FOR SELECT USING (
         foundry_id = get_my_foundry_id()
     );
 
+DROP POLICY IF EXISTS "Users can create RFQs" ON public.manufacturing_rfqs;
 CREATE POLICY "Users can create RFQs" ON public.manufacturing_rfqs
     FOR INSERT WITH CHECK (
         foundry_id = get_my_foundry_id()

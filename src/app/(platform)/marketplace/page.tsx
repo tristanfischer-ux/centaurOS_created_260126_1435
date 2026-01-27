@@ -17,7 +17,7 @@ export default async function MarketplacePage() {
         user ? supabase.from('profiles').select('foundry_id').eq('id', user.id).single() : Promise.resolve({ data: null })
     ])
 
-    let stackProviders: Set<string> = new Set()
+    const stackProviders: Set<string> = new Set()
 
     if (profileResult.data?.foundry_id) {
         const { data: stack } = await supabase
