@@ -120,6 +120,6 @@ export function validate<T>(schema: z.ZodSchema<T>, data: unknown):
   if (result.success) {
     return { success: true, data: result.data }
   }
-  const errorMessage = result.error.errors.map(e => e.message).join(', ')
+  const errorMessage = result.error.issues.map(e => e.message).join(', ')
   return { success: false, error: errorMessage }
 }
