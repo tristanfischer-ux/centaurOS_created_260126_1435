@@ -3,7 +3,7 @@ import { createObjective } from "@/actions/objectives"
 import { getObjectivePacks, getPackDetails, ObjectivePack } from "@/actions/packs"
 import { analyzeBusinessPlan, AnalyzedObjective } from "@/actions/analyze"
 import { toast } from "sonner"
-import { useEffect, useState } from "react"
+import { useEffect, useState, useRef } from "react"
 import { Loader2, Plus, BookTemplate, Upload, Check } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -23,6 +23,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 export function CreateObjectiveDialog({ disabled }: { disabled?: boolean }) {
     const [open, setOpen] = useState(false)
     const [loading, setLoading] = useState(false)
+    const formRef = useRef<HTMLFormElement>(null)
 
     // Manual / Pack Mode State
     const [packs, setPacks] = useState<ObjectivePack[]>([])
@@ -158,17 +159,8 @@ export function CreateObjectiveDialog({ disabled }: { disabled?: boolean }) {
 
                     <TabsContent value="manual" className="flex-1 overflow-hidden flex flex-col mt-0 h-full">
                         <ScrollArea className="flex-1 pr-4">
-                            <form action={clientAction} className="space-y-4 pb-6 pt-2 h-full">
-                                <Input
-                                    name="title"
-                                    placeholder="e.g. Expand Market Share"
-                                    className="bg-slate-50 border-slate-200"
-                                    onKeyDown={(e) => {
-                                        if (e.key === 'Enter') {
-                                            e.preventDefault();
-                                        }
-                                    }}
-                                />
+                            <form ref={formRef} action={clientAction} className="space-y-4 pb-6 pt-2 h-full">
+                                <Input name="title" placeholder="e.g. Expand Market Share" className="bg-slate-50 border-slate-200" />
                                 <Textarea name="description" placeholder="Success criteria and scope..." className="bg-slate-50 border-slate-200" />
 
                                 <div className="space-y-2">
@@ -247,7 +239,12 @@ export function CreateObjectiveDialog({ disabled }: { disabled?: boolean }) {
                                     )}
                                 </div>
 
-                                <Button type="submit" disabled={loading} className="w-full bg-slate-900 text-white">
+                                <Button
+                                    type="button"
+                                    onClick={() => formRef.current?.requestSubmit()}
+                                    disabled={loading}
+                                    className="w-full bg-slate-900 text-white"
+                                >
                                     {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                                     Initialize Objective
                                 </Button>

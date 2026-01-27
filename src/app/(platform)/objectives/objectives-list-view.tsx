@@ -1,10 +1,12 @@
 "use client"
 
 import { useState } from "react"
-import { ChevronDown, ChevronRight, Target, CheckCircle2, Clock, AlertCircle, ArrowRight } from "lucide-react"
+import { ChevronDown, ChevronRight, Target, CheckCircle2, Clock, AlertCircle, ArrowRight, Trash2 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
+import { deleteObjective } from "@/actions/objectives"
+import { toast } from "sonner"
 
 interface Task {
     id: string
@@ -129,6 +131,25 @@ export function ObjectivesListView({ objectives }: ObjectivesListViewProps) {
                                     <Badge variant="outline" className="text-xs">
                                         {progress}%
                                     </Badge>
+
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-8 w-8 text-slate-400 hover:text-red-600 hover:bg-red-50"
+                                        onClick={async (e) => {
+                                            e.stopPropagation()
+                                            if (confirm("Are you sure you want to delete this objective? This will also delete all associated tasks.")) {
+                                                const res = await deleteObjective(objective.id)
+                                                if (res?.success) {
+                                                    toast.success("Objective deleted")
+                                                } else {
+                                                    toast.error(res?.error || "Failed to delete objective")
+                                                }
+                                            }
+                                        }}
+                                    >
+                                        <Trash2 className="h-4 w-4" />
+                                    </Button>
                                 </div>
                             </div>
 
