@@ -15,14 +15,20 @@ export default async function TasksPage() {
             *,
             assignee:profiles!assignee_id(id, full_name, role, email),
             creator:profiles!creator_id(id, full_name, role),
-            objective:objectives!objective_id(id, title),
-            task_files(id)
+            objective:objectives!objective_id(id, title)
         `)
         .order('created_at', { ascending: false })
 
     if (error) {
         console.error("Error loading tasks:", error)
-        return <div className="text-red-500">Error loading tasks</div>
+        return (
+            <div className="p-8 text-red-500">
+                <h1 className="font-bold mb-2">Error loading tasks</h1>
+                <pre className="bg-red-50 p-4 rounded text-sm overflow-auto">
+                    {JSON.stringify(error, null, 2)}
+                </pre>
+            </div>
+        )
     }
 
     // Fetch current user's profile to get role
@@ -45,7 +51,8 @@ export default async function TasksPage() {
         assignee: Array.isArray(task.assignee) ? task.assignee[0] : task.assignee,
         creator: Array.isArray(task.creator) ? task.creator[0] : task.creator,
         objective: Array.isArray(task.objective) ? task.objective[0] : task.objective,
-        assignees: [] // Temporarily disabled while debugging task_assignees join
+        assignees: [], // Temporarily disabled while debugging task_assignees join
+        task_files: [] // Temporarily stubbed due to missing relationship
     })) || []
 
     return (
