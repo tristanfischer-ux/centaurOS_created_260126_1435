@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { Database } from '@/types/database.types'
 
 
 
@@ -43,7 +44,7 @@ export async function createObjective(formData: FormData) {
     if (!objective) return { error: 'Failed to create objective' }
 
     // 3. Create Tasks
-    let tasksToInsert: any[] = []
+    let tasksToInsert: Database['public']['Tables']['tasks']['Insert'][] = []
 
     // A. From Playbook
     if (playbookId && playbookId !== 'none') {
@@ -129,6 +130,14 @@ export async function createObjective(formData: FormData) {
 export async function deleteObjective(id: string) {
     const supabase = await createClient()
     const { error } = await supabase.from('objectives').delete().eq('id', id)
+    if (error) return { error: error.message }
+    revalidatePath('/objectives')
+    return { success: true }
+}
+
+export async function deleteObjectives(ids: string[]) {
+    const supabase = await createClient()
+    const { error } = await supabase.from('objectives').delete().in('id', ids)
     if (error) return { error: error.message }
     revalidatePath('/objectives')
     return { success: true }

@@ -17,8 +17,9 @@ import {
     AlertDialogFooter,
     AlertDialogHeader,
     AlertDialogTitle,
-    AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
+
+
 
 interface Task {
     id: string
@@ -63,14 +64,43 @@ function getStatusConfig(status: string | null) {
 
 export function ObjectivesListView({ objectives }: ObjectivesListViewProps) {
     const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
+    const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+    const [objectiveToDelete, setObjectiveToDelete] = useState<string | null>(null)
+    const [showBulkDeleteDialog, setShowBulkDeleteDialog] = useState(false)
 
-    const handleDelete = async (id: string) => {
-        const result = await deleteObjective(id)
+    // Handle single deletion
+    const handleDeleteSingle = async () => {
+        if (!objectiveToDelete) return
+
+        const result = await deleteObjective(objectiveToDelete)
 
         if (result?.error) {
             toast.error(result.error)
         } else {
             toast.success("Objective deleted")
+            setObjectiveToDelete(null)
+            // Remove from selection if it was there
+            const newSelected = new Set(selectedIds)
+            newSelected.delete(objectiveToDelete)
+            setSelectedIds(newSelected)
+        }
+    }
+
+    // Handle bulk deletion
+    const handleDeleteBulk = async () => {
+        if (selectedIds.size === 0) return
+
+        const idsToDelete = Array.from(selectedIds)
+        // Dynamically import to avoid circular dependencies if they exist, or just use the imported action
+        const { deleteObjectives } = await import("@/actions/objectives")
+        const result = await deleteObjectives(idsToDelete)
+
+        if (result?.error) {
+            toast.error(result.error)
+        } else {
+            toast.success(`${idsToDelete.length} objectives deleted`)
+            setSelectedIds(new Set())
+            setShowBulkDeleteDialog(false)
         }
     }
 
@@ -84,6 +114,24 @@ export function ObjectivesListView({ objectives }: ObjectivesListViewProps) {
         setExpandedIds(newSet)
     }
 
+    const toggleSelection = (id: string) => {
+        const newSet = new Set(selectedIds)
+        if (newSet.has(id)) {
+            newSet.delete(id)
+        } else {
+            newSet.add(id)
+        }
+        setSelectedIds(newSet)
+    }
+
+    const toggleSelectAll = () => {
+        if (selectedIds.size === objectives.length) {
+            setSelectedIds(new Set())
+        } else {
+            setSelectedIds(new Set(objectives.map(o => o.id)))
+        }
+    }
+
     const expandAll = () => {
         setExpandedIds(new Set(objectives.map(o => o.id)))
     }
@@ -95,30 +143,126 @@ export function ObjectivesListView({ objectives }: ObjectivesListViewProps) {
     return (
         <div className="space-y-4">
             {/* Controls */}
-            <div className="flex gap-2">
-                <Button variant="outline" size="sm" onClick={expandAll}>
-                    Expand All
-                </Button>
-                <Button variant="outline" size="sm" onClick={collapseAll}>
-                    Collapse All
-                </Button>
+            <div className="flex items-center justify-between">
+                <div className="flex gap-2">
+                    <Button variant="outline" size="sm" onClick={expandAll}>
+                        Expand All
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={collapseAll}>
+                        Collapse All
+                    </Button>
+                </div>
+
+                {selectedIds.size > 0 && (
+                    <div className="flex gap-2 animate-in fade-in slide-in-from-right-4 duration-300">
+                        <Button
+                            variant="destructive"
+                            size="sm"
+                            onClick={() => setShowBulkDeleteDialog(true)}
+                        >
+                            Delete Selected ({selectedIds.size})
+                        </Button>
+                    </div>
+                )}
             </div>
+
+            {/* Hoisted Delete Dialog (Single) */}
+            <AlertDialog open={!!objectiveToDelete} onOpenChange={(open) => !open && setObjectiveToDelete(null)}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Delete Objective?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            This will permanently delete this objective and all associated tasks.
+                            This action cannot be undone.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                            className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
+                            onClick={handleDeleteSingle}
+                        >
+                            Delete
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+
+            {/* Hoisted Delete Dialog (Bulk) */}
+            <AlertDialog open={showBulkDeleteDialog} onOpenChange={setShowBulkDeleteDialog}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Delete {selectedIds.size} Objectives?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            This will permanently delete the selected objectives and ALL their associated tasks.
+                            This action cannot be undone.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                            className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
+                            onClick={handleDeleteBulk}
+                        >
+                            Delete {selectedIds.size} Items
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
 
             {/* Objectives List */}
             <div className="space-y-3">
+                {/* Select All Header (Optional, but good for bulk actions) */}
+                {objectives.length > 0 && (
+                    <div className="flex items-center px-4 py-2 bg-slate-50 border border-slate-200 rounded-md">
+                        <div className="flex items-center h-5 w-5 mr-4">
+                            <input
+                                type="checkbox"
+                                className="h-4 w-4 rounded border-slate-300 text-amber-600 focus:ring-amber-500 cursor-pointer"
+                                checked={selectedIds.size === objectives.length && objectives.length > 0}
+                                onChange={toggleSelectAll}
+                                aria-label="Select all objectives"
+                            />
+                        </div>
+                        <span className="text-sm font-medium text-slate-500">Select All</span>
+                    </div>
+                )}
+
                 {objectives.map(objective => {
                     const isExpanded = expandedIds.has(objective.id)
+                    const isSelected = selectedIds.has(objective.id)
                     const taskCount = objective.tasks.length
                     const completedCount = objective.tasks.filter(t => t.status === 'Completed').length
                     const progress = taskCount > 0 ? Math.round((completedCount / taskCount) * 100) : 0
 
                     return (
-                        <div key={objective.id} className="bg-white border border-slate-200 rounded-lg shadow-sm overflow-hidden">
+                        <div
+                            key={objective.id}
+                            className={`bg-white border rounded-lg shadow-sm overflow-hidden transition-all duration-200 ${isSelected ? 'border-amber-500 ring-1 ring-amber-500/20' : 'border-slate-200'
+                                }`}
+                        >
                             {/* Objective Header */}
                             <div
                                 className="flex items-center gap-4 p-4 cursor-pointer hover:bg-slate-50 transition-colors"
                                 onClick={() => toggleExpand(objective.id)}
                             >
+                                {/* Checkbox */}
+                                <div
+                                    className="shrink-0 flex items-center justify-center p-1"
+                                    onClick={(e) => {
+                                        e.stopPropagation()
+                                        toggleSelection(objective.id)
+                                    }}
+                                >
+                                    <input
+                                        type="checkbox"
+                                        className="h-4 w-4 rounded border-slate-300 text-amber-600 focus:ring-amber-500 cursor-pointer"
+                                        checked={isSelected}
+                                        onChange={() => { }} // Handled by div click
+                                        aria-label={`Select objective ${objective.title}`}
+                                    />
+                                </div>
+
                                 <button className="shrink-0 text-slate-400 hover:text-slate-600">
                                     {isExpanded ? (
                                         <ChevronDown className="h-5 w-5" />
@@ -151,39 +295,17 @@ export function ObjectivesListView({ objectives }: ObjectivesListViewProps) {
                                         {progress}%
                                     </Badge>
 
-                                    <AlertDialog>
-                                        <AlertDialogTrigger asChild>
-                                            <Button
-                                                variant="ghost"
-                                                size="icon"
-                                                className="h-8 w-8 text-slate-400 hover:text-red-600 hover:bg-red-50"
-                                                onClick={(e) => e.stopPropagation()}
-                                            >
-                                                <Trash className="h-4 w-4" />
-                                            </Button>
-                                        </AlertDialogTrigger>
-                                        <AlertDialogContent onClick={(e) => e.stopPropagation()}>
-                                            <AlertDialogHeader>
-                                                <AlertDialogTitle>Delete Objective?</AlertDialogTitle>
-                                                <AlertDialogDescription>
-                                                    This will permanently delete this objective and all associated tasks.
-                                                    This action cannot be undone.
-                                                </AlertDialogDescription>
-                                            </AlertDialogHeader>
-                                            <AlertDialogFooter>
-                                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                                <AlertDialogAction
-                                                    className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
-                                                    onClick={(e) => {
-                                                        e.stopPropagation()
-                                                        handleDelete(objective.id)
-                                                    }}
-                                                >
-                                                    Delete
-                                                </AlertDialogAction>
-                                            </AlertDialogFooter>
-                                        </AlertDialogContent>
-                                    </AlertDialog>
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-8 w-8 text-slate-400 hover:text-red-600 hover:bg-red-50"
+                                        onClick={(e) => {
+                                            e.stopPropagation()
+                                            setObjectiveToDelete(objective.id)
+                                        }}
+                                    >
+                                        <Trash className="h-4 w-4" />
+                                    </Button>
                                 </div>
                             </div>
 

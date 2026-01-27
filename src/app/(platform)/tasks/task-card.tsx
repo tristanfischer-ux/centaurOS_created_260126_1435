@@ -66,16 +66,30 @@ interface TaskCardProps {
     currentUserId: string
     userRole?: string
     members: Member[]
+    expanded: boolean
+    onToggle: () => void
+    isSelectionMode?: boolean
+    isSelected?: boolean
+    onToggleSelection?: () => void
 }
 
-export function TaskCard({ task, currentUserId, userRole, members }: TaskCardProps) {
+export function TaskCard(props: TaskCardProps) {
+    const { task, currentUserId, userRole, members } = props
     const isAssignee = task.assignees?.some(a => a.id === currentUserId) || task.assignee_id === currentUserId
     const isCreator = currentUserId === task.creator_id
     const isAITask = task.assignees?.some(a => a.role === 'AI_Agent') || task.assignee?.role === 'AI_Agent'
     const isOverdue = task.end_date ? new Date(task.end_date) < new Date() : false
     const isExecutive = userRole === 'Executive' || userRole === 'Founder'
 
-    const [expanded, setExpanded] = useState(false)
+    // Externally controlled expansion state
+    const {
+        expanded,
+        onToggle,
+        isSelectionMode,
+        isSelected,
+        onToggleSelection
+    } = props
+
     const [loading, setLoading] = useState(false)
     const [aiRunning, setAiRunning] = useState(false)
 
@@ -233,7 +247,7 @@ export function TaskCard({ task, currentUserId, userRole, members }: TaskCardPro
 
     return (
         <Card className="bg-white border-slate-200 hover:border-slate-300 hover:shadow-md transition-all flex flex-col h-full group/card relative">
-            <CardHeader className="p-4 pb-2 space-y-3 cursor-pointer" onClick={() => setExpanded(!expanded)}>
+            <CardHeader className="p-4 pb-2 space-y-3 cursor-pointer" onClick={props.onToggle}>
                 <div className="flex justify-between items-start gap-2">
                     <div className="space-y-1 flex-1">
                         <div className="flex items-center gap-2 flex-wrap">

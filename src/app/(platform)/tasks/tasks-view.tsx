@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { TaskCard } from "./task-card"
 import { Button } from "@/components/ui/button"
 import { LayoutGrid, List, X } from "lucide-react"
@@ -117,6 +117,41 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
         )
     }
 
+    // Row Expansion Logic
+    const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set())
+    const [columns, setColumns] = useState(1) // Default to 1 (mobile-first safe)
+
+    // Handle Window Resize for Columns
+    useEffect(() => {
+        const handleResize = () => {
+            if (window.innerWidth >= 1024) {
+                setColumns(3) // lg:grid-cols-3
+            } else if (window.innerWidth >= 768) {
+                setColumns(2) // md:grid-cols-2
+            } else {
+                setColumns(1) // grid-cols-1
+            }
+        }
+
+        // Initial check
+        handleResize()
+
+        window.addEventListener('resize', handleResize)
+        return () => window.removeEventListener('resize', handleResize)
+    }, [])
+
+    const toggleRow = (rowIndex: number) => {
+        setExpandedRows(prev => {
+            const newSet = new Set(prev)
+            if (newSet.has(rowIndex)) {
+                newSet.delete(rowIndex)
+            } else {
+                newSet.add(rowIndex)
+            }
+            return newSet
+        })
+    }
+
     return (
         <>
             <div className="space-y-6">
@@ -231,16 +266,21 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
 
                 {viewMode === 'grid' ? (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {sortedTasks.map(task => (
-                            <div key={task.id} className="h-full">
-                                <TaskCard
-                                    task={task}
-                                    currentUserId={currentUserId}
-                                    userRole={currentUserRole}
-                                    members={members}
-                                />
-                            </div>
-                        ))}
+                        {sortedTasks.map((task, index) => {
+                            const rowIndex = Math.floor(index / columns)
+                            return (
+                                <div key={task.id} className="h-full">
+                                    <TaskCard
+                                        task={task}
+                                        currentUserId={currentUserId}
+                                        userRole={currentUserRole}
+                                        members={members}
+                                        expanded={expandedRows.has(rowIndex)}
+                                        onToggle={() => toggleRow(rowIndex)}
+                                    />
+                                </div>
+                            )
+                        })}
                         {sortedTasks.length === 0 && (
                             <div className="col-span-full py-16 text-center border-2 border-dashed border-slate-200 rounded-lg bg-slate-50/50">
                                 <div className="text-slate-400 mb-2">No tasks match your filters</div>

@@ -103,8 +103,8 @@ export function HistoryDrawer({ open, onOpenChange, taskId, taskTitle }: History
     }
 
     return (
-        <Drawer open={open} onOpenChange={onOpenChange}>
-            <DrawerContent className="h-[85vh] max-h-[85vh]">
+        <Drawer open={open} onOpenChange={onOpenChange} direction="right">
+            <DrawerContent className="h-full right-0 left-auto mt-0 w-[400px] rounded-none">
                 <div className="mx-auto w-full max-w-2xl flex flex-col h-full">
                     <DrawerHeader>
                         <DrawerTitle className="flex items-center gap-2">
