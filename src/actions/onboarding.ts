@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { getFoundryIdCached } from '@/lib/supabase/foundry-context'
 
 export async function createSampleData() {
   const supabase = await createClient()
@@ -9,14 +10,9 @@ export async function createSampleData() {
   
   if (!user) return { error: 'Unauthorized' }
   
-  // Get user's foundry
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('foundry_id')
-    .eq('id', user.id)
-    .single()
-  
-  if (!profile?.foundry_id) return { error: 'No foundry found' }
+  // Get user's foundry using cached helper
+  const foundry_id = await getFoundryIdCached()
+  if (!foundry_id) return { error: 'User not in a foundry' }
   
   // Create sample objective
   const { data: objective, error: objError } = await supabase
@@ -24,7 +20,8 @@ export async function createSampleData() {
     .insert({
       title: 'Sample Objective: Q1 Goals',
       description: 'This is a sample objective to help you get started. Feel free to edit or delete it.',
-      foundry_id: profile.foundry_id
+      creator_id: user.id,
+      foundry_id
     })
     .select()
     .single()
@@ -44,7 +41,7 @@ export async function createSampleData() {
       objective_id: objective.id,
       creator_id: user.id,
       assignee_id: user.id,
-      foundry_id: profile.foundry_id,
+      foundry_id,
       status: 'Pending',
       risk_level: 'Medium'
     })
