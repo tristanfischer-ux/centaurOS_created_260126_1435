@@ -15,12 +15,14 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { submitRFQ } from "@/actions/marketplace"
-import { Loader2 } from "lucide-react"
+import { Loader2, ChevronDown, ChevronUp } from "lucide-react"
 import { toast } from "sonner" // Assuming sonner is used, or I'll use a basic alert if not available
+import { Button } from "@/components/ui/button"
 
 export function CreateRFQDialog() {
     const [open, setOpen] = useState(false)
     const [isLoading, setIsLoading] = useState(false)
+    const [showAdvanced, setShowAdvanced] = useState(false)
     const [formData, setFormData] = useState({
         title: "",
         specifications: "",
@@ -63,31 +65,25 @@ export function CreateRFQDialog() {
             return
         }
 
-        // Validate budget range
-        if (!formData.budget_range || !formData.budget_range.trim()) {
-            setBudgetError('Budget range is required')
-            return
+        // Validate budget range (only if provided)
+        if (formData.budget_range && formData.budget_range.trim()) {
+            if (!validateBudgetRange(formData.budget_range)) {
+                setBudgetError('Please enter a valid budget range (e.g., "$500 - $1,000" or "$500-$1000")')
+                return
+            }
         }
 
-        if (!validateBudgetRange(formData.budget_range)) {
-            setBudgetError('Please enter a valid budget range (e.g., "$500 - $1,000" or "$500-$1000")')
-            return
-        }
+        // Validate specifications (only if provided)
+        if (formData.specifications && formData.specifications.trim()) {
+            if (formData.specifications.trim().length < 10) {
+                setSpecsError('Specifications must be at least 10 characters')
+                return
+            }
 
-        // Validate specifications
-        if (!formData.specifications || !formData.specifications.trim()) {
-            setSpecsError('Specifications are required')
-            return
-        }
-
-        if (formData.specifications.trim().length < 10) {
-            setSpecsError('Specifications must be at least 10 characters')
-            return
-        }
-
-        if (formData.specifications.trim().length > 5000) {
-            setSpecsError('Specifications must be 5,000 characters or less')
-            return
+            if (formData.specifications.trim().length > 5000) {
+                setSpecsError('Specifications must be 5,000 characters or less')
+                return
+            }
         }
 
         setIsLoading(true)
@@ -120,6 +116,7 @@ export function CreateRFQDialog() {
             // Reset state after dialog close animation
             setTimeout(() => {
                 setFormData({ title: "", specifications: "", budget_range: "" })
+                setShowAdvanced(false)
             }, 300)
         }
     }
@@ -137,6 +134,7 @@ export function CreateRFQDialog() {
                     </DialogDescription>
                 </DialogHeader>
                 <form onSubmit={handleSubmit} className="grid gap-4 py-4">
+                    {/* Always visible - Required */}
                     <div className="grid gap-2">
                         <Label htmlFor="title">Project Title</Label>
                         <Input
@@ -159,58 +157,85 @@ export function CreateRFQDialog() {
                             </p>
                         )}
                     </div>
-                    <div className="grid gap-2">
-                        <Label htmlFor="budget">Budget Range</Label>
-                        <Input
-                            id="budget"
-                            value={formData.budget_range}
-                            onChange={(e) => {
-                                setFormData({ ...formData, budget_range: e.target.value })
-                                setBudgetError(null)
-                            }}
-                            placeholder="e.g. $500 - $1,000"
-                            required
-                            enterKeyHint="next"
-                            className={budgetError ? 'border-red-500' : ''}
-                            aria-describedby={budgetError ? "budget-error" : undefined}
-                            aria-invalid={!!budgetError}
-                        />
-                        {budgetError && (
-                            <p id="budget-error" className="text-sm text-red-600 mt-1" role="alert">
-                                {budgetError}
-                            </p>
-                        )}
-                        {!budgetError && (
-                            <p className="text-xs text-slate-500">Format: $500 - $1,000 or $500-$1000</p>
-                        )}
+
+                    {/* Toggle Button */}
+                    <div className="pt-2">
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setShowAdvanced(!showAdvanced)}
+                            className="text-slate-500"
+                        >
+                            {showAdvanced ? (
+                                <>
+                                    <ChevronUp className="w-4 h-4 mr-1" />
+                                    Hide Details
+                                </>
+                            ) : (
+                                <>
+                                    <ChevronDown className="w-4 h-4 mr-1" />
+                                    Add Details
+                                </>
+                            )}
+                        </Button>
                     </div>
-                    <div className="grid gap-2">
-                        <Label htmlFor="specs">Specifications</Label>
-                        <Textarea
-                            id="specs"
-                            value={formData.specifications}
-                            onChange={(e) => {
-                                setFormData({ ...formData, specifications: e.target.value })
-                                setSpecsError(null)
-                            }}
-                            placeholder="Detailed requirements, materials, tolerances..."
-                            className={`h-32 ${specsError ? 'border-red-500' : ''}`}
-                            required
-                            enterKeyHint="done"
-                            aria-describedby={specsError ? "specs-error" : undefined}
-                            aria-invalid={!!specsError}
-                        />
-                        {specsError && (
-                            <p id="specs-error" className="text-sm text-red-600 mt-1" role="alert">
-                                {specsError}
-                            </p>
-                        )}
-                        {!specsError && formData.specifications && (
-                            <p className="text-xs text-slate-500 text-right">
-                                {formData.specifications.length} / 5,000 characters
-                            </p>
-                        )}
-                    </div>
+
+                    {/* Optional Fields */}
+                    {showAdvanced && (
+                        <>
+                            <div className="grid gap-2">
+                                <Label htmlFor="budget">Budget Range (Optional)</Label>
+                                <Input
+                                    id="budget"
+                                    value={formData.budget_range}
+                                    onChange={(e) => {
+                                        setFormData({ ...formData, budget_range: e.target.value })
+                                        setBudgetError(null)
+                                    }}
+                                    placeholder="e.g. $500 - $1,000"
+                                    enterKeyHint="next"
+                                    className={budgetError ? 'border-red-500' : ''}
+                                    aria-describedby={budgetError ? "budget-error" : undefined}
+                                    aria-invalid={!!budgetError}
+                                />
+                                {budgetError && (
+                                    <p id="budget-error" className="text-sm text-red-600 mt-1" role="alert">
+                                        {budgetError}
+                                    </p>
+                                )}
+                                {!budgetError && (
+                                    <p className="text-xs text-slate-500">Format: $500 - $1,000 or $500-$1000</p>
+                                )}
+                            </div>
+                            <div className="grid gap-2">
+                                <Label htmlFor="specs">Specifications (Optional)</Label>
+                                <Textarea
+                                    id="specs"
+                                    value={formData.specifications}
+                                    onChange={(e) => {
+                                        setFormData({ ...formData, specifications: e.target.value })
+                                        setSpecsError(null)
+                                    }}
+                                    placeholder="Detailed requirements, materials, tolerances..."
+                                    className={`h-32 ${specsError ? 'border-red-500' : ''}`}
+                                    enterKeyHint="done"
+                                    aria-describedby={specsError ? "specs-error" : undefined}
+                                    aria-invalid={!!specsError}
+                                />
+                                {specsError && (
+                                    <p id="specs-error" className="text-sm text-red-600 mt-1" role="alert">
+                                        {specsError}
+                                    </p>
+                                )}
+                                {!specsError && formData.specifications && (
+                                    <p className="text-xs text-slate-500 text-right">
+                                        {formData.specifications.length} / 5,000 characters
+                                    </p>
+                                )}
+                            </div>
+                        </>
+                    )}
                     <DialogFooter className="gap-2 pt-4 border-t border-slate-100">
                         <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
                         <Button type="submit" variant="primary" disabled={isLoading}>

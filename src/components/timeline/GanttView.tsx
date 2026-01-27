@@ -64,6 +64,55 @@ function getAvatarColor(name: string | null | undefined): string {
     return colors[Math.abs(hash) % colors.length]
 }
 
+// Calculate progress based on task status
+function getProgress(status: string | null): number {
+    switch (status) {
+        case 'Completed': return 100
+        case 'Accepted': return 50
+        case 'Pending': return 0
+        case 'Rejected': return 0
+        default: return 0
+    }
+}
+
+// Check if task is overdue
+function isOverdue(endDate: Date | null | undefined): boolean {
+    if (!endDate) return false
+    return endDate < new Date()
+}
+
+// Check if task is due soon (within 3 days)
+function isDueSoon(endDate: Date | null | undefined): boolean {
+    if (!endDate) return false
+    const now = new Date()
+    const threeDaysFromNow = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000)
+    return endDate >= now && endDate <= threeDaysFromNow
+}
+
+// Get bar color based on urgency and status
+function getBarColor(task: { status: string | null, end_date: string | null }): string {
+    const endDate = task.end_date ? new Date(task.end_date) : null
+    
+    // Overdue tasks are red
+    if (isOverdue(endDate) && task.status !== 'Completed') {
+        return '#ef4444' // red-500
+    }
+    
+    // Due soon tasks are yellow/orange
+    if (isDueSoon(endDate) && task.status !== 'Completed') {
+        return '#f59e0b' // amber-500
+    }
+    
+    // Status-based colors
+    if (task.status === "Completed") return '#22c55e' // green-500
+    if (task.status === "Accepted") return '#3b82f6' // blue-500
+    if (task.status === "Rejected") return '#ef4444' // red-500
+    if (task.status === "Amended" || task.status === "Amended_Pending_Approval") return '#f97316' // orange-500
+    
+    // Default: pending
+    return '#64748b' // slate-500
+}
+
 // Initials Avatar Component
 function InitialsAvatar({
     name,
@@ -271,13 +320,9 @@ export function GanttView({ tasks, objectives, profiles }: GanttViewProps) {
                     endDate = new Date(startDate.getTime() + 86400000)
                 }
 
-                // Standardized Colors (Solid)
-                let color = "#64748b" // Slate 500 (Pending)
-
-                if (task.status === "Accepted") { color = "#3b82f6"; } // Blue 500
-                if (task.status === "Completed") { color = "#22c55e"; } // Green 500
-                if (task.status === "Rejected") { color = "#ef4444"; } // Red 500
-                if (task.status === "Amended" || task.status === "Amended_Pending_Approval") { color = "#f97316"; } // Orange 500
+                // Get color based on urgency and status
+                const color = getBarColor({ status: task.status, end_date: task.end_date })
+                const progress = getProgress(task.status)
 
                 return {
                     start: startDate,
@@ -285,12 +330,12 @@ export function GanttView({ tasks, objectives, profiles }: GanttViewProps) {
                     name: task.title || "Untitled Task",
                     id: task.id,
                     type: "task" as const,
-                    progress: 100, // Visual: Always full bar (removes inconsistent "progress" look)
-                    isDisabled: false, // ENABLED for drag-drop (dates), but progress is effectively hidden
+                    progress: progress,
+                    isDisabled: false, // ENABLED for drag-drop (dates)
                     styles: {
                         progressColor: color,
                         progressSelectedColor: color,
-                        backgroundColor: color, // Solid color
+                        backgroundColor: color,
                     },
                     // Assignee info for avatar
                     assigneeName: task.profiles?.full_name,

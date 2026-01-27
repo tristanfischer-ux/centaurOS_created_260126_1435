@@ -4,10 +4,11 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 // We'll replace these with Lucide icons later if needed, or maintain text/emoji
-import { LayoutDashboard, Users, CheckSquare, Calendar, ShoppingBag, Settings } from "lucide-react"
+import { LayoutDashboard, Users, CheckSquare, Calendar, ShoppingBag, Settings, Target } from "lucide-react"
 
 const navigation = [
-    { name: "Objectives", href: "/objectives", icon: LayoutDashboard },
+    { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+    { name: "Objectives", href: "/objectives", icon: Target },
     { name: "Roster", href: "/team", icon: Users },
     { name: "Tasks", href: "/tasks", icon: CheckSquare },
     { name: "Timeline", href: "/timeline", icon: Calendar },
@@ -77,7 +78,10 @@ export function Sidebar({ foundryName, foundryId, userName, userRole }: { foundr
                         <p className="text-xs text-slate-500">Foundry Member</p>
                     </div>
                 </div>
-                <div className="text-[10px] text-slate-400 text-center font-mono">
+                <div className="text-xs text-slate-400 px-2 py-2 border-t border-slate-200 mt-2 pt-2 text-center">
+                    Press <kbd className="px-1.5 py-0.5 bg-slate-100 rounded text-xs font-mono border border-slate-200">⌘K</kbd> to search
+                </div>
+                <div className="text-[10px] text-slate-400 text-center font-mono mt-2">
                     v1.0.3
                 </div>
             </div>

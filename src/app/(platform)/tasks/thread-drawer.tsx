@@ -5,11 +5,13 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "
 import { createClient } from "@/lib/supabase/client"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { formatDistanceToNow } from "date-fns"
-import { Loader2, Send, Check, X, Forward, Paperclip, Bot } from "lucide-react"
+import { Loader2, Send, Check, X, Forward, Paperclip, Bot, Upload } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
+import { Textarea } from "@/components/ui/textarea"
 import { addTaskComment, acceptTask, rejectTask, completeTask, forwardTask, triggerAIWorker } from "@/actions/tasks"
 import { uploadTaskAttachment } from "@/actions/attachments"
 import { toast } from "sonner"
@@ -17,6 +19,7 @@ import { useRouter } from "next/navigation"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { EmptyState } from "@/components/ui/empty-state"
 import { MessageSquare } from "lucide-react"
+import { cn } from "@/lib/utils"
 
 function getInitials(name: string | null) {
     if (!name) return '??'
@@ -93,6 +96,9 @@ export function ThreadDrawer({
     const [commentError, setCommentError] = useState<string | null>(null)
     const [forwardError, setForwardError] = useState<string | null>(null)
     const [actionError, setActionError] = useState<string | null>(null)
+    const [rejectDialogOpen, setRejectDialogOpen] = useState(false)
+    const [rejectReason, setRejectReason] = useState('')
+    const [isDragging, setIsDragging] = useState(false)
     const fileInputRef = useRef<HTMLInputElement>(null)
     const supabase = useMemo(() => createClient(), [])
 
@@ -166,15 +172,19 @@ export function ThreadDrawer({
     }
 
     const handleReject = async () => {
-        const reason = prompt("Reason for rejection:")
-        if (!reason) return
+        if (!rejectReason.trim()) {
+            toast.error("Please provide a reason for rejection")
+            return
+        }
 
         setIsActionLoading(true)
-        const result = await rejectTask(taskId, reason)
+        const result = await rejectTask(taskId, rejectReason)
         if (result?.error) {
             toast.error(result.error)
         } else {
             toast.success("Task rejected")
+            setRejectDialogOpen(false)
+            setRejectReason('')
             router.refresh()
             onOpenChange(false)
         }
@@ -232,10 +242,7 @@ export function ThreadDrawer({
         setIsActionLoading(false)
     }
 
-    const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0]
-        if (!file) return
-
+    const handleFileUpload = async (file: File) => {
         setIsUploading(true)
         const formData = new FormData()
         formData.append('file', file)
@@ -255,6 +262,36 @@ export function ThreadDrawer({
         }
         setIsUploading(false)
         if (fileInputRef.current) fileInputRef.current.value = ''
+    }
+
+    const handleFileInputChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0]
+        if (!file) return
+        await handleFileUpload(file)
+    }
+
+    // Drag and drop handlers
+    const handleDragOver = (e: React.DragEvent) => {
+        e.preventDefault()
+        e.stopPropagation()
+        setIsDragging(true)
+    }
+
+    const handleDragLeave = (e: React.DragEvent) => {
+        e.preventDefault()
+        e.stopPropagation()
+        setIsDragging(false)
+    }
+
+    const handleDrop = async (e: React.DragEvent) => {
+        e.preventDefault()
+        e.stopPropagation()
+        setIsDragging(false)
+        
+        const files = Array.from(e.dataTransfer.files)
+        if (files.length > 0) {
+            await handleFileUpload(files[0])
+        }
     }
 
     return (
@@ -296,7 +333,7 @@ export function ThreadDrawer({
                                 <Button
                                     size="sm"
                                     variant="destructive"
-                                    onClick={handleReject}
+                                    onClick={() => setRejectDialogOpen(true)}
                                     disabled={isActionLoading}
                                 >
                                     <X className="h-4 w-4 mr-1" /> Reject
@@ -476,23 +513,37 @@ export function ThreadDrawer({
 
                 {/* Comment Input */}
                 <div className="pt-4 border-t border-slate-100 mt-auto">
+                    <div
+                        className={cn(
+                            "border-2 border-dashed rounded-lg p-3 mb-2 text-center cursor-pointer transition-colors",
+                            isDragging ? "border-blue-500 bg-blue-50" : "border-slate-200 hover:border-slate-300 hover:bg-slate-50"
+                        )}
+                        onClick={() => fileInputRef.current?.click()}
+                        onDragOver={handleDragOver}
+                        onDragLeave={handleDragLeave}
+                        onDrop={handleDrop}
+                        role="button"
+                        tabIndex={0}
+                        aria-label="Click to upload files or drag and drop"
+                        onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault()
+                                fileInputRef.current?.click()
+                            }
+                        }}
+                    >
+                        <Upload className="h-5 w-5 mx-auto text-slate-400 mb-1" />
+                        <p className="text-xs text-slate-500">
+                            Drag & drop or click to attach file
+                        </p>
+                    </div>
+                    <input
+                        type="file"
+                        ref={fileInputRef}
+                        onChange={handleFileInputChange}
+                        className="hidden"
+                    />
                     <form onSubmit={handleSend} className="flex gap-2">
-                        <input
-                            type="file"
-                            ref={fileInputRef}
-                            onChange={handleFileUpload}
-                            className="hidden"
-                        />
-                        <Button
-                            type="button"
-                            size="icon"
-                            variant="outline"
-                            disabled={isUploading}
-                            onClick={() => fileInputRef.current?.click()}
-                            className="shrink-0 border-slate-200"
-                        >
-                            {isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Paperclip className="h-4 w-4" />}
-                        </Button>
                         <div className="flex-1">
                             <Input
                                 value={newComment}
@@ -517,6 +568,34 @@ export function ThreadDrawer({
                         </Button>
                     </form>
                 </div>
+
+                {/* Reject Dialog */}
+                <Dialog open={rejectDialogOpen} onOpenChange={setRejectDialogOpen}>
+                    <DialogContent size="sm" className="bg-white border-slate-200 text-slate-900">
+                        <DialogHeader>
+                            <DialogTitle>Reject Task</DialogTitle>
+                            <DialogDescription>Please provide a reason for rejection</DialogDescription>
+                        </DialogHeader>
+                        <Textarea
+                            value={rejectReason}
+                            onChange={(e) => setRejectReason(e.target.value)}
+                            placeholder="Enter rejection reason..."
+                            className="bg-white border-slate-200 min-h-[100px]"
+                        />
+                        <DialogFooter>
+                            <Button variant="outline" onClick={() => {
+                                setRejectDialogOpen(false)
+                                setRejectReason('')
+                            }} disabled={isActionLoading}>
+                                Cancel
+                            </Button>
+                            <Button variant="destructive" onClick={handleReject} disabled={isActionLoading}>
+                                {isActionLoading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+                                Reject Task
+                            </Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
             </SheetContent>
         </Sheet>
     )

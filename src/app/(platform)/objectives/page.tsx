@@ -49,7 +49,18 @@ export default async function ObjectivesPage() {
         })) || []
     })) || []
 
+    // Fetch data for CreateTaskDialog
+    const objectivesForDialog = await supabase.from('objectives').select('id, title').then(r => r.data || [])
+    const membersData = await supabase.from('profiles').select('id, full_name, role')
+    const members = (membersData.data || []).map(p => ({
+        id: p.id,
+        full_name: p.full_name || 'Unknown',
+        role: p.role
+    }))
 
+    // Fetch Teams
+    const { data: teamsData } = await supabase.from('teams').select('id, name')
+    const teams = teamsData || []
 
     return (
         <div className="space-y-6">
@@ -61,7 +72,13 @@ export default async function ObjectivesPage() {
                 <CreateObjectiveDialog />
             </div>
 
-            <ObjectivesListView objectives={objectivesWithTasks} />
+            <ObjectivesListView 
+                objectives={objectivesWithTasks}
+                objectivesForDialog={objectivesForDialog}
+                members={members}
+                teams={teams}
+                currentUserId={user.id}
+            />
         </div>
     )
 }

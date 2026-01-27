@@ -5,13 +5,14 @@ import { useAutoRefresh } from "@/hooks/useAutoRefresh"
 import { RefreshButton } from "@/components/RefreshButton"
 import { TaskCard } from "./task-card"
 import { Button } from "@/components/ui/button"
-import { LayoutGrid, List, X, Trash2, CheckSquare, Loader2 } from "lucide-react"
-import { deleteTasks } from "@/actions/tasks"
+import { LayoutGrid, List, X, Trash2, CheckSquare, Loader2, Check, UserPlus } from "lucide-react"
+import { deleteTasks, acceptTask, completeTask, updateTaskAssignees } from "@/actions/tasks"
 import { toast } from "sonner"
 import { CreateTaskDialog } from "./create-task-dialog"
+import { QuickAddTask } from "@/components/ui/quick-add-task"
 import { Database } from "@/types/database.types"
 import { Badge } from "@/components/ui/badge"
-import { format } from "date-fns"
+import { format, isThisWeek } from "date-fns"
 import { ThreadDrawer } from "./thread-drawer"
 import { cn } from "@/lib/utils"
 import {
@@ -21,6 +22,19 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select"
+import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+} from "@/components/ui/popover"
+import {
+    Command,
+    CommandEmpty,
+    CommandGroup,
+    CommandInput,
+    CommandItem,
+    CommandList,
+} from "@/components/ui/command"
 import { EmptyState } from "@/components/ui/empty-state"
 import { Inbox } from "lucide-react"
 
@@ -58,17 +72,94 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
     const [isSelectionMode, setIsSelectionMode] = useState(false)
     const [selectedTaskIds, setSelectedTaskIds] = useState<Set<string>>(new Set())
     const [isBulkDeleting, setIsBulkDeleting] = useState(false)
+    const [isBulkOperating, setIsBulkOperating] = useState(false)
+    const [assignDialogOpen, setAssignDialogOpen] = useState(false)
+    const [selectedAssigneeId, setSelectedAssigneeId] = useState<string>("")
 
     // Filter & Sort State
     const [statusFilter, setStatusFilter] = useState<string[]>([])
     const [assigneeFilter, setAssigneeFilter] = useState<string | 'unassigned' | 'all'>('all')
     const [sortBy, setSortBy] = useState<'due_date_asc' | 'due_date_desc' | 'created_desc'>('due_date_asc')
+    
+    // Filter Presets State
+    const [activePreset, setActivePreset] = useState<string | null>(null)
+    
+    // Load active preset from localStorage on mount
+    useEffect(() => {
+        const savedPreset = localStorage.getItem('tasks-active-preset')
+        if (savedPreset) {
+            setActivePreset(savedPreset)
+        }
+    }, [])
+    
+    // Save active preset to localStorage when it changes
+    useEffect(() => {
+        if (activePreset) {
+            localStorage.setItem('tasks-active-preset', activePreset)
+        } else {
+            localStorage.removeItem('tasks-active-preset')
+        }
+    }, [activePreset])
 
     // Auto-refresh using Supabase Realtime
     useAutoRefresh({ tables: ['tasks', 'task_comments', 'task_files'] })
 
+    // Keyboard shortcut for quick add (N key)
+    useEffect(() => {
+        const handleKeyPress = (e: KeyboardEvent) => {
+            if (e.key === 'n' && !e.metaKey && !e.ctrlKey && !e.altKey) {
+                // Check if not in input/textarea/contenteditable
+                const activeElement = document.activeElement
+                const tagName = activeElement?.tagName
+                const isInput = tagName === 'INPUT' || tagName === 'TEXTAREA'
+                const isContentEditable = activeElement?.getAttribute('contenteditable') === 'true'
+                
+                if (!isInput && !isContentEditable) {
+                    e.preventDefault()
+                    // Trigger quick add expansion
+                    const quickAddButton = document.querySelector('[data-quick-add-trigger]') as HTMLButtonElement
+                    if (quickAddButton) {
+                        quickAddButton.click()
+                    }
+                }
+            }
+        }
+        document.addEventListener('keydown', handleKeyPress)
+        return () => document.removeEventListener('keydown', handleKeyPress)
+    }, [])
+
+    // Filter Presets
+    const filterPresets = [
+        { 
+            id: 'my-tasks', 
+            label: 'My Tasks', 
+            filter: (task: Task) => task.assignee_id === currentUserId 
+        },
+        { 
+            id: 'overdue', 
+            label: 'Overdue', 
+            filter: (task: Task) => task.end_date && new Date(task.end_date) < new Date() && task.status !== 'Completed' 
+        },
+        { 
+            id: 'this-week', 
+            label: 'This Week', 
+            filter: (task: Task) => task.end_date && isThisWeek(new Date(task.end_date)) 
+        },
+        { 
+            id: 'needs-action', 
+            label: 'Needs Action', 
+            filter: (task: Task) => ['Pending', 'Accepted'].includes(task.status || '') 
+        },
+    ]
+
     // Filter Logic
     const filteredTasks = tasks.filter(task => {
+        // Apply preset filter first if active
+        if (activePreset) {
+            const preset = filterPresets.find(p => p.id === activePreset)
+            if (preset && !preset.filter(task)) return false
+        }
+
         // Status Filter
         if (statusFilter.length > 0) {
             const taskStatus = task.status || 'Pending'
@@ -198,6 +289,98 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
         }
     }
 
+    const handleBulkAccept = async () => {
+        if (selectedTaskIds.size === 0) return
+        setIsBulkOperating(true)
+        try {
+            const taskIdsArray = Array.from(selectedTaskIds)
+            let successCount = 0
+            let errorCount = 0
+
+            for (const taskId of taskIdsArray) {
+                const result = await acceptTask(taskId)
+                if (result?.error) {
+                    errorCount++
+                } else {
+                    successCount++
+                }
+            }
+
+            if (successCount > 0) {
+                toast.success(`${successCount} task${successCount > 1 ? 's' : ''} accepted`)
+            }
+            if (errorCount > 0) {
+                toast.error(`${errorCount} task${errorCount > 1 ? 's' : ''} failed to accept`)
+            }
+            setIsSelectionMode(false)
+            setSelectedTaskIds(new Set())
+        } finally {
+            setIsBulkOperating(false)
+        }
+    }
+
+    const handleBulkComplete = async () => {
+        if (selectedTaskIds.size === 0) return
+        setIsBulkOperating(true)
+        try {
+            const taskIdsArray = Array.from(selectedTaskIds)
+            let successCount = 0
+            let errorCount = 0
+
+            for (const taskId of taskIdsArray) {
+                const result = await completeTask(taskId)
+                if (result?.error) {
+                    errorCount++
+                } else {
+                    successCount++
+                }
+            }
+
+            if (successCount > 0) {
+                toast.success(`${successCount} task${successCount > 1 ? 's' : ''} completed`)
+            }
+            if (errorCount > 0) {
+                toast.error(`${errorCount} task${errorCount > 1 ? 's' : ''} failed to complete`)
+            }
+            setIsSelectionMode(false)
+            setSelectedTaskIds(new Set())
+        } finally {
+            setIsBulkOperating(false)
+        }
+    }
+
+    const handleBulkAssign = async () => {
+        if (selectedTaskIds.size === 0 || !selectedAssigneeId) return
+        setIsBulkOperating(true)
+        try {
+            const taskIdsArray = Array.from(selectedTaskIds)
+            let successCount = 0
+            let errorCount = 0
+
+            for (const taskId of taskIdsArray) {
+                const result = await updateTaskAssignees(taskId, [selectedAssigneeId])
+                if (result?.error) {
+                    errorCount++
+                } else {
+                    successCount++
+                }
+            }
+
+            if (successCount > 0) {
+                toast.success(`${successCount} task${successCount > 1 ? 's' : ''} assigned`)
+            }
+            if (errorCount > 0) {
+                toast.error(`${errorCount} task${errorCount > 1 ? 's' : ''} failed to assign`)
+            }
+            setIsSelectionMode(false)
+            setSelectedTaskIds(new Set())
+            setAssignDialogOpen(false)
+            setSelectedAssigneeId("")
+        } finally {
+            setIsBulkOperating(false)
+        }
+    }
+
     return (
         <>
             <div className="space-y-6">
@@ -264,6 +447,24 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                                 currentUserId={currentUserId}
                             />
                         </div>
+                    </div>
+
+                    {/* Filter Presets */}
+                    <div className="flex gap-2 mb-4">
+                        {filterPresets.map(preset => (
+                            <button
+                                key={preset.id}
+                                onClick={() => setActivePreset(activePreset === preset.id ? null : preset.id)}
+                                className={cn(
+                                    "px-3 py-1.5 rounded-full text-sm font-medium transition-all",
+                                    activePreset === preset.id
+                                        ? "bg-slate-900 text-white"
+                                        : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                                )}
+                            >
+                                {preset.label}
+                            </button>
+                        ))}
                     </div>
 
                     {/* Filter Bar */}
@@ -342,6 +543,19 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                     </div>
                 </div>
 
+                {/* Quick Add Task */}
+                <div className="mb-4">
+                    <QuickAddTask
+                        objectives={objectives}
+                        members={members}
+                        currentUserId={currentUserId}
+                        teams={teams}
+                        onTaskCreated={() => {
+                            // Auto-refresh will handle the update via useAutoRefresh hook
+                        }}
+                    />
+                </div>
+
                 {viewMode === 'grid' ? (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         {sortedTasks.map((task, index) => {
@@ -381,6 +595,7 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                                                 onClick={() => {
                                                     setStatusFilter([])
                                                     setAssigneeFilter('all')
+                                                    setActivePreset(null)
                                                 }}
                                                 className="text-blue-600"
                                             >
@@ -497,6 +712,99 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                     </div>
                 )}
             </div>
+
+            {/* Bulk Action Toolbar */}
+            {selectedTaskIds.size > 0 && (
+                <div className="fixed bottom-4 left-1/2 -translate-x-1/2 bg-slate-900 text-white rounded-lg shadow-lg p-4 flex items-center gap-3 z-50">
+                    <span className="text-sm font-medium">{selectedTaskIds.size} selected</span>
+                    <Button 
+                        size="sm" 
+                        variant="outline" 
+                        onClick={handleBulkAccept}
+                        disabled={isBulkOperating}
+                        className="bg-white text-slate-900 hover:bg-slate-100"
+                    >
+                        <Check className="w-4 h-4 mr-1" />
+                        Accept
+                    </Button>
+                    <Button 
+                        size="sm" 
+                        variant="outline" 
+                        onClick={handleBulkComplete}
+                        disabled={isBulkOperating}
+                        className="bg-white text-slate-900 hover:bg-slate-100"
+                    >
+                        <CheckSquare className="w-4 h-4 mr-1" />
+                        Complete
+                    </Button>
+                    <Popover open={assignDialogOpen} onOpenChange={setAssignDialogOpen}>
+                        <PopoverTrigger asChild>
+                            <Button 
+                                size="sm" 
+                                variant="outline"
+                                disabled={isBulkOperating}
+                                className="bg-white text-slate-900 hover:bg-slate-100"
+                            >
+                                <UserPlus className="w-4 h-4 mr-1" />
+                                Assign
+                            </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-[240px] p-0" align="end">
+                            <Command>
+                                <CommandInput placeholder="Search members..." />
+                                <CommandList>
+                                    <CommandEmpty>No members found.</CommandEmpty>
+                                    <CommandGroup>
+                                        {members.map((member) => (
+                                            <CommandItem
+                                                key={member.id}
+                                                value={member.full_name || ''}
+                                                onSelect={() => {
+                                                    setAssignDialogOpen(false)
+                                                    handleBulkAssign(member.id)
+                                                }}
+                                            >
+                                                {member.full_name} {member.role === 'AI_Agent' ? '🤖' : ''}
+                                            </CommandItem>
+                                        ))}
+                                    </CommandGroup>
+                                </CommandList>
+                            </Command>
+                        </PopoverContent>
+                    </Popover>
+                    <Button 
+                        size="sm" 
+                        variant="destructive" 
+                        onClick={handleBulkDelete}
+                        disabled={isBulkDeleting || isBulkOperating}
+                        className="bg-red-600 hover:bg-red-700"
+                    >
+                        {isBulkDeleting ? (
+                            <>
+                                <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                                Deleting...
+                            </>
+                        ) : (
+                            <>
+                                <Trash2 className="w-4 h-4 mr-1" />
+                                Delete
+                            </>
+                        )}
+                    </Button>
+                    <Button 
+                        size="sm" 
+                        variant="ghost" 
+                        onClick={() => {
+                            setIsSelectionMode(false)
+                            setSelectedTaskIds(new Set())
+                        }}
+                        disabled={isBulkOperating || isBulkDeleting}
+                        className="text-white hover:bg-slate-800"
+                    >
+                        Cancel
+                    </Button>
+                </div>
+            )}
 
             {/* Task Detail Drawer */}
             <ThreadDrawer

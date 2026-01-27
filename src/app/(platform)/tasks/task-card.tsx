@@ -46,6 +46,7 @@ import { toast } from "sonner"
 import { HistoryDrawer } from "@/components/tasks/history-drawer"
 import { RubberStampModal } from "@/components/smart-airlock/RubberStampModal"
 import { ClientNudgeButton } from "@/components/smart-airlock/ClientNudgeButton"
+import { Checkbox } from "@/components/ui/checkbox"
 
 type Task = Database["public"]["Tables"]["tasks"]["Row"] & {
     assignee?: { id: string, full_name: string | null, role: string, email: string, avatar_url?: string | null } | null
@@ -80,6 +81,14 @@ export function TaskCard(props: TaskCardProps) {
     const isAITask = task.assignees?.some(a => a.role === 'AI_Agent') || task.assignee?.role === 'AI_Agent'
     const isOverdue = task.end_date ? new Date(task.end_date) < new Date() : false
     const isExecutive = userRole === 'Executive' || userRole === 'Founder'
+    
+    // Check if task is due soon (within 24 hours)
+    const isDueSoon = task.end_date && !isOverdue && task.status !== 'Completed' ? (() => {
+        const endDate = new Date(task.end_date)
+        const now = new Date()
+        const hoursUntilDue = (endDate.getTime() - now.getTime()) / (1000 * 60 * 60)
+        return hoursUntilDue <= 24 && hoursUntilDue > 0
+    })() : false
 
     // Externally controlled expansion state
     const {
@@ -260,17 +269,19 @@ export function TaskCard(props: TaskCardProps) {
         >
             {isSelectionMode && (
                 <div 
-                    className="absolute top-4 right-4 z-50 pointer-events-none" 
-                    role="checkbox" 
-                    aria-checked={isSelected} 
-                    aria-label={`Select task ${task.title}`}
+                    className="absolute top-4 left-4 z-50 pointer-events-auto" 
+                    onClick={(e) => {
+                        e.stopPropagation()
+                        if (onToggleSelection) onToggleSelection()
+                    }}
                 >
-                    <div className={cn(
-                        "w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors",
-                        isSelected ? "bg-slate-900 border-slate-900" : "border-slate-300 bg-white"
-                    )}>
-                        {isSelected && <Check className="w-3 h-3 text-white" />}
-                    </div>
+                    <Checkbox
+                        checked={isSelected}
+                        onCheckedChange={(checked) => {
+                            if (onToggleSelection) onToggleSelection()
+                        }}
+                        aria-label={`Select task ${task.title}`}
+                    />
                 </div>
             )}
             <CardHeader className="p-4 pb-2 space-y-3 cursor-pointer" onClick={!isSelectionMode ? handleCardClick : undefined}>
@@ -285,9 +296,14 @@ export function TaskCard(props: TaskCardProps) {
                             </Badge>
                             {getRiskBadge(task.risk_level)}
                             {isOverdue && task.status !== 'Completed' && (
-                                <span className="text-red-600 flex items-center text-[10px] font-medium">
-                                    <AlertCircle className="w-3 h-3 mr-1" /> Overdue
-                                </span>
+                                <Badge variant="destructive" className="ml-2">
+                                    ⚠️ Overdue
+                                </Badge>
+                            )}
+                            {isDueSoon && !isOverdue && (
+                                <Badge variant="outline" className="ml-2 bg-yellow-500 text-white border-yellow-600">
+                                    ⏰ Due Soon
+                                </Badge>
                             )}
                         </div>
                         {task.objective && (

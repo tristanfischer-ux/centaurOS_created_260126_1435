@@ -18,7 +18,9 @@ import {
     Scale,
     Building,
     Rocket,
-    Server
+    Server,
+    ChevronDown,
+    ChevronUp
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -62,6 +64,7 @@ export function CreateObjectiveDialog() {
     const [description, setDescription] = useState("")
     const [titleError, setTitleError] = useState<string | null>(null)
     const [descriptionError, setDescriptionError] = useState<string | null>(null)
+    const [showAdvanced, setShowAdvanced] = useState(false)
 
     // Pack Data
     const [packs, setPacks] = useState<ObjectivePack[]>([])
@@ -69,6 +72,8 @@ export function CreateObjectiveDialog() {
     const [isPackLoading, setIsPackLoading] = useState(false)
     const [packError, setPackError] = useState<string | null>(null)
     const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([])
+    const [packSearchQuery, setPackSearchQuery] = useState('')
+    const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
 
     // Import Data
     const [isAnalyzing, setIsAnalyzing] = useState(false)
@@ -114,6 +119,9 @@ export function CreateObjectiveDialog() {
                 setSelectedAnalysisIndex(null)
                 setAnalysisFile(null)
                 setPackError(null)
+                setPackSearchQuery('')
+                setSelectedCategory(null)
+                setShowAdvanced(false)
             }, 300)
         }
     }, [open, loadPacksCallback])
@@ -145,6 +153,49 @@ export function CreateObjectiveDialog() {
             toast.success(`Analysis complete: Found ${result.objectives.length} objectives`)
         } else {
             toast.warning("No objectives found in document")
+        }
+    }
+
+    const handleCreateAll = async () => {
+        if (analyzedObjectives.length === 0) return
+
+        setIsLoading(true)
+        let successCount = 0
+        let errorCount = 0
+
+        for (const obj of analyzedObjectives) {
+            try {
+                const formData = new FormData()
+                formData.append('title', obj.title)
+                formData.append('description', obj.description)
+                obj.tasks.forEach(task => {
+                    formData.append('aiTasks', JSON.stringify(task))
+                })
+
+                const res = await createObjective(formData)
+                if (!res?.error) {
+                    successCount++
+                } else {
+                    errorCount++
+                    console.error(`Failed to create objective "${obj.title}":`, res.error)
+                }
+            } catch (e) {
+                errorCount++
+                console.error(`Error creating objective "${obj.title}":`, e)
+            }
+        }
+
+        setIsLoading(false)
+        
+        if (successCount > 0) {
+            toast.success(`Successfully created ${successCount} ${successCount === 1 ? 'objective' : 'objectives'}`)
+        }
+        if (errorCount > 0) {
+            toast.error(`Failed to create ${errorCount} ${errorCount === 1 ? 'objective' : 'objectives'}`)
+        }
+        
+        if (successCount > 0) {
+            setOpen(false)
         }
     }
 
@@ -311,31 +362,58 @@ export function CreateObjectiveDialog() {
                                         </p>
                                     )}
                                 </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="description" className="text-base font-semibold">Description & Success Criteria</Label>
-                                    <Textarea
-                                        id="description"
-                                        placeholder="Define the scope, key results, and success metrics..."
-                                        value={description}
-                                        onChange={(e) => {
-                                            setDescription(e.target.value)
-                                            setDescriptionError(null)
-                                        }}
-                                        className={`min-h-[200px] text-base resize-none p-4 ${descriptionError ? 'border-red-500' : ''}`}
-                                        aria-describedby={descriptionError ? "description-error" : undefined}
-                                        aria-invalid={!!descriptionError}
-                                    />
-                                    {descriptionError && (
-                                        <p id="description-error" className="text-sm text-red-600 mt-1" role="alert">
-                                            {descriptionError}
-                                        </p>
-                                    )}
-                                    {!descriptionError && (
-                                        <p className="text-xs text-slate-400 text-right">
-                                            {description.length} / 10,000 characters {description.length > 0 && '(Markdown supported)'}
-                                        </p>
-                                    )}
+                                
+                                {/* Toggle Button */}
+                                <div className="pt-2">
+                                    <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => setShowAdvanced(!showAdvanced)}
+                                        className="text-slate-500"
+                                    >
+                                        {showAdvanced ? (
+                                            <>
+                                                <ChevronUp className="w-4 h-4 mr-1" />
+                                                Hide Description
+                                            </>
+                                        ) : (
+                                            <>
+                                                <ChevronDown className="w-4 h-4 mr-1" />
+                                                Add Description
+                                            </>
+                                        )}
+                                    </Button>
                                 </div>
+
+                                {/* Optional Description */}
+                                {showAdvanced && (
+                                    <div className="space-y-2">
+                                        <Label htmlFor="description" className="text-base font-semibold">Description & Success Criteria</Label>
+                                        <Textarea
+                                            id="description"
+                                            placeholder="Define the scope, key results, and success metrics..."
+                                            value={description}
+                                            onChange={(e) => {
+                                                setDescription(e.target.value)
+                                                setDescriptionError(null)
+                                            }}
+                                            className={`min-h-[200px] text-base resize-none p-4 ${descriptionError ? 'border-red-500' : ''}`}
+                                            aria-describedby={descriptionError ? "description-error" : undefined}
+                                            aria-invalid={!!descriptionError}
+                                        />
+                                        {descriptionError && (
+                                            <p id="description-error" className="text-sm text-red-600 mt-1" role="alert">
+                                                {descriptionError}
+                                            </p>
+                                        )}
+                                        {!descriptionError && (
+                                            <p className="text-xs text-slate-400 text-right">
+                                                {description.length} / 10,000 characters {description.length > 0 && '(Markdown supported)'}
+                                            </p>
+                                        )}
+                                    </div>
+                                )}
                             </div>
                         )}
 
@@ -343,58 +421,103 @@ export function CreateObjectiveDialog() {
                         {mode === 'pack' && (
                             <div className="h-full">
                                 {!selectedPack ? (
-                                    // Pack Grid
-                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                        {isPackLoading ? (
-                                            <div className="col-span-full flex items-center justify-center py-20">
-                                                <Loader2 className="w-8 h-8 animate-spin text-slate-300" />
-                                            </div>
-                                        ) : packError ? (
-                                            <div className="col-span-full border-2 border-dashed border-red-200 rounded-lg">
-                                                <EmptyState
-                                                    icon={<Package className="h-8 w-8 text-red-500" />}
-                                                    title="Failed to load packs"
-                                                    description={packError}
+                                    <>
+                                        {packs.length > 0 && (
+                                            <div className="mb-4 space-y-3">
+                                                <Input
+                                                    placeholder="Search packs..."
+                                                    value={packSearchQuery}
+                                                    onChange={(e) => setPackSearchQuery(e.target.value)}
+                                                    className="max-w-md"
                                                 />
+                                                {/* Category chips */}
+                                                <div className="flex flex-wrap gap-2">
+                                                    {Array.from(new Set(packs.map(p => p.category).filter(Boolean))).map(cat => (
+                                                        <button
+                                                            key={cat}
+                                                            onClick={() => setSelectedCategory(selectedCategory === cat ? null : cat)}
+                                                            className={cn(
+                                                                "px-3 py-1 rounded-full text-sm",
+                                                                selectedCategory === cat ? "bg-slate-900 text-white" : "bg-slate-100"
+                                                            )}
+                                                        >
+                                                            {cat}
+                                                        </button>
+                                                    ))}
+                                                </div>
                                             </div>
-                                        ) : packs.length === 0 ? (
-                                            <div className="col-span-full border-2 border-dashed border-slate-200 rounded-lg">
-                                                <EmptyState
-                                                    icon={<Package className="h-8 w-8" />}
-                                                    title="No packs available"
-                                                    description="Objective packs are not currently available. Try creating an objective manually."
-                                                />
-                                            </div>
-                                        ) : packs.map((pack) => {
-                                            const Icon = pack.icon_name ? PACK_ICONS[pack.icon_name] || Package : Package
-                                            return (
-                                                <Card
-                                                    key={pack.id}
-                                                    className="cursor-pointer hover:border-blue-500 hover:shadow-md transition-all group border-slate-200"
-                                                    onClick={() => {
-                                                        setSelectedPack(pack)
-                                                        setSelectedTaskIds(pack.items?.map(i => i.id) || []) // Auto-select all by default
-                                                        setTitle(pack.title)
-                                                        setDescription(pack.description || "")
-                                                    }}
-                                                >
-                                                    <CardHeader className="space-y-1">
-                                                        <div className="w-10 h-10 rounded-lg bg-slate-50 border border-slate-100 flex items-center justify-center mb-2 group-hover:bg-blue-50 group-hover:text-blue-600 transition-colors">
-                                                            <Icon className="w-5 h-5 text-slate-500 group-hover:text-blue-600" />
+                                        )}
+                                        {/* Pack Grid */}
+                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                            {isPackLoading ? (
+                                                <div className="col-span-full flex items-center justify-center py-20">
+                                                    <Loader2 className="w-8 h-8 animate-spin text-slate-300" />
+                                                </div>
+                                            ) : packError ? (
+                                                <div className="col-span-full border-2 border-dashed border-red-200 rounded-lg">
+                                                    <EmptyState
+                                                        icon={<Package className="h-8 w-8 text-red-500" />}
+                                                        title="Failed to load packs"
+                                                        description={packError}
+                                                    />
+                                                </div>
+                                            ) : packs.length === 0 ? (
+                                                <div className="col-span-full border-2 border-dashed border-slate-200 rounded-lg">
+                                                    <EmptyState
+                                                        icon={<Package className="h-8 w-8" />}
+                                                        title="No packs available"
+                                                        description="Objective packs are not currently available. Try creating an objective manually."
+                                                    />
+                                                </div>
+                                            ) : (() => {
+                                                const filteredPacks = packs.filter(pack => {
+                                                    const matchesSearch = !packSearchQuery || 
+                                                        pack.title.toLowerCase().includes(packSearchQuery.toLowerCase()) ||
+                                                        pack.description?.toLowerCase().includes(packSearchQuery.toLowerCase())
+                                                    const matchesCategory = !selectedCategory || pack.category === selectedCategory
+                                                    return matchesSearch && matchesCategory
+                                                })
+                                                
+                                                if (filteredPacks.length === 0) {
+                                                    return (
+                                                        <div className="col-span-full border-2 border-dashed border-slate-200 rounded-lg py-8 text-center">
+                                                            <p className="text-slate-500">No packs match your search criteria.</p>
                                                         </div>
-                                                        <CardTitle className="text-lg">{pack.title}</CardTitle>
-                                                        <CardDescription className="line-clamp-2">{pack.description}</CardDescription>
-                                                    </CardHeader>
-                                                    <CardContent>
-                                                        <div className="flex flex-wrap gap-2">
-                                                            {pack.category && <Badge variant="secondary" className="text-xs font-normal text-slate-500">{pack.category}</Badge>}
-                                                            <Badge variant="outline" className="text-xs font-normal text-slate-500">{pack.items?.length || 0} Tasks</Badge>
-                                                        </div>
-                                                    </CardContent>
-                                                </Card>
-                                            )
-                                        })}
-                                    </div>
+                                                    )
+                                                }
+                                                
+                                                return filteredPacks.map((pack) => {
+                                                    const Icon = pack.icon_name ? PACK_ICONS[pack.icon_name] || Package : Package
+                                                    return (
+                                                        <Card
+                                                            key={pack.id}
+                                                            className="cursor-pointer hover:border-blue-500 hover:shadow-md transition-all group border-slate-200"
+                                                            onClick={() => {
+                                                                setSelectedPack(pack)
+                                                                setSelectedTaskIds(pack.items?.map(i => i.id) || []) // Auto-select all by default
+                                                                setTitle(pack.title)
+                                                                setDescription(pack.description || "")
+                                                            }}
+                                                        >
+                                                            <CardHeader className="space-y-1">
+                                                                <div className="w-10 h-10 rounded-lg bg-slate-50 border border-slate-100 flex items-center justify-center mb-2 group-hover:bg-blue-50 group-hover:text-blue-600 transition-colors">
+                                                                    <Icon className="w-5 h-5 text-slate-500 group-hover:text-blue-600" />
+                                                                </div>
+                                                                <CardTitle className="text-lg">{pack.title}</CardTitle>
+                                                                <CardDescription className="line-clamp-2">{pack.description}</CardDescription>
+                                                            </CardHeader>
+                                                            <CardContent>
+                                                                <div className="flex flex-wrap gap-2">
+                                                                    {pack.category && <Badge variant="secondary" className="text-xs font-normal text-slate-500">{pack.category}</Badge>}
+                                                                    <Badge variant="outline" className="text-xs font-normal text-slate-500">{pack.items?.length || 0} Tasks</Badge>
+                                                                </div>
+                                                            </CardContent>
+                                                        </Card>
+                                                    )
+                                                })
+                                            })()}
+                                        </div>
+                                    </>
                                 ) : (
                                     // Selected Pack Details
                                     <div className="space-y-6 max-w-3xl mx-auto">
@@ -503,6 +626,27 @@ export function CreateObjectiveDialog() {
                                                 setAnalysisFile(null)
                                             }}>Upload Different File</Button>
                                         </div>
+
+                                        {analyzedObjectives.length > 0 && (
+                                            <Button
+                                                variant="outline"
+                                                onClick={handleCreateAll}
+                                                className="mb-4 w-full"
+                                                disabled={isLoading}
+                                            >
+                                                {isLoading ? (
+                                                    <>
+                                                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                                        Creating...
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <Plus className="h-4 w-4 mr-2" />
+                                                        Create All {analyzedObjectives.length} Objectives
+                                                    </>
+                                                )}
+                                            </Button>
+                                        )}
 
                                         <div className="grid gap-3">
                                             {analyzedObjectives.map((obj, idx) => (

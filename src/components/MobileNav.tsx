@@ -3,14 +3,16 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
-import { LayoutDashboard, Users, CheckSquare, Calendar, ShoppingBag } from "lucide-react"
+import { LayoutDashboard, Users, CheckSquare, Calendar, ShoppingBag, Settings, Target } from "lucide-react"
 
 const navigation = [
-    { name: "Objectives", href: "/objectives", icon: LayoutDashboard },
+    { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+    { name: "Objectives", href: "/objectives", icon: Target },
     { name: "Roster", href: "/team", icon: Users },
     { name: "Tasks", href: "/tasks", icon: CheckSquare },
     { name: "Timeline", href: "/timeline", icon: Calendar },
     { name: "Marketplace", href: "/marketplace", icon: ShoppingBag },
+    { name: "Settings", href: "/settings", icon: Settings },
 ]
 
 export function MobileNav() {

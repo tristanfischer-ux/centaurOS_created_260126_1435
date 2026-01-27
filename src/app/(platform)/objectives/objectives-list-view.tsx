@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { useAutoRefresh } from "@/hooks/useAutoRefresh"
 import { RefreshButton } from "@/components/RefreshButton"
-import { ChevronDown, ChevronRight, Target, CheckCircle2, Clock, AlertCircle, ArrowRight, Trash, MessageSquare, Paperclip, Loader2 } from "lucide-react"
+import { ChevronDown, ChevronRight, Target, CheckCircle2, Clock, AlertCircle, ArrowRight, Trash, MessageSquare, Paperclip, Loader2, Plus } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
@@ -20,6 +20,7 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import { CreateTaskDialog } from "@/app/(platform)/tasks/create-task-dialog"
 
 
 
@@ -47,6 +48,10 @@ interface Objective {
 
 interface ObjectivesListViewProps {
     objectives: Objective[]
+    objectivesForDialog: { id: string; title: string }[]
+    members: { id: string; full_name: string; role: string }[]
+    teams?: { id: string; name: string }[]
+    currentUserId: string
 }
 
 function getStatusConfig(status: string | null) {
@@ -64,7 +69,7 @@ function getStatusConfig(status: string | null) {
     }
 }
 
-export function ObjectivesListView({ objectives }: ObjectivesListViewProps) {
+export function ObjectivesListView({ objectives, objectivesForDialog, members, teams = [], currentUserId }: ObjectivesListViewProps) {
     const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
     const [objectiveToDelete, setObjectiveToDelete] = useState<string | null>(null)
@@ -268,12 +273,26 @@ export function ObjectivesListView({ objectives }: ObjectivesListViewProps) {
                     const taskCount = objective.tasks.length
                     const completedCount = objective.tasks.filter(t => t.status === 'Completed').length
                     const progress = taskCount > 0 ? Math.round((completedCount / taskCount) * 100) : 0
+                    
+                    // Calculate attention indicators
+                    const hasOverdueTasks = objective.tasks.some(t => 
+                        t.end_date && new Date(t.end_date) < new Date() && t.status !== 'Completed'
+                    )
+                    
+                    // Check if stalled (no progress in 7 days)
+                    const now = new Date()
+                    const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+                    const isStalled = objective.created_at && new Date(objective.created_at) < sevenDaysAgo && 
+                        progress === 0 && taskCount > 0
 
                     return (
                         <div
                             key={objective.id}
-                            className={`bg-white border rounded-lg shadow-sm overflow-hidden transition-all duration-200 ${isSelected ? 'ring-2 ring-slate-500 border-slate-500' : 'border-slate-200'
-                                }`}
+                            className={`bg-white border rounded-lg shadow-sm overflow-hidden transition-all duration-200 ${
+                                isSelected ? 'ring-2 ring-slate-500 border-slate-500' : ''
+                            } ${
+                                hasOverdueTasks ? 'border-orange-400' : isStalled ? 'border-yellow-400' : 'border-slate-200'
+                            }`}
                         >
                             {/* Objective Header */}
                             <div
@@ -314,9 +333,21 @@ export function ObjectivesListView({ objectives }: ObjectivesListViewProps) {
                                 </div>
 
                                 <div className="flex-1 min-w-0">
-                                    <Link href={`/objectives/${objective.id}`} className="font-semibold text-slate-900 hover:text-amber-600 transition-colors" onClick={(e) => e.stopPropagation()}>
-                                        {objective.title}
-                                    </Link>
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                        <Link href={`/objectives/${objective.id}`} className="font-semibold text-slate-900 hover:text-amber-600 transition-colors" onClick={(e) => e.stopPropagation()}>
+                                            {objective.title}
+                                        </Link>
+                                        {hasOverdueTasks && (
+                                            <Badge variant="destructive" className="ml-2">
+                                                ⚠️ Overdue Tasks
+                                            </Badge>
+                                        )}
+                                        {isStalled && !hasOverdueTasks && (
+                                            <Badge variant="outline" className="ml-2 bg-yellow-50 text-yellow-700 border-yellow-300">
+                                                ⏸️ Stalled
+                                            </Badge>
+                                        )}
+                                    </div>
                                     {objective.description && (
                                         <p className="text-sm text-slate-500 truncate">{objective.description}</p>
                                     )}
@@ -406,6 +437,21 @@ export function ObjectivesListView({ objectives }: ObjectivesListViewProps) {
                                             })}
                                         </div>
                                     )}
+                                    {/* Add Task button */}
+                                    <div className="mt-4 px-4 pb-4">
+                                        <CreateTaskDialog 
+                                            objectives={objectivesForDialog}
+                                            members={members}
+                                            teams={teams}
+                                            currentUserId={currentUserId}
+                                            defaultObjectiveId={objective.id}
+                                        >
+                                            <Button variant="outline" size="sm" className="w-full">
+                                                <Plus className="h-4 w-4 mr-2" />
+                                                Add Task to this Objective
+                                            </Button>
+                                        </CreateTaskDialog>
+                                    </div>
                                 </div>
                             )}
                         </div>

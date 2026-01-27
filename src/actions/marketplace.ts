@@ -99,8 +99,8 @@ export async function submitRFQ(formData: {
         .from("manufacturing_rfqs")
         .insert({
             title: formData.title,
-            specifications: formData.specifications,
-            budget_range: formData.budget_range,
+            specifications: formData.specifications?.trim() || null,
+            budget_range: formData.budget_range?.trim() || null,
             foundry_id: profile.foundry_id,
             created_by: user.id,
             status: "Open"

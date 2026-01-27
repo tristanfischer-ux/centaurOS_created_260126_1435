@@ -1,8 +1,8 @@
 "use client"
 
-import { useState, useRef } from "react"
+import { useState, useRef, useEffect } from "react"
 import { Button } from "@/components/ui/button"
-import { Plus, Loader2, CalendarIcon, Upload, X, FileIcon, Volume2 } from "lucide-react"
+import { Plus, Loader2, Upload, X, FileIcon, Volume2, Check, ChevronsUpDown, ChevronDown, ChevronUp } from "lucide-react"
 import {
     Dialog,
     DialogContent,
@@ -22,18 +22,27 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select"
-import { MultiSelect } from "@/components/ui/multi-select"
-import { createTask } from "@/actions/tasks"
-import { toast } from "sonner"
-import { format } from "date-fns"
-import { cn } from "@/lib/utils"
-import { Calendar } from "@/components/ui/calendar"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import {
     Popover,
     PopoverContent,
     PopoverTrigger,
 } from "@/components/ui/popover"
+import {
+    Command,
+    CommandEmpty,
+    CommandGroup,
+    CommandInput,
+    CommandItem,
+    CommandList,
+} from "@/components/ui/command"
+import { Check, ChevronsUpDown } from "lucide-react"
+import { MultiSelect } from "@/components/ui/multi-select"
+import { createTask } from "@/actions/tasks"
+import { toast } from "sonner"
+import { addDays } from "date-fns"
+import { cn } from "@/lib/utils"
+import { DatePickerWithShortcuts } from "@/components/ui/date-picker-with-shortcuts"
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 
 function getInitials(name: string | null) {
     if (!name) return '??'
@@ -51,6 +60,8 @@ interface CreateTaskDialogProps {
     members: { id: string; full_name: string; role: string }[]
     teams?: { id: string; name: string }[]
     currentUserId: string
+    defaultObjectiveId?: string
+    children?: React.ReactNode
 }
 
 const MAX_FILES = 5
@@ -63,16 +74,37 @@ const ALLOWED_TYPES = [
     'text/plain', 'text/csv'
 ]
 
-export function CreateTaskDialog({ objectives, members, teams = [], currentUserId }: CreateTaskDialogProps) {
+export function CreateTaskDialog({ objectives, members, teams = [], currentUserId, defaultObjectiveId, children }: CreateTaskDialogProps) {
     const [open, setOpen] = useState(false)
     const [isLoading, setIsLoading] = useState(false)
-    const [date, setDate] = useState<Date>()
-    const [selectedAssignees, setSelectedAssignees] = useState<string[]>([])
+    const [showAdvanced, setShowAdvanced] = useState(false)
+    // Default deadline to 7 days from now (can be cleared)
+    const [date, setDate] = useState<Date | undefined>(() => addDays(new Date(), 7))
+    // Default assignee to current user
+    const [selectedAssignees, setSelectedAssignees] = useState<string[]>([currentUserId])
+    // Default objective if provided
+    const [selectedObjective, setSelectedObjective] = useState<string>(defaultObjectiveId || "")
+    const [objectiveOpen, setObjectiveOpen] = useState(false)
     const [files, setFiles] = useState<File[]>([])
+    const [isDragging, setIsDragging] = useState(false)
     const [titleError, setTitleError] = useState<string | null>(null)
     const [descriptionError, setDescriptionError] = useState<string | null>(null)
     const [assigneeError, setAssigneeError] = useState<string | null>(null)
     const [submitError, setSubmitError] = useState<string | null>(null)
+    const [showVoiceNudge, setShowVoiceNudge] = useState(false)
+
+    // Check if user has seen voice recorder before
+    useEffect(() => {
+        const hasSeenVoiceRecorder = localStorage.getItem('hasSeenVoiceRecorder')
+        if (!hasSeenVoiceRecorder) {
+            setShowVoiceNudge(true)
+            // Mark as seen after 5 seconds
+            setTimeout(() => {
+                setShowVoiceNudge(false)
+                localStorage.setItem('hasSeenVoiceRecorder', 'true')
+            }, 5000)
+        }
+    }, [])
 
     // Form Refs for manual value setting
     const titleObjRef = useRef<HTMLInputElement>(null)
@@ -94,12 +126,21 @@ export function CreateTaskDialog({ objectives, members, teams = [], currentUserI
         if (!newOpen) {
             // Reset state after dialog close animation
             setTimeout(() => {
-                setDate(undefined)
-                setSelectedAssignees([])
+                // Reset to smart defaults
+                setDate(addDays(new Date(), 7))
+                setSelectedAssignees([currentUserId])
+                setSelectedObjective(defaultObjectiveId || "")
                 setFiles([])
+                setShowAdvanced(false)
                 if (titleObjRef.current) titleObjRef.current.value = ''
                 if (descRef.current) descRef.current.value = ''
             }, 300)
+        } else {
+            // When opening, set smart defaults
+            setDate(addDays(new Date(), 7))
+            setSelectedAssignees([currentUserId])
+            setSelectedObjective(defaultObjectiveId || "")
+            setShowAdvanced(false)
         }
     }
 
@@ -241,10 +282,14 @@ export function CreateTaskDialog({ objectives, members, teams = [], currentUserI
     ]
 
     // File handling
-    const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const newFiles = Array.from(e.target.files || [])
-        addFiles(newFiles)
+    const handleFileSelect = (selectedFiles: File[]) => {
+        addFiles(selectedFiles)
         if (fileInputRef.current) fileInputRef.current.value = ''
+    }
+
+    const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const newFiles = Array.from(e.target.files || [])
+        handleFileSelect(newFiles)
     }
 
     const addFiles = (newFiles: File[]) => {
@@ -267,6 +312,28 @@ export function CreateTaskDialog({ objectives, members, teams = [], currentUserI
         setFiles(totalFiles)
     }
 
+    // Drag and drop handlers
+    const handleDragOver = (e: React.DragEvent) => {
+        e.preventDefault()
+        e.stopPropagation()
+        setIsDragging(true)
+    }
+
+    const handleDragLeave = (e: React.DragEvent) => {
+        e.preventDefault()
+        e.stopPropagation()
+        setIsDragging(false)
+    }
+
+    const handleDrop = (e: React.DragEvent) => {
+        e.preventDefault()
+        e.stopPropagation()
+        setIsDragging(false)
+        
+        const droppedFiles = Array.from(e.dataTransfer.files)
+        handleFileSelect(droppedFiles)
+    }
+
     const removeFile = (index: number) => {
         setFiles(prev => prev.filter((_, i) => i !== index))
     }
@@ -280,33 +347,48 @@ export function CreateTaskDialog({ objectives, members, teams = [], currentUserI
     return (
         <Dialog open={open} onOpenChange={handleOpenChange}>
             <DialogTrigger asChild>
-                <Button
-                    size="sm"
-                    variant="primary"
-                    className="touch-manipulation"
-                    type="button"
-                    onClick={handleMobileClick}
-                >
-                    <Plus className="h-4 w-4" /> New Task
-                </Button>
+                {children || (
+                    <Button
+                        size="sm"
+                        variant="primary"
+                        className="touch-manipulation"
+                        type="button"
+                        onClick={handleMobileClick}
+                    >
+                        <Plus className="h-4 w-4" /> New Task
+                    </Button>
+                )}
             </DialogTrigger>
             <DialogContent className="w-[calc(100vw-2rem)] sm:max-w-[600px] bg-white text-slate-900 border-slate-200 max-h-[90dvh] overflow-y-auto">
                 <form onSubmit={onSubmit}>
                     <DialogHeader>
-                        <div className="flex items-center justify-between pr-8">
-                            <div>
+                        <div className="flex items-start justify-between pr-8">
+                            <div className="flex-1">
                                 <DialogTitle>Create New Task</DialogTitle>
                                 <DialogDescription>
                                     Assign a new task. Assign to an AI Agent for auto-execution.
                                 </DialogDescription>
                             </div>
-                            <VoiceRecorder
-                                onTaskParsed={handleVoiceFill}
-                                className="flex items-center gap-2"
-                            />
+                            <div className="flex flex-col items-end gap-1 ml-4">
+                                <div className="relative">
+                                    <VoiceRecorder
+                                        onTaskParsed={handleVoiceFill}
+                                        className={`flex items-center gap-2 ${showVoiceNudge ? 'animate-pulse' : ''}`}
+                                    />
+                                    {showVoiceNudge && (
+                                        <div className="absolute -top-8 right-0 bg-amber-500 text-white text-xs px-2 py-1 rounded shadow-lg whitespace-nowrap animate-pulse">
+                                            ✨ Try voice input
+                                        </div>
+                                    )}
+                                </div>
+                                <p className="text-xs text-slate-500 text-right max-w-[120px]">
+                                    Speak to fill task details
+                                </p>
+                            </div>
                         </div>
                     </DialogHeader>
                     <div className="grid gap-4 py-4">
+                        {/* Stage 1 - Required Fields (always visible) */}
                         <div className="grid gap-2">
                             <Label htmlFor="title">Task Title</Label>
                             <Input
@@ -327,17 +409,6 @@ export function CreateTaskDialog({ objectives, members, teams = [], currentUserI
                                     {titleError}
                                 </p>
                             )}
-                        </div>
-                        <div className="grid gap-2">
-                            <Label htmlFor="description">Description</Label>
-                            <Textarea
-                                id="description"
-                                name="description"
-                                placeholder="Provide specific details so the assignee knows what to do."
-                                className="h-24"
-                                enterKeyHint="done"
-                                ref={descRef}
-                            />
                         </div>
 
                         {/* Assignees - Multi-Select */}
@@ -365,113 +436,169 @@ export function CreateTaskDialog({ objectives, members, teams = [], currentUserI
                         {/* Objective */}
                         <div className="grid gap-2">
                             <Label htmlFor="objective">Objective</Label>
-                            <Select name="objective_id" required>
-                                <SelectTrigger 
-                                    id="objective"
-                                    className="bg-white border-slate-200"
-                                    aria-required={true}
-                                >
-                                    <SelectValue placeholder="Link to objective..." />
-                                </SelectTrigger>
-                                <SelectContent className="bg-white border-slate-200 z-50">
-                                    {objectives.map(obj => (
-                                        <SelectItem key={obj.id} value={obj.id}>
-                                            {obj.title}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
-
-                        {/* Deadline */}
-                        <div className="grid gap-2">
-                            <Label>Deadline (Optional)</Label>
-                            <Popover>
+                            <Popover open={objectiveOpen} onOpenChange={setObjectiveOpen}>
                                 <PopoverTrigger asChild>
                                     <Button
-                                        variant={"outline"}
-                                        className={cn(
-                                            "w-full justify-start text-left font-normal",
-                                            !date && "text-muted-foreground"
-                                        )}
+                                        variant="outline"
+                                        role="combobox"
+                                        aria-expanded={objectiveOpen}
+                                        className="w-full justify-between bg-white border-slate-200"
+                                        id="objective"
                                     >
-                                        <CalendarIcon className="h-4 w-4" />
-                                        {date ? format(date, "PPP") : <span>Pick a date</span>}
+                                        {selectedObjective
+                                            ? objectives.find((o) => o.id === selectedObjective)?.title
+                                            : "Select objective..."}
+                                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                                     </Button>
                                 </PopoverTrigger>
-                                <PopoverContent className="w-auto p-0 bg-white border-slate-200 z-[100]">
-                                    <Calendar
-                                        mode="single"
-                                        selected={date}
-                                        onSelect={setDate}
-                                        initialFocus
-                                        className="bg-white"
-                                    />
+                                <PopoverContent className="w-full p-0" align="start">
+                                    <Command>
+                                        <CommandInput placeholder="Search objectives..." />
+                                        <CommandList>
+                                            <CommandEmpty>No objective found.</CommandEmpty>
+                                            <CommandGroup>
+                                                {objectives.map((obj) => (
+                                                    <CommandItem
+                                                        key={obj.id}
+                                                        value={obj.title}
+                                                        onSelect={() => {
+                                                            setSelectedObjective(obj.id)
+                                                            setObjectiveOpen(false)
+                                                        }}
+                                                    >
+                                                        <Check
+                                                            className={cn(
+                                                                "mr-2 h-4 w-4",
+                                                                selectedObjective === obj.id ? "opacity-100" : "opacity-0"
+                                                            )}
+                                                        />
+                                                        {obj.title}
+                                                    </CommandItem>
+                                                ))}
+                                            </CommandGroup>
+                                        </CommandList>
+                                    </Command>
                                 </PopoverContent>
                             </Popover>
-                        </div>
-
-                        {/* File Attachments */}
-                        <div className="grid gap-2">
-                            <Label htmlFor="file-upload">Attachments (Optional)</Label>
-                            <div
-                                className="border-2 border-dashed border-slate-200 rounded-lg p-4 text-center cursor-pointer hover:border-slate-300 hover:bg-slate-50 transition-colors"
-                                onClick={() => fileInputRef.current?.click()}
-                                role="button"
-                                tabIndex={0}
-                                aria-label="Click to upload files or drag and drop"
-                                onKeyDown={(e) => {
-                                    if (e.key === 'Enter' || e.key === ' ') {
-                                        e.preventDefault()
-                                        fileInputRef.current?.click()
-                                    }
-                                }}
-                            >
-                                <Upload className="h-6 w-6 mx-auto text-slate-400 mb-2" />
-                                <p className="text-sm text-slate-500">
-                                    Click to upload or drag & drop
-                                </p>
-                                <p className="text-xs text-slate-400 mt-1">
-                                    Max {MAX_FILES} files, 10MB each
-                                </p>
-                            </div>
                             <input
-                                ref={fileInputRef}
-                                id="file-upload"
-                                type="file"
-                                multiple
-                                accept={ALLOWED_TYPES.join(',')}
-                                onChange={handleFileSelect}
-                                className="hidden"
-                                aria-label="Upload files"
+                                type="hidden"
+                                name="objective_id"
+                                value={selectedObjective}
+                                required
                             />
-
-                            {/* File List */}
-                            {files.length > 0 && (
-                                <div className="space-y-2 mt-2">
-                                    {files.map((file, idx) => (
-                                        <div
-                                            key={idx}
-                                            className="flex items-center gap-2 bg-slate-50 rounded-md px-3 py-2 text-sm"
-                                        >
-                                            <FileIcon className="h-4 w-4 text-slate-400 shrink-0" />
-                                            <span className="truncate flex-1">{file.name}</span>
-                                            <span className="text-xs text-slate-400 shrink-0">
-                                                {formatFileSize(file.size)}
-                                            </span>
-                                            <button
-                                                type="button"
-                                                onClick={() => removeFile(idx)}
-                                                className="text-slate-400 hover:text-red-500"
-                                                aria-label={`Remove ${file.name}`}
-                                            >
-                                                <X className="h-4 w-4" />
-                                            </button>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
                         </div>
+
+                        {/* Toggle Button */}
+                        <div className="pt-4">
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setShowAdvanced(!showAdvanced)}
+                                className="text-slate-500"
+                            >
+                                {showAdvanced ? (
+                                    <>
+                                        <ChevronUp className="w-4 h-4 mr-1" />
+                                        Hide Details
+                                    </>
+                                ) : (
+                                    <>
+                                        <ChevronDown className="w-4 h-4 mr-1" />
+                                        Add Details
+                                    </>
+                                )}
+                            </Button>
+                        </div>
+
+                        {/* Stage 2 - Optional Fields (hidden until "Add details" is clicked) */}
+                        {showAdvanced && (
+                            <>
+                                <div className="grid gap-2">
+                                    <Label htmlFor="description">Description</Label>
+                                    <Textarea
+                                        id="description"
+                                        name="description"
+                                        placeholder="Provide specific details so the assignee knows what to do."
+                                        className="h-24"
+                                        enterKeyHint="done"
+                                        ref={descRef}
+                                    />
+                                </div>
+
+                                {/* Deadline */}
+                                <div className="grid gap-2">
+                                    <Label>Deadline (Optional)</Label>
+                                    <DatePickerWithShortcuts
+                                        date={date}
+                                        onDateChange={setDate}
+                                        placeholder="Pick a date"
+                                    />
+                                </div>
+
+                                {/* File Attachments */}
+                                <div className="grid gap-2">
+                                    <Label htmlFor="file-upload">Attachments (Optional)</Label>
+                                    <div
+                                        className="border-2 border-dashed border-slate-200 rounded-lg p-4 text-center cursor-pointer hover:border-slate-300 hover:bg-slate-50 transition-colors"
+                                        onClick={() => fileInputRef.current?.click()}
+                                        role="button"
+                                        tabIndex={0}
+                                        aria-label="Click to upload files or drag and drop"
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter' || e.key === ' ') {
+                                                e.preventDefault()
+                                                fileInputRef.current?.click()
+                                            }
+                                        }}
+                                    >
+                                        <Upload className="h-6 w-6 mx-auto text-slate-400 mb-2" />
+                                        <p className="text-sm text-slate-500">
+                                            Click to upload or drag & drop
+                                        </p>
+                                        <p className="text-xs text-slate-400 mt-1">
+                                            Max {MAX_FILES} files, 10MB each
+                                        </p>
+                                    </div>
+                                    <input
+                                        ref={fileInputRef}
+                                        id="file-upload"
+                                        type="file"
+                                        multiple
+                                        accept={ALLOWED_TYPES.join(',')}
+                                        onChange={handleFileInputChange}
+                                        className="hidden"
+                                        aria-label="Upload files"
+                                    />
+
+                                    {/* File List */}
+                                    {files.length > 0 && (
+                                        <div className="space-y-2 mt-2">
+                                            {files.map((file, idx) => (
+                                                <div
+                                                    key={idx}
+                                                    className="flex items-center gap-2 bg-slate-50 rounded-md px-3 py-2 text-sm"
+                                                >
+                                                    <FileIcon className="h-4 w-4 text-slate-400 shrink-0" />
+                                                    <span className="truncate flex-1">{file.name}</span>
+                                                    <span className="text-xs text-slate-400 shrink-0">
+                                                        {formatFileSize(file.size)}
+                                                    </span>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => removeFile(idx)}
+                                                        className="text-slate-400 hover:text-red-500"
+                                                        aria-label={`Remove ${file.name}`}
+                                                    >
+                                                        <X className="h-4 w-4" />
+                                                    </button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            </>
+                        )}
                         {submitError && (
                             <div className="col-span-full">
                                 <p className="text-sm text-red-600" role="alert">

@@ -1,17 +1,31 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Label } from "@/components/ui/label"
-import { Loader2, Plus } from "lucide-react"
+import { Loader2, Plus, Upload, Check, ChevronsUpDown } from "lucide-react"
+import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+} from "@/components/ui/popover"
+import {
+    Command,
+    CommandEmpty,
+    CommandGroup,
+    CommandInput,
+    CommandItem,
+    CommandList,
+} from "@/components/ui/command"
 import { toast } from "sonner"
 import { updateTaskDetails, updateTaskAssignees, uploadTaskAttachment, getTaskAttachments } from "@/actions/tasks"
 import { AttachmentList } from "./attachment-list"
 import { Database } from "@/types/database.types"
+import { cn } from "@/lib/utils"
 
 type Task = Database["public"]["Tables"]["tasks"]["Row"]
 
@@ -27,11 +41,14 @@ export function EditTaskDialog({ open, onOpenChange, task, members }: EditTaskDi
     const [title, setTitle] = useState(task.title)
     const [description, setDescription] = useState(task.description || "")
     const [assigneeId, setAssigneeId] = useState(task.assignee_id || "")
+    const [assigneeOpen, setAssigneeOpen] = useState(false)
 
     // Attachments state
     const [attachments, setAttachments] = useState<any[]>([])
     const [isLoadingAttachments, setIsLoadingAttachments] = useState(false)
     const [isUploading, setIsUploading] = useState(false)
+    const [isDragging, setIsDragging] = useState(false)
+    const fileInputRef = useRef<HTMLInputElement>(null)
 
     const loadAttachments = async () => {
         setIsLoadingAttachments(true)
@@ -80,11 +97,8 @@ export function EditTaskDialog({ open, onOpenChange, task, members }: EditTaskDi
         onOpenChange(false)
     }
 
-    const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (!e.target.files || e.target.files.length === 0) return
-
+    const handleFileUpload = async (file: File) => {
         setIsUploading(true)
-        const file = e.target.files[0]
         const formData = new FormData()
         formData.append('file', file)
 
@@ -96,6 +110,37 @@ export function EditTaskDialog({ open, onOpenChange, task, members }: EditTaskDi
         } else {
             toast.success("Attachment uploaded")
             loadAttachments() // Refresh list
+        }
+    }
+
+    const handleFileInputChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (!e.target.files || e.target.files.length === 0) return
+        const file = e.target.files[0]
+        await handleFileUpload(file)
+        if (fileInputRef.current) fileInputRef.current.value = ''
+    }
+
+    // Drag and drop handlers
+    const handleDragOver = (e: React.DragEvent) => {
+        e.preventDefault()
+        e.stopPropagation()
+        setIsDragging(true)
+    }
+
+    const handleDragLeave = (e: React.DragEvent) => {
+        e.preventDefault()
+        e.stopPropagation()
+        setIsDragging(false)
+    }
+
+    const handleDrop = async (e: React.DragEvent) => {
+        e.preventDefault()
+        e.stopPropagation()
+        setIsDragging(false)
+        
+        const files = Array.from(e.dataTransfer.files)
+        if (files.length > 0) {
+            await handleFileUpload(files[0])
         }
     }
 
@@ -132,18 +177,52 @@ export function EditTaskDialog({ open, onOpenChange, task, members }: EditTaskDi
 
                         <div className="space-y-2">
                             <Label>Assignee</Label>
-                            <Select value={assigneeId} onValueChange={setAssigneeId}>
-                                <SelectTrigger className="bg-white border-slate-200">
-                                    <SelectValue placeholder="Select assignee" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {members.map(m => (
-                                        <SelectItem key={m.id} value={m.id}>
-                                            {m.full_name} {m.role === 'AI_Agent' ? '🤖' : ''}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
+                            <Popover open={assigneeOpen} onOpenChange={setAssigneeOpen}>
+                                <PopoverTrigger asChild>
+                                    <Button
+                                        variant="outline"
+                                        role="combobox"
+                                        aria-expanded={assigneeOpen}
+                                        className="w-full justify-between bg-white border-slate-200"
+                                    >
+                                        {assigneeId
+                                            ? (() => {
+                                                const member = members.find((m) => m.id === assigneeId)
+                                                return member ? `${member.full_name} ${member.role === 'AI_Agent' ? '🤖' : ''}` : "Select assignee..."
+                                            })()
+                                            : "Select assignee..."}
+                                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                    </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-full p-0" align="start">
+                                    <Command>
+                                        <CommandInput placeholder="Search members..." />
+                                        <CommandList>
+                                            <CommandEmpty>No members found.</CommandEmpty>
+                                            <CommandGroup>
+                                                {members.map((member) => (
+                                                    <CommandItem
+                                                        key={member.id}
+                                                        value={member.full_name || ''}
+                                                        onSelect={() => {
+                                                            setAssigneeId(member.id)
+                                                            setAssigneeOpen(false)
+                                                        }}
+                                                    >
+                                                        <Check
+                                                            className={cn(
+                                                                "mr-2 h-4 w-4",
+                                                                assigneeId === member.id ? "opacity-100" : "opacity-0"
+                                                            )}
+                                                        />
+                                                        {member.full_name} {member.role === 'AI_Agent' ? '🤖' : ''}
+                                                    </CommandItem>
+                                                ))}
+                                            </CommandGroup>
+                                        </CommandList>
+                                    </Command>
+                                </PopoverContent>
+                            </Popover>
                         </div>
                     </div>
 
@@ -151,21 +230,43 @@ export function EditTaskDialog({ open, onOpenChange, task, members }: EditTaskDi
                     <div className="space-y-3 pt-2 border-t border-slate-100">
                         <div className="flex items-center justify-between">
                             <Label>Attachments</Label>
-                            <div className="relative">
-                                <input
-                                    type="file"
-                                    title="Upload attachment"
-                                    aria-label="Upload attachment"
-                                    className="absolute inset-0 opacity-0 cursor-pointer"
-                                    onChange={handleFileUpload}
-                                    disabled={isUploading}
-                                />
-                                <Button size="sm" variant="outline" disabled={isUploading} className="h-8">
-                                    {isUploading ? <Loader2 className="h-3 w-3 animate-spin mr-2" /> : <Plus className="h-3 w-3 mr-2" />}
-                                    Add File
-                                </Button>
-                            </div>
                         </div>
+                        <div
+                            className={cn(
+                                "border-2 border-dashed rounded-lg p-4 text-center cursor-pointer transition-colors",
+                                isDragging ? "border-blue-500 bg-blue-50" : "border-slate-200 hover:border-slate-300 hover:bg-slate-50"
+                            )}
+                            onClick={() => fileInputRef.current?.click()}
+                            onDragOver={handleDragOver}
+                            onDragLeave={handleDragLeave}
+                            onDrop={handleDrop}
+                            role="button"
+                            tabIndex={0}
+                            aria-label="Click to upload files or drag and drop"
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter' || e.key === ' ') {
+                                    e.preventDefault()
+                                    fileInputRef.current?.click()
+                                }
+                            }}
+                        >
+                            <Upload className="h-6 w-6 mx-auto text-slate-400 mb-2" />
+                            <p className="text-sm text-slate-500">
+                                Click to upload or drag & drop
+                            </p>
+                            <p className="text-xs text-slate-400 mt-1">
+                                Single file upload
+                            </p>
+                        </div>
+                        <input
+                            ref={fileInputRef}
+                            type="file"
+                            title="Upload attachment"
+                            aria-label="Upload attachment"
+                            className="hidden"
+                            onChange={handleFileInputChange}
+                            disabled={isUploading}
+                        />
 
                         {isLoadingAttachments ? (
                             <div className="flex justify-center py-4">
