@@ -42,11 +42,54 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
     const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
     const [selectedTask, setSelectedTask] = useState<Task | null>(null)
 
-    // Group tasks by objective
+    // Filter & Sort State
+    const [statusFilter, setStatusFilter] = useState<string[]>([])
+    const [assigneeFilter, setAssigneeFilter] = useState<string | 'unassigned' | 'all'>('all')
+    const [sortBy, setSortBy] = useState<'due_date_asc' | 'due_date_desc' | 'created_desc'>('due_date_asc')
+
+    // Filter Logic
+    const filteredTasks = tasks.filter(task => {
+        // Status Filter
+        if (statusFilter.length > 0) {
+            const taskStatus = task.status || 'Pending'
+            if (!statusFilter.includes(taskStatus)) return false
+        }
+
+        // Assignee Filter
+        if (assigneeFilter !== 'all') {
+            if (assigneeFilter === 'unassigned') {
+                if (task.assignee_id) return false
+            } else {
+                if (task.assignee_id !== assigneeFilter) return false
+            }
+        }
+
+        return true
+    })
+
+    // Sort Logic
+    const sortedTasks = [...filteredTasks].sort((a, b) => {
+        if (sortBy === 'created_desc') {
+            return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        }
+        if (sortBy === 'due_date_asc') {
+            if (!a.end_date) return 1
+            if (!b.end_date) return -1
+            return new Date(a.end_date).getTime() - new Date(b.end_date).getTime()
+        }
+        if (sortBy === 'due_date_desc') {
+            if (!a.end_date) return 1
+            if (!b.end_date) return -1
+            return new Date(b.end_date).getTime() - new Date(a.end_date).getTime()
+        }
+        return 0
+    })
+
+    // Group tasks by objective (using sorted tasks)
     const tasksByObjective: Record<string, Task[]> = {}
     const orphanedTasks: Task[] = []
 
-    tasks.forEach(task => {
+    sortedTasks.forEach(task => {
         if (task.objective_id) {
             if (!tasksByObjective[task.objective_id]) {
                 tasksByObjective[task.objective_id] = []
@@ -57,45 +100,130 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
         }
     })
 
+    // Helper for toggle
+    const toggleStatusFilter = (status: string) => {
+        setStatusFilter(prev =>
+            prev.includes(status)
+                ? prev.filter(s => s !== status)
+                : [...prev, status]
+        )
+    }
+
     return (
         <>
             <div className="space-y-6">
-                <div className="flex items-center justify-between">
-                    <div>
-                        <h1 className="text-3xl font-bold tracking-tight text-slate-900 mb-2">Tasks</h1>
-                        <p className="text-slate-500">Democratic workflow management.</p>
+                <div className="flex flex-col gap-4">
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <h1 className="text-3xl font-bold tracking-tight text-slate-900 mb-2">Tasks</h1>
+                            <p className="text-slate-500">Democratic workflow management.</p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <div className="bg-slate-100 p-1 rounded-lg flex items-center mr-2">
+                                <Button
+                                    variant={viewMode === 'grid' ? 'default' : 'ghost'}
+                                    size="sm"
+                                    onClick={() => setViewMode('grid')}
+                                    className={viewMode === 'grid' ? 'shadow-sm' : ''}
+                                >
+                                    <LayoutGrid className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                    variant={viewMode === 'list' ? 'default' : 'ghost'}
+                                    size="sm"
+                                    onClick={() => setViewMode('list')}
+                                    className={viewMode === 'list' ? 'shadow-sm' : ''}
+                                >
+                                    <List className="h-4 w-4" />
+                                </Button>
+                            </div>
+                            <CreateTaskDialog
+                                objectives={objectives}
+                                members={members}
+                                currentUserId={currentUserId}
+                            />
+                        </div>
                     </div>
 
-                    <div className="flex items-center gap-2">
-                        <div className="bg-slate-100 p-1 rounded-lg flex items-center mr-2">
-                            <Button
-                                variant={viewMode === 'grid' ? 'default' : 'ghost'}
-                                size="sm"
-                                onClick={() => setViewMode('grid')}
-                                className={viewMode === 'grid' ? 'shadow-sm' : ''}
-                            >
-                                <LayoutGrid className="h-4 w-4" />
-                            </Button>
-                            <Button
-                                variant={viewMode === 'list' ? 'default' : 'ghost'}
-                                size="sm"
-                                onClick={() => setViewMode('list')}
-                                className={viewMode === 'list' ? 'shadow-sm' : ''}
-                            >
-                                <List className="h-4 w-4" />
-                            </Button>
+                    {/* Filter Bar */}
+                    <div className="flex flex-wrap items-center gap-3 bg-white p-3 rounded-lg border border-slate-200 shadow-sm">
+                        <div className="flex items-center gap-2 pr-4 border-r border-slate-100">
+                            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Filter:</span>
+                            {['Pending', 'Accepted', 'Completed', 'Rejected'].map(status => (
+                                <Badge
+                                    key={status}
+                                    variant={statusFilter.includes(status) ? 'default' : 'outline'}
+                                    className={cn(
+                                        "cursor-pointer hover:opacity-80 transition-all",
+                                        statusFilter.includes(status)
+                                            ? status === 'Accepted' ? 'bg-green-600 hover:bg-green-700'
+                                                : status === 'Completed' ? 'bg-slate-800 hover:bg-slate-900'
+                                                    : status === 'Rejected' ? 'bg-red-600 hover:bg-red-700'
+                                                        : 'bg-slate-500 hover:bg-slate-600'
+                                            : "text-slate-500 bg-white hover:bg-slate-50"
+                                    )}
+                                    onClick={() => toggleStatusFilter(status)}
+                                >
+                                    {status}
+                                </Badge>
+                            ))}
                         </div>
-                        <CreateTaskDialog
-                            objectives={objectives}
-                            members={members}
-                            currentUserId={currentUserId}
-                        />
+
+                        <div className="flex items-center gap-2">
+                            <Select
+                                value={assigneeFilter}
+                                onValueChange={(val) => setAssigneeFilter(val as string)}
+                            >
+                                <SelectTrigger className="h-8 w-[180px] text-xs bg-slate-50 border-slate-200">
+                                    <SelectValue placeholder="All Assignees" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">All Assignees</SelectItem>
+                                    <SelectItem value="unassigned">Unassigned</SelectItem>
+                                    {members.map(m => (
+                                        <SelectItem key={m.id} value={m.id}>{m.full_name}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+
+                            <Select
+                                value={sortBy}
+                                onValueChange={(val) => setSortBy(val as any)}
+                            >
+                                <SelectTrigger className="h-8 w-[160px] text-xs bg-slate-50 border-slate-200">
+                                    <SelectValue placeholder="Sort by" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="due_date_asc">Due Date (Earliest)</SelectItem>
+                                    <SelectItem value="due_date_desc">Due Date (Latest)</SelectItem>
+                                    <SelectItem value="created_desc">Newest Created</SelectItem>
+                                </SelectContent>
+                            </Select>
+
+                            {(statusFilter.length > 0 || assigneeFilter !== 'all') && (
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => {
+                                        setStatusFilter([])
+                                        setAssigneeFilter('all')
+                                        setSortBy('due_date_asc')
+                                    }}
+                                    className="text-slate-400 hover:text-red-500 h-8 ml-2"
+                                >
+                                    <X className="w-3 h-3 mr-1" /> Clear
+                                </Button>
+                            )}
+                        </div>
+                        <div className="ml-auto text-xs text-slate-400">
+                            Showing {sortedTasks.length} tasks
+                        </div>
                     </div>
                 </div>
 
                 {viewMode === 'grid' ? (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {tasks.map(task => (
+                        {sortedTasks.map(task => (
                             <div key={task.id} className="h-full">
                                 <TaskCard
                                     task={task}
@@ -105,9 +233,19 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                                 />
                             </div>
                         ))}
-                        {tasks.length === 0 && (
-                            <div className="col-span-full py-12 text-center border-2 border-dashed border-slate-200 rounded-lg text-slate-500">
-                                No active tasks. Create one to start the engine.
+                        {sortedTasks.length === 0 && (
+                            <div className="col-span-full py-16 text-center border-2 border-dashed border-slate-200 rounded-lg bg-slate-50/50">
+                                <div className="text-slate-400 mb-2">No tasks match your filters</div>
+                                <Button
+                                    variant="link"
+                                    onClick={() => {
+                                        setStatusFilter([])
+                                        setAssigneeFilter('all')
+                                    }}
+                                    className="text-blue-600"
+                                >
+                                    Reset Filters
+                                </Button>
                             </div>
                         )}
                     </div>

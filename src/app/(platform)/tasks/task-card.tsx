@@ -258,7 +258,7 @@ export function TaskCard({ task, currentUserId, userRole, members }: TaskCardPro
                             {task.start_date && (
                                 <span className="flex items-center gap-1" title="Start Date">
                                     <CalendarIcon className="w-3 h-3" />
-                                    {format(new Date(task.start_date), "MMM d")}
+                                    Start: {format(new Date(task.start_date), "MMM d")}
                                 </span>
                             )}
                             <span className="flex items-center gap-1" title="Documents">
@@ -369,7 +369,7 @@ export function TaskCard({ task, currentUserId, userRole, members }: TaskCardPro
                         <div className="flex items-center gap-4 text-xs text-slate-400">
                             <div className="flex items-center gap-1">
                                 <CalendarIcon className="w-3 h-3" />
-                                <span>{task.end_date ? format(new Date(task.end_date), "MMM d") : "-"}</span>
+                                <span>Due: {task.end_date ? format(new Date(task.end_date), "MMM d") : "-"}</span>
                             </div>
                         </div>
                     </div>

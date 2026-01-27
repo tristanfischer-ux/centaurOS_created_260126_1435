@@ -109,7 +109,7 @@ export default async function TeamPage() {
                 executives={executives}
                 apprentices={apprentices}
                 aiAgents={aiAgents}
-                teams={teams}
+                teams={teams || []}
             />
         </div>
     )
