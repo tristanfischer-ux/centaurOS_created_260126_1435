@@ -63,12 +63,9 @@ function getStatusConfig(status: string | null) {
 
 export function ObjectivesListView({ objectives }: ObjectivesListViewProps) {
     const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
-    const [isDeleting, setIsDeleting] = useState(false)
 
     const handleDelete = async (id: string) => {
-        setIsDeleting(true)
         const result = await deleteObjective(id)
-        setIsDeleting(false)
 
         if (result?.error) {
             toast.error(result.error)
