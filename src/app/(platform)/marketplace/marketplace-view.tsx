@@ -26,7 +26,6 @@ interface MarketplaceViewProps {
 
 interface ProviderContactInfo {
     services?: string[];
-    [key: string]: any;
 }
 
 export function MarketplaceView({ providers, aiTools, rfqs, initialStack = [] }: MarketplaceViewProps) {

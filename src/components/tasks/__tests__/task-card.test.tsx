@@ -1,5 +1,5 @@
 import { render, screen } from '@testing-library/react'
-import { TaskCard } from '@/app/tasks/task-card'
+import { TaskCard } from '@/app/(platform)/tasks/task-card'
 import '@testing-library/jest-dom'
 
 // Mock server actions
