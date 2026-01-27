@@ -116,19 +116,25 @@ export function CreateObjectiveDialog({ disabled }: { disabled?: boolean }) {
 
     async function clientAction(formData: FormData) {
         setLoading(true)
-        const res = await createObjective(formData)
-        setLoading(false)
-        if (res?.error) {
-            toast.error(res.error)
-        } else {
-            toast.success("Objective Initiated")
-            setOpen(false)
-            // Reset selection
-            setSelectedPackId("none")
-            setSelectedPack(null)
-            setSelectedItems(new Set())
-            setAnalyzedObjectives([])
-            setSelectedObjectiveIndex(null)
+        try {
+            const res = await createObjective(formData)
+            if (res?.error) {
+                toast.error(res.error)
+            } else {
+                toast.success("Objective Initiated")
+                setOpen(false)
+                // Reset selection
+                setSelectedPackId("none")
+                setSelectedPack(null)
+                setSelectedItems(new Set())
+                setAnalyzedObjectives([])
+                setSelectedObjectiveIndex(null)
+            }
+        } catch (e) {
+            toast.error("An unexpected error occurred")
+            console.error(e)
+        } finally {
+            setLoading(false)
         }
     }
 

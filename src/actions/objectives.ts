@@ -11,59 +11,108 @@ export async function createObjective(formData: FormData) {
 
     if (!user) return { error: 'Unauthorized' }
 
+    // 1. Get real foundry_id
+    const { data: profile } = await supabase
+        .from('profiles')
+        .select('foundry_id')
+        .eq('id', user.id)
+        .single()
+
+    if (!profile?.foundry_id) return { error: 'No foundry associated with user' }
+
     const title = formData.get('title') as string
     const description = formData.get('description') as string
     const playbookId = formData.get('playbookId') as string
 
+    // Get selected tasks (handle multiple values with same name)
+    const selectedTaskIds = formData.getAll('selectedTaskIds') as string[]
+    // AI Import tasks (JSON strings)
+    const aiTasksJson = formData.getAll('aiTasks') as string[]
+
     if (!title) return { error: 'Title is required' }
 
-    // 1. Create the objective
+    // 2. Create the objective
     const { data: objective, error } = await supabase.from('objectives').insert({
         title,
         description,
         creator_id: user.id,
-        foundry_id: 'foundry-demo' // Hardcoded for demo
+        foundry_id: profile.foundry_id
     }).select().single()
 
     if (error) return { error: error.message }
     if (!objective) return { error: 'Failed to create objective' }
 
-    // 2. If playbook selected, generate tasks
+    // 3. Create Tasks
+    let tasksToInsert: any[] = []
+
+    // A. From Playbook
     if (playbookId && playbookId !== 'none') {
         const playbook = OBJECTIVE_PLAYBOOKS.find(pb => pb.id === playbookId)
         if (playbook) {
-            // Find an AI agent to assign AI tasks to (optional)
-            const { data: aiAgents } = await supabase
-                .from('profiles')
-                .select('id')
-                .eq('role', 'AI_Agent')
-                .limit(1)
+            // Filter tasks based on selection
+            const tasksFromBook = playbook.tasks.filter(t => selectedTaskIds.includes(t.id))
 
-            const aiAgentId = aiAgents && aiAgents.length > 0 ? aiAgents[0].id : null
+            // Find AI Agent if needed
+            let aiAgentId = null
+            if (tasksFromBook.some(t => t.role === 'AI_Agent')) {
+                const { data: aiAgents } = await supabase
+                    .from('profiles')
+                    .select('id')
+                    .eq('role', 'AI_Agent')
+                    .limit(1)
+                aiAgentId = aiAgents?.[0]?.id || null
+            }
 
-            // Create tasks
-            const tasksToInsert = playbook.tasks.map(task => ({
+            tasksToInsert = [
+                ...tasksToInsert,
+                ...tasksFromBook.map(task => ({
+                    title: task.title,
+                    description: task.description,
+                    objective_id: objective.id,
+                    creator_id: user.id,
+                    foundry_id: profile.foundry_id,
+                    status: 'Pending' as const,
+                    assignee_id: task.role === 'AI_Agent' ? aiAgentId : null,
+                }))
+            ]
+        }
+    }
+
+    // B. From AI Import
+    if (aiTasksJson.length > 0) {
+        // Find AI Agent if needed
+        let aiAgentId = null
+        const { data: aiAgents } = await supabase
+            .from('profiles')
+            .select('id')
+            .eq('role', 'AI_Agent')
+            .limit(1)
+        aiAgentId = aiAgents?.[0]?.id || null
+
+        const aiTasks = aiTasksJson.map(str => JSON.parse(str))
+        tasksToInsert = [
+            ...tasksToInsert,
+            ...aiTasks.map(task => ({
                 title: task.title,
                 description: task.description,
                 objective_id: objective.id,
                 creator_id: user.id,
-                foundry_id: 'foundry-demo',
+                foundry_id: profile.foundry_id,
                 status: 'Pending' as const,
                 assignee_id: task.role === 'AI_Agent' ? aiAgentId : null,
-                // If it's an Executive task, maybe assign to creator? keeping null for now to let them choose
             }))
+        ]
+    }
 
-            const { error: taskError } = await supabase.from('tasks').insert(tasksToInsert)
-
-            if (taskError) {
-                console.error('Error creating playbook tasks:', taskError)
-                // Don't fail the whole request, just log it
-            }
+    if (tasksToInsert.length > 0) {
+        const { error: taskError } = await supabase.from('tasks').insert(tasksToInsert)
+        if (taskError) {
+            console.error('Error creating tasks:', taskError)
         }
     }
 
     revalidatePath('/objectives')
-    revalidatePath('/tasks') // Because tasks dropdown uses objectives
+    revalidatePath('/tasks')
     return { success: true }
 }
 
