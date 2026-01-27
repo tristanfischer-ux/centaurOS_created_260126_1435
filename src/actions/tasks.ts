@@ -657,7 +657,8 @@ export async function batchRejectTasks(taskIds: string[], reason: string) {
     for (const taskId of taskIds) {
         try {
             await logSystemEvent(taskId, `Task Batch Rejected by ${approver.role}: ${reason}`, user.id)
-            await logTaskHistory(taskId, 'REJECTED', user.id, {
+            await logTaskHistory(taskId, 'STATUS_CHANGE', user.id, {
+                new_status: 'Rejected',
                 approver_role: approver.role,
                 via_batch_rejection: true,
                 reason,
