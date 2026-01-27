@@ -12,9 +12,9 @@ export function Markdown({ content, className }: MarkdownProps) {
   if (!content) return null
 
   return (
-    <ReactMarkdown
-      className={cn('markdown-content', className)}
-      components={{
+    <div className={cn('markdown-content', className)}>
+      <ReactMarkdown
+        components={{
         p: ({ children }) => <p className="my-1 text-inherit">{children}</p>,
         h1: ({ children }) => <h1 className="my-2 text-xl font-bold">{children}</h1>,
         h2: ({ children }) => <h2 className="my-2 text-lg font-bold">{children}</h2>,
@@ -49,9 +49,10 @@ export function Markdown({ content, className }: MarkdownProps) {
         ),
         strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
         em: ({ children }) => <em className="italic">{children}</em>,
-      }}
-    >
-      {content}
-    </ReactMarkdown>
+        }}
+      >
+        {content}
+      </ReactMarkdown>
+    </div>
   )
 }
