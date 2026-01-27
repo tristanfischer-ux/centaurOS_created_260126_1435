@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Outfit, Playfair_Display, Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "@/components/ui/sonner";
@@ -27,11 +27,30 @@ const jetbrains = JetBrains_Mono({
   display: "swap",
 });
 
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  themeColor: "#FFFFFF",
+}
+
 export const metadata: Metadata = {
   title: "Centaur Dynamics",
   description: "The Renaissance of Industry",
+  manifest: "/manifest.json",
   icons: {
+    icon: "/icons/icon-192x192.png",
+    shortcut: "/icons/icon-192x192.png",
     apple: "/icons/icon-192x192.png",
+  },
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "CentaurOS",
+  },
+  formatDetection: {
+    telephone: false,
   },
 };
 
@@ -42,10 +61,6 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <head>
-        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0" />
-        <meta name="theme-color" content="#FFFFFF" />
-      </head>
       <body
         className={`${outfit.variable} ${playfair.variable} ${inter.variable} ${jetbrains.variable} antialiased bg-white text-slate-900 font-sans`}
       >
