@@ -43,11 +43,11 @@ interface TasksViewProps {
     members: Member[]
     currentUserId: string
     currentUserRole?: string
+    teams: { id: string, name: string }[]
 }
 
-
 // ...
-export function TasksView({ tasks, objectives, members, currentUserId, currentUserRole }: TasksViewProps) {
+export function TasksView({ tasks, objectives, members, currentUserId, currentUserRole, teams }: TasksViewProps) {
     const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
     const [selectedTask, setSelectedTask] = useState<Task | null>(null)
     const [isSelectionMode, setIsSelectionMode] = useState(false)
@@ -229,6 +229,7 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                             <CreateTaskDialog
                                 objectives={objectives}
                                 members={members}
+                                teams={teams}
                                 currentUserId={currentUserId}
                             />
                         </div>

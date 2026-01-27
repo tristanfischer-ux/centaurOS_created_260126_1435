@@ -61,9 +61,39 @@ export async function createTask(formData: FormData) {
     let assigneeIds: string[] = [assigneeId]
     if (assigneeIdsJson) {
         try {
-            assigneeIds = JSON.parse(assigneeIdsJson)
+            const parsedIds = JSON.parse(assigneeIdsJson) as string[]
+            assigneeIds = [] // Reset to populate from parsed list
+
+            // Handle Team expansion (team:uuid)
+            for (const id of parsedIds) {
+                if (id.startsWith('team:')) {
+                    const teamId = id.replace('team:', '')
+                    // Fetch team members
+                    const { data: teamMembers } = await supabase
+                        .from('team_members')
+                        .select('profile_id')
+                        .eq('team_id', teamId)
+
+                    if (teamMembers) {
+                        assigneeIds.push(...teamMembers.map(tm => tm.profile_id))
+                    }
+                } else {
+                    assigneeIds.push(id)
+                }
+            }
+            // Remove duplicates
+            assigneeIds = Array.from(new Set(assigneeIds))
+
+            // If empty after expansion (e.g. empty team), fallback to creator or handle error?
+            // User prompt doesn't specify. We'll proceed. If empty, it might fail validation if we enforce assignee.
+            // But we have primary assignee fallback logic below.
+            if (assigneeIds.length === 0 && assigneeId) {
+                assigneeIds.push(assigneeId)
+            }
+
         } catch {
             // Fall back to single assignee
+            assigneeIds = [assigneeId]
         }
     }
 

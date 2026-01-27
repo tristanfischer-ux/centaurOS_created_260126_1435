@@ -15,7 +15,8 @@ export default async function TasksPage() {
             *,
             assignee:profiles!assignee_id(id, full_name, role, email),
             creator:profiles!creator_id(id, full_name, role),
-            objective:objectives!objective_id(id, title)
+            objective:objectives!objective_id(id, title),
+            task_files(id)
         `)
         .order('created_at', { ascending: false })
 
@@ -45,6 +46,10 @@ export default async function TasksPage() {
         email: p.email
     }))
 
+    // Fetch Teams
+    const { data: teamsData } = await supabase.from('teams').select('id, name')
+    const teams = teamsData || []
+
     // Join tasks with related data
     const tasksWithData = tasks?.map(task => ({
         ...task,
@@ -52,7 +57,7 @@ export default async function TasksPage() {
         creator: Array.isArray(task.creator) ? task.creator[0] : task.creator,
         objective: Array.isArray(task.objective) ? task.objective[0] : task.objective,
         assignees: [], // Temporarily disabled while debugging task_assignees join
-        task_files: [] // Temporarily stubbed due to missing relationship
+        task_files: task.task_files || [] // Restored
     })) || []
 
     return (
@@ -60,6 +65,7 @@ export default async function TasksPage() {
             tasks={tasksWithData}
             objectives={objectives}
             members={members}
+            teams={teams}
             currentUserId={user.id}
             currentUserRole={currentUserRole}
         />

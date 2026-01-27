@@ -26,13 +26,23 @@ export async function uploadTaskAttachment(taskId: string, formData: FormData) {
         .from('task-attachments')
         .getPublicUrl(fileName)
 
-    // Store reference as a system comment (since we don't have attachments table)
+    // Store reference as a system comment (keeping this for the thread)
     await supabase.from('task_comments').insert({
         task_id: taskId,
         foundry_id: (await supabase.from('tasks').select('foundry_id').eq('id', taskId).single()).data?.foundry_id || '',
         user_id: user.id,
         content: `📎 Attached: [${file.name}](${urlData.publicUrl})`,
         is_system_log: true
+    })
+
+    // Insert into task_files table for the attachment count
+    await supabase.from('task_files').insert({
+        task_id: taskId,
+        file_name: file.name,
+        file_path: fileName, // Store the full storage path
+        file_size: file.size,
+        mime_type: file.type,
+        uploaded_by: user.id
     })
 
     revalidatePath('/tasks')

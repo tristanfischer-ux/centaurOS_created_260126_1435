@@ -38,6 +38,7 @@ import { VoiceRecorder } from "@/components/tasks/voice-recorder"
 interface CreateTaskDialogProps {
     objectives: { id: string; title: string }[]
     members: { id: string; full_name: string; role: string }[]
+    teams?: { id: string; name: string }[]
     currentUserId: string
 }
 
@@ -51,7 +52,7 @@ const ALLOWED_TYPES = [
     'text/plain', 'text/csv'
 ]
 
-export function CreateTaskDialog({ objectives, members, currentUserId }: CreateTaskDialogProps) {
+export function CreateTaskDialog({ objectives, members, teams = [], currentUserId }: CreateTaskDialogProps) {
     const [open, setOpen] = useState(false)
     const [isLoading, setIsLoading] = useState(false)
     const [date, setDate] = useState<Date>()
@@ -145,11 +146,18 @@ export function CreateTaskDialog({ objectives, members, currentUserId }: CreateT
     })
 
     // Transform for MultiSelect
-    const memberOptions = sortedMembers.map(m => ({
-        value: m.id,
-        label: m.id === currentUserId ? 'Myself' : (m.full_name || 'Unknown'),
-        icon: getRoleLabel(m.role)
-    }))
+    const memberOptions = [
+        ...teams.map(t => ({
+            value: `team:${t.id}`,
+            label: t.name,
+            icon: '👥'
+        })),
+        ...sortedMembers.map(m => ({
+            value: m.id,
+            label: m.id === currentUserId ? 'Myself' : (m.full_name || 'Unknown'),
+            icon: getRoleLabel(m.role)
+        }))
+    ]
 
     // File handling
     const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
