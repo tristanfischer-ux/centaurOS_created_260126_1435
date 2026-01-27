@@ -269,13 +269,13 @@ export function TaskCard({ task, currentUserId, userRole, members }: TaskCardPro
                     </div>
 
 
-                    <div className="flex items-start gap-2">
+                    <div className="flex items-center gap-2">
                         {/* Visibility Indicator */}
                         <div title={task.client_visible ? "Visible to Client" : "Hidden from Client"}>
                             {task.client_visible ? (
-                                <Eye className="w-4 h-4 text-green-500/50 mt-1" />
+                                <Eye className="w-4 h-4 text-green-500/50" />
                             ) : (
-                                <EyeOff className="w-4 h-4 text-slate-300 mt-1" />
+                                <EyeOff className="w-4 h-4 text-slate-300" />
                             )}
                         </div>
 

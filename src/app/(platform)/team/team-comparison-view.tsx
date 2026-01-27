@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
-import { Check, X, GitCompare, Users, MoreHorizontal, Pencil, Trash2, Loader2, AlertTriangle, Mail, Phone } from "lucide-react"
+import { Check, X, GitCompare, Users, MoreHorizontal, Pencil, Trash2, Loader2, AlertTriangle, Mail, Phone, LayoutGrid, List } from "lucide-react"
 import { createTeam, addTeamMember, deleteMember } from "@/actions/team"
 import { deleteTeam, updateTeamName } from "@/actions/teams"
 import Link from "next/link"
@@ -75,6 +75,7 @@ interface TeamComparisonViewProps {
 
 export function TeamComparisonView({ founders, executives, apprentices, aiAgents, teams }: TeamComparisonViewProps) {
     const [compareMode, setCompareMode] = useState(false)
+    const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
     const [showComparison, setShowComparison] = useState(false)
 
@@ -494,6 +495,106 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
         )
     }
 
+    const MemberListItem = ({ member, type }: { member: Member, type: 'founder' | 'executive' | 'apprentice' | 'ai_agent' }) => {
+        const isFounder = type === 'founder'
+        const isExecutive = type === 'executive'
+        const isAIAgent = type === 'ai_agent'
+
+        // Centaur Status
+        const pairedAI = member.pairedAI?.[0]
+        const isCentaur = !!member.paired_ai_id && !!pairedAI
+
+        let badgeClass = 'text-slate-600 border-slate-200 bg-slate-50'
+
+        if (isAIAgent) {
+            badgeClass = 'text-indigo-600 border-indigo-200 bg-indigo-50'
+        } else if (isFounder) {
+            badgeClass = 'text-purple-600 border-purple-200 bg-purple-50'
+        } else if (isExecutive) {
+            badgeClass = 'text-amber-600 border-amber-200 bg-amber-50'
+        }
+
+        return (
+            <tr className="group hover:bg-slate-50 transition-colors border-b border-slate-100 last:border-0">
+                <td className="px-4 py-3 pl-6">
+                    <div className="flex items-center gap-3">
+                        <Link href={`/team/${member.id}`} className="flex items-center gap-3">
+                            <Avatar className="h-9 w-9 border border-slate-200">
+                                <AvatarFallback className="bg-slate-100 text-slate-500 text-xs">
+                                    {isAIAgent ? <Brain className="h-4 w-4" /> : getInitials(member.full_name)}
+                                </AvatarFallback>
+                            </Avatar>
+                            <span className="font-medium text-slate-900 group-hover:text-blue-600 transition-colors">
+                                {member.full_name}
+                            </span>
+                        </Link>
+                    </div>
+                </td>
+                <td className="px-4 py-3">
+                    <Badge variant="outline" className={`text-[10px] ${badgeClass} font-normal`}>
+                        {member.role}
+                    </Badge>
+                </td>
+                <td className="px-4 py-3">
+                    {isCentaur && (
+                        <div className="flex items-center gap-2">
+                            <Badge variant="secondary" className="text-[10px] bg-amber-100 text-amber-700 h-5 px-1.5 border-amber-200 gap-1 pl-1">
+                                <Avatar className="h-3 w-3 inline-block">
+                                    <AvatarFallback className="bg-amber-200 text-amber-800 text-[6px]">AI</AvatarFallback>
+                                </Avatar>
+                                {pairedAI.full_name}
+                            </Badge>
+                            <button
+                                aria-label="Unpair Centaur"
+                                onClick={(e) => {
+                                    e.preventDefault()
+                                    e.stopPropagation()
+                                    startTransition(async () => {
+                                        await unpairCentaur(member.id)
+                                        toast.success("Centaur unpaired")
+                                    })
+                                }}
+                                className="text-slate-300 hover:text-red-500 hover:bg-red-50 rounded p-1 transition-all opacity-0 group-hover:opacity-100"
+                            >
+                                <Unplug className="h-3 w-3" />
+                            </button>
+                        </div>
+                    )}
+                </td>
+                <td className="px-4 py-3 text-slate-500">
+                    <div className="flex gap-3 text-xs">
+                        <span className="text-green-600 font-medium">{member.completedTasks} done</span>
+                        <span className="text-blue-600 font-medium">{member.activeTasks} active</span>
+                        <span className="text-slate-400">{member.pendingTasks} pending</span>
+                    </div>
+                </td>
+                <td className="px-4 py-3 text-right pr-6">
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button
+                                variant="ghost"
+                                className="h-8 w-8 p-0 text-slate-400 hover:text-slate-600 opacity-0 group-hover:opacity-100 transition-opacity"
+                            >
+                                <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                            <DropdownMenuItem asChild>
+                                <Link href={`/team/${member.id}`}>View Profile</Link>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                                className="text-red-600 focus:text-red-600 focus:bg-red-50"
+                                onClick={() => setMemberToDelete(member.id)}
+                            >
+                                <Trash2 className="mr-2 h-4 w-4" /> Delete Person
+                            </DropdownMenuItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+                </td>
+            </tr>
+        )
+    }
+
     return (
         <div className="space-y-8">
             {/* Header */}
@@ -523,6 +624,24 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                         {compareMode ? <X className="h-4 w-4 mr-2" /> : <GitCompare className="h-4 w-4 mr-2" />}
                         {compareMode ? "Cancel" : "Compare"}
                     </Button>
+                    <div className="flex bg-slate-100 p-1 rounded-lg border border-slate-200 ml-2">
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setViewMode('grid')}
+                            className={`h-8 w-8 p-0 rounded-md transition-all ${viewMode === 'grid' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-400 hover:text-slate-600'}`}
+                        >
+                            <LayoutGrid className="h-4 w-4" />
+                        </Button>
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setViewMode('list')}
+                            className={`h-8 w-8 p-0 rounded-md transition-all ${viewMode === 'list' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-400 hover:text-slate-600'}`}
+                        >
+                            <List className="h-4 w-4" />
+                        </Button>
+                    </div>
                 </div>
             </div>
 
@@ -539,11 +658,32 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                     <h2 className="text-xl font-semibold text-purple-600 uppercase tracking-wider border-b border-slate-200 pb-2">
                         Founders (Decide)
                     </h2>
-                    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                        {founders.map(member => (
-                            <MemberCard key={member.id} member={member} type="founder" />
-                        ))}
-                    </div>
+                    {viewMode === 'grid' ? (
+                        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                            {founders.map(member => (
+                                <MemberCard key={member.id} member={member} type="founder" />
+                            ))}
+                        </div>
+                    ) : (
+                        <div className="border border-slate-200 rounded-lg overflow-hidden">
+                            <table className="w-full text-sm text-left">
+                                <thead className="bg-slate-50 text-slate-500 font-medium border-b border-slate-200">
+                                    <tr>
+                                        <th className="px-4 py-3 pl-6">Profile</th>
+                                        <th className="px-4 py-3">Role</th>
+                                        <th className="px-4 py-3">Paired Centaur</th>
+                                        <th className="px-4 py-3">Tasks</th>
+                                        <th className="px-4 py-3"></th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100 bg-white">
+                                    {founders.map(member => (
+                                        <MemberListItem key={member.id} member={member} type="founder" />
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
                 </section>
             )}
 
@@ -552,14 +692,40 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                 <h2 className="text-xl font-semibold text-amber-600 uppercase tracking-wider border-b border-slate-200 pb-2">
                     Executives (Evaluate)
                 </h2>
-                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                    {executives.map(member => (
-                        <MemberCard key={member.id} member={member} type="executive" />
-                    ))}
-                    {executives.length === 0 && (
-                        <div className="col-span-full py-8 text-center text-gray-500 italic">No executives listed.</div>
-                    )}
-                </div>
+                {viewMode === 'grid' ? (
+                    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                        {executives.map(member => (
+                            <MemberCard key={member.id} member={member} type="executive" />
+                        ))}
+                        {executives.length === 0 && (
+                            <div className="col-span-full py-8 text-center text-gray-500 italic">No executives listed.</div>
+                        )}
+                    </div>
+                ) : (
+                    <div className="border border-slate-200 rounded-lg overflow-hidden">
+                        <table className="w-full text-sm text-left">
+                            <thead className="bg-slate-50 text-slate-500 font-medium border-b border-slate-200">
+                                <tr>
+                                    <th className="px-4 py-3 pl-6">Profile</th>
+                                    <th className="px-4 py-3">Role</th>
+                                    <th className="px-4 py-3">Paired Centaur</th>
+                                    <th className="px-4 py-3">Tasks</th>
+                                    <th className="px-4 py-3"></th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100 bg-white">
+                                {executives.map(member => (
+                                    <MemberListItem key={member.id} member={member} type="executive" />
+                                ))}
+                                {executives.length === 0 && (
+                                    <tr>
+                                        <td colSpan={5} className="py-8 text-center text-gray-500 italic">No executives listed.</td>
+                                    </tr>
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
             </section>
 
             {/* Apprentices Section */}
@@ -567,14 +733,40 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                 <h2 className="text-xl font-semibold text-blue-600 uppercase tracking-wider border-b border-slate-200 pb-2">
                     Apprentices (Do)
                 </h2>
-                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                    {apprentices.map(member => (
-                        <MemberCard key={member.id} member={member} type="apprentice" />
-                    ))}
-                    {apprentices.length === 0 && (
-                        <div className="col-span-full py-8 text-center text-gray-500 italic">No apprentices listed.</div>
-                    )}
-                </div>
+                {viewMode === 'grid' ? (
+                    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                        {apprentices.map(member => (
+                            <MemberCard key={member.id} member={member} type="apprentice" />
+                        ))}
+                        {apprentices.length === 0 && (
+                            <div className="col-span-full py-8 text-center text-gray-500 italic">No apprentices listed.</div>
+                        )}
+                    </div>
+                ) : (
+                    <div className="border border-slate-200 rounded-lg overflow-hidden">
+                        <table className="w-full text-sm text-left">
+                            <thead className="bg-slate-50 text-slate-500 font-medium border-b border-slate-200">
+                                <tr>
+                                    <th className="px-4 py-3 pl-6">Profile</th>
+                                    <th className="px-4 py-3">Role</th>
+                                    <th className="px-4 py-3">Paired Centaur</th>
+                                    <th className="px-4 py-3">Tasks</th>
+                                    <th className="px-4 py-3"></th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100 bg-white">
+                                {apprentices.map(member => (
+                                    <MemberListItem key={member.id} member={member} type="apprentice" />
+                                ))}
+                                {apprentices.length === 0 && (
+                                    <tr>
+                                        <td colSpan={5} className="py-8 text-center text-gray-500 italic">No apprentices listed.</td>
+                                    </tr>
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
             </section>
 
             {/* Neural Network (AI Agents) */}

@@ -22,18 +22,6 @@ export default async function TeamPage() {
         return <div className="p-8 text-red-500">Error: No Foundry associated with your account.</div>
     }
 
-    // Fetch profiles
-    const { data: profiles, error } = await supabase
-        .from('profiles')
-        .select('*, paired_ai:profiles!paired_ai_id(id, full_name, avatar_url, role)')
-        .eq('foundry_id', foundry_id)
-        .order('created_at', { ascending: false })
-
-    if (error) {
-        console.error("Error fetching profiles:", error)
-        return <div className="text-red-500">Error loading team members</div>
-    }
-
     // Fetch all tasks for task metrics
     const { data: tasks } = await supabase
         .from('tasks')
@@ -52,6 +40,7 @@ export default async function TeamPage() {
 
     if (profilesError) {
         console.error("Error fetching profiles:", profilesError)
+        return <div className="text-red-500">Error loading team members</div>
     }
 
     // Fetch teams with members

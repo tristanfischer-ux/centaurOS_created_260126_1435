@@ -45,14 +45,26 @@ export default async function SettingsPage() {
                 </CardContent>
             </Card>
 
-            <form action={async () => {
-                'use server'
-                const supabase = await createClient()
-                await supabase.auth.signOut()
-                redirect('/login')
-            }}>
-                <Button variant="destructive">Sign Out</Button>
-            </form>
+            <Card className="border-red-100 bg-red-50/50">
+                <CardHeader>
+                    <CardTitle className="text-red-900">Sign Out</CardTitle>
+                    <CardDescription className="text-red-700">
+                        Securely sign out of your account on this device. You will need to sign in again to access the platform.
+                    </CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <form action={async () => {
+                        'use server'
+                        const supabase = await createClient()
+                        await supabase.auth.signOut()
+                        redirect('/login')
+                    }}>
+                        <Button variant="destructive" className="w-full h-12 text-lg font-semibold">
+                            Sign Out
+                        </Button>
+                    </form>
+                </CardContent>
+            </Card>
         </div>
     )
 }

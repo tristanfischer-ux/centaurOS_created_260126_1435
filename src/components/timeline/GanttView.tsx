@@ -8,114 +8,26 @@ import { MultiSelect } from "@/components/ui/multi-select"
 
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
-import { ChevronLeft, ChevronRight, CalendarDays } from "lucide-react"
+import { ChevronLeft, ChevronRight, CalendarDays, ArrowUpDown } from "lucide-react"
 import { updateTaskDates, updateTaskProgress } from "@/actions/tasks"
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select"
+import { toast } from "sonner"
+import { useRouter } from "next/navigation"
+import { format, addDays, subDays, addWeeks, subWeeks, addMonths, subMonths } from "date-fns"
 
-// ... (in component)
-
-// Handler: When task progress is changed (dragged)
-const handleProgressChange = async (task: GanttTask) => {
-    // Optimistic update handled by the library UI temporarily, 
-    // but we should probably track it if we wanted perfect consistency.
-    // For now, simpler approach: just fire the update.
-
-    try {
-        const result = await updateTaskProgress(task.id, task.progress)
-
-        if (result.error) {
-            toast.error(result.error)
-            router.refresh() // Revert on error
-        } else {
-            // Success: toast is a bit spammy for dragging, maybe only on error? 
-            // Or "Progress updated" 
-            // toast.success(`Progress updated to ${task.progress}%`) 
-            // actually silently updating is better for sliders usually, maybe just refresh
-            router.refresh()
-        }
-    } catch {
-        toast.error("Failed to update progress")
-        router.refresh()
-    }
-}
-
-// Transform to Gantt Library Format
-const ganttTasks: ExtendedGanttTask[] = useMemo(() => {
-    return filteredTasks
-        .slice(0, 50)
-        .sort((a, b) => { // ... sort logic
-            const aEnd = a.end_date ? new Date(a.end_date).getTime() : Infinity
-            const bEnd = b.end_date ? new Date(b.end_date).getTime() : Infinity
-            return aEnd - bEnd
-        })
-        .map(task => {
-            // ... overrides logic
-            const override = localDateOverrides[task.id]
-            const startDate = override?.start ?? (task.start_date ? new Date(task.start_date) : new Date())
-            const endDate = override?.end ?? (task.end_date ? new Date(task.end_date) : new Date(startDate.getTime() + 86400000 * 2))
-
-            if (endDate <= startDate) {
-                endDate.setDate(startDate.getDate() + 1)
-            }
-
-            let color = "#6b7280" // Pending
-
-            // Prioritize explicit progress field
-            let progress = task.progress ?? 0
-
-            // Fallback / Synchronization logic (optional, but good for consistency)
-            // If progress is 0 but status is Completed, maybe force 100? 
-            // User asked for "manual change", so let's stick to the DB field primarily.
-            // But we can apply colors based on status still.
-
-            if (task.status === "Accepted") { color = "#2563eb"; }
-            if (task.status === "Completed") { color = "#16a34a"; progress = 100; /* Force 100 if completed? Or let them have 100% and not be completed? Let's force 100 for visual consistency if needed, but safer to respect DB. */ }
-            if (task.status === "Rejected") { color = "#dc2626"; }
-            if (task.status === "Amended" || task.status === "Amended_Pending_Approval") { color = "#ea580c"; }
-
-            // Override: If status is Completed, visual progress SHOULD be 100 usually. 
-            // But the user might want to set 90% then manually mark complete. 
-            // Let's use the DB value 'task.progress', and if it's null/0 and status is Completed, show 100.
-            if (task.status === 'Completed' && Math.round(progress) < 100) {
-                progress = 100
-            }
-
-            return {
-                start: startDate,
-                end: endDate,
-                name: task.title || "Untitled Task",
-                id: task.id,
-                type: "task" as const,
-                progress,
-                isDisabled: false,
-                styles: {
-                    progressColor: color,
-                    progressSelectedColor: color,
-                    backgroundColor: color + "40",
-                },
-                assigneeName: task.profiles?.full_name,
-                assigneeRole: task.profiles?.role
-            }
-        })
-}, [filteredTasks, localDateOverrides])
-
-    // ... (in render)
-    < Gantt
-tasks = { ganttTasks }
-viewMode = { viewMode }
-viewDate = { dateOffset }
-listCellWidth = "260px"
-columnWidth = { viewMode === ViewMode.Month ? 300 : viewMode === ViewMode.Week ? 150 : 65}
-barFill = { 60}
-onDateChange = { handleDateChange }
-onProgressChange = { handleProgressChange } // Added handler
-onDoubleClick = { handleDoubleClick }
-onClick = { handleClick }
-TaskListHeader = { CustomTaskListHeader }
-TaskListTable = { CustomTaskListTable }
-    />
+// Types for joined data
+export type JoinedTask = Database["public"]["Tables"]["tasks"]["Row"] & {
     profiles: Database["public"]["Tables"]["profiles"]["Row"] | null
-objectives: Database["public"]["Tables"]["objectives"]["Row"] | null
+    objectives: Database["public"]["Tables"]["objectives"]["Row"] | null
 }
+
+
 
 export type GanttViewProps = {
     tasks: JoinedTask[]
@@ -240,6 +152,7 @@ export function GanttView({ tasks, objectives, profiles }: GanttViewProps) {
     const [viewMode, setViewMode] = useState<ViewMode>(ViewMode.Day)
     const [selectedObjectives, setSelectedObjectives] = useState<string[]>([])
     const [selectedMembers, setSelectedMembers] = useState<string[]>([])
+    const [sortBy, setSortBy] = useState<'start_date' | 'end_date'>('end_date')
 
     // Optimistic local state for task dates (prevents "bounce back")
     const [localDateOverrides, setLocalDateOverrides] = useState<Record<string, { start: Date, end: Date }>>({})
@@ -289,11 +202,18 @@ export function GanttView({ tasks, objectives, profiles }: GanttViewProps) {
 
     // Transform to Gantt Library Format (with optimistic overrides and assignee info)
     // SORTED BY DEADLINE (end_date) - tasks due sooner appear first
+    // Transform to Gantt Library Format (with optimistic overrides and assignee info)
+    // SORTED BY DEADLINE (end_date) - tasks due sooner appear first
     const ganttTasks: ExtendedGanttTask[] = useMemo(() => {
         return filteredTasks
             .slice(0, 50)
-            // Sort by deadline (end_date) - soonest first
             .sort((a, b) => {
+                if (sortBy === 'start_date') {
+                    const aStart = a.start_date ? new Date(a.start_date).getTime() : Infinity
+                    const bStart = b.start_date ? new Date(b.start_date).getTime() : Infinity
+                    return aStart - bStart
+                }
+                // Default: Sort by deadline (end_date) - soonest first
                 const aEnd = a.end_date ? new Date(a.end_date).getTime() : Infinity
                 const bEnd = b.end_date ? new Date(b.end_date).getTime() : Infinity
                 return aEnd - bEnd
@@ -308,12 +228,18 @@ export function GanttView({ tasks, objectives, profiles }: GanttViewProps) {
                     endDate.setDate(startDate.getDate() + 1)
                 }
 
-                let color = "#6b7280" // Pending - gray
-                let progress = 0
-                if (task.status === "Accepted") { color = "#2563eb"; progress = 50 }
-                if (task.status === "Completed") { color = "#16a34a"; progress = 100 }
-                if (task.status === "Rejected") { color = "#dc2626"; progress = 0 }
-                if (task.status === "Amended" || task.status === "Amended_Pending_Approval") { color = "#ea580c"; progress = 25 }
+                let color = "#6b7280" // Pending
+                let progress = task.progress ?? 0
+
+                if (task.status === "Accepted") { color = "#2563eb"; }
+                if (task.status === "Completed") { color = "#16a34a"; progress = 100; }
+                if (task.status === "Rejected") { color = "#dc2626"; }
+                if (task.status === "Amended" || task.status === "Amended_Pending_Approval") { color = "#ea580c"; }
+
+                // Ensure completed tasks show 100% implicitly if not set otherwise
+                if (task.status === 'Completed' && Math.round(progress) < 100) {
+                    progress = 100
+                }
 
                 return {
                     start: startDate,
@@ -333,7 +259,24 @@ export function GanttView({ tasks, objectives, profiles }: GanttViewProps) {
                     assigneeRole: task.profiles?.role
                 }
             })
-    }, [filteredTasks, localDateOverrides])
+    }, [filteredTasks, localDateOverrides, sortBy])
+
+    // Handler: When task progress is changed (dragged)
+    const handleProgressChange = async (task: GanttTask) => {
+        try {
+            const result = await updateTaskProgress(task.id, task.progress)
+
+            if (result.error) {
+                toast.error(result.error)
+                router.refresh()
+            } else {
+                router.refresh()
+            }
+        } catch {
+            toast.error("Failed to update progress")
+            router.refresh()
+        }
+    }
 
     // Handler: When task bar is dragged or resized
     const handleDateChange = async (task: GanttTask) => {
@@ -418,63 +361,76 @@ export function GanttView({ tasks, objectives, profiles }: GanttViewProps) {
                     />
                 </div>
 
-                <div className="flex gap-1 bg-slate-100 p-1 rounded-lg border border-slate-200">
-                    <Button
-                        variant={viewMode === ViewMode.Day ? "default" : "ghost"}
-                        size="sm"
-                        onClick={() => setViewMode(ViewMode.Day)}
-                        className={viewMode === ViewMode.Day ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-900"}
-                    >
-                        Day
-                    </Button>
-                    <Button
-                        variant={viewMode === ViewMode.Week ? "default" : "ghost"}
-                        size="sm"
-                        onClick={() => setViewMode(ViewMode.Week)}
-                        className={viewMode === ViewMode.Week ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-900"}
-                    >
-                        Week
-                    </Button>
-                    <Button
-                        variant={viewMode === ViewMode.Month ? "default" : "ghost"}
-                        size="sm"
-                        onClick={() => setViewMode(ViewMode.Month)}
-                        className={viewMode === ViewMode.Month ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-900"}
-                    >
-                        Month
-                    </Button>
-                </div>
-
-                {/* Date Navigation */}
                 <div className="flex items-center gap-2">
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => navigateDate('prev')}
-                        className="h-8 w-8 p-0"
-                        title="Previous"
-                    >
-                        <ChevronLeft className="h-4 w-4" />
-                    </Button>
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={goToToday}
-                        className="h-8 px-3 text-xs"
-                        title="Go to today"
-                    >
-                        <CalendarDays className="h-3 w-3 mr-1" />
-                        Today
-                    </Button>
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => navigateDate('next')}
-                        className="h-8 w-8 p-0"
-                        title="Next"
-                    >
-                        <ChevronRight className="h-4 w-4" />
-                    </Button>
+                    <Select value={sortBy} onValueChange={(v) => setSortBy(v as 'start_date' | 'end_date')}>
+                        <SelectTrigger className="w-[140px] h-8 text-xs">
+                            <ArrowUpDown className="w-3 h-3 mr-2 text-slate-400" />
+                            <SelectValue placeholder="Sort by" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="end_date">Deadline</SelectItem>
+                            <SelectItem value="start_date">Start Date</SelectItem>
+                        </SelectContent>
+                    </Select>
+
+                    <div className="flex gap-1 bg-slate-100 p-1 rounded-lg border border-slate-200">
+                        <Button
+                            variant={viewMode === ViewMode.Day ? "default" : "ghost"}
+                            size="sm"
+                            onClick={() => setViewMode(ViewMode.Day)}
+                            className={viewMode === ViewMode.Day ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-900"}
+                        >
+                            Day
+                        </Button>
+                        <Button
+                            variant={viewMode === ViewMode.Week ? "default" : "ghost"}
+                            size="sm"
+                            onClick={() => setViewMode(ViewMode.Week)}
+                            className={viewMode === ViewMode.Week ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-900"}
+                        >
+                            Week
+                        </Button>
+                        <Button
+                            variant={viewMode === ViewMode.Month ? "default" : "ghost"}
+                            size="sm"
+                            onClick={() => setViewMode(ViewMode.Month)}
+                            className={viewMode === ViewMode.Month ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-900"}
+                        >
+                            Month
+                        </Button>
+                    </div>
+
+                    {/* Date Navigation */}
+                    <div className="flex items-center gap-2">
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => navigateDate('prev')}
+                            className="h-8 w-8 p-0"
+                            title="Previous"
+                        >
+                            <ChevronLeft className="h-4 w-4" />
+                        </Button>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={goToToday}
+                            className="h-8 px-3 text-xs"
+                            title="Go to today"
+                        >
+                            <CalendarDays className="h-3 w-3 mr-1" />
+                            Today
+                        </Button>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => navigateDate('next')}
+                            className="h-8 w-8 p-0"
+                            title="Next"
+                        >
+                            <ChevronRight className="h-4 w-4" />
+                        </Button>
+                    </div>
                 </div>
             </Card>
 
@@ -493,6 +449,7 @@ export function GanttView({ tasks, objectives, profiles }: GanttViewProps) {
                         columnWidth={viewMode === ViewMode.Month ? 300 : viewMode === ViewMode.Week ? 150 : 65}
                         barFill={60}
                         onDateChange={handleDateChange}
+                        onProgressChange={handleProgressChange}
                         onDoubleClick={handleDoubleClick}
                         onClick={handleClick}
                         TaskListHeader={CustomTaskListHeader}
