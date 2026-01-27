@@ -31,40 +31,47 @@ export function NotificationCenter() {
     
     // Fetch initial notifications and set up subscription
     const setupNotifications = async () => {
-      // Get current user
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
-      
-      // Fetch initial notifications
-      const { data } = await supabase
-        .from('notifications')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
-        .limit(20)
-      
-      if (data) {
-        setNotifications(data)
-        setUnreadCount(data.filter(n => !n.is_read).length)
+      try {
+        // Get current user
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) return
+        
+        // Fetch initial notifications
+        // TODO: notifications table not yet created in database
+        // This will be enabled once the notifications table is added
+        /* const { data } = await supabase
+          .from('notifications')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false })
+          .limit(20)
+        
+        if (data) {
+          setNotifications(data)
+          setUnreadCount(data.filter(n => !n.is_read).length)
+        }
+        
+        // Subscribe to new notifications for this user
+        channel = supabase
+          .channel(`notifications:${user.id}`)
+          .on(
+            'postgres_changes',
+            { 
+              event: 'INSERT', 
+              schema: 'public', 
+              table: 'notifications',
+              filter: `user_id=eq.${user.id}`
+            },
+            (payload) => {
+              setNotifications(prev => [payload.new as Notification, ...prev])
+              setUnreadCount(prev => prev + 1)
+            }
+          )
+          .subscribe() */
+      } catch (error) {
+        // Silently fail if notifications table doesn't exist yet
+        console.debug('Notifications not yet available:', error)
       }
-      
-      // Subscribe to new notifications for this user
-      channel = supabase
-        .channel(`notifications:${user.id}`)
-        .on(
-          'postgres_changes',
-          { 
-            event: 'INSERT', 
-            schema: 'public', 
-            table: 'notifications',
-            filter: `user_id=eq.${user.id}`
-          },
-          (payload) => {
-            setNotifications(prev => [payload.new as Notification, ...prev])
-            setUnreadCount(prev => prev + 1)
-          }
-        )
-        .subscribe()
     }
     
     setupNotifications()
@@ -77,27 +84,37 @@ export function NotificationCenter() {
   }, [])
 
   const markAsRead = async (id: string) => {
-    const supabase = createClient()
-    await supabase
-      .from('notifications')
-      .update({ is_read: true })
-      .eq('id', id)
-    
-    setNotifications(prev =>
-      prev.map(n => n.id === id ? { ...n, is_read: true } : n)
-    )
-    setUnreadCount(prev => Math.max(0, prev - 1))
+    try {
+      const supabase = createClient()
+      // TODO: Enable when notifications table is created
+      /* await supabase
+        .from('notifications')
+        .update({ is_read: true })
+        .eq('id', id) */
+      
+      setNotifications(prev =>
+        prev.map(n => n.id === id ? { ...n, is_read: true } : n)
+      )
+      setUnreadCount(prev => Math.max(0, prev - 1))
+    } catch (error) {
+      console.debug('Notifications not yet available:', error)
+    }
   }
 
   const markAllAsRead = async () => {
-    const supabase = createClient()
-    await supabase
-      .from('notifications')
-      .update({ is_read: true })
-      .eq('is_read', false)
-    
-    setNotifications(prev => prev.map(n => ({ ...n, is_read: true })))
-    setUnreadCount(0)
+    try {
+      const supabase = createClient()
+      // TODO: Enable when notifications table is created
+      /* await supabase
+        .from('notifications')
+        .update({ is_read: true })
+        .eq('is_read', false) */
+      
+      setNotifications(prev => prev.map(n => ({ ...n, is_read: true })))
+      setUnreadCount(0)
+    } catch (error) {
+      console.debug('Notifications not yet available:', error)
+    }
   }
 
   const getIcon = (type: string) => {
