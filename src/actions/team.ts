@@ -248,6 +248,62 @@ export async function removeTeamMember(teamId: string, profileId: string) {
     return { success: true }
 }
 
+export async function deleteMember(memberId: string) {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return { error: 'Unauthorized' }
+
+    // 1. Get current user's profile ID to take ownership
+    const { data: currentProfile } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('id', user.id)
+        .single()
+
+    if (!currentProfile) return { error: 'Current user profile not found' }
+
+    // 2. Reassign Objectives created by the member
+    const { error: objError } = await supabase
+        .from('objectives')
+        .update({ creator_id: currentProfile.id })
+        .eq('creator_id', memberId)
+
+    if (objError) return { error: `Failed to reassign objectives: ${objError.message}` }
+
+    // 3. Reassign Tasks created by the member
+    const { error: taskError } = await supabase
+        .from('tasks')
+        .update({ creator_id: currentProfile.id })
+        .eq('creator_id', memberId)
+
+    if (taskError) return { error: `Failed to reassign tasks: ${taskError.message}` }
+
+    // 4. Unassign Tasks assigned TO the member
+    const { error: unassignError } = await supabase
+        .from('tasks')
+        .update({ assignee_id: null })
+        .eq('assignee_id', memberId)
+
+    if (unassignError) return { error: `Failed to unassign tasks: ${unassignError.message}` }
+
+    // 5. Delete from team_members (Manual cleanup if cascade missing)
+    await supabase.from('team_members').delete().eq('profile_id', memberId)
+
+    // 6. Delete from task_assignees (Manual cleanup if cascade missing)
+    await supabase.from('task_assignees').delete().eq('profile_id', memberId)
+
+    // 7. Finally, delete the profile
+    const { error: deleteError } = await supabase
+        .from('profiles')
+        .delete()
+        .eq('id', memberId)
+
+    if (deleteError) return { error: `Failed to delete profile: ${deleteError.message}` }
+
+    revalidatePath('/team')
+    return { success: true }
+}
+
 export async function deleteTeam(teamId: string) {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()

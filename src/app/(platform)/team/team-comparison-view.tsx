@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
 import { Check, X, GitCompare, Users, MoreHorizontal, Pencil, Trash2, Loader2, AlertTriangle } from "lucide-react"
-import { createTeam, addTeamMember } from "@/actions/team"
+import { createTeam, addTeamMember, deleteMember } from "@/actions/team"
 import { deleteTeam, updateTeamName } from "@/actions/teams"
 import Link from "next/link"
 import { CreateTeamDialog } from "./create-team-dialog"
@@ -88,6 +88,7 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
     // Edit/Delete Team State
     const [teamToEdit, setTeamToEdit] = useState<{ id: string, name: string } | null>(null)
     const [teamToDelete, setTeamToDelete] = useState<string | null>(null)
+    const [memberToDelete, setMemberToDelete] = useState<string | null>(null)
     const [newName, setNewName] = useState("")
 
     const allMembers = [...executives, ...apprentices]
@@ -214,6 +215,19 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                 setTeamToDelete(null)
             } catch (error) {
                 console.error(error)
+            }
+        })
+    }
+
+    const handleDeleteMember = async () => {
+        if (!memberToDelete) return
+
+        startTransition(async () => {
+            const res = await deleteMember(memberToDelete)
+            if (res?.error) toast.error(res.error)
+            else {
+                toast.success("Member removed")
+                setMemberToDelete(null)
             }
         })
     }
@@ -351,15 +365,42 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                     </div>
 
                     <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                            <CardTitle className="text-lg text-slate-900 truncate">
-                                {member.full_name}
-                            </CardTitle>
-                            {isCentaur && (
-                                <Badge variant="secondary" className="text-[10px] bg-amber-100 text-amber-700 h-5 px-1.5 border-amber-200">
-                                    Centaur
-                                </Badge>
-                            )}
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                <CardTitle className="text-lg text-slate-900 truncate">
+                                    {member.full_name}
+                                </CardTitle>
+                                {isCentaur && (
+                                    <Badge variant="secondary" className="text-[10px] bg-amber-100 text-amber-700 h-5 px-1.5 border-amber-200">
+                                        Centaur
+                                    </Badge>
+                                )}
+                            </div>
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <Button
+                                        variant="ghost"
+                                        className="h-6 w-6 p-0 text-slate-400 hover:text-slate-600 opacity-0 group-hover:opacity-100 transition-opacity"
+                                        onClick={(e) => {
+                                            e.preventDefault()
+                                            e.stopPropagation()
+                                        }}
+                                    >
+                                        <MoreHorizontal className="h-4 w-4" />
+                                    </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                    <DropdownMenuItem
+                                        className="text-red-600 focus:text-red-600 focus:bg-red-50"
+                                        onClick={(e) => {
+                                            e.stopPropagation()
+                                            setMemberToDelete(member.id)
+                                        }}
+                                    >
+                                        <Trash2 className="mr-2 h-4 w-4" /> Delete Person
+                                    </DropdownMenuItem>
+                                </DropdownMenuContent>
+                            </DropdownMenu>
                         </div>
                         <div className="flex items-center gap-2 mt-1">
                             <Badge variant="outline" className={`text-[10px] ${badgeClass}`}>
@@ -372,6 +413,7 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                                         aria-label="Unpair Centaur"
                                         onClick={(e) => {
                                             e.preventDefault()
+                                            e.stopPropagation()
                                             startTransition(async () => {
                                                 await unpairCentaur(member.id)
                                                 toast.success("Centaur unpaired")
@@ -470,7 +512,7 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
             {founders.length > 0 && (
                 <section className="space-y-4">
                     <h2 className="text-xl font-semibold text-purple-600 uppercase tracking-wider border-b border-slate-200 pb-2">
-                        Founders (Visionaries)
+                        Founders (Decide)
                     </h2>
                     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                         {founders.map(member => (
@@ -483,7 +525,7 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
             {/* Executives Section */}
             <section className="space-y-4">
                 <h2 className="text-xl font-semibold text-amber-600 uppercase tracking-wider border-b border-slate-200 pb-2">
-                    Executives (Assessors)
+                    Executives (Evaluate)
                 </h2>
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                     {executives.map(member => (
@@ -498,7 +540,7 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
             {/* Apprentices Section */}
             <section className="space-y-4">
                 <h2 className="text-xl font-semibold text-blue-600 uppercase tracking-wider border-b border-slate-200 pb-2">
-                    Apprentices (Executors)
+                    Apprentices (Do)
                 </h2>
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                     {apprentices.map(member => (
@@ -801,24 +843,45 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                             <AlertTriangle className="h-5 w-5" />
                             Delete Team?
                         </AlertDialogTitle>
-                        <AlertDialogDescription className="text-slate-500">
-                            This will permanently remove this team. This action cannot be undone.
-                            Members will remain in the User Roster.
+                        <AlertDialogDescription>
+                            This will permanently delete this team. This action cannot be undone.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
-                        <AlertDialogCancel className="bg-slate-100 hover:bg-slate-200 text-slate-900">Cancel</AlertDialogCancel>
-                        <AlertDialogAction
-                            onClick={handleDeleteTeam}
-                            disabled={isPending}
-                            className="bg-red-600 hover:bg-red-700 text-white"
-                        >
-                            {isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <><Trash2 className="h-4 w-4 mr-2" /> Delete Team</>}
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleDeleteTeam} className="bg-red-600 hover:bg-red-700 focus:ring-red-600">
+                            Delete Team
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
-        </div>
+
+            {/* Member Delete/Archive Confirmation */}
+            <AlertDialog open={!!memberToDelete} onOpenChange={(open) => !open && setMemberToDelete(null)}>
+                <AlertDialogContent className="bg-white text-slate-900 border-slate-200">
+                    <AlertDialogHeader>
+                        <AlertDialogTitle className="flex items-center gap-2 text-red-600">
+                            <AlertTriangle className="h-5 w-5" />
+                            Remove Person?
+                        </AlertDialogTitle>
+                        <AlertDialogDescription>
+                            This will remove the person from the roster.
+                            <br /><br />
+                            <strong>Ownership Transfer:</strong> Any Tasks or Objectives created by this person will be reassigned to you.
+                            <br />
+                            <strong>Unassignment:</strong> Any Tasks assigned to them will become unassigned.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleDeleteMember} className="bg-red-600 hover:bg-red-700 focus:ring-red-600">
+                            Remove Person
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+
+        </div >
     )
 }
 
