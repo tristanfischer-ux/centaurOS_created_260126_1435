@@ -1,14 +1,14 @@
 "use client"
 
 import {
-    Drawer,
-    DrawerContent,
-    DrawerHeader,
-    DrawerTitle,
-    DrawerDescription,
-    DrawerFooter,
-    DrawerClose,
-} from "@/components/ui/drawer"
+    Sheet,
+    SheetContent,
+    SheetHeader,
+    SheetTitle,
+    SheetDescription,
+    SheetFooter,
+    SheetClose,
+} from "@/components/ui/sheet"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -104,69 +104,67 @@ export function HistoryDrawer({ open, onOpenChange, taskId, taskTitle }: History
     }
 
     return (
-        <Drawer open={open} onOpenChange={onOpenChange} direction="right">
-            <DrawerContent className="h-full right-0 left-auto mt-0 w-[400px] rounded-none">
-                <div className="mx-auto w-full max-w-2xl flex flex-col h-full">
-                    <DrawerHeader>
-                        <DrawerTitle className="flex items-center gap-2">
-                            <History className="w-5 h-5 text-slate-500" />
-                            History: {taskTitle}
-                        </DrawerTitle>
-                        <DrawerDescription>Audit log of all actions performed on this task.</DrawerDescription>
-                    </DrawerHeader>
+        <Sheet open={open} onOpenChange={onOpenChange}>
+            <SheetContent className="w-[400px] sm:w-[540px] flex flex-col p-0">
+                <SheetHeader className="p-6 border-b">
+                    <SheetTitle className="flex items-center gap-2">
+                        <History className="w-5 h-5 text-slate-500" />
+                        History: {taskTitle}
+                    </SheetTitle>
+                    <SheetDescription>Audit log of all actions performed on this task.</SheetDescription>
+                </SheetHeader>
 
-                    <ScrollArea className="flex-1 px-4 overflow-y-auto">
-                        {loading ? (
-                            <div className="flex justify-center py-8"><Loader2 className="animate-spin h-6 w-6 text-slate-400" /></div>
-                        ) : history.length === 0 ? (
-                            <div className="text-center py-8 text-slate-400 text-sm">No history recorded yet.</div>
-                        ) : (
-                            <div className="relative border-l border-slate-200 ml-4 my-4 space-y-8">
-                                {history.map((item) => (
-                                    <div key={item.id} className="relative pl-6">
-                                        {/* Dot on timeline */}
-                                        <div className="absolute -left-[5px] top-1.5 h-2.5 w-2.5 rounded-full bg-slate-300 border-2 border-white ring-1 ring-slate-100" />
+                <ScrollArea className="flex-1 px-6">
+                    {loading ? (
+                        <div className="flex justify-center py-8"><Loader2 className="animate-spin h-6 w-6 text-slate-400" /></div>
+                    ) : history.length === 0 ? (
+                        <div className="text-center py-8 text-slate-400 text-sm">No history recorded yet.</div>
+                    ) : (
+                        <div className="relative border-l border-slate-200 ml-2 my-6 space-y-8">
+                            {history.map((item) => (
+                                <div key={item.id} className="relative pl-6">
+                                    {/* Dot on timeline */}
+                                    <div className="absolute -left-[5px] top-1.5 h-2.5 w-2.5 rounded-full bg-slate-300 border-2 border-white ring-1 ring-slate-100" />
 
-                                        <div className="flex flex-col gap-1">
-                                            <div className="flex items-center gap-2 justify-between">
-                                                <div className="flex items-center gap-2">
-                                                    <span className="text-xs font-mono text-slate-400">
-                                                        {item.created_at && format(new Date(item.created_at), 'MMM d, HH:mm')}
-                                                    </span>
-                                                    {getActionBadges(item)}
-                                                </div>
-                                            </div>
-
-                                            <div className="flex items-center gap-2 mt-1">
-                                                <Avatar className="h-5 w-5 border border-slate-100">
-                                                    <AvatarImage src={`https://avatar.vercel.sh/${item.user?.email || 'user'}`} />
-                                                    <AvatarFallback className="text-[9px]">{item.user?.full_name?.substring(0, 2) || "??"}</AvatarFallback>
-                                                </Avatar>
-                                                <span className="text-sm font-medium text-slate-900">
-                                                    {item.user?.full_name || 'Unknown User'}
+                                    <div className="flex flex-col gap-1">
+                                        <div className="flex items-center gap-2 justify-between">
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-xs font-mono text-slate-400">
+                                                    {item.created_at && format(new Date(item.created_at), 'MMM d, HH:mm')}
                                                 </span>
-                                            </div>
-
-                                            <div className="bg-slate-50 rounded-md p-2 mt-1 border border-slate-100 text-sm">
-                                                {renderChanges(item.changes)}
-                                                {/* Handle specifics for better readability */}
-                                                {item.action_type === 'CREATED' && <div className="text-xs text-slate-500">Task created.</div>}
-                                                {item.action_type === 'COMPLETED' && <div className="text-xs text-slate-700 font-medium">Task marked as complete.</div>}
+                                                {getActionBadges(item)}
                                             </div>
                                         </div>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                    </ScrollArea>
 
-                    <DrawerFooter>
-                        <DrawerClose asChild>
-                            <Button variant="outline">Close</Button>
-                        </DrawerClose>
-                    </DrawerFooter>
-                </div>
-            </DrawerContent>
-        </Drawer>
+                                        <div className="flex items-center gap-2 mt-1">
+                                            <Avatar className="h-5 w-5 border border-slate-100">
+                                                <AvatarImage src={`https://avatar.vercel.sh/${item.user?.email || 'user'}`} />
+                                                <AvatarFallback className="text-[9px]">{item.user?.full_name?.substring(0, 2) || "??"}</AvatarFallback>
+                                            </Avatar>
+                                            <span className="text-sm font-medium text-slate-900">
+                                                {item.user?.full_name || 'Unknown User'}
+                                            </span>
+                                        </div>
+
+                                        <div className="bg-slate-50 rounded-md p-2 mt-1 border border-slate-100 text-sm">
+                                            {renderChanges(item.changes)}
+                                            {/* Handle specifics for better readability */}
+                                            {item.action_type === 'CREATED' && <div className="text-xs text-slate-500">Task created.</div>}
+                                            {item.action_type === 'COMPLETED' && <div className="text-xs text-slate-700 font-medium">Task marked as complete.</div>}
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </ScrollArea>
+
+                <SheetFooter className="p-6 border-t mt-auto">
+                    <SheetClose asChild>
+                        <Button variant="outline">Close</Button>
+                    </SheetClose>
+                </SheetFooter>
+            </SheetContent>
+        </Sheet>
     )
 }
