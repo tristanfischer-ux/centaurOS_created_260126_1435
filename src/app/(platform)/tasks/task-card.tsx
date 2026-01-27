@@ -347,12 +347,12 @@ export function TaskCard(props: TaskCardProps) {
                                         </div>
                                     </div>
                                 </PopoverTrigger>
-                                <PopoverContent className="w-[200px] p-0" align="end" onClick={(e) => e.stopPropagation()}>
+                                <PopoverContent className="w-[240px] p-0" align="end" onClick={(e) => e.stopPropagation()}>
                                     <Command>
-                                        <CommandInput placeholder="Assign to..." className="h-9" />
+                                        <CommandInput placeholder="Assign to member..." className="h-9" />
                                         <CommandList>
                                             <CommandEmpty>No members found.</CommandEmpty>
-                                            <CommandGroup heading="Select Assignees">
+                                            <CommandGroup>
                                                 {sortedMembers.map((member) => {
                                                     const isSelected = currentAssignees.some(a => a.id === member.id)
                                                     return (
@@ -395,12 +395,12 @@ export function TaskCard(props: TaskCardProps) {
                                 </span>
                             </div>
                         </PopoverTrigger>
-                        <PopoverContent className="w-[200px] p-0" align="start" onClick={(e) => e.stopPropagation()}>
+                        <PopoverContent className="w-[240px] p-0" align="start" onClick={(e) => e.stopPropagation()}>
                             <Command>
-                                <CommandInput placeholder="Assign to..." className="h-9" />
+                                <CommandInput placeholder="Assign to member..." className="h-9" />
                                 <CommandList>
                                     <CommandEmpty>No members found.</CommandEmpty>
-                                    <CommandGroup heading="Select Assignees">
+                                    <CommandGroup>
                                         {sortedMembers.map((member) => {
                                             const isSelected = currentAssignees.some(a => a.id === member.id)
                                             return (

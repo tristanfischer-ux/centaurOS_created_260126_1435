@@ -113,3 +113,36 @@ export async function submitRFQ(formData: {
     revalidatePath("/marketplace")
     return { success: true }
 }
+
+export interface MarketplaceListing {
+    id: string
+    category: 'People' | 'Products' | 'Services' | 'AI'
+    subcategory: string
+    title: string
+    description: string
+    attributes: Record<string, any>
+    image_url: string | null
+    is_verified: boolean
+}
+
+export async function getMarketplaceListings(category?: string) {
+    const supabase = await createClient()
+
+    let query = supabase
+        .from('marketplace_listings' as any)
+        .select('*')
+        .order('is_verified', { ascending: false })
+
+    if (category) {
+        query = query.eq('category', category)
+    }
+
+    const { data, error } = await query
+
+    if (error) {
+        console.error('Marketplace Fetch Error:', error)
+        return []
+    }
+
+    return data as any as MarketplaceListing[]
+}

@@ -85,6 +85,8 @@ export async function createObjective(formData: FormData) {
                         assignee_id: task.role === 'AI_Agent' ? aiAgentId : null,
                         start_date: now.toISOString(),
                         end_date: nextWeek.toISOString(),
+                        risk_level: 'Low' as const,
+                        client_visible: true
                     }
                 })
             ]
@@ -113,6 +115,8 @@ export async function createObjective(formData: FormData) {
                 foundry_id: profile.foundry_id,
                 status: 'Pending' as const,
                 assignee_id: task.role === 'AI_Agent' ? aiAgentId : null,
+                risk_level: 'Low' as const,
+                client_visible: true
             }))
         ]
     }

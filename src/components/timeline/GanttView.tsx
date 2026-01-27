@@ -9,7 +9,7 @@ import { MultiSelect } from "@/components/ui/multi-select"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { ChevronLeft, ChevronRight, CalendarDays, ArrowUpDown } from "lucide-react"
-import { updateTaskDates, updateTaskProgress } from "@/actions/tasks"
+import { updateTaskDates } from "@/actions/tasks"
 import {
     Select,
     SelectContent,
@@ -301,22 +301,6 @@ export function GanttView({ tasks, objectives, profiles }: GanttViewProps) {
 
     }, [filteredTasks, localDateOverrides, sortBy])
 
-    // Handler: When task progress is changed (dragged)
-    const handleProgressChange = async (task: GanttTask) => {
-        try {
-            const result = await updateTaskProgress(task.id, task.progress)
-
-            if (result.error) {
-                toast.error(result.error)
-                router.refresh()
-            } else {
-                router.refresh()
-            }
-        } catch {
-            toast.error("Failed to update progress")
-            router.refresh()
-        }
-    }
 
     // Handler: When task bar is dragged or resized
     const handleDateChange = async (task: GanttTask) => {

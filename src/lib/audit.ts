@@ -6,6 +6,7 @@ export async function logTaskHistory(
     taskId: string,
     actionType: AuditActionType,
     userId: string,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     changes: Record<string, any> = {}
 ) {
     const supabase = await createClient()

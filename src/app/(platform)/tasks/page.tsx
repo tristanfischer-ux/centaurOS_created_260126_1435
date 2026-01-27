@@ -16,6 +16,7 @@ export default async function TasksPage() {
             assignee:profiles!assignee_id(id, full_name, role, email),
             creator:profiles!creator_id(id, full_name, role),
             objective:objectives!objective_id(id, title),
+            task_files(id),
             task_assignees(
                 profile:profiles(id, full_name, role, email)
             )

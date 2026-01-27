@@ -277,7 +277,7 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
 
                             <Select
                                 value={sortBy}
-                                onValueChange={(val) => setSortBy(val as any)}
+                                onValueChange={(val) => setSortBy(val as 'due_date_asc' | 'due_date_desc' | 'created_desc')}
                             >
                                 <SelectTrigger className="h-8 w-[160px] text-xs bg-slate-50 border-slate-200">
                                     <SelectValue placeholder="Sort by" />

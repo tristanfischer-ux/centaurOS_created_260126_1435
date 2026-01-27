@@ -79,6 +79,7 @@ export function HistoryDrawer({ open, onOpenChange, taskId, taskTitle }: History
     const renderChanges = (changes: unknown) => {
         if (!changes || typeof changes !== 'object' || Object.keys(changes).length === 0) return null
 
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const changeObj = changes as Record<string, any>
 
         return (
