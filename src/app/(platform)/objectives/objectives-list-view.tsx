@@ -221,7 +221,7 @@ export function ObjectivesListView({ objectives }: ObjectivesListViewProps) {
 
                                                         {task.end_date && (
                                                             <span className="text-xs text-slate-400">
-                                                                {new Date(task.end_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                                                                Due {new Date(task.end_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                                                             </span>
                                                         )}
                                                     </div>

@@ -3,17 +3,40 @@
 import { useState, useMemo } from "react"
 import { Database } from "@/types/database.types"
 import { Badge } from "@/components/ui/badge"
-import { Calendar, Clock, ChevronRight, ChevronDown, Target } from "lucide-react"
+import { Calendar, Clock, ChevronRight, ChevronDown, Target, Check, Plus, Calendar as CalendarIcon } from "lucide-react"
 import Link from "next/link"
+import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+} from "@/components/ui/popover"
+import {
+    Command,
+    CommandEmpty,
+    CommandGroup,
+    CommandInput,
+    CommandItem,
+    CommandList,
+} from "@/components/ui/command"
+import { Calendar as CalendarComponent } from "@/components/ui/calendar"
+import { updateTaskAssignees, updateTaskDates } from "@/actions/tasks"
+import { toast } from "sonner"
+import { format } from "date-fns"
+import { format } from "date-fns"
 
 // Types for joined data
 type JoinedTask = Database["public"]["Tables"]["tasks"]["Row"] & {
     profiles: Database["public"]["Tables"]["profiles"]["Row"] | null
     objectives: Database["public"]["Tables"]["objectives"]["Row"] | null
+    // Assignees support
+    assignees?: { id: string, full_name: string | null, role: string, email: string, avatar_url?: string | null }[]
+    assignee?: { id: string, full_name: string | null, role: string, email: string, avatar_url?: string | null } | null
 }
 
 interface TimelineListViewProps {
     tasks: JoinedTask[]
+    members: { id: string, full_name: string, role: string }[]
+    currentUserId: string
 }
 
 // Get initials from full name
@@ -195,14 +218,20 @@ function MiniTimelineBar({ task, windowStart, windowEnd }: {
     )
 }
 
-export function TimelineListView({ tasks }: TimelineListViewProps) {
+export function TimelineListView({ tasks, members, currentUserId }: TimelineListViewProps) {
     const [expandedDate, setExpandedDate] = useState<string | null>(null)
     const [collapsedTasks, setCollapsedTasks] = useState<Set<string>>(new Set())
 
+    // Sorted members for picker
+    const sortedMembers = useMemo(() =>
+        [...members].sort((a, b) => a.full_name.localeCompare(b.full_name)),
+        [members])
+
     // Toggle individual task collapse/expand
     const toggleTaskCollapse = (taskId: string, e: React.MouseEvent) => {
-        e.preventDefault() // Prevent navigation
-        e.stopPropagation()
+        // Only toggle if clicking the container or chevron, not interactive elements
+        // This is handled by stopPropagation on interactive elements
+        e.preventDefault()
         setCollapsedTasks(prev => {
             const newSet = new Set(prev)
             if (newSet.has(taskId)) {
@@ -249,7 +278,47 @@ export function TimelineListView({ tasks }: TimelineListViewProps) {
             current.setDate(current.getDate() + 1)
         }
         return markers
-    }, [])
+    }, []) // Dependency array empty as windowStart/End are derived from 'now' which is effectively constant for render pass
+
+    // Handlers
+    const handleAssigneeToggle = async (taskId: string, currentAssignees: { id: string }[], memberId: string) => {
+        const currentIds = currentAssignees.map(a => a.id)
+        let newIds: string[]
+
+        if (currentIds.includes(memberId)) {
+            // Remove
+            newIds = currentIds.filter(id => id !== memberId)
+            if (newIds.length === 0) {
+                toast.error("Task must have at least one assignee")
+                return
+            }
+        } else {
+            // Add
+            newIds = [...currentIds, memberId]
+        }
+
+        const result = await updateTaskAssignees(taskId, newIds)
+        if (result.error) {
+            toast.error(result.error)
+        } else {
+            toast.success("Assignees updated")
+        }
+    }
+
+    const handleDateUpdate = async (taskId: string, currentStart: string | null, currentEnd: string | null, type: 'start' | 'end', date: Date | undefined) => {
+        if (!date) return
+        const newDateStr = date.toISOString()
+        const start = currentStart || new Date().toISOString()
+        const end = currentEnd || new Date().toISOString()
+
+        if (type === 'start') {
+            await updateTaskDates(taskId, newDateStr, end)
+        } else {
+            await updateTaskDates(taskId, start, newDateStr)
+        }
+        toast.success("Date updated")
+    }
+
 
     if (tasks.length === 0) {
         return (
@@ -260,9 +329,9 @@ export function TimelineListView({ tasks }: TimelineListViewProps) {
     }
 
     return (
-        <div className="space-y-3">
+        <div className="space-y-3 pb-20"> {/* Add padding bottom for safe mobile scrolling */}
             {/* Timeline Header */}
-            <div className="bg-white rounded-xl border border-slate-200 p-3">
+            <div className="bg-white rounded-xl border border-slate-200 p-3 sticky top-0 z-30 shadow-sm">
                 <div className="flex items-center gap-2 mb-2">
                     <Calendar className="h-4 w-4 text-amber-500" />
                     <span className="text-xs font-medium text-slate-600">2 Week Timeline</span>
@@ -318,22 +387,82 @@ export function TimelineListView({ tasks }: TimelineListViewProps) {
                             <div className="border-t border-slate-100">
                                 {dateTasks.map((task, idx) => {
                                     const isTaskCollapsed = collapsedTasks.has(task.id)
+                                    // Normalize assignees
+                                    const currentAssignees = task.assignees && task.assignees.length > 0
+                                        ? task.assignees
+                                        : (task.assignee ? [task.assignee] : [])
+
+                                    const isAssignee = currentAssignees.some(a => a.id === currentUserId)
+                                    const isCreator = task.creator_id === currentUserId
+                                    const canEdit = isAssignee || isCreator
+
                                     return (
                                         <div
                                             key={task.id}
                                             className={`${idx !== dateTasks.length - 1 ? 'border-b border-slate-50' : ''}`}
                                         >
-                                            {/* Task Header - Always Visible, Clickable to Collapse */}
+                                            {/* Task Header - Always Visible */}
                                             <div
                                                 className="p-4 hover:bg-slate-50 transition-colors cursor-pointer flex items-start gap-3"
                                                 onClick={(e) => toggleTaskCollapse(task.id, e)}
                                             >
-                                                {/* Avatar */}
-                                                <InitialsAvatar
-                                                    name={task.profiles?.full_name}
-                                                    size="md"
-                                                    isAI={task.profiles?.role === 'AI_Agent'}
-                                                />
+                                                {/* Interactive Avatar Picker (Stop Propagation) */}
+                                                <div onClick={(e) => e.stopPropagation()}>
+                                                    <Popover>
+                                                        <PopoverTrigger asChild>
+                                                            <div className="relative group cursor-pointer">
+                                                                <div className="flex -space-x-2">
+                                                                    {currentAssignees.length > 0 ? (
+                                                                        currentAssignees.slice(0, 3).map((assignee, i) => (
+                                                                            <div key={assignee.id} className="relative" style={{ zIndex: 10 - i }}>
+                                                                                <InitialsAvatar
+                                                                                    name={assignee.full_name}
+                                                                                    size="md"
+                                                                                    isAI={assignee.role === 'AI_Agent'}
+                                                                                />
+                                                                            </div>
+                                                                        ))
+                                                                    ) : (
+                                                                        <div className="h-8 w-8 rounded-full bg-slate-100 border border-slate-200 border-dashed flex items-center justify-center text-slate-400">
+                                                                            <Plus className="w-4 h-4" />
+                                                                        </div>
+                                                                    )}
+                                                                    {currentAssignees.length > 3 && (
+                                                                        <div className="h-7 w-7 rounded-full bg-slate-100 border border-white flex items-center justify-center text-[10px] text-slate-500 font-medium z-0">
+                                                                            +{currentAssignees.length - 3}
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                        </PopoverTrigger>
+                                                        <PopoverContent className="w-[200px] p-0" align="start">
+                                                            <Command>
+                                                                <CommandInput placeholder="Assign..." className="h-9" />
+                                                                <CommandList>
+                                                                    <CommandEmpty>No members.</CommandEmpty>
+                                                                    <CommandGroup>
+                                                                        {sortedMembers.map((member) => {
+                                                                            const isSelected = currentAssignees.some(a => a.id === member.id)
+                                                                            return (
+                                                                                <CommandItem
+                                                                                    key={member.id}
+                                                                                    value={member.full_name}
+                                                                                    onSelect={() => handleAssigneeToggle(task.id, currentAssignees, member.id)}
+                                                                                >
+                                                                                    <div className="flex items-center gap-2 w-full">
+                                                                                        <InitialsAvatar name={member.full_name} size="sm" isAI={member.role === 'AI_Agent'} />
+                                                                                        <span className="truncate flex-1">{member.full_name}</span>
+                                                                                        {isSelected && <Check className="ml-auto h-4 w-4 text-blue-600" />}
+                                                                                    </div>
+                                                                                </CommandItem>
+                                                                            )
+                                                                        })}
+                                                                    </CommandGroup>
+                                                                </CommandList>
+                                                            </Command>
+                                                        </PopoverContent>
+                                                    </Popover>
+                                                </div>
 
                                                 {/* Task Info */}
                                                 <div className="flex-1 min-w-0">
@@ -349,12 +478,28 @@ export function TimelineListView({ tasks }: TimelineListViewProps) {
 
                                                     {/* Compact info when collapsed */}
                                                     <div className="flex items-center gap-3 mt-1 text-sm text-slate-500 flex-wrap">
-                                                        {task.profiles && (
-                                                            <span className="flex items-center gap-1">
-                                                                {task.profiles.full_name}
-                                                                {task.profiles.role === 'AI_Agent' && ' 🤖'}
-                                                            </span>
-                                                        )}
+                                                        {/* Interactive Date (End Date) - Stop Propagation */}
+                                                        <div onClick={(e) => e.stopPropagation()}>
+                                                            <Popover>
+                                                                <PopoverTrigger asChild>
+                                                                    <div className={`flex items-center gap-1 cursor-pointer hover:text-amber-600 transition-colors ${!task.end_date ? 'text-slate-300' : ''}`}>
+                                                                        <Clock className="h-3 w-3" />
+                                                                        {task.end_date
+                                                                            ? <span>Due {format(new Date(task.end_date), "MMM d")}</span>
+                                                                            : <span>No Due Date</span>
+                                                                        }
+                                                                    </div>
+                                                                </PopoverTrigger>
+                                                                <PopoverContent className="w-auto p-0" align="start">
+                                                                    <CalendarComponent
+                                                                        mode="single"
+                                                                        selected={task.end_date ? new Date(task.end_date) : undefined}
+                                                                        onSelect={(date) => handleDateUpdate(task.id, task.start_date, task.end_date, 'end', date)}
+                                                                        initialFocus
+                                                                    />
+                                                                </PopoverContent>
+                                                            </Popover>
+                                                        </div>
                                                     </div>
                                                 </div>
 
@@ -366,23 +511,40 @@ export function TimelineListView({ tasks }: TimelineListViewProps) {
                                             {!isTaskCollapsed && (
                                                 <div className="px-4 pb-4 -mt-2">
                                                     {/* Extra info */}
-                                                    <div className="ml-9 mb-2 text-sm text-slate-500 flex flex-wrap gap-3">
+                                                    <div className="ml-11 mb-2 text-sm text-slate-500 flex flex-wrap gap-4">
                                                         {task.objectives && (
                                                             <span className="flex items-center gap-1">
                                                                 <Target className="h-3 w-3 text-amber-500" />
                                                                 <span className="truncate max-w-[140px]">{task.objectives.title}</span>
                                                             </span>
                                                         )}
-                                                        {task.end_date && (
-                                                            <span className="flex items-center gap-1">
-                                                                <Clock className="h-3 w-3" />
-                                                                Due {new Date(task.end_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                                                            </span>
-                                                        )}
+
+                                                        {/* Start Date Picker */}
+                                                        <div onClick={(e) => e.stopPropagation()}>
+                                                            <Popover>
+                                                                <PopoverTrigger asChild>
+                                                                    <div className="flex items-center gap-1 cursor-pointer hover:text-amber-600 transition-colors">
+                                                                        <CalendarIcon className="h-3 w-3" />
+                                                                        {task.start_date
+                                                                            ? <span>Start: {format(new Date(task.start_date), "MMM d")}</span>
+                                                                            : <span className="text-slate-400">Set Start Date</span>
+                                                                        }
+                                                                    </div>
+                                                                </PopoverTrigger>
+                                                                <PopoverContent className="w-auto p-0" align="start">
+                                                                    <CalendarComponent
+                                                                        mode="single"
+                                                                        selected={task.start_date ? new Date(task.start_date) : undefined}
+                                                                        onSelect={(date) => handleDateUpdate(task.id, task.start_date, task.end_date, 'start', date)}
+                                                                        initialFocus
+                                                                    />
+                                                                </PopoverContent>
+                                                            </Popover>
+                                                        </div>
                                                     </div>
 
                                                     {/* Mini Timeline Bar */}
-                                                    <div className="ml-9">
+                                                    <div className="ml-11">
                                                         <MiniTimelineBar
                                                             task={task}
                                                             windowStart={windowStart}
@@ -393,10 +555,10 @@ export function TimelineListView({ tasks }: TimelineListViewProps) {
                                                     {/* View Details Link */}
                                                     <Link
                                                         href={`/tasks?highlight=${task.id}`}
-                                                        className="ml-9 mt-2 inline-flex items-center text-xs text-amber-600 hover:text-amber-700"
+                                                        className="ml-11 mt-3 inline-flex items-center text-xs font-semibold text-amber-600 hover:text-amber-700 bg-amber-50 px-2 py-1 rounded-md"
                                                         onClick={(e) => e.stopPropagation()}
                                                     >
-                                                        View Details <ChevronRight className="h-3 w-3 ml-1" />
+                                                        View Full Details <ChevronRight className="h-3 w-3 ml-1" />
                                                     </Link>
                                                 </div>
                                             )}

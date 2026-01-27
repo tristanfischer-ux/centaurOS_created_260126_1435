@@ -147,6 +147,42 @@ function CustomTaskListTable({
     )
 }
 
+// Custom Tooltip Component
+const CustomTooltip = ({ task }: { task: GanttTask, fontSize: string, fontFamily: string }) => {
+    const startDate = task.start
+    const endDate = task.end
+    // Calculate duration in days (inclusive)
+    const diffTime = Math.abs(endDate.getTime() - startDate.getTime())
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+
+    return (
+        <div style={{
+            backgroundColor: 'white',
+            padding: '12px',
+            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+            borderRadius: '8px',
+            border: '1px solid #e2e8f0', // slate-200
+            fontSize: '12px',
+            fontFamily: 'var(--font-geist-sans), sans-serif',
+            fontWeight: 500,
+            whiteSpace: 'nowrap',
+            // CRITICAL: Move tooltip UP to avoid blocking the task bar
+            transform: 'translateY(-130%)',
+            pointerEvents: 'none', // Ensure clicks pass through to the task bar below
+            zIndex: 50,
+            color: '#0f172a' // slate-900
+        }}>
+            <div className="font-bold mb-1">{task.name}</div>
+            <div className="text-slate-500 mb-1">
+                {format(startDate, 'MMM d')} - {format(endDate, 'MMM d, yyyy')}
+            </div>
+            <div className="text-amber-600 text-xs font-semibold">
+                Duration: {diffDays} day{diffDays !== 1 ? 's' : ''}
+            </div>
+        </div>
+    )
+}
+
 export function GanttView({ tasks, objectives, profiles }: GanttViewProps) {
     const router = useRouter()
     const [viewMode, setViewMode] = useState<ViewMode>(ViewMode.Day)
@@ -222,10 +258,17 @@ export function GanttView({ tasks, objectives, profiles }: GanttViewProps) {
                 // Check for optimistic override first
                 const override = localDateOverrides[task.id]
                 const startDate = override?.start ?? (task.start_date ? new Date(task.start_date) : new Date())
-                const endDate = override?.end ?? (task.end_date ? new Date(task.end_date) : new Date(startDate.getTime() + 86400000 * 2))
+                // Ensure date is valid, fallback to now if missing
+                if (isNaN(startDate.getTime())) {
+                    // Should technically not happen if filtered correctly or defaulted, but adding safety
+                }
 
+                // If end date is missing or invalid, default to start + 1 day
+                let endDate = override?.end ?? (task.end_date ? new Date(task.end_date) : new Date(startDate.getTime() + 86400000))
+
+                // Ensure end > start
                 if (endDate <= startDate) {
-                    endDate.setDate(startDate.getDate() + 1)
+                    endDate = new Date(startDate.getTime() + 86400000)
                 }
 
                 let color = "#475569" // Slate 600 (Darker for better contrast)
@@ -331,8 +374,9 @@ export function GanttView({ tasks, objectives, profiles }: GanttViewProps) {
     }
 
     // Handler: Click shows task info
-    const handleClick = (task: GanttTask) => {
-        toast.info(`${task.name} • ${task.start.toLocaleDateString()} → ${task.end.toLocaleDateString()}`)
+    const handleClick = () => {
+        // Optional: Keep standard click behavior or remove if it conflicts
+        // toast.info(`${task.name} • ${task.start.toLocaleDateString()} → ${task.end.toLocaleDateString()}`)
     }
 
 
@@ -457,6 +501,7 @@ export function GanttView({ tasks, objectives, profiles }: GanttViewProps) {
                         onClick={handleClick}
                         TaskListHeader={CustomTaskListHeader}
                         TaskListTable={CustomTaskListTable}
+                        TooltipContent={CustomTooltip}
                     />
                 </div>
             )}

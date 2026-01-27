@@ -562,10 +562,24 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                     )}
                 </td>
                 <td className="px-4 py-3 text-slate-500">
-                    <div className="flex gap-3 text-xs">
-                        <span className="text-green-600 font-medium">{member.completedTasks} done</span>
-                        <span className="text-blue-600 font-medium">{member.activeTasks} active</span>
-                        <span className="text-slate-400">{member.pendingTasks} pending</span>
+                    <div className="flex flex-col gap-1 text-xs">
+                        <div className="flex gap-3">
+                            <span className="text-green-600 font-medium">{member.completedTasks} done</span>
+                            <span className="text-blue-600 font-medium">{member.activeTasks} active</span>
+                            <span className="text-slate-400">{member.pendingTasks} pending</span>
+                        </div>
+                        {member.taskTitles?.active && member.taskTitles.active.length > 0 && (
+                            <div className="text-blue-600 truncate max-w-[200px]">
+                                <span className="font-semibold">Active:</span> {member.taskTitles.active[0]}
+                                {member.taskTitles.active.length > 1 && ` +${member.taskTitles.active.length - 1} more`}
+                            </div>
+                        )}
+                        {member.taskTitles?.pending && member.taskTitles.pending.length > 0 && (
+                            <div className="text-slate-500 truncate max-w-[200px]">
+                                <span className="font-semibold">Pending:</span> {member.taskTitles.pending[0]}
+                                {member.taskTitles.pending.length > 1 && ` +${member.taskTitles.pending.length - 1} more`}
+                            </div>
+                        )}
                     </div>
                 </td>
                 <td className="px-4 py-3 text-right pr-6">

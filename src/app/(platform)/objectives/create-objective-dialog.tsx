@@ -51,7 +51,7 @@ const PACK_ICONS: Record<string, any> = {
     'server': Server,
 }
 
-export function CreateObjectiveDialog({ disabled }: { disabled?: boolean }) {
+export function CreateObjectiveDialog() {
     const [open, setOpen] = useState(false)
     const [mode, setMode] = useState<CreationMode>('manual')
     const [loading, setLoading] = useState(false)
@@ -185,7 +185,7 @@ export function CreateObjectiveDialog({ disabled }: { disabled?: boolean }) {
     return (
         <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
-                <Button size="sm" className="bg-white text-black hover:bg-gray-200 border border-transparent shadow-sm" disabled={disabled}>
+                <Button size="sm" className="bg-white text-black hover:bg-gray-200 border border-transparent shadow-sm">
                     <Plus className="mr-2 h-4 w-4" /> New Objective
                 </Button>
             </DialogTrigger>

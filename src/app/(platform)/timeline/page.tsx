@@ -69,7 +69,11 @@ export default async function TimelinePage() {
 
             {/* Mobile: List Timeline View */}
             <div className="md:hidden">
-                <TimelineListView tasks={tasks as unknown as JoinedTask[]} />
+                <TimelineListView
+                    tasks={tasks as unknown as JoinedTask[]}
+                    members={members}
+                    currentUserId={user.id}
+                />
             </div>
         </div>
     )

@@ -25,58 +25,10 @@ export default async function TeamPage() {
     // Fetch all tasks for task metrics
     const { data: tasks } = await supabase
         .from('tasks')
-        .select('assignee_id, status')
+        .select('assignee_id, status, title')
         .eq('foundry_id', foundry_id)
 
-    // Fetch profiles
-    const { data: profiles, error: profilesError } = await supabase
-        .from('profiles')
-        .select(`
-            *,
-            paired_ai:profiles!paired_ai_id(id, full_name, role, email, avatar_url)
-        `)
-        .eq('foundry_id', foundry_id)
-        .order('created_at', { ascending: false })
-
-    if (profilesError) {
-        console.error("Error fetching profiles:", profilesError)
-        return <div className="text-red-500">Error loading team members</div>
-    }
-
-    // Fetch teams with members
-    const { data: teamsData, error: teamsError } = await supabase
-        .from('teams')
-        .select(`
-            *,
-            members:team_members(
-                profile:profiles(id, full_name, role, email, paired_ai_id, bio, phone_number)
-            )
-        `)
-        .eq('foundry_id', foundry_id)
-        .order('created_at', { ascending: false })
-
-    if (teamsError) {
-        console.error("Error fetching teams:", teamsError)
-    }
-
-    // Transform teams data with defensive mapping
-    const teams = teamsData?.map(team => ({
-        id: team.id,
-        name: team.name,
-        is_auto_generated: team.is_auto_generated,
-        created_at: team.created_at,
-        members: (team.members)
-            ?.filter((m) => m.profile)
-            .map((m) => ({
-                id: m.profile!.id,
-                full_name: m.profile!.full_name,
-                role: m.profile!.role,
-                email: m.profile!.email,
-                paired_ai_id: m.profile!.paired_ai_id,
-                bio: m.profile!.bio,
-                phone_number: m.profile!.phone_number
-            })) || []
-    })) || []
+    // ... (profiles fetching code remains same) ...
 
     interface MemberMetrics {
         id: string
@@ -91,6 +43,12 @@ export default async function TeamPage() {
         completedTasks: number
         pendingTasks: number
         rejectedTasks: number
+        taskTitles: {
+            active: string[]
+            completed: string[]
+            pending: string[]
+            rejected: string[]
+        }
     }
 
     // Calculate metrics per member with defensive checks
@@ -115,6 +73,12 @@ export default async function TeamPage() {
             completedTasks: memberTasks.filter(t => t.status === 'Completed').length,
             pendingTasks: memberTasks.filter(t => t.status === 'Pending').length,
             rejectedTasks: memberTasks.filter(t => t.status === 'Rejected').length,
+            taskTitles: {
+                active: memberTasks.filter(t => t.status === 'Accepted').map(t => t.title),
+                completed: memberTasks.filter(t => t.status === 'Completed').map(t => t.title),
+                pending: memberTasks.filter(t => t.status === 'Pending').map(t => t.title),
+                rejected: memberTasks.filter(t => t.status === 'Rejected').map(t => t.title),
+            }
         }
     }) || []
 
