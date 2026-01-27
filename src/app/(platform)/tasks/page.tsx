@@ -15,8 +15,7 @@ export default async function TasksPage() {
             *,
             assignee:profiles!assignee_id(id, full_name, role, email),
             creator:profiles!creator_id(id, full_name, role),
-            objective:objectives!objective_id(id, title),
-            task_files(id)
+            objective:objectives!objective_id(id, title)
         `)
         .order('created_at', { ascending: false })
 
@@ -57,7 +56,7 @@ export default async function TasksPage() {
         creator: Array.isArray(task.creator) ? task.creator[0] : task.creator,
         objective: Array.isArray(task.objective) ? task.objective[0] : task.objective,
         assignees: [], // Temporarily disabled while debugging task_assignees join
-        task_files: task.task_files || [] // Restored
+        task_files: [] // task.task_files || [] - Disabled due to schema error
     })) || []
 
     return (

@@ -32,8 +32,7 @@ export default async function ObjectivesPage() {
             end_date,
             objective_id,
             assignee:profiles!tasks_assignee_id_fkey(full_name, role),
-            task_comments(id, is_system_log),
-            task_files(count)
+            task_comments(id, is_system_log)
         `)
         .not('objective_id', 'is', null)
         .order('end_date', { ascending: true })
@@ -45,7 +44,7 @@ export default async function ObjectivesPage() {
             ...t,
             assignee: t.assignee as unknown as { full_name: string | null; role: string | null } | null,
             notesCount: t.task_comments?.filter((c: { is_system_log: boolean | null }) => !c.is_system_log).length || 0,
-            attachmentCount: t.task_files?.[0]?.count || 0
+            attachmentCount: 0 // t.task_files?.[0]?.count || 0 - Disabled due to schema error
         })) || []
     })) || []
 

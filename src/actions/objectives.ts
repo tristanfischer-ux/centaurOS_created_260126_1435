@@ -48,14 +48,34 @@ export async function createObjective(formData: FormData) {
 
     // A. From Playbook
     if (playbookId && playbookId !== 'none') {
-        const { data: packItems } = await supabase
+        const fs = require('fs');
+        const logPath = '/tmp/centaur_debug_v2.log';
+        fs.appendFileSync(logPath, `\n\n[${new Date().toISOString()}] START PROCESSING PLAYBOOK: ${playbookId}\n`);
+        fs.appendFileSync(logPath, `[${new Date().toISOString()}] Selected Task IDs Raw: ${JSON.stringify(selectedTaskIds)}\n`);
+
+        const { data: packItems, error: packError } = await supabase
             .from('pack_items')
             .select('*')
             .eq('pack_id', playbookId)
 
+        if (packError) {
+            fs.appendFileSync(logPath, `[ERROR] Supabase Fetch Error: ${JSON.stringify(packError)}\n`);
+        }
+
+        fs.appendFileSync(logPath, `[${new Date().toISOString()}] Pack Items Found in DB: ${packItems?.length}\n`);
+
         if (packItems && packItems.length > 0) {
             // Filter tasks based on selection
             const tasksFromBook = packItems.filter(t => selectedTaskIds.includes(t.id))
+            fs.appendFileSync(logPath, `[${new Date().toISOString()}] Tasks matched from selection: ${tasksFromBook.length}\n`);
+
+            if (tasksFromBook.length === 0) {
+                fs.appendFileSync(logPath, `[WARNING] No tasks matched! Checking ID types...\n`);
+                fs.appendFileSync(logPath, `First PackItem ID: ${packItems[0].id} (${typeof packItems[0].id})\n`);
+                if (selectedTaskIds.length > 0) {
+                    fs.appendFileSync(logPath, `First Selected ID: ${selectedTaskIds[0]} (${typeof selectedTaskIds[0]})\n`);
+                }
+            }
 
             // Find AI Agent if needed
             let aiAgentId = null
