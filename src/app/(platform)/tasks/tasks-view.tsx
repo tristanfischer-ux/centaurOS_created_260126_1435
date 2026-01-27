@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { useAutoRefresh } from "@/hooks/useAutoRefresh"
 import { RefreshButton } from "@/components/RefreshButton"
 import { TaskCard } from "./task-card"
@@ -261,14 +261,14 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
         setSelectedTaskIds(new Set())
     }
 
-    const toggleTaskSelection = (taskId: string) => {
+    const toggleTaskSelection = useCallback((taskId: string) => {
         setSelectedTaskIds(prev => {
             const newSet = new Set(prev)
             if (newSet.has(taskId)) newSet.delete(taskId)
             else newSet.add(taskId)
             return newSet
         })
-    }
+    }, [])
 
     const handleBulkDelete = async () => {
         if (selectedTaskIds.size === 0) return
@@ -349,8 +349,9 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
         }
     }
 
-    const handleBulkAssign = async () => {
-        if (selectedTaskIds.size === 0 || !selectedAssigneeId) return
+    const handleBulkAssign = async (assigneeId?: string) => {
+        const targetAssigneeId = assigneeId || selectedAssigneeId
+        if (selectedTaskIds.size === 0 || !targetAssigneeId) return
         setIsBulkOperating(true)
         try {
             const taskIdsArray = Array.from(selectedTaskIds)
@@ -358,7 +359,7 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
             let errorCount = 0
 
             for (const taskId of taskIdsArray) {
-                const result = await updateTaskAssignees(taskId, [selectedAssigneeId])
+                const result = await updateTaskAssignees(taskId, [targetAssigneeId])
                 if (result?.error) {
                     errorCount++
                 } else {
