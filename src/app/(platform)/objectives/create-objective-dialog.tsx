@@ -54,7 +54,11 @@ const PACK_ICONS: Record<string, any> = {
     'server': Server,
 }
 
-export function CreateObjectiveDialog() {
+interface CreateObjectiveDialogProps {
+    children?: React.ReactNode
+}
+
+export function CreateObjectiveDialog({ children }: CreateObjectiveDialogProps) {
     const [open, setOpen] = useState(false)
     const [mode, setMode] = useState<CreationMode>('manual')
     const [isLoading, setIsLoading] = useState(false)
@@ -282,9 +286,11 @@ export function CreateObjectiveDialog() {
     return (
         <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
-                <Button size="sm" className="bg-white text-black hover:bg-gray-200 border border-transparent shadow-sm">
-                    <Plus className="h-4 w-4" /> New Objective
-                </Button>
+                {children || (
+                    <Button size="sm" className="bg-white text-black hover:bg-gray-200 border border-transparent shadow-sm">
+                        <Plus className="h-4 w-4" /> New Objective
+                    </Button>
+                )}
             </DialogTrigger>
             <DialogContent className="w-[calc(100vw-2rem)] sm:max-w-[800px] max-h-[90dvh] flex flex-col p-0 gap-0 bg-white sm:rounded-xl overflow-hidden">
                 {/* Header Section */}
