@@ -60,13 +60,16 @@ export function Sidebar({ foundryName, foundryId }: { foundryName?: string; foun
                 })}
             </nav>
             <div className="border-t border-slate-200 p-4">
-                <div className="flex items-center">
+                <div className="flex items-center mb-2">
                     {/* Placeholder for user profile */}
                     <div className="h-8 w-8 rounded-full bg-slate-200"></div>
                     <div className="ml-3">
                         <p className="text-sm font-medium text-slate-900">User</p>
                         <p className="text-xs text-slate-500">Foundry Member</p>
                     </div>
+                </div>
+                <div className="text-[10px] text-slate-400 text-center font-mono">
+                    v1.0.1
                 </div>
             </div>
         </div>
