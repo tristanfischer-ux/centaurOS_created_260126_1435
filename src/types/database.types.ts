@@ -386,6 +386,10 @@ export type Database = {
                     task_number: number
                     title: string
                     updated_at: string | null
+                    risk_level: Database["public"]["Enums"]["risk_level"]
+                    client_visible: boolean | null
+                    nudge_count: number | null
+                    last_nudge_at: string | null
                 }
                 Insert: {
                     amendment_notes?: string | null
@@ -404,6 +408,10 @@ export type Database = {
                     task_number?: number
                     title: string
                     updated_at?: string | null
+                    risk_level?: Database["public"]["Enums"]["risk_level"]
+                    client_visible?: boolean | null
+                    nudge_count?: number | null
+                    last_nudge_at?: string | null
                 }
                 Update: {
                     amendment_notes?: string | null
@@ -422,6 +430,10 @@ export type Database = {
                     task_number?: number
                     title?: string
                     updated_at?: string | null
+                    risk_level?: Database["public"]["Enums"]["risk_level"]
+                    client_visible?: boolean | null
+                    nudge_count?: number | null
+                    last_nudge_at?: string | null
                 }
                 Relationships: [
                     {
@@ -469,6 +481,10 @@ export type Database = {
             | "Rejected"
             | "Amended"
             | "Amended_Pending_Approval"
+            | "Pending_Peer_Review"
+            | "Pending_Executive_Approval"
+            | "Completed"
+            risk_level: "Low" | "Medium" | "High"
         }
         CompositeTypes: {
             [_ in never]: never

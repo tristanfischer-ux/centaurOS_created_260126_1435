@@ -22,7 +22,7 @@ import {
 } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { format } from "date-fns"
-import { Calendar as CalendarIcon, Check, X, ArrowRight, Edit, Bot, MessageSquare, ChevronDown, ChevronUp, AlertCircle, Copy, Pencil, History as HistoryIcon } from "lucide-react"
+import { Calendar as CalendarIcon, Check, X, ArrowRight, Edit, Bot, MessageSquare, ChevronDown, ChevronUp, AlertCircle, Copy, Pencil, History as HistoryIcon, ShieldAlert, Eye, EyeOff, ShieldCheck } from "lucide-react"
 import { Calendar } from "@/components/ui/calendar"
 import {
     Popover,
@@ -36,6 +36,8 @@ import { ThreadDrawer } from "./thread-drawer"
 import { EditTaskDialog } from "@/components/tasks/edit-task-dialog"
 import { toast } from "sonner"
 import { HistoryDrawer } from "@/components/tasks/history-drawer"
+import { RubberStampModal } from "@/components/smart-airlock/RubberStampModal"
+import { ClientNudgeButton } from "@/components/smart-airlock/ClientNudgeButton"
 
 type Task = Database["public"]["Tables"]["tasks"]["Row"] & {
     assignee?: { id: string, full_name: string | null, role: string, email: string } | null
@@ -60,6 +62,7 @@ export function TaskCard({ task, currentUserId, userRole, members }: TaskCardPro
     const isCreator = currentUserId === task.creator_id
     const isAITask = task.assignee?.role === 'AI_Agent'
     const isOverdue = task.end_date ? new Date(task.end_date) < new Date() : false
+    const isExecutive = userRole === 'Executive' || userRole === 'Founder'
 
     const [expanded, setExpanded] = useState(false)
     const [loading, setLoading] = useState(false)
@@ -72,6 +75,7 @@ export function TaskCard({ task, currentUserId, userRole, members }: TaskCardPro
     const [threadOpen, setThreadOpen] = useState(false)
     const [editOpen, setEditOpen] = useState(false)
     const [historyOpen, setHistoryOpen] = useState(false)
+    const [rubberStampOpen, setRubberStampOpen] = useState(false)
 
     // Helper Functions
     const formatFullDate = (dateStr: string | null) => {
@@ -85,7 +89,17 @@ export function TaskCard({ task, currentUserId, userRole, members }: TaskCardPro
             case 'Completed': return 'bg-slate-800'
             case 'Rejected': return 'bg-red-600'
             case 'Amended_Pending_Approval': return 'bg-orange-500'
+            case 'Pending_Executive_Approval': return 'bg-purple-600'
+            case 'Pending_Peer_Review': return 'bg-blue-500'
             default: return 'bg-slate-500'
+        }
+    }
+
+    const getRiskBadge = (level: string | null) => {
+        switch (level) {
+            case 'High': return <Badge variant="outline" className="text-red-600 border-red-200 bg-red-50 gap-1"><ShieldAlert className="w-3 h-3" /> High Risk</Badge>
+            case 'Medium': return <Badge variant="outline" className="text-amber-600 border-amber-200 bg-amber-50 gap-1"><ShieldCheck className="w-3 h-3" /> Medium Risk</Badge>
+            default: return null // Low risk doesn't need a badge to reduce noise? Or maybe text-green-600?
         }
     }
 
@@ -134,7 +148,13 @@ export function TaskCard({ task, currentUserId, userRole, members }: TaskCardPro
         const res = await completeTask(task.id)
         setLoading(false)
         if (res.error) toast.error(res.error)
-        else toast.success("Task completed")
+        else {
+            if (res.newStatus === 'Completed') {
+                toast.success("Task completed")
+            } else {
+                toast.info(`Task moved to ${res.newStatus?.replace(/_/g, ' ')}`)
+            }
+        }
     }
 
     const handleDuplicate = async () => {
@@ -174,17 +194,29 @@ export function TaskCard({ task, currentUserId, userRole, members }: TaskCardPro
     const sortedMembers = [...members].sort((a, b) => a.full_name.localeCompare(b.full_name))
 
     return (
-        <Card className="bg-white border-slate-200 hover:border-slate-300 hover:shadow-md transition-all flex flex-col h-full group/card">
+        <Card className="bg-white border-slate-200 hover:border-slate-300 hover:shadow-md transition-all flex flex-col h-full group/card relative">
+            {/* Visibility Indicator */}
+            <div className="absolute top-4 right-4 z-10" title={task.client_visible ? "Visible to Client" : "Hidden from Client"}>
+                {task.client_visible ? (
+                    <Eye className="w-4 h-4 text-green-500/50" />
+                ) : (
+                    <EyeOff className="w-4 h-4 text-slate-300" />
+                )}
+            </div>
+
             <CardHeader className="p-4 pb-2 space-y-3 cursor-pointer" onClick={() => setExpanded(!expanded)}>
-                <div className="flex justify-between items-start gap-2">
+                <div className="flex justify-between items-start gap-2 pr-6">
                     <div className="space-y-1 flex-1">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                             <span className="text-xs font-mono text-slate-400">
                                 #{task.task_number ?? '...'}
                             </span>
                             <Badge className={`${getStatusColor(task.status)} text-white hover:${getStatusColor(task.status)} border-0`}>
-                                {task.status || 'Pending'}
+                                {(task.status || 'Pending').replace(/_/g, ' ')}
                             </Badge>
+                            {/* Risk Badge */}
+                            {getRiskBadge(task.risk_level)}
+
                             {isOverdue && task.status !== 'Completed' && (
                                 <span className="text-red-600 flex items-center text-[10px] font-medium">
                                     <AlertCircle className="w-3 h-3 mr-1" /> Overdue
@@ -310,148 +342,184 @@ export function TaskCard({ task, currentUserId, userRole, members }: TaskCardPro
                                 <p className="mt-1 opacity-90">{task.amendment_notes}</p>
                             </div>
                         )}
+
+                        {/* Executive Airlock Warning */}
+                        {task.status === 'Pending_Executive_Approval' && (
+                            <div className="mt-4 bg-purple-50 border border-purple-200 p-3 rounded-md text-sm text-purple-800 flex items-start gap-2">
+                                <ShieldAlert className="w-5 h-5 shrink-0" />
+                                <div>
+                                    <strong className="block uppercase text-xs tracking-wide mb-1">Airlock Active</strong>
+                                    Task completed but held for Executive Certification.
+                                </div>
+                            </div>
+                        )}
                     </CardContent>
 
                     <Separator className="bg-slate-200" />
 
-                    <CardFooter className="bg-slate-50 p-4 flex flex-wrap gap-2 items-center">
-                        {(isAssignee || userRole === 'Executive' || isCreator) && (
-                            <div className="flex flex-wrap gap-2 flex-1 min-w-0">
-                                {/* Actions based on status */}
-                                {task.status === 'Pending' && (
-                                    <>
-                                        {isAssignee && (
-                                            <Button size="sm" onClick={handleAccept} disabled={loading} className="bg-green-600 hover:bg-green-700 flex-1 text-white shadow-sm">
-                                                <Check className="h-4 w-4 mr-2" /> Accept
+                    <CardFooter className="bg-slate-50 p-4 flex flex-col gap-2">
+                        <div className="flex flex-wrap gap-2 w-full items-center">
+                            {(isAssignee || userRole === 'Executive' || isCreator) && (
+                                <div className="flex flex-wrap gap-2 flex-1 min-w-0">
+                                    {/* Actions based on status */}
+                                    {task.status === 'Pending' && (
+                                        <>
+                                            {isAssignee && (
+                                                <Button size="sm" onClick={handleAccept} disabled={loading} className="bg-green-600 hover:bg-green-700 flex-1 text-white shadow-sm">
+                                                    <Check className="h-4 w-4 mr-2" /> Accept
+                                                </Button>
+                                            )}
+                                            {isAssignee && (
+                                                <Dialog open={rejectOpen} onOpenChange={setRejectOpen}>
+                                                    <DialogTrigger asChild>
+                                                        <Button size="sm" variant="destructive" disabled={loading} className="flex-1 shadow-sm">
+                                                            <X className="h-4 w-4 mr-2" /> Reject
+                                                        </Button>
+                                                    </DialogTrigger>
+                                                    <DialogContent className="bg-white border-slate-200 text-slate-900">
+                                                        <DialogHeader><DialogTitle>Reject Task</DialogTitle></DialogHeader>
+                                                        <form action={handleReject} className="space-y-4">
+                                                            <Textarea name="reason" placeholder="Reason for rejection..." required className="bg-slate-50 border-slate-200" />
+                                                            <Button type="submit" variant="destructive">Confirm Rejection</Button>
+                                                        </form>
+                                                    </DialogContent>
+                                                </Dialog>
+                                            )}
+                                        </>
+                                    )}
+
+                                    {task.status === 'Accepted' && (
+                                        <Button size="sm" onClick={handleComplete} disabled={loading} className="bg-slate-900 hover:bg-slate-800 flex-1 text-white shadow-sm">
+                                            <Check className="h-4 w-4 mr-2" /> Complete
+                                        </Button>
+                                    )}
+
+                                    {/* Airlock / Executive Approval Button */}
+                                    {task.status === 'Pending_Executive_Approval' && isExecutive && (
+                                        <Button
+                                            size="sm"
+                                            onClick={() => setRubberStampOpen(true)}
+                                            disabled={loading}
+                                            className="bg-purple-600 hover:bg-purple-700 flex-1 text-white shadow-sm gap-2"
+                                        >
+                                            <ShieldCheck className="h-4 w-4" />
+                                            Certify Release
+                                        </Button>
+                                    )}
+
+                                    {isAITask && (task.status === 'Pending' || task.status === 'Accepted') && (
+                                        <Button
+                                            size="sm"
+                                            onClick={handleRunAI}
+                                            disabled={aiRunning}
+                                            className="bg-purple-600 hover:bg-purple-700 flex-1 text-white shadow-sm"
+                                        >
+                                            <Bot className="h-4 w-4 mr-2" /> {aiRunning ? 'AI Working...' : 'Trigger AI Agent'}
+                                        </Button>
+                                    )}
+
+                                    <Dialog open={forwardOpen} onOpenChange={setForwardOpen}>
+                                        <DialogTrigger asChild>
+                                            <Button size="sm" variant="outline" disabled={loading} className="border-slate-200 text-slate-600 hover:bg-slate-50 flex-1">
+                                                <ArrowRight className="h-4 w-4 mr-2" /> Forward
                                             </Button>
-                                        )}
-                                        {isAssignee && (
-                                            <Dialog open={rejectOpen} onOpenChange={setRejectOpen}>
-                                                <DialogTrigger asChild>
-                                                    <Button size="sm" variant="destructive" disabled={loading} className="flex-1 shadow-sm">
-                                                        <X className="h-4 w-4 mr-2" /> Reject
-                                                    </Button>
-                                                </DialogTrigger>
-                                                <DialogContent className="bg-white border-slate-200 text-slate-900">
-                                                    <DialogHeader><DialogTitle>Reject Task</DialogTitle></DialogHeader>
-                                                    <form action={handleReject} className="space-y-4">
-                                                        <Textarea name="reason" placeholder="Reason for rejection..." required className="bg-slate-50 border-slate-200" />
-                                                        <Button type="submit" variant="destructive">Confirm Rejection</Button>
-                                                    </form>
-                                                </DialogContent>
-                                            </Dialog>
-                                        )}
+                                        </DialogTrigger>
+                                        <DialogContent className="bg-white border-slate-200 text-slate-900">
+                                            <DialogHeader><DialogTitle>Forward Task</DialogTitle></DialogHeader>
+                                            <form action={handleForward} className="space-y-4">
+                                                <div className="grid gap-2">
+                                                    <label className="text-sm font-medium">New Assignee</label>
+                                                    <Select name="new_assignee_id" required>
+                                                        <SelectTrigger className="bg-white border-slate-200">
+                                                            <SelectValue placeholder="Select person..." />
+                                                        </SelectTrigger>
+                                                        <SelectContent className="bg-white border-slate-200 z-50">
+                                                            {sortedMembers.map(member => (
+                                                                <SelectItem key={member.id} value={member.id}>
+                                                                    {member.full_name}
+                                                                    {member.role === 'AI_Agent' && ' 🤖'}
+                                                                </SelectItem>
+                                                            ))}
+                                                        </SelectContent>
+                                                    </Select>
+                                                </div>
+                                                <Textarea name="reason" placeholder="Handover notes..." required className="bg-slate-50 border-slate-200" />
+                                                <Button type="submit" className="bg-amber-500 text-white hover:bg-amber-600">Forward Task</Button>
+                                            </form>
+                                        </DialogContent>
+                                    </Dialog>
+
+                                    <Dialog open={amendOpen} onOpenChange={setAmendOpen}>
+                                        <DialogTrigger asChild>
+                                            <Button size="sm" variant="outline" disabled={loading} className="border-slate-200 text-slate-600 hover:bg-slate-50 flex-1">
+                                                <Edit className="h-4 w-4 mr-2" /> Amend
+                                            </Button>
+                                        </DialogTrigger>
+                                        <DialogContent className="bg-white border-slate-200 text-slate-900">
+                                            <DialogHeader><DialogTitle>Amend Task</DialogTitle></DialogHeader>
+                                            <form action={handleAmend} className="space-y-4">
+                                                <Textarea name="amendment_notes" placeholder="New terms/scope..." required className="bg-slate-50 border-slate-200" />
+                                                <Button type="submit" className="bg-orange-600 text-white hover:bg-orange-700">Propose Amendment</Button>
+                                            </form>
+                                        </DialogContent>
+                                    </Dialog>
+                                </div>
+                            )}
+
+                            <div className="flex items-center gap-1 ml-auto shrink-0">
+                                {(isAssignee || isCreator || userRole === 'Executive') && (
+                                    <>
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-8 w-8 text-slate-500 hover:text-blue-600"
+                                            onClick={() => setEditOpen(true)}
+                                            title="Edit Task"
+                                            disabled={loading}
+                                        >
+                                            <Pencil className="h-4 w-4" />
+                                        </Button>
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-8 w-8 text-slate-500 hover:text-blue-600"
+                                            onClick={handleDuplicate}
+                                            title="Duplicate Task"
+                                            disabled={loading}
+                                        >
+                                            <Copy className="h-4 w-4" />
+                                        </Button>
                                     </>
                                 )}
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="text-slate-500 hover:text-blue-600 ml-1"
+                                    onClick={() => setHistoryOpen(true)}
+                                    title="View History"
+                                >
+                                    <HistoryIcon className="h-4 w-4 mr-2" /> History
+                                </Button>
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="text-slate-500 hover:text-amber-600 ml-1"
+                                    onClick={() => setThreadOpen(true)}
+                                >
+                                    <MessageSquare className="h-4 w-4 mr-2" /> Thread
+                                </Button>
+                            </div>
+                        </div>
 
-                                {task.status === 'Accepted' && (
-                                    <Button size="sm" onClick={handleComplete} disabled={loading} className="bg-slate-900 hover:bg-slate-800 flex-1 text-white shadow-sm">
-                                        <Check className="h-4 w-4 mr-2" /> Complete
-                                    </Button>
-                                )}
-
-                                {isAITask && (task.status === 'Pending' || task.status === 'Accepted') && (
-                                    <Button
-                                        size="sm"
-                                        onClick={handleRunAI}
-                                        disabled={aiRunning}
-                                        className="bg-purple-600 hover:bg-purple-700 flex-1 text-white shadow-sm"
-                                    >
-                                        <Bot className="h-4 w-4 mr-2" /> {aiRunning ? 'AI Working...' : 'Trigger AI Agent'}
-                                    </Button>
-                                )}
-
-                                <Dialog open={forwardOpen} onOpenChange={setForwardOpen}>
-                                    <DialogTrigger asChild>
-                                        <Button size="sm" variant="outline" disabled={loading} className="border-slate-200 text-slate-600 hover:bg-slate-50 flex-1">
-                                            <ArrowRight className="h-4 w-4 mr-2" /> Forward
-                                        </Button>
-                                    </DialogTrigger>
-                                    <DialogContent className="bg-white border-slate-200 text-slate-900">
-                                        <DialogHeader><DialogTitle>Forward Task</DialogTitle></DialogHeader>
-                                        <form action={handleForward} className="space-y-4">
-                                            <div className="grid gap-2">
-                                                <label className="text-sm font-medium">New Assignee</label>
-                                                <Select name="new_assignee_id" required>
-                                                    <SelectTrigger className="bg-white border-slate-200">
-                                                        <SelectValue placeholder="Select person..." />
-                                                    </SelectTrigger>
-                                                    <SelectContent className="bg-white border-slate-200 z-50">
-                                                        {sortedMembers.map(member => (
-                                                            <SelectItem key={member.id} value={member.id}>
-                                                                {member.full_name}
-                                                                {member.role === 'AI_Agent' && ' 🤖'}
-                                                            </SelectItem>
-                                                        ))}
-                                                    </SelectContent>
-                                                </Select>
-                                            </div>
-                                            <Textarea name="reason" placeholder="Handover notes..." required className="bg-slate-50 border-slate-200" />
-                                            <Button type="submit" className="bg-amber-500 text-white hover:bg-amber-600">Forward Task</Button>
-                                        </form>
-                                    </DialogContent>
-                                </Dialog>
-
-                                <Dialog open={amendOpen} onOpenChange={setAmendOpen}>
-                                    <DialogTrigger asChild>
-                                        <Button size="sm" variant="outline" disabled={loading} className="border-slate-200 text-slate-600 hover:bg-slate-50 flex-1">
-                                            <Edit className="h-4 w-4 mr-2" /> Amend
-                                        </Button>
-                                    </DialogTrigger>
-                                    <DialogContent className="bg-white border-slate-200 text-slate-900">
-                                        <DialogHeader><DialogTitle>Amend Task</DialogTitle></DialogHeader>
-                                        <form action={handleAmend} className="space-y-4">
-                                            <Textarea name="amendment_notes" placeholder="New terms/scope..." required className="bg-slate-50 border-slate-200" />
-                                            <Button type="submit" className="bg-orange-600 text-white hover:bg-orange-700">Propose Amendment</Button>
-                                        </form>
-                                    </DialogContent>
-                                </Dialog>
+                        {/* Client Nudge Button (Debug / Red Phone) */}
+                        {!task.client_visible && task.status !== 'Completed' && (
+                            <div className="w-full mt-2 pt-2 border-t border-slate-100 flex justify-end">
+                                <ClientNudgeButton
+                                    taskId={task.id}
+                                    lastNudge={task.last_nudge_at}
+                                />
                             </div>
                         )}
-
-                        <div className="flex items-center gap-1 ml-auto shrink-0">
-                            {(isAssignee || isCreator || userRole === 'Executive') && (
-                                <>
-                                    <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        className="h-8 w-8 text-slate-500 hover:text-blue-600"
-                                        onClick={() => setEditOpen(true)}
-                                        title="Edit Task"
-                                        disabled={loading}
-                                    >
-                                        <Pencil className="h-4 w-4" />
-                                    </Button>
-                                    <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        className="h-8 w-8 text-slate-500 hover:text-blue-600"
-                                        onClick={handleDuplicate}
-                                        title="Duplicate Task"
-                                        disabled={loading}
-                                    >
-                                        <Copy className="h-4 w-4" />
-                                    </Button>
-                                </>
-                            )}
-                            <Button
-                                variant="ghost"
-                                size="sm"
-                                className="text-slate-500 hover:text-blue-600 ml-1"
-                                onClick={() => setHistoryOpen(true)}
-                                title="View History"
-                            >
-                                <HistoryIcon className="h-4 w-4 mr-2" /> History
-                            </Button>
-                            <Button
-                                variant="ghost"
-                                size="sm"
-                                className="text-slate-500 hover:text-amber-600 ml-1"
-                                onClick={() => setThreadOpen(true)}
-                            >
-                                <MessageSquare className="h-4 w-4 mr-2" /> Thread
-                            </Button>
-                        </div>
                     </CardFooter>
 
                     <EditTaskDialog
@@ -479,6 +547,11 @@ export function TaskCard({ task, currentUserId, userRole, members }: TaskCardPro
                         isAssignee={isAssignee}
                         isCreator={isCreator}
                         members={members}
+                    />
+                    <RubberStampModal
+                        isOpen={rubberStampOpen}
+                        onClose={() => setRubberStampOpen(false)}
+                        taskId={task.id}
                     />
                 </>
             )}

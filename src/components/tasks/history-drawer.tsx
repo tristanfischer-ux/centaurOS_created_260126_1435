@@ -16,7 +16,8 @@ import { Badge } from "@/components/ui/badge"
 import { format } from "date-fns"
 import { useEffect, useState } from "react"
 import { getTaskHistory } from "@/actions/tasks"
-import { Loader2, History, ArrowRight } from "lucide-react"
+import { Loader2, History } from "lucide-react"
+import { Database } from "@/types/database.types"
 
 interface HistoryDrawerProps {
     open: boolean
@@ -25,27 +26,48 @@ interface HistoryDrawerProps {
     taskTitle: string
 }
 
+type TaskHistoryItem = Database['public']['Tables']['task_history']['Row'] & {
+    user: {
+        full_name: string | null
+        email: string
+    } | null
+}
+
 export function HistoryDrawer({ open, onOpenChange, taskId, taskTitle }: HistoryDrawerProps) {
-    const [history, setHistory] = useState<any[]>([])
+    const [history, setHistory] = useState<TaskHistoryItem[]>([])
     const [loading, setLoading] = useState(false)
 
     useEffect(() => {
+        let mounted = true
         if (open) {
-            setLoading(true)
+            // Delay setting loading to avoid synchronous update warning
+            const timer = setTimeout(() => {
+                if (mounted) setLoading(true)
+            }, 0)
+
             getTaskHistory(taskId).then((res) => {
-                if (res.data) setHistory(res.data)
-                setLoading(false)
+                if (mounted) {
+                    if (res.data) setHistory(res.data as unknown as TaskHistoryItem[]) // Cast due to join complexity
+                    setLoading(false)
+                }
             })
+            return () => {
+                mounted = false
+                clearTimeout(timer)
+            }
         }
     }, [open, taskId])
 
-    const getActionBadges = (item: any) => {
+    const getActionBadges = (item: TaskHistoryItem) => {
         switch (item.action_type) {
             case 'CREATED': return <Badge variant="outline" className="text-blue-600 border-blue-200 bg-blue-50">Created</Badge>
-            case 'COMPLETED': return <Badge className="bg-slate-900">Completed</Badge>
+            case 'COMPLETED': return <Badge className="bg-slate-900 border-slate-900 text-white hover:bg-slate-800">Completed</Badge>
             case 'STATUS_CHANGE':
-                if (item.changes?.new_status === 'Accepted') return <Badge className="bg-green-600">Accepted</Badge>
-                if (item.changes?.new_status === 'Rejected') return <Badge className="bg-red-600">Rejected</Badge>
+                if (item.changes && typeof item.changes === 'object' && 'new_status' in item.changes) {
+                    const changes = item.changes as { new_status?: string }
+                    if (changes.new_status === 'Accepted') return <Badge className="bg-green-600 hover:bg-green-700 border-0 text-white">Accepted</Badge>
+                    if (changes.new_status === 'Rejected') return <Badge className="bg-red-600 hover:bg-red-700 border-0 text-white">Rejected</Badge>
+                }
                 return <Badge variant="secondary">Status Change</Badge>
             case 'ASSIGNED': return <Badge variant="outline" className="text-purple-600 border-purple-200 bg-purple-50">Assigned</Badge>
             case 'FORWARDED': return <Badge variant="outline" className="text-amber-600 border-amber-200 bg-amber-50">Forwarded</Badge>
@@ -54,12 +76,14 @@ export function HistoryDrawer({ open, onOpenChange, taskId, taskTitle }: History
         }
     }
 
-    const renderChanges = (changes: any) => {
-        if (!changes || Object.keys(changes).length === 0) return null
+    const renderChanges = (changes: unknown) => {
+        if (!changes || typeof changes !== 'object' || Object.keys(changes).length === 0) return null
+
+        const changeObj = changes as Record<string, any>
 
         return (
             <div className="mt-2 space-y-1">
-                {Object.entries(changes).map(([key, value]: [string, any]) => {
+                {Object.entries(changeObj).map(([key, value]) => {
                     if (key === 'initial_status' || key === 'source') return null
                     // Skip some fields if too verbose
                     return (
@@ -67,7 +91,7 @@ export function HistoryDrawer({ open, onOpenChange, taskId, taskTitle }: History
                             <span className="font-medium text-slate-700 capitalize">{key.replace(/_/g, ' ')}:</span>
                             {typeof value === 'object' && value !== null ? (
                                 // Handle nested objects like dates
-                                JSON.stringify(value)
+                                <span>{JSON.stringify(value)}</span>
                             ) : (
                                 <span>{String(value)}</span>
                             )}

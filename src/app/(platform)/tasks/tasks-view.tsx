@@ -35,6 +35,8 @@ interface TasksViewProps {
     currentUserRole?: string
 }
 
+import { LivePulse } from "@/components/smart-airlock/LivePulse"
+// ...
 export function TasksView({ tasks, objectives, members, currentUserId, currentUserRole }: TasksViewProps) {
     const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
     const [selectedTask, setSelectedTask] = useState<Task | null>(null)
@@ -61,6 +63,10 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                     <div>
                         <h1 className="text-3xl font-bold tracking-tight text-slate-900 mb-2">Tasks</h1>
                         <p className="text-slate-500">Democratic workflow management.</p>
+                    </div>
+                    {/* Live Pulse Widget */}
+                    <div className="hidden lg:block ml-auto mr-4">
+                        <LivePulse />
                     </div>
                     <div className="flex items-center gap-2">
                         <div className="bg-slate-100 p-1 rounded-lg flex items-center mr-2">

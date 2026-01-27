@@ -7,6 +7,8 @@ import { runAIWorker } from '@/lib/ai-worker'
 import { logTaskHistory } from '@/lib/audit'
 
 export type TaskStatus = Database["public"]["Enums"]["task_status"]
+export type RiskLevel = Database["public"]["Enums"]["risk_level"]
+
 
 async function getFoundryId() {
     const supabase = await createClient()
@@ -48,6 +50,7 @@ export async function createTask(formData: FormData) {
     const assigneeIdsJson = formData.get('assignee_ids') as string
     const startDate = formData.get('start_date') as string
     const endDate = formData.get('end_date') as string
+    const riskLevel = (formData.get('risk_level') as RiskLevel) || 'Low' // Default to Low
     const fileCount = parseInt(formData.get('file_count') as string || '0')
 
     if (!title || !objectiveId || !assigneeId) {
@@ -74,7 +77,9 @@ export async function createTask(formData: FormData) {
         assignee_id: assigneeIds[0], // Primary assignee
         start_date: startDate || null,
         end_date: endDate || null,
-        status: 'Pending'
+        status: 'Pending',
+        risk_level: riskLevel,
+        client_visible: false // Always hidden initially
     }).select().single()
 
     if (error) return { error: error.message }
@@ -118,11 +123,12 @@ export async function createTask(formData: FormData) {
     }
 
     // Log Creation
-    await logSystemEvent(data.id, `Task created by User`, user.id)
+    await logSystemEvent(data.id, `Task created by User (Risk: ${riskLevel})`, user.id)
     await logTaskHistory(data.id, 'CREATED', user.id, {
         title,
         assignee_id: assigneeIds[0],
-        initial_status: 'Pending'
+        initial_status: 'Pending',
+        risk_level: riskLevel
     })
 
     // Trigger AI Worker for primary assignee
@@ -308,18 +314,153 @@ export async function completeTask(taskId: string) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return { error: 'Unauthorized' }
 
+    // Fetch Risk Level
+    const { data: task, error: fetchError } = await supabase
+        .from('tasks')
+        .select('risk_level, status')
+        .eq('id', taskId)
+        .single()
+
+    if (fetchError || !task) return { error: 'Task not found' }
+
+    let nextStatus: TaskStatus = 'Completed'
+    let clientVisible = true
+
+    if (task.risk_level === 'Medium') {
+        nextStatus = 'Pending_Peer_Review'
+        clientVisible = false
+    } else if (task.risk_level === 'High') {
+        nextStatus = 'Pending_Executive_Approval'
+        clientVisible = false
+    }
+
+    const updates: any = { status: nextStatus }
+    // Only set end_date if actually fully completed
+    if (nextStatus === 'Completed') {
+        updates.end_date = new Date().toISOString()
+        updates.client_visible = true // Explicitly set visible
+    }
+
     const { error } = await supabase.from('tasks')
-        .update({ status: 'Completed', end_date: new Date().toISOString() }) // Auto-set end date?
+        .update(updates)
         .eq('id', taskId)
 
     if (error) return { error: error.message }
 
-    await logSystemEvent(taskId, 'Task mark as Completed', user.id)
-    await logTaskHistory(taskId, 'COMPLETED', user.id, {
-        completed_at: new Date().toISOString()
+    await logSystemEvent(taskId, `Task marked as ${nextStatus} (Risk: ${task.risk_level})`, user.id)
+    await logTaskHistory(taskId, nextStatus === 'Completed' ? 'COMPLETED' : 'STATUS_CHANGE', user.id, {
+        new_status: nextStatus,
+        risk_level: task.risk_level,
+        completed_at: nextStatus === 'Completed' ? new Date().toISOString() : undefined
     })
     revalidatePath('/tasks')
+    return { success: true, newStatus: nextStatus }
+}
+
+export async function approveTask(taskId: string) {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return { error: 'Unauthorized' }
+
+    // Fetch task and user profile checks
+    const { data: task } = await supabase.from('tasks').select('risk_level, status').eq('id', taskId).single()
+    const { data: approver } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+
+    if (!task) return { error: 'Task not found' }
+    if (!approver) return { error: 'User profile not found' }
+
+    // Validation Logic
+    if (task.status === 'Pending_Executive_Approval') {
+        if (approver.role !== 'Executive' && approver.role !== 'Founder') {
+            return { error: 'Only Executives can approve High Risk tasks.' } // Rubber stamp needed
+        }
+    }
+
+    // Release Logic
+    const { error } = await supabase.from('tasks')
+        .update({
+            status: 'Completed',
+            client_visible: true,
+            end_date: new Date().toISOString()
+        })
+        .eq('id', taskId)
+
+    if (error) return { error: error.message }
+
+    await logSystemEvent(taskId, `Task Approved & Released by ${approver.role}`, user.id)
+    await logTaskHistory(taskId, 'COMPLETED', user.id, {
+        approver_role: approver.role,
+        via_approval: true
+    })
+
+    revalidatePath('/tasks')
     return { success: true }
+}
+
+export async function nudgeTask(taskId: string) {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return { error: 'Unauthorized' } // Assuming Client is an authenticated user?
+
+    // Check last nudge to prevent spam? (1 hour cooldown)
+    const { data: task } = await supabase.from('tasks').select('last_nudge_at, nudge_count').eq('id', taskId).single()
+
+    if (task?.last_nudge_at) {
+        const lastNudge = new Date(task.last_nudge_at).getTime()
+        const now = Date.now()
+        if (now - lastNudge < 3600000) { // 1 hour
+            const remaining = Math.ceil((3600000 - (now - lastNudge)) / 60000)
+            return { error: `Please wait ${remaining} minutes before nudging again.` }
+        }
+    }
+
+    const { error } = await supabase.from('tasks')
+        .update({
+            nudge_count: (task?.nudge_count || 0) + 1,
+            last_nudge_at: new Date().toISOString()
+        })
+        .eq('id', taskId)
+
+    if (error) return { error: error.message }
+
+    // NOTIFICATION LOGIC (Mock implementation for now)
+    // In a real app, this would send an SMS/Slack webhook.
+    console.log(`[RED PHONE] Client nudged Task ${taskId}!!`)
+    await logSystemEvent(taskId, "🔴 CLIENT NUDGE: Client requested an update.", user.id)
+
+    revalidatePath('/tasks')
+    return { success: true }
+}
+
+
+// --- LIVE PULSE METRICS ---
+export async function getPulseMetrics() {
+    const supabase = await createClient()
+    const foundry_id = await getFoundryId()
+
+    if (!foundry_id) return { actions: 0 }
+
+    // Count history events in last 1 hour
+    const oneHourAgo = new Date(Date.now() - 3600000).toISOString()
+
+    // We join with profiles to ensure we are only counting activity for OUR foundry (tenancy)
+    // task_history -> tasks (filtered by foundry_id)
+    // But task_history doesn't have foundry_id directly. It links to task.
+
+    const { count, error } = await supabase
+        .from('task_history')
+        .select('id', { count: 'exact', head: true })
+        .gt('created_at', oneHourAgo)
+    // complex filter might be needed if tenancy isn't strict, but assuming tasks are RLS protected to foundry
+    // we can simpler just query. But wait, RLS is active.
+    // So checking "count" should automatically respect RLS and only show me history I can see (my foundry).
+
+    if (error) {
+        console.error("Pulse error", error)
+        return { actions: 0 }
+    }
+
+    return { actions: count || 0 }
 }
 
 export async function updateTaskDates(taskId: string, startDate: string, endDate: string) {
@@ -426,7 +567,9 @@ export async function duplicateTask(originalTaskId: string) {
         status: 'Pending',
         start_date: null, // Reset dates? Or keep? Resetting is usually safer for copies.
         end_date: null,
-        progress: 0
+        progress: 0,
+        risk_level: originalTask.risk_level || 'Low', // Copy risk level
+        client_visible: false // Reset visibility
     }).select().single()
 
     if (insertError) return { error: insertError.message }
