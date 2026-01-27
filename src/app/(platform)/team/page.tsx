@@ -28,7 +28,21 @@ export default async function TeamPage() {
         .select('assignee_id, status, title')
         .eq('foundry_id', foundry_id)
 
-    // ... (profiles fetching code remains same) ...
+    // Fetch all profiles for the current foundry
+    const { data: profiles } = await supabase
+        .from('profiles')
+        .select(`
+            *,
+            paired_ai:profiles!paired_ai_id(id, full_name, role, email, avatar_url)
+        `)
+        .eq('foundry_id', foundry_id)
+        .order('role', { ascending: true })
+
+    // Fetch teams
+    const { data: teams } = await supabase
+        .from('teams')
+        .select('*')
+        .eq('foundry_id', foundry_id)
 
     interface MemberMetrics {
         id: string
