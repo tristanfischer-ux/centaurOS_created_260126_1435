@@ -3,12 +3,20 @@
 import { useState } from "react"
 import { TaskCard } from "./task-card"
 import { Button } from "@/components/ui/button"
-import { LayoutGrid, List } from "lucide-react"
+import { LayoutGrid, List, X } from "lucide-react"
 import { CreateTaskDialog } from "./create-task-dialog"
 import { Database } from "@/types/database.types"
 import { Badge } from "@/components/ui/badge"
 import { format } from "date-fns"
 import { ThreadDrawer } from "./thread-drawer"
+import { cn } from "@/lib/utils"
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select"
 
 // Task type update
 type Task = Database["public"]["Tables"]["tasks"]["Row"] & {

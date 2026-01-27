@@ -38,11 +38,22 @@ export default async function TeamPage() {
         .eq('foundry_id', foundry_id)
         .order('role', { ascending: true })
 
-    // Fetch teams
-    const { data: teams } = await supabase
+    // Fetch teams with members
+    const { data: rawTeams } = await supabase
         .from('teams')
-        .select('*')
+        .select(`
+            *,
+            team_members(
+                profile:profiles(id, full_name, role, email)
+            )
+        `)
         .eq('foundry_id', foundry_id)
+        .order('created_at', { ascending: false })
+
+    const teams = rawTeams?.map(team => ({
+        ...team,
+        members: (team.team_members as any[])?.map(tm => tm.profile) || []
+    })) || []
 
     interface MemberMetrics {
         id: string
