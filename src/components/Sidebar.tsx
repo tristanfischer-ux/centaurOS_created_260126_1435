@@ -69,7 +69,7 @@ export function Sidebar({ foundryName, foundryId }: { foundryName?: string; foun
                     </div>
                 </div>
                 <div className="text-[10px] text-slate-400 text-center font-mono">
-                    v1.0.2
+                    v1.0.3
                 </div>
             </div>
         </div>
