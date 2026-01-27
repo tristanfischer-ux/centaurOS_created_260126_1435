@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { GanttView, JoinedTask } from '@/components/timeline/GanttView'
 import { TimelineListView } from '@/components/timeline/TimelineListView'
-import { CreateTaskDialog } from '@/app/tasks/create-task-dialog'
+import { CreateTaskDialog } from '@/app/(platform)/tasks/create-task-dialog'
 
 export default async function TimelinePage() {
     const supabase = await createClient()
