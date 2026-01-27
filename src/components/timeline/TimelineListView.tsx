@@ -339,6 +339,7 @@ export function TimelineListView({ tasks }: TimelineListViewProps) {
                                                 <div className="flex-1 min-w-0">
                                                     <div className="flex items-start justify-between gap-2">
                                                         <h4 className="font-medium text-slate-900 truncate">
+                                                            <span className="text-slate-400 font-mono text-xs mr-2">#{task.task_number}</span>
                                                             {task.title}
                                                         </h4>
                                                         <Badge className={`shrink-0 text-xs ${getStatusBadge(task.status)}`}>

@@ -16,7 +16,6 @@ export default async function TasksPage() {
             assignee:profiles!assignee_id(id, full_name, role, email),
             creator:profiles!creator_id(id, full_name, role),
             objective:objectives!objective_id(id, title),
-            task_files(id),
             task_assignees(
                 profile:profiles(id, full_name, role, email)
             )
@@ -24,6 +23,7 @@ export default async function TasksPage() {
         .order('created_at', { ascending: false })
 
     if (error) {
+        console.error("Error loading tasks:", error)
         return <div className="text-red-500">Error loading tasks</div>
     }
 

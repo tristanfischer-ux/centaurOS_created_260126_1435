@@ -228,7 +228,7 @@ export function GanttView({ tasks, objectives, profiles }: GanttViewProps) {
                     endDate.setDate(startDate.getDate() + 1)
                 }
 
-                let color = "#6b7280" // Pending
+                let color = "#475569" // Slate 600 (Darker for better contrast)
                 let progress = task.progress ?? 0
 
                 if (task.status === "Accepted") { color = "#2563eb"; }
@@ -256,7 +256,8 @@ export function GanttView({ tasks, objectives, profiles }: GanttViewProps) {
                     },
                     // Assignee info for avatar
                     assigneeName: task.profiles?.full_name,
-                    assigneeRole: task.profiles?.role
+                    assigneeRole: task.profiles?.role,
+                    taskNumber: task.task_number
                 }
             })
     }, [filteredTasks, localDateOverrides, sortBy])
@@ -338,8 +339,10 @@ export function GanttView({ tasks, objectives, profiles }: GanttViewProps) {
 
     return (
         <div className="space-y-4">
-            <div className="text-xs text-slate-400 text-right px-1">
-                Drag to reschedule • Resize to change duration • Double-click to view
+            <div className="text-xs text-slate-500 text-right px-1 flex justify-end gap-4">
+                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-slate-400"></span> Drag bar to reschedule</span>
+                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-slate-400"></span> Drag edges to resize duration</span>
+                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-slate-600"></span> Drag darker fill to update progress</span>
             </div>
             {/* Control Bar */}
             <Card className="p-4 bg-white border-slate-200 flex flex-wrap gap-4 items-center justify-between shadow-sm">
@@ -445,9 +448,9 @@ export function GanttView({ tasks, objectives, profiles }: GanttViewProps) {
                         tasks={ganttTasks}
                         viewMode={viewMode}
                         viewDate={dateOffset}
-                        listCellWidth="260px"
+                        listCellWidth="300px"
                         columnWidth={viewMode === ViewMode.Month ? 300 : viewMode === ViewMode.Week ? 150 : 65}
-                        barFill={60}
+                        barFill={80} // Thicker bars for easier grabbing
                         onDateChange={handleDateChange}
                         onProgressChange={handleProgressChange}
                         onDoubleClick={handleDoubleClick}

@@ -33,6 +33,15 @@ export function EditTaskDialog({ open, onOpenChange, task, members }: EditTaskDi
     const [loadingAttachments, setLoadingAttachments] = useState(false)
     const [uploading, setUploading] = useState(false)
 
+    const loadAttachments = async () => {
+        setLoadingAttachments(true)
+        const res = await getTaskAttachments(task.id)
+        if (res.data) {
+            setAttachments(res.data)
+        }
+        setLoadingAttachments(false)
+    }
+
     useEffect(() => {
         if (open) {
             // Reset fields to current task data
@@ -42,15 +51,6 @@ export function EditTaskDialog({ open, onOpenChange, task, members }: EditTaskDi
             loadAttachments()
         }
     }, [open, task])
-
-    const loadAttachments = async () => {
-        setLoadingAttachments(true)
-        const res = await getTaskAttachments(task.id)
-        if (res.data) {
-            setAttachments(res.data)
-        }
-        setLoadingAttachments(false)
-    }
 
     const handleSavePrimary = async () => {
         setLoading(true)
@@ -103,7 +103,10 @@ export function EditTaskDialog({ open, onOpenChange, task, members }: EditTaskDi
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="bg-white border-slate-200 text-slate-900 sm:max-w-xl max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
-                    <DialogTitle>Edit Task</DialogTitle>
+                    <DialogTitle className="flex items-baseline gap-2">
+                        Edit Task
+                        <span className="text-sm font-mono font-normal text-slate-400">#{task.task_number}</span>
+                    </DialogTitle>
                 </DialogHeader>
 
                 <div className="space-y-6 py-2">

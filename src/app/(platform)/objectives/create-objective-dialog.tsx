@@ -321,7 +321,7 @@ export function CreateObjectiveDialog({ disabled }: { disabled?: boolean }) {
                                                 <div className="px-4 py-3 border-b bg-white font-medium text-sm text-slate-500 flex justify-between items-center">
                                                     <div className="flex items-center gap-2">
                                                         <Checkbox
-                                                            checked={selectedTaskIds.length === (selectedPack.items?.length || 0) && selectedPack.items?.length > 0}
+                                                            checked={selectedTaskIds.length === (selectedPack.items?.length || 0) && (selectedPack.items?.length ?? 0) > 0}
                                                             onCheckedChange={(checked) => {
                                                                 if (checked) {
                                                                     setSelectedTaskIds(selectedPack.items?.map(i => i.id) || [])
