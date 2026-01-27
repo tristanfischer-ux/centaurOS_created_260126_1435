@@ -314,7 +314,7 @@ export async function forwardTask(taskId: string, newAssigneeId: string, reason:
     
     // Properly type the forwarding_history JSON field
     const history: ForwardingEvent[] = Array.isArray(task.forwarding_history) 
-        ? (task.forwarding_history as ForwardingEvent[])
+        ? (task.forwarding_history as unknown as ForwardingEvent[])
         : []
     
     const newHistory: ForwardingEvent[] = [
