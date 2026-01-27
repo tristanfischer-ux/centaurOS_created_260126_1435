@@ -3,7 +3,8 @@
 import { useState, useEffect } from "react"
 import { TaskCard } from "./task-card"
 import { Button } from "@/components/ui/button"
-import { LayoutGrid, List, X } from "lucide-react"
+import { LayoutGrid, List, X, Trash2, CheckSquare } from "lucide-react"
+import { deleteTasks } from "@/actions/tasks"
 import { CreateTaskDialog } from "./create-task-dialog"
 import { Database } from "@/types/database.types"
 import { Badge } from "@/components/ui/badge"
@@ -49,6 +50,8 @@ interface TasksViewProps {
 export function TasksView({ tasks, objectives, members, currentUserId, currentUserRole }: TasksViewProps) {
     const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
     const [selectedTask, setSelectedTask] = useState<Task | null>(null)
+    const [isSelectionMode, setIsSelectionMode] = useState(false)
+    const [selectedTaskIds, setSelectedTaskIds] = useState<Set<string>>(new Set())
 
     // Filter & Sort State
     const [statusFilter, setStatusFilter] = useState<string[]>([])
@@ -152,16 +155,59 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
         })
     }
 
+    // Selection Handlers
+    const toggleSelectionMode = () => {
+        setIsSelectionMode(prev => !prev)
+        setSelectedTaskIds(new Set())
+    }
+
+    const toggleTaskSelection = (taskId: string) => {
+        setSelectedTaskIds(prev => {
+            const newSet = new Set(prev)
+            if (newSet.has(taskId)) newSet.delete(taskId)
+            else newSet.add(taskId)
+            return newSet
+        })
+    }
+
+    const handleBulkDelete = async () => {
+        if (selectedTaskIds.size === 0) return
+        if (!confirm(`Are you sure you want to delete ${selectedTaskIds.size} tasks?`)) return
+
+        await deleteTasks(Array.from(selectedTaskIds))
+        setIsSelectionMode(false)
+        setSelectedTaskIds(new Set())
+    }
+
     return (
         <>
             <div className="space-y-6">
                 <div className="flex flex-col gap-4">
                     <div className="flex items-center justify-between">
                         <div>
-                            <h1 className="text-3xl font-bold tracking-tight text-slate-900 mb-2">Tasks</h1>
+                            <h1 className="text-3xl font-bold tracking-tight text-slate-900 mb-2 flex items-center gap-3">
+                                Tasks
+                                <span className="text-slate-400 font-medium text-2xl">{tasks.length}</span>
+                            </h1>
                             <p className="text-slate-500">Democratic workflow management.</p>
                         </div>
                         <div className="flex items-center gap-2">
+                            {isSelectionMode ? (
+                                <div className="flex items-center gap-2 mr-2">
+                                    <Button variant="destructive" size="sm" onClick={handleBulkDelete} disabled={selectedTaskIds.size === 0}>
+                                        <Trash2 className="w-4 h-4 mr-2" />
+                                        Delete ({selectedTaskIds.size})
+                                    </Button>
+                                    <Button variant="ghost" size="sm" onClick={toggleSelectionMode}>
+                                        Cancel
+                                    </Button>
+                                </div>
+                            ) : (
+                                <Button variant="outline" size="sm" onClick={toggleSelectionMode} className="mr-2">
+                                    <CheckSquare className="w-4 h-4 mr-2 text-slate-500" />
+                                    Select
+                                </Button>
+                            )}
                             <div className="bg-slate-100 p-1 rounded-lg flex items-center mr-2">
                                 <Button
                                     variant={viewMode === 'grid' ? 'default' : 'ghost'}
@@ -277,6 +323,9 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                                         members={members}
                                         expanded={expandedRows.has(rowIndex)}
                                         onToggle={() => toggleRow(rowIndex)}
+                                        isSelectionMode={isSelectionMode}
+                                        isSelected={selectedTaskIds.has(task.id)}
+                                        onToggleSelection={() => toggleTaskSelection(task.id)}
                                     />
                                 </div>
                             )

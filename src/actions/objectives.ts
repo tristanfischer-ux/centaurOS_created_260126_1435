@@ -48,12 +48,14 @@ export async function createObjective(formData: FormData) {
 
     // A. From Playbook
     if (playbookId && playbookId !== 'none') {
-        const { getPackDetails } = await import('@/actions/packs')
-        const { pack } = await getPackDetails(playbookId)
+        const { data: packItems } = await supabase
+            .from('pack_items')
+            .select('*')
+            .eq('pack_id', playbookId)
 
-        if (pack && pack.items) {
+        if (packItems && packItems.length > 0) {
             // Filter tasks based on selection
-            const tasksFromBook = pack.items.filter(t => selectedTaskIds.includes(t.id))
+            const tasksFromBook = packItems.filter(t => selectedTaskIds.includes(t.id))
 
             // Find AI Agent if needed
             let aiAgentId = null

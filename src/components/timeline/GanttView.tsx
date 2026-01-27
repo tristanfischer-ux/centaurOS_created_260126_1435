@@ -271,18 +271,13 @@ export function GanttView({ tasks, objectives, profiles }: GanttViewProps) {
                     endDate = new Date(startDate.getTime() + 86400000)
                 }
 
-                let color = "#475569" // Slate 600 (Darker for better contrast)
-                let progress = task.progress ?? 0
+                // Standardized Colors (Solid)
+                let color = "#64748b" // Slate 500 (Pending)
 
-                if (task.status === "Accepted") { color = "#2563eb"; }
-                if (task.status === "Completed") { color = "#16a34a"; progress = 100; }
-                if (task.status === "Rejected") { color = "#dc2626"; }
-                if (task.status === "Amended" || task.status === "Amended_Pending_Approval") { color = "#ea580c"; }
-
-                // Ensure completed tasks show 100% implicitly if not set otherwise
-                if (task.status === 'Completed' && Math.round(progress) < 100) {
-                    progress = 100
-                }
+                if (task.status === "Accepted") { color = "#3b82f6"; } // Blue 500
+                if (task.status === "Completed") { color = "#22c55e"; } // Green 500
+                if (task.status === "Rejected") { color = "#ef4444"; } // Red 500
+                if (task.status === "Amended" || task.status === "Amended_Pending_Approval") { color = "#f97316"; } // Orange 500
 
                 return {
                     start: startDate,
@@ -290,12 +285,12 @@ export function GanttView({ tasks, objectives, profiles }: GanttViewProps) {
                     name: task.title || "Untitled Task",
                     id: task.id,
                     type: "task" as const,
-                    progress,
-                    isDisabled: false, // ENABLED for drag-drop!
+                    progress: 100, // Visual: Always full bar (removes inconsistent "progress" look)
+                    isDisabled: false, // ENABLED for drag-drop (dates), but progress is effectively hidden
                     styles: {
                         progressColor: color,
                         progressSelectedColor: color,
-                        backgroundColor: color + "40", // 25% opacity background
+                        backgroundColor: color, // Solid color
                     },
                     // Assignee info for avatar
                     assigneeName: task.profiles?.full_name,
@@ -303,6 +298,7 @@ export function GanttView({ tasks, objectives, profiles }: GanttViewProps) {
                     taskNumber: task.task_number
                 }
             })
+
     }, [filteredTasks, localDateOverrides, sortBy])
 
     // Handler: When task progress is changed (dragged)
@@ -386,7 +382,7 @@ export function GanttView({ tasks, objectives, profiles }: GanttViewProps) {
             <div className="text-xs text-slate-500 text-right px-1 flex justify-end gap-4">
                 <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-slate-400"></span> Drag bar to reschedule</span>
                 <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-slate-400"></span> Drag edges to resize duration</span>
-                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-slate-600"></span> Drag darker fill to update progress</span>
+
             </div>
             {/* Control Bar */}
             <Card className="p-4 bg-white border-slate-200 flex flex-wrap gap-4 items-center justify-between shadow-sm">
@@ -496,7 +492,7 @@ export function GanttView({ tasks, objectives, profiles }: GanttViewProps) {
                         columnWidth={viewMode === ViewMode.Month ? 300 : viewMode === ViewMode.Week ? 150 : 65}
                         barFill={80} // Thicker bars for easier grabbing
                         onDateChange={handleDateChange}
-                        onProgressChange={handleProgressChange}
+
                         onDoubleClick={handleDoubleClick}
                         onClick={handleClick}
                         TaskListHeader={CustomTaskListHeader}
