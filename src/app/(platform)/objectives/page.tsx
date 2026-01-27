@@ -31,7 +31,9 @@ export default async function ObjectivesPage() {
             assignee_id,
             end_date,
             objective_id,
-            assignee:profiles!tasks_assignee_id_fkey(full_name, role)
+            assignee:profiles!tasks_assignee_id_fkey(full_name, role),
+            task_comments(id, is_system_log),
+            task_files(count)
         `)
         .not('objective_id', 'is', null)
         .order('end_date', { ascending: true })
@@ -41,7 +43,9 @@ export default async function ObjectivesPage() {
         ...obj,
         tasks: tasks?.filter(t => t.objective_id === obj.id).map(t => ({
             ...t,
-            assignee: t.assignee as unknown as { full_name: string | null; role: string | null } | null
+            assignee: t.assignee as unknown as { full_name: string | null; role: string | null } | null,
+            notesCount: t.task_comments?.filter((c: { is_system_log: boolean | null }) => !c.is_system_log).length || 0,
+            attachmentCount: t.task_files?.[0]?.count || 0
         })) || []
     })) || []
 

@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { ChevronDown, ChevronRight, Target, CheckCircle2, Clock, AlertCircle, ArrowRight, Trash2, Trash } from "lucide-react"
+import { ChevronDown, ChevronRight, Target, CheckCircle2, Clock, AlertCircle, ArrowRight, Trash, MessageSquare, Paperclip } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
@@ -26,6 +26,8 @@ interface Task {
     status: string | null
     assignee_id: string | null
     end_date: string | null
+    notesCount?: number
+    attachmentCount?: number
     assignee?: {
         full_name: string | null
         role: string | null
@@ -213,17 +215,35 @@ export function ObjectivesListView({ objectives }: ObjectivesListViewProps) {
                                                             {task.status?.replace('_', ' ') || 'Pending'}
                                                         </Badge>
 
-                                                        {task.assignee?.full_name && (
-                                                            <span className="text-xs text-slate-400 max-w-[120px] truncate">
-                                                                {task.assignee.full_name}
-                                                            </span>
-                                                        )}
+                                                        <div className="flex items-center gap-3">
+                                                            {task.assignee?.full_name && (
+                                                                <span className="text-xs text-slate-400 max-w-[120px] truncate">
+                                                                    {task.assignee.full_name}
+                                                                </span>
+                                                            )}
 
-                                                        {task.end_date && (
-                                                            <span className="text-xs text-slate-400">
-                                                                Due {new Date(task.end_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                                                            </span>
-                                                        )}
+                                                            {/* Meta Icons */}
+                                                            <div className="flex items-center gap-2">
+                                                                {(task.notesCount || 0) > 0 && (
+                                                                    <div className="flex items-center text-slate-400" title={`${task.notesCount} notes`}>
+                                                                        <MessageSquare className="h-3.5 w-3.5 mr-1" />
+                                                                        <span className="text-[10px]">{task.notesCount}</span>
+                                                                    </div>
+                                                                )}
+                                                                {(task.attachmentCount || 0) > 0 && (
+                                                                    <div className="flex items-center text-slate-400" title={`${task.attachmentCount} attachments`}>
+                                                                        <Paperclip className="h-3.5 w-3.5 mr-1" />
+                                                                        <span className="text-[10px]">{task.attachmentCount}</span>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+
+                                                            {task.end_date && (
+                                                                <span className="text-xs text-slate-400">
+                                                                    Due {new Date(task.end_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                                                                </span>
+                                                            )}
+                                                        </div>
                                                     </div>
                                                 )
                                             })}
