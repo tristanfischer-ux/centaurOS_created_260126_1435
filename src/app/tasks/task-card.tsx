@@ -6,7 +6,7 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/componen
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
-import { Check, X, ArrowRight, Edit, MessageSquare, Clock, ChevronDown, Bot, Target } from "lucide-react"
+import { Check, X, ArrowRight, Edit, MessageSquare, ChevronDown, Bot, Target, Calendar, User, PlayCircle, AlertCircle } from "lucide-react"
 import { acceptTask, rejectTask, forwardTask, amendTask, completeTask, triggerAIWorker, updateTaskProgress } from "@/actions/tasks"
 import {
     Dialog,
@@ -108,6 +108,11 @@ export function TaskCard({ task, currentUserId, userRole, members }: TaskCardPro
         return format(date, 'MMM d')
     }
 
+    const formatFullDate = (dateStr: string | null) => {
+        if (!dateStr) return "Not set"
+        return format(new Date(dateStr), "MMMM d, yyyy")
+    }
+
     // Handlers for actions
     const handleAccept = async () => {
         setLoading(true)
@@ -159,7 +164,7 @@ export function TaskCard({ task, currentUserId, userRole, members }: TaskCardPro
             case 'Completed': return 'bg-green-600'
             case 'Rejected': return 'bg-red-600'
             case 'Amended_Pending_Approval': return 'bg-orange-500'
-            default: return 'bg-gray-500'
+            default: return 'bg-slate-500'
         }
     }
 
@@ -169,35 +174,36 @@ export function TaskCard({ task, currentUserId, userRole, members }: TaskCardPro
     })
 
     const dueInfo = formatDate(task.end_date)
+    const isOverdue = task.end_date && new Date(task.end_date) < new Date() && task.status !== 'Completed'
 
     return (
-        <Card className="bg-white border-slate-200 hover:border-slate-300 hover:shadow-md transition-all">
+        <Card className="bg-white border-slate-200 hover:border-slate-300 hover:shadow-md transition-all flex flex-col h-full">
             {/* Clickable Header - Always Visible */}
             <CardHeader
-                className="pb-3 cursor-pointer"
+                className="pb-3 cursor-pointer select-none"
                 onClick={() => setExpanded(!expanded)}
             >
-                <div className="flex flex-col gap-3">
+                <div className="flex flex-col gap-4">
                     {/* Top Row: Objective & Status */}
                     <div className="flex justify-between items-start">
-                        <div className="flex-1 min-w-0 pr-2">
+                        <div className="flex-1 min-w-0 pr-4">
                             {task.objective && (
-                                <div className="text-xs font-semibold text-amber-600 mb-1 flex items-center gap-1">
+                                <div className="text-xs font-semibold text-amber-600 mb-1.5 flex items-center gap-1.5">
                                     <Target className="h-3 w-3" />
-                                    {task.objective.title}
+                                    <span className="truncate">{task.objective.title}</span>
                                 </div>
                             )}
-                            <CardTitle className="text-lg text-slate-900 font-bold leading-tight line-clamp-2">
+                            <CardTitle className="text-xl text-slate-900 font-bold leading-tight decoration-slate-900/50">
                                 {task.title || "Untitled Task"}
                             </CardTitle>
                         </div>
-                        <div className="flex flex-col items-end gap-1 shrink-0">
-                            <Badge className={`${getStatusColor(task.status)} text-white border-0 shadow-sm whitespace-nowrap`}>
-                                {task.status}
+                        <div className="flex flex-col items-end gap-1.5 shrink-0">
+                            <Badge className={`${getStatusColor(task.status)} text-white border-0 shadow-sm px-2.5 py-1 whitespace-nowrap`}>
+                                {task.status?.replace(/_/g, " ")}
                             </Badge>
-                            {task.assignee?.role === 'AI_Agent' && (
-                                <Badge variant="outline" className="text-[10px] border-purple-200 bg-purple-50 text-purple-700">
-                                    <Bot className="h-3 w-3 mr-1" /> AI Agent
+                            {isAITask && (
+                                <Badge variant="outline" className="text-[10px] border-purple-200 bg-purple-50 text-purple-700 flex items-center gap-1">
+                                    <Bot className="h-3 w-3" /> AI Agent
                                 </Badge>
                             )}
                         </div>
@@ -210,35 +216,68 @@ export function TaskCard({ task, currentUserId, userRole, members }: TaskCardPro
                         </p>
                     )}
 
-                    {/* Metadata Grid */}
-                    <div className="grid grid-cols-2 gap-y-2 gap-x-4 text-xs mt-1">
-                        {task.assignee && (
-                            <div className="flex items-center gap-1.5 text-slate-600">
-                                <div className="h-5 w-5 rounded-full bg-slate-100 flex items-center justify-center text-[10px] font-bold">
-                                    {task.assignee.full_name?.charAt(0)}
-                                </div>
-                                <span className="truncate max-w-[100px]" title={task.assignee.full_name || ''}>
-                                    {task.assignee.full_name}
+                    <Separator className="bg-slate-100" />
+
+                    {/* Enhanced Metadata Grid */}
+                    <div className="grid grid-cols-2 gap-y-3 gap-x-4 text-xs mt-1">
+                        {/* Assignee */}
+                        <div className="flex items-center gap-2 text-slate-600">
+                            <div className="h-6 w-6 rounded-full bg-slate-100 flex items-center justify-center text-xs font-bold ring-2 ring-white shadow-sm">
+                                {task.assignee?.full_name?.charAt(0) || "?"}
+                            </div>
+                            <div className="flex flex-col">
+                                <span className="text-[10px] text-slate-400 font-medium uppercase tracking-wide">Assigned To</span>
+                                <span className="truncate font-medium text-slate-700" title={task.assignee?.full_name || ''}>
+                                    {task.assignee?.full_name || "Unassigned"}
                                 </span>
                             </div>
-                        )}
+                        </div>
 
-                        {dueInfo && (
-                            <div className={`flex items-center gap-1.5 justify-end ${dueInfo.includes('overdue') ? 'text-red-600 font-medium' : 'text-slate-500'}`}>
-                                <Clock className="h-3.5 w-3.5" />
-                                {dueInfo}
+                        {/* Due Date */}
+                        <div className={`flex items-center justify-end gap-2 ${isOverdue ? 'text-red-600' : 'text-slate-600'}`}>
+                            <div className="flex flex-col items-end">
+                                <span className="text-[10px] text-slate-400 font-medium uppercase tracking-wide">Due Date</span>
+                                <div className="flex items-center gap-1.5 font-medium">
+                                    {(isOverdue || dueInfo?.includes('overdue')) && <AlertCircle className="h-3.5 w-3.5" />}
+                                    {!isOverdue && <Calendar className="h-3.5 w-3.5 opacity-70" />}
+                                    <span>{dueInfo || "No Deadline"}</span>
+                                </div>
                             </div>
-                        )}
+                        </div>
+
+                        {/* Creator (Only if expanded or distinct) - Actually let's show always for context if space allows, or in second row */}
+                        <div className="flex items-center gap-2 text-slate-600">
+                            <div className="h-6 w-6 rounded-full bg-slate-50 border border-slate-100 flex items-center justify-center text-[10px] text-slate-400">
+                                <User className="h-3.5 w-3.5" />
+                            </div>
+                            <div className="flex flex-col">
+                                <span className="text-[10px] text-slate-400 font-medium uppercase tracking-wide">Created By</span>
+                                <span className="truncate font-medium text-slate-700">
+                                    {task.creator?.full_name || "System"}
+                                </span>
+                            </div>
+                        </div>
+
+                        {/* Start Date or Status Context */}
+                        <div className="flex items-center justify-end gap-2 text-slate-600">
+                            <div className="flex flex-col items-end">
+                                <span className="text-[10px] text-slate-400 font-medium uppercase tracking-wide">Start Date</span>
+                                <div className="flex items-center gap-1.5 font-medium">
+                                    <PlayCircle className="h-3.5 w-3.5 opacity-70" />
+                                    <span>{task.start_date ? formatDate(task.start_date) : "ASAP"}</span>
+                                </div>
+                            </div>
+                        </div>
                     </div>
 
-                    {/* Progress Bar */}
+                    {/* Progress Bar moved inside Header for constant visibility */}
                     <div className="pt-2">
                         <div className="flex justify-between items-center text-[10px] text-slate-400 mb-1.5 uppercase tracking-wider font-medium">
                             <span>Progress</span>
                             <span>{displayProgress}%</span>
                         </div>
                         <div
-                            className="h-2 bg-slate-100 rounded-full overflow-hidden cursor-pointer hover:ring-2 hover:ring-amber-300 transition-all"
+                            className="h-2.5 bg-slate-100 rounded-full overflow-hidden cursor-pointer hover:ring-2 hover:ring-amber-300 transition-all"
                             onClick={(e) => { e.stopPropagation(); handleProgressClick(e); }}
                             title="Click to set progress"
                         >
@@ -259,68 +298,79 @@ export function TaskCard({ task, currentUserId, userRole, members }: TaskCardPro
             {/* Expandable Content */}
             {expanded && (
                 <>
-                    <CardContent>
-                        <p className="text-slate-600 text-sm mb-3 line-clamp-2">{task.description || "No description."}</p>
-
-                        {/* Progress Bar - Clickable */}
-                        <div className="mb-3">
-                            <div className="flex justify-between items-center text-xs text-slate-500 mb-1">
-                                <span>Progress</span>
-                                <span>{displayProgress}%</span>
+                    <CardContent className="bg-slate-50/50 pt-4 pb-4">
+                        <div className="space-y-4">
+                            {/* Full Description */}
+                            <div className="space-y-1">
+                                <h4 className="text-xs font-semibold text-slate-900 uppercase tracking-wider">Description</h4>
+                                <p className="text-slate-700 text-sm leading-relaxed whitespace-pre-wrap">
+                                    {task.description || "No specific details provided."}
+                                </p>
                             </div>
-                            <div
-                                className="h-3 bg-slate-100 rounded-full overflow-hidden cursor-pointer hover:ring-2 hover:ring-amber-300 transition-all"
-                                onClick={handleProgressClick}
-                                title="Click to set progress"
-                            >
-                                <div
-                                    className={`h-full ${progressColor} transition-all duration-300`}
-                                    style={{ width: `${displayProgress}%` }}
-                                />
+
+                            {/* Detailed Dates */}
+                            <div className="grid grid-cols-2 gap-4 pt-2">
+                                <div className="bg-white p-2.5 rounded border border-slate-100">
+                                    <span className="text-[10px] text-slate-400 block mb-1">Start Date</span>
+                                    <span className="text-sm font-medium text-slate-700">{formatFullDate(task.start_date)}</span>
+                                </div>
+                                <div className="bg-white p-2.5 rounded border border-slate-100">
+                                    <span className="text-[10px] text-slate-400 block mb-1">Deadline</span>
+                                    <span className={`text-sm font-medium ${isOverdue ? "text-red-600" : "text-slate-700"}`}>
+                                        {formatFullDate(task.end_date)}
+                                    </span>
+                                </div>
                             </div>
                         </div>
 
                         {task.status === 'Amended_Pending_Approval' && (
-                            <div className="bg-orange-50 border border-orange-200 p-3 rounded-md mb-4 text-sm text-orange-800">
+                            <div className="mt-4 bg-orange-50 border border-orange-200 p-3 rounded-md text-sm text-orange-800">
                                 <strong>Amendment Proposed:</strong>
                                 <p className="mt-1 opacity-90">{task.amendment_notes}</p>
                             </div>
                         )}
                     </CardContent>
-                    <Separator className="bg-slate-100" />
-                    <CardFooter className="pt-3 flex flex-wrap gap-2 items-center">
+
+                    <Separator className="bg-slate-200" />
+
+                    <CardFooter className="bg-slate-50 p-4 flex flex-wrap gap-2 items-center">
                         {/* Action Buttons: Visible to Assignee OR Executives (Managers) */}
-                        {(isAssignee || userRole === 'Executive') && (
+                        {(isAssignee || userRole === 'Executive' || isCreator) && (
                             <div className="flex flex-wrap gap-2 flex-1 min-w-0">
                                 {/* Pending Actions */}
                                 {task.status === 'Pending' && (
                                     <>
-                                        <Button size="sm" onClick={handleAccept} disabled={loading} className="bg-green-600 hover:bg-green-700 flex-1 text-white shadow-sm">
-                                            <Check className="h-4 w-4 mr-1" /> Accept
-                                        </Button>
+                                        {/* Accept Button - Only for Assignee */}
+                                        {isAssignee && (
+                                            <Button size="sm" onClick={handleAccept} disabled={loading} className="bg-green-600 hover:bg-green-700 flex-1 text-white shadow-sm">
+                                                <Check className="h-4 w-4 mr-2" /> Accept Task
+                                            </Button>
+                                        )}
 
-                                        {/* Reject Dialog */}
-                                        <Dialog open={rejectOpen} onOpenChange={setRejectOpen}>
-                                            <DialogTrigger asChild>
-                                                <Button size="sm" variant="destructive" disabled={loading} className="flex-1 shadow-sm">
-                                                    <X className="h-4 w-4 mr-1" /> Reject
-                                                </Button>
-                                            </DialogTrigger>
-                                            <DialogContent className="bg-white border-slate-200 text-slate-900">
-                                                <DialogHeader><DialogTitle>Reject Task</DialogTitle></DialogHeader>
-                                                <form action={handleReject} className="space-y-4">
-                                                    <Textarea name="reason" placeholder="Reason for rejection..." required className="bg-slate-50 border-slate-200" />
-                                                    <Button type="submit" variant="destructive">Confirm Rejection</Button>
-                                                </form>
-                                            </DialogContent>
-                                        </Dialog>
+                                        {/* Reject Dialog - Only for Assignee */}
+                                        {isAssignee && (
+                                            <Dialog open={rejectOpen} onOpenChange={setRejectOpen}>
+                                                <DialogTrigger asChild>
+                                                    <Button size="sm" variant="destructive" disabled={loading} className="flex-1 shadow-sm">
+                                                        <X className="h-4 w-4 mr-2" /> Reject
+                                                    </Button>
+                                                </DialogTrigger>
+                                                <DialogContent className="bg-white border-slate-200 text-slate-900">
+                                                    <DialogHeader><DialogTitle>Reject Task</DialogTitle></DialogHeader>
+                                                    <form action={handleReject} className="space-y-4">
+                                                        <Textarea name="reason" placeholder="Reason for rejection..." required className="bg-slate-50 border-slate-200" />
+                                                        <Button type="submit" variant="destructive">Confirm Rejection</Button>
+                                                    </form>
+                                                </DialogContent>
+                                            </Dialog>
+                                        )}
                                     </>
                                 )}
 
                                 {/* Accepted Actions */}
                                 {task.status === 'Accepted' && (
                                     <Button size="sm" onClick={handleComplete} disabled={loading} className="bg-slate-900 hover:bg-slate-800 flex-1 text-white shadow-sm">
-                                        <Check className="h-4 w-4 mr-1" /> Complete Task
+                                        <Check className="h-4 w-4 mr-2" /> Complete Task
                                     </Button>
                                 )}
 
@@ -332,7 +382,7 @@ export function TaskCard({ task, currentUserId, userRole, members }: TaskCardPro
                                         disabled={aiRunning}
                                         className="bg-purple-600 hover:bg-purple-700 flex-1 text-white shadow-sm"
                                     >
-                                        <Bot className="h-4 w-4 mr-1" /> {aiRunning ? 'AI Working...' : 'Run AI'}
+                                        <Bot className="h-4 w-4 mr-2" /> {aiRunning ? 'AI Working...' : 'Trigger AI Agent'}
                                     </Button>
                                 )}
 
@@ -340,7 +390,7 @@ export function TaskCard({ task, currentUserId, userRole, members }: TaskCardPro
                                 <Dialog open={forwardOpen} onOpenChange={setForwardOpen}>
                                     <DialogTrigger asChild>
                                         <Button size="sm" variant="outline" disabled={loading} className="border-slate-200 text-slate-600 hover:bg-slate-50 flex-1">
-                                            <ArrowRight className="h-4 w-4 mr-1" /> Fwd
+                                            <ArrowRight className="h-4 w-4 mr-2" /> Forward
                                         </Button>
                                     </DialogTrigger>
                                     <DialogContent className="bg-white border-slate-200 text-slate-900">
@@ -363,7 +413,7 @@ export function TaskCard({ task, currentUserId, userRole, members }: TaskCardPro
                                                 </Select>
                                             </div>
                                             <Textarea name="reason" placeholder="Handover notes..." required className="bg-slate-50 border-slate-200" />
-                                            <Button type="submit" className="bg-amber-500 text-white hover:bg-amber-600">Forward</Button>
+                                            <Button type="submit" className="bg-amber-500 text-white hover:bg-amber-600">Forward Task</Button>
                                         </form>
                                     </DialogContent>
                                 </Dialog>
@@ -372,7 +422,7 @@ export function TaskCard({ task, currentUserId, userRole, members }: TaskCardPro
                                 <Dialog open={amendOpen} onOpenChange={setAmendOpen}>
                                     <DialogTrigger asChild>
                                         <Button size="sm" variant="outline" disabled={loading} className="border-slate-200 text-slate-600 hover:bg-slate-50 flex-1">
-                                            <Edit className="h-4 w-4 mr-1" /> Amend
+                                            <Edit className="h-4 w-4 mr-2" /> Amend
                                         </Button>
                                     </DialogTrigger>
                                     <DialogContent className="bg-white border-slate-200 text-slate-900">
@@ -390,10 +440,10 @@ export function TaskCard({ task, currentUserId, userRole, members }: TaskCardPro
                         <Button
                             variant="ghost"
                             size="sm"
-                            className="text-slate-500 hover:text-amber-600 shrink-0"
+                            className="text-slate-500 hover:text-amber-600 shrink-0 ml-auto"
                             onClick={() => setThreadOpen(true)}
                         >
-                            <MessageSquare className="h-4 w-4 mr-1" /> Thread
+                            <MessageSquare className="h-4 w-4 mr-2" /> Thread
                         </Button>
                     </CardFooter>
 

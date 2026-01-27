@@ -27,7 +27,7 @@ export async function createMember(formData: FormData) {
 
     const email = formData.get('email') as string
     const full_name = formData.get('full_name') as string
-    const role_type = formData.get('role_type') as "Executive" | "Apprentice"
+    const role_type = formData.get('role_type') as "Executive" | "Apprentice" | "AI_Agent"
 
     if (!email) return { error: 'Email is required' }
     if (!full_name) return { error: 'Full name is required' }
@@ -48,6 +48,50 @@ export async function createMember(formData: FormData) {
     if (error) {
         return { error: error.message }
     }
+
+    revalidatePath('/team')
+    return { success: true }
+}
+
+export async function pairCentaur(humanId: string, aiId: string) {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return { error: 'Unauthorized' }
+
+    // Verify AI exists and is an AI_Agent
+    const { data: aiProfile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', aiId)
+        .single()
+
+    if (!aiProfile || aiProfile.role !== 'AI_Agent') {
+        return { error: 'Invalid AI Agent selected' }
+    }
+
+    // Link the human profile to the AI agent
+    const { error } = await supabase
+        .from('profiles')
+        .update({ paired_ai_id: aiId })
+        .eq('id', humanId)
+
+    if (error) return { error: error.message }
+
+    revalidatePath('/team')
+    return { success: true }
+}
+
+export async function unpairCentaur(humanId: string) {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return { error: 'Unauthorized' }
+
+    const { error } = await supabase
+        .from('profiles')
+        .update({ paired_ai_id: null })
+        .eq('id', humanId)
+
+    if (error) return { error: error.message }
 
     revalidatePath('/team')
     return { success: true }

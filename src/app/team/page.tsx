@@ -48,7 +48,13 @@ export default async function TeamPage() {
         name: team.name,
         is_auto_generated: team.is_auto_generated,
         created_at: team.created_at,
-        members: (team.team_members as Array<{ profiles: { id: string; full_name: string | null; role: string | null; email: string | null } }>)
+        members: (team.members as unknown as Array<{ profile: { id: string; full_name: string | null; role: string | null; email: string | null } }>)
+            .map(m => ({
+                id: m.profile.id,
+                full_name: m.profile.full_name,
+                role: m.profile.role,
+                email: m.profile.email
+            }))
     })) || []
 
     // Calculate metrics per member

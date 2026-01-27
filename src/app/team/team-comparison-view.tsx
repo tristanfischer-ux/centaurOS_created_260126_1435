@@ -9,10 +9,11 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
 import { Check, X, GitCompare, Users, MoreHorizontal, Pencil, Trash2, Loader2, AlertTriangle } from "lucide-react"
-import { createTeam } from "@/actions/team"
+import { createTeam, addTeamMember } from "@/actions/team"
 import { deleteTeam, updateTeamName } from "@/actions/teams"
 import Link from "next/link"
 import { CreateTeamDialog } from "./create-team-dialog"
+import { InviteMemberDialog } from "./invite-member-dialog"
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -333,6 +334,7 @@ export function TeamComparisonView({ founders, executives, apprentices, teams }:
                     <p className="text-gray-400">Manage your Executives and Apprentices.</p>
                 </div>
                 <div className="flex items-center gap-2">
+                    <InviteMemberDialog />
                     <CreateTeamDialog members={[...executives, ...apprentices]} />
 
                     {compareMode && selectedIds.size >= 2 && (
@@ -413,64 +415,103 @@ export function TeamComparisonView({ founders, executives, apprentices, teams }:
                         Teams
                     </h2>
                     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                        {teams.map(team => (
-                            <Card key={team.id} className="bg-white border-slate-200 shadow-sm hover:border-green-400 transition-all group relative">
-                                <CardHeader className="pb-2">
-                                    <div className="flex items-center justify-between">
-                                        <CardTitle className="text-lg text-slate-900 truncate pr-6">{team.name}</CardTitle>
+                        {teams.map(team => {
+                            const isDropTarget = dropTargetId === team.id
 
+                            return (
+                                <Card
+                                    key={team.id}
+                                    className={`
+                                        bg-white border-slate-200 shadow-sm transition-all group relative
+                                        ${isDropTarget ? 'ring-2 ring-green-500 border-green-500 bg-green-50' : 'hover:border-green-400'}
+                                    `}
+                                    onDragOver={(e) => {
+                                        e.preventDefault()
+                                        e.dataTransfer.dropEffect = 'move'
+                                        const draggedId = draggedMemberId || e.dataTransfer.getData('text/plain')
+                                        if (draggedId && !team.members.some(m => m.id === draggedId)) {
+                                            setDropTargetId(team.id)
+                                        }
+                                    }}
+                                    onDragLeave={() => setDropTargetId(null)}
+                                    onDrop={(e) => {
+                                        e.preventDefault()
+                                        const draggedId = e.dataTransfer.getData('text/plain') || draggedMemberId
+
+                                        if (draggedId && !team.members.some(m => m.id === draggedId)) {
+                                            startTransition(async () => {
+                                                await addTeamMember(team.id, draggedId)
+                                            })
+                                        }
+                                        setDropTargetId(null)
+                                        setDraggedMemberId(null)
+                                    }}
+                                >
+                                    {isDropTarget && (
+                                        <div className="absolute inset-0 flex items-center justify-center bg-green-500/10 rounded-lg z-10">
+                                            <div className="bg-green-600 text-white px-3 py-1 rounded-full text-xs font-medium flex items-center gap-1">
+                                                <Users className="h-3 w-3" />
+                                                Add to Team
+                                            </div>
+                                        </div>
+                                    )}
+                                    <CardHeader className="pb-2">
+                                        <div className="flex items-center justify-between">
+                                            <CardTitle className="text-lg text-slate-900 truncate pr-6">{team.name}</CardTitle>
+
+                                            <div className="flex items-center gap-2">
+                                                {team.is_auto_generated && (
+                                                    <Badge variant="outline" className="text-[10px] text-slate-400">Auto</Badge>
+                                                )}
+
+                                                {/* Team Actions Dropdown */}
+                                                <DropdownMenu>
+                                                    <DropdownMenuTrigger asChild>
+                                                        <Button variant="ghost" className="h-8 w-8 p-0 text-slate-400 hover:text-slate-600">
+                                                            <MoreHorizontal className="h-4 w-4" />
+                                                        </Button>
+                                                    </DropdownMenuTrigger>
+                                                    <DropdownMenuContent align="end" className="w-[160px] bg-white border-slate-200">
+                                                        <DropdownMenuItem onClick={() => {
+                                                            setTeamToEdit({ id: team.id, name: team.name })
+                                                            setNewName(team.name)
+                                                        }}>
+                                                            <Pencil className="mr-2 h-4 w-4" /> Rename
+                                                        </DropdownMenuItem>
+                                                        <DropdownMenuItem
+                                                            onClick={() => setTeamToDelete(team.id)}
+                                                            className="text-red-600 focus:text-red-600 focus:bg-red-50"
+                                                        >
+                                                            <Trash2 className="mr-2 h-4 w-4" /> Delete
+                                                        </DropdownMenuItem>
+                                                    </DropdownMenuContent>
+                                                </DropdownMenu>
+                                            </div>
+                                        </div>
+                                    </CardHeader>
+                                    <CardContent>
                                         <div className="flex items-center gap-2">
-                                            {team.is_auto_generated && (
-                                                <Badge variant="outline" className="text-[10px] text-slate-400">Auto</Badge>
-                                            )}
-
-                                            {/* Team Actions Dropdown */}
-                                            <DropdownMenu>
-                                                <DropdownMenuTrigger asChild>
-                                                    <Button variant="ghost" className="h-8 w-8 p-0 text-slate-400 hover:text-slate-600">
-                                                        <MoreHorizontal className="h-4 w-4" />
-                                                    </Button>
-                                                </DropdownMenuTrigger>
-                                                <DropdownMenuContent align="end" className="w-[160px] bg-white border-slate-200">
-                                                    <DropdownMenuItem onClick={() => {
-                                                        setTeamToEdit({ id: team.id, name: team.name })
-                                                        setNewName(team.name)
-                                                    }}>
-                                                        <Pencil className="mr-2 h-4 w-4" /> Rename
-                                                    </DropdownMenuItem>
-                                                    <DropdownMenuItem
-                                                        onClick={() => setTeamToDelete(team.id)}
-                                                        className="text-red-600 focus:text-red-600 focus:bg-red-50"
-                                                    >
-                                                        <Trash2 className="mr-2 h-4 w-4" /> Delete
-                                                    </DropdownMenuItem>
-                                                </DropdownMenuContent>
-                                            </DropdownMenu>
+                                            {/* Member avatars */}
+                                            <div className="flex -space-x-2">
+                                                {(team.members || []).slice(0, 4).map(member => (
+                                                    <Avatar key={member.id} className="h-8 w-8 border-2 border-white">
+                                                        <AvatarFallback className="bg-green-100 text-green-700 text-xs font-bold">
+                                                            {getInitials(member.full_name)}
+                                                        </AvatarFallback>
+                                                    </Avatar>
+                                                ))}
+                                                {(team.members || []).length > 4 && (
+                                                    <div className="h-8 w-8 rounded-full bg-slate-200 border-2 border-white flex items-center justify-center text-xs text-slate-600">
+                                                        +{(team.members || []).length - 4}
+                                                    </div>
+                                                )}
+                                            </div>
+                                            <span className="text-sm text-slate-500 ml-2">{(team.members || []).length} members</span>
                                         </div>
-                                    </div>
-                                </CardHeader>
-                                <CardContent>
-                                    <div className="flex items-center gap-2">
-                                        {/* Member avatars */}
-                                        <div className="flex -space-x-2">
-                                            {(team.members || []).slice(0, 4).map(member => (
-                                                <Avatar key={member.id} className="h-8 w-8 border-2 border-white">
-                                                    <AvatarFallback className="bg-green-100 text-green-700 text-xs font-bold">
-                                                        {getInitials(member.full_name)}
-                                                    </AvatarFallback>
-                                                </Avatar>
-                                            ))}
-                                            {(team.members || []).length > 4 && (
-                                                <div className="h-8 w-8 rounded-full bg-slate-200 border-2 border-white flex items-center justify-center text-xs text-slate-600">
-                                                    +{(team.members || []).length - 4}
-                                                </div>
-                                            )}
-                                        </div>
-                                        <span className="text-sm text-slate-500 ml-2">{(team.members || []).length} members</span>
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        ))}
+                                    </CardContent>
+                                </Card>
+                            )
+                        })}
                     </div>
                 </section>
             )}
