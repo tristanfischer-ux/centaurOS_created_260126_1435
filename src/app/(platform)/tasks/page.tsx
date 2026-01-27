@@ -1,6 +1,9 @@
 import { createClient } from '@/lib/supabase/server'
 import { TasksView } from './tasks-view'
 
+// Revalidate every 60 seconds
+export const revalidate = 60
+
 export default async function TasksPage() {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
@@ -16,7 +19,7 @@ export default async function TasksPage() {
             assignee:profiles!assignee_id(id, full_name, role, email),
             creator:profiles!creator_id(id, full_name, role),
             objective:objectives!objective_id(id, title),
-            task_files(id, file_name, file_size, uploaded_at)
+            task_files(id, file_name, file_size, created_at)
         `)
         .order('created_at', { ascending: false })
 
@@ -32,22 +35,27 @@ export default async function TasksPage() {
         )
     }
 
-    // Fetch current user's profile to get role
-    const { data: currentUserProfile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
-    const currentUserRole = currentUserProfile?.role
+    // Parallelize independent queries
+    const [
+        { data: currentUserProfile },
+        { data: objectives },
+        { data: membersData },
+        { data: teamsData }
+    ] = await Promise.all([
+        supabase.from('profiles').select('id, foundry_id, role').eq('id', user.id).single(),
+        supabase.from('objectives').select('id, title'),
+        supabase.from('profiles').select('id, full_name, role, email'),
+        supabase.from('teams').select('id, name')
+    ])
 
-    // Fetch data for the dialog and cards
-    const objectives = await supabase.from('objectives').select('id, title').then(r => r.data || [])
-    const membersData = await supabase.from('profiles').select('id, full_name, role, email')
-    const members = (membersData.data || []).map(p => ({
+    const currentUserRole = currentUserProfile?.role
+    const objectivesList = objectives || []
+    const members = (membersData || []).map(p => ({
         id: p.id,
         full_name: p.full_name || 'Unknown',
         role: p.role,
         email: p.email
     }))
-
-    // Fetch Teams
-    const { data: teamsData } = await supabase.from('teams').select('id, name')
     const teams = teamsData || []
 
     // Join tasks with related data
@@ -63,7 +71,7 @@ export default async function TasksPage() {
     return (
         <TasksView
             tasks={tasksWithData}
-            objectives={objectives}
+            objectives={objectivesList}
             members={members}
             teams={teams}
             currentUserId={user.id}

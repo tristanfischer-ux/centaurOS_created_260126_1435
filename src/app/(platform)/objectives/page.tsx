@@ -2,6 +2,9 @@ import { createClient } from '@/lib/supabase/server'
 import { CreateObjectiveDialog } from './create-objective-dialog'
 import { ObjectivesListView } from './objectives-list-view'
 
+// Revalidate every 60 seconds
+export const revalidate = 60
+
 export default async function ObjectivesPage() {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
@@ -13,7 +16,7 @@ export default async function ObjectivesPage() {
     // Fetch objectives
     const { data: objectives, error } = await supabase
         .from('objectives')
-        .select('*')
+        .select('id, title, description, status, progress, parent_objective_id, creator_id, foundry_id, created_at, updated_at')
         .order('created_at', { ascending: false })
 
     if (error) {
@@ -33,7 +36,7 @@ export default async function ObjectivesPage() {
             objective_id,
             assignee:profiles!tasks_assignee_id_fkey(full_name, role),
             task_comments(id, is_system_log),
-            task_files(id, file_name, file_size, uploaded_at)
+            task_files(id, file_name, file_size, created_at)
         `)
         .not('objective_id', 'is', null)
         .order('end_date', { ascending: true })
