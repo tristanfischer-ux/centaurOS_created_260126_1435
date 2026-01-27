@@ -15,14 +15,9 @@ export async function createObjective(formData: FormData) {
 
     if (!user) return { error: 'Unauthorized' }
 
-    // 1. Get real foundry_id
-    const { data: profile } = await supabase
-        .from('profiles')
-        .select('foundry_id')
-        .eq('id', user.id)
-        .single()
-
-    if (!profile?.foundry_id) return { error: 'No foundry associated with user' }
+    // Get foundry_id using cached helper
+    const foundry_id = await getFoundryIdCached()
+    if (!foundry_id) return { error: 'User not in a foundry' }
 
     const title = formData.get('title') as string
     const description = formData.get('description') as string
@@ -49,18 +44,23 @@ export async function createObjective(formData: FormData) {
     const { title: validatedTitle, description: validatedDescription, playbookId: validatedPlaybookId, selectedTaskIds: validatedSelectedTaskIds } = validation.data
 
     // 2. Create the objective
-    const { data: objective, error } = await withRetry(async () => {
-        const result = await supabase.from('objectives').insert({
-            title: validatedTitle,
-            description: validatedDescription || null,
-            creator_id: user.id,
-            foundry_id: profile.foundry_id
-        }).select().single()
-        if (result.error) throw result.error
-        return result
-    })
+    let objective
+    try {
+        const result = await withRetry(async () => {
+            const res = await supabase.from('objectives').insert({
+                title: validatedTitle,
+                description: validatedDescription || null,
+                creator_id: user.id,
+                foundry_id
+            }).select().single()
+            if (res.error) throw res.error
+            return res.data
+        })
+        objective = result
+    } catch (error) {
+        return { error: error instanceof Error ? error.message : 'Failed to create objective' }
+    }
 
-    if (error) return { error: error.message }
     if (!objective) return { error: 'Failed to create objective' }
 
     // 3. Create Tasks
@@ -156,7 +156,7 @@ export async function createObjective(formData: FormData) {
                     description: item.description?.trim() || '',
                     objective_id: objective.id,
                     creator_id: user.id,
-                    foundry_id: profile.foundry_id,
+                    foundry_id,
                     status: 'Pending' as const,
                     assignee_id: assigneeId,
                     start_date: now.toISOString(),
@@ -196,7 +196,7 @@ export async function createObjective(formData: FormData) {
                 description: task.description,
                 objective_id: objective.id,
                 creator_id: user.id,
-                foundry_id: profile.foundry_id,
+                foundry_id,
                 status: 'Pending' as const,
                 assignee_id: task.role === 'AI_Agent' ? aiAgentId : user.id, // Assign to creator by default
                 risk_level: 'Low' as const,
@@ -206,12 +206,13 @@ export async function createObjective(formData: FormData) {
     }
 
     if (tasksToInsert.length > 0) {
-        const { error: taskError } = await withRetry(async () => {
-            const result = await supabase.from('tasks').insert(tasksToInsert)
-            if (result.error) throw result.error
-            return result
-        })
-        if (taskError) {
+        try {
+            await withRetry(async () => {
+                const result = await supabase.from('tasks').insert(tasksToInsert)
+                if (result.error) throw result.error
+                return result
+            })
+        } catch (taskError) {
             console.error('Error creating tasks:', taskError)
             // Delete the objective to prevent partial creation
             const { error: deleteError } = await supabase
@@ -224,7 +225,8 @@ export async function createObjective(formData: FormData) {
                 return { error: `Failed to create tasks and cleanup failed. Objective ID: ${objective.id}` }
             }
             
-            return { error: `Failed to create tasks: ${taskError.message}` }
+            const errorMessage = taskError instanceof Error ? taskError.message : 'Unknown error'
+            return { error: `Failed to create tasks: ${errorMessage}` }
         }
     }
 
