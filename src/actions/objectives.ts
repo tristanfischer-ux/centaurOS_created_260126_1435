@@ -67,15 +67,23 @@ export async function createObjective(formData: FormData) {
 
             tasksToInsert = [
                 ...tasksToInsert,
-                ...tasksFromBook.map(task => ({
-                    title: task.title,
-                    description: task.description || '',
-                    objective_id: objective.id,
-                    creator_id: user.id,
-                    foundry_id: profile.foundry_id,
-                    status: 'Pending' as const,
-                    assignee_id: task.role === 'AI_Agent' ? aiAgentId : null,
-                }))
+                ...tasksFromBook.map(task => {
+                    const now = new Date()
+                    const nextWeek = new Date(now)
+                    nextWeek.setDate(now.getDate() + 7)
+
+                    return {
+                        title: task.title,
+                        description: task.description || '',
+                        objective_id: objective.id,
+                        creator_id: user.id,
+                        foundry_id: profile.foundry_id,
+                        status: 'Pending' as const,
+                        assignee_id: task.role === 'AI_Agent' ? aiAgentId : null,
+                        start_date: now.toISOString(),
+                        end_date: nextWeek.toISOString(),
+                    }
+                })
             ]
         }
     }

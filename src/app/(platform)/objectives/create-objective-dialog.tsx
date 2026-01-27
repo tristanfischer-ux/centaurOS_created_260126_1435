@@ -22,6 +22,7 @@ import {
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
+import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
@@ -63,6 +64,7 @@ export function CreateObjectiveDialog({ disabled }: { disabled?: boolean }) {
     const [packs, setPacks] = useState<ObjectivePack[]>([])
     const [selectedPack, setSelectedPack] = useState<ObjectivePack | null>(null)
     const [packLoading, setPackLoading] = useState(false)
+    const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([])
 
     // Import Data
     const [analyzing, setAnalyzing] = useState(false)
@@ -81,6 +83,7 @@ export function CreateObjectiveDialog({ disabled }: { disabled?: boolean }) {
                 setTitle("")
                 setDescription("")
                 setSelectedPack(null)
+                setSelectedTaskIds([])
                 setAnalyzedObjectives([])
                 setSelectedAnalysisIndex(null)
                 setAnalysisFile(null)
@@ -139,9 +142,9 @@ export function CreateObjectiveDialog({ disabled }: { disabled?: boolean }) {
         // Add special handling for Packs
         if (mode === 'pack' && selectedPack) {
             formData.append('playbookId', selectedPack.id)
-            // Auto-select all items from the pack
-            selectedPack.items?.forEach(item => {
-                formData.append('selectedTaskIds', item.id)
+            // Use user-selected tasks
+            selectedTaskIds.forEach(id => {
+                formData.append('selectedTaskIds', id)
             })
         }
 
@@ -279,6 +282,7 @@ export function CreateObjectiveDialog({ disabled }: { disabled?: boolean }) {
                                                     className="cursor-pointer hover:border-blue-500 hover:shadow-md transition-all group border-slate-200"
                                                     onClick={() => {
                                                         setSelectedPack(pack)
+                                                        setSelectedTaskIds(pack.items?.map(i => i.id) || []) // Auto-select all by default
                                                         setTitle(pack.title)
                                                         setDescription(pack.description || "")
                                                     }}
@@ -314,20 +318,41 @@ export function CreateObjectiveDialog({ disabled }: { disabled?: boolean }) {
                                             </div>
 
                                             <div className="border rounded-xl overflow-hidden bg-slate-50">
-                                                <div className="px-4 py-3 border-b bg-white font-medium text-sm text-slate-500 flex justify-between">
-                                                    <span>Included Tasks</span>
-                                                    <span>{selectedPack.items?.length || 0} Items</span>
+                                                <div className="px-4 py-3 border-b bg-white font-medium text-sm text-slate-500 flex justify-between items-center">
+                                                    <div className="flex items-center gap-2">
+                                                        <Checkbox
+                                                            checked={selectedTaskIds.length === (selectedPack.items?.length || 0) && selectedPack.items?.length > 0}
+                                                            onCheckedChange={(checked) => {
+                                                                if (checked) {
+                                                                    setSelectedTaskIds(selectedPack.items?.map(i => i.id) || [])
+                                                                } else {
+                                                                    setSelectedTaskIds([])
+                                                                }
+                                                            }}
+                                                        />
+                                                        <span>Select All Tasks</span>
+                                                    </div>
+                                                    <span>{selectedTaskIds.length} of {selectedPack.items?.length || 0} selected</span>
                                                 </div>
                                                 <div className="divide-y divide-slate-100">
                                                     {selectedPack.items?.map((item) => (
-                                                        <div key={item.id} className="p-4 flex items-start gap-4">
+                                                        <div key={item.id} className="p-4 flex items-start gap-4 hover:bg-slate-50/50 transition-colors">
                                                             <div className="mt-1">
-                                                                <Check className="w-4 h-4 text-green-500" />
+                                                                <Checkbox
+                                                                    checked={selectedTaskIds.includes(item.id)}
+                                                                    onCheckedChange={(checked) => {
+                                                                        if (checked) {
+                                                                            setSelectedTaskIds(prev => [...prev, item.id])
+                                                                        } else {
+                                                                            setSelectedTaskIds(prev => prev.filter(id => id !== item.id))
+                                                                        }
+                                                                    }}
+                                                                />
                                                             </div>
                                                             <div className="space-y-1">
                                                                 <p className="font-medium text-slate-900 text-sm">{item.title}</p>
                                                                 <p className="text-sm text-slate-500">{item.description}</p>
-                                                                {item.role && <Badge variant="outline" className="text-[10px] h-5">{item.role}</Badge>}
+                                                                {/* Role removed for later assignment */}
                                                             </div>
                                                         </div>
                                                     ))}
