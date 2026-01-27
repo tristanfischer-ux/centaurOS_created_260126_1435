@@ -36,6 +36,9 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import { usePresenceContext } from "@/components/PresenceProvider"
+import { PresenceIndicator } from "@/components/PresenceIndicator"
+import { cn } from "@/lib/utils"
 
 
 interface Member {
@@ -105,8 +108,11 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
     const [memberToDelete, setMemberToDelete] = useState<string | null>(null)
     const [newName, setNewName] = useState("")
 
+    // Presence tracking for remote team visibility
+    const { getPresenceForUser, teamPresence } = usePresenceContext()
+
     // Auto-refresh using Supabase Realtime
-    useAutoRefresh({ tables: ['profiles', 'teams'] })
+    useAutoRefresh({ tables: ['profiles', 'teams', 'presence'] })
 
     const allMembers = [...executives, ...apprentices]
     const selectedMembers = allMembers.filter(m => selectedIds.has(m.id))
@@ -384,13 +390,22 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                     </div>
                 )}
                 <CardHeader className="flex flex-row items-center gap-4 pb-2 relative">
-                    {/* Main Avatar */}
+                    {/* Main Avatar with Presence */}
                     <div className="relative">
                         <Avatar className={`h-12 w-12 ${avatarBorderClass}`}>
                             <AvatarFallback className={avatarBgClass}>
                                 {isAIAgent ? <Brain className="h-6 w-6" /> : getInitials(member.full_name)}
                             </AvatarFallback>
                         </Avatar>
+
+                        {/* Presence Indicator */}
+                        {!isAIAgent && (
+                            <PresenceIndicator
+                                status={getPresenceForUser(member.id)?.status || 'offline'}
+                                presence={getPresenceForUser(member.id)}
+                                size="md"
+                            />
+                        )}
 
                         {/* Paired AI Badge (Little Avatar) */}
                         {isCentaur && (
@@ -630,11 +645,20 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                 <td className="px-4 py-3 pl-6">
                     <div className="flex items-center gap-3">
                         <Link href={`/team/${member.id}`} className="flex items-center gap-3">
-                            <Avatar className="h-9 w-9 border border-slate-200">
-                                <AvatarFallback className="bg-slate-100 text-slate-500 text-xs">
-                                    {isAIAgent ? <Brain className="h-4 w-4" /> : getInitials(member.full_name)}
-                                </AvatarFallback>
-                            </Avatar>
+                            <div className="relative">
+                                <Avatar className="h-9 w-9 border border-slate-200">
+                                    <AvatarFallback className="bg-slate-100 text-slate-500 text-xs">
+                                        {isAIAgent ? <Brain className="h-4 w-4" /> : getInitials(member.full_name)}
+                                    </AvatarFallback>
+                                </Avatar>
+                                {!isAIAgent && (
+                                    <PresenceIndicator
+                                        status={getPresenceForUser(member.id)?.status || 'offline'}
+                                        presence={getPresenceForUser(member.id)}
+                                        size="sm"
+                                    />
+                                )}
+                            </div>
                             <span className="font-medium text-slate-900 group-hover:text-blue-600 group-active:text-blue-700 transition-colors">
                                 {member.full_name}
                             </span>
