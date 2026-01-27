@@ -37,20 +37,31 @@ export function usePresence(options: UsePresenceOptions = {}) {
 
   const supabase = createClient()
 
-  // Update presence via RPC
+  // Update presence via direct upsert
   const updatePresence = useCallback(async (
     status: PresenceStatus,
     currentTaskId?: string | null,
     statusMessage?: string | null
   ) => {
     try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return null
+      
       const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone
-      const { data, error } = await supabase.rpc('upsert_presence', {
-        p_status: status,
-        p_current_task_id: currentTaskId || null,
-        p_timezone: timezone,
-        p_status_message: statusMessage || null
-      })
+      const { data, error } = await supabase
+        .from('presence')
+        .upsert({
+          user_id: user.id,
+          status: status,
+          current_task_id: currentTaskId || null,
+          last_seen: new Date().toISOString(),
+          timezone: timezone,
+          status_message: statusMessage || null
+        }, {
+          onConflict: 'user_id'
+        })
+        .select()
+        .single()
       
       if (error) {
         console.error('Error updating presence:', error)
