@@ -442,7 +442,7 @@ export function CreateObjectiveDialog({ disabled }: { disabled?: boolean }) {
                 </ScrollArea>
 
                 {/* Footer Actions */}
-                <DialogFooter className="p-6 pt-4 border-t border-slate-100 bg-white items-center">
+                <DialogFooter className="p-6 pt-4 border-t border-slate-100 bg-white">
                     <div className="flex-1 text-sm text-slate-500">
                         {mode === 'pack' && selectedPack && "This will create 1 objective and multiple tasks."}
                         {mode === 'import' && selectedAnalysisIndex !== null && "AI generated tasks will be created."}
@@ -455,7 +455,7 @@ export function CreateObjectiveDialog({ disabled }: { disabled?: boolean }) {
                     <Button
                         onClick={handleCreate}
                         disabled={loading || (mode === 'pack' && !selectedPack) || (mode === 'import' && selectedAnalysisIndex === null) || !title.trim()}
-                        className="bg-slate-900 text-white min-w-[120px]"
+                        className="bg-black hover:bg-slate-800 text-white min-w-[140px] shadow-sm"
                     >
                         {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                         {!loading && <Plus className="mr-2 h-4 w-4" />}

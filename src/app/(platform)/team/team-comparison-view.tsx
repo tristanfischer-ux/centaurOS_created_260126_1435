@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
-import { Check, X, GitCompare, Users, MoreHorizontal, Pencil, Trash2, Loader2, AlertTriangle } from "lucide-react"
+import { Check, X, GitCompare, Users, MoreHorizontal, Pencil, Trash2, Loader2, AlertTriangle, Mail, Phone } from "lucide-react"
 import { createTeam, addTeamMember, deleteMember } from "@/actions/team"
 import { deleteTeam, updateTeamName } from "@/actions/teams"
 import Link from "next/link"
@@ -39,6 +39,8 @@ interface Member {
     id: string
     full_name: string | null
     email: string | null
+    bio?: string | null
+    phone_number?: string | null
     role: string
     activeTasks: number
     completedTasks: number
@@ -389,7 +391,7 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                                         <MoreHorizontal className="h-4 w-4" />
                                     </Button>
                                 </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end">
+                                <DropdownMenuContent align="end" sideOffset={8}>
                                     <DropdownMenuItem
                                         className="text-red-600 focus:text-red-600 focus:bg-red-50"
                                         onClick={(e) => {
@@ -428,8 +430,31 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                         </div>
                     </div>
                 </CardHeader>
-                <CardContent className="text-sm text-slate-500">
-                    <div className="flex gap-4 text-xs">
+                <CardContent className="text-sm text-slate-500 space-y-3">
+                    {/* Contact Info */}
+                    <div className="space-y-1">
+                        {member.email && (
+                            <div className="flex items-center gap-2 text-xs">
+                                <Mail className="h-3 w-3 text-slate-400" />
+                                <span className="truncate">{member.email}</span>
+                            </div>
+                        )}
+                        {member.phone_number && (
+                            <div className="flex items-center gap-2 text-xs">
+                                <Phone className="h-3 w-3 text-slate-400" />
+                                <span className="truncate">{member.phone_number}</span>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Bio */}
+                    {member.bio && (
+                        <p className="text-xs text-slate-600 line-clamp-2 italic">
+                            {member.bio}
+                        </p>
+                    )}
+
+                    <div className="flex gap-4 text-xs pt-1 border-t border-slate-100">
                         <span className="text-green-600">{member.completedTasks} done</span>
                         <span className="text-blue-600">{member.activeTasks} active</span>
                         <span className="text-slate-400">{member.pendingTasks} pending</span>
@@ -633,7 +658,7 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                                                             <MoreHorizontal className="h-4 w-4" />
                                                         </Button>
                                                     </DropdownMenuTrigger>
-                                                    <DropdownMenuContent align="end" className="w-[160px] bg-white border-slate-200">
+                                                    <DropdownMenuContent align="end" className="w-[160px] bg-white border-slate-200" sideOffset={8}>
                                                         <DropdownMenuItem onClick={() => {
                                                             setTeamToEdit({ id: team.id, name: team.name })
                                                             setNewName(team.name)

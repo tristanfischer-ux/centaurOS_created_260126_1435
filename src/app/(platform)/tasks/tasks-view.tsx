@@ -14,6 +14,7 @@ import { ThreadDrawer } from "./thread-drawer"
 type Task = Database["public"]["Tables"]["tasks"]["Row"] & {
     assignee?: { id: string, full_name: string | null, role: string, email: string }
     task_number?: number
+    task_files?: { id: string }[]
 }
 
 type Objective = {
@@ -35,7 +36,7 @@ interface TasksViewProps {
     currentUserRole?: string
 }
 
-import { LivePulse } from "@/components/smart-airlock/LivePulse"
+
 // ...
 export function TasksView({ tasks, objectives, members, currentUserId, currentUserRole }: TasksViewProps) {
     const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
@@ -64,10 +65,7 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                         <h1 className="text-3xl font-bold tracking-tight text-slate-900 mb-2">Tasks</h1>
                         <p className="text-slate-500">Democratic workflow management.</p>
                     </div>
-                    {/* Live Pulse Widget */}
-                    <div className="hidden lg:block ml-auto mr-4">
-                        <LivePulse />
-                    </div>
+
                     <div className="flex items-center gap-2">
                         <div className="bg-slate-100 p-1 rounded-lg flex items-center mr-2">
                             <Button
@@ -96,9 +94,9 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                 </div>
 
                 {viewMode === 'grid' ? (
-                    <div className="columns-1 md:columns-2 lg:columns-3 gap-6 space-y-6 block">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         {tasks.map(task => (
-                            <div key={task.id} className="break-inside-avoid mb-6">
+                            <div key={task.id} className="h-full">
                                 <TaskCard
                                     task={task}
                                     currentUserId={currentUserId}

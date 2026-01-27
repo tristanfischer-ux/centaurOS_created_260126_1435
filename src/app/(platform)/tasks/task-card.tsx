@@ -22,15 +22,23 @@ import {
 } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { format } from "date-fns"
-import { Calendar as CalendarIcon, Check, X, ArrowRight, Edit, Bot, MessageSquare, ChevronDown, ChevronUp, AlertCircle, Copy, Pencil, History as HistoryIcon, ShieldAlert, Eye, EyeOff, ShieldCheck } from "lucide-react"
+import { Calendar as CalendarIcon, Check, X, ArrowRight, Edit, Bot, MessageSquare, ChevronDown, ChevronUp, AlertCircle, Copy, Pencil, History as HistoryIcon, ShieldAlert, Eye, EyeOff, ShieldCheck, Paperclip, Plus } from "lucide-react"
 import { Calendar } from "@/components/ui/calendar"
 import {
     Popover,
     PopoverContent,
     PopoverTrigger,
 } from "@/components/ui/popover"
-import { acceptTask, rejectTask, forwardTask, amendTask, completeTask, triggerAIWorker, updateTaskDates, duplicateTask } from "@/actions/tasks"
-import { cn } from "@/lib/utils"
+import {
+    Command,
+    CommandEmpty,
+    CommandGroup,
+    CommandInput,
+    CommandItem,
+    CommandList,
+} from "@/components/ui/command"
+import { acceptTask, rejectTask, forwardTask, amendTask, completeTask, triggerAIWorker, updateTaskDates, duplicateTask, updateTaskAssignees } from "@/actions/tasks"
+import { cn, getInitials } from "@/lib/utils"
 import { Database } from "@/types/database.types"
 import { ThreadDrawer } from "./thread-drawer"
 import { EditTaskDialog } from "@/components/tasks/edit-task-dialog"
@@ -40,8 +48,10 @@ import { RubberStampModal } from "@/components/smart-airlock/RubberStampModal"
 import { ClientNudgeButton } from "@/components/smart-airlock/ClientNudgeButton"
 
 type Task = Database["public"]["Tables"]["tasks"]["Row"] & {
-    assignee?: { id: string, full_name: string | null, role: string, email: string } | null
+    assignee?: { id: string, full_name: string | null, role: string, email: string, avatar_url?: string | null } | null
+    assignees?: { id: string, full_name: string | null, role: string, email: string, avatar_url?: string | null }[]
     task_number?: number
+    task_files?: { id: string }[]
 }
 
 type Member = {
@@ -58,9 +68,9 @@ interface TaskCardProps {
 }
 
 export function TaskCard({ task, currentUserId, userRole, members }: TaskCardProps) {
-    const isAssignee = currentUserId === task.assignee_id
+    const isAssignee = task.assignees?.some(a => a.id === currentUserId) || task.assignee_id === currentUserId
     const isCreator = currentUserId === task.creator_id
-    const isAITask = task.assignee?.role === 'AI_Agent'
+    const isAITask = task.assignees?.some(a => a.role === 'AI_Agent') || task.assignee?.role === 'AI_Agent'
     const isOverdue = task.end_date ? new Date(task.end_date) < new Date() : false
     const isExecutive = userRole === 'Executive' || userRole === 'Founder'
 
@@ -76,6 +86,11 @@ export function TaskCard({ task, currentUserId, userRole, members }: TaskCardPro
     const [editOpen, setEditOpen] = useState(false)
     const [historyOpen, setHistoryOpen] = useState(false)
     const [rubberStampOpen, setRubberStampOpen] = useState(false)
+
+    // Normalize assignees list (handle backward compatibility or fallback)
+    const currentAssignees = task.assignees && task.assignees.length > 0
+        ? task.assignees
+        : (task.assignee ? [task.assignee] : [])
 
     // Helper Functions
     const formatFullDate = (dateStr: string | null) => {
@@ -103,7 +118,7 @@ export function TaskCard({ task, currentUserId, userRole, members }: TaskCardPro
         }
     }
 
-    // Handlers
+    // Handlers (keep existing ones...)
     const handleAccept = async () => {
         setLoading(true)
         const res = await acceptTask(task.id)
@@ -176,11 +191,9 @@ export function TaskCard({ task, currentUserId, userRole, members }: TaskCardPro
     // Date Update Handler
     const handleDateUpdate = async (type: 'start' | 'end', date: Date | undefined) => {
         if (!date) return
-
         const newDateStr = date.toISOString()
         const currentStart = task.start_date || new Date().toISOString()
         const currentEnd = task.end_date || new Date().toISOString()
-
         setLoading(true)
         if (type === 'start') {
             await updateTaskDates(task.id, newDateStr, currentEnd)
@@ -193,19 +206,34 @@ export function TaskCard({ task, currentUserId, userRole, members }: TaskCardPro
 
     const sortedMembers = [...members].sort((a, b) => a.full_name.localeCompare(b.full_name))
 
+    const handleAssigneeToggle = async (memberId: string) => {
+        const currentIds = currentAssignees.map(a => a.id)
+        let newIds: string[]
+
+        if (currentIds.includes(memberId)) {
+            // Remove
+            newIds = currentIds.filter(id => id !== memberId)
+            if (newIds.length === 0) {
+                toast.error("Task must have at least one assignee")
+                return
+            }
+        } else {
+            // Add
+            newIds = [...currentIds, memberId]
+        }
+
+        const result = await updateTaskAssignees(task.id, newIds)
+        if (result.error) {
+            toast.error(result.error)
+        } else {
+            toast.success("Assignees updated")
+        }
+    }
+
     return (
         <Card className="bg-white border-slate-200 hover:border-slate-300 hover:shadow-md transition-all flex flex-col h-full group/card relative">
-            {/* Visibility Indicator */}
-            <div className="absolute top-4 right-4 z-10" title={task.client_visible ? "Visible to Client" : "Hidden from Client"}>
-                {task.client_visible ? (
-                    <Eye className="w-4 h-4 text-green-500/50" />
-                ) : (
-                    <EyeOff className="w-4 h-4 text-slate-300" />
-                )}
-            </div>
-
             <CardHeader className="p-4 pb-2 space-y-3 cursor-pointer" onClick={() => setExpanded(!expanded)}>
-                <div className="flex justify-between items-start gap-2 pr-6">
+                <div className="flex justify-between items-start gap-2">
                     <div className="space-y-1 flex-1">
                         <div className="flex items-center gap-2 flex-wrap">
                             <span className="text-xs font-mono text-slate-400">
@@ -214,9 +242,7 @@ export function TaskCard({ task, currentUserId, userRole, members }: TaskCardPro
                             <Badge className={`${getStatusColor(task.status)} text-white hover:${getStatusColor(task.status)} border-0`}>
                                 {(task.status || 'Pending').replace(/_/g, ' ')}
                             </Badge>
-                            {/* Risk Badge */}
                             {getRiskBadge(task.risk_level)}
-
                             {isOverdue && task.status !== 'Completed' && (
                                 <span className="text-red-600 flex items-center text-[10px] font-medium">
                                     <AlertCircle className="w-3 h-3 mr-1" /> Overdue
@@ -226,12 +252,97 @@ export function TaskCard({ task, currentUserId, userRole, members }: TaskCardPro
                         <h3 className="font-semibold text-slate-900 leading-tight group-hover/card:text-blue-700 transition-colors">
                             {task.title}
                         </h3>
+
+                        {/* Summary Metadata */}
+                        <div className="flex items-center gap-3 text-xs text-slate-500 pt-1">
+                            {task.start_date && (
+                                <span className="flex items-center gap-1" title="Start Date">
+                                    <CalendarIcon className="w-3 h-3" />
+                                    {format(new Date(task.start_date), "MMM d")}
+                                </span>
+                            )}
+                            <span className="flex items-center gap-1" title="Documents">
+                                <Paperclip className="w-3 h-3" />
+                                {task.task_files?.length || 0}
+                            </span>
+                        </div>
                     </div>
-                    <div title={task.assignee ? `Assignee: ${task.assignee.full_name}` : "Unassigned"}>
-                        <Avatar className="h-8 w-8 border border-slate-200">
-                            <AvatarImage src={`https://avatar.vercel.sh/${task.assignee?.email || 'unassigned'}`} />
-                            <AvatarFallback>{task.assignee?.full_name?.substring(0, 2) || "??"}</AvatarFallback>
-                        </Avatar>
+
+
+                    <div className="flex items-start gap-2">
+                        {/* Visibility Indicator */}
+                        <div title={task.client_visible ? "Visible to Client" : "Hidden from Client"}>
+                            {task.client_visible ? (
+                                <Eye className="w-4 h-4 text-green-500/50 mt-1" />
+                            ) : (
+                                <EyeOff className="w-4 h-4 text-slate-300 mt-1" />
+                            )}
+                        </div>
+
+                        {/* Assignee Avatar & Picker */}
+                        <div className="relative">
+                            <Popover>
+                                <PopoverTrigger asChild>
+                                    <div
+                                        className="cursor-pointer hover:opacity-80 transition-opacity"
+                                        title={currentAssignees.map(a => a.full_name).join(', ') || "Click to assign"}
+                                        onClick={(e) => e.stopPropagation()}
+                                    >
+                                        <div className="flex -space-x-2">
+                                            {currentAssignees.length > 0 ? (
+                                                currentAssignees.map((assignee, i) => (
+                                                    <Avatar key={assignee.id} className="h-8 w-8 border-2 border-white ring-1 ring-slate-100" style={{ zIndex: 10 - i }}>
+                                                        {assignee.avatar_url ? (
+                                                            <AvatarImage src={assignee.avatar_url} />
+                                                        ) : null}
+                                                        <AvatarFallback className="bg-gradient-to-br from-indigo-500 to-purple-600 text-[10px] text-white font-medium">
+                                                            {getInitials(assignee.full_name)}
+                                                        </AvatarFallback>
+                                                    </Avatar>
+                                                ))
+                                            ) : (
+                                                <div className="h-8 w-8 rounded-full bg-slate-100 border border-slate-200 border-dashed flex items-center justify-center text-slate-400">
+                                                    <Plus className="w-4 h-4" />
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-[200px] p-0" align="end" onClick={(e) => e.stopPropagation()}>
+                                    <Command>
+                                        <CommandInput placeholder="Assign to..." className="h-9" />
+                                        <CommandList>
+                                            <CommandEmpty>No members found.</CommandEmpty>
+                                            <CommandGroup heading="Select Assignees">
+                                                {sortedMembers.map((member) => {
+                                                    const isSelected = currentAssignees.some(a => a.id === member.id)
+                                                    return (
+                                                        <CommandItem
+                                                            key={member.id}
+                                                            value={member.full_name || ''}
+                                                            onSelect={() => handleAssigneeToggle(member.id)}
+                                                        >
+                                                            <div className="flex items-center gap-2 w-full">
+                                                                <Avatar className="h-6 w-6 relative">
+                                                                    <AvatarFallback className="text-[10px]">
+                                                                        {getInitials(member.full_name)}
+                                                                    </AvatarFallback>
+                                                                    {/* Simple online indicator if needed, but keeping simple */}
+                                                                </Avatar>
+                                                                <span className="truncate flex-1">{member.full_name}</span>
+                                                                {isSelected && (
+                                                                    <Check className="ml-auto h-4 w-4 opacity-100 text-blue-600" />
+                                                                )}
+                                                            </div>
+                                                        </CommandItem>
+                                                    )
+                                                })}
+                                            </CommandGroup>
+                                        </CommandList>
+                                    </Command>
+                                </PopoverContent>
+                            </Popover>
+                        </div>
                     </div>
                 </div>
 

@@ -322,6 +322,8 @@ export type Database = {
                     full_name: string | null
                     id: string
                     paired_ai_id: string | null
+                    bio: string | null
+                    phone_number: string | null
                     role: Database["public"]["Enums"]["member_role"]
                     updated_at: string | null
                 }
@@ -333,6 +335,8 @@ export type Database = {
                     full_name?: string | null
                     id: string
                     paired_ai_id?: string | null
+                    bio?: string | null
+                    phone_number?: string | null
                     role?: Database["public"]["Enums"]["member_role"]
                     updated_at?: string | null
                 }
@@ -344,6 +348,8 @@ export type Database = {
                     full_name?: string | null
                     id?: string
                     paired_ai_id?: string | null
+                    bio?: string | null
+                    phone_number?: string | null
                     role?: Database["public"]["Enums"]["member_role"]
                     updated_at?: string | null
                 }

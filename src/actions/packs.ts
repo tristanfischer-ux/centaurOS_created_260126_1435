@@ -28,7 +28,7 @@ export async function getObjectivePacks(): Promise<{ packs: ObjectivePack[], err
 
     const { data, error } = await supabase
         .from('objective_packs')
-        .select('*')
+        .select('*, items:pack_items(*)')
         .order('title')
 
     if (error) {

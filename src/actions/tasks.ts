@@ -221,6 +221,13 @@ export async function forwardTask(taskId: string, newAssigneeId: string, reason:
 
     if (error) return { error: error.message }
 
+    // Sync task_assignees table (Replace all previous assignees with the new one)
+    await supabase.from('task_assignees').delete().eq('task_id', taskId)
+    await supabase.from('task_assignees').insert({
+        task_id: taskId,
+        profile_id: newAssigneeId
+    })
+
     // Log with names ideally, but IDs for now
     await logSystemEvent(taskId, `Task forwarded to new assignee. Reason: ${reason}`, user.id)
     await logTaskHistory(taskId, 'FORWARDED', user.id, {

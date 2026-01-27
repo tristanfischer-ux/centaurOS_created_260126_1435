@@ -9,15 +9,112 @@ import { MultiSelect } from "@/components/ui/multi-select"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { ChevronLeft, ChevronRight, CalendarDays } from "lucide-react"
-import { updateTaskDates } from "@/actions/tasks"
-import { toast } from "sonner"
-import { useRouter } from "next/navigation"
-import { format, addDays, subDays, addWeeks, subWeeks, addMonths, subMonths } from "date-fns"
+import { updateTaskDates, updateTaskProgress } from "@/actions/tasks"
 
-// Types for joined data
-export type JoinedTask = Database["public"]["Tables"]["tasks"]["Row"] & {
+// ... (in component)
+
+// Handler: When task progress is changed (dragged)
+const handleProgressChange = async (task: GanttTask) => {
+    // Optimistic update handled by the library UI temporarily, 
+    // but we should probably track it if we wanted perfect consistency.
+    // For now, simpler approach: just fire the update.
+
+    try {
+        const result = await updateTaskProgress(task.id, task.progress)
+
+        if (result.error) {
+            toast.error(result.error)
+            router.refresh() // Revert on error
+        } else {
+            // Success: toast is a bit spammy for dragging, maybe only on error? 
+            // Or "Progress updated" 
+            // toast.success(`Progress updated to ${task.progress}%`) 
+            // actually silently updating is better for sliders usually, maybe just refresh
+            router.refresh()
+        }
+    } catch {
+        toast.error("Failed to update progress")
+        router.refresh()
+    }
+}
+
+// Transform to Gantt Library Format
+const ganttTasks: ExtendedGanttTask[] = useMemo(() => {
+    return filteredTasks
+        .slice(0, 50)
+        .sort((a, b) => { // ... sort logic
+            const aEnd = a.end_date ? new Date(a.end_date).getTime() : Infinity
+            const bEnd = b.end_date ? new Date(b.end_date).getTime() : Infinity
+            return aEnd - bEnd
+        })
+        .map(task => {
+            // ... overrides logic
+            const override = localDateOverrides[task.id]
+            const startDate = override?.start ?? (task.start_date ? new Date(task.start_date) : new Date())
+            const endDate = override?.end ?? (task.end_date ? new Date(task.end_date) : new Date(startDate.getTime() + 86400000 * 2))
+
+            if (endDate <= startDate) {
+                endDate.setDate(startDate.getDate() + 1)
+            }
+
+            let color = "#6b7280" // Pending
+
+            // Prioritize explicit progress field
+            let progress = task.progress ?? 0
+
+            // Fallback / Synchronization logic (optional, but good for consistency)
+            // If progress is 0 but status is Completed, maybe force 100? 
+            // User asked for "manual change", so let's stick to the DB field primarily.
+            // But we can apply colors based on status still.
+
+            if (task.status === "Accepted") { color = "#2563eb"; }
+            if (task.status === "Completed") { color = "#16a34a"; progress = 100; /* Force 100 if completed? Or let them have 100% and not be completed? Let's force 100 for visual consistency if needed, but safer to respect DB. */ }
+            if (task.status === "Rejected") { color = "#dc2626"; }
+            if (task.status === "Amended" || task.status === "Amended_Pending_Approval") { color = "#ea580c"; }
+
+            // Override: If status is Completed, visual progress SHOULD be 100 usually. 
+            // But the user might want to set 90% then manually mark complete. 
+            // Let's use the DB value 'task.progress', and if it's null/0 and status is Completed, show 100.
+            if (task.status === 'Completed' && Math.round(progress) < 100) {
+                progress = 100
+            }
+
+            return {
+                start: startDate,
+                end: endDate,
+                name: task.title || "Untitled Task",
+                id: task.id,
+                type: "task" as const,
+                progress,
+                isDisabled: false,
+                styles: {
+                    progressColor: color,
+                    progressSelectedColor: color,
+                    backgroundColor: color + "40",
+                },
+                assigneeName: task.profiles?.full_name,
+                assigneeRole: task.profiles?.role
+            }
+        })
+}, [filteredTasks, localDateOverrides])
+
+    // ... (in render)
+    < Gantt
+tasks = { ganttTasks }
+viewMode = { viewMode }
+viewDate = { dateOffset }
+listCellWidth = "260px"
+columnWidth = { viewMode === ViewMode.Month ? 300 : viewMode === ViewMode.Week ? 150 : 65}
+barFill = { 60}
+onDateChange = { handleDateChange }
+onProgressChange = { handleProgressChange } // Added handler
+onDoubleClick = { handleDoubleClick }
+onClick = { handleClick }
+TaskListHeader = { CustomTaskListHeader }
+TaskListTable = { CustomTaskListTable }
+    />
     profiles: Database["public"]["Tables"]["profiles"]["Row"] | null
-    objectives: Database["public"]["Tables"]["objectives"]["Row"] | null
+objectives: Database["public"]["Tables"]["objectives"]["Row"] | null
 }
 
 export type GanttViewProps = {
