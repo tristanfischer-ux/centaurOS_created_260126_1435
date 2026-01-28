@@ -241,7 +241,8 @@ export async function getTasksNeedingEscalation(timeoutHours: number = 24): Prom
         }
 
         const result = (data || [])
-            .filter((task): task is typeof task & { updated_at: string } => task.updated_at !== null)
+            .filter((task): task is typeof task & { updated_at: string; status: string } => 
+                task.updated_at !== null && task.status !== null)
             .map(task => ({
                 task_id: task.id,
                 task_title: task.title,
