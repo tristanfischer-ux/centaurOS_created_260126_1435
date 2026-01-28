@@ -7,7 +7,7 @@ import { MarketingFooter } from "@/components/marketing/MarketingFooter";
 
 export default function MarketingPage() {
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen">
       <MarketingNavbar />
       <main>
         <HeroSection />
