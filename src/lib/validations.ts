@@ -28,15 +28,21 @@ export const updateTaskSchema = z.object({
   deadline: z.string().datetime().optional().nullable()
 })
 
+// Custom date string validator that accepts ISO 8601 and other common formats
+const dateStringSchema = z.string().refine(
+  (val) => !isNaN(Date.parse(val)),
+  { message: 'Invalid date format' }
+)
+
 export const updateTaskDatesSchema = z.object({
   taskId: z.string().uuid('Invalid task ID'),
   startDate: z.union([
-    z.string().datetime('Invalid start date format'),
+    dateStringSchema,
     z.null(),
     z.undefined()
   ]).optional().nullable(),
   endDate: z.union([
-    z.string().datetime('Invalid end date format'),
+    dateStringSchema,
     z.null(),
     z.undefined()
   ]).optional().nullable()

@@ -803,70 +803,82 @@ export async function getPulseMetrics() {
 }
 
 export async function updateTaskDates(taskId: string, startDate: string, endDate: string) {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return { error: 'Unauthorized' }
-
-    // Get user's foundry_id
-    const foundry_id = await getFoundryIdCached()
-    if (!foundry_id) return { error: 'User not in a foundry' }
-
-    // Verify user has access to the task's foundry
-    const { data: task, error: taskFetchError } = await supabase
-        .from('tasks')
-        .select('foundry_id')
-        .eq('id', taskId)
-        .single()
-
-    if (taskFetchError || !task) return { error: 'Task not found' }
-
-    if (task.foundry_id !== foundry_id) {
-        return { error: 'Unauthorized: Task belongs to a different foundry' }
-    }
-
-    // Validate using Zod schema
-    // Convert empty strings to null for optional date fields
-    const validation = validate(updateTaskDatesSchema, {
-        taskId,
-        startDate: startDate?.trim() ? startDate.trim() : null,
-        endDate: endDate?.trim() ? endDate.trim() : null
-    })
-    if (!validation.success) {
-        return { error: validation.error }
-    }
-
-    const { startDate: validatedStartDate, endDate: validatedEndDate } = validation.data
-
-    const { error } = await supabase.from('tasks')
-        .update({
-            start_date: validatedStartDate,
-            end_date: validatedEndDate
-        })
-        .eq('id', taskId)
-
-    if (error) return { error: error.message }
-
     try {
-        // Safely format dates for logging (validatedStartDate and validatedEndDate are validated above but add null checks for safety)
-        const startDateFormatted = validatedStartDate ? validatedStartDate.split('T')[0] : 'N/A'
-        const endDateFormatted = validatedEndDate ? validatedEndDate.split('T')[0] : 'N/A'
-        await logSystemEvent(taskId, `Task rescheduled: ${startDateFormatted} → ${endDateFormatted}`, user.id)
-    } catch (logError) {
-        console.error('Failed to log system event:', logError)
-    }
-    
-    try {
-        await logTaskHistory(taskId, 'UPDATED', user.id, {
-            field: 'dates',
-            new_start: validatedStartDate,
-            new_end: validatedEndDate
+        const supabase = await createClient()
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) return { error: 'Unauthorized' }
+
+        // Get user's foundry_id
+        const foundry_id = await getFoundryIdCached()
+        if (!foundry_id) return { error: 'User not in a foundry' }
+
+        // Verify user has access to the task's foundry
+        const { data: task, error: taskFetchError } = await supabase
+            .from('tasks')
+            .select('foundry_id')
+            .eq('id', taskId)
+            .single()
+
+        if (taskFetchError || !task) {
+            console.error('Task fetch error:', taskFetchError)
+            return { error: 'Task not found' }
+        }
+
+        if (task.foundry_id !== foundry_id) {
+            return { error: 'Unauthorized: Task belongs to a different foundry' }
+        }
+
+        // Validate using Zod schema
+        // Convert empty strings to null for optional date fields
+        const validation = validate(updateTaskDatesSchema, {
+            taskId,
+            startDate: startDate?.trim() ? startDate.trim() : null,
+            endDate: endDate?.trim() ? endDate.trim() : null
         })
-    } catch (logError) {
-        console.error('Failed to log task history:', logError)
+        if (!validation.success) {
+            console.error('Validation error:', validation.error, { startDate, endDate })
+            return { error: validation.error }
+        }
+
+        const { startDate: validatedStartDate, endDate: validatedEndDate } = validation.data
+
+        const { error } = await supabase.from('tasks')
+            .update({
+                start_date: validatedStartDate,
+                end_date: validatedEndDate
+            })
+            .eq('id', taskId)
+
+        if (error) {
+            console.error('Supabase update error:', error)
+            return { error: error.message }
+        }
+
+        try {
+            // Safely format dates for logging (validatedStartDate and validatedEndDate are validated above but add null checks for safety)
+            const startDateFormatted = validatedStartDate ? validatedStartDate.split('T')[0] : 'N/A'
+            const endDateFormatted = validatedEndDate ? validatedEndDate.split('T')[0] : 'N/A'
+            await logSystemEvent(taskId, `Task rescheduled: ${startDateFormatted} → ${endDateFormatted}`, user.id)
+        } catch (logError) {
+            console.error('Failed to log system event:', logError)
+        }
+        
+        try {
+            await logTaskHistory(taskId, 'UPDATED', user.id, {
+                field: 'dates',
+                new_start: validatedStartDate,
+                new_end: validatedEndDate
+            })
+        } catch (logError) {
+            console.error('Failed to log task history:', logError)
+        }
+        revalidatePath('/timeline')
+        revalidatePath('/tasks')
+        return { success: true }
+    } catch (err) {
+        console.error('updateTaskDates unexpected error:', err)
+        return { error: 'Failed to update task dates' }
     }
-    revalidatePath('/timeline')
-    revalidatePath('/tasks')
-    return { success: true }
 }
 
 export async function triggerAIWorker(taskId: string) {
