@@ -41,7 +41,7 @@ export function Sidebar({ foundryName, foundryId, userName, userRole }: { foundr
                 <div className="flex items-center justify-between">
                     <Link href="/dashboard" className="group flex items-center gap-2">
                         <span className="font-display text-xl font-bold tracking-[0.12em] uppercase text-international-orange group-hover:text-international-orange-hover transition-colors">
-                            CENTAUR
+                            CentaurOS
                         </span>
                         <span className="w-1.5 h-1.5 rounded-full bg-international-orange animate-pulse"></span>
                     </Link>
