@@ -61,7 +61,7 @@ export function ListingDetailDrawer({ open, onOpenChange, listing }: ListingDeta
 
     return (
         <Sheet open={open} onOpenChange={onOpenChange}>
-            <SheetContent side="right" className="w-full sm:w-[480px] sm:max-w-[480px] p-0 flex flex-col">
+            <SheetContent side="right" className="w-full sm:w-[480px] sm:max-w-[480px] p-0 flex flex-col bg-card">
                 <SheetHeader className="p-6 pb-4 border-b border-border space-y-3">
                     {/* Subcategory badge + Verified */}
                     <div className="flex items-center gap-2">
@@ -122,7 +122,7 @@ export function ListingDetailDrawer({ open, onOpenChange, listing }: ListingDeta
                 </ScrollArea>
 
                 {/* Footer Actions */}
-                <div className="p-4 border-t border-border bg-slate-50 flex gap-3">
+                <div className="p-4 border-t border-border bg-muted/30 flex gap-3">
                     <Button 
                         variant="outline" 
                         className="flex-1"
@@ -132,7 +132,7 @@ export function ListingDetailDrawer({ open, onOpenChange, listing }: ListingDeta
                         Add to Comparison
                     </Button>
                     <Button 
-                        variant="primary" 
+                        variant="brand" 
                         className="flex-1"
                         onClick={handleContact}
                     >
@@ -178,7 +178,7 @@ function KeyMetricsSection({ category, attrs }: { category: string; attrs: Recor
                 {metrics.map((metric, idx) => (
                     <div 
                         key={idx} 
-                        className="bg-slate-50 rounded-lg p-3 text-center"
+                        className="bg-muted/50 p-3 text-center border border-border"
                     >
                         <div className="flex justify-center text-muted-foreground mb-1">
                             {metric.icon}
@@ -303,13 +303,13 @@ function AISection({ attrs }: { attrs: Record<string, any> }) {
                     </h4>
                     <div className="grid grid-cols-2 gap-2 text-sm">
                         {attrs.model && (
-                            <div className="bg-slate-50 rounded p-2">
+                            <div className="bg-muted/50 p-2 border border-border">
                                 <span className="text-muted-foreground text-xs">Model</span>
                                 <p className="font-medium">{attrs.model}</p>
                             </div>
                         )}
                         {attrs.provider && (
-                            <div className="bg-slate-50 rounded p-2">
+                            <div className="bg-muted/50 p-2 border border-border">
                                 <span className="text-muted-foreground text-xs">Provider</span>
                                 <p className="font-medium">{attrs.provider}</p>
                             </div>
@@ -327,19 +327,19 @@ function AISection({ attrs }: { attrs: Record<string, any> }) {
                     </h4>
                     <div className="grid grid-cols-3 gap-2 text-sm">
                         {attrs.accuracy && (
-                            <div className="bg-emerald-50 rounded p-2 text-center">
+                            <div className="bg-emerald-50 p-2 text-center border border-emerald-100">
                                 <p className="font-bold text-emerald-700">{attrs.accuracy}</p>
                                 <span className="text-muted-foreground text-xs">Accuracy</span>
                             </div>
                         )}
                         {attrs.latency && (
-                            <div className="bg-blue-50 rounded p-2 text-center">
+                            <div className="bg-blue-50 p-2 text-center border border-blue-100">
                                 <p className="font-bold text-blue-700">{attrs.latency}</p>
                                 <span className="text-muted-foreground text-xs">Latency</span>
                             </div>
                         )}
                         {attrs.throughput && (
-                            <div className="bg-purple-50 rounded p-2 text-center">
+                            <div className="bg-purple-50 p-2 text-center border border-purple-100">
                                 <p className="font-bold text-purple-700">{attrs.throughput}</p>
                                 <span className="text-muted-foreground text-xs">Throughput</span>
                             </div>
@@ -400,7 +400,7 @@ function ProductsSection({ attrs }: { attrs: Record<string, any> }) {
             {/* Location & Lead Time */}
             <div className="grid grid-cols-2 gap-3">
                 {attrs.location && (
-                    <div className="bg-slate-50 rounded-lg p-3">
+                    <div className="bg-muted/50 p-3 border border-border">
                         <div className="flex items-center gap-2 text-muted-foreground mb-1">
                             <MapPin className="w-4 h-4" />
                             <span className="text-xs">Location</span>
@@ -409,7 +409,7 @@ function ProductsSection({ attrs }: { attrs: Record<string, any> }) {
                     </div>
                 )}
                 {attrs.lead_time && (
-                    <div className="bg-slate-50 rounded-lg p-3">
+                    <div className="bg-muted/50 p-3 border border-border">
                         <div className="flex items-center gap-2 text-muted-foreground mb-1">
                             <Timer className="w-4 h-4" />
                             <span className="text-xs">Lead Time</span>
@@ -471,7 +471,7 @@ function ServicesSection({ attrs }: { attrs: Record<string, any> }) {
             {/* Service details */}
             <div className="grid grid-cols-2 gap-3">
                 {attrs.location && (
-                    <div className="bg-slate-50 rounded-lg p-3">
+                    <div className="bg-muted/50 p-3 border border-border">
                         <div className="flex items-center gap-2 text-muted-foreground mb-1">
                             <MapPin className="w-4 h-4" />
                             <span className="text-xs">Location</span>
@@ -480,7 +480,7 @@ function ServicesSection({ attrs }: { attrs: Record<string, any> }) {
                     </div>
                 )}
                 {attrs.availability && (
-                    <div className="bg-slate-50 rounded-lg p-3">
+                    <div className="bg-muted/50 p-3 border border-border">
                         <div className="flex items-center gap-2 text-muted-foreground mb-1">
                             <Clock className="w-4 h-4" />
                             <span className="text-xs">Availability</span>
@@ -588,7 +588,7 @@ function AttributeRow({ label, value }: { label: string; value: any }) {
                     {getIcon()}
                     <span className="capitalize">{formattedLabel}</span>
                 </div>
-                <div className="bg-slate-50 rounded p-2 text-xs text-muted-foreground font-mono">
+                <div className="bg-muted/50 p-2 text-xs text-muted-foreground font-mono border border-border">
                     {JSON.stringify(value, null, 2)}
                 </div>
             </div>

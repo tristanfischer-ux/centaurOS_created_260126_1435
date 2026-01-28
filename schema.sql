@@ -6,6 +6,8 @@ CREATE TYPE "public"."member_role" AS ENUM ('Executive', 'Apprentice', 'AI_Agent
 CREATE TYPE "public"."task_status" AS ENUM ('Pending', 'Accepted', 'Rejected', 'Amended', 'Amended_Pending_Approval');
 CREATE TYPE "public"."rfq_status" AS ENUM ('Open', 'Bidding', 'Awarded', 'Closed');
 CREATE TYPE "public"."provider_type" AS ENUM ('Legal', 'Financial', 'VC', 'Additive Manufacturing', 'Fabrication');
+CREATE TYPE "public"."coverage_status" AS ENUM ('covered', 'partial', 'gap', 'not_applicable');
+CREATE TYPE "public"."function_category" AS ENUM ('Operations', 'Finance', 'Sales & Marketing', 'HR & People', 'Legal & Compliance', 'Technology', 'Product', 'Customer Success');
 
 -- 3. Tables
 
@@ -79,6 +81,22 @@ CREATE TABLE IF NOT EXISTS "public"."service_providers" (
     PRIMARY KEY ("id")
 );
 
+-- BUSINESS FUNCTIONS (Org Blueprint)
+CREATE TABLE IF NOT EXISTS "public"."business_functions" (
+    "id" uuid DEFAULT uuid_generate_v4() NOT NULL,
+    "foundry_id" text NOT NULL,
+    "category" "public"."function_category" NOT NULL,
+    "name" text NOT NULL,
+    "description" text,
+    "coverage_status" "public"."coverage_status" DEFAULT 'gap'::coverage_status,
+    "covered_by" text,
+    "covered_by_type" text CHECK ("covered_by_type" IN ('internal', 'external')),
+    "notes" text,
+    "created_at" timestamptz DEFAULT now(),
+    "updated_at" timestamptz DEFAULT now(),
+    PRIMARY KEY ("id")
+);
+
 -- RLS Policies
 ALTER TABLE "public"."profiles" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "public"."objectives" ENABLE ROW LEVEL SECURITY;
@@ -98,3 +116,9 @@ CREATE POLICY "Users can update tasks" ON "public"."tasks" FOR UPDATE USING (aut
 
 CREATE POLICY "Users can view comments" ON "public"."task_comments" FOR SELECT USING (auth.role() = 'authenticated');
 CREATE POLICY "Users can insert comments" ON "public"."task_comments" FOR INSERT WITH CHECK (auth.role() = 'authenticated');
+
+ALTER TABLE "public"."business_functions" ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users can view business functions" ON "public"."business_functions" FOR SELECT USING (auth.role() = 'authenticated');
+CREATE POLICY "Users can insert business functions" ON "public"."business_functions" FOR INSERT WITH CHECK (auth.role() = 'authenticated');
+CREATE POLICY "Users can update business functions" ON "public"."business_functions" FOR UPDATE USING (auth.role() = 'authenticated');
+CREATE POLICY "Users can delete business functions" ON "public"."business_functions" FOR DELETE USING (auth.role() = 'authenticated');

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useRef, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import {
     Dialog,
@@ -15,7 +15,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { submitRFQ } from "@/actions/marketplace"
-import { Loader2, ChevronDown, ChevronUp } from "lucide-react"
+import { Loader2, ChevronDown, ChevronUp, Mic, Square } from "lucide-react"
 import { toast } from "sonner" // Assuming sonner is used, or I'll use a basic alert if not available
 
 export function CreateRFQDialog() {
@@ -31,6 +31,23 @@ export function CreateRFQDialog() {
     const [titleError, setTitleError] = useState<string | null>(null)
     const [specsError, setSpecsError] = useState<string | null>(null)
 
+    // Voice recording state
+    const [isRecording, setIsRecording] = useState(false)
+    const [isTranscribing, setIsTranscribing] = useState(false)
+    const [recordingDuration, setRecordingDuration] = useState(0)
+    const mediaRecorderRef = useRef<MediaRecorder | null>(null)
+    const chunksRef = useRef<Blob[]>([])
+    const timerRef = useRef<NodeJS.Timeout | null>(null)
+
+    // Cleanup interval on unmount
+    useEffect(() => {
+        return () => {
+            if (timerRef.current) {
+                clearInterval(timerRef.current)
+            }
+        }
+    }, [])
+
     // Budget range validation - accepts formats like "$500 - $1,000", "$500-$1000", "$500 to $1000", etc.
     const validateBudgetRange = (budget: string): boolean => {
         if (!budget || !budget.trim()) return false
@@ -43,6 +60,89 @@ export function CreateRFQDialog() {
         const budgetPattern = /^\$?\d{1,9}(?:[,\s]?\d{3})*(?:\s*(?:-|to|–)\s*\$?\d{1,9}(?:[,\s]?\d{3})*)?$/i
         
         return budgetPattern.test(cleaned)
+    }
+
+    // Voice recording functions
+    const formatDuration = (seconds: number) => {
+        const mins = Math.floor(seconds / 60)
+        const secs = seconds % 60
+        return `${mins}:${secs.toString().padStart(2, '0')}`
+    }
+
+    const startRecording = async () => {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+            mediaRecorderRef.current = new MediaRecorder(stream)
+            chunksRef.current = []
+            setRecordingDuration(0)
+
+            // Start recording duration timer
+            timerRef.current = setInterval(() => {
+                setRecordingDuration(prev => prev + 1)
+            }, 1000)
+
+            mediaRecorderRef.current.ondataavailable = (e) => {
+                if (e.data.size > 0) chunksRef.current.push(e.data)
+            }
+
+            mediaRecorderRef.current.onstop = async () => {
+                // Clear timer
+                if (timerRef.current) {
+                    clearInterval(timerRef.current)
+                    timerRef.current = null
+                }
+
+                const audioBlob = new Blob(chunksRef.current, { type: "audio/webm" })
+                await handleVoiceSubmit(audioBlob)
+                // Stop all tracks
+                stream.getTracks().forEach(track => track.stop())
+            }
+
+            mediaRecorderRef.current.start()
+            setIsRecording(true)
+            toast.info("Recording... Describe your RFQ requirements")
+        } catch (error) {
+            console.error("Error accessing microphone:", error)
+            toast.error("Could not access microphone. Please check permissions.")
+        }
+    }
+
+    const stopRecording = () => {
+        if (mediaRecorderRef.current && isRecording) {
+            mediaRecorderRef.current.stop()
+            setIsRecording(false)
+        }
+    }
+
+    async function handleVoiceSubmit(audioBlob: Blob) {
+        setIsTranscribing(true)
+        const formData = new FormData()
+        formData.append('file', audioBlob, 'recording.webm')
+        
+        try {
+            const response = await fetch('/api/rfq/voice', {
+                method: 'POST',
+                body: formData
+            })
+            const data = await response.json()
+            if (data.title) {
+                setFormData(prev => ({
+                    ...prev,
+                    title: data.title || prev.title,
+                    specifications: data.specifications || prev.specifications,
+                    budget_range: data.budget_range || prev.budget_range
+                }))
+                // Auto-expand the advanced section if we have specs
+                if (data.specifications) setShowAdvanced(true)
+                toast.success("Voice transcription complete!")
+            }
+        } catch (error) {
+            console.error('Voice transcription failed:', error)
+            toast.error('Voice transcription failed')
+        } finally {
+            setIsTranscribing(false)
+            setRecordingDuration(0)
+        }
     }
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -133,23 +233,61 @@ export function CreateRFQDialog() {
                     </DialogDescription>
                 </DialogHeader>
                 <form onSubmit={handleSubmit} className="grid gap-4 py-4">
+                    {/* Voice recording status */}
+                    {(isRecording || isTranscribing) && (
+                        <div className={`flex items-center justify-center gap-2 py-2 px-3 rounded-md text-sm font-medium ${
+                            isRecording ? 'bg-red-50 text-red-600 animate-pulse' : 'bg-amber-50 text-amber-600'
+                        }`}>
+                            {isRecording ? (
+                                <>
+                                    <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
+                                    Recording... {formatDuration(recordingDuration)}
+                                </>
+                            ) : (
+                                <>
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                    Transcribing...
+                                </>
+                            )}
+                        </div>
+                    )}
+
                     {/* Always visible - Required */}
                     <div className="grid gap-2">
                         <Label htmlFor="title">Project Title</Label>
-                        <Input
-                            id="title"
-                            value={formData.title}
-                            onChange={(e) => {
-                                setFormData({ ...formData, title: e.target.value })
-                                setTitleError(null)
-                            }}
-                            placeholder="e.g. Aluminum Enclosure Prototype"
-                            required
-                            enterKeyHint="next"
-                            className={titleError ? 'border-red-500' : ''}
-                            aria-describedby={titleError ? "title-error" : undefined}
-                            aria-invalid={!!titleError}
-                        />
+                        <div className="flex gap-2">
+                            <Input
+                                id="title"
+                                value={formData.title}
+                                onChange={(e) => {
+                                    setFormData({ ...formData, title: e.target.value })
+                                    setTitleError(null)
+                                }}
+                                placeholder="e.g. Aluminum Enclosure Prototype"
+                                required
+                                enterKeyHint="next"
+                                className={`flex-1 ${titleError ? 'border-red-500' : ''}`}
+                                aria-describedby={titleError ? "title-error" : undefined}
+                                aria-invalid={!!titleError}
+                            />
+                            <Button
+                                type="button"
+                                size="icon"
+                                variant={isRecording ? "destructive" : "outline"}
+                                onClick={isRecording ? stopRecording : startRecording}
+                                disabled={isTranscribing}
+                                className={isRecording ? "animate-pulse" : ""}
+                                title={isRecording ? "Stop recording" : "Voice fill form"}
+                            >
+                                {isTranscribing ? (
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : isRecording ? (
+                                    <Square className="h-4 w-4 fill-current" />
+                                ) : (
+                                    <Mic className="h-4 w-4" />
+                                )}
+                            </Button>
+                        </div>
                         {titleError && (
                             <p id="title-error" className="text-sm text-red-600 mt-1" role="alert">
                                 {titleError}

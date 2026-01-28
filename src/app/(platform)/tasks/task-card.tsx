@@ -701,31 +701,31 @@ export const TaskCard = memo(function TaskCard(props: TaskCardProps) {
                                 )}
                             </div>
 
-                            {/* Meta Area */}
+                            {/* Meta Area - History & Notes */}
                             <div className="flex items-center gap-1">
                                 <Button
                                     variant="ghost"
-                                    size="icon"
+                                    size="sm"
                                     className={cn(
-                                        "h-8 w-8 transition-all duration-200",
-                                        showHistory ? "text-blue-600 bg-blue-50" : "text-muted-foreground hover:text-muted-foreground"
+                                        "h-8 px-2 gap-1.5 text-xs transition-all duration-200",
+                                        showHistory ? "text-blue-600 bg-blue-50" : "text-muted-foreground hover:text-foreground"
                                     )}
                                     onClick={() => { setShowHistory(!showHistory); setShowThread(false) }}
-                                    title="Toggle History"
                                 >
-                                    <HistoryIcon className="h-4 w-4" />
+                                    <HistoryIcon className="h-3.5 w-3.5" />
+                                    <span className="hidden sm:inline">Audit Log</span>
                                 </Button>
                                 <Button
                                     variant="ghost"
-                                    size="icon"
+                                    size="sm"
                                     className={cn(
-                                        "h-8 w-8 transition-all duration-200",
-                                        showThread ? "text-blue-600 bg-blue-50" : "text-muted-foreground hover:text-muted-foreground"
+                                        "h-8 px-2 gap-1.5 text-xs transition-all duration-200",
+                                        showThread ? "text-blue-600 bg-blue-50" : "text-muted-foreground hover:text-foreground"
                                     )}
                                     onClick={() => { setShowThread(!showThread); setShowHistory(false) }}
-                                    title="Toggle Thread"
                                 >
-                                    <MessageSquare className="h-4 w-4" />
+                                    <MessageSquare className="h-3.5 w-3.5" />
+                                    <span className="hidden sm:inline">Notes</span>
                                 </Button>
                             </div>
                         </div>

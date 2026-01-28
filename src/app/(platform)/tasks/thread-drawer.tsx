@@ -294,24 +294,24 @@ export function ThreadDrawer({
 
     return (
         <Sheet open={open} onOpenChange={onOpenChange}>
-            <SheetContent side="right" className="w-full sm:w-[400px] md:w-[540px] flex flex-col h-full bg-white">
-                <div className="mx-auto mt-2 h-1.5 w-12 rounded-full bg-slate-300 md:hidden" />
+            <SheetContent side="right" className="w-full sm:w-[400px] md:w-[540px] flex flex-col h-full bg-card">
+                <div className="mx-auto mt-2 h-1.5 w-12 rounded-full bg-muted-foreground/30 md:hidden" />
                 <SheetHeader>
-                    <SheetTitle className="text-slate-900">{taskTitle}</SheetTitle>
+                    <SheetTitle className="text-foreground">{taskTitle}</SheetTitle>
                     <SheetDescription className="flex items-center gap-2">
                         <Badge className={getStatusBadgeClass(taskStatus)}>
                             {taskStatus?.replace(/_/g, ' ')}
                         </Badge>
                         {assigneeName && (
-                            <span className="text-slate-500">• {assigneeName}</span>
+                            <span className="text-muted-foreground">• {assigneeName}</span>
                         )}
                     </SheetDescription>
                 </SheetHeader>
 
                 {/* Task Actions */}
-                <div className="mt-4 p-3 bg-slate-50 rounded-lg border border-slate-100 space-y-3">
+                <div className="mt-4 p-3 bg-muted/30 border border-border space-y-3">
                     {actionError && (
-                        <div className="text-sm text-red-600 bg-red-50 p-2 rounded" role="alert">
+                        <div className="text-sm text-destructive bg-destructive/10 p-2" role="alert">
                             {actionError}
                         </div>
                     )}
@@ -366,7 +366,7 @@ export function ThreadDrawer({
 
                     {/* Forward/Reassign Section */}
                     {!showForward ? (
-                        <div className="flex gap-2 pt-2 border-t border-slate-200">
+                        <div className="flex gap-2 pt-2 border-t border-border">
                             <Button
                                 size="sm"
                                 variant="outline"
@@ -390,8 +390,8 @@ export function ThreadDrawer({
                             )}
                         </div>
                     ) : (
-                        <div className="pt-2 border-t border-slate-200 space-y-2">
-                            <p className="text-xs text-slate-500">Forward this task to:</p>
+                        <div className="pt-2 border-t border-border space-y-2">
+                            <p className="text-xs text-muted-foreground">Forward this task to:</p>
                             <Select 
                                 value={forwardToId} 
                                 onValueChange={(value) => {
@@ -412,8 +412,8 @@ export function ThreadDrawer({
                                         .map(member => (
                                             <SelectItem key={member.id} value={member.id}>
                                                 <div className="flex items-center gap-2">
-                                                    <Avatar className="h-5 w-5 border border-slate-200 shrink-0">
-                                                        <AvatarFallback className="text-[9px] bg-indigo-50 text-indigo-700 font-medium flex items-center justify-center">
+                                                    <Avatar className="h-5 w-5 border border-border shrink-0">
+                                                        <AvatarFallback className="text-[9px] bg-muted text-muted-foreground font-medium flex items-center justify-center">
                                                             {getInitials(member.full_name)}
                                                         </AvatarFallback>
                                                     </Avatar>
@@ -463,42 +463,42 @@ export function ThreadDrawer({
 
                 {/* Description */}
                 {taskDescription && (
-                    <div className="mt-4 p-3 bg-slate-50 rounded-lg border border-slate-100">
-                        <p className="text-sm text-slate-600 whitespace-pre-wrap">{taskDescription}</p>
+                    <div className="mt-4 p-3 bg-muted/30 border border-border">
+                        <p className="text-sm text-muted-foreground whitespace-pre-wrap">{taskDescription}</p>
                     </div>
                 )}
 
                 {/* Comments Thread */}
                 <div className="flex-1 overflow-hidden mt-4 relative">
-                    <h4 className="text-sm font-medium text-slate-500 mb-3">Activity Log</h4>
+                    <h4 className="text-sm font-medium text-muted-foreground mb-3">Activity Log</h4>
                     {isLoading ? (
-                        <div className="flex items-center justify-center h-full text-slate-400">
+                        <div className="flex items-center justify-center h-full text-muted-foreground">
                             <Loader2 className="h-6 w-6 animate-spin mr-2" /> Loading history...
                         </div>
                     ) : (
                         <ScrollArea className="h-[calc(100dvh-400px)] pr-4">
                             <div className="space-y-4">
                                 {comments.length === 0 && (
-                                    <p className="text-center text-slate-400 py-8 text-sm">No history yet.</p>
+                                    <p className="text-center text-muted-foreground py-8 text-sm">No history yet.</p>
                                 )}
                                 {comments.map((comment) => (
                                     <div key={comment.id} className={`flex gap-3 ${comment.is_system_log ? 'opacity-75' : ''}`}>
                                         <div className={`
-                                            h-8 w-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0
-                                            ${comment.is_system_log ? 'bg-slate-100 text-slate-500' : 'bg-blue-100 text-blue-700'}
+                                            h-8 w-8 flex items-center justify-center text-xs font-bold shrink-0
+                                            ${comment.is_system_log ? 'bg-muted text-muted-foreground' : 'bg-international-orange/10 text-international-orange'}
                                         `}>
                                             {comment.is_system_log ? 'SYS' : comment.user?.full_name?.substring(0, 2).toUpperCase()}
                                         </div>
-                                        <div className="bg-slate-50 p-3 rounded-lg text-sm w-full">
+                                        <div className="bg-muted/50 p-3 text-sm w-full border border-border">
                                             <div className="flex justify-between items-center mb-1">
-                                                <span className="font-medium text-slate-900">
+                                                <span className="font-medium text-foreground">
                                                     {comment.is_system_log ? 'System' : comment.user?.full_name}
                                                 </span>
-                                                <span className="text-xs text-slate-400">
+                                                <span className="text-xs text-muted-foreground">
                                                     {formatDistanceToNow(new Date(comment.created_at), { addSuffix: true })}
                                                 </span>
                                             </div>
-                                            <div className="text-slate-700 leading-relaxed">
+                                            <div className="text-foreground/80 leading-relaxed">
                                                 <MentionText 
                                                     content={comment.content} 
                                                     members={members.filter(m => m.full_name !== null).map(m => ({
@@ -516,11 +516,11 @@ export function ThreadDrawer({
                 </div>
 
                 {/* Comment Input */}
-                <div className="pt-4 border-t border-slate-100 mt-auto">
+                <div className="pt-4 border-t border-border mt-auto">
                     <div
                         className={cn(
-                            "border-2 border-dashed rounded-lg p-3 mb-2 text-center cursor-pointer transition-colors",
-                            isDragging ? "border-blue-500 bg-blue-50" : "border-slate-200 hover:border-slate-300 hover:bg-slate-50"
+                            "border-2 border-dashed p-3 mb-2 text-center cursor-pointer transition-colors",
+                            isDragging ? "border-international-orange bg-international-orange/5" : "border-border hover:border-muted-foreground/50 hover:bg-muted/50"
                         )}
                         onClick={() => fileInputRef.current?.click()}
                         onDragOver={handleDragOver}
@@ -536,8 +536,8 @@ export function ThreadDrawer({
                             }
                         }}
                     >
-                        <Upload className="h-5 w-5 mx-auto text-slate-400 mb-1" />
-                        <p className="text-xs text-slate-500">
+                        <Upload className="h-5 w-5 mx-auto text-muted-foreground mb-1" />
+                        <p className="text-xs text-muted-foreground">
                             Drag & drop or click to attach file
                         </p>
                     </div>
@@ -569,10 +569,10 @@ export function ThreadDrawer({
                                     const fakeEvent = { preventDefault: () => {} } as React.FormEvent
                                     handleSend(fakeEvent)
                                 }}
-                                className={`bg-white border-slate-200 ${commentError ? 'border-red-500' : ''}`}
+                                className={`bg-card border-border ${commentError ? 'border-destructive' : ''}`}
                             />
                             {commentError && (
-                                <p id="comment-error" className="text-sm text-red-600 mt-1" role="alert">
+                                <p id="comment-error" className="text-sm text-destructive mt-1" role="alert">
                                     {commentError}
                                 </p>
                             )}
@@ -585,7 +585,7 @@ export function ThreadDrawer({
 
                 {/* Reject Dialog */}
                 <Dialog open={rejectDialogOpen} onOpenChange={setRejectDialogOpen}>
-                    <DialogContent size="sm" className="bg-white border-slate-200 text-slate-900">
+                    <DialogContent size="sm">
                         <DialogHeader>
                             <DialogTitle>Reject Task</DialogTitle>
                             <DialogDescription>Please provide a reason for rejection</DialogDescription>
@@ -594,7 +594,7 @@ export function ThreadDrawer({
                             value={rejectReason}
                             onChange={(e) => setRejectReason(e.target.value)}
                             placeholder="Enter rejection reason..."
-                            className="bg-white border-slate-200 min-h-[100px]"
+                            className="min-h-[100px]"
                         />
                         <DialogFooter>
                             <Button variant="outline" onClick={() => {

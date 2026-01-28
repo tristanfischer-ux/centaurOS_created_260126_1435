@@ -11,8 +11,11 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { CreateRFQDialog } from "./create-rfq-dialog"
-import { useState, useMemo, useEffect } from "react"
-import { Loader2, Store, Search, X, SlidersHorizontal, MapPin, Briefcase, GraduationCap, Bot, Factory, Zap, Shield } from "lucide-react"
+import { useState, useMemo, useEffect, useCallback } from "react"
+import { Loader2, Store, Search, X, SlidersHorizontal, MapPin, Briefcase, GraduationCap, Bot, Factory, Zap, Shield, LayoutGrid, List, ShieldCheck, Clock, Sparkles, Users, ArrowRight } from "lucide-react"
+import { toast } from "sonner"
+import { Card } from "@/components/ui/card"
+import { Checkbox } from "@/components/ui/checkbox"
 
 interface MarketplaceViewProps {
     initialListings: MarketplaceListing[]
@@ -25,13 +28,27 @@ export function MarketplaceView({ initialListings }: MarketplaceViewProps) {
     const [searchQuery, setSearchQuery] = useState('')
     const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('')
     const [showFilters, setShowFilters] = useState(false)
+    const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
     
-    // Inline expansion state - only one card expanded at a time
-    const [expandedId, setExpandedId] = useState<string | null>(null)
+    // Global expansion state - all cards expand/collapse together
+    const [allExpanded, setAllExpanded] = useState(false)
     
-    // Universal filters
-    const [subcategoryFilter, setSubcategoryFilter] = useState<string>('all')
+    // Universal filters - subcategory is multi-select
+    const [selectedSubcategories, setSelectedSubcategories] = useState<Set<string>>(new Set())
     const [locationFilter, setLocationFilter] = useState<string>('all')
+    
+    // Toggle a subcategory in the multi-select
+    const toggleSubcategory = (sub: string) => {
+        setSelectedSubcategories(prev => {
+            const next = new Set(prev)
+            if (next.has(sub)) {
+                next.delete(sub)
+            } else {
+                next.add(sub)
+            }
+            return next
+        })
+    }
     
     // People-specific filters
     const [skillFilter, setSkillFilter] = useState<string>('all')
@@ -46,6 +63,35 @@ export function MarketplaceView({ initialListings }: MarketplaceViewProps) {
     const [certificationFilter, setCertificationFilter] = useState<string>('all')
     const [technologyFilter, setTechnologyFilter] = useState<string>('all')
 
+    // AI Search state
+    const [aiSearchEnabled, setAiSearchEnabled] = useState(false)
+    const [isAiSearching, setIsAiSearching] = useState(false)
+    const [aiFilters, setAiFilters] = useState<{
+        category?: string
+        subcategory?: string
+        skills?: string[]
+        location?: string
+        minExperience?: number
+        type?: string
+        maxCost?: number
+        integrations?: string[]
+        certifications?: string[]
+        technology?: string
+    } | null>(null)
+    const [aiExplanation, setAiExplanation] = useState<string>('')
+
+    // Centaur Matcher state
+    const [showCentaurMatcher, setShowCentaurMatcher] = useState(false)
+    const [centaurMatchLoading, setCentaurMatchLoading] = useState(false)
+    const [selectedMemberId, setSelectedMemberId] = useState<string>('')
+    const [centaurSuggestions, setCentaurSuggestions] = useState<{
+        listingId: string
+        title: string
+        compatibilityScore: number
+        reasoning: string
+        useCases: string[]
+    }[]>([])
+
     // Debounce search query
     useEffect(() => {
         const timer = setTimeout(() => {
@@ -53,6 +99,110 @@ export function MarketplaceView({ initialListings }: MarketplaceViewProps) {
         }, 300)
         return () => clearTimeout(timer)
     }, [searchQuery])
+
+    // AI Search handler
+    const handleAiSearch = useCallback(async () => {
+        if (!searchQuery.trim() || searchQuery.length < 3) {
+            toast.error('Please enter at least 3 characters for AI search')
+            return
+        }
+        
+        setIsAiSearching(true)
+        try {
+            const response = await fetch('/api/marketplace/ai-search', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ query: searchQuery })
+            })
+            
+            const data = await response.json()
+            
+            if (data.success && data.filters) {
+                // Apply AI-extracted filters
+                const filters = data.filters
+                setAiFilters(filters)
+                setAiExplanation(data.explanation || '')
+                
+                // Switch to the AI-suggested category if provided
+                if (filters.category && filters.category !== activeTab) {
+                    setActiveTab(filters.category)
+                }
+                
+                // Apply location filter
+                if (filters.location) {
+                    setLocationFilter(filters.location)
+                }
+                
+                // Apply category-specific filters
+                if (filters.skills?.length) {
+                    setSkillFilter(filters.skills[0])
+                }
+                if (filters.minExperience) {
+                    setMinExperience(String(filters.minExperience))
+                }
+                if (filters.type) {
+                    setAiTypeFilter(filters.type)
+                }
+                if (filters.maxCost) {
+                    setMaxCostFilter(String(filters.maxCost))
+                }
+                if (filters.integrations?.length) {
+                    setIntegrationFilter(filters.integrations[0])
+                }
+                if (filters.certifications?.length) {
+                    setCertificationFilter(filters.certifications[0])
+                }
+                if (filters.technology) {
+                    setTechnologyFilter(filters.technology)
+                }
+                
+                toast.success('AI filters applied')
+            } else {
+                toast.error(data.error || 'AI search failed')
+            }
+        } catch (error) {
+            console.error('AI search error:', error)
+            toast.error('AI search failed')
+        } finally {
+            setIsAiSearching(false)
+        }
+    }, [searchQuery, activeTab])
+
+    // Centaur Matcher handler
+    const handleCentaurMatch = useCallback(async (memberId: string) => {
+        if (!memberId) return
+        
+        setCentaurMatchLoading(true)
+        setCentaurSuggestions([])
+        
+        try {
+            const response = await fetch('/api/marketplace/centaur-match', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ memberId })
+            })
+            
+            const data = await response.json()
+            
+            if (data.suggestions) {
+                setCentaurSuggestions(data.suggestions)
+            } else {
+                toast.error(data.error || 'Failed to get AI pairing suggestions')
+            }
+        } catch (error) {
+            console.error('Centaur match error:', error)
+            toast.error('Failed to get AI pairing suggestions')
+        } finally {
+            setCentaurMatchLoading(false)
+        }
+    }, [])
+
+    // Clear AI filters
+    const clearAiFilters = useCallback(() => {
+        setAiFilters(null)
+        setAiExplanation('')
+        clearFilters()
+    }, [])
 
     // Get listings for current tab
     const currentListings = useMemo(() => 
@@ -130,7 +280,7 @@ export function MarketplaceView({ initialListings }: MarketplaceViewProps) {
     const clearSelection = () => setSelectedIds(new Set())
     
     const clearFilters = () => {
-        setSubcategoryFilter('all')
+        setSelectedSubcategories(new Set())
         setLocationFilter('all')
         setSkillFilter('all')
         setMinExperience('all')
@@ -143,7 +293,7 @@ export function MarketplaceView({ initialListings }: MarketplaceViewProps) {
     }
 
     const hasActiveFilters = useMemo(() => {
-        const baseFilters = subcategoryFilter !== 'all' || locationFilter !== 'all' || searchQuery.trim() !== ''
+        const baseFilters = selectedSubcategories.size > 0 || locationFilter !== 'all' || searchQuery.trim() !== ''
         if (activeTab === 'People') {
             return baseFilters || skillFilter !== 'all' || minExperience !== 'all'
         }
@@ -154,7 +304,7 @@ export function MarketplaceView({ initialListings }: MarketplaceViewProps) {
             return baseFilters || certificationFilter !== 'all' || technologyFilter !== 'all'
         }
         return baseFilters
-    }, [activeTab, subcategoryFilter, locationFilter, searchQuery, skillFilter, minExperience, aiTypeFilter, maxCostFilter, integrationFilter, certificationFilter, technologyFilter])
+    }, [activeTab, selectedSubcategories, locationFilter, searchQuery, skillFilter, minExperience, aiTypeFilter, maxCostFilter, integrationFilter, certificationFilter, technologyFilter])
 
     // Filter items
     const filteredItems = useMemo(() => {
@@ -175,9 +325,9 @@ export function MarketplaceView({ initialListings }: MarketplaceViewProps) {
             })
         }
         
-        // Universal filters
-        if (subcategoryFilter !== 'all') {
-            filtered = filtered.filter(item => item.subcategory === subcategoryFilter)
+        // Universal filters - subcategory multi-select
+        if (selectedSubcategories.size > 0) {
+            filtered = filtered.filter(item => selectedSubcategories.has(item.subcategory))
         }
         if (locationFilter !== 'all') {
             filtered = filtered.filter(item => item.attributes?.location === locationFilter)
@@ -231,7 +381,7 @@ export function MarketplaceView({ initialListings }: MarketplaceViewProps) {
         }
         
         return filtered
-    }, [currentListings, activeTab, debouncedSearchQuery, subcategoryFilter, locationFilter, skillFilter, minExperience, aiTypeFilter, maxCostFilter, integrationFilter, certificationFilter, technologyFilter])
+    }, [currentListings, activeTab, debouncedSearchQuery, selectedSubcategories, locationFilter, skillFilter, minExperience, aiTypeFilter, maxCostFilter, integrationFilter, certificationFilter, technologyFilter])
 
     const selectedItems = initialListings.filter(item => selectedIds.has(item.id))
 
@@ -275,15 +425,46 @@ export function MarketplaceView({ initialListings }: MarketplaceViewProps) {
                     <div className="flex flex-col gap-4 mb-6">
                         {/* Search and Filter Controls */}
                         <div className="flex flex-col sm:flex-row gap-3">
-                            <div className="relative flex-1 max-w-md">
-                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                                <Input
-                                    type="search"
-                                    placeholder={getSearchPlaceholder()}
-                                    value={searchQuery}
-                                    onChange={(e) => setSearchQuery(e.target.value)}
-                                    className="pl-9 w-full"
-                                />
+                            <div className="relative flex-1 max-w-md flex gap-2">
+                                <div className="relative flex-1">
+                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                    <Input
+                                        type="search"
+                                        placeholder={aiSearchEnabled ? "Describe what you're looking for..." : getSearchPlaceholder()}
+                                        value={searchQuery}
+                                        onChange={(e) => setSearchQuery(e.target.value)}
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter' && aiSearchEnabled) {
+                                                e.preventDefault()
+                                                handleAiSearch()
+                                            }
+                                        }}
+                                        className="pl-9 w-full"
+                                    />
+                                </div>
+                                <Button
+                                    variant={aiSearchEnabled ? "default" : "outline"}
+                                    size="icon"
+                                    onClick={() => {
+                                        if (aiSearchEnabled && searchQuery.trim()) {
+                                            handleAiSearch()
+                                        } else {
+                                            setAiSearchEnabled(!aiSearchEnabled)
+                                            if (!aiSearchEnabled) {
+                                                toast.info('AI Search enabled - describe what you need')
+                                            }
+                                        }
+                                    }}
+                                    disabled={isAiSearching}
+                                    title={aiSearchEnabled ? "Search with AI" : "Enable AI Search"}
+                                    className={aiSearchEnabled ? "bg-violet-600 hover:bg-violet-700" : ""}
+                                >
+                                    {isAiSearching ? (
+                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                    ) : (
+                                        <Sparkles className="h-4 w-4" />
+                                    )}
+                                </Button>
                             </div>
                             {showFiltersButton && (
                                 <Button 
@@ -314,19 +495,7 @@ export function MarketplaceView({ initialListings }: MarketplaceViewProps) {
                                         </Button>
                                     )}
                                 </div>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                                    <div className="space-y-1.5">
-                                        <label className="text-xs font-medium text-muted-foreground flex items-center gap-1">
-                                            <Briefcase className="h-3 w-3" /> Role Type
-                                        </label>
-                                        <Select value={subcategoryFilter} onValueChange={setSubcategoryFilter}>
-                                            <SelectTrigger className="h-9"><SelectValue placeholder="All roles" /></SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="all">All roles</SelectItem>
-                                                {subcategories.map(sub => <SelectItem key={sub} value={sub}>{sub}</SelectItem>)}
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                                     <div className="space-y-1.5">
                                         <label className="text-xs font-medium text-muted-foreground flex items-center gap-1">
                                             <MapPin className="h-3 w-3" /> Location
@@ -418,18 +587,6 @@ export function MarketplaceView({ initialListings }: MarketplaceViewProps) {
                                             </SelectContent>
                                         </Select>
                                     </div>
-                                    <div className="space-y-1.5">
-                                        <label className="text-xs font-medium text-muted-foreground flex items-center gap-1">
-                                            <Briefcase className="h-3 w-3" /> Subcategory
-                                        </label>
-                                        <Select value={subcategoryFilter} onValueChange={setSubcategoryFilter}>
-                                            <SelectTrigger className="h-9"><SelectValue placeholder="All" /></SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="all">All</SelectItem>
-                                                {subcategories.map(sub => <SelectItem key={sub} value={sub}>{sub}</SelectItem>)}
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
                                 </div>
                             </div>
                         )}
@@ -445,19 +602,7 @@ export function MarketplaceView({ initialListings }: MarketplaceViewProps) {
                                         </Button>
                                     )}
                                 </div>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                                    <div className="space-y-1.5">
-                                        <label className="text-xs font-medium text-muted-foreground flex items-center gap-1">
-                                            <Factory className="h-3 w-3" /> Category
-                                        </label>
-                                        <Select value={subcategoryFilter} onValueChange={setSubcategoryFilter}>
-                                            <SelectTrigger className="h-9"><SelectValue placeholder="All categories" /></SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="all">All categories</SelectItem>
-                                                {subcategories.map(sub => <SelectItem key={sub} value={sub}>{sub}</SelectItem>)}
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                                     <div className="space-y-1.5">
                                         <label className="text-xs font-medium text-muted-foreground flex items-center gap-1">
                                             <MapPin className="h-3 w-3" /> Location
@@ -499,12 +644,12 @@ export function MarketplaceView({ initialListings }: MarketplaceViewProps) {
                         {/* Active filter badges */}
                         {hasActiveFilters && (
                             <div className="flex flex-wrap gap-2">
-                                {subcategoryFilter !== 'all' && (
-                                    <Badge variant="secondary" className="gap-1">
-                                        {subcategoryFilter}
-                                        <X className="h-3 w-3 cursor-pointer" onClick={() => setSubcategoryFilter('all')} />
+                                {Array.from(selectedSubcategories).map(sub => (
+                                    <Badge key={sub} variant="secondary" className="gap-1">
+                                        {sub}
+                                        <X className="h-3 w-3 cursor-pointer" onClick={() => toggleSubcategory(sub)} />
                                     </Badge>
-                                )}
+                                ))}
                                 {locationFilter !== 'all' && (
                                     <Badge variant="secondary" className="gap-1">
                                         {locationFilter}
@@ -556,6 +701,28 @@ export function MarketplaceView({ initialListings }: MarketplaceViewProps) {
                             </div>
                         )}
 
+                        {/* AI Search Explanation */}
+                        {aiExplanation && (
+                            <div className="bg-violet-50 border border-violet-200 rounded-lg p-3 flex items-start justify-between gap-3">
+                                <div className="flex items-start gap-2">
+                                    <Sparkles className="h-4 w-4 text-violet-600 mt-0.5 shrink-0" />
+                                    <div>
+                                        <p className="text-sm text-violet-900">{aiExplanation}</p>
+                                        <p className="text-xs text-violet-600 mt-1">AI-extracted filters applied. You can modify them above.</p>
+                                    </div>
+                                </div>
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={clearAiFilters}
+                                    className="shrink-0 h-7 text-xs text-violet-600 hover:text-violet-800"
+                                >
+                                    <X className="h-3 w-3 mr-1" />
+                                    Clear AI
+                                </Button>
+                            </div>
+                        )}
+
                         {selectedIds.size === 0 && (
                             <p className="text-sm text-muted-foreground flex items-center gap-1">
                                 Select up to 3 items to compare
@@ -569,17 +736,177 @@ export function MarketplaceView({ initialListings }: MarketplaceViewProps) {
                         </TabsList>
                     </div>
 
-                    {/* Results count */}
-                    <p className="text-sm text-muted-foreground mb-4">
-                        Showing {getResultsLabel()}
-                        {hasActiveFilters && ' (filtered)'}
-                    </p>
+                    {/* Subcategory quick filters - multi-select pills */}
+                    {subcategories.length > 0 && (
+                        <div className="flex flex-wrap items-center gap-2 mb-4">
+                            <span className="text-xs text-muted-foreground mr-1">Filter:</span>
+                            {subcategories.map(sub => (
+                                <button
+                                    key={sub}
+                                    onClick={() => toggleSubcategory(sub)}
+                                    className={`px-3 py-1.5 text-xs font-medium transition-all ${
+                                        selectedSubcategories.has(sub)
+                                            ? 'bg-international-orange text-white'
+                                            : 'bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground'
+                                    }`}
+                                >
+                                    {sub}
+                                </button>
+                            ))}
+                            {selectedSubcategories.size > 0 && (
+                                <button
+                                    onClick={() => setSelectedSubcategories(new Set())}
+                                    className="px-2 py-1.5 text-xs text-muted-foreground hover:text-foreground flex items-center gap-1"
+                                >
+                                    <X className="h-3 w-3" />
+                                    Clear
+                                </button>
+                            )}
+                        </div>
+                    )}
+
+                    {/* Centaur Matcher - only on AI tab */}
+                    {activeTab === 'AI' && (
+                        <div className="mb-6">
+                            <button
+                                onClick={() => setShowCentaurMatcher(!showCentaurMatcher)}
+                                className="flex items-center gap-2 text-sm font-medium text-violet-700 hover:text-violet-900 mb-3"
+                            >
+                                <Users className="h-4 w-4" />
+                                Build Your Centaur
+                                <ArrowRight className={`h-4 w-4 transition-transform ${showCentaurMatcher ? 'rotate-90' : ''}`} />
+                            </button>
+                            
+                            {showCentaurMatcher && (
+                                <Card className="p-4 bg-gradient-to-r from-violet-50 to-indigo-50 border-violet-200">
+                                    <div className="flex flex-col gap-4">
+                                        <div>
+                                            <h3 className="font-medium text-violet-900">Find the Perfect AI Partner</h3>
+                                            <p className="text-sm text-violet-700">Select a team member to get AI-powered pairing suggestions.</p>
+                                        </div>
+                                        
+                                        <div className="flex gap-3 items-end">
+                                            <div className="flex-1 max-w-xs">
+                                                <label className="text-xs font-medium text-violet-700 mb-1.5 block">Team Member</label>
+                                                <Input
+                                                    placeholder="Enter member ID (from team page)"
+                                                    value={selectedMemberId}
+                                                    onChange={(e) => setSelectedMemberId(e.target.value)}
+                                                    className="bg-white"
+                                                />
+                                            </div>
+                                            <Button
+                                                onClick={() => handleCentaurMatch(selectedMemberId)}
+                                                disabled={!selectedMemberId || centaurMatchLoading}
+                                                className="bg-violet-600 hover:bg-violet-700"
+                                            >
+                                                {centaurMatchLoading ? (
+                                                    <>
+                                                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                                        Analyzing...
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <Sparkles className="h-4 w-4 mr-2" />
+                                                        Find Matches
+                                                    </>
+                                                )}
+                                            </Button>
+                                        </div>
+                                        
+                                        {/* Centaur Suggestions */}
+                                        {centaurSuggestions.length > 0 && (
+                                            <div className="space-y-3 pt-3 border-t border-violet-200">
+                                                <h4 className="text-sm font-medium text-violet-900">Recommended AI Partners</h4>
+                                                {centaurSuggestions.map((suggestion, idx) => {
+                                                    const listing = initialListings.find(l => l.id === suggestion.listingId)
+                                                    return (
+                                                        <div key={suggestion.listingId} className="bg-white rounded-lg p-3 border border-violet-100">
+                                                            <div className="flex items-start justify-between gap-3">
+                                                                <div className="flex-1">
+                                                                    <div className="flex items-center gap-2">
+                                                                        <span className="text-xs font-bold text-violet-600">#{idx + 1}</span>
+                                                                        <h5 className="font-medium text-slate-900">{suggestion.title}</h5>
+                                                                        <Badge className="bg-violet-100 text-violet-700 text-xs">
+                                                                            {suggestion.compatibilityScore}/10
+                                                                        </Badge>
+                                                                    </div>
+                                                                    <p className="text-sm text-slate-600 mt-1">{suggestion.reasoning}</p>
+                                                                    {suggestion.useCases.length > 0 && (
+                                                                        <div className="flex flex-wrap gap-1 mt-2">
+                                                                            {suggestion.useCases.slice(0, 3).map((useCase, i) => (
+                                                                                <span key={i} className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded">
+                                                                                    {useCase}
+                                                                                </span>
+                                                                            ))}
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                                {listing && (
+                                                                    <Button
+                                                                        size="sm"
+                                                                        variant="outline"
+                                                                        onClick={() => toggleSelect(listing.id)}
+                                                                        className="shrink-0"
+                                                                    >
+                                                                        {selectedIds.has(listing.id) ? 'Selected' : 'Select'}
+                                                                    </Button>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    )
+                                                })}
+                                            </div>
+                                        )}
+                                    </div>
+                                </Card>
+                            )}
+                        </div>
+                    )}
+
+                    {/* Results count, view toggle, and expand all */}
+                    <div className="flex items-center justify-between mb-4">
+                        <p className="text-sm text-muted-foreground">
+                            Showing {getResultsLabel()}
+                            {hasActiveFilters && ' (filtered)'}
+                        </p>
+                        <div className="flex items-center gap-2">
+                            {viewMode === 'grid' && filteredItems.length > 0 && (
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => setAllExpanded(!allExpanded)}
+                                    className="text-xs text-muted-foreground hover:text-foreground"
+                                >
+                                    {allExpanded ? 'Collapse All' : 'Expand All'}
+                                </Button>
+                            )}
+                            <div className="bg-muted p-1 flex items-center">
+                                <Button
+                                    variant={viewMode === 'grid' ? 'default' : 'ghost'}
+                                    size="sm"
+                                    onClick={() => setViewMode('grid')}
+                                    className={viewMode === 'grid' ? 'shadow-sm h-8 w-8 p-0' : 'h-8 w-8 p-0'}
+                                >
+                                    <LayoutGrid className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                    variant={viewMode === 'list' ? 'default' : 'ghost'}
+                                    size="sm"
+                                    onClick={() => setViewMode('list')}
+                                    className={viewMode === 'list' ? 'shadow-sm h-8 w-8 p-0' : 'h-8 w-8 p-0'}
+                                >
+                                    <List className="h-4 w-4" />
+                                </Button>
+                            </div>
+                        </div>
+                    </div>
 
                     {initialListings.length === 0 ? (
                         <div className="flex items-center justify-center py-20">
                             <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
                         </div>
-                    ) : (
+                    ) : viewMode === 'grid' ? (
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 animate-in fade-in duration-500">
                             {filteredItems.map(item => (
                                 <MarketCard
@@ -587,10 +914,99 @@ export function MarketplaceView({ initialListings }: MarketplaceViewProps) {
                                     listing={item}
                                     isSelected={selectedIds.has(item.id)}
                                     onToggleSelect={toggleSelect}
-                                    expandedId={expandedId}
-                                    onExpandedChange={setExpandedId}
+                                    isExpanded={allExpanded}
+                                    onToggleExpandAll={() => setAllExpanded(!allExpanded)}
                                 />
                             ))}
+                        </div>
+                    ) : (
+                        <div className="space-y-3 animate-in fade-in duration-500">
+                            {filteredItems.map(item => {
+                                const attrs = item.attributes || {}
+                                return (
+                                    <Card key={item.id} className="p-4 hover:shadow-md transition-shadow">
+                                        <div className="flex items-start gap-4">
+                                            {/* Checkbox */}
+                                            <Checkbox
+                                                checked={selectedIds.has(item.id)}
+                                                onCheckedChange={() => toggleSelect(item.id)}
+                                                className="mt-1"
+                                            />
+                                            
+                                            {/* Main content */}
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex items-start justify-between gap-4">
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className="flex items-center gap-2 mb-1">
+                                                            <Badge variant="outline" className="text-[10px] uppercase tracking-wider">
+                                                                {item.subcategory}
+                                                            </Badge>
+                                                            {item.is_verified && (
+                                                                <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                                                            )}
+                                                        </div>
+                                                        <h3 className="font-semibold text-foreground truncate">{item.title}</h3>
+                                                        {attrs.role && (
+                                                            <p className="text-sm text-muted-foreground">{attrs.role}</p>
+                                                        )}
+                                                    </div>
+                                                    
+                                                    {/* Key metrics */}
+                                                    <div className="text-right shrink-0">
+                                                        {attrs.rate && (
+                                                            <p className="font-semibold text-foreground">{attrs.rate}</p>
+                                                        )}
+                                                        {attrs.cost && (
+                                                            <p className="font-semibold text-foreground">{attrs.cost}</p>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                                
+                                                {/* Description */}
+                                                <p className="text-sm text-muted-foreground mt-2 line-clamp-2">
+                                                    {item.description}
+                                                </p>
+                                                
+                                                {/* Meta row */}
+                                                <div className="flex items-center gap-4 mt-3 text-xs text-muted-foreground">
+                                                    {attrs.years_experience && (
+                                                        <span className="flex items-center gap-1">
+                                                            <Briefcase className="w-3 h-3" />
+                                                            {attrs.years_experience} years
+                                                        </span>
+                                                    )}
+                                                    {attrs.location && (
+                                                        <span className="flex items-center gap-1">
+                                                            <MapPin className="w-3 h-3" />
+                                                            {attrs.location}
+                                                        </span>
+                                                    )}
+                                                    {attrs.lead_time && (
+                                                        <span className="flex items-center gap-1">
+                                                            <Clock className="w-3 h-3" />
+                                                            {attrs.lead_time}
+                                                        </span>
+                                                    )}
+                                                    {(attrs.skills || attrs.expertise) && (
+                                                        <div className="flex gap-1">
+                                                            {(attrs.skills || attrs.expertise || []).slice(0, 3).map((skill: string, i: number) => (
+                                                                <span key={i} className="px-2 py-0.5 bg-muted text-muted-foreground">
+                                                                    {skill}
+                                                                </span>
+                                                            ))}
+                                                            {(attrs.skills || attrs.expertise || []).length > 3 && (
+                                                                <span className="px-2 py-0.5 bg-muted text-muted-foreground">
+                                                                    +{(attrs.skills || attrs.expertise).length - 3}
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </Card>
+                                )
+                            })}
                         </div>
                     )}
 

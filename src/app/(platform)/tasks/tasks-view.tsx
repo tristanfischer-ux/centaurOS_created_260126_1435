@@ -223,39 +223,11 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
         )
     }
 
-    // Row Expansion Logic
-    const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set())
-    const [columns, setColumns] = useState(1) // Default to 1 (mobile-first safe)
+    // Global expansion state - all cards expand/collapse together
+    const [allExpanded, setAllExpanded] = useState(false)
 
-    // Handle Window Resize for Columns
-    useEffect(() => {
-        const handleResize = () => {
-            if (window.innerWidth >= 1024) {
-                setColumns(3) // lg:grid-cols-3
-            } else if (window.innerWidth >= 768) {
-                setColumns(2) // md:grid-cols-2
-            } else {
-                setColumns(1) // grid-cols-1
-            }
-        }
-
-        // Initial check
-        handleResize()
-
-        window.addEventListener('resize', handleResize)
-        return () => window.removeEventListener('resize', handleResize)
-    }, [])
-
-    const toggleRow = (rowIndex: number) => {
-        setExpandedRows(prev => {
-            const newSet = new Set(prev)
-            if (newSet.has(rowIndex)) {
-                newSet.delete(rowIndex)
-            } else {
-                newSet.add(rowIndex)
-            }
-            return newSet
-        })
+    const toggleAllExpanded = () => {
+        setAllExpanded(prev => !prev)
     }
 
     // Selection Handlers
@@ -393,7 +365,10 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                         <div>
                             <h1 className="text-3xl font-bold tracking-tight text-foreground mb-2 flex items-center gap-3">
                                 Tasks
-                                <span className="text-muted-foreground font-medium text-2xl">{tasks.length}</span>
+                                <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-muted text-muted-foreground text-sm font-medium">
+                                    <span className="text-foreground font-semibold">{tasks.length}</span>
+                                    <span className="text-xs uppercase tracking-wider">total</span>
+                                </span>
                             </h1>
                             <p className="text-muted-foreground">Democratic workflow management.</p>
                         </div>
@@ -425,6 +400,16 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                                         Select
                                     </Button>
                                 </>
+                            )}
+                            {viewMode === 'grid' && sortedTasks.length > 0 && (
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={toggleAllExpanded}
+                                    className="text-xs text-muted-foreground hover:text-foreground mr-2"
+                                >
+                                    {allExpanded ? 'Collapse All' : 'Expand All'}
+                                </Button>
                             )}
                             <div className="bg-slate-100 p-1 rounded-lg flex items-center mr-2">
                                 <Button
@@ -585,24 +570,21 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
 
                 {viewMode === 'grid' ? (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {sortedTasks.map((task, index) => {
-                            const rowIndex = Math.floor(index / columns)
-                            return (
-                                <div key={task.id} className="h-full">
-                                    <TaskCard
-                                        task={task}
-                                        currentUserId={currentUserId}
-                                        userRole={currentUserRole}
-                                        members={members}
-                                        expanded={expandedRows.has(rowIndex)}
-                                        onToggle={() => toggleRow(rowIndex)}
-                                        isSelectionMode={isSelectionMode}
-                                        isSelected={selectedTaskIds.has(task.id)}
-                                        onToggleSelection={() => toggleTaskSelection(task.id)}
-                                    />
-                                </div>
-                            )
-                        })}
+                        {sortedTasks.map((task) => (
+                            <div key={task.id} className="h-full">
+                                <TaskCard
+                                    task={task}
+                                    currentUserId={currentUserId}
+                                    userRole={currentUserRole}
+                                    members={members}
+                                    expanded={allExpanded}
+                                    onToggle={toggleAllExpanded}
+                                    isSelectionMode={isSelectionMode}
+                                    isSelected={selectedTaskIds.has(task.id)}
+                                    onToggleSelection={() => toggleTaskSelection(task.id)}
+                                />
+                            </div>
+                        ))}
                         {sortedTasks.length === 0 && (
                             <div className="col-span-full border-2 border-dashed border-slate-200 rounded-lg bg-slate-50/50">
                                 {tasks.length === 0 ? (

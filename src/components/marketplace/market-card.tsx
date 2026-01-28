@@ -1,6 +1,6 @@
 'use client'
 
-import { memo, useState } from "react"
+import { memo } from "react"
 import { MarketplaceListing } from "@/actions/marketplace"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -18,8 +18,8 @@ interface MarketCardProps {
     listing: MarketplaceListing
     isSelected: boolean
     onToggleSelect: (id: string) => void
-    expandedId?: string | null
-    onExpandedChange?: (id: string | null) => void
+    isExpanded?: boolean
+    onToggleExpandAll?: () => void
 }
 
 // Get icon for AI subcategory
@@ -37,20 +37,11 @@ export const MarketCard = memo(function MarketCard({
     listing, 
     isSelected, 
     onToggleSelect,
-    expandedId,
-    onExpandedChange 
+    isExpanded = false,
+    onToggleExpandAll
 }: MarketCardProps) {
-    const [localExpanded, setLocalExpanded] = useState(false)
-    
-    // Use controlled expansion if provided, otherwise use local state
-    const isExpanded = expandedId !== undefined ? expandedId === listing.id : localExpanded
-    
     const handleToggleExpand = () => {
-        if (expandedId !== undefined) {
-            onExpandedChange?.(isExpanded ? null : listing.id)
-        } else {
-            setLocalExpanded(!localExpanded)
-        }
+        onToggleExpandAll?.()
     }
 
     const categoryBadgeStyles: Record<string, string> = {
@@ -72,7 +63,7 @@ export const MarketCard = memo(function MarketCard({
 
     return (
         <Card className={cn(
-            "group relative flex flex-col rounded-lg shadow-sm transition-all duration-200 overflow-hidden",
+            "group relative flex flex-col shadow-sm transition-all duration-200 overflow-hidden",
             isSelected && "ring-2 ring-ring",
             isExpanded && "shadow-lg ring-1 ring-slate-200"
         )}>
@@ -121,65 +112,50 @@ export const MarketCard = memo(function MarketCard({
                 <SummaryMetrics listing={listing} attrs={attrs} />
             </CardContent>
 
-            {/* Expanded Content */}
-            <div className={cn(
-                "grid transition-all duration-300 ease-in-out",
-                isExpanded ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"
-            )}>
-                <div className="overflow-hidden">
-                    <div className="border-t border-slate-100 bg-slate-50/50 p-4 space-y-4">
-                        {/* Close button */}
-                        <div className="flex justify-end -mt-2 -mr-2">
-                            <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={(e) => { e.stopPropagation(); handleToggleExpand() }}
-                                className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
-                            >
-                                <X className="h-4 w-4" />
-                            </Button>
-                        </div>
-
-                        {/* Detailed content based on category */}
-                        <ExpandedDetails listing={listing} attrs={attrs} />
-
-                        {/* Actions */}
-                        <div className="flex gap-2 pt-2 border-t border-slate-100">
-                            <Button 
-                                variant="outline" 
-                                size="sm"
-                                className="flex-1 text-xs"
-                                onClick={(e) => {
-                                    e.stopPropagation()
-                                    onToggleSelect(listing.id)
-                                }}
-                            >
-                                <Plus className="w-3 h-3 mr-1" />
-                                {isSelected ? 'Remove from Compare' : 'Add to Compare'}
-                            </Button>
-                            <Button 
-                                size="sm"
-                                className="flex-1 text-xs"
-                                onClick={(e) => {
-                                    e.stopPropagation()
-                                    console.log('Contact:', listing.id)
-                                }}
-                            >
-                                <Mail className="w-3 h-3 mr-1" />
-                                {isPerson ? 'Contact' : 'Enquire'}
-                            </Button>
-                        </div>
-                    </div>
+            {/* Expanded Content - Details only - NO flex-grow, only shows when expanded */}
+            {isExpanded && (
+                <div className="border-t border-slate-100 bg-slate-50/50 p-4">
+                    <ExpandedDetails listing={listing} attrs={attrs} />
                 </div>
-            </div>
+            )}
 
-            <CardFooter className="relative z-10 flex items-center justify-between pt-3 pb-3 px-4 mt-auto bg-slate-50">
+            {/* Action buttons - shown when expanded */}
+            {isExpanded && (
+                <div className="flex gap-2 px-4 pb-3 pt-2 border-t border-slate-100 bg-white">
+                    <Button 
+                        variant="outline" 
+                        size="sm"
+                        className="flex-1 text-xs"
+                        onClick={(e) => {
+                            e.stopPropagation()
+                            onToggleSelect(listing.id)
+                        }}
+                    >
+                        <Plus className="w-3 h-3 mr-1" />
+                        {isSelected ? 'Remove' : 'Compare'}
+                    </Button>
+                    <Button 
+                        size="sm"
+                        variant="brand"
+                        className="flex-1 text-xs"
+                        onClick={(e) => {
+                            e.stopPropagation()
+                            console.log('Contact:', listing.id)
+                        }}
+                    >
+                        <Mail className="w-3 h-3 mr-1" />
+                        {isPerson ? 'Contact' : 'Enquire'}
+                    </Button>
+                </div>
+            )}
+
+            <CardFooter className="relative z-10 flex items-center justify-between pt-3 pb-3 px-4 bg-slate-50">
                 <div className="flex items-center gap-2">
                     <Checkbox
                         id={`compare-${listing.id}`}
                         checked={isSelected}
                         onCheckedChange={() => onToggleSelect(listing.id)}
-                        className="h-4 w-4 rounded bg-slate-200 data-[state=checked]:bg-foreground text-foreground focus:ring-ring"
+                        className="h-4 w-4 bg-slate-200 data-[state=checked]:bg-foreground text-foreground focus:ring-ring"
                         aria-label={`Select ${listing.title} for comparison`}
                     />
                     <label

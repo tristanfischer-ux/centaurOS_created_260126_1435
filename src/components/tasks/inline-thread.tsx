@@ -118,9 +118,12 @@ export function InlineThread({ taskId, isOpen, onClose, members }: InlineThreadP
         <div className="border-t border-slate-200 bg-white">
             {/* Header */}
             <div className="flex items-center justify-between px-4 py-2 bg-slate-50">
-                <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                    Activity ({comments.length})
-                </h4>
+                <div>
+                    <h4 className="text-xs font-semibold text-foreground uppercase tracking-wider">
+                        Notes & Comments
+                    </h4>
+                    <p className="text-[10px] text-muted-foreground">{comments.length} {comments.length === 1 ? 'entry' : 'entries'}</p>
+                </div>
                 <Button variant="ghost" size="sm" onClick={onClose} className="h-6 w-6 p-0">
                     <X className="h-4 w-4" />
                 </Button>
@@ -199,7 +202,7 @@ export function InlineThread({ taskId, isOpen, onClose, members }: InlineThreadP
                     }}
                     className="hidden"
                 />
-                <form onSubmit={handleSend} className="flex gap-2">
+                <form onSubmit={handleSend} className="flex items-start gap-2 w-full">
                     <MentionInput
                         value={newComment}
                         onChange={setNewComment}
@@ -214,10 +217,10 @@ export function InlineThread({ taskId, isOpen, onClose, members }: InlineThreadP
                                 handleSend({ preventDefault: () => {} } as React.FormEvent)
                             }
                         }}
-                        className="flex-1 text-sm h-8"
+                        className="text-sm min-h-[60px] resize-none"
                     />
-                    <Button type="submit" size="sm" disabled={isSending || !newComment.trim()} className="h-8 w-8 p-0">
-                        {isSending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Send className="h-3 w-3" />}
+                    <Button type="submit" size="sm" disabled={isSending || !newComment.trim()} className="h-10 w-10 p-0 shrink-0">
+                        {isSending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
                     </Button>
                 </form>
             </div>

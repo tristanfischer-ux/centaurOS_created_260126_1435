@@ -116,14 +116,14 @@ export function MentionInput({
   }, [showSuggestions])
 
   return (
-    <div className="relative">
+    <div className="relative flex-1 w-full">
       <Textarea
         ref={textareaRef}
         value={value}
         onChange={handleChange}
         onKeyDown={handleKeyDown}
         placeholder={placeholder}
-        className={className}
+        className={cn("w-full", className)}
       />
       
       {showSuggestions && suggestions.length > 0 && (

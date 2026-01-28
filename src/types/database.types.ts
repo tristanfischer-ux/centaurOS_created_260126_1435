@@ -111,6 +111,48 @@ export type Database = {
           },
         ]
       }
+      business_functions: {
+        Row: {
+          id: string
+          foundry_id: string
+          category: string
+          name: string
+          description: string | null
+          coverage_status: string
+          covered_by: string | null
+          covered_by_type: string | null
+          notes: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          foundry_id: string
+          category: string
+          name: string
+          description?: string | null
+          coverage_status?: string
+          covered_by?: string | null
+          covered_by_type?: string | null
+          notes?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          foundry_id?: string
+          category?: string
+          name?: string
+          description?: string | null
+          coverage_status?: string
+          covered_by?: string | null
+          covered_by_type?: string | null
+          notes?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       foundries: {
         Row: {
           created_at: string | null

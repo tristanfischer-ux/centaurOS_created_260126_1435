@@ -82,9 +82,12 @@ export function InlineHistory({ taskId, isOpen, onClose }: InlineHistoryProps) {
         <div className="border-t border-slate-200 bg-white">
             {/* Header */}
             <div className="flex items-center justify-between px-4 py-2 bg-slate-50">
-                <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                    History
-                </h4>
+                <div>
+                    <h4 className="text-xs font-semibold text-foreground uppercase tracking-wider">
+                        Audit Log
+                    </h4>
+                    <p className="text-[10px] text-muted-foreground">Status changes & activity</p>
+                </div>
                 <Button variant="ghost" size="sm" onClick={onClose} className="h-6 w-6 p-0">
                     <X className="h-4 w-4" />
                 </Button>

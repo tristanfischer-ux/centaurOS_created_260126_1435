@@ -1,12 +1,25 @@
 'use client'
 
+import { useState, useEffect } from "react"
 import { MarketplaceListing } from "@/actions/marketplace"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Check, X, TrendingUp, TrendingDown, Minus } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { Check, X, TrendingUp, TrendingDown, Minus, Sparkles, Loader2, Trophy, AlertCircle } from "lucide-react"
 import { cn } from "@/lib/utils"
+
+interface AIAnalysisResult {
+    winner: {
+        id: string
+        title: string
+        reason: string
+    }
+    reasoning: string
+    tradeoffs: string[]
+    summary: string
+}
 
 interface ComparisonModalProps {
     open: boolean
@@ -63,6 +76,39 @@ const categoryBadgeStyles: Record<string, string> = {
 }
 
 export function ComparisonModal({ open, onOpenChange, items }: ComparisonModalProps) {
+    const [aiAnalysis, setAiAnalysis] = useState<AIAnalysisResult | null>(null)
+    const [isAnalyzing, setIsAnalyzing] = useState(false)
+
+    // Clear analysis when items change or modal closes
+    useEffect(() => {
+        setAiAnalysis(null)
+    }, [items])
+
+    // Clear analysis when modal closes
+    const handleOpenChange = (newOpen: boolean) => {
+        if (!newOpen) {
+            setAiAnalysis(null)
+        }
+        onOpenChange(newOpen)
+    }
+
+    async function analyzeWithAI() {
+        setIsAnalyzing(true)
+        try {
+            const response = await fetch('/api/marketplace/compare', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ items })
+            })
+            const data = await response.json()
+            setAiAnalysis(data)
+        } catch (error) {
+            console.error('AI analysis failed:', error)
+        } finally {
+            setIsAnalyzing(false)
+        }
+    }
+
     if (items.length === 0) return null
 
     // Determine the primary category (use most common among items)
@@ -90,14 +136,96 @@ export function ComparisonModal({ open, onOpenChange, items }: ComparisonModalPr
     const bestValues = computeBestValues(items, allKeys)
 
     return (
-        <Dialog open={open} onOpenChange={onOpenChange}>
+        <Dialog open={open} onOpenChange={handleOpenChange}>
             <DialogContent className="max-w-4xl max-h-[80vh] flex flex-col p-0 gap-0">
                 <DialogHeader className="p-6 pb-4 border-b border-border">
-                    <DialogTitle className="text-xl font-semibold">Compare Listings</DialogTitle>
+                    <div className="flex items-center justify-between">
+                        <DialogTitle className="text-xl font-semibold">Compare Listings</DialogTitle>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={analyzeWithAI}
+                            disabled={isAnalyzing || items.length < 2}
+                            className="gap-2"
+                        >
+                            {isAnalyzing ? (
+                                <>
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                    Analyzing...
+                                </>
+                            ) : (
+                                <>
+                                    <Sparkles className="h-4 w-4" />
+                                    Analyze with AI
+                                </>
+                            )}
+                        </Button>
+                    </div>
                 </DialogHeader>
 
                 <ScrollArea className="flex-1">
                     <div className="p-6 pt-4">
+                        {/* AI Analysis Results */}
+                        {aiAnalysis && (
+                            <Card className="mb-6 p-4 bg-violet-50 dark:bg-violet-950/30 border-violet-200 dark:border-violet-800">
+                                <div className="flex items-start justify-between mb-4">
+                                    <div className="flex items-center gap-2">
+                                        <Sparkles className="h-5 w-5 text-violet-600 dark:text-violet-400" />
+                                        <h3 className="font-semibold text-violet-900 dark:text-violet-100">AI Analysis</h3>
+                                    </div>
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => setAiAnalysis(null)}
+                                        className="h-7 px-2 text-violet-600 hover:text-violet-800 hover:bg-violet-100 dark:text-violet-400 dark:hover:bg-violet-900/50"
+                                    >
+                                        <X className="h-4 w-4" />
+                                    </Button>
+                                </div>
+
+                                {/* Winner Section */}
+                                <div className="mb-4 p-3 bg-white dark:bg-violet-900/40 rounded-lg border border-violet-200 dark:border-violet-700">
+                                    <div className="flex items-center gap-2 mb-2">
+                                        <Trophy className="h-4 w-4 text-amber-500" />
+                                        <span className="text-sm font-medium text-violet-900 dark:text-violet-100">Recommended</span>
+                                        <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-200 border-0">
+                                            {aiAnalysis.winner.title}
+                                        </Badge>
+                                    </div>
+                                    <p className="text-sm text-violet-700 dark:text-violet-300">{aiAnalysis.winner.reason}</p>
+                                </div>
+
+                                {/* Reasoning */}
+                                <div className="mb-4">
+                                    <h4 className="text-sm font-medium text-violet-900 dark:text-violet-100 mb-2">Analysis</h4>
+                                    <p className="text-sm text-violet-700 dark:text-violet-300 leading-relaxed">{aiAnalysis.reasoning}</p>
+                                </div>
+
+                                {/* Trade-offs */}
+                                {aiAnalysis.tradeoffs && aiAnalysis.tradeoffs.length > 0 && (
+                                    <div className="mb-4">
+                                        <h4 className="text-sm font-medium text-violet-900 dark:text-violet-100 mb-2 flex items-center gap-1.5">
+                                            <AlertCircle className="h-4 w-4" />
+                                            Trade-offs to Consider
+                                        </h4>
+                                        <ul className="space-y-1.5">
+                                            {aiAnalysis.tradeoffs.map((tradeoff, index) => (
+                                                <li key={index} className="text-sm text-violet-700 dark:text-violet-300 flex items-start gap-2">
+                                                    <span className="text-violet-400 mt-1">•</span>
+                                                    <span>{tradeoff}</span>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    </div>
+                                )}
+
+                                {/* Summary */}
+                                <div className="pt-3 border-t border-violet-200 dark:border-violet-700">
+                                    <p className="text-sm text-violet-600 dark:text-violet-400 italic">{aiAnalysis.summary}</p>
+                                </div>
+                            </Card>
+                        )}
+
                         {/* Mobile: Card Layout */}
                         <div className="block md:hidden space-y-4">
                             {items.map(item => (

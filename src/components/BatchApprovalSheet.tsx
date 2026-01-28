@@ -1,15 +1,14 @@
 'use client'
 
 import { useState, useEffect, useTransition, useCallback } from 'react'
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetTrigger } from '@/components/ui/sheet'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Checkbox } from '@/components/ui/checkbox'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogTrigger } from '@/components/ui/dialog'
 import { Textarea } from '@/components/ui/textarea'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
-import { Check, X, AlertTriangle, Loader2, CheckCircle2, XCircle, ClipboardList } from 'lucide-react'
+import { Check, AlertTriangle, Loader2, CheckCircle2, XCircle, ClipboardList } from 'lucide-react'
 import { getPendingApprovals, batchApproveTasks, batchRejectTasks, approveTask } from '@/actions/tasks'
 import { toast } from 'sonner'
 import { formatDistanceToNow } from 'date-fns'
@@ -154,41 +153,41 @@ export function BatchApprovalSheet({ onApprovalComplete, trigger }: BatchApprova
 
     return (
         <>
-            <Sheet open={open} onOpenChange={setOpen}>
-                <SheetTrigger asChild>
+            <Dialog open={open} onOpenChange={setOpen}>
+                <DialogTrigger asChild>
                     {trigger || (
                         <Button variant="outline" size="sm" className="relative">
                             <ClipboardList className="h-4 w-4 mr-2" />
                             Approvals
                             {pendingCount > 0 && (
-                                <span className="absolute -top-1 -right-1 bg-amber-500 text-white text-xs font-medium rounded-full h-5 w-5 flex items-center justify-center">
+                                <span className="absolute -top-1 -right-1 bg-international-orange text-white text-xs font-medium rounded-full h-5 w-5 flex items-center justify-center">
                                     {pendingCount > 9 ? '9+' : pendingCount}
                                 </span>
                             )}
                         </Button>
                     )}
-                </SheetTrigger>
-                <SheetContent side="right" className="w-full sm:w-[500px] md:w-[600px] flex flex-col bg-white">
-                    <SheetHeader>
-                        <SheetTitle className="flex items-center gap-2 text-slate-900">
-                            <AlertTriangle className="h-5 w-5 text-amber-500" />
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-[600px] max-h-[85vh] flex flex-col p-0">
+                    <DialogHeader className="px-6 pt-6 pb-4">
+                        <DialogTitle className="flex items-center gap-2 text-foreground">
+                            <AlertTriangle className="h-5 w-5 text-international-orange" />
                             Pending Approvals
-                        </SheetTitle>
-                        <SheetDescription>
+                        </DialogTitle>
+                        <DialogDescription>
                             {tasks.length} task{tasks.length !== 1 ? 's' : ''} waiting for your approval
-                        </SheetDescription>
-                    </SheetHeader>
+                        </DialogDescription>
+                    </DialogHeader>
 
                     {/* Batch Actions Bar */}
                     {tasks.length > 0 && (
-                        <div className="flex items-center justify-between py-3 border-b border-slate-200">
+                        <div className="flex items-center justify-between px-6 py-3 border-y border-border bg-muted/30">
                             <div className="flex items-center gap-2">
                                 <Checkbox
                                     id="select-all"
                                     checked={selectedIds.size === tasks.length && tasks.length > 0}
                                     onCheckedChange={selectAll}
                                 />
-                                <label htmlFor="select-all" className="text-sm text-slate-600 cursor-pointer">
+                                <label htmlFor="select-all" className="text-sm text-muted-foreground cursor-pointer">
                                     {selectedIds.size > 0 ? `${selectedIds.size} selected` : 'Select all'}
                                 </label>
                             </div>
@@ -222,16 +221,16 @@ export function BatchApprovalSheet({ onApprovalComplete, trigger }: BatchApprova
                     )}
 
                     {/* Task List */}
-                    <ScrollArea className="flex-1 -mx-6 px-6">
+                    <ScrollArea className="flex-1 px-6">
                         {isLoading ? (
                             <div className="flex items-center justify-center h-40">
-                                <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
+                                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
                             </div>
                         ) : tasks.length === 0 ? (
                             <div className="flex flex-col items-center justify-center h-40 text-center">
                                 <CheckCircle2 className="h-12 w-12 text-green-500 mb-2" />
-                                <p className="text-slate-600 font-medium">All caught up!</p>
-                                <p className="text-slate-400 text-sm">No tasks pending approval</p>
+                                <p className="text-foreground font-medium">All caught up!</p>
+                                <p className="text-muted-foreground text-sm">No tasks pending approval</p>
                             </div>
                         ) : (
                             <div className="space-y-3 py-4">
@@ -244,10 +243,10 @@ export function BatchApprovalSheet({ onApprovalComplete, trigger }: BatchApprova
                                         <div
                                             key={task.id}
                                             className={cn(
-                                                'p-4 rounded-lg border transition-all',
+                                                'p-4 border transition-all bg-card',
                                                 isSelected
-                                                    ? 'border-blue-500 bg-blue-50/50'
-                                                    : 'border-slate-200 hover:border-slate-300 bg-white'
+                                                    ? 'border-international-orange bg-international-orange/5'
+                                                    : 'border-border hover:border-muted-foreground/30'
                                             )}
                                         >
                                             <div className="flex items-start gap-3">
@@ -260,11 +259,11 @@ export function BatchApprovalSheet({ onApprovalComplete, trigger }: BatchApprova
                                                 <div className="flex-1 min-w-0">
                                                     <div className="flex items-start justify-between gap-2">
                                                         <div className="flex-1 min-w-0">
-                                                            <h4 className="font-medium text-slate-900 truncate">
+                                                            <h4 className="font-medium text-foreground truncate">
                                                                 {task.title}
                                                             </h4>
                                                             {objective && (
-                                                                <p className="text-xs text-slate-500 truncate mt-0.5">
+                                                                <p className="text-xs text-muted-foreground truncate mt-0.5">
                                                                     Objective: {objective.title}
                                                                 </p>
                                                             )}
@@ -275,7 +274,7 @@ export function BatchApprovalSheet({ onApprovalComplete, trigger }: BatchApprova
                                                     </div>
 
                                                     {task.description && (
-                                                        <p className="text-sm text-slate-600 mt-2 line-clamp-2">
+                                                        <p className="text-sm text-muted-foreground mt-2 line-clamp-2">
                                                             {task.description}
                                                         </p>
                                                     )}
@@ -284,12 +283,12 @@ export function BatchApprovalSheet({ onApprovalComplete, trigger }: BatchApprova
                                                         <div className="flex items-center gap-2">
                                                             {assignee && (
                                                                 <div className="flex items-center gap-1.5">
-                                                                    <Avatar className="h-8 w-8">
-                                                                        <AvatarFallback className="text-xs bg-slate-100 text-slate-600">
+                                                                    <Avatar className="h-6 w-6">
+                                                                        <AvatarFallback className="text-[10px] bg-muted text-muted-foreground">
                                                                             {getInitials(assignee.full_name)}
                                                                         </AvatarFallback>
                                                                     </Avatar>
-                                                                    <span className="text-xs text-slate-500">
+                                                                    <span className="text-xs text-muted-foreground">
                                                                         {assignee.full_name}
                                                                     </span>
                                                                 </div>
@@ -303,7 +302,7 @@ export function BatchApprovalSheet({ onApprovalComplete, trigger }: BatchApprova
                                                         
                                                         <div className="flex items-center gap-2">
                                                             {task.created_at && (
-                                                                <span className="text-xs text-slate-400">
+                                                                <span className="text-xs text-muted-foreground">
                                                                     {formatDistanceToNow(new Date(task.created_at), { addSuffix: true })}
                                                                 </span>
                                                             )}
@@ -331,8 +330,8 @@ export function BatchApprovalSheet({ onApprovalComplete, trigger }: BatchApprova
 
                     {/* Footer */}
                     {tasks.length > 0 && (
-                        <div className="pt-4 border-t border-slate-200 mt-auto">
-                            <div className="flex items-center justify-between text-sm text-slate-500">
+                        <div className="px-6 py-4 border-t border-border mt-auto bg-muted/30">
+                            <div className="flex items-center justify-between text-sm text-muted-foreground">
                                 <span>
                                     {selectedIds.size > 0 
                                         ? `${selectedIds.size} of ${tasks.length} selected`
@@ -350,14 +349,14 @@ export function BatchApprovalSheet({ onApprovalComplete, trigger }: BatchApprova
                             </div>
                         </div>
                     )}
-                </SheetContent>
-            </Sheet>
+                </DialogContent>
+            </Dialog>
 
             {/* Batch Reject Dialog */}
             <Dialog open={rejectDialogOpen} onOpenChange={setRejectDialogOpen}>
-                <DialogContent className="sm:max-w-[425px] bg-white">
+                <DialogContent className="sm:max-w-[425px]">
                     <DialogHeader>
-                        <DialogTitle className="text-slate-900">Reject Tasks</DialogTitle>
+                        <DialogTitle>Reject Tasks</DialogTitle>
                         <DialogDescription>
                             Provide a reason for rejecting {selectedIds.size} task{selectedIds.size !== 1 ? 's' : ''}.
                             They will be sent back for revision.
@@ -367,7 +366,7 @@ export function BatchApprovalSheet({ onApprovalComplete, trigger }: BatchApprova
                         value={rejectReason}
                         onChange={(e) => setRejectReason(e.target.value)}
                         placeholder="Enter rejection reason..."
-                        className="min-h-[100px] bg-white border-slate-200"
+                        className="min-h-[100px]"
                     />
                     <DialogFooter>
                         <Button variant="outline" onClick={() => setRejectDialogOpen(false)}>
@@ -409,10 +408,10 @@ export function PendingApprovalsButton() {
     return (
         <BatchApprovalSheet
             trigger={
-                <button className="relative p-2 rounded-full hover:bg-slate-100 transition-colors">
-                    <ClipboardList className="h-5 w-5 text-slate-600" />
+                <button className="relative p-2 hover:bg-muted transition-colors">
+                    <ClipboardList className="h-5 w-5 text-muted-foreground" />
                     {count > 0 && (
-                        <span className="absolute -top-0.5 -right-0.5 bg-amber-500 text-white text-xs font-medium rounded-full h-5 w-5 flex items-center justify-center">
+                        <span className="absolute -top-0.5 -right-0.5 bg-international-orange text-white text-xs font-medium rounded-full h-5 w-5 flex items-center justify-center">
                             {count > 9 ? '9+' : count}
                         </span>
                     )}

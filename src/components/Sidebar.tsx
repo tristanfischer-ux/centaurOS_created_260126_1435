@@ -3,12 +3,8 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
-// We'll replace these with Lucide icons later if needed, or maintain text/emoji
-import { LayoutDashboard, Users, CheckSquare, Clock, Store, Settings, Target, HelpCircle, Compass } from "lucide-react"
+import { LayoutDashboard, Users, CheckSquare, Clock, Store, Target, Compass, LayoutGrid, MessageCircleQuestion } from "lucide-react"
 import { NotificationCenter } from "@/components/NotificationCenter"
-import { PendingApprovalsButton } from "@/components/BatchApprovalSheet"
-import { FocusModeToggle } from "@/components/FocusModeToggle"
-import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip"
 import { ThemeToggle } from "@/components/ThemeToggle"
 import { ZoomControl } from "@/components/ZoomControl"
 import { useZoomContext } from "@/components/ZoomProvider"
@@ -18,17 +14,14 @@ const APP_VERSION = "1.0.3"
 
 const mainNavigation = [
     { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+    { name: "Org Blueprint", href: "/org-blueprint", icon: LayoutGrid, tooltip: "Business function coverage and gap analysis" },
+    { name: "Advisory", href: "/advisory", icon: MessageCircleQuestion, tooltip: "Ask questions and get expert guidance" },
     { name: "Objectives", href: "/objectives", icon: Target },
     { name: "Tasks", href: "/tasks", icon: CheckSquare },
     { name: "Team", href: "/team", icon: Users },
     { name: "Timeline", href: "/timeline", icon: Clock, tooltip: "Gantt chart view of all tasks" },
     { name: "Marketplace", href: "/marketplace", icon: Store, tooltip: "Browse and compare service providers" },
     { name: "Guild", href: "/guild", icon: Compass, tooltip: "Community events and resources" },
-]
-
-const bottomNavigation = [
-    { name: "Help", href: "/help", icon: HelpCircle },
-    { name: "Settings", href: "/settings", icon: Settings },
 ]
 
 export function Sidebar({ foundryName, foundryId, userName, userRole }: { foundryName?: string; foundryId?: string; userName?: string; userRole?: string }) {
@@ -98,26 +91,13 @@ export function Sidebar({ foundryName, foundryId, userName, userRole }: { foundr
                 })}
             </nav>
 
-            <div className="p-4 mt-auto">
-                <div className="flex items-center gap-3 mb-4">
-                    <div className="h-8 w-8 bg-muted flex items-center justify-center">
-                        <span className="text-xs font-mono text-muted-foreground">
-                            {userName?.charAt(0)?.toUpperCase() || "U"}
-                        </span>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-foreground truncate">{userName || "User"}</p>
-                        <p className="text-[10px] text-muted-foreground font-mono uppercase tracking-wider">{userRole || "Member"}</p>
-                    </div>
-                    <FocusModeToggle compact />
-                    {(userRole === 'Executive' || userRole === 'Founder') && (
-                        <PendingApprovalsButton />
-                    )}
-                </div>
+            <div className="p-4 mt-auto space-y-3">
                 {/* Zoom Control */}
-                <div className="flex justify-center mb-3">
+                <div className="flex justify-center">
                     <ZoomControl onZoomChange={setZoom} />
                 </div>
+                
+                {/* Version info */}
                 <div className="text-[10px] text-muted-foreground text-center font-mono tracking-wider opacity-50">
                     <kbd className="px-1 py-0.5 bg-muted text-[9px]">⌘K</kbd> search · v{APP_VERSION}
                 </div>
