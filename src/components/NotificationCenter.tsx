@@ -37,9 +37,7 @@ export function NotificationCenter() {
         if (!user) return
         
         // Fetch initial notifications
-        // TODO: notifications table not yet created in database
-        // This will be enabled once the notifications table is added
-        /* const { data } = await supabase
+        const { data } = await supabase
           .from('notifications')
           .select('*')
           .eq('user_id', user.id)
@@ -67,7 +65,7 @@ export function NotificationCenter() {
               setUnreadCount(prev => prev + 1)
             }
           )
-          .subscribe() */
+          .subscribe()
       } catch (error) {
         // Silently fail if notifications table doesn't exist yet
         console.debug('Notifications not yet available:', error)
@@ -86,34 +84,36 @@ export function NotificationCenter() {
   const markAsRead = async (id: string) => {
     try {
       const supabase = createClient()
-      // TODO: Enable when notifications table is created
-      /* await supabase
+      await supabase
         .from('notifications')
-        .update({ is_read: true })
-        .eq('id', id) */
+        .update({ is_read: true, read_at: new Date().toISOString() })
+        .eq('id', id)
       
       setNotifications(prev =>
         prev.map(n => n.id === id ? { ...n, is_read: true } : n)
       )
       setUnreadCount(prev => Math.max(0, prev - 1))
     } catch (error) {
-      console.debug('Notifications not yet available:', error)
+      console.debug('Error marking notification as read:', error)
     }
   }
 
   const markAllAsRead = async () => {
     try {
       const supabase = createClient()
-      // TODO: Enable when notifications table is created
-      /* await supabase
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+      
+      await supabase
         .from('notifications')
-        .update({ is_read: true })
-        .eq('is_read', false) */
+        .update({ is_read: true, read_at: new Date().toISOString() })
+        .eq('user_id', user.id)
+        .eq('is_read', false)
       
       setNotifications(prev => prev.map(n => ({ ...n, is_read: true })))
       setUnreadCount(0)
     } catch (error) {
-      console.debug('Notifications not yet available:', error)
+      console.debug('Error marking all notifications as read:', error)
     }
   }
 
