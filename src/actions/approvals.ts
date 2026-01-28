@@ -241,13 +241,13 @@ export async function getTasksNeedingEscalation(timeoutHours: number = 24): Prom
         }
 
         const result = (data || [])
-            .filter(task => task.updated_at !== null)
+            .filter((task): task is typeof task & { updated_at: string } => task.updated_at !== null)
             .map(task => ({
                 task_id: task.id,
                 task_title: task.title,
                 status: task.status,
-                approval_requested_at: task.updated_at!,
-                hours_pending: Math.round((Date.now() - new Date(task.updated_at!).getTime()) / (60 * 60 * 1000))
+                approval_requested_at: task.updated_at,
+                hours_pending: Math.round((Date.now() - new Date(task.updated_at).getTime()) / (60 * 60 * 1000))
             }))
 
         return { data: result, error: null }
