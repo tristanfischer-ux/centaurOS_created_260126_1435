@@ -62,7 +62,7 @@ export default async function TeamPage() {
 
     const teams = rawTeams?.map(team => ({
         ...team,
-        members: (team.team_members as TeamMemberJoin[] | null)?.map(tm => tm.profile).filter(Boolean) || []
+        members: (team.team_members as TeamMemberJoin[] | null)?.map(tm => tm.profile).filter((profile): profile is NonNullable<typeof profile> => profile !== null) || []
     })) || []
 
     interface MemberMetrics {
