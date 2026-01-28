@@ -9,6 +9,7 @@ import { OfflineIndicator } from "@/components/OfflineIndicator";
 import { OnboardingModal } from "@/components/OnboardingModal";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { PresenceProvider } from "@/components/PresenceProvider";
+import { ZoomProvider, MobileZoomControl, ZoomableContent } from "@/components/ZoomProvider";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 
@@ -61,21 +62,26 @@ export default async function PlatformLayout({
     return (
         <TooltipProvider>
             <PresenceProvider>
-                <div className="flex h-screen overflow-hidden">
-                    <CommandPalette />
-                    <KeyboardShortcutsDialog />
-                    <Sidebar foundryName={foundryName} foundryId={foundryId} userName={profile?.full_name || user.email || "User"} userRole={profile?.role || "Member"} />
-                    <main className="flex-1 overflow-y-auto bg-white p-4 sm:p-6 lg:p-8 pb-32 lg:pb-8">
-                        <ErrorBoundary>
-                            {children}
-                        </ErrorBoundary>
-                    </main>
-                    <MobileNav />
-                    <PWARegister />
-                    <DragDropPolyfill />
-                    <OfflineIndicator />
-                    <OnboardingModal />
-                </div>
+                <ZoomProvider>
+                    <div className="flex h-screen overflow-hidden">
+                        <CommandPalette />
+                        <KeyboardShortcutsDialog />
+                        <MobileZoomControl />
+                        <Sidebar foundryName={foundryName} foundryId={foundryId} userName={profile?.full_name || user.email || "User"} userRole={profile?.role || "Member"} />
+                        <ZoomableContent className="flex-1 overflow-y-auto bg-white">
+                            <main className="p-4 sm:p-6 lg:p-8 pb-32 lg:pb-8">
+                                <ErrorBoundary>
+                                    {children}
+                                </ErrorBoundary>
+                            </main>
+                        </ZoomableContent>
+                        <MobileNav />
+                        <PWARegister />
+                        <DragDropPolyfill />
+                        <OfflineIndicator />
+                        <OnboardingModal />
+                    </div>
+                </ZoomProvider>
             </PresenceProvider>
         </TooltipProvider>
     );

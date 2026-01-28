@@ -10,6 +10,8 @@ import { PendingApprovalsButton } from "@/components/BatchApprovalSheet"
 import { FocusModeToggle } from "@/components/FocusModeToggle"
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip"
 import { ThemeToggle } from "@/components/ThemeToggle"
+import { ZoomControl } from "@/components/ZoomControl"
+import { useZoomContext } from "@/components/ZoomProvider"
 
 // Keep in sync with package.json version
 const APP_VERSION = "1.0.3"
@@ -30,6 +32,7 @@ const bottomNavigation = [
 
 export function Sidebar({ foundryName, foundryId, userName, userRole }: { foundryName?: string; foundryId?: string; userName?: string; userRole?: string }) {
     const pathname = usePathname()
+    const { setZoom } = useZoomContext()
 
     return (
         <div className="hidden md:flex h-screen w-64 flex-col bg-card text-foreground">
@@ -109,6 +112,10 @@ export function Sidebar({ foundryName, foundryId, userName, userRole }: { foundr
                     {(userRole === 'Executive' || userRole === 'Founder') && (
                         <PendingApprovalsButton />
                     )}
+                </div>
+                {/* Zoom Control */}
+                <div className="flex justify-center mb-3">
+                    <ZoomControl onZoomChange={setZoom} />
                 </div>
                 <div className="text-[10px] text-muted-foreground text-center font-mono tracking-wider opacity-50">
                     <kbd className="px-1 py-0.5 bg-muted text-[9px]">⌘K</kbd> search · v{APP_VERSION}
