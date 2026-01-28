@@ -96,8 +96,8 @@ export async function getTaskContext(taskId: string): Promise<{
         assignee: assignee ? { id: assignee.id, name: assignee.full_name } : null,
         creator: creator ? { id: creator.id, name: creator.full_name } : null,
         timeline: {
-            created: task.created_at,
-            lastUpdated: task.updated_at,
+            created: task.created_at || new Date().toISOString(),
+            lastUpdated: task.updated_at || new Date().toISOString(),
             deadline: task.end_date
         },
         commentCount: commentCount || 0,
