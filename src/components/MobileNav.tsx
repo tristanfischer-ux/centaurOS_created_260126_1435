@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
-import { LayoutDashboard, Users, CheckSquare, Clock, Store, Settings, Target, HelpCircle, MoreHorizontal } from "lucide-react"
+import { LayoutDashboard, Users, CheckSquare, Clock, Store, Settings, Target, HelpCircle, MoreHorizontal, Compass } from "lucide-react"
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -21,6 +21,7 @@ const mainNavigation = [
 
 const moreNavigation = [
     { name: "Marketplace", href: "/marketplace", icon: Store },
+    { name: "Guild", href: "/guild", icon: Compass },
     { name: "Help", href: "/help", icon: HelpCircle },
     { name: "Settings", href: "/settings", icon: Settings },
 ]
@@ -39,7 +40,7 @@ export function MobileNav() {
                             href={item.href}
                             className={cn(
                                 "flex flex-col items-center justify-center w-full min-h-[44px] h-full space-y-1 touch-action-manipulation",
-                                isActive ? "text-amber-600" : "text-muted-foreground hover:text-foreground"
+                                isActive ? "text-international-orange" : "text-muted-foreground hover:text-foreground"
                             )}
                         >
                             <item.icon className={cn("h-5 w-5", isActive && "fill-current")} />
@@ -52,12 +53,12 @@ export function MobileNav() {
                         <button
                             className={cn(
                                 "flex flex-col items-center justify-center w-full min-h-[44px] h-full space-y-1 touch-action-manipulation",
-                                pathname.startsWith("/marketplace") || pathname.startsWith("/help") || pathname.startsWith("/settings")
-                                    ? "text-amber-600" 
+                                pathname.startsWith("/marketplace") || pathname.startsWith("/guild") || pathname.startsWith("/help") || pathname.startsWith("/settings")
+                                    ? "text-international-orange" 
                                     : "text-muted-foreground hover:text-foreground"
                             )}
                         >
-                            <MoreHorizontal className={cn("h-5 w-5", (pathname.startsWith("/marketplace") || pathname.startsWith("/help") || pathname.startsWith("/settings")) && "fill-current")} />
+                            <MoreHorizontal className={cn("h-5 w-5", (pathname.startsWith("/marketplace") || pathname.startsWith("/guild") || pathname.startsWith("/help") || pathname.startsWith("/settings")) && "fill-current")} />
                             <span className="text-xs font-medium">More</span>
                         </button>
                     </DropdownMenuTrigger>
@@ -70,7 +71,7 @@ export function MobileNav() {
                                         href={item.href}
                                         className={cn(
                                             "flex items-center gap-2 cursor-pointer",
-                                            isActive && "text-amber-600"
+                                            isActive && "text-international-orange"
                                         )}
                                     >
                                         <item.icon className="h-4 w-4" />

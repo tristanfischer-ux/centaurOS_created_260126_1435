@@ -4,7 +4,7 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 // We'll replace these with Lucide icons later if needed, or maintain text/emoji
-import { LayoutDashboard, Users, CheckSquare, Clock, Store, Settings, Target, HelpCircle } from "lucide-react"
+import { LayoutDashboard, Users, CheckSquare, Clock, Store, Settings, Target, HelpCircle, Compass } from "lucide-react"
 import { NotificationCenter } from "@/components/NotificationCenter"
 import { PendingApprovalsButton } from "@/components/BatchApprovalSheet"
 import { FocusModeToggle } from "@/components/FocusModeToggle"
@@ -23,6 +23,7 @@ const mainNavigation = [
     { name: "Team", href: "/team", icon: Users },
     { name: "Timeline", href: "/timeline", icon: Clock, tooltip: "Gantt chart view of all tasks" },
     { name: "Marketplace", href: "/marketplace", icon: Store, tooltip: "Browse and compare service providers" },
+    { name: "Guild", href: "/guild", icon: Compass, tooltip: "Community events and resources" },
 ]
 
 const bottomNavigation = [

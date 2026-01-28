@@ -1,10 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
-import { Card } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { EmptyState } from "@/components/ui/empty-state"
-import { MapPin, Lock, Calendar } from "lucide-react"
+import { GuildTabs } from './guild-tabs'
 
 export default async function GuildPage() {
     const supabase = await createClient()
@@ -14,75 +10,61 @@ export default async function GuildPage() {
         redirect('/login')
     }
 
-    // Get User Profile for Role and Location
-    const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single()
-    const isExecutive = profile?.role === 'Executive'
+    // Get User Profile for Role and Foundry
+    const { data: profile } = await supabase.from('profiles').select('*, foundry:foundries(name)').eq('id', user.id).single()
+    const isExecutive = profile?.role === 'Executive' || profile?.role === 'Founder'
+    const foundryId = profile?.foundry_id
 
-    // Fetch Events (Mocking logic needed for "Geotargeting" since we don't have real geo-distance in Postgres extension enabled yet, just string match for MVP)
-    let query = supabase.from('guild_events').select('*').order('event_date', { ascending: true })
+    // Fetch Events
+    let eventsQuery = supabase.from('guild_events').select('*').order('event_date', { ascending: true })
 
     // Tiered Networking: Hide exec only events from apprentices
     if (!isExecutive) {
-        query = query.eq('is_executive_only', false)
+        eventsQuery = eventsQuery.eq('is_executive_only', false)
     }
 
-    const { data: events, error } = await query
+    const { data: events, error: eventsError } = await eventsQuery
 
-    if (error) return <div className="text-red-500">Error loading events.</div>
+    // Fetch Network Members (from same foundry for now, could expand to all foundries)
+    const { data: members, error: membersError } = await supabase
+        .from('profiles')
+        .select('id, full_name, role, email, foundry:foundries(name)')
+        .eq('foundry_id', foundryId)
+        .neq('id', user.id) // Exclude current user
+        .order('role', { ascending: true })
+        .limit(50)
+
+    if (eventsError) {
+        console.error('Error loading events:', eventsError)
+    }
+
+    if (membersError) {
+        console.error('Error loading members:', membersError)
+    }
+
+    // Transform members data to flatten foundry name
+    const transformedMembers = (members || []).map(member => ({
+        id: member.id,
+        full_name: member.full_name,
+        role: member.role,
+        email: member.email,
+        foundry_name: (member.foundry as { name: string } | null)?.name || undefined
+    }))
 
     return (
         <div className="space-y-6">
-            <div className="flex justify-between items-end">
-                <div>
-                    <h1 className="text-3xl font-bold tracking-tight text-slate-900 mb-2">The Guild</h1>
-                    <p className="text-muted-foreground">Offline-to-Online (O2O) network and events.</p>
-                </div>
-                {/* Geotargeting Mock Indicator */}
-                <div className="text-xs text-amber-600 border border-amber-200 bg-amber-50 px-3 py-1 rounded-full">
-                    📍 Showing events near you
-                </div>
+            <div>
+                <h1 className="text-3xl font-bold tracking-tight text-foreground mb-2">The Guild</h1>
+                <p className="text-muted-foreground">
+                    Virtual connectivity, physical reality. Connect, learn, and grow together.
+                </p>
             </div>
 
-            <div className="grid gap-6">
-                {(events || []).length === 0 ? (
-                    <EmptyState
-                        icon={<Calendar className="h-8 w-8" />}
-                        title="No Upcoming Events"
-                        description="There are no events visible to your tier at this time. Check back soon for new networking opportunities."
-                        className="border-2 border-dashed border-slate-200 rounded-lg"
-                    />
-                ) : (
-                    (events || []).map(event => (
-                        <Card key={event.id} className="bg-white border-slate-200 flex flex-col md:flex-row overflow-hidden shadow-sm">
-                            <div className="bg-slate-50 p-6 flex flex-col items-center justify-center min-w-[150px] border-r border-slate-200">
-                                <span className="text-2xl font-bold text-slate-900">
-                                    {new Date(event.event_date).getDate()}
-                                </span>
-                                <span className="text-sm text-slate-500 uppercase">
-                                    {new Date(event.event_date).toLocaleString('default', { month: 'short' })}
-                                </span>
-                            </div>
-                            <div className="flex-1 p-6">
-                                <div className="flex justify-between items-start mb-2">
-                                    <Badge variant="outline" className="border-slate-200 text-slate-500">
-                                        <MapPin className="mr-1 h-3 w-3" /> {event.location_geo || "TBD"}
-                                    </Badge>
-                                    {event.is_executive_only && (
-                                        <Badge className="bg-amber-100 text-amber-700 border border-amber-200 ml-2 shadow-none">
-                                            <Lock className="mr-1 h-3 w-3" /> Executive Only
-                                        </Badge>
-                                    )}
-                                </div>
-                                <h3 className="text-xl font-semibold text-slate-900 mb-2">{event.title}</h3>
-                                <p className="text-slate-500 text-sm mb-4">{event.description}</p>
-                                <Button size="sm" className="bg-slate-900 hover:bg-slate-800 text-white">
-                                    RSVP
-                                </Button>
-                            </div>
-                        </Card>
-                    ))
-                )}
-            </div>
+            <GuildTabs 
+                events={events || []} 
+                members={transformedMembers}
+                isExecutive={isExecutive}
+            />
         </div>
     )
 }
