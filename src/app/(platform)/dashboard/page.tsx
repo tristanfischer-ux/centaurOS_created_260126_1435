@@ -373,13 +373,13 @@ export default async function DashboardPage() {
                                 Create Objective
                             </Button>
                         </CreateObjectiveDialog>
-                        <Link href="/team">
+                        <Link href="/team" className="block">
                             <Button variant="outline" className="w-full justify-start">
                                 <Users className="h-4 w-4 mr-2" />
                                 Invite Team Member
                             </Button>
                         </Link>
-                        <Link href="/marketplace">
+                        <Link href="/marketplace" className="block">
                             <Button variant="outline" className="w-full justify-start">
                                 <ShoppingBag className="h-4 w-4 mr-2" />
                                 View Marketplace
