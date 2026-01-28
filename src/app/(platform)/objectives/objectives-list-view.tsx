@@ -253,11 +253,11 @@ export function ObjectivesListView({ objectives, objectivesForDialog, members, t
             <div className="space-y-3">
                 {/* Select All Header (Optional, but good for bulk actions) */}
                 {objectives.length > 0 && (
-                    <div className="flex items-center px-4 py-2 bg-muted/50 border rounded-md">
+                    <div className="flex items-center px-4 py-2 bg-muted/50 rounded-md">
                         <div className="flex items-center h-5 w-5 mr-4">
                             <input
                                 type="checkbox"
-                                className="h-4 w-4 rounded border-input text-foreground focus:ring-ring cursor-pointer"
+                                className="h-4 w-4 rounded bg-slate-200 text-foreground focus:ring-ring cursor-pointer"
                                 checked={selectedIds.size === objectives.length && objectives.length > 0}
                                 onChange={toggleSelectAll}
                                 aria-label="Select all objectives"
@@ -288,10 +288,10 @@ export function ObjectivesListView({ objectives, objectivesForDialog, members, t
                     return (
                         <div
                             key={objective.id}
-                            className={`bg-card border rounded-lg shadow-sm overflow-hidden transition-all duration-200 ${
+                            className={`bg-card rounded-lg shadow-md overflow-hidden transition-all duration-200 ${
                                 isSelected ? 'ring-2 ring-ring' : ''
                             } ${
-                                hasOverdueTasks ? 'border-orange-500 dark:border-orange-400' : isStalled ? 'border-yellow-500 dark:border-yellow-400' : ''
+                                hasOverdueTasks ? 'ring-2 ring-orange-500' : isStalled ? 'ring-2 ring-yellow-500' : ''
                             }`}
                         >
                             {/* Objective Header */}
@@ -309,7 +309,7 @@ export function ObjectivesListView({ objectives, objectivesForDialog, members, t
                                 >
                                     <input
                                         type="checkbox"
-                                        className="h-4 w-4 rounded border-input text-foreground focus:ring-ring cursor-pointer"
+                                        className="h-4 w-4 rounded bg-slate-200 text-foreground focus:ring-ring cursor-pointer"
                                         checked={isSelected}
                                         onChange={() => { }} // Handled by div click
                                         aria-label={`Select objective ${objective.title}`}
@@ -382,13 +382,13 @@ export function ObjectivesListView({ objectives, objectivesForDialog, members, t
 
                             {/* Tasks List (expanded) */}
                             {isExpanded && (
-                                <div className="border-t bg-muted/30">
+                                <div className="bg-muted/30">
                                     {taskCount === 0 ? (
                                         <div className="p-4 text-center text-sm text-muted-foreground">
                                             No tasks assigned to this objective yet.
                                         </div>
                                     ) : (
-                                        <div className="divide-y divide-border">
+                                        <div className="space-y-px">
                                             {objective.tasks.map(task => {
                                                 const statusConfig = getStatusConfig(task.status)
                                                 const StatusIcon = statusConfig.icon
@@ -461,7 +461,7 @@ export function ObjectivesListView({ objectives, objectivesForDialog, members, t
                 })}
 
                 {objectives.length === 0 && (
-                    <div className="py-12 text-center border-2 border-dashed rounded-lg text-muted-foreground">
+                    <div className="py-12 text-center bg-muted/30 rounded-lg text-muted-foreground">
                         No objectives set. Define your mission.
                     </div>
                 )}
