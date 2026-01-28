@@ -7,9 +7,12 @@ import { MarketCard } from "@/components/marketplace/market-card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { EmptyState } from "@/components/ui/empty-state"
 import { Input } from "@/components/ui/input"
+import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { CreateRFQDialog } from "./create-rfq-dialog"
 import { useState, useMemo, useEffect } from "react"
-import { Loader2, Store, Search } from "lucide-react"
+import { Loader2, Store, Search, X, SlidersHorizontal, MapPin, Briefcase, GraduationCap } from "lucide-react"
 
 interface MarketplaceViewProps {
     initialListings: MarketplaceListing[]
@@ -21,6 +24,13 @@ export function MarketplaceView({ initialListings }: MarketplaceViewProps) {
     const [activeTab, setActiveTab] = useState("People")
     const [searchQuery, setSearchQuery] = useState('')
     const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('')
+    const [showFilters, setShowFilters] = useState(false)
+    
+    // People-specific filters
+    const [subcategoryFilter, setSubcategoryFilter] = useState<string>('all')
+    const [locationFilter, setLocationFilter] = useState<string>('all')
+    const [skillFilter, setSkillFilter] = useState<string>('all')
+    const [minExperience, setMinExperience] = useState<string>('all')
 
     // Debounce search query
     useEffect(() => {
@@ -31,14 +41,39 @@ export function MarketplaceView({ initialListings }: MarketplaceViewProps) {
         return () => clearTimeout(timer)
     }, [searchQuery])
 
+    // Extract unique values for filter options (only from People)
+    const peopleListings = useMemo(() => 
+        initialListings.filter(item => item.category === 'People'), 
+        [initialListings]
+    )
+
+    const subcategories = useMemo(() => 
+        [...new Set(peopleListings.map(p => p.subcategory))].sort(),
+        [peopleListings]
+    )
+
+    const locations = useMemo(() => {
+        const locs = peopleListings
+            .map(p => p.attributes?.location)
+            .filter(Boolean)
+        return [...new Set(locs)].sort()
+    }, [peopleListings])
+
+    const allSkills = useMemo(() => {
+        const skills = new Set<string>()
+        peopleListings.forEach(p => {
+            const itemSkills = p.attributes?.skills || p.attributes?.expertise || []
+            itemSkills.forEach((s: string) => skills.add(s))
+        })
+        return [...skills].sort()
+    }, [peopleListings])
+
     const toggleSelect = (id: string) => {
         const next = new Set(selectedIds)
         if (next.has(id)) {
             next.delete(id)
         } else {
-            // Limit to 3 items for reasonable comparison UI
             if (next.size >= 3) {
-                // optionally alert user, for now simple limit
                 return
             }
             next.add(id)
@@ -47,25 +82,65 @@ export function MarketplaceView({ initialListings }: MarketplaceViewProps) {
     }
 
     const clearSelection = () => setSelectedIds(new Set())
+    
+    const clearFilters = () => {
+        setSubcategoryFilter('all')
+        setLocationFilter('all')
+        setSkillFilter('all')
+        setMinExperience('all')
+        setSearchQuery('')
+    }
 
-    // Filter items based on active tab and search query
+    const hasActiveFilters = subcategoryFilter !== 'all' || locationFilter !== 'all' || 
+                             skillFilter !== 'all' || minExperience !== 'all' || searchQuery.trim() !== ''
+
+    // Filter items based on active tab, search query, and filters
     const filteredItems = useMemo(() => {
         let filtered = initialListings.filter(item => item.category === activeTab)
         
-        // Apply search filter if query exists
+        // Apply search filter - search in title, description, and attributes
         if (debouncedSearchQuery.trim()) {
             const query = debouncedSearchQuery.toLowerCase().trim()
-            filtered = filtered.filter(item => 
-                item.title.toLowerCase().includes(query) ||
-                (item.description && item.description.toLowerCase().includes(query))
-            )
+            filtered = filtered.filter(item => {
+                // Search in title and description
+                if (item.title.toLowerCase().includes(query)) return true
+                if (item.description?.toLowerCase().includes(query)) return true
+                
+                // Search in attributes
+                const attrs = item.attributes || {}
+                for (const value of Object.values(attrs)) {
+                    if (typeof value === 'string' && value.toLowerCase().includes(query)) return true
+                    if (Array.isArray(value) && value.some(v => v.toLowerCase?.().includes(query))) return true
+                }
+                return false
+            })
+        }
+        
+        // Apply People-specific filters
+        if (activeTab === 'People') {
+            if (subcategoryFilter !== 'all') {
+                filtered = filtered.filter(item => item.subcategory === subcategoryFilter)
+            }
+            if (locationFilter !== 'all') {
+                filtered = filtered.filter(item => item.attributes?.location === locationFilter)
+            }
+            if (skillFilter !== 'all') {
+                filtered = filtered.filter(item => {
+                    const skills = item.attributes?.skills || item.attributes?.expertise || []
+                    return skills.includes(skillFilter)
+                })
+            }
+            if (minExperience !== 'all') {
+                const minYears = parseInt(minExperience)
+                filtered = filtered.filter(item => {
+                    const years = item.attributes?.years_experience || 0
+                    return years >= minYears
+                })
+            }
         }
         
         return filtered
-    }, [initialListings, activeTab, debouncedSearchQuery])
-
-    // Sub-tab logic could go here if we want strictly separated sub-tabs
-    // For now we show all in category, maybe grouping by subcategory visually
+    }, [initialListings, activeTab, debouncedSearchQuery, subcategoryFilter, locationFilter, skillFilter, minExperience])
 
     const selectedItems = initialListings.filter(item => selectedIds.has(item.id))
 
@@ -82,18 +157,156 @@ export function MarketplaceView({ initialListings }: MarketplaceViewProps) {
                     </div>
                 </div>
 
-                <Tabs value={activeTab} onValueChange={(val) => { setActiveTab(val); clearSelection(); setSearchQuery('') }} className="w-full">
+                <Tabs value={activeTab} onValueChange={(val) => { setActiveTab(val); clearSelection(); clearFilters() }} className="w-full">
                     <div className="flex flex-col gap-4 mb-6">
-                        <div className="relative">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                            <Input
-                                type="search"
-                                placeholder="Search listings..."
-                                value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
-                                className="pl-9 w-full max-w-md"
-                            />
+                        {/* Search and Filter Controls */}
+                        <div className="flex flex-col sm:flex-row gap-3">
+                            <div className="relative flex-1 max-w-md">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                <Input
+                                    type="search"
+                                    placeholder={activeTab === 'People' ? "Search by name, skill, role..." : "Search listings..."}
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    className="pl-9 w-full"
+                                />
+                            </div>
+                            {activeTab === 'People' && (
+                                <Button 
+                                    variant="outline" 
+                                    size="default"
+                                    onClick={() => setShowFilters(!showFilters)}
+                                    className={showFilters ? 'bg-slate-100' : ''}
+                                >
+                                    <SlidersHorizontal className="h-4 w-4 mr-2" />
+                                    Filters
+                                    {hasActiveFilters && (
+                                        <Badge className="ml-2 h-5 w-5 p-0 flex items-center justify-center text-[10px]">
+                                            !
+                                        </Badge>
+                                    )}
+                                </Button>
+                            )}
                         </div>
+
+                        {/* People Filters Panel */}
+                        {activeTab === 'People' && showFilters && (
+                            <div className="bg-slate-50 rounded-lg p-4 space-y-4">
+                                <div className="flex items-center justify-between">
+                                    <h3 className="font-medium text-sm">Filter People</h3>
+                                    {hasActiveFilters && (
+                                        <Button variant="ghost" size="sm" onClick={clearFilters} className="h-8 text-xs">
+                                            <X className="h-3 w-3 mr-1" />
+                                            Clear all
+                                        </Button>
+                                    )}
+                                </div>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                                    {/* Role Type */}
+                                    <div className="space-y-1.5">
+                                        <label className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+                                            <Briefcase className="h-3 w-3" /> Role Type
+                                        </label>
+                                        <Select value={subcategoryFilter} onValueChange={setSubcategoryFilter}>
+                                            <SelectTrigger className="h-9">
+                                                <SelectValue placeholder="All roles" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="all">All roles</SelectItem>
+                                                {subcategories.map(sub => (
+                                                    <SelectItem key={sub} value={sub}>{sub}</SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+
+                                    {/* Location */}
+                                    <div className="space-y-1.5">
+                                        <label className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+                                            <MapPin className="h-3 w-3" /> Location
+                                        </label>
+                                        <Select value={locationFilter} onValueChange={setLocationFilter}>
+                                            <SelectTrigger className="h-9">
+                                                <SelectValue placeholder="All locations" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="all">All locations</SelectItem>
+                                                {locations.map(loc => (
+                                                    <SelectItem key={loc} value={loc}>{loc}</SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+
+                                    {/* Skills */}
+                                    <div className="space-y-1.5">
+                                        <label className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+                                            <GraduationCap className="h-3 w-3" /> Skill
+                                        </label>
+                                        <Select value={skillFilter} onValueChange={setSkillFilter}>
+                                            <SelectTrigger className="h-9">
+                                                <SelectValue placeholder="Any skill" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="all">Any skill</SelectItem>
+                                                {allSkills.map(skill => (
+                                                    <SelectItem key={skill} value={skill}>{skill}</SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+
+                                    {/* Experience */}
+                                    <div className="space-y-1.5">
+                                        <label className="text-xs font-medium text-muted-foreground">Min. Experience</label>
+                                        <Select value={minExperience} onValueChange={setMinExperience}>
+                                            <SelectTrigger className="h-9">
+                                                <SelectValue placeholder="Any experience" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="all">Any experience</SelectItem>
+                                                <SelectItem value="1">1+ years</SelectItem>
+                                                <SelectItem value="3">3+ years</SelectItem>
+                                                <SelectItem value="5">5+ years</SelectItem>
+                                                <SelectItem value="10">10+ years</SelectItem>
+                                                <SelectItem value="15">15+ years</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                </div>
+
+                                {/* Active filter badges */}
+                                {hasActiveFilters && (
+                                    <div className="flex flex-wrap gap-2 pt-2">
+                                        {subcategoryFilter !== 'all' && (
+                                            <Badge variant="secondary" className="gap-1">
+                                                {subcategoryFilter}
+                                                <X className="h-3 w-3 cursor-pointer" onClick={() => setSubcategoryFilter('all')} />
+                                            </Badge>
+                                        )}
+                                        {locationFilter !== 'all' && (
+                                            <Badge variant="secondary" className="gap-1">
+                                                {locationFilter}
+                                                <X className="h-3 w-3 cursor-pointer" onClick={() => setLocationFilter('all')} />
+                                            </Badge>
+                                        )}
+                                        {skillFilter !== 'all' && (
+                                            <Badge variant="secondary" className="gap-1">
+                                                {skillFilter}
+                                                <X className="h-3 w-3 cursor-pointer" onClick={() => setSkillFilter('all')} />
+                                            </Badge>
+                                        )}
+                                        {minExperience !== 'all' && (
+                                            <Badge variant="secondary" className="gap-1">
+                                                {minExperience}+ years exp
+                                                <X className="h-3 w-3 cursor-pointer" onClick={() => setMinExperience('all')} />
+                                            </Badge>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
                         {selectedIds.size === 0 && (
                             <p className="text-sm text-muted-foreground flex items-center gap-1">
                                 💡 Select up to 3 items to compare
@@ -106,6 +319,14 @@ export function MarketplaceView({ initialListings }: MarketplaceViewProps) {
                             <TabsTrigger value="AI">AI</TabsTrigger>
                         </TabsList>
                     </div>
+
+                    {/* Results count */}
+                    {activeTab === 'People' && (
+                        <p className="text-sm text-muted-foreground mb-4">
+                            Showing {filteredItems.length} {filteredItems.length === 1 ? 'person' : 'people'}
+                            {hasActiveFilters && ' (filtered)'}
+                        </p>
+                    )}
 
                     {initialListings.length === 0 ? (
                         <div className="flex items-center justify-center py-20">
@@ -128,8 +349,13 @@ export function MarketplaceView({ initialListings }: MarketplaceViewProps) {
                         <div className="col-span-full bg-slate-100/50 rounded-xl">
                             <EmptyState
                                 icon={<Store className="h-12 w-12" />}
-                                title={debouncedSearchQuery.trim() ? "No listings match your search" : "No listings found in this category yet"}
-                                description={debouncedSearchQuery.trim() ? "Try adjusting your search terms or browse other categories." : "Check back later or browse other categories."}
+                                title={hasActiveFilters ? "No people match your filters" : "No listings found in this category yet"}
+                                description={hasActiveFilters ? "Try adjusting your filters or search terms." : "Check back later or browse other categories."}
+                                action={hasActiveFilters ? (
+                                    <Button variant="outline" onClick={clearFilters}>
+                                        Clear filters
+                                    </Button>
+                                ) : undefined}
                             />
                         </div>
                     )}
