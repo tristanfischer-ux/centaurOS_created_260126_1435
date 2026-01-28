@@ -12,6 +12,7 @@ import { CreateTaskDialog } from "./create-task-dialog"
 import { QuickAddTask } from "@/components/ui/quick-add-task"
 import { Database } from "@/types/database.types"
 import { Badge } from "@/components/ui/badge"
+import { Checkbox } from "@/components/ui/checkbox"
 import { format, isThisWeek } from "date-fns"
 import { ThreadDrawer } from "./thread-drawer"
 import { cn } from "@/lib/utils"
@@ -643,6 +644,21 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                                 <div key={objective.id} className="border border-slate-200 rounded-lg overflow-hidden bg-white">
                                     <div className="bg-slate-50 px-4 py-3 border-b border-slate-200 flex justify-between items-center">
                                         <h3 className="font-semibold text-slate-900 flex items-center gap-2">
+                                            {isSelectionMode && (
+                                                <Checkbox
+                                                    checked={objectiveTasks.every(t => selectedTaskIds.has(t.id))}
+                                                    onCheckedChange={(checked) => {
+                                                        const newSelection = new Set(selectedTaskIds)
+                                                        if (checked) {
+                                                            objectiveTasks.forEach(t => newSelection.add(t.id))
+                                                        } else {
+                                                            objectiveTasks.forEach(t => newSelection.delete(t.id))
+                                                        }
+                                                        setSelectedTaskIds(newSelection)
+                                                    }}
+                                                    aria-label={`Select all tasks in ${objective.title}`}
+                                                />
+                                            )}
                                             <div className="bg-blue-600 w-2 h-2 rounded-full" />
                                             {objective.title}
                                             <Badge variant="outline" className="ml-2 bg-white text-slate-600 font-normal">
@@ -654,10 +670,37 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                                         {objectiveTasks.map(task => (
                                             <div
                                                 key={task.id}
-                                                className="pl-12 pr-6 py-3 border-b border-slate-100 last:border-0 hover:bg-slate-50 active:bg-slate-100 flex items-center justify-between group gap-4 relative cursor-pointer transition-colors duration-200"
-                                                onClick={() => setSelectedTask(task)}
+                                                className={cn(
+                                                    "pl-4 pr-6 py-3 border-b border-slate-100 last:border-0 hover:bg-slate-50 active:bg-slate-100 flex items-center justify-between group gap-4 relative cursor-pointer transition-colors duration-200",
+                                                    isSelectionMode && selectedTaskIds.has(task.id) && "bg-blue-50 hover:bg-blue-100"
+                                                )}
+                                                onClick={() => {
+                                                    if (isSelectionMode) {
+                                                        toggleTaskSelection(task.id)
+                                                    } else {
+                                                        setSelectedTask(task)
+                                                    }
+                                                }}
                                             >
-                                                <div className="absolute left-0 top-0 bottom-0 w-1 bg-transparent group-hover:bg-blue-500 transition-colors duration-200" />
+                                                {isSelectionMode && (
+                                                    <div 
+                                                        className="flex-shrink-0"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation()
+                                                            toggleTaskSelection(task.id)
+                                                        }}
+                                                    >
+                                                        <Checkbox
+                                                            checked={selectedTaskIds.has(task.id)}
+                                                            onCheckedChange={() => toggleTaskSelection(task.id)}
+                                                            aria-label={`Select task ${task.title}`}
+                                                        />
+                                                    </div>
+                                                )}
+                                                <div className={cn(
+                                                    "absolute left-0 top-0 bottom-0 w-1 bg-transparent group-hover:bg-blue-500 transition-colors duration-200",
+                                                    isSelectionMode && selectedTaskIds.has(task.id) && "bg-blue-500"
+                                                )} />
                                                 <div className="flex-1 min-w-0">
                                                     <div className="flex items-center gap-2 mb-1">
                                                         <span className="font-medium text-foreground truncate">{task.title}</span>
@@ -694,6 +737,21 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                             <div className="border border-slate-200 rounded-lg overflow-hidden bg-white">
                                 <div className="bg-slate-50 px-4 py-3 border-b border-slate-200">
                                     <h3 className="font-semibold text-muted-foreground flex items-center gap-2">
+                                        {isSelectionMode && (
+                                            <Checkbox
+                                                checked={orphanedTasks.every(t => selectedTaskIds.has(t.id))}
+                                                onCheckedChange={(checked) => {
+                                                    const newSelection = new Set(selectedTaskIds)
+                                                    if (checked) {
+                                                        orphanedTasks.forEach(t => newSelection.add(t.id))
+                                                    } else {
+                                                        orphanedTasks.forEach(t => newSelection.delete(t.id))
+                                                    }
+                                                    setSelectedTaskIds(newSelection)
+                                                }}
+                                                aria-label="Select all general tasks"
+                                            />
+                                        )}
                                         <div className="bg-slate-400 w-2 h-2 rounded-full" />
                                         General Tasks (No Objective)
                                     </h3>
@@ -702,9 +760,33 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                                     {orphanedTasks.map(task => (
                                         <div
                                             key={task.id}
-                                            className="px-6 py-3 border-b border-slate-100 last:border-0 hover:bg-slate-50 active:bg-slate-100 flex items-center justify-between group gap-4 cursor-pointer transition-colors duration-200"
-                                            onClick={() => setSelectedTask(task)}
+                                            className={cn(
+                                                "px-4 py-3 border-b border-slate-100 last:border-0 hover:bg-slate-50 active:bg-slate-100 flex items-center justify-between group gap-4 cursor-pointer transition-colors duration-200",
+                                                isSelectionMode && selectedTaskIds.has(task.id) && "bg-blue-50 hover:bg-blue-100"
+                                            )}
+                                            onClick={() => {
+                                                if (isSelectionMode) {
+                                                    toggleTaskSelection(task.id)
+                                                } else {
+                                                    setSelectedTask(task)
+                                                }
+                                            }}
                                         >
+                                            {isSelectionMode && (
+                                                <div 
+                                                    className="flex-shrink-0"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation()
+                                                        toggleTaskSelection(task.id)
+                                                    }}
+                                                >
+                                                    <Checkbox
+                                                        checked={selectedTaskIds.has(task.id)}
+                                                        onCheckedChange={() => toggleTaskSelection(task.id)}
+                                                        aria-label={`Select task ${task.title}`}
+                                                    />
+                                                </div>
+                                            )}
                                             <div className="flex-1 min-w-0">
                                                 <div className="flex items-center gap-2 mb-1">
                                                     <span className="font-medium text-foreground truncate">{task.title}</span>
