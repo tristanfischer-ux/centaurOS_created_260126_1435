@@ -109,8 +109,8 @@ export async function submitRFQ(formData: {
     const { error } = await supabase
         .from("manufacturing_rfqs")
         .insert({
-            title: validatedTitle,
-            specifications: validatedSpecifications || null,
+            title: validatedTitle as string,
+            specifications: validatedSpecifications || '',
             budget_range: validatedBudgetRange || null,
             foundry_id: foundry_id as string,
             created_by: user.id,
