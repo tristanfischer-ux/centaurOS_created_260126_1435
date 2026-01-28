@@ -11,6 +11,10 @@ import {
 } from '@/hooks/usePresence'
 import { Clock, Target, MapPin } from 'lucide-react'
 
+// Re-export for convenience
+export { getPresenceColor, getPresenceLabel, formatLastSeen }
+export type { PresenceStatus, UserPresence }
+
 interface PresenceIndicatorProps {
   status: PresenceStatus
   size?: 'sm' | 'md' | 'lg'
