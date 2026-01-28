@@ -4,7 +4,6 @@ import { MarketplaceListing } from "@/actions/marketplace"
 import { ComparisonBar } from "@/components/marketplace/comparison-bar"
 import { ComparisonModal } from "@/components/marketplace/comparison-modal"
 import { MarketCard } from "@/components/marketplace/market-card"
-import { ListingDetailDrawer } from "@/components/marketplace/listing-detail-drawer"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { EmptyState } from "@/components/ui/empty-state"
 import { Input } from "@/components/ui/input"
@@ -27,9 +26,8 @@ export function MarketplaceView({ initialListings }: MarketplaceViewProps) {
     const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('')
     const [showFilters, setShowFilters] = useState(false)
     
-    // Detail drawer state
-    const [detailDrawerOpen, setDetailDrawerOpen] = useState(false)
-    const [selectedListing, setSelectedListing] = useState<MarketplaceListing | null>(null)
+    // Inline expansion state - only one card expanded at a time
+    const [expandedId, setExpandedId] = useState<string | null>(null)
     
     // Universal filters
     const [subcategoryFilter, setSubcategoryFilter] = useState<string>('all')
@@ -236,11 +234,6 @@ export function MarketplaceView({ initialListings }: MarketplaceViewProps) {
     }, [currentListings, activeTab, debouncedSearchQuery, subcategoryFilter, locationFilter, skillFilter, minExperience, aiTypeFilter, maxCostFilter, integrationFilter, certificationFilter, technologyFilter])
 
     const selectedItems = initialListings.filter(item => selectedIds.has(item.id))
-
-    const handleViewDetails = (listing: MarketplaceListing) => {
-        setSelectedListing(listing)
-        setDetailDrawerOpen(true)
-    }
 
     const getSearchPlaceholder = () => {
         switch (activeTab) {
@@ -594,7 +587,8 @@ export function MarketplaceView({ initialListings }: MarketplaceViewProps) {
                                     listing={item}
                                     isSelected={selectedIds.has(item.id)}
                                     onToggleSelect={toggleSelect}
-                                    onViewDetails={handleViewDetails}
+                                    expandedId={expandedId}
+                                    onExpandedChange={setExpandedId}
                                 />
                             ))}
                         </div>
@@ -626,12 +620,6 @@ export function MarketplaceView({ initialListings }: MarketplaceViewProps) {
                 open={isComparisonOpen}
                 onOpenChange={setIsComparisonOpen}
                 items={selectedItems}
-            />
-
-            <ListingDetailDrawer
-                open={detailDrawerOpen}
-                onOpenChange={setDetailDrawerOpen}
-                listing={selectedListing}
             />
         </div>
     )

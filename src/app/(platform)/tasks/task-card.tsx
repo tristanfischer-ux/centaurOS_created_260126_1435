@@ -41,10 +41,10 @@ import {
 import { acceptTask, rejectTask, forwardTask, completeTask, triggerAIWorker, updateTaskDates, duplicateTask, updateTaskAssignees } from "@/actions/tasks"
 import { cn, getInitials } from "@/lib/utils"
 import { Database } from "@/types/database.types"
-import { ThreadDrawer } from "./thread-drawer"
+import { InlineThread } from "@/components/tasks/inline-thread"
+import { InlineHistory } from "@/components/tasks/inline-history"
 import { EditTaskDialog } from "@/components/tasks/edit-task-dialog"
 import { toast } from "sonner"
-import { HistoryDrawer } from "@/components/tasks/history-drawer"
 import { RubberStampModal } from "@/components/smart-airlock/RubberStampModal"
 import { ClientNudgeButton } from "@/components/smart-airlock/ClientNudgeButton"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -108,9 +108,9 @@ export const TaskCard = memo(function TaskCard(props: TaskCardProps) {
     const [rejectOpen, setRejectOpen] = useState(false)
     const [forwardOpen, setForwardOpen] = useState(false)
 
-    const [threadOpen, setThreadOpen] = useState(false)
+    const [showThread, setShowThread] = useState(false)
     const [editOpen, setEditOpen] = useState(false)
-    const [historyOpen, setHistoryOpen] = useState(false)
+    const [showHistory, setShowHistory] = useState(false)
     const [rubberStampOpen, setRubberStampOpen] = useState(false)
     const [assigneePopoverOpen, setAssigneePopoverOpen] = useState(false)
     const [assigneeNamePopoverOpen, setAssigneeNamePopoverOpen] = useState(false)
@@ -706,18 +706,24 @@ export const TaskCard = memo(function TaskCard(props: TaskCardProps) {
                                 <Button
                                     variant="ghost"
                                     size="icon"
-                                    className="h-8 w-8 text-muted-foreground hover:text-muted-foreground active:text-foreground active:scale-[0.98] transition-all duration-200"
-                                    onClick={() => setHistoryOpen(true)}
-                                    title="View View History"
+                                    className={cn(
+                                        "h-8 w-8 transition-all duration-200",
+                                        showHistory ? "text-blue-600 bg-blue-50" : "text-muted-foreground hover:text-muted-foreground"
+                                    )}
+                                    onClick={() => { setShowHistory(!showHistory); setShowThread(false) }}
+                                    title="Toggle History"
                                 >
                                     <HistoryIcon className="h-4 w-4" />
                                 </Button>
                                 <Button
                                     variant="ghost"
                                     size="icon"
-                                    className="h-8 w-8 text-muted-foreground hover:text-muted-foreground active:text-foreground active:scale-[0.98] transition-all duration-200"
-                                    onClick={() => setThreadOpen(true)}
-                                    title="View Thread"
+                                    className={cn(
+                                        "h-8 w-8 transition-all duration-200",
+                                        showThread ? "text-blue-600 bg-blue-50" : "text-muted-foreground hover:text-muted-foreground"
+                                    )}
+                                    onClick={() => { setShowThread(!showThread); setShowHistory(false) }}
+                                    title="Toggle Thread"
                                 >
                                     <MessageSquare className="h-4 w-4" />
                                 </Button>
@@ -751,30 +757,23 @@ export const TaskCard = memo(function TaskCard(props: TaskCardProps) {
                         )}
                     </CardFooter>
 
+                    {/* Inline panels */}
+                    <InlineHistory
+                        taskId={task.id}
+                        isOpen={showHistory}
+                        onClose={() => setShowHistory(false)}
+                    />
+                    <InlineThread
+                        taskId={task.id}
+                        isOpen={showThread}
+                        onClose={() => setShowThread(false)}
+                        members={members}
+                    />
+
                     <EditTaskDialog
                         open={editOpen}
                         onOpenChange={setEditOpen}
                         task={task}
-                        members={members}
-                    />
-                    <HistoryDrawer
-                        open={historyOpen}
-                        onOpenChange={setHistoryOpen}
-                        taskId={task.id}
-                        taskTitle={task.title}
-                    />
-                    <ThreadDrawer
-                        open={threadOpen}
-                        onOpenChange={setThreadOpen}
-                        taskId={task.id}
-                        taskTitle={task.title}
-                        taskStatus={task.status || 'Pending'}
-                        taskDescription={task.description || undefined}
-                        assigneeName={task.assignee?.full_name || undefined}
-                        assigneeId={task.assignee_id || undefined}
-                        assigneeRole={task.assignee?.role || undefined}
-                        isAssignee={isAssignee}
-                        isCreator={isCreator}
                         members={members}
                     />
                     <RubberStampModal
