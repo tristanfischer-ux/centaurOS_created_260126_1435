@@ -26,7 +26,7 @@ export const MarketCard = memo(function MarketCard({ listing, isSelected, onTogg
 
     return (
         <Card className={cn(
-            "group relative flex flex-col justify-between rounded-xl shadow-sm hover:shadow-md hover:scale-[1.01] transition-all duration-200 overflow-hidden",
+            "group relative flex flex-col justify-between rounded-lg shadow-sm hover:shadow-md hover:scale-[1.01] transition-all duration-200 overflow-hidden",
             isSelected && "ring-2 ring-ring border-ring"
         )}>
             <CardContent className="p-4 relative z-10">
@@ -35,8 +35,8 @@ export const MarketCard = memo(function MarketCard({ listing, isSelected, onTogg
                         {listing.subcategory}
                     </Badge>
                     {listing.is_verified && (
-                        <div title="Verified">
-                            <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                        <div title="Verified" role="img" aria-label="Verified listing">
+                            <ShieldCheck className="w-4 h-4 text-emerald-600" aria-hidden="true" />
                         </div>
                     )}
                 </div>

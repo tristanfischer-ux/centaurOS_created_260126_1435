@@ -76,37 +76,34 @@ describe('TaskCard', () => {
     })
 
     describe('Button Variants', () => {
-        it('should render success variant button', () => {
-            const completedTask = { ...mockTask, status: 'Completed' }
-            // @ts-expect-error mock data
-            render(<TaskCard {...defaultProps} task={completedTask} currentUserId="user-1" expanded={true} />)
-            // Check for success button (Accept button uses success variant when task is completed)
-            const acceptButton = screen.queryByText('Accept')
-            if (acceptButton) {
-                expect(acceptButton).toBeInTheDocument()
-            }
-        })
-
-        it('should render certified variant button for AI tasks', () => {
-            const aiTask = { 
-                ...mockTask, 
-                assignees: [{ id: 'ai-1', full_name: 'AI Agent', role: 'AI_Agent', email: 'ai@test.com' }]
-            }
-            // @ts-expect-error mock data
-            render(<TaskCard {...defaultProps} task={aiTask} currentUserId="user-1" expanded={true} />)
-            // AI tasks may have certified variant buttons
-            const buttons = screen.getAllByRole('button')
-            expect(buttons.length).toBeGreaterThan(0)
-        })
-
-        it('should render warning variant button for forward action', () => {
+        it('should render success variant button for Accept action', () => {
             // @ts-expect-error mock data
             render(<TaskCard {...defaultProps} currentUserId="user-1" expanded={true} />)
-            // Forward button should use warning variant
-            const forwardButton = screen.queryByText(/forward/i)
-            if (forwardButton) {
-                expect(forwardButton).toBeInTheDocument()
-            }
+            // Accept button should use success/green variant
+            const acceptButton = screen.getByText('Accept')
+            expect(acceptButton).toBeInTheDocument()
+            // Verify it has success variant CSS class (green styling)
+            expect(acceptButton).toHaveClass('bg-green-600')
+        })
+
+        it('should render destructive variant button for Reject action', () => {
+            // @ts-expect-error mock data
+            render(<TaskCard {...defaultProps} currentUserId="user-1" expanded={true} />)
+            // Reject button should use destructive/red variant
+            const rejectButton = screen.getByText('Reject')
+            expect(rejectButton).toBeInTheDocument()
+            // Verify it has destructive variant CSS class (red styling)
+            expect(rejectButton).toHaveClass('bg-red-600')
+        })
+
+        it('should render warning variant button for Forward action', () => {
+            // @ts-expect-error mock data
+            render(<TaskCard {...defaultProps} currentUserId="user-1" expanded={true} />)
+            // Forward button should use warning/yellow variant
+            const forwardButton = screen.getByText('Forward')
+            expect(forwardButton).toBeInTheDocument()
+            // Verify it has warning variant CSS class (yellow/amber styling)
+            expect(forwardButton).toHaveClass('bg-yellow-600')
         })
     })
 
@@ -128,11 +125,16 @@ describe('TaskCard', () => {
 
         it('should have aria-expanded attribute for collapsible sections', () => {
             // @ts-expect-error mock data
-            render(<TaskCard {...defaultProps} expanded={true} />)
-            // Check for elements with aria-expanded (like assignee popover)
-            const expandedElements = screen.queryAllByRole('button', { expanded: true })
-            // At least one element should have aria-expanded when expanded
-            expect(expandedElements.length).toBeGreaterThanOrEqual(0)
+            const { container } = render(<TaskCard {...defaultProps} expanded={true} />)
+            // Check for elements with aria-expanded attribute
+            const elementsWithAriaExpanded = container.querySelectorAll('[aria-expanded]')
+            // When the card is expanded, there should be at least one element with aria-expanded
+            expect(elementsWithAriaExpanded.length).toBeGreaterThan(0)
+            // Verify at least one element has aria-expanded="true"
+            const hasExpandedTrue = Array.from(elementsWithAriaExpanded).some(
+                el => el.getAttribute('aria-expanded') === 'true'
+            )
+            expect(hasExpandedTrue).toBe(true)
         })
     })
 

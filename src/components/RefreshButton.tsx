@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useTransition } from 'react'
+import { useState, useTransition, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -26,14 +26,28 @@ export function RefreshButton({
     const router = useRouter()
     const [isPending, startTransition] = useTransition()
     const [isAnimating, setIsAnimating] = useState(false)
+    const animationTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+
+    // Cleanup timeout on unmount
+    useEffect(() => {
+        return () => {
+            if (animationTimeoutRef.current) {
+                clearTimeout(animationTimeoutRef.current)
+            }
+        }
+    }, [])
 
     const handleRefresh = () => {
         setIsAnimating(true)
         startTransition(() => {
             router.refresh()
         })
+        // Clear any existing timeout before setting a new one
+        if (animationTimeoutRef.current) {
+            clearTimeout(animationTimeoutRef.current)
+        }
         // Animation runs for fixed duration regardless of transition
-        setTimeout(() => setIsAnimating(false), 600)
+        animationTimeoutRef.current = setTimeout(() => setIsAnimating(false), 600)
     }
 
     return (

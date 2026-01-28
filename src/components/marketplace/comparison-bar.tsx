@@ -30,9 +30,10 @@ export function ComparisonBar({ selectedItems, onClear, onCompare, onRemove }: C
                                 </div>
                                 <button
                                     onClick={() => onRemove(item.id)}
-                                    className="absolute -top-1 -right-1 bg-destructive rounded-full w-8 h-8 sm:w-6 sm:h-6 flex items-center justify-center sm:opacity-0 sm:group-hover:opacity-100 transition-opacity hover:bg-destructive/80 active:bg-destructive/60"
+                                    aria-label={`Remove ${item.title} from comparison`}
+                                    className="absolute -top-1 -right-1 bg-destructive rounded-full min-h-[44px] min-w-[44px] w-8 h-8 flex items-center justify-center sm:opacity-0 sm:group-hover:opacity-100 transition-opacity hover:bg-destructive/80 active:bg-destructive/60"
                                 >
-                                    <X className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
+                                    <X className="w-4 h-4" />
                                 </button>
                             </div>
                         ))}

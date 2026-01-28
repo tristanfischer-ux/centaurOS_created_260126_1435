@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { redirect } from 'next/navigation'
 import { TeamComparisonView } from './team-comparison-view'
 
 export default async function TeamPage() {
@@ -6,7 +7,7 @@ export default async function TeamPage() {
     const { data: { user } } = await supabase.auth.getUser()
 
     if (!user) {
-        return <div className="p-8 text-red-500">Unauthenticated. Please login.</div>
+        redirect('/login')
     }
 
     // Get current user profile to get foundry_id
@@ -39,6 +40,15 @@ export default async function TeamPage() {
         .order('role', { ascending: true })
 
     // Fetch teams with members
+    interface TeamMemberJoin {
+        profile: {
+            id: string
+            full_name: string | null
+            role: string | null
+            email: string | null
+        } | null
+    }
+
     const { data: rawTeams } = await supabase
         .from('teams')
         .select(`
@@ -52,7 +62,7 @@ export default async function TeamPage() {
 
     const teams = rawTeams?.map(team => ({
         ...team,
-        members: (team.team_members as any[])?.map(tm => tm.profile) || []
+        members: (team.team_members as TeamMemberJoin[] | null)?.map(tm => tm.profile).filter(Boolean) || []
     })) || []
 
     interface MemberMetrics {

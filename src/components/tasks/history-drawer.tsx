@@ -31,7 +31,20 @@ type TaskHistoryItem = Database['public']['Tables']['task_history']['Row'] & {
     user: {
         full_name: string | null
         email: string
+        role?: string | null
+        avatar_url?: string | null
     } | null
+}
+
+function isTaskHistoryItemArray(data: unknown): data is TaskHistoryItem[] {
+    if (!Array.isArray(data)) return false
+    return data.every(item => 
+        typeof item === 'object' && 
+        item !== null &&
+        'id' in item &&
+        'task_id' in item &&
+        'action_type' in item
+    )
 }
 
 export function HistoryDrawer({ open, onOpenChange, taskId, taskTitle }: HistoryDrawerProps) {
@@ -48,7 +61,9 @@ export function HistoryDrawer({ open, onOpenChange, taskId, taskTitle }: History
 
             getTaskHistory(taskId).then((res) => {
                 if (mounted) {
-                    if (res.data) setHistory(res.data as unknown as TaskHistoryItem[]) // Cast due to join complexity
+                    if (res.data && isTaskHistoryItemArray(res.data)) {
+                        setHistory(res.data)
+                    }
                     setLoading(false)
                 }
             })

@@ -13,8 +13,23 @@ export async function createMember(formData: FormData) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return { error: 'Unauthorized' }
 
-    const foundry_id = user.app_metadata.foundry_id
-    if (!foundry_id) return { error: 'Missing Foundry ID' }
+    const foundry_id = await getFoundryIdCached()
+    if (!foundry_id) return { error: 'User not in a foundry' }
+
+    // Verify user has permission to create members (Executive or Founder only)
+    const { data: currentProfile, error: profileError } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .single()
+
+    if (profileError || !currentProfile) {
+        return { error: 'Failed to verify user permissions' }
+    }
+
+    if (currentProfile.role !== 'Executive' && currentProfile.role !== 'Founder') {
+        return { error: 'Unauthorized: Only Executives and Founders can create members' }
+    }
 
     const email = formData.get('email') as string
     const full_name = formData.get('full_name') as string
@@ -59,15 +74,37 @@ export async function pairCentaur(humanId: string, aiId: string) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return { error: 'Unauthorized' }
 
-    // Verify AI exists and is an AI_Agent
-    const { data: aiProfile } = await supabase
+    const foundry_id = await getFoundryIdCached()
+    if (!foundry_id) return { error: 'User not in a foundry' }
+
+    // Verify AI exists, is an AI_Agent, and belongs to the same foundry
+    const { data: aiProfile, error: aiProfileError } = await supabase
         .from('profiles')
-        .select('role')
+        .select('role, foundry_id')
         .eq('id', aiId)
         .single()
 
-    if (!aiProfile || aiProfile.role !== 'AI_Agent') {
+    if (aiProfileError || !aiProfile || aiProfile.role !== 'AI_Agent') {
         return { error: 'Invalid AI Agent selected' }
+    }
+
+    if (aiProfile.foundry_id !== foundry_id) {
+        return { error: 'AI Agent must belong to the same foundry' }
+    }
+
+    // Verify human profile exists and belongs to the same foundry
+    const { data: humanProfile, error: humanProfileError } = await supabase
+        .from('profiles')
+        .select('foundry_id')
+        .eq('id', humanId)
+        .single()
+
+    if (humanProfileError || !humanProfile) {
+        return { error: 'Human profile not found' }
+    }
+
+    if (humanProfile.foundry_id !== foundry_id) {
+        return { error: 'Human profile must belong to the same foundry' }
     }
 
     // Link the human profile to the AI agent
@@ -204,7 +241,13 @@ export async function getOrCreateAutoTeam(memberIds: string[]): Promise<{ teamId
         profile_id: profileId
     }))
 
-    await supabase.from('team_members').insert(memberInserts)
+    const { error: memberInsertError } = await supabase.from('team_members').insert(memberInserts)
+    
+    if (memberInsertError) {
+        // Attempt to clean up the created team since member insert failed
+        await supabase.from('teams').delete().eq('id', team.id)
+        return { teamId: null, error: `Failed to add team members: ${memberInsertError.message}` }
+    }
 
     revalidatePath('/team')
     return { teamId: team.id }
@@ -226,13 +269,13 @@ export async function addTeamMember(teamId: string, profileId: string) {
         return { error: 'Missing Foundry ID' }
     }
 
-    const { data: team } = await supabase
+    const { data: team, error: teamError } = await supabase
         .from('teams')
         .select('foundry_id')
         .eq('id', teamId)
         .single()
 
-    if (!team) {
+    if (teamError || !team) {
         return { error: 'Team not found' }
     }
 
@@ -241,13 +284,13 @@ export async function addTeamMember(teamId: string, profileId: string) {
     }
 
     // Verify profile exists and is in same foundry
-    const { data: profile } = await supabase
+    const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('foundry_id')
         .eq('id', profileId)
         .single()
 
-    if (!profile) {
+    if (profileError || !profile) {
         return { error: 'Profile not found' }
     }
 
@@ -305,13 +348,13 @@ export async function removeTeamMember(teamId: string, profileId: string) {
         return { error: 'Missing Foundry ID' }
     }
 
-    const { data: team } = await supabase
+    const { data: team, error: teamError } = await supabase
         .from('teams')
         .select('foundry_id')
         .eq('id', teamId)
         .single()
 
-    if (!team) {
+    if (teamError || !team) {
         return { error: 'Team not found' }
     }
 
@@ -496,6 +539,70 @@ export async function assignToTask(taskId: string, profileIds: string[]) {
     if (!user) return { error: 'Unauthorized' }
 
     if (profileIds.length === 0) return { error: 'At least one assignee required' }
+
+    const foundry_id = await getFoundryIdCached()
+    if (!foundry_id) return { error: 'User not in a foundry' }
+
+    // Verify user has permission to assign the task
+    // User must be the task creator, an Executive, Founder, or already assigned to the task
+    const { data: task, error: taskError } = await supabase
+        .from('tasks')
+        .select('creator_id, foundry_id')
+        .eq('id', taskId)
+        .single()
+
+    if (taskError || !task) {
+        return { error: 'Task not found' }
+    }
+
+    if (task.foundry_id !== foundry_id) {
+        return { error: 'Unauthorized: Task not in your foundry' }
+    }
+
+    // Check if user is the creator
+    const isCreator = task.creator_id === user.id
+
+    // Check user's role
+    const { data: userProfile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .single()
+
+    const isAdmin = userProfile?.role === 'Executive' || userProfile?.role === 'Founder'
+
+    // Check if user is currently assigned to the task
+    const { data: existingAssignment } = await supabase
+        .from('task_assignees')
+        .select('profile_id')
+        .eq('task_id', taskId)
+        .eq('profile_id', user.id)
+        .single()
+
+    const isAssigned = !!existingAssignment
+
+    if (!isCreator && !isAdmin && !isAssigned) {
+        return { error: 'Unauthorized: You do not have permission to assign this task' }
+    }
+
+    // Verify all assignees belong to the same foundry
+    const { data: assigneeProfiles, error: assigneeError } = await supabase
+        .from('profiles')
+        .select('id, foundry_id')
+        .in('id', profileIds)
+
+    if (assigneeError) {
+        return { error: 'Failed to verify assignees' }
+    }
+
+    if (!assigneeProfiles || assigneeProfiles.length !== profileIds.length) {
+        return { error: 'One or more assignees not found' }
+    }
+
+    const invalidAssignees = assigneeProfiles.filter(p => p.foundry_id !== foundry_id)
+    if (invalidAssignees.length > 0) {
+        return { error: 'All assignees must belong to the same foundry' }
+    }
 
     let teamId: string | null = null
     if (profileIds.length > 1) {

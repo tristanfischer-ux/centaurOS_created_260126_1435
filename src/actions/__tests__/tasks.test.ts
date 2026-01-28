@@ -39,14 +39,16 @@ describe('Task Actions', () => {
 
     describe('acceptTask', () => {
         it('should update status to Accepted', async () => {
+            const mockUpdate = jest.fn().mockReturnValue({
+                eq: jest.fn().mockResolvedValue({ error: null })
+            })
             mockSupabaseClient.from.mockReturnValue({
-                update: jest.fn().mockReturnValue({
-                    eq: jest.fn().mockResolvedValue({ error: null })
-                })
+                update: mockUpdate
             })
 
             const result = await acceptTask('task-123')
             expect(result).toEqual({ success: true })
+            expect(mockUpdate).toHaveBeenCalledWith({ status: 'Accepted' })
         })
     })
 
@@ -57,14 +59,16 @@ describe('Task Actions', () => {
         })
 
         it('should update status to Rejected', async () => {
+            const mockUpdate = jest.fn().mockReturnValue({
+                eq: jest.fn().mockResolvedValue({ error: null })
+            })
             mockSupabaseClient.from.mockReturnValue({
-                update: jest.fn().mockReturnValue({
-                    eq: jest.fn().mockResolvedValue({ error: null })
-                })
+                update: mockUpdate
             })
 
             const result = await rejectTask('task-123', 'Not my job')
             expect(result).toEqual({ success: true })
+            expect(mockUpdate).toHaveBeenCalledWith({ status: 'Rejected', rejection_reason: 'Not my job' })
         })
     })
 

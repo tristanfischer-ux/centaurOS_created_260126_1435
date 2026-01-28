@@ -41,7 +41,6 @@ export async function POST(req: NextRequest) {
         });
 
         const transcriptText = transcription.text;
-        console.log("Transcript:", transcriptText);
 
         // 2. Extract Task Intent with GPT-4o
         // @ts-expect-error types for beta.chat.completions.parse are conflicting
@@ -99,14 +98,25 @@ export async function POST(req: NextRequest) {
             }
         }
 
-        // 4. Create Task in DB
+        // 4. Get user's foundry_id from database (NOT from user_metadata which is client-writable)
+        const { data: profile } = await supabase
+            .from('profiles')
+            .select('foundry_id')
+            .eq('id', user.id)
+            .single();
+
+        if (!profile?.foundry_id) {
+            return NextResponse.json({ error: 'User not associated with a foundry' }, { status: 403 });
+        }
+
+        // 5. Create Task in DB
         const { data: newTask, error } = await supabase
             .from("tasks")
             .insert({
                 title: taskData.title,
                 description: `${taskData.description}\n\n[Transcript]: ${transcriptText}`,
                 creator_id: user.id,
-                foundry_id: user.user_metadata.foundry_id || "default_foundry", // Fallback if meta missing
+                foundry_id: profile.foundry_id,
                 assignee_id: assigneeId,
                 status: "Pending",
                 start_date: new Date().toISOString(),

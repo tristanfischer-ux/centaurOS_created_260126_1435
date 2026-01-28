@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { redirect } from 'next/navigation'
 import { TasksView } from './tasks-view'
 
 // Revalidate every 60 seconds
@@ -9,7 +10,7 @@ export default async function TasksPage() {
     const { data: { user } } = await supabase.auth.getUser()
 
     if (!user) {
-        return <div className="p-8 text-red-500">Unauthenticated.</div>
+        redirect('/login')
     }
 
     const { data: tasks, error } = await supabase
@@ -19,7 +20,8 @@ export default async function TasksPage() {
             assignee:profiles!assignee_id(id, full_name, role, email),
             creator:profiles!creator_id(id, full_name, role),
             objective:objectives!objective_id(id, title),
-            task_files(id, file_name, file_size, created_at)
+            task_files(id, file_name, file_size, created_at),
+            task_assignees(profile:profiles(id, full_name, role, email))
         `)
         .order('created_at', { ascending: false })
 
@@ -64,7 +66,7 @@ export default async function TasksPage() {
         assignee: Array.isArray(task.assignee) ? task.assignee[0] : task.assignee,
         creator: Array.isArray(task.creator) ? task.creator[0] : task.creator,
         objective: Array.isArray(task.objective) ? task.objective[0] : task.objective,
-        assignees: [], // Temporarily disabled while debugging task_assignees join
+        assignees: task.task_assignees?.map(ta => ta.profile).filter(Boolean) || [],
         task_files: task.task_files || []
     })) || []
 

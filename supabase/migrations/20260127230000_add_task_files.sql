@@ -1,6 +1,6 @@
 -- =============================================
 -- MIGRATION: Add task_files table
--- Run this in Supabase SQL Editor
+-- Creates the task_files table for file attachments
 -- =============================================
 
 -- Create task_files table for file attachments
@@ -15,10 +15,14 @@ CREATE TABLE IF NOT EXISTS public.task_files (
     created_at TIMESTAMPTZ DEFAULT now()
 );
 
+-- Create index for faster lookups by task_id (this is what PostgREST uses for the relationship)
+CREATE INDEX IF NOT EXISTS idx_task_files_task_id ON public.task_files(task_id);
+
 -- Enable RLS
 ALTER TABLE public.task_files ENABLE ROW LEVEL SECURITY;
 
 -- Policy: Users can view task files in their foundry
+DROP POLICY IF EXISTS "Users can view task files in their foundry" ON public.task_files;
 CREATE POLICY "Users can view task files in their foundry" ON public.task_files
     FOR SELECT USING (
         task_id IN (
@@ -29,32 +33,17 @@ CREATE POLICY "Users can view task files in their foundry" ON public.task_files
     );
 
 -- Policy: Users can insert task files  
+DROP POLICY IF EXISTS "Users can insert task files" ON public.task_files;
 CREATE POLICY "Users can insert task files" ON public.task_files
     FOR INSERT WITH CHECK (uploaded_by = auth.uid());
 
 -- Policy: Users can delete their own uploads
+DROP POLICY IF EXISTS "Users can delete own task files" ON public.task_files;
 CREATE POLICY "Users can delete own task files" ON public.task_files
     FOR DELETE USING (uploaded_by = auth.uid());
 
--- =============================================
--- STORAGE BUCKET (run these one at a time)
--- =============================================
-
--- Create the storage bucket via Supabase Dashboard:
--- 1. Go to Storage in your Supabase dashboard
--- 2. Click "New bucket"
--- 3. Name: task-files
--- 4. Public: No (private)
--- 5. Click Create
-
--- Then add RLS policies for the bucket:
--- (run in SQL editor after bucket is created)
-
--- Allow authenticated users to upload to their foundry folder
--- INSERT INTO storage.policies (name, bucket_id, expression, definition)
--- VALUES (
---     'Allow upload to task-files',
---     'task-files',
---     '(bucket_id = ''task-files''::text)',
---     '(auth.role() = ''authenticated''::text)'
--- );
+-- Policy: Users can update their own uploads
+DROP POLICY IF EXISTS "Users can update own task files" ON public.task_files;
+CREATE POLICY "Users can update own task files" ON public.task_files
+    FOR UPDATE USING (uploaded_by = auth.uid()) 
+    WITH CHECK (uploaded_by = auth.uid());

@@ -73,7 +73,7 @@ function InitialsAvatar({
 }) {
     const initials = getInitials(name)
     const bgColor = isAI ? "bg-amber-500" : getAvatarColor(name)
-    const sizeClasses = size === "sm" ? "h-5 w-5 text-[10px]" : "h-7 w-7 text-xs"
+    const sizeClasses = size === "sm" ? "h-5 w-5 text-[10px]" : "h-8 w-8 text-xs"
 
     return (
         <div className={`${sizeClasses} ${bgColor} rounded-full flex items-center justify-center text-white font-semibold shrink-0`}>
@@ -315,17 +315,21 @@ export function TimelineListView({ tasks, members, currentUserId }: TimelineList
                     <span className="text-xs font-medium text-muted-foreground">2 Week Timeline</span>
                 </div>
                 <div className="relative h-6 bg-muted rounded-md flex">
-                    {dateMarkers.map((marker, idx) => (
-                        <div
-                            key={idx}
-                            className={`flex-1 text-center text-xs ${marker.isToday
-                                ? 'text-amber-600 font-bold'
-                                : 'text-muted-foreground'
-                                }`}
-                        >
-                            {idx % 2 === 0 && marker.label}
-                        </div>
-                    ))}
+                    {dateMarkers.map((marker, idx) => {
+                        // Create stable key using index since labels (day numbers) can repeat across months
+                        const markerKey = `day-${idx}`
+                        return (
+                            <div
+                                key={markerKey}
+                                className={`flex-1 text-center text-xs ${marker.isToday
+                                    ? 'text-amber-600 font-bold'
+                                    : 'text-muted-foreground'
+                                    }`}
+                            >
+                                {idx % 2 === 0 && marker.label}
+                            </div>
+                        )
+                    })}
                 </div>
             </div>
 
@@ -405,7 +409,7 @@ export function TimelineListView({ tasks, members, currentUserId }: TimelineList
                                                                         </div>
                                                                     )}
                                                                     {currentAssignees.length > 3 && (
-                                                                        <div className="h-7 w-7 rounded-full bg-muted border border-card flex items-center justify-center text-[10px] text-muted-foreground font-medium z-0">
+                                                                        <div className="h-8 w-8 rounded-full bg-muted border border-card flex items-center justify-center text-xs text-muted-foreground font-medium z-0">
                                                                             +{currentAssignees.length - 3}
                                                                         </div>
                                                                     )}

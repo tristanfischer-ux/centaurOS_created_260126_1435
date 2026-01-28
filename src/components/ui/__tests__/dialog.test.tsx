@@ -61,15 +61,26 @@ describe('Dialog Component', () => {
         it('should render with proper ARIA attributes', () => {
             render(
                 <Dialog open>
-                    <DialogContent>
+                    <DialogContent data-testid="dialog-content">
                         <DialogTitle>Dialog Title</DialogTitle>
                         <p>Dialog Content</p>
                     </DialogContent>
                 </Dialog>
             )
-            // Dialog should be accessible
-            const content = screen.getByText('Dialog Content')
-            expect(content).toBeInTheDocument()
+            // Verify dialog has proper role attribute
+            const dialog = screen.getByRole('dialog')
+            expect(dialog).toBeInTheDocument()
+            
+            // Verify aria-modal is set for modal dialogs
+            expect(dialog).toHaveAttribute('aria-modal', 'true')
+            
+            // Verify dialog is labeled by the title (aria-labelledby or aria-describedby)
+            const dialogTitle = screen.getByText('Dialog Title')
+            expect(dialogTitle).toBeInTheDocument()
+            
+            // Check that the dialog has aria-labelledby pointing to the title
+            const labelledBy = dialog.getAttribute('aria-labelledby')
+            expect(labelledBy).toBeTruthy()
         })
     })
 })

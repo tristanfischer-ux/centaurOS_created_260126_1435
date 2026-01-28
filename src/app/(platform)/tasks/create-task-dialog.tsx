@@ -91,6 +91,7 @@ export function CreateTaskDialog({ objectives, members, teams = [], currentUserI
     const [assigneeError, setAssigneeError] = useState<string | null>(null)
     const [submitError, setSubmitError] = useState<string | null>(null)
     const [showVoiceNudge, setShowVoiceNudge] = useState(false)
+    const [description, setDescription] = useState("")
 
     // Check if user has seen voice recorder before
     useEffect(() => {
@@ -131,8 +132,8 @@ export function CreateTaskDialog({ objectives, members, teams = [], currentUserI
                 setSelectedObjective(defaultObjectiveId || "")
                 setFiles([])
                 setShowAdvanced(false)
+                setDescription('')
                 if (titleObjRef.current) titleObjRef.current.value = ''
-                if (descRef.current) descRef.current.value = ''
             }, 300)
         } else {
             // When opening, set smart defaults
@@ -205,6 +206,7 @@ export function CreateTaskDialog({ objectives, members, teams = [], currentUserI
                 setDate(undefined)
                 setSelectedAssignees([])
                 setFiles([])
+                setDescription('')
                 setTitleError(null)
                 setDescriptionError(null)
                 setAssigneeError(null)
@@ -220,7 +222,7 @@ export function CreateTaskDialog({ objectives, members, teams = [], currentUserI
 
     const handleVoiceFill = (data: { title: string; description: string; assignee_type: string; due_date?: string }) => {
         if (titleObjRef.current) titleObjRef.current.value = data.title;
-        if (descRef.current) descRef.current.value = data.description;
+        setDescription(data.description);
 
         // Try to set date
         if (data.due_date) {
@@ -389,7 +391,7 @@ export function CreateTaskDialog({ objectives, members, teams = [], currentUserI
                     <div className="grid gap-4 py-4">
                         {/* Stage 1 - Required Fields (always visible) */}
                         <div className="grid gap-2">
-                            <Label htmlFor="title">Task Title</Label>
+                            <Label htmlFor="title">Task Title <span className="text-red-500">*</span></Label>
                             <Input
                                 id="title"
                                 name="title"
@@ -402,6 +404,7 @@ export function CreateTaskDialog({ objectives, members, teams = [], currentUserI
                                 aria-invalid={!!titleError}
                                 className={titleError ? "border-red-500" : ""}
                                 onChange={() => setTitleError(null)}
+                                autoFocus
                             />
                             {titleError && (
                                 <p id="title-error" className="text-sm text-red-600 mt-1" role="alert">
@@ -412,7 +415,7 @@ export function CreateTaskDialog({ objectives, members, teams = [], currentUserI
 
                         {/* Assignees - Multi-Select */}
                         <div className="grid gap-2">
-                            <Label>Assignees</Label>
+                            <Label>Assignees <span className="text-red-500">*</span></Label>
                             <div aria-describedby={assigneeError ? "assignee-error" : undefined}>
                                 <MultiSelect
                                     options={memberOptions}
@@ -514,7 +517,7 @@ export function CreateTaskDialog({ objectives, members, teams = [], currentUserI
                         {showAdvanced && (
                             <>
                                 <div className="grid gap-2">
-                                    <Label htmlFor="description">Description</Label>
+                                    <Label htmlFor="description">Description <span className="text-slate-500 font-normal">(Optional)</span></Label>
                                     <Textarea
                                         id="description"
                                         name="description"
@@ -522,7 +525,11 @@ export function CreateTaskDialog({ objectives, members, teams = [], currentUserI
                                         className="h-24"
                                         enterKeyHint="done"
                                         ref={descRef}
+                                        value={description}
+                                        onChange={(e) => setDescription(e.target.value)}
+                                        maxLength={500}
                                     />
+                                    <p className="text-xs text-slate-500 text-right">{description.length}/500</p>
                                 </div>
 
                                 {/* Deadline */}

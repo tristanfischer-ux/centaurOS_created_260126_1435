@@ -71,7 +71,7 @@
   ::before,
   ::backdrop,
   ::file-selector-button {
-    border-color: var(--color-gray-200, currentColor);
+    border-color: var(--color-border, currentColor);
   }
 }
 
@@ -200,8 +200,18 @@ button, a, [role="button"], input, select, textarea {
 
 /* Focus ring consistency */
 :focus-visible {
-  outline: none;
-  ring: 2px;
-  ring-color: hsl(var(--ring));
-  ring-offset: 2px;
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 2px;
+}
+
+/* Reduced motion accessibility */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

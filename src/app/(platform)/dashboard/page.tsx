@@ -10,6 +10,10 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
 import { CreateTaskDialog } from "../tasks/create-task-dialog"
 import { CreateObjectiveDialog } from "../objectives/create-objective-dialog"
+import { TeamPulseWidget } from "@/components/dashboard/TeamPulseWidget"
+import { PendingApprovalsWidget } from "@/components/dashboard/PendingApprovalsWidget"
+import { BlockersWidget } from "@/components/dashboard/BlockersWidget"
+import { StandupWidget } from "@/components/StandupWidget"
 import Link from "next/link"
 import { 
     CheckSquare, 
@@ -56,7 +60,8 @@ export default async function DashboardPage() {
     const assignedIds = assignedTaskIds?.map(ta => ta.task_id) || []
     
     // Fetch tasks where user is assignee (via assignee_id or task_assignees)
-    const { data: myTasks } = await supabase
+    // Build query safely to avoid SQL injection - use conditional chaining instead of string interpolation
+    let myTasksQuery = supabase
         .from('tasks')
         .select(`
             id,
@@ -68,7 +73,18 @@ export default async function DashboardPage() {
             objective:objectives!objective_id(id, title)
         `)
         .in('status', ['Pending', 'Accepted'])
-        .or(`assignee_id.eq.${user.id}${assignedIds.length > 0 ? `,id.in.(${assignedIds.join(',')})` : ''}`)
+    
+    // Apply filter based on whether user has task_assignees entries
+    if (assignedIds.length > 0) {
+        // User could be direct assignee OR in task_assignees - use .in() for both
+        const allRelevantTaskIds = [...new Set(assignedIds)]
+        myTasksQuery = myTasksQuery.or(`assignee_id.eq.${user.id},id.in.(${allRelevantTaskIds.map(id => `"${id}"`).join(',')})`)
+    } else {
+        // No task_assignees entries, just filter by direct assignment
+        myTasksQuery = myTasksQuery.eq('assignee_id', user.id)
+    }
+    
+    const { data: myTasks } = await myTasksQuery
         .order('created_at', { ascending: false })
         .limit(10)
 
@@ -194,8 +210,8 @@ export default async function DashboardPage() {
             {/* Header */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>
-                    <h1 className="text-3xl font-bold text-slate-900">Welcome back, {userName}</h1>
-                    <p className="text-slate-500 mt-1">Here's what's happening with your work</p>
+                    <h1 className="text-3xl font-bold text-foreground">Welcome back, {userName}</h1>
+                    <p className="text-muted-foreground mt-1">Here's what's happening with your work</p>
                 </div>
                 <div className="flex gap-2 flex-wrap">
                     <CreateTaskDialog 
@@ -212,6 +228,21 @@ export default async function DashboardPage() {
                 </div>
             </div>
 
+            {/* Remote Team Widgets - Executive/Founder View */}
+            {(profile?.role === 'Executive' || profile?.role === 'Founder') && (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <TeamPulseWidget members={members} />
+                    <PendingApprovalsWidget userRole={profile?.role || ''} />
+                    <BlockersWidget userRole={profile?.role || ''} />
+                    <StandupWidget userRole={profile?.role} compact />
+                </div>
+            )}
+
+            {/* Standup for non-executives */}
+            {profile?.role !== 'Executive' && profile?.role !== 'Founder' && (
+                <StandupWidget userRole={profile?.role} compact />
+            )}
+
             {/* Dashboard Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {/* My Tasks Section */}
@@ -219,7 +250,7 @@ export default async function DashboardPage() {
                     <CardHeader>
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2">
-                                <CheckSquare className="h-5 w-5 text-slate-600" />
+                                <CheckSquare className="h-5 w-5 text-muted-foreground" />
                                 <CardTitle className="flex items-center gap-2">
                                     My Tasks
                                     <Tooltip>
@@ -275,12 +306,12 @@ export default async function DashboardPage() {
                                         <Link 
                                             key={task.id} 
                                             href={`/tasks`}
-                                            className="block p-3 rounded-lg border border-slate-200 hover:border-slate-300 hover:bg-slate-50 active:bg-slate-100 transition-colors"
+                                            className="block p-3 rounded-lg border hover:bg-accent/50 active:bg-accent transition-colors"
                                         >
                                             <div className="flex items-start justify-between gap-2">
                                                 <div className="flex-1 min-w-0">
                                                     <div className="flex items-center gap-2 mb-1">
-                                                        <h4 className="font-medium text-slate-900 truncate">{task.title}</h4>
+                                                        <h4 className="font-medium text-foreground truncate">{task.title}</h4>
                                                         <Badge 
                                                             variant={task.status === 'Accepted' ? 'default' : 'secondary'}
                                                             className="text-xs shrink-0"
@@ -289,15 +320,15 @@ export default async function DashboardPage() {
                                                         </Badge>
                                                     </div>
                                                     {objective && (
-                                                        <p className="text-xs text-slate-500 mb-1">
+                                                        <p className="text-xs text-muted-foreground mb-1">
                                                             Objective: {objective.title}
                                                         </p>
                                                     )}
                                                     {task.end_date && (
                                                         <div className="flex items-center gap-1 text-xs">
-                                                            <Clock className="h-3 w-3 text-slate-400" />
+                                                            <Clock className="h-3 w-3 text-muted-foreground" />
                                                             <span className={cn(
-                                                                "text-slate-500",
+                                                                "text-muted-foreground",
                                                                 isOverdue && "text-red-600 font-medium",
                                                                 isDueSoon && !isOverdue && "text-amber-600 font-medium"
                                                             )}>
@@ -324,32 +355,32 @@ export default async function DashboardPage() {
                         <CardTitle>Quick Actions</CardTitle>
                         <CardDescription>Common tasks and shortcuts</CardDescription>
                     </CardHeader>
-                    <CardContent className="space-y-2">
+                    <CardContent className="space-y-3">
                         <CreateTaskDialog 
                             objectives={objectivesForDialog}
                             members={members}
                             teams={teams}
                             currentUserId={user.id}
                         >
-                            <Button variant="outline" className="w-full justify-start" size="sm">
+                            <Button variant="outline" className="w-full justify-start">
                                 <Plus className="h-4 w-4 mr-2" />
                                 Create Task
                             </Button>
                         </CreateTaskDialog>
                         <CreateObjectiveDialog>
-                            <Button variant="outline" className="w-full justify-start" size="sm">
+                            <Button variant="outline" className="w-full justify-start">
                                 <Target className="h-4 w-4 mr-2" />
                                 Create Objective
                             </Button>
                         </CreateObjectiveDialog>
                         <Link href="/team">
-                            <Button variant="outline" className="w-full justify-start" size="sm">
+                            <Button variant="outline" className="w-full justify-start">
                                 <Users className="h-4 w-4 mr-2" />
                                 Invite Team Member
                             </Button>
                         </Link>
                         <Link href="/marketplace">
-                            <Button variant="outline" className="w-full justify-start" size="sm">
+                            <Button variant="outline" className="w-full justify-start">
                                 <ShoppingBag className="h-4 w-4 mr-2" />
                                 View Marketplace
                             </Button>
@@ -362,7 +393,7 @@ export default async function DashboardPage() {
                     <CardHeader>
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2">
-                                <Calendar className="h-5 w-5 text-slate-600" />
+                                <Calendar className="h-5 w-5 text-muted-foreground" />
                                 <CardTitle className="flex items-center gap-2">
                                     Upcoming Deadlines
                                     <Tooltip>
@@ -403,14 +434,14 @@ export default async function DashboardPage() {
                                             {overdueTasks.map((task) => {
                                                 const assignee = task.assignee as { full_name: string | null, role: string } | null
                                                 return (
-                                                    <Link 
-                                                        key={task.id} 
-                                                        href={`/tasks`}
-                                                        className="block p-3 rounded-lg border border-red-200 bg-red-50 hover:bg-red-100 active:bg-red-200 transition-colors"
-                                                    >
-                                                        <div className="flex items-start justify-between gap-2">
-                                                            <div className="flex-1 min-w-0">
-                                                                <h4 className="font-medium text-slate-900 truncate mb-1">{task.title}</h4>
+                                                <Link 
+                                                    key={task.id} 
+                                                    href={`/tasks`}
+                                                    className="block p-3 rounded-lg border border-destructive/50 bg-destructive/10 hover:bg-destructive/20 transition-colors"
+                                                >
+                                                    <div className="flex items-start justify-between gap-2">
+                                                        <div className="flex-1 min-w-0">
+                                                            <h4 className="font-medium text-foreground truncate mb-1">{task.title}</h4>
                                                                 <div className="flex items-center gap-1 text-xs text-red-600">
                                                                     <Clock className="h-3 w-3" />
                                                                     <span>Overdue: {formatDistanceToNow(new Date(task.end_date!), { addSuffix: true })}</span>
@@ -440,14 +471,14 @@ export default async function DashboardPage() {
                                                 <Link 
                                                     key={task.id} 
                                                     href={`/tasks`}
-                                                    className="block p-3 rounded-lg border border-slate-200 hover:border-slate-300 hover:bg-slate-50 active:bg-slate-100 transition-colors"
+                                                    className="block p-3 rounded-lg border hover:bg-accent/50 transition-colors"
                                                 >
                                                     <div className="flex items-start justify-between gap-2">
                                                         <div className="flex-1 min-w-0">
-                                                            <h4 className="font-medium text-slate-900 truncate mb-1">{task.title}</h4>
+                                                            <h4 className="font-medium text-foreground truncate mb-1">{task.title}</h4>
                                                             <div className="flex items-center gap-1 text-xs">
-                                                                <Clock className="h-3 w-3 text-slate-400" />
-                                                                <span className={isDueSoon ? "text-amber-600 font-medium" : "text-slate-500"}>
+                                                                <Clock className="h-3 w-3 text-muted-foreground" />
+                                                                <span className={isDueSoon ? "text-amber-600 dark:text-amber-400 font-medium" : "text-muted-foreground"}>
                                                                     Due {formatDistanceToNow(new Date(task.end_date!), { addSuffix: true })}
                                                                 </span>
                                                             </div>
@@ -471,7 +502,7 @@ export default async function DashboardPage() {
                     <CardHeader>
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2">
-                                <Target className="h-5 w-5 text-slate-600" />
+                                <Target className="h-5 w-5 text-muted-foreground" />
                                 <CardTitle className="flex items-center gap-2">
                                     Objectives
                                     <Tooltip>
@@ -516,7 +547,7 @@ export default async function DashboardPage() {
                                     >
                                         <div className="space-y-2">
                                             <div className="flex items-start justify-between gap-2">
-                                                <h4 className="font-medium text-slate-900 text-sm line-clamp-2">{objective.title}</h4>
+                                                <h4 className="font-medium text-foreground text-sm line-clamp-2">{objective.title}</h4>
                                                 <Badge variant="secondary" className="text-xs shrink-0">
                                                     {objective.progress || 0}%
                                                 </Badge>
@@ -535,7 +566,7 @@ export default async function DashboardPage() {
                     <CardHeader>
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2">
-                                <MessageSquare className="h-5 w-5 text-slate-600" />
+                                <MessageSquare className="h-5 w-5 text-muted-foreground" />
                                 <CardTitle className="flex items-center gap-2">
                                     Recent Activity
                                     <Tooltip>
@@ -571,16 +602,16 @@ export default async function DashboardPage() {
                                         <Link 
                                             key={`${activity.type}-${activity.id}`} 
                                             href={`/tasks`}
-                                            className="flex items-start gap-3 p-3 rounded-lg border border-slate-200 hover:border-slate-300 hover:bg-slate-50 active:bg-slate-100 transition-colors"
+                                            className="flex items-start gap-3 p-3 rounded-lg border hover:bg-accent/50 transition-colors"
                                         >
                                             <Avatar className="h-8 w-8 shrink-0">
-                                                <AvatarFallback className="text-xs bg-slate-100 text-slate-600">
+                                                <AvatarFallback className="text-xs bg-muted text-muted-foreground">
                                                     {getInitials(user?.full_name || 'U')}
                                                 </AvatarFallback>
                                             </Avatar>
                                             <div className="flex-1 min-w-0">
                                                 <div className="flex items-center gap-2 mb-1">
-                                                    <span className="text-sm font-medium text-slate-900">
+                                                    <span className="text-sm font-medium text-foreground">
                                                         {user?.full_name || 'Unknown User'}
                                                     </span>
                                                     {activity.type === 'comment' && (
@@ -596,13 +627,13 @@ export default async function DashboardPage() {
                                                         </Badge>
                                                     )}
                                                 </div>
-                                                <p className="text-sm text-slate-600 mb-1">
+                                                <p className="text-sm text-muted-foreground mb-1">
                                                     {activity.type === 'comment' 
                                                         ? activity.content 
                                                         : activity.content
                                                     }
                                                 </p>
-                                                <div className="flex items-center gap-2 text-xs text-slate-500">
+                                                <div className="flex items-center gap-2 text-xs text-muted-foreground">
                                                     <span className="truncate">{activity.taskTitle}</span>
                                                     <span>•</span>
                                                     <span>{formatDistanceToNow(new Date(activity.timestamp || ''), { addSuffix: true })}</span>

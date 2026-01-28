@@ -114,7 +114,7 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
     // Auto-refresh using Supabase Realtime
     useAutoRefresh({ tables: ['profiles', 'teams', 'presence'] })
 
-    const allMembers = [...executives, ...apprentices]
+    const allMembers = [...founders, ...executives, ...apprentices, ...aiAgents]
     const selectedMembers = allMembers.filter(m => selectedIds.has(m.id))
     const quickTeamMembers = allMembers.filter(m => quickTeamMemberIds.includes(m.id))
 
@@ -171,8 +171,8 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
         const draggedId = e.dataTransfer.getData('text/plain') || draggedMemberId
 
         // --- Centaur Pairing Logic ---
-        const draggedMember = [...allMembers, ...aiAgents].find(m => m.id === draggedId)
-        const targetMember = [...allMembers, ...aiAgents].find(m => m.id === targetMemberId)
+        const draggedMember = allMembers.find(m => m.id === draggedId)
+        const targetMember = allMembers.find(m => m.id === targetMemberId)
 
         if (draggedMember && targetMember) {
             // Case 1: Dragging AI onto Human
@@ -747,12 +747,12 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
     }
 
     return (
-        <div className="space-y-8">
+        <div className="space-y-6">
             {/* Header */}
             <div className="flex items-center justify-between">
                 <div>
                     <h1 className="text-3xl font-bold tracking-tight text-slate-900 mb-2">Foundry Roster</h1>
-                    <p className="text-gray-400">Manage your Executives and Apprentices.</p>
+                    <p className="text-muted-foreground">Manage your Executives and Apprentices.</p>
                 </div>
                 <div className="flex items-center gap-2">
                     <RefreshButton />

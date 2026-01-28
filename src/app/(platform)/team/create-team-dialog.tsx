@@ -88,12 +88,13 @@ export function CreateTeamDialog({ members }: { members: Member[] }) {
                 </DialogHeader>
                 <form onSubmit={handleCreate} className="space-y-4 py-4">
                     <div className="space-y-2">
-                        <Label htmlFor="name">Team Name</Label>
+                        <Label htmlFor="name">Team Name <span className="text-red-500">*</span></Label>
                         <Input
                             id="name"
                             value={name}
                             onChange={(e) => setName(e.target.value)}
                             placeholder="e.g. Frontend Squad"
+                            autoFocus
                         />
                     </div>
                     <div className="space-y-2">

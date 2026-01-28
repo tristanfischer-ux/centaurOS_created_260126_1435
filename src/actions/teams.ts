@@ -18,13 +18,13 @@ export async function deleteTeam(teamId: string) {
         return { error: 'Missing Foundry ID' }
     }
 
-    const { data: team } = await supabase
+    const { data: team, error: teamError } = await supabase
         .from('teams')
         .select('foundry_id')
         .eq('id', teamId)
         .single()
 
-    if (!team) {
+    if (teamError || !team) {
         return { error: 'Team not found' }
     }
 
@@ -33,13 +33,13 @@ export async function deleteTeam(teamId: string) {
     }
 
     // Verify user is Executive or Founder (admin role)
-    const { data: profile } = await supabase
+    const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('role')
         .eq('id', user.id)
         .single()
 
-    if (!profile || (profile.role !== 'Executive' && profile.role !== 'Founder')) {
+    if (profileError || !profile || (profile.role !== 'Executive' && profile.role !== 'Founder')) {
         return { error: 'Unauthorized: Only Executives and Founders can delete teams' }
     }
 
@@ -53,6 +53,25 @@ export async function deleteTeam(teamId: string) {
 
     if (!membership) {
         return { error: 'Unauthorized: You must be a team member to delete the team' }
+    }
+
+    // Check for active tasks assigned to this team
+    // Note: Deleting a team will cascade delete team_members but task_assignees
+    // with this team_id will have their team_id set to null (if FK allows) or fail
+    const { data: activeTasks, error: taskCheckError } = await supabase
+        .from('task_assignees')
+        .select('task_id, tasks!inner(status)')
+        .eq('team_id', teamId)
+        .not('tasks.status', 'in', '("done","cancelled")')
+
+    if (taskCheckError) {
+        return { error: 'Failed to check for active tasks' }
+    }
+
+    if (activeTasks && activeTasks.length > 0) {
+        return { 
+            error: `Cannot delete team: ${activeTasks.length} active task(s) are assigned to this team. Please reassign or complete them first.` 
+        }
     }
 
     const { error } = await supabase
@@ -90,13 +109,13 @@ export async function updateTeamName(teamId: string, name: string) {
         return { error: 'Missing Foundry ID' }
     }
 
-    const { data: team } = await supabase
+    const { data: team, error: teamError } = await supabase
         .from('teams')
         .select('foundry_id')
         .eq('id', teamId)
         .single()
 
-    if (!team) {
+    if (teamError || !team) {
         return { error: 'Team not found' }
     }
 
@@ -122,8 +141,7 @@ export async function updateTeamName(teamId: string, name: string) {
         .eq('id', teamId)
 
     if (error) {
-        console.error('Error updating team name:', error)
-        return { error: 'Failed to update team name' }
+        return { error: `Failed to update team name: ${error.message}` }
     }
 
     revalidatePath('/team')

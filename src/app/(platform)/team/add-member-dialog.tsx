@@ -84,7 +84,7 @@ export function AddMemberDialog() {
                 <form action={clientAction}>
                     <div className="grid gap-4 py-4">
                         <div className="grid gap-2">
-                            <Label htmlFor="full_name">Full Name</Label>
+                            <Label htmlFor="full_name">Full Name <span className="text-red-500">*</span></Label>
                             <Input
                                 id="full_name"
                                 name="full_name"
@@ -94,10 +94,11 @@ export function AddMemberDialog() {
                                 autoComplete="name"
                                 enterKeyHint="next"
                                 className="bg-white border-slate-200"
+                                autoFocus
                             />
                         </div>
                         <div className="grid gap-2">
-                            <Label htmlFor="email">Email Address</Label>
+                            <Label htmlFor="email">Email Address <span className="text-red-500">*</span></Label>
                             <Input
                                 id="email"
                                 name="email"
@@ -112,7 +113,7 @@ export function AddMemberDialog() {
                             />
                         </div>
                         <div className="grid gap-2">
-                            <Label htmlFor="role_type">Role</Label>
+                            <Label htmlFor="role_type">Role <span className="text-red-500">*</span></Label>
                             <Select name="role_type" defaultValue="Apprentice" required>
                                 <SelectTrigger 
                                     id="role_type"

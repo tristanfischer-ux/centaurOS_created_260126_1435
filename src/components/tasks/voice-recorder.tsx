@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef } from "react"
+import { useState, useRef, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Mic, Square, Loader2 } from "lucide-react"
 import { toast } from "sonner"
@@ -19,6 +19,15 @@ export function VoiceRecorder({ onTaskParsed, className }: VoiceRecorderProps) {
     const mediaRecorderRef = useRef<MediaRecorder | null>(null)
     const chunksRef = useRef<Blob[]>([])
     const timerRef = useRef<NodeJS.Timeout | null>(null)
+
+    // Cleanup interval on unmount
+    useEffect(() => {
+        return () => {
+            if (timerRef.current) {
+                clearInterval(timerRef.current)
+            }
+        }
+    }, [])
 
     const startRecording = async () => {
         try {

@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { uploadAttachmentSchema, validate } from '@/lib/validations'
+import { getFoundryIdCached } from '@/lib/supabase/foundry-context'
 
 export async function uploadTaskAttachment(taskId: string, formData: FormData) {
     const supabase = await createClient()
@@ -23,20 +24,10 @@ export async function uploadTaskAttachment(taskId: string, formData: FormData) {
         return { error: validation.error }
     }
 
-    // Get user's foundry_id
-    const { data: profile, error: profileError } = await supabase
-        .from('profiles')
-        .select('foundry_id')
-        .eq('id', user.id)
-        .single()
-
-    if (profileError || !profile) {
-        console.error('Failed to fetch user profile:', profileError)
-        return { error: 'Failed to verify user permissions' }
-    }
-
-    if (!profile.foundry_id) {
-        return { error: 'User is not associated with a foundry' }
+    // Get user's foundry_id using cached helper
+    const foundry_id = await getFoundryIdCached()
+    if (!foundry_id) {
+        return { error: 'User not in a foundry' }
     }
 
     // Get task's foundry_id and validate it matches user's foundry
@@ -55,7 +46,7 @@ export async function uploadTaskAttachment(taskId: string, formData: FormData) {
         return { error: 'Task is not associated with a foundry' }
     }
 
-    if (task.foundry_id !== profile.foundry_id) {
+    if (task.foundry_id !== foundry_id) {
         return { error: 'Unauthorized: Task belongs to a different foundry' }
     }
 
@@ -112,6 +103,25 @@ export async function uploadTaskAttachment(taskId: string, formData: FormData) {
 
 export async function getTaskAttachments(taskId: string) {
     const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return []
+
+    // Get user's foundry_id
+    const foundry_id = await getFoundryIdCached()
+    if (!foundry_id) return []
+
+    // Verify user has access to the task's foundry
+    const { data: task, error: taskError } = await supabase
+        .from('tasks')
+        .select('foundry_id')
+        .eq('id', taskId)
+        .single()
+
+    if (taskError || !task) return []
+
+    if (task.foundry_id !== foundry_id) {
+        return [] // User doesn't have access to this task's foundry
+    }
 
     // List files in task folder
     const { data, error } = await supabase.storage
@@ -125,6 +135,14 @@ export async function getTaskAttachments(taskId: string) {
         const { data: urlData } = supabase.storage
             .from('task-attachments')
             .getPublicUrl(`${taskId}/${file.name}`)
+        // Check if urlData exists before accessing publicUrl
+        if (!urlData) {
+            return {
+                name: file.name,
+                url: '',
+                size: file.metadata?.size || 0
+            }
+        }
         return {
             name: file.name,
             url: urlData.publicUrl,

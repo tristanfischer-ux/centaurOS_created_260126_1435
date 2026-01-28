@@ -394,12 +394,23 @@ export async function amendTask(taskId: string, updates: {
 
     if (error) return { error: error.message }
 
-    await logSystemEvent(taskId, `Task Amended. Notes: ${updates.amendment_notes}`, user.id)
-    await logTaskHistory(taskId, 'STATUS_CHANGE', user.id, { // Or UPDATED? It changes status too.
-        new_status: 'Amended_Pending_Approval',
-        amendment_notes: updates.amendment_notes,
-        new_dates: { start: updates.start_date, end: updates.end_date }
-    })
+    // Fire-and-forget logging - errors shouldn't fail the main operation
+    try {
+        await logSystemEvent(taskId, `Task Amended. Notes: ${updates.amendment_notes}`, user.id)
+    } catch (logError) {
+        console.error('Failed to log system event:', logError)
+    }
+    
+    try {
+        await logTaskHistory(taskId, 'STATUS_CHANGE', user.id, {
+            new_status: 'Amended_Pending_Approval',
+            amendment_notes: updates.amendment_notes,
+            new_dates: { start: updates.start_date, end: updates.end_date }
+        })
+    } catch (logError) {
+        console.error('Failed to log task history:', logError)
+    }
+    
     revalidatePath('/tasks')
     return { success: true }
 }
@@ -415,11 +426,22 @@ export async function approveAmendment(taskId: string) {
 
     if (error) return { error: error.message }
 
-    await logSystemEvent(taskId, 'Amendment Approved. Task is now Accepted.', user.id)
-    await logTaskHistory(taskId, 'STATUS_CHANGE', user.id, {
-        old_status: 'Amended_Pending_Approval',
-        new_status: 'Accepted'
-    })
+    // Fire-and-forget logging - errors shouldn't fail the main operation
+    try {
+        await logSystemEvent(taskId, 'Amendment Approved. Task is now Accepted.', user.id)
+    } catch (logError) {
+        console.error('Failed to log system event:', logError)
+    }
+    
+    try {
+        await logTaskHistory(taskId, 'STATUS_CHANGE', user.id, {
+            old_status: 'Amended_Pending_Approval',
+            new_status: 'Accepted'
+        })
+    } catch (logError) {
+        console.error('Failed to log task history:', logError)
+    }
+    
     revalidatePath('/tasks')
     return { success: true }
 }
@@ -522,10 +544,16 @@ export async function approveTask(taskId: string) {
     if (!task) return { error: 'Task not found' }
     if (!approver) return { error: 'User profile not found' }
 
-    // Validation Logic
+    // Validate task is in an approvable state
+    const approvableStatuses: TaskStatus[] = ['Pending_Peer_Review', 'Pending_Executive_Approval']
+    if (!approvableStatuses.includes(task.status as TaskStatus)) {
+        return { error: `Task cannot be approved in its current status: ${task.status}` }
+    }
+
+    // Role-based validation for different approval types
     if (task.status === 'Pending_Executive_Approval') {
         if (approver.role !== 'Executive' && approver.role !== 'Founder') {
-            return { error: 'Only Executives can approve High Risk tasks.' } // Rubber stamp needed
+            return { error: 'Only Executives can approve High Risk tasks.' }
         }
     }
 
@@ -540,11 +568,21 @@ export async function approveTask(taskId: string) {
 
     if (error) return { error: error.message }
 
-    await logSystemEvent(taskId, `Task Approved & Released by ${approver.role}`, user.id)
-    await logTaskHistory(taskId, 'COMPLETED', user.id, {
-        approver_role: approver.role,
-        via_approval: true
-    })
+    // Fire-and-forget logging - errors shouldn't fail the main operation
+    try {
+        await logSystemEvent(taskId, `Task Approved & Released by ${approver.role}`, user.id)
+    } catch (logError) {
+        console.error('Failed to log system event:', logError)
+    }
+    
+    try {
+        await logTaskHistory(taskId, 'COMPLETED', user.id, {
+            approver_role: approver.role,
+            via_approval: true
+        })
+    } catch (logError) {
+        console.error('Failed to log task history:', logError)
+    }
 
     revalidatePath('/tasks')
     return { success: true }
@@ -677,11 +715,27 @@ export async function batchRejectTasks(taskIds: string[], reason: string) {
 export async function nudgeTask(taskId: string) {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return { error: 'Unauthorized' } // Assuming Client is an authenticated user?
+    if (!user) return { error: 'Unauthorized' }
 
-    // Check last nudge to prevent spam? (1 hour cooldown)
-    const { data: task } = await supabase.from('tasks').select('last_nudge_at, nudge_count').eq('id', taskId).single()
+    // Get user's foundry_id
+    const foundry_id = await getFoundryIdCached()
+    if (!foundry_id) return { error: 'User not in a foundry' }
 
+    // Verify user has access to the task's foundry
+    const { data: task, error: taskError } = await supabase
+        .from('tasks')
+        .select('last_nudge_at, nudge_count, foundry_id')
+        .eq('id', taskId)
+        .single()
+
+    if (taskError || !task) return { error: 'Task not found' }
+
+    if (task.foundry_id !== foundry_id) {
+        return { error: 'Unauthorized: Task belongs to a different foundry' }
+    }
+
+    // Check last nudge to prevent spam (1 hour cooldown)
+    // Calculate cooldown threshold for user-facing message
     if (task?.last_nudge_at) {
         const lastNudge = new Date(task.last_nudge_at).getTime()
         const now = Date.now()
@@ -691,17 +745,23 @@ export async function nudgeTask(taskId: string) {
         }
     }
 
-    // Attempt to update task (might fail due to RLS for Clients, but we proceed to notify)
-    const { error: updateError } = await supabase.from('tasks')
+    // Atomic update with cooldown condition to prevent race conditions
+    // The update only succeeds if last_nudge_at is null OR older than the cooldown period
+    const cooldownThreshold = new Date(Date.now() - NUDGE_COOLDOWN_MS).toISOString()
+    const { error: updateError, count } = await supabase.from('tasks')
         .update({
             nudge_count: (task?.nudge_count || 0) + 1,
             last_nudge_at: new Date().toISOString()
         })
         .eq('id', taskId)
+        .or(`last_nudge_at.is.null,last_nudge_at.lt.${cooldownThreshold}`)
 
     if (updateError) {
         console.warn(`Nudge update failed for task ${taskId} (likely RLS):`, updateError)
         // We continue intentionally to allow the notification to go through
+    } else if (count === 0) {
+        // Race condition: another nudge happened between our check and update
+        return { error: 'Please wait before nudging again (concurrent request detected).' }
     }
 
     // NOTIFICATION LOGIC
@@ -746,6 +806,23 @@ export async function updateTaskDates(taskId: string, startDate: string, endDate
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return { error: 'Unauthorized' }
+
+    // Get user's foundry_id
+    const foundry_id = await getFoundryIdCached()
+    if (!foundry_id) return { error: 'User not in a foundry' }
+
+    // Verify user has access to the task's foundry
+    const { data: task, error: taskFetchError } = await supabase
+        .from('tasks')
+        .select('foundry_id')
+        .eq('id', taskId)
+        .single()
+
+    if (taskFetchError || !task) return { error: 'Task not found' }
+
+    if (task.foundry_id !== foundry_id) {
+        return { error: 'Unauthorized: Task belongs to a different foundry' }
+    }
 
     // Validate using Zod schema
     // Convert empty strings to null for optional date fields
@@ -865,6 +942,11 @@ export async function duplicateTask(originalTaskId: string) {
 
     if (fetchError || !originalTask) return { error: 'Original task not found' }
 
+    // Verify user has access to the task's foundry
+    if (originalTask.foundry_id !== foundry_id) {
+        return { error: 'Unauthorized: Task belongs to a different foundry' }
+    }
+
     // 2. Insert new task
     const { data: newTask, error: insertError } = await supabase.from('tasks').insert({
         foundry_id,
@@ -907,10 +989,8 @@ export async function duplicateTask(originalTaskId: string) {
     // If user wants files, they can re-upload or we can implement 'link to existing file' later.
 
     try {
-        // Properly type task_number from the query result
-        const taskNumber = 'task_number' in originalTask && typeof originalTask.task_number === 'number' 
-            ? originalTask.task_number 
-            : null
+        // Use task_number if available, otherwise fall back to truncated ID
+        const taskNumber = originalTask.task_number as number | null
         const taskIdentifier = taskNumber ? `#${taskNumber}` : originalTaskId.substring(0, 4)
         await logSystemEvent(newTask.id, `Task duplicated from ${taskIdentifier}`, user.id)
     } catch (logError) {
@@ -1123,26 +1203,57 @@ export async function deleteTasks(taskIds: string[]) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return { error: 'Unauthorized' }
 
-    if (!taskIds || taskIds.length === 0) return { success: true }
+    if (!taskIds || taskIds.length === 0) return { success: true, deletedCount: 0, failedIds: [] }
 
-    // 1. Delete tasks (Cascade should handle relations like comments, files, assignees if set up correctly in DB, 
-    // otherwise we might need to delete related first. Assuming cascade for now or standard foreign keys).
-    // Actually, storage files might need manual cleanup if not careful, but `deleteTaskAttachment` handles individual. 
-    // For bulk, let's assume we just remove the records.
+    // Track results for partial failure handling
+    const failedIds: string[] = []
+    let deletedCount = 0
 
-    const { error } = await supabase.from('tasks')
-        .delete()
-        .in('id', taskIds)
+    // Delete tasks individually to track partial failures
+    // This allows us to report which specific tasks failed while still completing successful deletions
+    for (const taskId of taskIds) {
+        const { error } = await supabase.from('tasks')
+            .delete()
+            .eq('id', taskId)
 
-    if (error) return { error: error.message }
+        if (error) {
+            console.error(`Failed to delete task ${taskId}:`, error.message)
+            failedIds.push(taskId)
+        } else {
+            deletedCount++
+        }
+    }
 
-    // Log event (system wide or per task? System wide summary is better for noise)
-    try {
-        await logSystemEvent(taskIds[0], `Bulk deletion of ${taskIds.length} tasks`, user.id)
-    } catch (logError) {
-        console.error('Failed to log system event:', logError)
+    // Log event for successful deletions
+    if (deletedCount > 0) {
+        try {
+            // Log to first successfully deleted task (or first task if available)
+            const logTaskId = taskIds.find(id => !failedIds.includes(id)) || taskIds[0]
+            await logSystemEvent(logTaskId, `Bulk deletion: ${deletedCount}/${taskIds.length} tasks deleted`, user.id)
+        } catch (logError) {
+            console.error('Failed to log system event:', logError)
+        }
     }
 
     revalidatePath('/tasks')
-    return { success: true }
+
+    // Return detailed result for partial failures
+    if (failedIds.length > 0) {
+        if (deletedCount === 0) {
+            return { 
+                error: `Failed to delete all ${taskIds.length} tasks`, 
+                failedIds,
+                deletedCount: 0
+            }
+        }
+        return { 
+            success: true, 
+            partial: true,
+            deletedCount, 
+            failedIds,
+            message: `Deleted ${deletedCount}/${taskIds.length} tasks. ${failedIds.length} failed.`
+        }
+    }
+
+    return { success: true, deletedCount, failedIds: [] }
 }

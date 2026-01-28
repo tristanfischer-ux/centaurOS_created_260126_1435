@@ -189,11 +189,22 @@ export async function createObjective(formData: FormData) {
                 throw new Error(`Invalid task data format: ${parseError instanceof Error ? parseError.message : 'Unknown error'}`)
             }
         })
+
+        // Validate parsed task properties
+        for (const task of aiTasks) {
+            if (!task || typeof task !== 'object') {
+                return { error: 'Invalid task data: expected an object' }
+            }
+            if (!task.title || typeof task.title !== 'string' || task.title.trim().length === 0) {
+                return { error: 'Invalid task data: title is required and must be a non-empty string' }
+            }
+        }
+
         tasksToInsert = [
             ...tasksToInsert,
             ...aiTasks.map(task => ({
-                title: task.title,
-                description: task.description,
+                title: task.title.trim(),
+                description: typeof task.description === 'string' ? task.description.trim() : '',
                 objective_id: objective.id,
                 creator_id: user.id,
                 foundry_id,

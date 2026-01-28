@@ -20,7 +20,16 @@ import {
     Rocket,
     Server,
     ChevronDown,
-    ChevronUp
+    ChevronUp,
+    Shield,
+    FileCheck,
+    Target,
+    DollarSign,
+    ShieldCheck,
+    Search,
+    UserPlus,
+    ClipboardCheck,
+    Users
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -52,6 +61,15 @@ const PACK_ICONS: Record<string, any> = {
     'building': Building,
     'rocket': Rocket,
     'server': Server,
+    'shield': Shield,
+    'file-check': FileCheck,
+    'target': Target,
+    'dollar-sign': DollarSign,
+    'shield-check': ShieldCheck,
+    'search': Search,
+    'user-plus': UserPlus,
+    'clipboard-check': ClipboardCheck,
+    'users': Users,
 }
 
 interface CreateObjectiveDialogProps {
@@ -358,7 +376,7 @@ export function CreateObjectiveDialog({ children }: CreateObjectiveDialogProps) 
                         {mode === 'manual' && (
                             <div className="space-y-6 max-w-2xl mx-auto pt-4">
                                 <div className="space-y-2">
-                                    <Label htmlFor="title" className="text-base font-semibold">Objective Title</Label>
+                                    <Label htmlFor="title" className="text-base font-semibold">Objective Title <span className="text-red-500">*</span></Label>
                                     <Input
                                         id="title"
                                         placeholder="e.g. Q1 Market Expansion"

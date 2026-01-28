@@ -39,7 +39,7 @@ export default async function ObjectiveDetailPage({ params }: { params: Promise<
                 <div className="flex items-center gap-4 mt-4 text-sm text-slate-400">
                     <span>ID: {objective.id}</span>
                     <span>•</span>
-                    <span>Created: {new Date(objective.created_at!).toLocaleDateString()}</span>
+                    <span>Created: {new Date(objective.created_at!).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
                 </div>
             </div>
 

@@ -27,9 +27,12 @@ export async function runAIWorker(taskId: string, assigneeId: string) {
         if (!task) return
 
         // 3. Generate Content
-        const openai = new OpenAI({
-            apiKey: process.env.OPENAI_API_KEY,
-        })
+        const apiKey = process.env.OPENAI_API_KEY
+        if (!apiKey) {
+            throw new Error('Missing OPENAI_API_KEY environment variable')
+        }
+        
+        const openai = new OpenAI({ apiKey })
 
         const context = task.objective
             ? `\nContext (Objective): ${task.objective.title} - ${task.objective.description}`

@@ -37,8 +37,8 @@ export function ProductizationSection() {
                 </div>
 
                 <div className="grid md:grid-cols-3 gap-8">
-                    {packs.map((pack, index) => (
-                        <div key={index} className="group relative bg-white border border-slate-200 p-8 hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
+                    {packs.map((pack) => (
+                        <div key={pack.title} className="group relative bg-white border border-slate-200 p-8 hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
                             {/* Cartridge Visual Top Bar */}
                             <div className={`absolute top-0 left-0 right-0 h-1.5 ${pack.color}`}></div>
 

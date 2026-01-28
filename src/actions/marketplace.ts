@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server"
 import { revalidatePath } from "next/cache"
 import { Database } from "@/types/database.types"
 import { createRFQSchema, validate } from "@/lib/validations"
+import { getFoundryIdCached } from "@/lib/supabase/foundry-context"
 
 
 
@@ -15,23 +16,18 @@ export async function addToStack(id: string, type: 'provider' | 'tool' = 'provid
     const providerId = id
     const supabase = await createClient()
 
-    // 1. Get current user profile to determine foundry_id
+    // Get current user and foundry_id
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return { error: "Not authenticated" }
 
-    const { data: profile } = await supabase
-        .from("profiles")
-        .select("foundry_id")
-        .eq("id", user.id)
-        .single()
+    const foundry_id = await getFoundryIdCached()
+    if (!foundry_id) return { error: "User not in a foundry" }
 
-    if (!profile) return { error: "Profile not found" }
-
-    // 2. Add to stack
+    // Add to stack
     const { error } = await supabase
         .from("foundry_stack")
         .insert({
-            foundry_id: profile.foundry_id,
+            foundry_id,
             provider_id: providerId,
             status: "Active"
         })
@@ -58,18 +54,13 @@ export async function removeFromStack(id: string, type: 'provider' | 'tool' = 'p
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return { error: "Not authenticated" }
 
-    const { data: profile } = await supabase
-        .from("profiles")
-        .select("foundry_id")
-        .eq("id", user.id)
-        .single()
-
-    if (!profile) return { error: "Profile not found" }
+    const foundry_id = await getFoundryIdCached()
+    if (!foundry_id) return { error: "User not in a foundry" }
 
     const { error } = await supabase
         .from("foundry_stack")
         .delete()
-        .eq("foundry_id", profile.foundry_id)
+        .eq("foundry_id", foundry_id)
         .eq("provider_id", providerId)
 
     if (error) return { error: "Failed to remove from stack" }
@@ -88,19 +79,24 @@ export async function submitRFQ(formData: {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return { error: "Not authenticated" }
 
-    const { data: profile } = await supabase
-        .from("profiles")
-        .select("foundry_id")
-        .eq("id", user.id)
-        .single()
+    const foundry_id = await getFoundryIdCached()
+    if (!foundry_id) return { error: "User not in a foundry" }
 
-    if (!profile) return { error: "Profile not found" }
+    // Early validation for formData structure
+    if (!formData || typeof formData !== 'object') {
+        return { error: "Invalid request data" }
+    }
 
-    // Validate using Zod schema
+    // Sanitize and prepare input for Zod validation
+    // Zod schema handles: title (1-200 chars), specifications (10-5000 chars), budgetRange (format: "$X - $Y")
     const rawData = {
-        title: formData.title || '',
-        specifications: formData.specifications?.trim() || undefined,
-        budgetRange: formData.budget_range?.trim() || undefined
+        title: typeof formData.title === 'string' ? formData.title.trim() : '',
+        specifications: typeof formData.specifications === 'string' && formData.specifications.trim() 
+            ? formData.specifications.trim() 
+            : undefined,
+        budgetRange: typeof formData.budget_range === 'string' && formData.budget_range.trim()
+            ? formData.budget_range.trim()
+            : undefined
     }
 
     const validation = validate(createRFQSchema, rawData)
@@ -116,7 +112,7 @@ export async function submitRFQ(formData: {
             title: validatedTitle,
             specifications: validatedSpecifications || null,
             budget_range: validatedBudgetRange || null,
-            foundry_id: profile.foundry_id,
+            foundry_id,
             created_by: user.id,
             status: "Open"
         })

@@ -4,6 +4,7 @@ import { useState, useMemo } from "react"
 import { FileIcon, X, Loader2, Paperclip, FileText, Image, Eye } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent } from "@/components/ui/dialog"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { toast } from "sonner"
 import { deleteTaskAttachment } from "@/actions/tasks"
 import { createClient } from "@/lib/supabase/client"
@@ -110,34 +111,52 @@ export function AttachmentList({ taskId, attachments, canDelete = false, onDelet
                                     </p>
                                     <p className="text-[10px] text-slate-400">
                                         {formatFileSize(file.file_size)}
-                                        • {file.created_at ? new Date(file.created_at).toLocaleDateString() : 'Unknown date'}
+                                        • {file.created_at ? new Date(file.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Unknown date'}
                                     </p>
                                 </div>
                             </div>
 
                             <div className="flex items-center gap-1">
-                                <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="h-7 w-7 p-0 text-slate-400 hover:text-slate-600"
-                                    onClick={() => setPreviewFile(file)}
-                                >
-                                    <Eye className="h-4 w-4" />
-                                </Button>
+                                <TooltipProvider>
+                                    <Tooltip>
+                                        <TooltipTrigger asChild>
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                className="min-h-[44px] min-w-[44px] h-9 w-9 p-0 text-slate-400 hover:text-slate-600"
+                                                onClick={() => setPreviewFile(file)}
+                                            >
+                                                <Eye className="h-4 w-4" />
+                                            </Button>
+                                        </TooltipTrigger>
+                                        <TooltipContent>
+                                            <p>Preview attachment</p>
+                                        </TooltipContent>
+                                    </Tooltip>
+                                </TooltipProvider>
                                 {canDelete && (
-                                    <Button
-                                        size="icon"
-                                        variant="ghost"
-                                        className="h-7 w-7 text-slate-400 hover:text-red-600 hover:bg-red-50"
-                                        disabled={deletingId === file.id}
-                                        onClick={() => handleDelete(file.id, file.file_path)}
-                                    >
-                                        {deletingId === file.id ? (
-                                            <Loader2 className="h-3 w-3 animate-spin" />
-                                        ) : (
-                                            <X className="h-3.5 w-3.5" />
-                                        )}
-                                    </Button>
+                                    <TooltipProvider>
+                                        <Tooltip>
+                                            <TooltipTrigger asChild>
+                                                <Button
+                                                    size="icon"
+                                                    variant="ghost"
+                                                    className="min-h-[44px] min-w-[44px] h-9 w-9 text-slate-400 hover:text-red-600 hover:bg-red-50"
+                                                    disabled={deletingId === file.id}
+                                                    onClick={() => handleDelete(file.id, file.file_path)}
+                                                >
+                                                    {deletingId === file.id ? (
+                                                        <Loader2 className="h-3 w-3 animate-spin" />
+                                                    ) : (
+                                                        <X className="h-3.5 w-3.5" />
+                                                    )}
+                                                </Button>
+                                            </TooltipTrigger>
+                                            <TooltipContent>
+                                                <p>Delete attachment</p>
+                                            </TooltipContent>
+                                        </Tooltip>
+                                    </TooltipProvider>
                                 )}
                             </div>
                         </div>

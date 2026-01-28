@@ -6,8 +6,13 @@ import { cn } from "@/lib/utils"
 // We'll replace these with Lucide icons later if needed, or maintain text/emoji
 import { LayoutDashboard, Users, CheckSquare, Clock, Store, Settings, Target, HelpCircle } from "lucide-react"
 import { NotificationCenter } from "@/components/NotificationCenter"
+import { PendingApprovalsButton } from "@/components/BatchApprovalSheet"
+import { FocusModeToggle } from "@/components/FocusModeToggle"
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip"
 import { ThemeToggle } from "@/components/ThemeToggle"
+
+// Keep in sync with package.json version
+const APP_VERSION = "1.0.3"
 
 const mainNavigation = [
     { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
@@ -33,8 +38,12 @@ export function Sidebar({ foundryName, foundryId, userName, userRole }: { foundr
                 <div className="font-bold text-xl tracking-wider uppercase text-amber-600">
                     Centaur App
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1">
                     <ThemeToggle />
+                    <FocusModeToggle compact />
+                    {(userRole === 'Executive' || userRole === 'Founder') && (
+                        <PendingApprovalsButton />
+                    )}
                     <NotificationCenter />
                 </div>
             </div>
@@ -52,10 +61,10 @@ export function Sidebar({ foundryName, foundryId, userName, userRole }: { foundr
             {/* Current User */}
             <div className="px-4 py-4 border-b border-border bg-muted">
                 <div className="text-sm font-medium text-foreground truncate">
-                    {userName}
+                    {userName || "Loading..."}
                 </div>
                 <div className="text-xs text-muted-foreground mt-0.5">
-                    {userRole}
+                    {userRole || "Member"}
                 </div>
             </div>
             <nav className="flex-1 space-y-1 px-2 py-4">
@@ -97,7 +106,7 @@ export function Sidebar({ foundryName, foundryId, userName, userRole }: { foundr
                     Press <kbd className="px-1.5 py-0.5 bg-muted rounded text-xs font-mono border border-border">⌘K</kbd> to search
                 </div>
                 <div className="text-[10px] text-muted-foreground text-center font-mono mt-2">
-                    v1.0.3
+                    v{APP_VERSION}
                 </div>
             </div>
         </div>

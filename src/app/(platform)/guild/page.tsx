@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { redirect } from 'next/navigation'
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -8,7 +9,9 @@ export default async function GuildPage() {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
 
-    if (!user) return <div>Unauthenticated</div>
+    if (!user) {
+        redirect('/login')
+    }
 
     // Get User Profile for Role and Location
     const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single()
@@ -31,7 +34,7 @@ export default async function GuildPage() {
             <div className="flex justify-between items-end">
                 <div>
                     <h1 className="text-3xl font-bold tracking-tight text-slate-900 mb-2">The Guild</h1>
-                    <p className="text-slate-500">Offline-to-Online (O2O) network and events.</p>
+                    <p className="text-muted-foreground">Offline-to-Online (O2O) network and events.</p>
                 </div>
                 {/* Geotargeting Mock Indicator */}
                 <div className="text-xs text-amber-600 border border-amber-200 bg-amber-50 px-3 py-1 rounded-full">

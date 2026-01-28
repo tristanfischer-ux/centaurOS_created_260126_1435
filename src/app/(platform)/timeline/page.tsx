@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { redirect } from 'next/navigation'
 import { GanttView, JoinedTask } from '@/components/timeline/GanttView'
 import { TimelineListView } from '@/components/timeline/TimelineListView'
 import { CreateTaskDialog } from '@/app/(platform)/tasks/create-task-dialog'
@@ -9,7 +10,7 @@ export default async function TimelinePage() {
     // Verify Auth
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) {
-        return <div className="p-8 text-red-500">Unauthenticated</div>
+        redirect('/login')
     }
 
     // Fetch Tasks with Joins
@@ -49,7 +50,7 @@ export default async function TimelinePage() {
             <div className="flex-none flex items-center justify-between flex-wrap gap-4">
                 <div>
                     <h1 className="text-3xl font-bold tracking-tight text-white mb-2">Campaign Timeline</h1>
-                    <p className="text-gray-400">Visualizing the Foundry&apos;s execution vector.</p>
+                    <p className="text-muted-foreground">Visualizing the Foundry&apos;s execution vector.</p>
                 </div>
                 <CreateTaskDialog
                     objectives={objectivesList}

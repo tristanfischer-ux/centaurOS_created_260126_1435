@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { redirect } from 'next/navigation'
 import { CreateObjectiveDialog } from './create-objective-dialog'
 import { ObjectivesListView } from './objectives-list-view'
 
@@ -10,7 +11,7 @@ export default async function ObjectivesPage() {
     const { data: { user } } = await supabase.auth.getUser()
 
     if (!user) {
-        return <div className="p-8 text-red-500">Unauthenticated. Please login.</div>
+        redirect('/login')
     }
 
     // Fetch objectives
@@ -22,6 +23,24 @@ export default async function ObjectivesPage() {
     if (error) {
         console.error(error)
         return <div className="text-red-500">Error loading objectives</div>
+    }
+
+    // Type definitions for task joins
+    interface TaskAssignee {
+        full_name: string | null
+        role: string | null
+    }
+
+    interface TaskComment {
+        id: string
+        is_system_log: boolean | null
+    }
+
+    interface TaskFile {
+        id: string
+        file_name: string
+        file_size: number | null
+        created_at: string | null
     }
 
     // Fetch tasks with assignee info for all objectives
@@ -46,9 +65,9 @@ export default async function ObjectivesPage() {
         ...obj,
         tasks: tasks?.filter(t => t.objective_id === obj.id).map(t => ({
             ...t,
-            assignee: t.assignee as unknown as { full_name: string | null; role: string | null } | null,
-            notesCount: t.task_comments?.filter((c: { is_system_log: boolean | null }) => !c.is_system_log).length || 0,
-            attachmentCount: (t.task_files as unknown as any[])?.length || 0
+            assignee: t.assignee as TaskAssignee | null,
+            notesCount: (t.task_comments as TaskComment[] | null)?.filter(c => !c.is_system_log).length || 0,
+            attachmentCount: (t.task_files as TaskFile[] | null)?.length || 0
         })) || []
     })) || []
 
@@ -69,8 +88,8 @@ export default async function ObjectivesPage() {
         <div className="space-y-6">
             <div className="flex items-center justify-between">
                 <div>
-                    <h1 className="text-3xl font-bold tracking-tight text-slate-900 mb-2">Strategic Objectives</h1>
-                    <p className="text-slate-500">High-level goals driving the Foundry.</p>
+                    <h1 className="text-3xl font-bold tracking-tight text-foreground mb-2">Strategic Objectives</h1>
+                    <p className="text-muted-foreground">High-level goals driving the Foundry.</p>
                 </div>
                 <CreateObjectiveDialog />
             </div>

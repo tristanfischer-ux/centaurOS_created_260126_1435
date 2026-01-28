@@ -253,17 +253,17 @@ export function ObjectivesListView({ objectives, objectivesForDialog, members, t
             <div className="space-y-3">
                 {/* Select All Header (Optional, but good for bulk actions) */}
                 {objectives.length > 0 && (
-                    <div className="flex items-center px-4 py-2 bg-slate-50 border border-slate-200 rounded-md">
+                    <div className="flex items-center px-4 py-2 bg-muted/50 border rounded-md">
                         <div className="flex items-center h-5 w-5 mr-4">
                             <input
                                 type="checkbox"
-                                className="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-500 cursor-pointer"
+                                className="h-4 w-4 rounded border-input text-foreground focus:ring-ring cursor-pointer"
                                 checked={selectedIds.size === objectives.length && objectives.length > 0}
                                 onChange={toggleSelectAll}
                                 aria-label="Select all objectives"
                             />
                         </div>
-                        <span className="text-sm font-medium text-slate-500">Select All</span>
+                        <span className="text-sm font-medium text-muted-foreground">Select All</span>
                     </div>
                 )}
 
@@ -288,15 +288,15 @@ export function ObjectivesListView({ objectives, objectivesForDialog, members, t
                     return (
                         <div
                             key={objective.id}
-                            className={`bg-white border rounded-lg shadow-sm overflow-hidden transition-all duration-200 ${
-                                isSelected ? 'ring-2 ring-slate-500 border-slate-500' : ''
+                            className={`bg-card border rounded-lg shadow-sm overflow-hidden transition-all duration-200 ${
+                                isSelected ? 'ring-2 ring-ring' : ''
                             } ${
-                                hasOverdueTasks ? 'border-orange-400' : isStalled ? 'border-yellow-400' : 'border-slate-200'
+                                hasOverdueTasks ? 'border-orange-500 dark:border-orange-400' : isStalled ? 'border-yellow-500 dark:border-yellow-400' : ''
                             }`}
                         >
                             {/* Objective Header */}
                             <div
-                                className="flex items-center gap-4 p-4 cursor-pointer hover:bg-slate-50 active:bg-slate-100 transition-colors"
+                                className="flex items-center gap-4 p-4 cursor-pointer hover:bg-accent/50 active:bg-accent transition-colors"
                                 onClick={() => toggleExpand(objective.id)}
                             >
                                 {/* Checkbox */}
@@ -309,7 +309,7 @@ export function ObjectivesListView({ objectives, objectivesForDialog, members, t
                                 >
                                     <input
                                         type="checkbox"
-                                        className="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-500 cursor-pointer"
+                                        className="h-4 w-4 rounded border-input text-foreground focus:ring-ring cursor-pointer"
                                         checked={isSelected}
                                         onChange={() => { }} // Handled by div click
                                         aria-label={`Select objective ${objective.title}`}
@@ -317,7 +317,7 @@ export function ObjectivesListView({ objectives, objectivesForDialog, members, t
                                 </div>
 
                                 <button
-                                    className="shrink-0 text-slate-400 hover:text-slate-600 active:text-slate-700 transition-colors"
+                                    className="shrink-0 text-muted-foreground hover:text-foreground transition-colors"
                                     aria-label={isExpanded ? "Collapse objective" : "Expand objective"}
                                     aria-expanded={isExpanded}
                                 >
@@ -334,7 +334,7 @@ export function ObjectivesListView({ objectives, objectivesForDialog, members, t
 
                                 <div className="flex-1 min-w-0">
                                     <div className="flex items-center gap-2 flex-wrap">
-                                        <Link href={`/objectives/${objective.id}`} className="font-semibold text-slate-900 hover:text-amber-600 transition-colors" onClick={(e) => e.stopPropagation()}>
+                                        <Link href={`/objectives/${objective.id}`} className="font-semibold text-foreground hover:text-amber-600 dark:hover:text-amber-400 transition-colors" onClick={(e) => e.stopPropagation()}>
                                             {objective.title}
                                         </Link>
                                         {hasOverdueTasks && (
@@ -358,10 +358,10 @@ export function ObjectivesListView({ objectives, objectivesForDialog, members, t
                                 {/* Task stats */}
                                 <div className="flex items-center gap-4 shrink-0">
                                     <div className="text-right">
-                                        <span className="text-sm font-medium text-slate-700">{completedCount}/{taskCount}</span>
-                                        <span className="text-xs text-slate-400 ml-1">completed</span>
+                                        <span className="text-sm font-medium text-foreground">{completedCount}/{taskCount}</span>
+                                        <span className="text-xs text-muted-foreground ml-1">completed</span>
                                     </div>
-                                    <Progress value={progress} className="w-24 h-2 bg-slate-100" />
+                                    <Progress value={progress} className="w-24 h-2" />
                                     <Badge variant="outline" className="text-xs">
                                         {progress}%
                                     </Badge>
@@ -369,7 +369,7 @@ export function ObjectivesListView({ objectives, objectivesForDialog, members, t
                                     <Button
                                         variant="ghost"
                                         size="icon"
-                                        className="h-8 w-8 text-slate-400 hover:text-red-600 hover:bg-red-50 active:text-red-700 active:bg-red-100 active:scale-[0.98] transition-all"
+                                        className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 active:scale-[0.98] transition-all"
                                         onClick={(e) => {
                                             e.stopPropagation()
                                             setObjectiveToDelete(objective.id)
@@ -382,22 +382,22 @@ export function ObjectivesListView({ objectives, objectivesForDialog, members, t
 
                             {/* Tasks List (expanded) */}
                             {isExpanded && (
-                                <div className="border-t border-slate-100 bg-slate-50/50">
+                                <div className="border-t bg-muted/30">
                                     {taskCount === 0 ? (
-                                        <div className="p-4 text-center text-sm text-slate-400">
+                                        <div className="p-4 text-center text-sm text-muted-foreground">
                                             No tasks assigned to this objective yet.
                                         </div>
                                     ) : (
-                                        <div className="divide-y divide-slate-100">
+                                        <div className="divide-y divide-border">
                                             {objective.tasks.map(task => {
                                                 const statusConfig = getStatusConfig(task.status)
                                                 const StatusIcon = statusConfig.icon
 
                                                 return (
-                                                    <div key={task.id} className="flex items-center gap-2 sm:gap-4 p-3 pl-8 sm:pl-14 hover:bg-white active:bg-slate-50 transition-colors">
+                                                    <div key={task.id} className="flex items-center gap-2 sm:gap-4 p-3 pl-8 sm:pl-14 hover:bg-card transition-colors">
                                                         <StatusIcon className={`h-4 w-4 shrink-0 ${statusConfig.color.split(' ')[1]}`} />
 
-                                                        <Link href={`/tasks?task=${task.id}`} className="flex-1 min-w-0 text-sm text-slate-700 hover:text-amber-600 truncate">
+                                                        <Link href={`/tasks?task=${task.id}`} className="flex-1 min-w-0 text-sm text-foreground hover:text-amber-600 dark:hover:text-amber-400 truncate">
                                                             {task.title}
                                                         </Link>
 
@@ -407,7 +407,7 @@ export function ObjectivesListView({ objectives, objectivesForDialog, members, t
 
                                                         <div className="flex items-center gap-2 sm:gap-3 shrink-0">
                                                             {task.assignee?.full_name && (
-                                                                <span className="text-xs text-slate-400 max-w-[80px] sm:max-w-[120px] truncate hidden sm:inline">
+                                                                <span className="text-xs text-muted-foreground max-w-[80px] sm:max-w-[120px] truncate hidden sm:inline">
                                                                     {task.assignee.full_name}
                                                                 </span>
                                                             )}
@@ -415,13 +415,13 @@ export function ObjectivesListView({ objectives, objectivesForDialog, members, t
                                                             {/* Meta Icons */}
                                                             <div className="flex items-center gap-1 sm:gap-2">
                                                                 {(task.notesCount || 0) > 0 && (
-                                                                    <div className="flex items-center text-slate-400" title={`${task.notesCount} notes`}>
+                                                                    <div className="flex items-center text-muted-foreground" title={`${task.notesCount} notes`}>
                                                                         <MessageSquare className="h-3.5 w-3.5 mr-1" />
                                                                         <span className="text-[10px]">{task.notesCount}</span>
                                                                     </div>
                                                                 )}
                                                                 {(task.attachmentCount || 0) > 0 && (
-                                                                    <div className="flex items-center text-slate-400" title={`${task.attachmentCount} attachments`}>
+                                                                    <div className="flex items-center text-muted-foreground" title={`${task.attachmentCount} attachments`}>
                                                                         <Paperclip className="h-3.5 w-3.5 mr-1" />
                                                                         <span className="text-[10px]">{task.attachmentCount}</span>
                                                                     </div>
@@ -429,7 +429,7 @@ export function ObjectivesListView({ objectives, objectivesForDialog, members, t
                                                             </div>
 
                                                             {task.end_date && (
-                                                                <span className="text-xs text-slate-400 hidden md:inline">
+                                                                <span className="text-xs text-muted-foreground hidden md:inline">
                                                                     Due {new Date(task.end_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                                                                 </span>
                                                             )}
@@ -461,7 +461,7 @@ export function ObjectivesListView({ objectives, objectivesForDialog, members, t
                 })}
 
                 {objectives.length === 0 && (
-                    <div className="py-12 text-center border-2 border-dashed border-slate-200 rounded-lg text-slate-500">
+                    <div className="py-12 text-center border-2 border-dashed rounded-lg text-muted-foreground">
                         No objectives set. Define your mission.
                     </div>
                 )}

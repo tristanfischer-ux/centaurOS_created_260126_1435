@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useRef, useEffect } from "react"
 import { Gantt, Task as GanttTask, ViewMode } from "gantt-task-react"
 import "gantt-task-react/dist/index.css"
 import { Database } from "@/types/database.types"
@@ -17,6 +17,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { toast } from "sonner"
 import { useRouter } from "next/navigation"
 import { format, addDays, subDays, addWeeks, subWeeks, addMonths, subMonths } from "date-fns"
@@ -240,6 +241,18 @@ export function GanttView({ tasks, objectives, profiles }: GanttViewProps) {
     // Date navigation offset
     const [dateOffset, setDateOffset] = useState<Date>(new Date())
 
+    // Ref to track cleanup timeout for date change
+    const dateChangeTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+
+    // Cleanup timeout on unmount
+    useEffect(() => {
+        return () => {
+            if (dateChangeTimeoutRef.current) {
+                clearTimeout(dateChangeTimeoutRef.current)
+            }
+        }
+    }, [])
+
     // Navigate dates left/right
     const navigateDate = (direction: 'prev' | 'next') => {
         setDateOffset(prev => {
@@ -375,7 +388,10 @@ export function GanttView({ tasks, objectives, profiles }: GanttViewProps) {
                 // Clear the override after successful server update and refresh
                 router.refresh()
                 // Keep override until refresh completes, then clear after a short delay
-                setTimeout(() => {
+                if (dateChangeTimeoutRef.current) {
+                    clearTimeout(dateChangeTimeoutRef.current)
+                }
+                dateChangeTimeoutRef.current = setTimeout(() => {
                     setLocalDateOverrides(prev => {
                         const next = { ...prev }
                         delete next[task.id]
@@ -475,34 +491,58 @@ export function GanttView({ tasks, objectives, profiles }: GanttViewProps) {
 
                     {/* Date Navigation */}
                     <div className="flex items-center gap-2">
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => navigateDate('prev')}
-                            className="h-8 w-8 p-0"
-                            title="Previous"
-                        >
-                            <ChevronLeft className="h-4 w-4" />
-                        </Button>
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={goToToday}
-                            className="h-8 px-3 text-xs"
-                            title="Go to today"
-                        >
-                            <CalendarDays className="h-3 w-3 mr-1" />
-                            Today
-                        </Button>
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => navigateDate('next')}
-                            className="h-8 w-8 p-0"
-                            title="Next"
-                        >
-                            <ChevronRight className="h-4 w-4" />
-                        </Button>
+                        <TooltipProvider>
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => navigateDate('prev')}
+                                        className="min-h-[44px] min-w-[44px] h-9 w-9 p-0"
+                                    >
+                                        <ChevronLeft className="h-4 w-4" />
+                                    </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                    <p>Previous</p>
+                                </TooltipContent>
+                            </Tooltip>
+                        </TooltipProvider>
+                        <TooltipProvider>
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={goToToday}
+                                        className="h-9 px-3 text-xs"
+                                    >
+                                        <CalendarDays className="h-3 w-3 mr-1" />
+                                        Today
+                                    </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                    <p>Today</p>
+                                </TooltipContent>
+                            </Tooltip>
+                        </TooltipProvider>
+                        <TooltipProvider>
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => navigateDate('next')}
+                                        className="min-h-[44px] min-w-[44px] h-9 w-9 p-0"
+                                    >
+                                        <ChevronRight className="h-4 w-4" />
+                                    </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                    <p>Next</p>
+                                </TooltipContent>
+                            </Tooltip>
+                        </TooltipProvider>
                     </div>
                 </div>
             </Card>

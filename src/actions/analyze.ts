@@ -75,6 +75,11 @@ export async function analyzeBusinessPlan(formData: FormData): Promise<{ objecti
             ]
         })
 
+        // Check if choices array exists and has elements before accessing
+        if (!completion.choices || completion.choices.length === 0) {
+            return { error: 'AI returned no response choices' }
+        }
+
         const content = completion.choices[0].message.content
         if (!content) {
             return { error: 'AI returned no content' }

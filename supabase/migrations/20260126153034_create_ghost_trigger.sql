@@ -6,9 +6,14 @@ create or replace function public.trigger_ghost_worker()
 returns trigger as $$
 declare
   is_ai boolean;
-  project_url text := 'https://YOUR_PROJECT_REF.supabase.co/functions/v1/ghost-worker'; -- REPLACE WITH ACTUAL URL
-  service_key text := 'YOUR_SERVICE_ROLE_KEY'; -- REPLACE WITH ACTUAL KEY
+  project_url text := current_setting('app.ghost_worker_url', true);
+  service_key text := current_setting('app.service_role_key', true);
 begin
+  -- Skip if configuration is not set
+  if project_url is null or service_key is null then
+    raise warning 'Ghost worker URL or service key not configured. Set app.ghost_worker_url and app.service_role_key.';
+    return NEW;
+  end if;
   -- Check if Assignee is an AI Agent
   select (role = 'AI_Agent') into is_ai from public.profiles where id = NEW.assignee_id;
   

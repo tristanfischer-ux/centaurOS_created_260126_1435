@@ -1,10 +1,11 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Dialog, DialogContent } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
-import { CheckCircle, Target, Users, Sparkles, ArrowRight, X } from 'lucide-react'
+import { CheckCircle, Target, Users, Sparkles, ArrowRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { VisuallyHidden } from '@radix-ui/react-visually-hidden'
 
 const ONBOARDING_KEY = 'centauros_onboarding_completed'
 
@@ -13,25 +14,25 @@ const steps = [
     title: 'Welcome to CentaurOS!',
     description: 'Your AI-powered strategic task management platform. Let\'s get you started with a quick tour.',
     icon: Sparkles,
-    color: 'bg-purple-100 text-purple-600'
+    color: 'bg-purple-100 dark:bg-purple-900/50 text-purple-600 dark:text-purple-400'
   },
   {
     title: 'Create Objectives',
     description: 'Objectives are your strategic goals. Break them down into actionable tasks and track progress toward your mission.',
     icon: Target,
-    color: 'bg-blue-100 text-blue-600'
+    color: 'bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400'
   },
   {
     title: 'Manage Tasks',
     description: 'Tasks can be assigned to team members or AI agents. Use the voice input feature to quickly create tasks by speaking.',
     icon: CheckCircle,
-    color: 'bg-green-100 text-green-600'
+    color: 'bg-green-100 dark:bg-green-900/50 text-green-600 dark:text-green-400'
   },
   {
     title: 'Collaborate with Your Team',
     description: 'Invite team members, create teams, and collaborate in real-time. Use @mentions to notify colleagues.',
     icon: Users,
-    color: 'bg-orange-100 text-orange-600'
+    color: 'bg-orange-100 dark:bg-orange-900/50 text-orange-600 dark:text-orange-400'
   }
 ]
 
@@ -49,11 +50,6 @@ export function OnboardingModal() {
   }, [])
 
   const handleComplete = () => {
-    localStorage.setItem(ONBOARDING_KEY, 'true')
-    setOpen(false)
-  }
-
-  const handleSkip = () => {
     localStorage.setItem(ONBOARDING_KEY, 'true')
     setOpen(false)
   }
@@ -80,15 +76,12 @@ export function OnboardingModal() {
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-[500px] p-0 overflow-hidden">
-        <div className="relative">
-          {/* Skip button */}
-          <button
-            onClick={handleSkip}
-            className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 z-10"
-          >
-            <X className="h-5 w-5" />
-          </button>
+        {/* Accessibility: Hidden title for screen readers */}
+        <VisuallyHidden>
+          <DialogTitle>{step.title}</DialogTitle>
+        </VisuallyHidden>
 
+        <div className="relative">
           {/* Progress dots */}
           <div className="absolute top-4 left-4 flex gap-1.5">
             {steps.map((_, index) => (
@@ -96,7 +89,9 @@ export function OnboardingModal() {
                 key={index}
                 className={cn(
                   'w-2 h-2 rounded-full transition-colors',
-                  index === currentStep ? 'bg-slate-900' : 'bg-slate-200'
+                  index === currentStep 
+                    ? 'bg-foreground' 
+                    : 'bg-muted-foreground/30'
                 )}
               />
             ))}
@@ -111,10 +106,10 @@ export function OnboardingModal() {
               <Icon className="w-10 h-10" />
             </div>
 
-            <h2 className="text-2xl font-bold text-slate-900 mb-3">
+            <h2 className="text-2xl font-bold text-foreground mb-3">
               {step.title}
             </h2>
-            <p className="text-slate-600 mb-8 max-w-sm mx-auto">
+            <p className="text-muted-foreground mb-8 max-w-sm mx-auto">
               {step.description}
             </p>
 

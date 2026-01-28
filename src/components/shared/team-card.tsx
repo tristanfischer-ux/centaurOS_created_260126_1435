@@ -40,8 +40,8 @@ export const TeamCard = memo(function TeamCard({
                 <div className="flex items-center gap-4 p-2 rounded-lg hover:bg-muted transition-colors">
                     <div className="relative flex -space-x-2">
                         {displayMembers.slice(0, 3).map((member, i) => (
-                            <Avatar key={member.id} className="h-6 w-6 border-2 border-background" style={{ zIndex: 3 - i }}>
-                                <AvatarFallback className="text-[10px] bg-muted">
+                            <Avatar key={member.id} className="h-8 w-8 border-2 border-background" style={{ zIndex: 3 - i }}>
+                                <AvatarFallback className="text-xs bg-muted">
                                     {member.full_name?.substring(0, 2).toUpperCase() || '?'}
                                 </AvatarFallback>
                             </Avatar>
@@ -92,17 +92,17 @@ export const TeamCard = memo(function TeamCard({
                             {displayMembers.map((member, i) => (
                                 <Avatar
                                     key={member.id}
-                                    className="h-10 w-10 border-2 border-background shadow-sm"
+                                    className="h-8 w-8 border-2 border-background shadow-sm"
                                     style={{ zIndex: displayMembers.length - i }}
                                 >
-                                    <AvatarFallback className={`text-sm ${member.role === 'AI_Agent' ? 'bg-purple-100 text-purple-600' : 'bg-muted'}`}>
+                                    <AvatarFallback className={`text-xs ${member.role === 'AI_Agent' ? 'bg-purple-100 text-purple-600' : 'bg-muted'}`}>
                                         {member.role === 'AI_Agent' ? '🤖' : member.full_name?.substring(0, 2).toUpperCase() || '?'}
                                     </AvatarFallback>
                                 </Avatar>
                             ))}
                             {remainingCount > 0 && (
                                 <div
-                                    className="h-10 w-10 rounded-full bg-muted border-2 border-background flex items-center justify-center text-sm font-medium text-muted-foreground"
+                                    className="h-8 w-8 rounded-full bg-muted border-2 border-background flex items-center justify-center text-xs font-medium text-muted-foreground"
                                     style={{ zIndex: 0 }}
                                 >
                                     +{remainingCount}

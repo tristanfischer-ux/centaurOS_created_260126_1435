@@ -5,26 +5,51 @@ import { getPulseMetrics } from '@/actions/tasks'
 import { Activity } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
+// Polling and animation configuration
+const METRICS_POLL_INTERVAL = 10000 // 10 seconds
+const SPIKE_ANIMATION_DURATION = 2000 // 2 seconds
+
 export function LivePulse() {
     const [activityCount, setActivityCount] = useState(0)
     const [isSpiking, setIsSpiking] = useState(false)
     const canvasRef = useRef<HTMLCanvasElement>(null)
+    const spikeTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
     // Poll for metrics
     useEffect(() => {
+        let mounted = true
+        
         const fetchMetrics = async () => {
-            const { actions } = await getPulseMetrics()
-            setActivityCount(actions)
-            // If significant activity, trigger visual spike
-            if (actions > 0) {
-                setIsSpiking(true)
-                setTimeout(() => setIsSpiking(false), 2000)
+            try {
+                const { actions } = await getPulseMetrics()
+                if (!mounted) return
+                
+                setActivityCount(actions)
+                // If significant activity, trigger visual spike
+                if (actions > 0) {
+                    setIsSpiking(true)
+                    // Clear any existing timeout before setting a new one
+                    if (spikeTimeoutRef.current) {
+                        clearTimeout(spikeTimeoutRef.current)
+                    }
+                    spikeTimeoutRef.current = setTimeout(() => {
+                        if (mounted) setIsSpiking(false)
+                    }, SPIKE_ANIMATION_DURATION)
+                }
+            } catch (error) {
+                console.error('Error fetching pulse metrics:', error)
             }
         }
 
         fetchMetrics()
-        const interval = setInterval(fetchMetrics, 10000) // 10s polling
-        return () => clearInterval(interval)
+        const interval = setInterval(fetchMetrics, METRICS_POLL_INTERVAL)
+        return () => {
+            mounted = false
+            clearInterval(interval)
+            if (spikeTimeoutRef.current) {
+                clearTimeout(spikeTimeoutRef.current)
+            }
+        }
     }, [])
 
     // EKG Animation Logic

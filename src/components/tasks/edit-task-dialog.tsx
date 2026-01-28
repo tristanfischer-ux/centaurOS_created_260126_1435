@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -50,14 +50,14 @@ export function EditTaskDialog({ open, onOpenChange, task, members }: EditTaskDi
     const [isDragging, setIsDragging] = useState(false)
     const fileInputRef = useRef<HTMLInputElement>(null)
 
-    const loadAttachments = async () => {
+    const loadAttachments = useCallback(async () => {
         setIsLoadingAttachments(true)
         const res = await getTaskAttachments(task.id)
         if (res.data) {
             setAttachments(res.data)
         }
         setIsLoadingAttachments(false)
-    }
+    }, [task.id])
 
     useEffect(() => {
         if (open) {
@@ -67,7 +67,7 @@ export function EditTaskDialog({ open, onOpenChange, task, members }: EditTaskDi
             setAssigneeId(task.assignee_id || "")
             loadAttachments()
         }
-    }, [open, task])
+    }, [open, task, loadAttachments])
 
     const handleSavePrimary = async () => {
         setIsLoading(true)
@@ -158,21 +158,25 @@ export function EditTaskDialog({ open, onOpenChange, task, members }: EditTaskDi
                     {/* Basic Info */}
                     <div className="space-y-4">
                         <div className="space-y-2">
-                            <Label>Task Title</Label>
+                            <Label>Task Title <span className="text-red-500">*</span></Label>
                             <Input
                                 value={title}
                                 onChange={(e) => setTitle(e.target.value)}
                                 className=""
+                                autoFocus
                             />
                         </div>
 
                         <div className="space-y-2">
-                            <Label>Description</Label>
+                            <Label htmlFor="edit-task-description">Description <span className="text-slate-500 font-normal">(Optional)</span></Label>
                             <Textarea
+                                id="edit-task-description"
                                 value={description}
                                 onChange={(e) => setDescription(e.target.value)}
                                 className="min-h-[100px]"
+                                maxLength={500}
                             />
+                            <p className="text-xs text-slate-500 text-right">{description.length}/500</p>
                         </div>
 
                         <div className="space-y-2">
