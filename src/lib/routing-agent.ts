@@ -138,21 +138,25 @@ export async function getTeamAvailability(): Promise<{
         .in('user_id', memberIds)
 
     // Build counts using plain objects
-    const activeTasksCounts: Record<string, number> = {}
-    const pendingTasksCounts: Record<string, number> = {}
-    const memberPresenceStatus: Record<string, 'online' | 'away' | 'focus' | 'offline'> = {}
+    const activeTasksCounts: Record<string, number> = {};
+    const pendingTasksCounts: Record<string, number> = {};
+    const memberPresenceStatus: Record<string, 'online' | 'away' | 'focus' | 'offline'> = {};
 
-    (activeTasks || []).forEach(t => {
-        activeTasksCounts[t.assignee_id] = (activeTasksCounts[t.assignee_id] || 0) + 1
-    })
+    for (const t of activeTasks || []) {
+        if (t.assignee_id) {
+            activeTasksCounts[t.assignee_id] = (activeTasksCounts[t.assignee_id] || 0) + 1;
+        }
+    }
 
-    (pendingTasks || []).forEach(t => {
-        pendingTasksCounts[t.assignee_id] = (pendingTasksCounts[t.assignee_id] || 0) + 1
-    })
+    for (const t of pendingTasks || []) {
+        if (t.assignee_id) {
+            pendingTasksCounts[t.assignee_id] = (pendingTasksCounts[t.assignee_id] || 0) + 1;
+        }
+    }
 
-    (presenceData || []).forEach(p => {
-        memberPresenceStatus[p.user_id] = p.status as 'online' | 'away' | 'focus' | 'offline'
-    })
+    for (const p of presenceData || []) {
+        memberPresenceStatus[p.user_id] = p.status as 'online' | 'away' | 'focus' | 'offline';
+    }
 
     const members = (profiles || []).map(p => {
         const active = activeTasksCounts[p.id] || 0
