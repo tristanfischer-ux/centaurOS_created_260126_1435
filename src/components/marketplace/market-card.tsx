@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardFooter } from "@/components/ui/card"
 import { Checkbox } from "@/components/ui/checkbox"
 import { cn } from "@/lib/utils"
-import { ArrowRight, ShieldCheck } from "lucide-react"
+import { ArrowRight, ShieldCheck, MapPin, GraduationCap, Clock, Briefcase } from "lucide-react"
 
 interface MarketCardProps {
     listing: MarketplaceListing
@@ -16,7 +16,6 @@ interface MarketCardProps {
 }
 
 export const MarketCard = memo(function MarketCard({ listing, isSelected, onToggleSelect }: MarketCardProps) {
-    // Aesthetic variants based on category - now unified to white, using badges for color
     const categoryBadgeStyles = {
         'People': 'bg-stone-100 text-stone-700',
         'Products': 'bg-slate-100 text-slate-700',
@@ -24,13 +23,17 @@ export const MarketCard = memo(function MarketCard({ listing, isSelected, onTogg
         'AI': 'bg-violet-50 text-violet-700'
     }
 
+    const attrs = listing.attributes || {}
+    const isPerson = listing.category === 'People'
+
     return (
         <Card className={cn(
             "group relative flex flex-col justify-between rounded-lg shadow-sm hover:shadow-md hover:scale-[1.01] transition-all duration-200 overflow-hidden",
-            isSelected && "ring-2 ring-ring border-ring"
+            isSelected && "ring-2 ring-ring"
         )}>
             <CardContent className="p-4 relative z-10">
-                <div className="flex justify-between items-start mb-4">
+                {/* Header */}
+                <div className="flex justify-between items-start mb-3">
                     <Badge variant="outline" className={cn("uppercase text-[10px] tracking-wider font-semibold border-0", categoryBadgeStyles[listing.category])}>
                         {listing.subcategory}
                     </Badge>
@@ -41,35 +44,111 @@ export const MarketCard = memo(function MarketCard({ listing, isSelected, onTogg
                     )}
                 </div>
 
-                <h3 className="text-lg font-bold tracking-tight mb-2 text-foreground group-hover:text-primary transition-colors">
+                {/* Name/Title */}
+                <h3 className="text-lg font-bold tracking-tight mb-1 text-foreground group-hover:text-primary transition-colors">
                     {listing.title}
                 </h3>
 
-                <p className="text-sm text-muted-foreground mb-4 line-clamp-2 min-h-[40px]">
+                {/* Role for People */}
+                {isPerson && attrs.role && (
+                    <p className="text-sm font-medium text-muted-foreground mb-2">{attrs.role}</p>
+                )}
+
+                {/* Description */}
+                <p className="text-sm text-muted-foreground mb-4 line-clamp-3">
                     {listing.description}
                 </p>
 
-                {/* Key Attributes Display */}
-                <div className="flex flex-wrap gap-2 mb-4">
-                    {Object.entries(listing.attributes).slice(0, 3).map(([key, value]) => {
-                        if (Array.isArray(value)) return null
-                        return (
-                            <div key={key} className="text-xs px-2 py-1 rounded-md bg-muted font-medium truncate max-w-[120px]">
-                                <span className="opacity-60 capitalize mr-1">{key.replace('_', ' ')}:</span>
-                                <span className="text-foreground">{String(value)}</span>
+                {/* People-specific details */}
+                {isPerson && (
+                    <div className="space-y-2 mb-4">
+                        {/* Key metrics row */}
+                        <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
+                            {attrs.years_experience && (
+                                <div className="flex items-center gap-1">
+                                    <Briefcase className="w-3 h-3" />
+                                    <span>{attrs.years_experience} years</span>
+                                </div>
+                            )}
+                            {attrs.location && (
+                                <div className="flex items-center gap-1">
+                                    <MapPin className="w-3 h-3" />
+                                    <span>{attrs.location}</span>
+                                </div>
+                            )}
+                            {attrs.availability && (
+                                <div className="flex items-center gap-1">
+                                    <Clock className="w-3 h-3" />
+                                    <span>{attrs.availability}</span>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Education */}
+                        {attrs.education && (
+                            <div className="flex items-start gap-1 text-xs text-muted-foreground">
+                                <GraduationCap className="w-3 h-3 mt-0.5 shrink-0" />
+                                <span className="line-clamp-1">{attrs.education}</span>
                             </div>
-                        )
-                    })}
-                </div>
+                        )}
+
+                        {/* Skills/Expertise Tags */}
+                        {(attrs.skills || attrs.expertise) && (
+                            <div className="flex flex-wrap gap-1 mt-2">
+                                {(attrs.skills || attrs.expertise || []).slice(0, 4).map((skill: string, i: number) => (
+                                    <span key={i} className="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">
+                                        {skill}
+                                    </span>
+                                ))}
+                                {(attrs.skills || attrs.expertise || []).length > 4 && (
+                                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-500">
+                                        +{(attrs.skills || attrs.expertise).length - 4}
+                                    </span>
+                                )}
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {/* Non-People attributes */}
+                {!isPerson && (
+                    <div className="flex flex-wrap gap-2 mb-4">
+                        {Object.entries(attrs).slice(0, 3).map(([key, value]) => {
+                            if (Array.isArray(value)) return null
+                            return (
+                                <div key={key} className="text-xs px-2 py-1 rounded-md bg-muted font-medium truncate max-w-[120px]">
+                                    <span className="opacity-60 capitalize mr-1">{key.replace('_', ' ')}:</span>
+                                    <span className="text-foreground">{String(value)}</span>
+                                </div>
+                            )
+                        })}
+                    </div>
+                )}
+
+                {/* Rate - prominent for People */}
+                {isPerson && attrs.rate && (
+                    <div className="flex items-center justify-between pt-3 mt-auto border-t border-slate-100">
+                        <div>
+                            <span className="text-xs text-muted-foreground">Rate</span>
+                            <p className="text-sm font-bold text-foreground">{attrs.rate}</p>
+                        </div>
+                        {attrs.projects_completed && (
+                            <div className="text-right">
+                                <span className="text-xs text-muted-foreground">Projects</span>
+                                <p className="text-sm font-bold text-foreground">{attrs.projects_completed}</p>
+                            </div>
+                        )}
+                    </div>
+                )}
             </CardContent>
 
-            <CardFooter className="relative z-10 flex items-center justify-between pt-4 mt-auto bg-muted/30">
+            <CardFooter className="relative z-10 flex items-center justify-between pt-3 pb-3 px-4 mt-auto bg-slate-50">
                 <div className="flex items-center gap-2">
                     <Checkbox
                         id={`compare-${listing.id}`}
                         checked={isSelected}
                         onCheckedChange={() => onToggleSelect(listing.id)}
-                        className="h-4 w-4 rounded bg-muted data-[state=checked]:bg-foreground text-foreground focus:ring-ring"
+                        className="h-4 w-4 rounded bg-slate-200 data-[state=checked]:bg-foreground text-foreground focus:ring-ring"
                         aria-label={`Select ${listing.title} for comparison`}
                     />
                     <label
