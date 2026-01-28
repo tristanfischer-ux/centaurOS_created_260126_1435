@@ -32,52 +32,42 @@ export function Sidebar({ foundryName, foundryId, userName, userRole }: { foundr
     const pathname = usePathname()
 
     return (
-        <div className="hidden md:flex h-screen w-64 flex-col bg-muted text-foreground border-r border-border">
+        <div className="hidden md:flex h-screen w-64 flex-col bg-card text-foreground">
             {/* App Header - Centaur Dynamics Branding */}
-            <div className="flex items-center justify-between px-4 py-4 border-b border-border bg-card">
-                <Link href="/dashboard" className="group">
-                    <span className="font-display text-lg font-bold tracking-[0.15em] uppercase text-international-orange group-hover:text-international-orange-hover transition-colors">
-                        CENTAUR
-                    </span>
-                </Link>
-                <div className="flex items-center gap-1">
-                    <ThemeToggle />
-                    <FocusModeToggle compact />
-                    {(userRole === 'Executive' || userRole === 'Founder') && (
-                        <PendingApprovalsButton />
-                    )}
-                    <NotificationCenter />
+            <div className="px-4 pt-5 pb-4">
+                <div className="flex items-center justify-between">
+                    <Link href="/dashboard" className="group flex items-center gap-2">
+                        <span className="font-display text-xl font-bold tracking-[0.12em] uppercase text-international-orange group-hover:text-international-orange-hover transition-colors">
+                            CENTAUR
+                        </span>
+                        <span className="w-1.5 h-1.5 rounded-full bg-international-orange animate-pulse"></span>
+                    </Link>
+                    <div className="flex items-center gap-0.5">
+                        <ThemeToggle />
+                        <NotificationCenter />
+                    </div>
                 </div>
             </div>
             
-            {/* System Status Indicator */}
-            <div className="px-4 py-2 border-b border-border bg-card/50">
-                <div className="flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-international-orange animate-pulse"></span>
-                    <span className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">System Online</span>
-                </div>
-            </div>
-            
-            {/* Foundry Info */}
-            <div className="px-4 py-4 border-b border-border bg-card">
+            {/* Foundry & User Info - Combined */}
+            <div className="px-4 pb-4">
                 <div className="text-sm font-semibold text-foreground uppercase tracking-wider truncate">
                     {foundryName || "Centaur Inc."}
                 </div>
-                <div className="text-[10px] text-muted-foreground font-mono mt-1 tracking-wide">
-                    ID: {foundryId || "Loading..."}
+                <div className="text-[10px] text-muted-foreground font-mono mt-0.5 tracking-wide">
+                    {foundryId || "Loading..."}
+                </div>
+                <div className="mt-3 flex items-center gap-2">
+                    <div className="text-sm text-muted-foreground truncate">
+                        {userName || "Loading..."}
+                    </div>
+                    <span className="text-[10px] text-muted-foreground font-mono uppercase px-1.5 py-0.5 bg-muted">
+                        {userRole || "Member"}
+                    </span>
                 </div>
             </div>
-            
-            {/* Current User */}
-            <div className="px-4 py-4 border-b border-border bg-muted">
-                <div className="text-sm font-medium text-foreground truncate">
-                    {userName || "Loading..."}
-                </div>
-                <div className="text-[10px] text-muted-foreground mt-0.5 font-mono uppercase tracking-wider">
-                    {userRole || "Member"}
-                </div>
-            </div>
-            <nav className="flex-1 space-y-1 px-2 py-4">
+
+            <nav className="flex-1 space-y-0.5 px-2 py-2">
                 {mainNavigation.map((item) => {
                     const isActive = pathname.startsWith(item.href)
                     return (
@@ -86,15 +76,15 @@ export function Sidebar({ foundryName, foundryId, userName, userRole }: { foundr
                             href={item.href}
                             className={cn(
                                 isActive
-                                    ? "bg-card text-international-orange shadow-sm border border-border"
-                                    : "text-muted-foreground hover:bg-card hover:text-foreground hover:shadow-sm active:bg-muted",
-                                "group flex items-center px-2 py-2 text-sm font-medium transition-all duration-200"
+                                    ? "bg-international-orange/10 text-international-orange"
+                                    : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                                "group flex items-center px-3 py-2.5 text-sm font-medium transition-all duration-150"
                             )}
                         >
                             <item.icon
                                 className={cn(
-                                    isActive ? "text-international-orange" : "text-muted-foreground group-hover:text-international-orange",
-                                    "mr-3 h-5 w-5 flex-shrink-0 transition-colors"
+                                    isActive ? "text-international-orange" : "text-muted-foreground group-hover:text-foreground",
+                                    "mr-3 h-4 w-4 flex-shrink-0 transition-colors"
                                 )}
                                 aria-hidden="true"
                             />
@@ -103,20 +93,25 @@ export function Sidebar({ foundryName, foundryId, userName, userRole }: { foundr
                     )
                 })}
             </nav>
-            <div className="border-t border-border p-4">
-                <div className="flex items-center mb-2">
-                    {/* Placeholder for user profile */}
-                    <div className="h-8 w-8 bg-muted-foreground/20"></div>
-                    <div className="ml-3">
-                        <p className="text-sm font-medium text-foreground">User</p>
-                        <p className="text-[10px] text-muted-foreground font-mono uppercase tracking-wider">Foundry Member</p>
+
+            <div className="p-4 mt-auto">
+                <div className="flex items-center gap-3 mb-4">
+                    <div className="h-8 w-8 bg-muted flex items-center justify-center">
+                        <span className="text-xs font-mono text-muted-foreground">
+                            {userName?.charAt(0)?.toUpperCase() || "U"}
+                        </span>
                     </div>
+                    <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-foreground truncate">{userName || "User"}</p>
+                        <p className="text-[10px] text-muted-foreground font-mono uppercase tracking-wider">{userRole || "Member"}</p>
+                    </div>
+                    <FocusModeToggle compact />
+                    {(userRole === 'Executive' || userRole === 'Founder') && (
+                        <PendingApprovalsButton />
+                    )}
                 </div>
-                <div className="text-xs text-muted-foreground px-2 py-2 border-t border-border mt-2 pt-2 text-center">
-                    Press <kbd className="px-1.5 py-0.5 bg-muted text-[10px] font-mono border border-border">⌘K</kbd> to search
-                </div>
-                <div className="text-[10px] text-muted-foreground text-center font-mono mt-2 tracking-wider">
-                    VER: {APP_VERSION}
+                <div className="text-[10px] text-muted-foreground text-center font-mono tracking-wider opacity-50">
+                    <kbd className="px-1 py-0.5 bg-muted text-[9px]">⌘K</kbd> search · v{APP_VERSION}
                 </div>
             </div>
         </div>
