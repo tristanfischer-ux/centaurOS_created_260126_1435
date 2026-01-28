@@ -137,28 +137,26 @@ export async function getTeamAvailability(): Promise<{
         .select('user_id, status')
         .in('user_id', memberIds)
 
-    // Build counts maps
-    const activeTasksMap = new Map<string, number>()
-    const pendingTasksMap = new Map<string, number>()
-    const memberPresenceMap = new Map<string, 'online' | 'away' | 'focus' | 'offline'>()
+    // Build counts using plain objects
+    const activeTasksCounts: Record<string, number> = {}
+    const pendingTasksCounts: Record<string, number> = {}
+    const memberPresenceStatus: Record<string, 'online' | 'away' | 'focus' | 'offline'> = {}
 
     (activeTasks || []).forEach(t => {
-        const count = activeTasksMap.get(t.assignee_id) || 0
-        activeTasksMap.set(t.assignee_id, count + 1)
+        activeTasksCounts[t.assignee_id] = (activeTasksCounts[t.assignee_id] || 0) + 1
     })
 
     (pendingTasks || []).forEach(t => {
-        const count = pendingTasksMap.get(t.assignee_id) || 0
-        pendingTasksMap.set(t.assignee_id, count + 1)
+        pendingTasksCounts[t.assignee_id] = (pendingTasksCounts[t.assignee_id] || 0) + 1
     })
 
     (presenceData || []).forEach(p => {
-        memberPresenceMap.set(p.user_id, p.status as 'online' | 'away' | 'focus' | 'offline')
+        memberPresenceStatus[p.user_id] = p.status as 'online' | 'away' | 'focus' | 'offline'
     })
 
     const members = (profiles || []).map(p => {
-        const active = activeTasksMap.get(p.id) || 0
-        const pending = pendingTasksMap.get(p.id) || 0
+        const active = activeTasksCounts[p.id] || 0
+        const pending = pendingTasksCounts[p.id] || 0
         return {
             id: p.id,
             fullName: p.full_name,
@@ -167,7 +165,7 @@ export async function getTeamAvailability(): Promise<{
             activeTasks: active,
             pendingTasks: pending,
             workloadScore: Math.min(100, (active * 20) + (pending * 10)),
-            presenceStatus: memberPresenceMap.get(p.id) || 'offline'
+            presenceStatus: memberPresenceStatus[p.id] || 'offline'
         }
     })
 
