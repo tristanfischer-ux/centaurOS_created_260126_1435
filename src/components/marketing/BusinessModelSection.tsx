@@ -34,7 +34,7 @@ export function BusinessModelSection() {
                 <div className="grid md:grid-cols-3 gap-8">
                     {centaurs.map((item, index) => (
                         <div 
-                            key={index}
+                            key={item.title}
                             className="group relative bg-slate-50 rounded-lg overflow-hidden hover:shadow-xl transition-all duration-500"
                         >
                             {/* Image Placeholder with Gradient */}

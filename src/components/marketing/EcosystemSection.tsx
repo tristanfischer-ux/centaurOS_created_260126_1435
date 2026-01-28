@@ -34,7 +34,7 @@ export function EcosystemSection() {
                 <div className="grid md:grid-cols-3 gap-8">
                     {osComponents.map((item, index) => (
                         <div 
-                            key={index}
+                            key={item.title}
                             className="group relative bg-slate-50 rounded-lg overflow-hidden hover:shadow-xl transition-all duration-500"
                         >
                             {/* Image Placeholder with Gradient */}

@@ -34,7 +34,7 @@ export function ProductizationSection() {
                 <div className="grid md:grid-cols-3 gap-8">
                     {network.map((item, index) => (
                         <div 
-                            key={index}
+                            key={item.title}
                             className="group relative bg-white rounded-lg overflow-hidden hover:shadow-xl transition-all duration-500"
                         >
                             {/* Image Placeholder with Gradient */}
