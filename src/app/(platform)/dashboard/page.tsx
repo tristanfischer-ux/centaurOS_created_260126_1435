@@ -306,7 +306,7 @@ export default async function DashboardPage() {
                                         <Link 
                                             key={task.id} 
                                             href={`/tasks`}
-                                            className="block p-3 rounded-lg border hover:bg-accent/50 active:bg-accent transition-colors"
+                                            className="block p-3 rounded-lg bg-muted/30 hover:bg-accent/50 active:bg-accent transition-colors"
                                         >
                                             <div className="flex items-start justify-between gap-2">
                                                 <div className="flex-1 min-w-0">
@@ -437,7 +437,7 @@ export default async function DashboardPage() {
                                                 <Link 
                                                     key={task.id} 
                                                     href={`/tasks`}
-                                                    className="block p-3 rounded-lg border border-destructive/50 bg-destructive/10 hover:bg-destructive/20 transition-colors"
+                                                    className="block p-3 rounded-lg bg-destructive/10 hover:bg-destructive/20 transition-colors"
                                                 >
                                                     <div className="flex items-start justify-between gap-2">
                                                         <div className="flex-1 min-w-0">
@@ -471,7 +471,7 @@ export default async function DashboardPage() {
                                                 <Link 
                                                     key={task.id} 
                                                     href={`/tasks`}
-                                                    className="block p-3 rounded-lg border hover:bg-accent/50 transition-colors"
+                                                    className="block p-3 rounded-lg bg-muted/30 hover:bg-accent/50 transition-colors"
                                                 >
                                                     <div className="flex items-start justify-between gap-2">
                                                         <div className="flex-1 min-w-0">
@@ -602,7 +602,7 @@ export default async function DashboardPage() {
                                         <Link 
                                             key={`${activity.type}-${activity.id}`} 
                                             href={`/tasks`}
-                                            className="flex items-start gap-3 p-3 rounded-lg border hover:bg-accent/50 transition-colors"
+                                            className="flex items-start gap-3 p-3 rounded-lg bg-muted/30 hover:bg-accent/50 transition-colors"
                                         >
                                             <Avatar className="h-8 w-8 shrink-0">
                                                 <AvatarFallback className="text-xs bg-muted text-muted-foreground">

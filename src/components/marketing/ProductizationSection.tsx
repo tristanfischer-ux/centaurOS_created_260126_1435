@@ -1,61 +1,62 @@
 "use client";
 
-import { Package, Truck, ShieldCheck } from "lucide-react";
-import { motion } from "framer-motion";
+import { TrendingUp, Factory, GraduationCap } from "lucide-react";
 
-const packs = [
+const network = [
     {
-        icon: Package,
-        title: "Startup Foundation",
-        desc: "Pre-loaded modules for Incorporation, IP Assignment, and Equity management. Day 0 legal readiness.",
+        icon: TrendingUp,
+        role: "VCs",
+        title: "MORE BETS. SAME FUND.",
+        description: "Hardware usually kills returns with 12-month cycles. We shorten that to 12 weeks. Validate cheaper, kill failures faster, and place more winning bets.",
+        color: "bg-emerald-500",
+    },
+    {
+        icon: Factory,
+        role: "FACTORIES",
+        title: "THE VIRTUAL FACTORY.",
+        description: "Monetize latent capacity. Connect your machines to Centaur OS. Receive pre-vetted, production-ready files: no sales friction, just print, ship, and bank.",
+        color: "bg-purple-500",
+    },
+    {
+        icon: GraduationCap,
+        role: "UNIVERSITIES",
+        title: "THE FOUNDER PIPELINE.",
+        description: "Universities are IP-rich but execution-constrained. We provide the commercialization engine to transform research into venture-backed startups and students into Centaur Apprentices.",
         color: "bg-blue-500",
-    },
-    {
-        icon: Truck,
-        title: "Supply Chain Alpha",
-        desc: "Autonomous Sourcing agents, RFQ generation, and Logistics tracking. Global reach instantly.",
-        color: "bg-orange-500",
-    },
-    {
-        icon: ShieldCheck,
-        title: "Regulatory Clearance",
-        desc: "Compliance automations for OSHA, GDPR, and ISO standards. Safety as code.",
-        color: "bg-green-500",
     },
 ];
 
 export function ProductizationSection() {
     return (
-        <section className="py-24 bg-slate-50 relative border-t border-slate-200" id="productization">
+        <section className="py-24 bg-slate-50 relative" id="network">
             <div className="container mx-auto px-6">
                 <div className="max-w-4xl mx-auto mb-16 text-center space-y-4">
-                    <h2 className="text-gold font-mono text-international-orange uppercase tracking-widest text-sm">Plug & Play</h2>
-                    <h3 className="text-4xl md:text-5xl font-display text-slate-900">PRE-CONFIGURED VELOCITY.</h3>
-                    <p className="text-xl text-slate-600 font-light max-w-2xl mx-auto">
-                        We don't start from zero. Our Centaurs arrive with Agent Packs—pre-loaded AI modules for instant capability.
-                    </p>
+                    <h2 className="text-4xl md:text-5xl font-display text-slate-900">THE NETWORK.</h2>
                 </div>
 
-                <div className="grid md:grid-cols-3 gap-8">
-                    {packs.map((pack) => (
-                        <div key={pack.title} className="group relative bg-white border border-slate-200 p-8 hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
-                            {/* Cartridge Visual Top Bar */}
-                            <div className={`absolute top-0 left-0 right-0 h-1.5 ${pack.color}`}></div>
+                <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto">
+                    {network.map((item) => (
+                        <div key={item.title} className="group relative bg-white shadow-md p-8 hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
+                            {/* Color accent bar */}
+                            <div className={`absolute top-0 left-0 right-0 h-1.5 ${item.color}`}></div>
 
+                            {/* Icon */}
                             <div className="mb-6 inline-flex p-3 bg-slate-50 rounded-lg group-hover:scale-110 transition-transform duration-300">
-                                <pack.icon className="w-8 h-8 text-slate-900" strokeWidth={1.5} />
+                                <item.icon className="w-8 h-8 text-slate-900" strokeWidth={1.5} />
                             </div>
 
-                            <h4 className="text-xl font-display font-bold text-slate-900 mb-3">{pack.title}</h4>
+                            {/* Role Label */}
+                            <div className="font-mono text-xs text-international-orange tracking-widest uppercase mb-2">
+                                {item.role}
+                            </div>
+
+                            {/* Title */}
+                            <h4 className="text-2xl font-display font-bold text-slate-900 mb-4">{item.title}</h4>
+
+                            {/* Description */}
                             <p className="text-slate-600 font-sans leading-relaxed text-sm">
-                                {pack.desc}
+                                &ldquo;{item.description}&rdquo;
                             </p>
-
-                            {/* Technical Markers */}
-                            <div className="mt-8 pt-4 border-t border-slate-100 flex justify-between text-[10px] font-mono text-slate-400 uppercase">
-                                <span>Ver 2.1.0</span>
-                                <span>Ready</span>
-                            </div>
                         </div>
                     ))}
                 </div>

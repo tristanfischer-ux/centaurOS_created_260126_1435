@@ -29,7 +29,7 @@ export function MobileNav() {
     const pathname = usePathname()
 
     return (
-        <div className="fixed bottom-0 left-0 right-0 z-50 bg-card border-t border-border md:hidden pb-safe">
+        <div className="fixed bottom-0 left-0 right-0 z-50 bg-card shadow-[0_-4px_12px_-2px_rgba(0,0,0,0.1)] md:hidden pb-safe">
             <div className="flex justify-around items-center h-16">
                 {mainNavigation.map((item) => {
                     const isActive = pathname.startsWith(item.href)

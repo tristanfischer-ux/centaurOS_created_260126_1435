@@ -309,7 +309,7 @@ export function TimelineListView({ tasks, members, currentUserId }: TimelineList
     return (
         <div className="space-y-3 pb-20"> {/* Add padding bottom for safe mobile scrolling */}
             {/* Timeline Header */}
-            <div className="bg-card rounded-xl border border-border p-3 sticky top-0 z-30 shadow-sm">
+            <div className="bg-card rounded-xl p-3 sticky top-0 z-30 shadow-md">
                 <div className="flex items-center gap-2 mb-2">
                     <Calendar className="h-4 w-4 text-amber-500" />
                     <span className="text-xs font-medium text-muted-foreground">2 Week Timeline</span>
@@ -339,7 +339,7 @@ export function TimelineListView({ tasks, members, currentUserId }: TimelineList
                 const completedCount = dateTasks.filter(t => t.status === 'Completed').length
 
                 return (
-                    <div key={dateKey} className="bg-card rounded-xl border border-border overflow-hidden">
+                    <div key={dateKey} className="bg-card rounded-xl shadow-md overflow-hidden">
                         {/* Date Header */}
                         <button
                             onClick={() => setExpandedDate(expandedDate === dateKey ? null : dateKey)}
@@ -366,7 +366,7 @@ export function TimelineListView({ tasks, members, currentUserId }: TimelineList
 
                         {/* Task List */}
                         {isExpanded && (
-                            <div className="border-t border-border">
+                            <div className="bg-muted/30">
                                 {dateTasks.map((task, idx) => {
                                     const isTaskCollapsed = collapsedTasks.has(task.id)
                                     // Normalize assignees
@@ -380,7 +380,7 @@ export function TimelineListView({ tasks, members, currentUserId }: TimelineList
                                     return (
                                         <div
                                             key={task.id}
-                                            className={`${idx !== dateTasks.length - 1 ? 'border-b border-border' : ''}`}
+                                            className={`${idx !== dateTasks.length - 1 ? 'mb-px' : ''}`}
                                         >
                                             {/* Task Header - Always Visible */}
                                             <div
@@ -404,12 +404,12 @@ export function TimelineListView({ tasks, members, currentUserId }: TimelineList
                                                                             </div>
                                                                         ))
                                                                     ) : (
-                                                                        <div className="h-8 w-8 rounded-full bg-muted border border-border border-dashed flex items-center justify-center text-muted-foreground">
+                                                                        <div className="h-8 w-8 rounded-full bg-muted/70 flex items-center justify-center text-muted-foreground">
                                                                             <Plus className="w-4 h-4" />
                                                                         </div>
                                                                     )}
                                                                     {currentAssignees.length > 3 && (
-                                                                        <div className="h-8 w-8 rounded-full bg-muted border border-card flex items-center justify-center text-xs text-muted-foreground font-medium z-0">
+                                                                        <div className="h-8 w-8 rounded-full bg-muted shadow-sm flex items-center justify-center text-xs text-muted-foreground font-medium z-0">
                                                                             +{currentAssignees.length - 3}
                                                                         </div>
                                                                     )}

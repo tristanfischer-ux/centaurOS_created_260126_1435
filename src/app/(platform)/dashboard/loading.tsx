@@ -35,7 +35,7 @@ export default function DashboardLoading() {
                     <CardContent>
                         <div className="space-y-3">
                             {[1, 2, 3].map((i) => (
-                                <div key={i} className="p-3 rounded-lg border border-slate-200">
+                                <div key={i} className="p-3 rounded-lg bg-slate-50">
                                     <Skeleton className="h-5 w-3/4 mb-2" />
                                     <Skeleton className="h-4 w-1/2" />
                                 </div>
@@ -76,7 +76,7 @@ export default function DashboardLoading() {
                     <CardContent>
                         <div className="space-y-3">
                             {[1, 2, 3].map((i) => (
-                                <div key={i} className="p-3 rounded-lg border border-slate-200">
+                                <div key={i} className="p-3 rounded-lg bg-slate-50">
                                     <Skeleton className="h-5 w-2/3 mb-2" />
                                     <Skeleton className="h-4 w-1/3" />
                                 </div>
@@ -131,7 +131,7 @@ export default function DashboardLoading() {
                     <CardContent>
                         <div className="space-y-3">
                             {[1, 2, 3, 4].map((i) => (
-                                <div key={i} className="flex items-start gap-3 p-3 rounded-lg border border-slate-200">
+                                <div key={i} className="flex items-start gap-3 p-3 rounded-lg bg-slate-50">
                                     <Skeleton className="h-8 w-8 rounded-full" />
                                     <div className="flex-1 space-y-2">
                                         <Skeleton className="h-4 w-1/3" />

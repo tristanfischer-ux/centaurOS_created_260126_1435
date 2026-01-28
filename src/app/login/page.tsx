@@ -40,7 +40,7 @@ function LoginForm() {
     return (
         <Card className="w-full max-w-md">
             <CardHeader className="space-y-1">
-                <CardTitle className="text-2xl font-bold text-center text-amber-600">CentaurOS</CardTitle>
+                <CardTitle className="text-2xl font-bold text-center text-international-orange">CentaurOS</CardTitle>
                 <CardDescription className="text-center">
                     Enter your email to sign in to your Foundry
                 </CardDescription>

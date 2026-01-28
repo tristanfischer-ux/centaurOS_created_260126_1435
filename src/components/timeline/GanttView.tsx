@@ -134,7 +134,7 @@ function InitialsAvatar({
 function CustomTaskListHeader({ headerHeight }: { headerHeight: number }) {
     return (
         <div
-            className="flex items-center border-b border-slate-200 bg-slate-50 text-xs font-medium text-slate-600"
+            className="flex items-center bg-slate-100 text-xs font-medium text-slate-600"
             style={{ height: headerHeight }}
         >
             <div className="w-10 px-2 text-center">#</div>
@@ -166,7 +166,7 @@ function CustomTaskListTable({
                 return (
                     <div
                         key={task.id}
-                        className="flex items-center border-b border-slate-100 hover:bg-slate-50 text-sm cursor-pointer"
+                        className="flex items-center hover:bg-slate-100 text-sm cursor-pointer"
                         style={{ height: rowHeight }}
                         onClick={() => onExpanderClick(task)}
                     >
@@ -204,9 +204,8 @@ const CustomTooltip = ({ task }: { task: GanttTask, fontSize: string, fontFamily
         <div style={{
             backgroundColor: 'white',
             padding: '12px',
-            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+            boxShadow: '0 4px 12px -1px rgba(0, 0, 0, 0.15), 0 2px 6px -1px rgba(0, 0, 0, 0.1)',
             borderRadius: '8px',
-            border: '1px solid #e2e8f0', // slate-200
             fontSize: '12px',
             fontFamily: 'var(--font-geist-sans), sans-serif',
             fontWeight: 500,
@@ -462,7 +461,7 @@ export function GanttView({ tasks, objectives, profiles }: GanttViewProps) {
                         </SelectContent>
                     </Select>
 
-                    <div className="flex gap-1 bg-muted p-1 rounded-lg border border-border">
+                    <div className="flex gap-1 bg-muted p-1 rounded-lg shadow-sm">
                         <Button
                             variant={viewMode === ViewMode.Day ? "default" : "ghost"}
                             size="sm"
@@ -549,11 +548,11 @@ export function GanttView({ tasks, objectives, profiles }: GanttViewProps) {
 
             {/* Gantt Chart or Empty State */}
             {ganttTasks.length === 0 ? (
-                <div className="bg-card rounded-lg border border-border text-center py-16 text-muted-foreground">
+                <div className="bg-card rounded-lg shadow-md text-center py-16 text-muted-foreground">
                     No tasks match current filters.
                 </div>
             ) : (
-                <div className="bg-card rounded-lg overflow-hidden border border-border shadow-sm">
+                <div className="bg-card rounded-lg overflow-hidden shadow-md">
                     <Gantt
                         tasks={ganttTasks}
                         viewMode={viewMode}

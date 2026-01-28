@@ -17,9 +17,9 @@ const buttonVariants = cva(
         "brand-secondary": "bg-electric-blue hover:bg-electric-blue-hover text-white font-mono uppercase tracking-wider",
         destructive:
           "bg-destructive text-destructive-foreground hover:bg-destructive/90",
-        // Industrial outline style
+        // Industrial outline style - using bg tint instead of border
         outline:
-          "border-2 border-slate-900 bg-background text-slate-900 hover:bg-slate-900 hover:text-white font-mono uppercase tracking-wider dark:border-slate-100 dark:text-slate-100 dark:hover:bg-slate-100 dark:hover:text-slate-900",
+          "bg-slate-100 text-slate-900 hover:bg-slate-900 hover:text-white font-mono uppercase tracking-wider dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-100 dark:hover:text-slate-900",
         secondary:
           "bg-secondary text-secondary-foreground hover:bg-secondary/80",
         ghost: "hover:bg-accent/10 hover:text-accent-foreground",

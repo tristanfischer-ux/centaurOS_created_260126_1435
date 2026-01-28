@@ -61,7 +61,7 @@ export function ZoomControl({ className, onZoomChange }: ZoomControlProps) {
     return (
         <div
             className={cn(
-                "inline-flex items-center gap-0.5 bg-card/80 backdrop-blur-sm border border-border px-1 py-0.5",
+                "inline-flex items-center gap-0.5 bg-muted/80 backdrop-blur-sm shadow-sm rounded px-1 py-0.5",
                 className
             )}
         >

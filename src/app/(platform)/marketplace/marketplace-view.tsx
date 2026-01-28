@@ -125,7 +125,7 @@ export function MarketplaceView({ initialListings }: MarketplaceViewProps) {
                     )}
 
                     {filteredItems.length === 0 && (
-                        <div className="col-span-full border-2 border-dashed border-slate-200 rounded-xl">
+                        <div className="col-span-full bg-slate-100/50 rounded-xl">
                             <EmptyState
                                 icon={<Store className="h-12 w-12" />}
                                 title={debouncedSearchQuery.trim() ? "No listings match your search" : "No listings found in this category yet"}

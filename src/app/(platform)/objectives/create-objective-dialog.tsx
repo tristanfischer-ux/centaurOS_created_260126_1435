@@ -312,7 +312,7 @@ export function CreateObjectiveDialog({ children }: CreateObjectiveDialogProps) 
             </DialogTrigger>
             <DialogContent className="w-[calc(100vw-2rem)] sm:max-w-[800px] max-h-[90dvh] flex flex-col p-0 gap-0 bg-white sm:rounded-xl overflow-hidden">
                 {/* Header Section */}
-                <div className="p-6 pb-4 border-b border-slate-100 bg-slate-50/50">
+                <div className="p-6 pb-4 bg-slate-50/50">
                     <DialogHeader>
                         <DialogTitle className="text-xl font-semibold tracking-tight text-slate-900">
                             {mode === 'manual' && "Define Strategic Objective"}
@@ -356,7 +356,7 @@ export function CreateObjectiveDialog({ children }: CreateObjectiveDialogProps) 
                                         "flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-all duration-200",
                                         mode === m
                                             ? "bg-slate-900 text-white shadow-md"
-                                            : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200",
+                                            : "bg-white text-slate-600 hover:bg-slate-100 shadow-sm",
                                         isDisabled && "opacity-50 cursor-not-allowed"
                                     )}
                                 >
@@ -501,7 +501,7 @@ export function CreateObjectiveDialog({ children }: CreateObjectiveDialogProps) 
                                                     />
                                                 </div>
                                             ) : packs.length === 0 ? (
-                                                <div className="col-span-full border-2 border-dashed border-slate-200 rounded-lg">
+                                                <div className="col-span-full bg-slate-100/50 rounded-lg">
                                                     <EmptyState
                                                         icon={<Package className="h-12 w-12" />}
                                                         title="No packs available"
@@ -519,7 +519,7 @@ export function CreateObjectiveDialog({ children }: CreateObjectiveDialogProps) 
                                                 
                                                 if (filteredPacks.length === 0) {
                                                     return (
-                                                        <div className="col-span-full border-2 border-dashed border-slate-200 rounded-lg py-8 text-center">
+                                                        <div className="col-span-full bg-slate-100/50 rounded-lg py-8 text-center">
                                                             <p className="text-slate-500">No packs match your search criteria.</p>
                                                         </div>
                                                     )
@@ -530,7 +530,7 @@ export function CreateObjectiveDialog({ children }: CreateObjectiveDialogProps) 
                                                     return (
                                                         <Card
                                                             key={pack.id}
-                                                            className="cursor-pointer hover:border-blue-500 hover:shadow-md transition-all group border-slate-200"
+                                                            className="cursor-pointer hover:shadow-lg transition-all group"
                                                             onClick={() => {
                                                                 setSelectedPack(pack)
                                                                 setSelectedTaskIds(pack.items?.map(i => i.id) || []) // Auto-select all by default
@@ -539,7 +539,7 @@ export function CreateObjectiveDialog({ children }: CreateObjectiveDialogProps) 
                                                             }}
                                                         >
                                                             <CardHeader className="space-y-1">
-                                                                <div className="w-10 h-10 rounded-lg bg-slate-50 border border-slate-100 flex items-center justify-center mb-2 group-hover:bg-blue-50 group-hover:text-blue-600 transition-colors">
+                                                                <div className="w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center mb-2 group-hover:bg-blue-50 group-hover:text-blue-600 transition-colors">
                                                                     <Icon className="w-5 h-5 text-slate-500 group-hover:text-blue-600" />
                                                                 </div>
                                                                 <CardTitle className="text-lg">{pack.title}</CardTitle>
@@ -623,7 +623,7 @@ export function CreateObjectiveDialog({ children }: CreateObjectiveDialogProps) 
                                 {!analyzedObjectives.length && !isAnalyzing ? (
                                     <div className="w-full">
                                         <div
-                                            className="border-2 border-dashed border-slate-200 rounded-xl p-12 flex flex-col items-center justify-center text-center space-y-4 hover:border-blue-500 hover:bg-blue-50/10 transition-all cursor-pointer group relative"
+                                            className="bg-slate-100/50 rounded-xl p-12 flex flex-col items-center justify-center text-center space-y-4 hover:bg-blue-50/20 transition-all cursor-pointer group relative"
                                         >
                                             <Input
                                                 type="file"
@@ -646,7 +646,7 @@ export function CreateObjectiveDialog({ children }: CreateObjectiveDialogProps) 
                                 ) : isAnalyzing ? (
                                     <div className="flex flex-col items-center justify-center py-20 space-y-6">
                                         <div className="relative">
-                                            <div className="w-16 h-16 border-4 border-slate-100 border-t-blue-600 rounded-full animate-spin"></div>
+                                            <div className="w-16 h-16 rounded-full bg-slate-100 border-t-4 border-t-blue-600 animate-spin"></div>
                                             <div className="absolute inset-0 flex items-center justify-center">
                                                 <img src="/icons/sparkles.svg" className="w-6 h-6 opacity-20" alt="" />
                                             </div>
@@ -700,7 +700,7 @@ export function CreateObjectiveDialog({ children }: CreateObjectiveDialogProps) 
                                                         "p-4 rounded-xl border text-left cursor-pointer transition-all",
                                                         selectedAnalysisIndex === idx
                                                             ? "border-blue-600 bg-blue-50/30 ring-1 ring-blue-600 shadow-sm"
-                                                            : "border-slate-200 hover:border-slate-300 hover:shadow-sm bg-white"
+                                                            : "hover:shadow-md bg-white"
                                                     )}
                                                 >
                                                     <div className="flex justify-between items-start mb-2">
@@ -709,7 +709,7 @@ export function CreateObjectiveDialog({ children }: CreateObjectiveDialogProps) 
                                                     </div>
                                                     <p className="text-sm text-slate-600 line-clamp-2">{obj.description}</p>
                                                     <div className="mt-3 flex items-center gap-2 text-xs text-slate-500">
-                                                        <Badge variant="secondary" className="bg-slate-100 text-slate-600 border-slate-200">
+                                                        <Badge variant="secondary" className="bg-slate-100 text-slate-600">
                                                             {obj.tasks.length} Tasks Generated
                                                         </Badge>
                                                     </div>
@@ -718,7 +718,7 @@ export function CreateObjectiveDialog({ children }: CreateObjectiveDialogProps) 
                                         </div>
 
                                         {selectedAnalysisIndex !== null && (
-                                            <div className="space-y-4 pt-4 border-t border-slate-100">
+                                            <div className="space-y-4 pt-4 mt-4">
                                                 <Label>Refine Selected Objective</Label>
                                                 <Input
                                                     value={title}
@@ -766,7 +766,7 @@ export function CreateObjectiveDialog({ children }: CreateObjectiveDialogProps) 
                 </ScrollArea>
 
                 {/* Footer Actions */}
-                <DialogFooter className="p-6 pt-4 border-t border-slate-100 bg-white">
+                <DialogFooter className="p-6 pt-4 bg-slate-50/50">
                     <div className="flex-1 text-sm text-slate-500">
                         {mode === 'pack' && selectedPack && "This will create 1 objective and multiple tasks."}
                         {mode === 'import' && selectedAnalysisIndex !== null && "AI generated tasks will be created."}

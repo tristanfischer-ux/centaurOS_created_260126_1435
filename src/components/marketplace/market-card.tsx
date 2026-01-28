@@ -18,10 +18,10 @@ interface MarketCardProps {
 export const MarketCard = memo(function MarketCard({ listing, isSelected, onToggleSelect }: MarketCardProps) {
     // Aesthetic variants based on category - now unified to white, using badges for color
     const categoryBadgeStyles = {
-        'People': 'bg-stone-100 text-stone-700 border-stone-200',
-        'Products': 'bg-slate-100 text-slate-700 border-slate-200',
-        'Services': 'bg-blue-50 text-blue-700 border-blue-100',
-        'AI': 'bg-violet-50 text-violet-700 border-violet-100'
+        'People': 'bg-stone-100 text-stone-700',
+        'Products': 'bg-slate-100 text-slate-700',
+        'Services': 'bg-blue-50 text-blue-700',
+        'AI': 'bg-violet-50 text-violet-700'
     }
 
     return (
@@ -54,7 +54,7 @@ export const MarketCard = memo(function MarketCard({ listing, isSelected, onTogg
                     {Object.entries(listing.attributes).slice(0, 3).map(([key, value]) => {
                         if (Array.isArray(value)) return null
                         return (
-                            <div key={key} className="text-xs px-2 py-1 rounded-md bg-muted border border-border font-medium truncate max-w-[120px]">
+                            <div key={key} className="text-xs px-2 py-1 rounded-md bg-muted font-medium truncate max-w-[120px]">
                                 <span className="opacity-60 capitalize mr-1">{key.replace('_', ' ')}:</span>
                                 <span className="text-foreground">{String(value)}</span>
                             </div>
@@ -63,13 +63,13 @@ export const MarketCard = memo(function MarketCard({ listing, isSelected, onTogg
                 </div>
             </CardContent>
 
-            <CardFooter className="relative z-10 flex items-center justify-between pt-4 border-t border-border mt-auto">
+            <CardFooter className="relative z-10 flex items-center justify-between pt-4 mt-auto bg-muted/30">
                 <div className="flex items-center gap-2">
                     <Checkbox
                         id={`compare-${listing.id}`}
                         checked={isSelected}
                         onCheckedChange={() => onToggleSelect(listing.id)}
-                        className="h-4 w-4 rounded border-input data-[state=checked]:bg-foreground data-[state=checked]:border-foreground text-foreground focus:ring-ring"
+                        className="h-4 w-4 rounded bg-muted data-[state=checked]:bg-foreground text-foreground focus:ring-ring"
                         aria-label={`Select ${listing.title} for comparison`}
                     />
                     <label

@@ -3,8 +3,6 @@ import { HeroSection } from "@/components/marketing/HeroSection";
 import { BusinessModelSection } from "@/components/marketing/BusinessModelSection";
 import { ProductizationSection } from "@/components/marketing/ProductizationSection";
 import { EcosystemSection } from "@/components/marketing/EcosystemSection";
-import { TalentSection } from "@/components/marketing/TalentSection";
-import { TrustSafetySection } from "@/components/marketing/TrustSafetySection";
 import { MarketingFooter } from "@/components/marketing/MarketingFooter";
 
 export default function MarketingPage() {
@@ -16,8 +14,6 @@ export default function MarketingPage() {
         <BusinessModelSection />
         <ProductizationSection />
         <EcosystemSection />
-        <TalentSection />
-        <TrustSafetySection />
       </main>
       <MarketingFooter />
     </div>

@@ -1,89 +1,64 @@
 "use client";
 
-import { Check, X } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Crown, Briefcase, Wrench } from "lucide-react";
+
+const centaurs = [
+    {
+        icon: Crown,
+        role: "FOUNDERS DECIDE",
+        title: "RETAIN YOUR EQUITY.",
+        description: "Don't burn seed capital on a standing army. Launch with a fractional team. Validate fast, risk less, and retain maximum equity at Series A.",
+        color: "bg-amber-500",
+    },
+    {
+        icon: Briefcase,
+        role: "EXECUTIVES EVALUATE",
+        title: "TRY BEFORE YOU FLY.",
+        description: "Monetize elite expertise without the burnout. Join as a Fractional Executive to accelerate deep-tech startups. Then, invest in them or launch your own.",
+        color: "bg-blue-500",
+    },
+    {
+        icon: Wrench,
+        role: "APPRENTICES DO",
+        title: "THE DIGITAL BODY.",
+        description: "We equip you with the Centaur OS—a 'Digital Body' multiplying your output tenfold. You aren't a junior. You are a Founder-in-Training.",
+        color: "bg-green-500",
+    },
+];
 
 export function BusinessModelSection() {
     return (
-        <section className="py-24 bg-white relative overflow-hidden" id="methodology">
+        <section className="py-24 bg-white relative overflow-hidden" id="centaurs">
             <div className="container mx-auto px-6">
                 <div className="max-w-4xl mx-auto mb-16 text-center space-y-4">
-                    <h2 className="text-gold font-mono text-international-orange uppercase tracking-widest text-sm">The new Operating Model</h2>
-                    <h3 className="text-4xl md:text-5xl font-display text-slate-900">OPEX, NOT CAPEX.</h3>
-                    <p className="text-xl text-slate-600 font-light max-w-2xl mx-auto">
-                        Stop hiring full-time headcount for temporary build phases.
-                        Centaur Dynamics employs the talent; you rent the capability.
-                    </p>
+                    <h2 className="text-4xl md:text-5xl font-display text-slate-900">THE CENTAURS.</h2>
                 </div>
 
-                <div className="grid md:grid-cols-2 gap-8 max-w-5xl mx-auto">
-                    {/* TRADITIONAL */}
-                    <div className="bg-slate-50 border border-slate-100 p-8 md:p-12 relative opacity-70 grayscale transition-all duration-500 hover:opacity-100 hover:grayscale-0">
-                        <div className="absolute top-0 right-0 p-4 font-mono text-xs text-slate-400">LEGACY MODEL</div>
-                        <h4 className="text-2xl font-display text-slate-700 mb-8">Traditional Hiring</h4>
+                <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto">
+                    {centaurs.map((centaur) => (
+                        <div key={centaur.title} className="group relative bg-slate-50 shadow-md p-8 hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
+                            {/* Color accent bar */}
+                            <div className={`absolute top-0 left-0 right-0 h-1.5 ${centaur.color}`}></div>
 
-                        <ul className="space-y-6 font-mono text-sm text-slate-600">
-                            <li className="flex items-center space-x-3">
-                                <X className="w-5 h-5 text-red-500" />
-                                <span>Recruitment Fees (20-30%)</span>
-                            </li>
-                            <li className="flex items-center space-x-3">
-                                <X className="w-5 h-5 text-red-500" />
-                                <span>Payroll Tax & Benefits</span>
-                            </li>
-                            <li className="flex items-center space-x-3">
-                                <X className="w-5 h-5 text-red-500" />
-                                <span>Equipment & Overhead</span>
-                            </li>
-                            <li className="flex items-center space-x-3">
-                                <X className="w-5 h-5 text-red-500" />
-                                <span>Significant Severance Risk</span>
-                            </li>
-                            <li className="flex items-center space-x-3">
-                                <X className="w-5 h-5 text-red-500" />
-                                <span>3-6 Month Ramp Up</span>
-                            </li>
-                        </ul>
-                    </div>
-
-                    {/* CENTAUR */}
-                    <div className="bg-white border-2 border-slate-900 p-8 md:p-12 relative shadow-2xl shadow-slate-200">
-                        <div className="absolute top-4 right-4 bg-international-orange text-white text-xs font-mono px-2 py-1 uppercase">Recommended</div>
-                        <h4 className="text-2xl font-display text-slate-900 mb-8">Centaur Unit</h4>
-
-                        <ul className="space-y-6 font-mono text-sm text-slate-900">
-                            <li className="flex items-center space-x-3">
-                                <Check className="w-5 h-5 text-international-orange" />
-                                <span>Single Flat Monthly Fee</span>
-                            </li>
-                            <li className="flex items-center space-x-3">
-                                <Check className="w-5 h-5 text-international-orange" />
-                                <span>Zero Payroll / Benefit Admin</span>
-                            </li>
-                            <li className="flex items-center space-x-3">
-                                <Check className="w-5 h-5 text-international-orange" />
-                                <span>Fully Equipped (HW/SW)</span>
-                            </li>
-                            <li className="flex items-center space-x-3">
-                                <Check className="w-5 h-5 text-international-orange" />
-                                <span>Pause or Scale Anytime</span>
-                            </li>
-                            <li className="flex items-center space-x-3">
-                                <Check className="w-5 h-5 text-international-orange" />
-                                <span>Instant Deployment (48 Hours)</span>
-                            </li>
-                        </ul>
-
-                        <div className="mt-10 pt-8 border-t border-slate-100 flex items-center justify-between">
-                            <div>
-                                <div className="text-xs text-slate-500 font-mono uppercase mb-1">Starting At</div>
-                                <div className="text-3xl font-display">$8,500<span className="text-base text-slate-400 font-sans">/mo</span></div>
+                            {/* Icon */}
+                            <div className="mb-6 inline-flex p-3 bg-white rounded-lg shadow-sm group-hover:scale-110 transition-transform duration-300">
+                                <centaur.icon className="w-8 h-8 text-slate-900" strokeWidth={1.5} />
                             </div>
-                            <Button className="rounded-none bg-slate-900 text-white hover:bg-slate-800">
-                                View Pricing
-                            </Button>
+
+                            {/* Role Label */}
+                            <div className="font-mono text-xs text-international-orange tracking-widest uppercase mb-2">
+                                {centaur.role}
+                            </div>
+
+                            {/* Title */}
+                            <h4 className="text-2xl font-display font-bold text-slate-900 mb-4">{centaur.title}</h4>
+
+                            {/* Description */}
+                            <p className="text-slate-600 font-sans leading-relaxed text-sm">
+                                &ldquo;{centaur.description}&rdquo;
+                            </p>
                         </div>
-                    </div>
+                    ))}
                 </div>
             </div>
         </section>

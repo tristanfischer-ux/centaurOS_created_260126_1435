@@ -44,7 +44,7 @@ export default async function ObjectiveDetailPage({ params }: { params: Promise<
             </div>
 
             {/* Tasks Section */}
-            <div className="border-t border-slate-100 pt-8">
+            <div className="pt-8 mt-4">
                 <h2 className="text-xl font-semibold text-slate-800 mb-6 flex items-center">
                     Associated Tasks
                     <Badge variant="secondary" className="ml-3 rounded-full">{tasks?.length || 0}</Badge>
@@ -52,7 +52,7 @@ export default async function ObjectiveDetailPage({ params }: { params: Promise<
 
                 <div className="grid gap-4 md:grid-cols-2">
                     {tasks?.map((task) => (
-                        <Card key={task.id} className="bg-white border-slate-200 shadow-sm hover:shadow-md transition-all">
+                        <Card key={task.id} className="bg-white hover:shadow-lg transition-all">
                             <CardHeader className="pb-2">
                                 <div className="flex justify-between items-start">
                                     <Badge variant={
@@ -87,7 +87,7 @@ export default async function ObjectiveDetailPage({ params }: { params: Promise<
                         </Card>
                     ))}
                     {(!tasks || tasks.length === 0) && (
-                        <div className="col-span-full py-12 text-center text-slate-400 bg-slate-50 rounded-lg border border-dashed border-slate-200">
+                        <div className="col-span-full py-12 text-center text-slate-400 bg-slate-100/50 rounded-lg">
                             No tasks linked to this objective yet.
                         </div>
                     )}

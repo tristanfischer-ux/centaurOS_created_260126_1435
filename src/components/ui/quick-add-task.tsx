@@ -69,7 +69,7 @@ export function QuickAddTask({ objectives, members, currentUserId, teams = [], o
             <button
                 data-quick-add-trigger
                 onClick={() => setIsExpanded(true)}
-                className="w-full flex items-center gap-2 px-4 py-3 text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-lg border-2 border-dashed border-slate-200 transition-all"
+                className="w-full flex items-center gap-2 px-4 py-3 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg bg-slate-50 transition-all"
             >
                 <Plus className="w-4 h-4" />
                 <span className="text-sm">Add a task... (press N)</span>
@@ -78,7 +78,7 @@ export function QuickAddTask({ objectives, members, currentUserId, teams = [], o
     }
 
     return (
-        <form onSubmit={handleSubmit} className="flex gap-2 p-2 border-2 border-border rounded-lg bg-card shadow-sm">
+        <form onSubmit={handleSubmit} className="flex gap-2 p-2 rounded-lg bg-card shadow-md">
             <Input
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
