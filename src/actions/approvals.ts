@@ -231,7 +231,7 @@ export async function getTasksNeedingEscalation(timeoutHours: number = 24): Prom
             .from('tasks')
             .select('id, title, status, updated_at')
             .eq('foundry_id', foundryId)
-            .eq('status', 'Pending Approval')
+            .in('status', ['Pending_Executive_Approval', 'Pending_Peer_Review', 'Amended_Pending_Approval'])
             .lt('updated_at', cutoffTime)
             .order('updated_at', { ascending: true })
 
