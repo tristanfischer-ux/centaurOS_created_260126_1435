@@ -102,20 +102,6 @@ export function CommandPalette() {
     return () => document.removeEventListener('keydown', down)
   }, [router, toggleFocusMode])
 
-  // Load data when opened
-  useEffect(() => {
-    let mounted = true
-    const isMounted = () => mounted
-    
-    if (open) {
-      loadData(isMounted)
-    }
-    
-    return () => {
-      mounted = false
-    }
-  }, [open, loadData])
-
   const loadData = useCallback(async (isMounted: () => boolean) => {
     try {
       const supabase = createClient()
@@ -167,6 +153,20 @@ export function CommandPalette() {
       console.error('Error loading command palette data:', error)
     }
   }, [])
+
+  // Load data when opened
+  useEffect(() => {
+    let mounted = true
+    const isMounted = () => mounted
+    
+    if (open) {
+      loadData(isMounted)
+    }
+    
+    return () => {
+      mounted = false
+    }
+  }, [open, loadData])
 
   const isExecutive = userRole === 'Executive' || userRole === 'Founder'
   const isFocusMode = myPresence?.status === 'focus'
