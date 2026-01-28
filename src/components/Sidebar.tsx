@@ -33,11 +33,13 @@ export function Sidebar({ foundryName, foundryId, userName, userRole }: { foundr
 
     return (
         <div className="hidden md:flex h-screen w-64 flex-col bg-muted text-foreground border-r border-border">
-            {/* App Header */}
+            {/* App Header - Centaur Dynamics Branding */}
             <div className="flex items-center justify-between px-4 py-4 border-b border-border bg-card">
-                <div className="font-bold text-xl tracking-wider uppercase text-amber-600">
-                    Centaur App
-                </div>
+                <Link href="/dashboard" className="group">
+                    <span className="font-display text-lg font-bold tracking-[0.15em] uppercase text-international-orange group-hover:text-international-orange-hover transition-colors">
+                        CENTAUR
+                    </span>
+                </Link>
                 <div className="flex items-center gap-1">
                     <ThemeToggle />
                     <FocusModeToggle compact />
@@ -48,13 +50,21 @@ export function Sidebar({ foundryName, foundryId, userName, userRole }: { foundr
                 </div>
             </div>
             
+            {/* System Status Indicator */}
+            <div className="px-4 py-2 border-b border-border bg-card/50">
+                <div className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-international-orange animate-pulse"></span>
+                    <span className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">System Online</span>
+                </div>
+            </div>
+            
             {/* Foundry Info */}
             <div className="px-4 py-4 border-b border-border bg-card">
-                <div className="text-sm font-semibold text-foreground uppercase tracking-wide truncate">
+                <div className="text-sm font-semibold text-foreground uppercase tracking-wider truncate">
                     {foundryName || "Centaur Inc."}
                 </div>
-                <div className="text-xs text-muted-foreground font-mono mt-1">
-                    {foundryId || "ID: Loading..."}
+                <div className="text-[10px] text-muted-foreground font-mono mt-1 tracking-wide">
+                    ID: {foundryId || "Loading..."}
                 </div>
             </div>
             
@@ -63,7 +73,7 @@ export function Sidebar({ foundryName, foundryId, userName, userRole }: { foundr
                 <div className="text-sm font-medium text-foreground truncate">
                     {userName || "Loading..."}
                 </div>
-                <div className="text-xs text-muted-foreground mt-0.5">
+                <div className="text-[10px] text-muted-foreground mt-0.5 font-mono uppercase tracking-wider">
                     {userRole || "Member"}
                 </div>
             </div>
@@ -76,15 +86,15 @@ export function Sidebar({ foundryName, foundryId, userName, userRole }: { foundr
                             href={item.href}
                             className={cn(
                                 isActive
-                                    ? "bg-card text-amber-600 shadow-sm border border-border"
+                                    ? "bg-card text-international-orange shadow-sm border border-border"
                                     : "text-muted-foreground hover:bg-card hover:text-foreground hover:shadow-sm active:bg-muted",
-                                "group flex items-center rounded-md px-2 py-2 text-sm font-medium transition-all duration-200"
+                                "group flex items-center px-2 py-2 text-sm font-medium transition-all duration-200"
                             )}
                         >
                             <item.icon
                                 className={cn(
-                                    isActive ? "text-amber-500" : "text-muted-foreground group-hover:text-amber-500",
-                                    "mr-3 h-5 w-5 flex-shrink-0"
+                                    isActive ? "text-international-orange" : "text-muted-foreground group-hover:text-international-orange",
+                                    "mr-3 h-5 w-5 flex-shrink-0 transition-colors"
                                 )}
                                 aria-hidden="true"
                             />
@@ -96,17 +106,17 @@ export function Sidebar({ foundryName, foundryId, userName, userRole }: { foundr
             <div className="border-t border-border p-4">
                 <div className="flex items-center mb-2">
                     {/* Placeholder for user profile */}
-                    <div className="h-8 w-8 rounded-full bg-muted-foreground/20"></div>
+                    <div className="h-8 w-8 bg-muted-foreground/20"></div>
                     <div className="ml-3">
                         <p className="text-sm font-medium text-foreground">User</p>
-                        <p className="text-xs text-muted-foreground">Foundry Member</p>
+                        <p className="text-[10px] text-muted-foreground font-mono uppercase tracking-wider">Foundry Member</p>
                     </div>
                 </div>
                 <div className="text-xs text-muted-foreground px-2 py-2 border-t border-border mt-2 pt-2 text-center">
-                    Press <kbd className="px-1.5 py-0.5 bg-muted rounded text-xs font-mono border border-border">⌘K</kbd> to search
+                    Press <kbd className="px-1.5 py-0.5 bg-muted text-[10px] font-mono border border-border">⌘K</kbd> to search
                 </div>
-                <div className="text-[10px] text-muted-foreground text-center font-mono mt-2">
-                    v{APP_VERSION}
+                <div className="text-[10px] text-muted-foreground text-center font-mono mt-2 tracking-wider">
+                    VER: {APP_VERSION}
                 </div>
             </div>
         </div>

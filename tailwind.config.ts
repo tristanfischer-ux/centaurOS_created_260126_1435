@@ -12,17 +12,36 @@ const config: Config = {
             colors: {
                 background: 'var(--background)',
                 foreground: 'var(--foreground)',
+                // Centaur Dynamics Brand Colors
+                'international-orange': {
+                    DEFAULT: '#ff4500',
+                    hover: '#e03e00',
+                    light: '#ff6a33',
+                },
+                'electric-blue': {
+                    DEFAULT: '#3b82f6',
+                    hover: '#2563eb',
+                    light: '#60a5fa',
+                },
+                // Foundry Slate Scale
                 foundry: {
                     '50': '#f8fafc',
+                    '100': '#f1f5f9',
                     '200': '#e2e8f0',
+                    '300': '#cbd5e1',
+                    '400': '#94a3b8',
+                    '500': '#64748b',
+                    '600': '#475569',
+                    '700': '#334155',
                     '800': '#1e293b',
                     '900': '#0f172a',
                     '950': '#020617'
                 },
+                // Legacy accent mapping to brand
                 accent: {
-                    DEFAULT: '#f59e0b',
-                    hover: '#d97706',
-                    foreground: '#0f172a'
+                    DEFAULT: '#ff4500',
+                    hover: '#e03e00',
+                    foreground: '#ffffff'
                 },
                 card: {
                     DEFAULT: "hsl(var(--card))",
@@ -62,7 +81,20 @@ const config: Config = {
             borderRadius: {
                 lg: 'var(--radius)',
                 md: 'calc(var(--radius) - 2px)',
-                sm: 'calc(var(--radius) - 4px)'
+                sm: 'calc(var(--radius) - 4px)',
+                none: '0px'
+            },
+            fontFamily: {
+                display: ['var(--font-playfair)', 'serif'],
+                sans: ['var(--font-inter)', 'sans-serif'],
+                mono: ['var(--font-jetbrains)', 'monospace'],
+            },
+            letterSpacing: {
+                'ultra-wide': '0.2em',
+            },
+            boxShadow: {
+                'brand': '0 10px 25px -5px rgba(255, 69, 0, 0.2)',
+                'brand-lg': '0 20px 40px -10px rgba(255, 69, 0, 0.3)',
             }
         }
     },
