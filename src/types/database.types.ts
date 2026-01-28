@@ -171,6 +171,66 @@ export type Database = {
           },
         ]
       }
+      guild_events: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          description: string | null
+          event_date: string
+          foundry_id: string | null
+          id: string
+          is_executive_only: boolean
+          location_address: string | null
+          location_geo: string | null
+          max_attendees: number | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          event_date: string
+          foundry_id?: string | null
+          id?: string
+          is_executive_only?: boolean
+          location_address?: string | null
+          location_geo?: string | null
+          max_attendees?: number | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          event_date?: string
+          foundry_id?: string | null
+          id?: string
+          is_executive_only?: boolean
+          location_address?: string | null
+          location_geo?: string | null
+          max_attendees?: number | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "guild_events_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "guild_events_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       manufacturing_rfqs: {
         Row: {
           budget_range: string | null
