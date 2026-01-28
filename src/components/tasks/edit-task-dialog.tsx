@@ -146,15 +146,15 @@ export function EditTaskDialog({ open, onOpenChange, task, members }: EditTaskDi
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-xl max-h-[90vh] overflow-y-auto">
-                <DialogHeader>
+            <DialogContent className="sm:max-w-xl max-h-[90vh] flex flex-col overflow-hidden">
+                <DialogHeader className="flex-shrink-0">
                     <DialogTitle className="flex items-baseline gap-2">
                         Edit Task
                         <span className="text-sm font-mono font-normal text-muted-foreground">#{task.task_number}</span>
                     </DialogTitle>
                 </DialogHeader>
 
-                <div className="space-y-6 py-2">
+                <div className="space-y-6 py-2 flex-1 overflow-y-auto">
                     {/* Basic Info */}
                     <div className="space-y-4">
                         <div className="space-y-2">
@@ -168,7 +168,7 @@ export function EditTaskDialog({ open, onOpenChange, task, members }: EditTaskDi
                         </div>
 
                         <div className="space-y-2">
-                            <Label htmlFor="edit-task-description">Description <span className="text-slate-500 font-normal">(Optional)</span></Label>
+                            <Label htmlFor="edit-task-description">Description <span className="text-muted-foreground font-normal">(Optional)</span></Label>
                             <Textarea
                                 id="edit-task-description"
                                 value={description}
@@ -176,7 +176,7 @@ export function EditTaskDialog({ open, onOpenChange, task, members }: EditTaskDi
                                 className="min-h-[100px]"
                                 maxLength={500}
                             />
-                            <p className="text-xs text-slate-500 text-right">{description.length}/500</p>
+                            <p className="text-xs text-muted-foreground text-right">{description.length}/500</p>
                         </div>
 
                         <div className="space-y-2">
@@ -231,14 +231,14 @@ export function EditTaskDialog({ open, onOpenChange, task, members }: EditTaskDi
                     </div>
 
                     {/* Attachments Section */}
-                    <div className="space-y-3 pt-2 border-t border-slate-100">
+                    <div className="space-y-3 pt-2 border-t">
                         <div className="flex items-center justify-between">
                             <Label>Attachments</Label>
                         </div>
                         <div
                             className={cn(
                                 "border-2 border-dashed rounded-lg p-4 text-center cursor-pointer transition-colors",
-                                isDragging ? "border-blue-500 bg-blue-50" : "border-slate-200 hover:border-slate-300 hover:bg-slate-50"
+                                isDragging ? "border-primary bg-primary/10" : "border-muted-foreground/25 hover:border-muted-foreground/50 hover:bg-accent/50"
                             )}
                             onClick={() => fileInputRef.current?.click()}
                             onDragOver={handleDragOver}
@@ -254,11 +254,11 @@ export function EditTaskDialog({ open, onOpenChange, task, members }: EditTaskDi
                                 }
                             }}
                         >
-                            <Upload className="h-6 w-6 mx-auto text-slate-400 mb-2" />
-                            <p className="text-sm text-slate-500">
+                            <Upload className="h-6 w-6 mx-auto text-muted-foreground mb-2" />
+                            <p className="text-sm text-muted-foreground">
                                 Click to upload or drag & drop
                             </p>
-                            <p className="text-xs text-slate-400 mt-1">
+                            <p className="text-xs text-muted-foreground/70 mt-1">
                                 Single file upload
                             </p>
                         </div>
@@ -274,7 +274,7 @@ export function EditTaskDialog({ open, onOpenChange, task, members }: EditTaskDi
 
                         {isLoadingAttachments ? (
                             <div className="flex justify-center py-4">
-                                <Loader2 className="h-5 w-5 animate-spin text-slate-400" />
+                                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
                             </div>
                         ) : (
                             <AttachmentList
@@ -287,7 +287,7 @@ export function EditTaskDialog({ open, onOpenChange, task, members }: EditTaskDi
                     </div>
                 </div>
 
-                <DialogFooter className="gap-2 pt-4 border-t border-slate-100">
+                <DialogFooter className="flex-shrink-0 gap-2 pt-4 border-t">
                     <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isLoading}>
                         Cancel
                     </Button>

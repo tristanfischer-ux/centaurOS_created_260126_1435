@@ -3,7 +3,8 @@ import { redirect } from 'next/navigation'
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { MapPin, Lock } from "lucide-react"
+import { EmptyState } from "@/components/ui/empty-state"
+import { MapPin, Lock, Calendar } from "lucide-react"
 
 export default async function GuildPage() {
     const supabase = await createClient()
@@ -44,9 +45,12 @@ export default async function GuildPage() {
 
             <div className="grid gap-6">
                 {(events || []).length === 0 ? (
-                    <div className="py-12 text-center border-2 border-dashed border-foundry-800 rounded-lg text-gray-500">
-                        No upcoming events visible to your tier.
-                    </div>
+                    <EmptyState
+                        icon={<Calendar className="h-8 w-8" />}
+                        title="No Upcoming Events"
+                        description="There are no events visible to your tier at this time. Check back soon for new networking opportunities."
+                        className="border-2 border-dashed border-slate-200 rounded-lg"
+                    />
                 ) : (
                     (events || []).map(event => (
                         <Card key={event.id} className="bg-white border-slate-200 flex flex-col md:flex-row overflow-hidden shadow-sm">
