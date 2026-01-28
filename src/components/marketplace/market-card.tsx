@@ -41,7 +41,7 @@ export const MarketCard = memo(function MarketCard({ listing, isSelected, onTogg
                     )}
                 </div>
 
-                <h3 className="text-lg font-bold tracking-tight mb-2 font-serif text-foreground group-hover:text-primary transition-colors">
+                <h3 className="text-lg font-bold tracking-tight mb-2 text-foreground group-hover:text-primary transition-colors">
                     {listing.title}
                 </h3>
 

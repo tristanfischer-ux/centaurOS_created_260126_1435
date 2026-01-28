@@ -75,7 +75,7 @@ export function MarketplaceView({ initialListings }: MarketplaceViewProps) {
                 <div className="flex flex-col gap-2">
                     <div className="flex items-center justify-between">
                         <div className="flex flex-col gap-2">
-                            <h1 className="text-3xl font-serif font-medium tracking-tight">Centaur Marketplace</h1>
+                            <h1 className="text-3xl font-bold tracking-tight">Centaur Marketplace</h1>
                             <p className="text-muted-foreground">Access global expertise, industrial capacity, and autonomous agents.</p>
                         </div>
                         <CreateRFQDialog />

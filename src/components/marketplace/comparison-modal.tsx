@@ -24,7 +24,7 @@ export function ComparisonModal({ open, onOpenChange, items }: ComparisonModalPr
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="max-w-4xl max-h-[80vh] flex flex-col p-0 gap-0">
                 <DialogHeader className="p-6 pb-4 border-b border-border">
-                    <DialogTitle className="text-xl font-serif">Compare Listings</DialogTitle>
+                    <DialogTitle className="text-xl font-semibold">Compare Listings</DialogTitle>
                 </DialogHeader>
 
                 <ScrollArea className="flex-1">
