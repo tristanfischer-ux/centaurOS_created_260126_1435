@@ -54,6 +54,16 @@ export function CommandPalette() {
   const router = useRouter()
   const { myPresence, goFocus, goOnline } = usePresenceContext()
 
+  const toggleFocusMode = useCallback(() => {
+    if (myPresence?.status === 'focus') {
+      goOnline()
+      toast.success('Focus mode disabled')
+    } else {
+      goFocus('Deep work time')
+      toast.success('Focus mode enabled - notifications muted')
+    }
+  }, [myPresence, goFocus, goOnline])
+
   // Keyboard shortcuts
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
@@ -91,16 +101,6 @@ export function CommandPalette() {
     document.addEventListener('keydown', down)
     return () => document.removeEventListener('keydown', down)
   }, [router, toggleFocusMode])
-
-  const toggleFocusMode = useCallback(() => {
-    if (myPresence?.status === 'focus') {
-      goOnline()
-      toast.success('Focus mode disabled')
-    } else {
-      goFocus('Deep work time')
-      toast.success('Focus mode enabled - notifications muted')
-    }
-  }, [myPresence, goFocus, goOnline])
 
   // Load data when opened
   useEffect(() => {
