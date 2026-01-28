@@ -26,13 +26,29 @@ export default async function GuildPage() {
     const { data: events, error: eventsError } = await eventsQuery
 
     // Fetch Network Members (from same foundry for now, could expand to all foundries)
-    const { data: members, error: membersError } = await supabase
-        .from('profiles')
-        .select('id, full_name, role, email, foundry:foundries(name)')
-        .eq('foundry_id', foundryId)
-        .neq('id', user.id) // Exclude current user
-        .order('role', { ascending: true })
-        .limit(50)
+    type MemberRow = {
+        id: string
+        full_name: string | null
+        role: string | null
+        email: string | null
+        foundry: { name: string } | { name: string }[] | null
+    }
+    
+    let membersData: MemberRow[] = []
+    let membersError: Error | null = null
+
+    if (foundryId) {
+        const result = await supabase
+            .from('profiles')
+            .select('id, full_name, role, email, foundry:foundries(name)')
+            .eq('foundry_id', foundryId)
+            .neq('id', user.id) // Exclude current user
+            .order('role', { ascending: true })
+            .limit(50)
+        
+        membersData = (result.data as MemberRow[]) || []
+        membersError = result.error
+    }
 
     if (eventsError) {
         console.error('Error loading events:', eventsError)
@@ -43,13 +59,21 @@ export default async function GuildPage() {
     }
 
     // Transform members data to flatten foundry name
-    const transformedMembers = (members || []).map(member => ({
-        id: member.id,
-        full_name: member.full_name,
-        role: member.role,
-        email: member.email,
-        foundry_name: (member.foundry as { name: string } | null)?.name || undefined
-    }))
+    const transformedMembers = (membersData || []).map(member => {
+        // Handle foundry which can be an object or array depending on join
+        const foundry = member.foundry as unknown as { name: string } | { name: string }[] | null
+        const foundryName = Array.isArray(foundry) 
+            ? foundry[0]?.name 
+            : foundry?.name
+        
+        return {
+            id: member.id,
+            full_name: member.full_name,
+            role: member.role,
+            email: member.email,
+            foundry_name: foundryName || undefined
+        }
+    })
 
     return (
         <div className="space-y-6">
