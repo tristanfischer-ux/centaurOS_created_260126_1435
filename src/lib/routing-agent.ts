@@ -138,27 +138,27 @@ export async function getTeamAvailability(): Promise<{
         .in('user_id', memberIds)
 
     // Build counts maps
-    const activeMap = new Map<string, number>()
-    const pendingMap = new Map<string, number>()
-    const presenceMap = new Map<string, 'online' | 'away' | 'focus' | 'offline'>()
+    const activeTasksMap = new Map<string, number>()
+    const pendingTasksMap = new Map<string, number>()
+    const memberPresenceMap = new Map<string, 'online' | 'away' | 'focus' | 'offline'>()
 
     (activeTasks || []).forEach(t => {
-        const count = activeMap.get(t.assignee_id) || 0
-        activeMap.set(t.assignee_id, count + 1)
+        const count = activeTasksMap.get(t.assignee_id) || 0
+        activeTasksMap.set(t.assignee_id, count + 1)
     })
 
     (pendingTasks || []).forEach(t => {
-        const count = pendingMap.get(t.assignee_id) || 0
-        pendingMap.set(t.assignee_id, count + 1)
+        const count = pendingTasksMap.get(t.assignee_id) || 0
+        pendingTasksMap.set(t.assignee_id, count + 1)
     })
 
     (presenceData || []).forEach(p => {
-        presenceMap.set(p.user_id, p.status as 'online' | 'away' | 'focus' | 'offline')
+        memberPresenceMap.set(p.user_id, p.status as 'online' | 'away' | 'focus' | 'offline')
     })
 
     const members = (profiles || []).map(p => {
-        const active = activeMap.get(p.id) || 0
-        const pending = pendingMap.get(p.id) || 0
+        const active = activeTasksMap.get(p.id) || 0
+        const pending = pendingTasksMap.get(p.id) || 0
         return {
             id: p.id,
             fullName: p.full_name,
@@ -167,7 +167,7 @@ export async function getTeamAvailability(): Promise<{
             activeTasks: active,
             pendingTasks: pending,
             workloadScore: Math.min(100, (active * 20) + (pending * 10)),
-            presenceStatus: presenceMap.get(p.id) || 'offline'
+            presenceStatus: memberPresenceMap.get(p.id) || 'offline'
         }
     })
 
