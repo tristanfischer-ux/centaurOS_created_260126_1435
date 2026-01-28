@@ -112,7 +112,7 @@ export async function submitRFQ(formData: {
             title: validatedTitle,
             specifications: validatedSpecifications || null,
             budget_range: validatedBudgetRange || null,
-            foundry_id,
+            foundry_id: foundry_id as string,
             created_by: user.id,
             status: "Open"
         })
