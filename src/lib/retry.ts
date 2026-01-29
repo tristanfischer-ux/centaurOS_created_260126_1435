@@ -71,9 +71,17 @@ export async function withTimeout<T>(
   fn: () => Promise<T>,
   timeoutMs: number = 30000
 ): Promise<T> {
-  const timeoutPromise = new Promise<never>((_, reject) => {
-    setTimeout(() => reject(new Error('Request timeout')), timeoutMs)
-  })
+let timeoutId: NodeJS.Timeout
+const timeoutPromise = new Promise<never>((_, reject) => {
+  timeoutId = setTimeout(() => reject(new Error('Request timeout')), timeoutMs)
+})
 
-  return Promise.race([fn(), timeoutPromise])
+try {
+  const result = await Promise.race([fn(), timeoutPromise])
+  clearTimeout(timeoutId!)
+  return result
+} catch (error) {
+  clearTimeout(timeoutId!)
+  throw error
+}
 }

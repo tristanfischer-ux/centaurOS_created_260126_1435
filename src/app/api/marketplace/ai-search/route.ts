@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
 import { z } from "zod";
 import { zodResponseFormat } from "openai/helpers/zod";
+import { createClient } from "@/lib/supabase/server";
 
 const openai = new OpenAI({
     apiKey: process.env.OPENAI_API_KEY || "dummy-key-for-build",
@@ -113,6 +114,17 @@ type AISearchResponse = AISearchSuccessResponse | AISearchErrorResponse;
 
 export async function POST(req: NextRequest): Promise<NextResponse<AISearchResponse>> {
     try {
+        // Authenticate user
+        const supabase = await createClient()
+        const { data: { user }, error: authError } = await supabase.auth.getUser()
+        
+        if (authError || !user) {
+            return NextResponse.json(
+                { success: false, error: "Unauthorized" },
+                { status: 401 }
+            );
+        }
+
         // Parse request body
         const body = await req.json() as AISearchRequest;
         

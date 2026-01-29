@@ -321,12 +321,35 @@ export async function getInvoiceHistory(
     .single()
 
   // Build query for orders where user is buyer or seller
+  // Note: Using .in() with array to avoid string interpolation in .or()
   let query = supabase
     .from("orders")
     .select("id")
 
   if (providerProfile) {
-    query = query.or(`buyer_id.eq.${user.id},seller_id.eq.${providerProfile.id}`)
+    // Fetch orders where user is buyer OR seller (using separate queries to avoid string interpolation)
+    const { data: buyerOrders } = await supabase
+      .from("orders")
+      .select("id")
+      .eq("buyer_id", user.id)
+    
+    const { data: sellerOrders } = await supabase
+      .from("orders")
+      .select("id")
+      .eq("seller_id", providerProfile.id)
+    
+    const orderIds = [
+      ...(buyerOrders || []).map(o => o.id),
+      ...(sellerOrders || []).map(o => o.id)
+    ]
+    
+    // Use .in() filter which is parameterized and safe
+    if (orderIds.length > 0) {
+      query = query.in("id", orderIds)
+    } else {
+      // No orders found, return empty result early
+      return { data: [], error: null, count: 0 }
+    }
   } else {
     query = query.eq("buyer_id", user.id)
   }

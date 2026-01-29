@@ -59,6 +59,30 @@ export async function initiatePayment(
       return { paymentIntent: null, order: null, error: 'Amount must be greater than 0' }
     }
 
+    if (amount < MIN_TRANSACTION_AMOUNT) {
+      return {
+        paymentIntent: null,
+        order: null,
+        error: `Amount must be at least ${MIN_TRANSACTION_AMOUNT} (£${MIN_TRANSACTION_AMOUNT / 100})`,
+      }
+    }
+
+    if (amount > MAX_TRANSACTION_AMOUNT) {
+      return {
+        paymentIntent: null,
+        order: null,
+        error: `Amount exceeds maximum allowed: ${MAX_TRANSACTION_AMOUNT} (£${MAX_TRANSACTION_AMOUNT / 100})`,
+      }
+    }
+
+    if (!Number.isInteger(amount)) {
+      return {
+        paymentIntent: null,
+        order: null,
+        error: 'Amount must be an integer (smallest currency unit)',
+      }
+    }
+
     const supabase = await createClient()
 
     // Get order and verify it exists

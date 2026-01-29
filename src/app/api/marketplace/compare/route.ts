@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
 import { Json } from "@/types/database.types";
+import { createClient } from "@/lib/supabase/server";
 
 const openai = new OpenAI({
     apiKey: process.env.OPENAI_API_KEY || "dummy-key-for-build",
@@ -36,6 +37,17 @@ export interface CompareResponse {
 
 export async function POST(req: NextRequest) {
     try {
+        // Authenticate user
+        const supabase = await createClient()
+        const { data: { user }, error: authError } = await supabase.auth.getUser()
+        
+        if (authError || !user) {
+            return NextResponse.json(
+                { error: "Unauthorized" },
+                { status: 401 }
+            );
+        }
+
         const body: CompareRequest = await req.json();
         const { items, foundryContext } = body;
 
@@ -128,6 +140,13 @@ Analyze these options and provide your recommendation.`;
             ],
             temperature: 0.7,
         });
+
+        if (!completion.choices || completion.choices.length === 0) {
+            return NextResponse.json(
+                { error: "AI returned no response" },
+                { status: 500 }
+            );
+        }
 
         if (!completion.choices || completion.choices.length === 0) {
             return NextResponse.json(

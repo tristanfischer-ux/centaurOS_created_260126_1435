@@ -64,7 +64,11 @@ export async function createDisputeAction(
   revalidatePath(`/orders/${orderId}`)
   revalidatePath("/my-orders")
 
-  return { data: { id: data!.id }, error: null }
+  if (!data) {
+    return { data: null, error: 'Failed to create dispute' }
+  }
+  
+  return { data: { id: data.id }, error: null }
 }
 
 /**
@@ -119,13 +123,21 @@ export async function getDisputeDetail(disputeId: string): Promise<{
 
   // Determine if user can add evidence
   const canAddEvidenceStatuses: DisputeStatus[] = ["open", "under_review", "mediation"]
-  const canAddEvidence = canAddEvidenceStatuses.includes(data!.status as DisputeStatus)
+  if (!data) {
+    return { data: null, error: 'Dispute not found' }
+  }
+
+  const canAddEvidence = canAddEvidenceStatuses.includes(data.status as DisputeStatus)
 
   // Check if user is a party
+  if (!data) {
+    return { data: null, error: 'Dispute not found' }
+  }
+
   const isParty =
-    data!.raised_by === user.id ||
-    data!.order?.buyer_id === user.id ||
-    data!.assigned_to === user.id
+    data.raised_by === user.id ||
+    data.order?.buyer_id === user.id ||
+    data.assigned_to === user.id
 
   return { data, error: null, canAddEvidence, isParty }
 }

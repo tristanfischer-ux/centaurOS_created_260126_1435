@@ -80,7 +80,11 @@ export async function analyzeBusinessPlan(formData: FormData): Promise<{ objecti
             return { error: 'AI returned no response choices' }
         }
 
-        const content = completion.choices[0].message.content
+        if (!completion.choices || completion.choices.length === 0) {
+        return { data: null, error: 'AI returned no response' }
+    }
+
+    const content = completion.choices[0].message.content
         if (!content) {
             return { error: 'AI returned no content' }
         }

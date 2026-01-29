@@ -6,6 +6,11 @@ import {
   DEFAULT_PLATFORM_FEE_PERCENT,
 } from '@/types/payments'
 
+// Maximum transaction amount: £1,000,000 (in pence)
+const MAX_TRANSACTION_AMOUNT = 100000000
+// Minimum transaction amount: £1 (in pence)
+const MIN_TRANSACTION_AMOUNT = 100
+
 export interface CreatePaymentIntentParams {
   /** Amount in smallest currency unit (e.g., pence for GBP) */
   amount: number
@@ -85,6 +90,28 @@ export async function createPaymentIntent(
       return {
         paymentIntent: null,
         error: 'Amount must be greater than 0',
+      }
+    }
+
+    if (amount < MIN_TRANSACTION_AMOUNT) {
+      return {
+        paymentIntent: null,
+        error: `Amount must be at least ${MIN_TRANSACTION_AMOUNT} (£${MIN_TRANSACTION_AMOUNT / 100})`,
+      }
+    }
+
+    if (amount > MAX_TRANSACTION_AMOUNT) {
+      return {
+        paymentIntent: null,
+        error: `Amount exceeds maximum allowed: ${MAX_TRANSACTION_AMOUNT} (£${MAX_TRANSACTION_AMOUNT / 100})`,
+      }
+    }
+
+    // Validate amount is an integer (no fractional pence)
+    if (!Number.isInteger(amount)) {
+      return {
+        paymentIntent: null,
+        error: 'Amount must be an integer (smallest currency unit)',
       }
     }
 
@@ -398,6 +425,42 @@ export async function releaseEscrow(
 
     const supabase = await createClient()
 
+    // Use atomic function to check available balance with row-level locking
+    // This prevents race conditions when multiple releases are attempted simultaneously
+    const { data: balanceData, error: balanceError } = await supabase.rpc(
+      'get_escrow_balance_atomic',
+      { p_order_id: orderId }
+    )
+
+    if (balanceError) {
+      return {
+        transfer: null,
+        transaction: null,
+        feeTransaction: null,
+        error: `Failed to check escrow balance: ${balanceError.message}`,
+      }
+    }
+
+    const balance = balanceData?.[0]
+    if (!balance) {
+      return {
+        transfer: null,
+        transaction: null,
+        feeTransaction: null,
+        error: 'Failed to retrieve escrow balance',
+      }
+    }
+
+    const availableBalance = Number(balance.available_balance)
+    if (amount > availableBalance) {
+      return {
+        transfer: null,
+        transaction: null,
+        feeTransaction: null,
+        error: `Insufficient escrow balance. Available: ${availableBalance}, Requested: ${amount}`,
+      }
+    }
+
     // Get order details including seller's Stripe account
     const { data: order, error: orderError } = await supabase
       .from('orders')
@@ -547,29 +610,32 @@ export async function releaseAllEscrow(orderId: string): Promise<
   try {
     const supabase = await createClient()
 
-    // Get all escrow transactions for this order
-    const { data: transactions, error: txError } = await supabase
-      .from('escrow_transactions')
-      .select('type, amount')
-      .eq('order_id', orderId)
+    // Use atomic function to check available balance with row-level locking
+    const { data: balanceData, error: balanceError } = await supabase.rpc(
+      'get_escrow_balance_atomic',
+      { p_order_id: orderId }
+    )
 
-    if (txError) {
+    if (balanceError) {
       return {
         transfer: null,
         transaction: null,
         feeTransaction: null,
-        error: txError.message,
+        error: `Failed to check escrow balance: ${balanceError.message}`,
       }
     }
 
-    // Calculate remaining amount
-    const totalHeld = transactions
-      .filter((t) => t.type === 'hold')
-      .reduce((sum, t) => sum + Number(t.amount), 0)
-    const totalReleased = transactions
-      .filter((t) => t.type === 'release' || t.type === 'fee_deduction')
-      .reduce((sum, t) => sum + Number(t.amount), 0)
-    const remainingAmount = totalHeld - totalReleased
+    const balance = balanceData?.[0]
+    if (!balance) {
+      return {
+        transfer: null,
+        transaction: null,
+        feeTransaction: null,
+        error: 'Failed to retrieve escrow balance',
+      }
+    }
+
+    const remainingAmount = Number(balance.available_balance)
 
     if (remainingAmount <= 0) {
       return {
@@ -644,6 +710,43 @@ export async function processRefund(
         refund: null,
         transaction: null,
         error: 'Refund amount must be greater than 0',
+      }
+    }
+
+    // Validate refund amount doesn't exceed order total
+    if (refundAmount > Number(order.total_amount)) {
+      return {
+        refund: null,
+        transaction: null,
+        error: `Refund amount (${refundAmount}) exceeds order total (${order.total_amount})`,
+      }
+    }
+
+    // Check if funds have already been released to seller
+    if (order.escrow_status === 'released') {
+      return {
+        refund: null,
+        transaction: null,
+        error: 'Cannot refund - funds have already been released to the seller',
+      }
+    }
+
+    // Check existing refunds to prevent over-refunding
+    const { data: existingRefunds } = await supabase
+      .from('escrow_transactions')
+      .select('amount')
+      .eq('order_id', orderId)
+      .eq('type', 'refund')
+
+    const totalRefunded = existingRefunds
+      ? existingRefunds.reduce((sum, r) => sum + Number(r.amount), 0)
+      : 0
+
+    if (totalRefunded + refundAmount > Number(order.total_amount)) {
+      return {
+        refund: null,
+        transaction: null,
+        error: `Refund would exceed order total. Already refunded: ${totalRefunded}, Requested: ${refundAmount}, Order total: ${order.total_amount}`,
       }
     }
 

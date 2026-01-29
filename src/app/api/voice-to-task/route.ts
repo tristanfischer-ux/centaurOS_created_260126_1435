@@ -34,6 +34,40 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: "No file provided" }, { status: 400 });
         }
 
+        // Validate file size (max 25MB)
+        const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25MB in bytes
+        if (file.size > MAX_FILE_SIZE) {
+            return NextResponse.json({ 
+                error: `File too large. Maximum size is 25MB, got ${Math.round(file.size / 1024 / 1024)}MB` 
+            }, { status: 400 });
+        }
+
+        // Validate file type (audio formats)
+        const ALLOWED_MIME_TYPES = [
+            'audio/mpeg',
+            'audio/mp3',
+            'audio/wav',
+            'audio/wave',
+            'audio/x-wav',
+            'audio/ogg',
+            'audio/webm',
+            'audio/mp4',
+            'audio/m4a',
+            'audio/x-m4a',
+        ];
+        
+        if (!ALLOWED_MIME_TYPES.includes(file.type)) {
+            return NextResponse.json({ 
+                error: `Invalid file type: ${file.type}. Only audio files are allowed.` 
+            }, { status: 400 });
+        }
+
+        // Sanitize filename to prevent path traversal
+        const sanitizedName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+        if (sanitizedName !== file.name) {
+            console.warn(`Filename sanitized from "${file.name}" to "${sanitizedName}"`);
+        }
+
         // 1. Transcribe with Whisper
         const transcription = await openai.audio.transcriptions.create({
             file: file,
@@ -63,6 +97,10 @@ export async function POST(req: NextRequest) {
             ],
             response_format: zodResponseFormat(TaskSchema, "task"),
         });
+
+        if (!completion.choices || completion.choices.length === 0) {
+            return NextResponse.json({ error: "AI returned no response" }, { status: 500 });
+        }
 
         const taskData = completion.choices[0].message.parsed;
 

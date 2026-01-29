@@ -542,6 +542,41 @@ export async function confirmOrderPayment(
   paymentIntentId: string
 ): Promise<ActionResult<EscrowTransaction>> {
   try {
+    // Authenticate user
+    const supabase = await createClient()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+
+    if (!user) {
+      return { data: null, error: 'Unauthorized' }
+    }
+
+    // Verify the user is associated with the order
+    const { data: order, error: orderError } = await supabase
+      .from('orders')
+      .select('id, buyer_id, seller_id')
+      .eq('stripe_payment_intent_id', paymentIntentId)
+      .single()
+
+    if (orderError || !order) {
+      return { data: null, error: 'Order not found' }
+    }
+
+    // Check if user is the buyer or seller
+    const isBuyer = order.buyer_id === user.id
+    const { data: sellerProfile } = await supabase
+      .from('provider_profiles')
+      .select('user_id')
+      .eq('id', order.seller_id)
+      .single()
+
+    const isSeller = sellerProfile?.user_id === user.id
+
+    if (!isBuyer && !isSeller) {
+      return { data: null, error: 'Unauthorized: You are not associated with this order' }
+    }
+
     const result = await confirmPaymentService(paymentIntentId)
 
     if (result.error || !result.transaction) {

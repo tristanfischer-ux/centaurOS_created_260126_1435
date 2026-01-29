@@ -517,10 +517,11 @@ async function saveRecentSearch(
       }, {
         onConflict: 'query',
       })
-      .then(() => {
-        // Increment count (separate query since upsert doesn't support increment)
-        supabase.rpc('increment_search_count', { search_query: query.trim().toLowerCase() })
-      })
+.then(() => {
+  // Increment count (separate query since upsert doesn't support increment)
+  supabase.rpc('increment_search_count', { search_query: query.trim().toLowerCase() })
+    .catch(err => console.error('Failed to increment search count:', err))
+})
   } catch (err) {
     console.error('Error saving recent search:', err)
   }

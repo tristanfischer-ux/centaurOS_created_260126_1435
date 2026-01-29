@@ -40,6 +40,17 @@ export async function POST(
     request: NextRequest
 ): Promise<NextResponse<CentaurMatchResponse | ErrorResponse>> {
     try {
+        // Create Supabase client and authenticate
+        const supabase = await createClient()
+        const { data: { user }, error: authError } = await supabase.auth.getUser()
+        
+        if (authError || !user) {
+            return NextResponse.json(
+                { error: 'Unauthorized' },
+                { status: 401 }
+            )
+        }
+
         // Parse request body
         const body: CentaurMatchRequest = await request.json()
         
@@ -50,13 +61,10 @@ export async function POST(
             )
         }
 
-        // Create Supabase client
-        const supabase = await createClient()
-
-        // Fetch member profile
+        // Fetch member profile and verify foundry membership
         const { data: member, error: memberError } = await supabase
             .from('profiles')
-            .select('id, full_name, role, skills, capacity_score, bio')
+            .select('id, full_name, role, skills, capacity_score, bio, foundry_id')
             .eq('id', body.memberId)
             .single()
 
@@ -64,6 +72,20 @@ export async function POST(
             return NextResponse.json(
                 { error: 'Member not found' },
                 { status: 404 }
+            )
+        }
+
+        // Verify the authenticated user's foundry matches the member's foundry
+        const { data: userProfile } = await supabase
+            .from('profiles')
+            .select('foundry_id')
+            .eq('id', user.id)
+            .single()
+
+        if (!userProfile || userProfile.foundry_id !== member.foundry_id) {
+            return NextResponse.json(
+                { error: 'Unauthorized: Member belongs to a different foundry' },
+                { status: 403 }
             )
         }
 

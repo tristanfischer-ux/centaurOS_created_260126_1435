@@ -54,22 +54,37 @@ export async function runAIWorker(taskId: string, assigneeId: string) {
             ]
         })
 
+        if (!completion.choices || completion.choices.length === 0) {
+            console.error('AI returned no choices')
+            throw new Error('AI returned no response')
+        }
+
         const aiResponse = completion.choices[0].message.content || "I have analyzed the task."
 
-        // 4. Update Task (The "Handshake")
-        await supabase.from('tasks').update({
-            status: 'Amended_Pending_Approval',
-            amendment_notes: aiResponse,
-        }).eq('id', taskId)
+// 4. Update Task (The "Handshake")
+const { error: updateError } = await supabase.from('tasks').update({
+    status: 'Amended_Pending_Approval',
+    amendment_notes: aiResponse,
+}).eq('id', taskId)
 
-        // 5. Log Comment
-        await supabase.from('task_comments').insert({
-            task_id: taskId,
-            foundry_id: task.foundry_id,
-            user_id: assigneeId,
-            content: "I have completed a draft. Please review my amendment.",
-            is_system_log: true
-        })
+if (updateError) {
+    console.error('Failed to update task:', updateError)
+    throw new Error(`Failed to update task: ${updateError.message}`)
+}
+
+// 5. Log Comment
+const { error: commentError } = await supabase.from('task_comments').insert({
+    task_id: taskId,
+    foundry_id: task.foundry_id,
+    user_id: assigneeId,
+    content: "I have completed a draft. Please review my amendment.",
+    is_system_log: true
+})
+
+if (commentError) {
+    console.error('Failed to log comment:', commentError)
+    // Don't throw - comment logging is non-critical
+}
 
         console.log(`✅ Ghost Worker completed Task ${taskId}`)
 

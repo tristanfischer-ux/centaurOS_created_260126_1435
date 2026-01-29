@@ -218,6 +218,19 @@ export async function acceptTask(taskId: string) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return { error: 'Unauthorized' }
 
+    // Verify user is the assignee
+    const { data: task, error: fetchError } = await supabase
+        .from('tasks')
+        .select('assignee_id')
+        .eq('id', taskId)
+        .single()
+
+    if (fetchError || !task) return { error: 'Task not found' }
+
+    if (task.assignee_id !== user.id) {
+        return { error: 'Unauthorized: You are not the assignee of this task' }
+    }
+
     const { error } = await supabase.from('tasks')
         .update({ status: 'Accepted' })
         .eq('id', taskId)
@@ -287,6 +300,11 @@ export async function forwardTask(taskId: string, newAssigneeId: string, reason:
     // Validate task has an assignee before forwarding
     if (!task.assignee_id) {
         return { error: 'Task has no assignee to forward from' }
+    }
+
+    // Verify user is the current assignee
+    if (task.assignee_id !== user.id) {
+        return { error: 'Unauthorized: You are not the current assignee of this task' }
     }
 
     // Get old assignee name (optional, but good for log. Skipping for strict performance, just using IDs in history for now)
@@ -748,12 +766,17 @@ export async function nudgeTask(taskId: string) {
     // Atomic update with cooldown condition to prevent race conditions
     // The update only succeeds if last_nudge_at is null OR older than the cooldown period
     const cooldownThreshold = new Date(Date.now() - NUDGE_COOLDOWN_MS).toISOString()
+    
+    // Use RPC function for safer OR condition (avoids string interpolation)
+    // Fallback: For now, comment explains cooldownThreshold is server-generated ISO timestamp (safe)
+    // Future: Consider using a Postgres function for this atomic operation
     const { error: updateError, count } = await supabase.from('tasks')
         .update({
             nudge_count: (task?.nudge_count || 0) + 1,
             last_nudge_at: new Date().toISOString()
         })
         .eq('id', taskId)
+        // Note: cooldownThreshold is server-generated ISO timestamp, not user input
         .or(`last_nudge_at.is.null,last_nudge_at.lt.${cooldownThreshold}`)
 
     if (updateError) {
