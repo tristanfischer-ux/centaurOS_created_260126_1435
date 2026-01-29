@@ -33,6 +33,7 @@ import {
     List,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { AssessmentModal } from '@/components/org-blueprint'
 
 type CoverageStatus = 'covered' | 'partial' | 'gap' | 'not_needed'
 
