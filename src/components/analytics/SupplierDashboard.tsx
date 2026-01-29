@@ -154,7 +154,7 @@ export function SupplierDashboard({
             </SelectContent>
           </Select>
           <Button
-            variant="outline"
+            variant="secondary"
             size="icon"
             onClick={handleRefresh}
             disabled={isRefreshing}
@@ -162,7 +162,7 @@ export function SupplierDashboard({
             <RefreshCw className={cn("h-4 w-4", isRefreshing && "animate-spin")} />
           </Button>
           <Button
-            variant="outline"
+            variant="secondary"
             onClick={() => handleExport('csv')}
             disabled={isExporting}
           >
@@ -298,7 +298,7 @@ export function SupplierDashboard({
                     outerRadius={70}
                     dataKey="value"
                     nameKey="category"
-                    label={({ category }) => category}
+                    label={({ name }) => name}
                   >
                     {analytics.ordersByStatus.map((entry, index) => (
                       <Cell 

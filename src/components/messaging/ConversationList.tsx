@@ -129,7 +129,7 @@ export function ConversationList({
       <div className={cn('flex flex-col items-center justify-center p-8 text-center', className)}>
         <MessageSquare className="w-10 h-10 text-muted-foreground mb-3" />
         <p className="text-sm text-muted-foreground">{error}</p>
-        <Button variant="outline" size="sm" className="mt-4" onClick={() => refresh()}>
+        <Button variant="secondary" size="sm" className="mt-4" onClick={() => refresh()}>
           Retry
         </Button>
       </div>
@@ -240,7 +240,7 @@ export function ConversationList({
                           {otherParticipant.full_name || otherParticipant.email}
                         </span>
                         {contextLabel && (
-                          <Badge variant="outline" className="text-[10px] px-1.5 py-0 flex items-center gap-1">
+                          <Badge variant="secondary" className="text-[10px] px-1.5 py-0 flex items-center gap-1">
                             {getContextIcon(conversation)}
                             {contextLabel}
                           </Badge>
@@ -264,7 +264,7 @@ export function ConversationList({
                       </p>
                       {hasUnread && (
                         <Badge 
-                          variant="brand" 
+                          variant="default" 
                           className="rounded-full min-w-[20px] h-5 flex items-center justify-center text-[10px]"
                         >
                           {conversation.unread_count}

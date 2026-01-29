@@ -16,9 +16,15 @@ export default async function SettingsPage() {
 
     return (
         <div className="space-y-6">
-            <h1 className="text-3xl font-bold tracking-tight text-slate-900">Settings</h1>
+            <div className="pb-4 border-b border-slate-100">
+                <div className="flex items-center gap-3 mb-1">
+                    <div className="h-8 w-1 bg-orange-600 rounded-full shadow-[0_0_8px_rgba(234,88,12,0.6)]" />
+                    <h1 className="text-2xl sm:text-3xl font-display font-semibold text-foreground tracking-tight">Settings</h1>
+                </div>
+                <p className="text-muted-foreground mt-1 text-sm font-medium pl-4">Configure your profile and preferences</p>
+            </div>
 
-            <Card>
+            <Card className="bg-white border-slate-100 shadow-[0_2px_15px_rgba(0,0,0,0.03)]">
                 <CardHeader>
                     <CardTitle>Profile Configuration</CardTitle>
                     <CardDescription>Manage your persona and foundry settings.</CardDescription>

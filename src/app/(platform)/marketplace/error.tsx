@@ -50,11 +50,11 @@ export default function MarketplaceError({
                                 Reload marketplace
                             </Button>
                             <div className="flex gap-2">
-                                <Button variant="outline" onClick={() => window.history.back()} className="flex-1">
+                                <Button variant="secondary" onClick={() => window.history.back()} className="flex-1">
                                     <ArrowLeft className="h-4 w-4 mr-2" />
                                     Go back
                                 </Button>
-                                <Button variant="outline" asChild className="flex-1">
+                                <Button variant="secondary" asChild className="flex-1">
                                     <Link href="/marketplace">
                                         <Store className="h-4 w-4 mr-2" />
                                         Marketplace

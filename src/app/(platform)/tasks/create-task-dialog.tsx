@@ -351,7 +351,7 @@ export function CreateTaskDialog({ objectives, members, teams = [], currentUserI
                 {children || (
                     <Button
                         size="sm"
-                        variant="primary"
+                        variant="default"
                         className="touch-manipulation"
                         type="button"
                         onClick={handleMobileClick}
@@ -441,7 +441,7 @@ export function CreateTaskDialog({ objectives, members, teams = [], currentUserI
                             <Popover open={objectiveOpen} onOpenChange={setObjectiveOpen}>
                                 <PopoverTrigger asChild>
                                     <Button
-                                        variant="outline"
+                                        variant="secondary"
                                         role="combobox"
                                         aria-expanded={objectiveOpen}
                                         className="w-full justify-between bg-white border-slate-200"
@@ -614,10 +614,10 @@ export function CreateTaskDialog({ objectives, members, teams = [], currentUserI
                         )}
                     </div>
                     <DialogFooter className="gap-2 pt-4 border-t border-slate-100">
-                        <Button variant="outline" onClick={() => setOpen(false)} disabled={isLoading}>Cancel</Button>
+                        <Button variant="secondary" onClick={() => setOpen(false)} disabled={isLoading}>Cancel</Button>
                         <Button
                             type="submit"
-                            variant="primary"
+                            variant="default"
                             disabled={isLoading || selectedAssignees.length === 0}
                         >
                             {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}

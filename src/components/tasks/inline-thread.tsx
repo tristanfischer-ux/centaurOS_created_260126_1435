@@ -7,7 +7,8 @@ import { Loader2, Send, Upload, ChevronDown, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { MentionInput } from "@/components/ui/mention-input"
 import { MentionText } from "@/components/ui/mention-text"
-import { addTaskComment } from "@/actions/tasks"
+import { AttachmentList } from "@/components/tasks/attachment-list"
+import { addTaskComment, getTaskAttachments } from "@/actions/tasks"
 import { uploadTaskAttachment } from "@/actions/attachments"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
@@ -42,12 +43,15 @@ export function InlineThread({ taskId, isOpen, onClose, members }: InlineThreadP
     const [isSending, setIsSending] = useState(false)
     const [isUploading, setIsUploading] = useState(false)
     const [isDragging, setIsDragging] = useState(false)
+    const [attachments, setAttachments] = useState<any[]>([])
     const fileInputRef = useRef<HTMLInputElement>(null)
     const supabase = useMemo(() => createClient(), [])
 
     useEffect(() => {
-        const fetchComments = async () => {
+        const fetchData = async () => {
             setIsLoading(true)
+            
+            // Fetch comments
             const { data, error } = await supabase
                 .from('task_comments')
                 .select('*, user:user_id(full_name, role)')
@@ -58,11 +62,18 @@ export function InlineThread({ taskId, isOpen, onClose, members }: InlineThreadP
             if (!error && data) {
                 setComments(data as Comment[])
             }
+
+            // Fetch attachments
+            const attachmentsRes = await getTaskAttachments(taskId)
+            if (attachmentsRes.data) {
+                setAttachments(attachmentsRes.data)
+            }
+            
             setIsLoading(false)
         }
 
         if (isOpen && taskId) {
-            fetchComments()
+            fetchData()
         }
     }, [isOpen, taskId, supabase])
 
@@ -100,6 +111,8 @@ export function InlineThread({ taskId, isOpen, onClose, members }: InlineThreadP
             toast.error(result.error)
         } else {
             toast.success(`Uploaded ${file.name}`)
+            
+            // Refresh both comments and attachments
             const { data } = await supabase
                 .from('task_comments')
                 .select('*, user:user_id(full_name, role)')
@@ -107,6 +120,11 @@ export function InlineThread({ taskId, isOpen, onClose, members }: InlineThreadP
                 .order('created_at', { ascending: false })
                 .limit(10)
             setComments((data || []) as Comment[])
+            
+            const attachmentsRes = await getTaskAttachments(taskId)
+            if (attachmentsRes.data) {
+                setAttachments(attachmentsRes.data)
+            }
         }
         setIsUploading(false)
         if (fileInputRef.current) fileInputRef.current.value = ''
@@ -129,52 +147,69 @@ export function InlineThread({ taskId, isOpen, onClose, members }: InlineThreadP
                 </Button>
             </div>
 
-            {/* Comments list */}
+            {/* Comments and Attachments */}
             <div className="max-h-48 overflow-y-auto p-3 space-y-3">
                 {isLoading ? (
                     <div className="flex items-center justify-center py-4 text-muted-foreground">
                         <Loader2 className="h-4 w-4 animate-spin mr-2" /> Loading...
                     </div>
-                ) : comments.length === 0 ? (
-                    <p className="text-center text-muted-foreground py-4 text-xs">No activity yet</p>
                 ) : (
-                    comments.map((comment) => (
-                        <div key={comment.id} className={cn(
-                            "flex gap-2 text-xs",
-                            comment.is_system_log && "opacity-60"
-                        )}>
-                            <div className={cn(
-                                "h-6 w-6 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0",
-                                comment.is_system_log ? "bg-slate-100 text-slate-500" : "bg-blue-100 text-blue-700"
-                            )}>
-                                {comment.is_system_log ? 'S' : comment.user?.full_name?.substring(0, 2).toUpperCase()}
+                    <>
+                        {/* Attachments Section */}
+                        {attachments.length > 0 && (
+                            <div className="pb-3 border-b border-slate-100">
+                                <AttachmentList
+                                    taskId={taskId}
+                                    attachments={attachments}
+                                    canDelete={false}
+                                    onDelete={(id) => setAttachments(prev => prev.filter(f => f.id !== id))}
+                                />
                             </div>
-                            <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-2 mb-0.5">
-                                    <span className="font-medium text-foreground truncate">
-                                        {comment.is_system_log ? 'System' : comment.user?.full_name}
-                                    </span>
-                                    <span className="text-muted-foreground whitespace-nowrap">
-                                        {formatDistanceToNow(new Date(comment.created_at), { addSuffix: true })}
-                                    </span>
+                        )}
+                        
+                        {/* Comments Section */}
+                        {comments.length === 0 && attachments.length === 0 ? (
+                            <p className="text-center text-muted-foreground py-4 text-xs">No activity yet</p>
+                        ) : (
+                            comments.map((comment) => (
+                                <div key={comment.id} className={cn(
+                                    "flex gap-2 text-xs",
+                                    comment.is_system_log && "opacity-60"
+                                )}>
+                                    <div className={cn(
+                                        "h-6 w-6 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0",
+                                        comment.is_system_log ? "bg-slate-100 text-slate-500" : "bg-blue-100 text-blue-700"
+                                    )}>
+                                        {comment.is_system_log ? 'S' : comment.user?.full_name?.substring(0, 2).toUpperCase()}
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <div className="flex items-center gap-2 mb-0.5">
+                                            <span className="font-medium text-foreground truncate">
+                                                {comment.is_system_log ? 'System' : comment.user?.full_name}
+                                            </span>
+                                            <span className="text-muted-foreground whitespace-nowrap">
+                                                {formatDistanceToNow(new Date(comment.created_at), { addSuffix: true })}
+                                            </span>
+                                        </div>
+                                        <div className="text-muted-foreground">
+                                            <MentionText 
+                                                content={comment.content} 
+                                                members={members.filter(m => m.full_name !== null).map(m => ({
+                                                    id: m.id,
+                                                    full_name: m.full_name!
+                                                }))}
+                                            />
+                                        </div>
+                                    </div>
                                 </div>
-                                <div className="text-muted-foreground">
-                                    <MentionText 
-                                        content={comment.content} 
-                                        members={members.filter(m => m.full_name !== null).map(m => ({
-                                            id: m.id,
-                                            full_name: m.full_name!
-                                        }))}
-                                    />
-                                </div>
-                            </div>
-                        </div>
-                    ))
+                            ))
+                        )}
+                    </>
                 )}
             </div>
 
             {/* Input area */}
-            <div className="p-3 border-t border-slate-100 space-y-2">
+            <div className="p-3 border-t border-slate-100 space-y-2 relative overflow-visible">
                 <div
                     className={cn(
                         "border border-dashed rounded p-2 text-center cursor-pointer transition-colors text-xs",
@@ -202,7 +237,7 @@ export function InlineThread({ taskId, isOpen, onClose, members }: InlineThreadP
                     }}
                     className="hidden"
                 />
-                <form onSubmit={handleSend} className="flex items-start gap-2 w-full">
+                <form onSubmit={handleSend} className="flex items-start gap-2 w-full relative">
                     <MentionInput
                         value={newComment}
                         onChange={setNewComment}

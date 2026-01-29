@@ -9,7 +9,7 @@ import { cn } from '@/lib/utils'
 interface RefreshButtonProps {
     className?: string
     size?: 'sm' | 'default' | 'lg' | 'icon'
-    variant?: 'default' | 'outline' | 'ghost' | 'link'
+    variant?: 'default' | 'secondary' | 'ghost' | 'link'
     showLabel?: boolean
 }
 
@@ -20,7 +20,7 @@ interface RefreshButtonProps {
 export function RefreshButton({
     className,
     size = 'sm',
-    variant = 'outline',
+    variant = 'secondary',
     showLabel = false
 }: RefreshButtonProps) {
     const router = useRouter()

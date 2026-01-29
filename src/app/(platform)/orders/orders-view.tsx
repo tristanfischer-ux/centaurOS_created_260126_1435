@@ -180,17 +180,20 @@ export function OrdersView({
   }
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Orders</h1>
-          <p className="text-muted-foreground">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-slate-100">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-3 mb-1">
+            <div className="h-8 w-1 bg-orange-600 rounded-full shadow-[0_0_8px_rgba(234,88,12,0.6)]" />
+            <h1 className="text-2xl sm:text-3xl font-display font-semibold text-foreground tracking-tight">Orders</h1>
+          </div>
+          <p className="text-slate-500 mt-1 text-sm font-medium pl-4">
             Manage your marketplace orders
           </p>
         </div>
         <Button
-          variant="outline"
+          variant="secondary"
           size="sm"
           onClick={fetchOrders}
           disabled={isPending}
@@ -286,7 +289,7 @@ export function OrdersView({
         <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4 text-center">
           <p className="text-sm text-destructive">{error}</p>
           <Button
-            variant="outline"
+            variant="secondary"
             size="sm"
             onClick={fetchOrders}
             className="mt-2"
@@ -322,7 +325,7 @@ export function OrdersView({
       {totalPages > 1 && (
         <div className="flex items-center justify-center gap-2">
           <Button
-            variant="outline"
+            variant="secondary"
             size="sm"
             onClick={() => handlePageChange(page - 1)}
             disabled={page === 0 || isPending}
@@ -344,7 +347,7 @@ export function OrdersView({
               return (
                 <Button
                   key={pageNum}
-                  variant={page === pageNum ? "default" : "outline"}
+                  variant={page === pageNum ? "default" : "secondary"}
                   size="sm"
                   onClick={() => handlePageChange(pageNum)}
                   disabled={isPending}
@@ -356,7 +359,7 @@ export function OrdersView({
             })}
           </div>
           <Button
-            variant="outline"
+            variant="secondary"
             size="sm"
             onClick={() => handlePageChange(page + 1)}
             disabled={page >= totalPages - 1 || isPending}

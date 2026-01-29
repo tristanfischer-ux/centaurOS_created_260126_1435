@@ -8,7 +8,8 @@ VALUES ('task-files', 'task-files', false)
 ON CONFLICT (id) DO NOTHING;
 
 -- 2. Enable RLS on objects if not already enabled
-ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;
+-- Note: storage.objects already has RLS enabled by Supabase - commented out
+-- ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;
 
 -- 3. Drop existing policies to avoid conflicts/duplication
 DROP POLICY IF EXISTS "Allow authenticated uploads" ON storage.objects;

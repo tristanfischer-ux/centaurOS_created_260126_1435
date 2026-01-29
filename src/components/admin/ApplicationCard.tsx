@@ -23,7 +23,7 @@ interface ApplicationCardProps {
 const statusConfig: Record<ApplicationStatus, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
     pending: { label: 'Pending', variant: 'secondary' },
     under_review: { label: 'Under Review', variant: 'default' },
-    approved: { label: 'Approved', variant: 'outline' },
+    approved: { label: 'Approved', variant: 'secondary' },
     rejected: { label: 'Rejected', variant: 'destructive' }
 }
 

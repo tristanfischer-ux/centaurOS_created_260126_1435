@@ -349,7 +349,7 @@ export function StandupWidget({ userRole, compact = false }: StandupWidgetProps)
                                 {hasSubmitted ? 'Update Standup' : 'Submit Standup'}
                             </Button>
                             {hasSubmitted && (
-                                <Button variant="outline" onClick={() => setShowForm(false)}>
+                                <Button variant="secondary" onClick={() => setShowForm(false)}>
                                     Cancel
                                 </Button>
                             )}
@@ -387,7 +387,7 @@ export function StandupWidget({ userRole, compact = false }: StandupWidgetProps)
                                 <p className="text-slate-700 pl-6">{myStandup.blockers}</p>
                             </div>
                         )}
-                        <Button variant="outline" size="sm" onClick={() => setShowForm(true)}>
+                        <Button variant="secondary" size="sm" onClick={() => setShowForm(true)}>
                             Edit
                         </Button>
                     </div>
@@ -435,7 +435,7 @@ export function StandupWidget({ userRole, compact = false }: StandupWidgetProps)
                                             AI Summary
                                         </h4>
                                         <Button
-                                            variant="outline"
+                                            variant="secondary"
                                             size="sm"
                                             onClick={handleGenerateSummary}
                                             disabled={isPending || stats.submittedToday === 0}
@@ -483,7 +483,7 @@ export function StandupWidget({ userRole, compact = false }: StandupWidgetProps)
                                                                 {user?.full_name || 'Unknown'}
                                                             </span>
                                                             {standup.mood && (
-                                                                <Badge variant="outline" className="text-xs">
+                                                                <Badge variant="secondary" className="text-xs">
                                                                     {standup.mood}
                                                                 </Badge>
                                                             )}

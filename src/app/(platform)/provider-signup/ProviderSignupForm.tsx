@@ -168,7 +168,7 @@ export function ProviderSignupForm({ listingId, listing, migrationRecord }: Prov
                             )}
                         </Button>
                         <Button 
-                            variant="outline" 
+                            variant="secondary" 
                             onClick={handleSkipStripe}
                             disabled={isPending}
                         >

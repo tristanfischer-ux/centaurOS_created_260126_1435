@@ -187,7 +187,7 @@ export function ConversationThread({
       <div className={cn('flex flex-col items-center justify-center h-full', className)}>
         <div className="text-center">
           <p className="text-sm text-destructive">{error}</p>
-          <Button variant="outline" size="sm" className="mt-4" onClick={() => window.location.reload()}>
+          <Button variant="secondary" size="sm" className="mt-4" onClick={() => window.location.reload()}>
             Retry
           </Button>
         </div>

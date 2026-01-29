@@ -15,7 +15,7 @@ export default async function CreateRFQPage() {
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) {
-    redirect('/auth/signin')
+    redirect('/login')
   }
 
   return (

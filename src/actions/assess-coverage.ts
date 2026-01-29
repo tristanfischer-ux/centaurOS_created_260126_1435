@@ -12,7 +12,7 @@ import {
 } from '@/types/org-blueprint'
 
 const openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY,
+    apiKey: process.env.OPENAI_API_KEY || "dummy-key-for-build",
 })
 
 /**

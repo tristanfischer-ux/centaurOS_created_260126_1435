@@ -119,7 +119,7 @@ export function OrderDetail({
                   </div>
                 </div>
                 {userRole === "seller" && (
-                  <Badge variant="outline">Counterparty</Badge>
+                  <Badge variant="secondary">Counterparty</Badge>
                 )}
                 {userRole === "buyer" && (
                   <Badge variant="info">You</Badge>
@@ -148,7 +148,7 @@ export function OrderDetail({
                   </div>
                 </div>
                 {userRole === "buyer" && (
-                  <Badge variant="outline">Counterparty</Badge>
+                  <Badge variant="secondary">Counterparty</Badge>
                 )}
                 {userRole === "seller" && (
                   <Badge variant="info">You</Badge>
@@ -300,7 +300,7 @@ export function OrderDetail({
             </CardHeader>
             <CardContent className="space-y-2">
               <Button
-                variant="outline"
+                variant="secondary"
                 className="w-full justify-start"
                 asChild
               >
@@ -311,7 +311,7 @@ export function OrderDetail({
               </Button>
               {order.listing && (
                 <Button
-                  variant="outline"
+                  variant="secondary"
                   className="w-full justify-start"
                   asChild
                 >
@@ -322,7 +322,7 @@ export function OrderDetail({
                 </Button>
               )}
               <Button
-                variant="outline"
+                variant="secondary"
                 className="w-full justify-start"
                 asChild
               >
@@ -367,7 +367,7 @@ function DetailRow({
         <span>{label}</span>
       </div>
       {badge ? (
-        <Badge variant="outline" className="font-normal">
+        <Badge variant="secondary" className="font-normal">
           {value}
         </Badge>
       ) : (

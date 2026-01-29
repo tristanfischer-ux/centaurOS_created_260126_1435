@@ -68,7 +68,7 @@ export function FraudAlertBadge({
     }
   }
 
-  const getBadgeVariant = (): "default" | "secondary" | "destructive" | "outline" => {
+  const getBadgeVariant = (): "default" | "secondary" | "destructive" | "secondary" => {
     switch (riskLevel) {
       case "critical":
         return "destructive"
@@ -78,7 +78,7 @@ export function FraudAlertBadge({
         return "secondary"
       case "low":
       default:
-        return "outline"
+        return "secondary"
     }
   }
 
@@ -201,7 +201,7 @@ export function FraudAlertBadge({
                     )}
                   >
                     <span className="text-muted-foreground">{factor.description}</span>
-                    <Badge variant="outline" className="text-xs">
+                    <Badge variant="secondary" className="text-xs">
                       +{factor.weight}
                     </Badge>
                   </div>
@@ -319,12 +319,12 @@ export function FraudAlertBanner({
         <div className="flex-1">
           <div className="flex items-center gap-2 mb-1">
             <span className="font-medium capitalize">{riskLevel} Risk</span>
-            <Badge variant="outline">Score: {riskScore}</Badge>
+            <Badge variant="secondary">Score: {riskScore}</Badge>
           </div>
           <p className="text-sm text-muted-foreground">{message || defaultMessage}</p>
         </div>
         {onReview && (
-          <Button variant="outline" size="sm" onClick={onReview}>
+          <Button variant="secondary" size="sm" onClick={onReview}>
             Review
           </Button>
         )}

@@ -154,7 +154,7 @@ export default function PricingPage() {
                     </p>
                 </div>
                 <Link href="/provider-portal/availability">
-                    <Button variant="outline" className="gap-2">
+                    <Button variant="secondary" className="gap-2">
                         <Calendar className="h-4 w-4" />
                         Availability Calendar
                     </Button>
@@ -332,7 +332,7 @@ export default function PricingPage() {
                                 <div className="p-4 bg-slate-50 rounded-lg">
                                     <p className="text-xs text-slate-500 uppercase tracking-wide">Stripe</p>
                                     <div className="mt-1">
-                                        <Badge variant={profileData?.stripe_onboarding_complete ? "default" : "outline"}>
+                                        <Badge variant={profileData?.stripe_onboarding_complete ? "default" : "secondary"}>
                                             {profileData?.stripe_onboarding_complete ? 'Connected' : 'Not Connected'}
                                         </Badge>
                                     </div>

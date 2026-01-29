@@ -250,7 +250,7 @@ export function StripeAccountStatus({
 
                     {hasAccount && (
                         <Button 
-                            variant={isReady ? "default" : "outline"}
+                            variant={isReady ? "default" : "secondary"}
                             onClick={handleOpenDashboard}
                             disabled={isPending}
                             className={isReady ? "flex-1" : ""}

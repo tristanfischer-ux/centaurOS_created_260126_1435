@@ -184,7 +184,7 @@ export function EditTaskDialog({ open, onOpenChange, task, members }: EditTaskDi
                             <Popover open={assigneeOpen} onOpenChange={setAssigneeOpen}>
                                 <PopoverTrigger asChild>
                                     <Button
-                                        variant="outline"
+                                        variant="secondary"
                                         role="combobox"
                                         aria-expanded={assigneeOpen}
                                         className="w-full justify-between"
@@ -288,10 +288,10 @@ export function EditTaskDialog({ open, onOpenChange, task, members }: EditTaskDi
                 </div>
 
                 <DialogFooter className="flex-shrink-0 gap-2 pt-4 border-t">
-                    <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isLoading}>
+                    <Button variant="secondary" onClick={() => onOpenChange(false)} disabled={isLoading}>
                         Cancel
                     </Button>
-                    <Button onClick={handleSavePrimary} variant="primary" disabled={isLoading}>
+                    <Button onClick={handleSavePrimary} variant="default" disabled={isLoading}>
                         {isLoading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                         Save Changes
                     </Button>

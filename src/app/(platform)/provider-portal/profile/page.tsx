@@ -160,7 +160,7 @@ export default function ProviderProfilePage() {
                 </div>
                 <div className="flex items-center gap-3">
                     <Button
-                        variant="outline"
+                        variant="secondary"
                         onClick={() => setShowPreview(!showPreview)}
                     >
                         <Eye className="h-4 w-4 mr-2" />

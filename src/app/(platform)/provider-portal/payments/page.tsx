@@ -48,7 +48,7 @@ async function PaymentsContent() {
     const stripeStatus = await checkStripeAccountStatus()
 
     // Get balance info if account is ready
-    let balanceInfo = null
+    let balanceInfo: { available: Record<string, number>; pending: Record<string, number> } | null = null
     if (stripeStatus.isReady && profile.stripe_account_id) {
         const { getAccountBalance } = await import("@/lib/stripe/connect")
         const balanceResult = await getAccountBalance(profile.stripe_account_id)

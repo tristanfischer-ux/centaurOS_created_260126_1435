@@ -31,7 +31,13 @@ import {
   Loader2,
   User,
   Zap,
+  ShoppingCart,
+  ArrowRight,
+  Send,
+  Users,
+  FileCheck,
 } from 'lucide-react'
+import Link from 'next/link'
 import {
   cancelMyRFQ,
   closeMyRFQ,
@@ -129,6 +135,31 @@ export function RFQDetail({
 
   return (
     <div className={cn('space-y-6', className)}>
+      {/* Order Created Alert - shown when RFQ is awarded */}
+      {isOwner && rfq.status === 'Awarded' && (
+        <Card className="border-emerald-200 bg-emerald-50">
+          <CardContent className="pt-6">
+            <div className="flex items-start gap-4">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-100">
+                <ShoppingCart className="h-5 w-5 text-emerald-600" />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-semibold text-emerald-900 mb-1">Order Automatically Created</h3>
+                <p className="text-sm text-emerald-700 mb-3">
+                  An order has been automatically created with the winning quote. You can now proceed with payment and project setup.
+                </p>
+                <Button asChild size="sm" className="bg-emerald-600 hover:bg-emerald-700">
+                  <Link href="/orders">
+                    View Orders
+                    <ArrowRight className="w-4 h-4 ml-2" />
+                  </Link>
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Header */}
       <Card>
         <CardHeader>
@@ -136,14 +167,14 @@ export function RFQDetail({
             <div className="space-y-2">
               <CardTitle className="text-2xl">{rfq.title}</CardTitle>
               <div className="flex items-center gap-2 flex-wrap">
-                <Badge variant="outline" className={cn('text-sm', statusColors[rfq.status])}>
+                <Badge variant="secondary" className={cn('text-sm', statusColors[rfq.status])}>
                   {rfq.status === 'priority_hold' ? 'Priority Hold' : rfq.status}
                 </Badge>
-                <Badge variant="outline" className="text-sm">
+                <Badge variant="secondary" className="text-sm">
                   {typeLabels[rfq.rfq_type]}
                 </Badge>
                 {rfq.urgency === 'urgent' && (
-                  <Badge variant="outline" className="text-sm bg-amber-50 text-amber-700 border-amber-200">
+                  <Badge variant="secondary" className="text-sm bg-amber-50 text-amber-700 border-amber-200">
                     <Zap className="w-3 h-3 mr-1" />
                     Urgent
                   </Badge>
@@ -157,7 +188,7 @@ export function RFQDetail({
                 {rfq.status === 'priority_hold' && (
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
-                      <Button variant="outline" size="sm" disabled={isPending}>
+                      <Button variant="secondary" size="sm" disabled={isPending}>
                         Release Hold
                       </Button>
                     </AlertDialogTrigger>
@@ -180,7 +211,7 @@ export function RFQDetail({
 
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
-                    <Button variant="outline" size="sm" disabled={isPending}>
+                    <Button variant="secondary" size="sm" disabled={isPending}>
                       Close RFQ
                     </Button>
                   </AlertDialogTrigger>
@@ -233,6 +264,9 @@ export function RFQDetail({
         </CardHeader>
 
         <CardContent className="space-y-6">
+          {/* Progress Indicator */}
+          <RFQProgressIndicator status={rfq.status} />
+
           {/* Race Status */}
           <RaceStatusIndicator
             status={rfq.status}
@@ -326,8 +360,7 @@ export function RFQDetail({
                       isAwarded={rfq.awarded_to === response.provider_id}
                       canAward={
                         isOwner &&
-                        (rfq.status === 'Bidding' || rfq.status === 'priority_hold' || rfq.status === 'Closed') &&
-                        rfq.status !== 'Awarded'
+                        (rfq.status === 'Bidding' || rfq.status === 'priority_hold' || rfq.status === 'Closed')
                       }
                       onAward={() => handleAward(response.provider_id)}
                       isPending={isPending}
@@ -391,6 +424,87 @@ export function RFQDetail({
   )
 }
 
+// Progress indicator showing RFQ lifecycle stages
+function RFQProgressIndicator({ status }: { status: RFQStatus }) {
+  const stages = [
+    { key: 'created', label: 'Created', icon: FileCheck },
+    { key: 'broadcast', label: 'Broadcast', icon: Send },
+    { key: 'bidding', label: 'Bidding', icon: Users },
+    { key: 'awarded', label: 'Awarded', icon: Award },
+    { key: 'order', label: 'Order', icon: ShoppingCart },
+  ]
+
+  // Determine which stages are complete based on status
+  const getStageStatus = (stageKey: string): 'complete' | 'current' | 'pending' => {
+    if (status === 'cancelled') {
+      return stageKey === 'created' ? 'complete' : 'pending'
+    }
+
+    const stageOrder = ['created', 'broadcast', 'bidding', 'awarded', 'order']
+    const currentStageIndex = status === 'Open' ? 0 :
+                              status === 'Bidding' || status === 'priority_hold' ? 2 :
+                              status === 'Awarded' ? 3 :
+                              status === 'Closed' ? 2 : 0
+
+    const stageIndex = stageOrder.indexOf(stageKey)
+    
+    if (stageIndex < currentStageIndex) return 'complete'
+    if (stageIndex === currentStageIndex) return 'current'
+    return 'pending'
+  }
+
+  return (
+    <div className="py-4">
+      <div className="flex items-center justify-between">
+        {stages.map((stage, index) => {
+          const stageStatus = getStageStatus(stage.key)
+          const Icon = stage.icon
+          const isLast = index === stages.length - 1
+
+          return (
+            <div key={stage.key} className="flex items-center flex-1">
+              <div className="flex flex-col items-center">
+                <div
+                  className={cn(
+                    'flex h-10 w-10 items-center justify-center rounded-full border-2 transition-colors',
+                    stageStatus === 'complete' && 'border-emerald-500 bg-emerald-50 text-emerald-600',
+                    stageStatus === 'current' && 'border-blue-500 bg-blue-50 text-blue-600',
+                    stageStatus === 'pending' && 'border-gray-200 bg-gray-50 text-gray-400'
+                  )}
+                >
+                  {stageStatus === 'complete' ? (
+                    <CheckCircle2 className="h-5 w-5" />
+                  ) : (
+                    <Icon className="h-5 w-5" />
+                  )}
+                </div>
+                <span
+                  className={cn(
+                    'mt-2 text-xs font-medium',
+                    stageStatus === 'complete' && 'text-emerald-600',
+                    stageStatus === 'current' && 'text-blue-600',
+                    stageStatus === 'pending' && 'text-gray-400'
+                  )}
+                >
+                  {stage.label}
+                </span>
+              </div>
+              {!isLast && (
+                <div
+                  className={cn(
+                    'flex-1 h-0.5 mx-2 mb-6',
+                    stageStatus === 'complete' ? 'bg-emerald-500' : 'bg-gray-200'
+                  )}
+                />
+              )}
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 // Response card sub-component
 interface ResponseCardProps {
   response: RFQResponseWithProvider
@@ -442,7 +556,7 @@ function ResponseCard({
               )}
             </div>
             {tierLabel && (
-              <Badge variant="outline" className="text-xs mt-1">
+              <Badge variant="secondary" className="text-xs mt-1">
                 {tierLabel}
               </Badge>
             )}

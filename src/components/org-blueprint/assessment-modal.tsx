@@ -17,7 +17,6 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import {
-    BusinessFunction,
     CoverageStatus,
     AssessmentAnswer,
     FunctionCategory,
@@ -25,7 +24,7 @@ import {
     CATEGORY_COLORS,
     STATUS_COLORS,
 } from '@/types/org-blueprint'
-import { saveAssessment } from '@/actions/org-blueprint'
+import { saveAssessment, BusinessFunctionWithCoverage } from '@/actions/org-blueprint'
 import { toast } from 'sonner'
 import {
     CheckCircle2,
@@ -42,7 +41,7 @@ import {
 import { cn } from '@/lib/utils'
 
 interface AssessmentModalProps {
-    functions: BusinessFunction[]
+    functions: BusinessFunctionWithCoverage[]
     onComplete?: () => void
     children: React.ReactNode
 }
@@ -75,7 +74,7 @@ const statusOptions: { status: CoverageStatus; label: string; description: strin
         icon: <XCircle className="h-5 w-5 text-red-600" />,
     },
     {
-        status: 'not_applicable',
+        status: 'not_needed',
         label: 'Not Applicable',
         description: "Doesn't apply to our business",
         icon: <MinusCircle className="h-5 w-5 text-gray-400" />,
@@ -88,18 +87,23 @@ export function AssessmentModal({ functions, onComplete, children }: AssessmentM
     const [answers, setAnswers] = useState<CategoryAnswers>({})
     const [isSaving, setIsSaving] = useState(false)
 
-    // Group functions by category
+    // Group functions by category (handle both lowercase and capitalized categories)
     const functionsByCategory = useMemo(() => {
-        const grouped: Record<FunctionCategory, BusinessFunction[]> = {} as Record<FunctionCategory, BusinessFunction[]>
-        ALL_CATEGORIES.forEach(cat => {
-            grouped[cat] = functions.filter(f => f.category === cat)
+        const grouped: Record<string, BusinessFunctionWithCoverage[]> = {}
+        functions.forEach(fn => {
+            const cat = fn.category
+            if (!grouped[cat]) {
+                grouped[cat] = []
+            }
+            grouped[cat].push(fn)
         })
         return grouped
     }, [functions])
 
-    // Get categories that have functions
-    const categoriesWithFunctions = ALL_CATEGORIES.filter(
-        cat => functionsByCategory[cat].length > 0
+    // Get categories that have functions (from actual data)
+    const categoriesWithFunctions = useMemo(() => 
+        Object.keys(functionsByCategory).filter(cat => functionsByCategory[cat].length > 0).sort(),
+        [functionsByCategory]
     )
 
     const currentCategory = categoriesWithFunctions[currentCategoryIndex]
@@ -182,7 +186,6 @@ export function AssessmentModal({ functions, onComplete, children }: AssessmentM
                     existingAnswers[fn.id] = {
                         status: fn.coverage_status,
                         coveredBy: fn.covered_by || undefined,
-                        coveredByType: fn.covered_by_type || undefined,
                     }
                 }
             })
@@ -209,7 +212,7 @@ export function AssessmentModal({ functions, onComplete, children }: AssessmentM
                                 Step {currentCategoryIndex + 1} of {totalCategories}: {currentCategory}
                             </DialogDescription>
                         </div>
-                        <Badge variant="outline" className="text-xs">
+                        <Badge variant="secondary" className="text-xs">
                             {totalAnswered}/{totalFunctions} answered
                         </Badge>
                     </div>
@@ -349,7 +352,7 @@ export function AssessmentModal({ functions, onComplete, children }: AssessmentM
                 <DialogFooter className="border-t pt-4">
                     <div className="flex items-center justify-between w-full">
                         <Button
-                            variant="outline"
+                            variant="secondary"
                             onClick={handlePrevious}
                             disabled={currentCategoryIndex === 0}
                         >

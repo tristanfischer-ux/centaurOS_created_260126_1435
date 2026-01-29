@@ -158,7 +158,8 @@ export async function flagSuspiciousActivity(
   // Auto-determine severity if not provided
   const calculatedSeverity = severity || determineSeverity(signalType, details)
 
-  const { data, error } = await supabase
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (supabase as any)
     .from("fraud_signals")
     .insert({
       user_id: userId,
@@ -504,7 +505,8 @@ async function checkPaymentFailureRate(
     .eq("buyer_id", userId)
     .gte("created_at", thirtyDaysAgo.toISOString())
 
-  const { count: failedOrders } = await supabase
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { count: failedOrders } = await (supabase as any)
     .from("orders")
     .select("*", { count: "exact", head: true })
     .eq("buyer_id", userId)

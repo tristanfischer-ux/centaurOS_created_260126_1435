@@ -78,7 +78,7 @@ export const PersonCard = memo(function PersonCard({
                                 )}
                             </div>
                             <p className="text-sm text-muted-foreground truncate">{email}</p>
-                            <Badge variant="outline" className="mt-2 text-xs">
+                            <Badge variant="secondary" className="mt-2 text-xs">
                                 {role}
                             </Badge>
                         </div>

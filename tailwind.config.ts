@@ -54,6 +54,33 @@ const config: Config = {
                     hover: '#e03e00',
                     foreground: '#ffffff'
                 },
+                // Semantic status colors
+                status: {
+                    success: { 
+                        DEFAULT: '#10b981', 
+                        light: '#d1fae5', 
+                        dark: '#064e3b',
+                        foreground: '#ffffff'
+                    },
+                    warning: { 
+                        DEFAULT: '#f59e0b', 
+                        light: '#fef3c7', 
+                        dark: '#78350f',
+                        foreground: '#ffffff'
+                    },
+                    error: { 
+                        DEFAULT: '#ef4444', 
+                        light: '#fee2e2', 
+                        dark: '#7f1d1d',
+                        foreground: '#ffffff'
+                    },
+                    info: { 
+                        DEFAULT: '#3b82f6', 
+                        light: '#dbeafe', 
+                        dark: '#1e3a8a',
+                        foreground: '#ffffff'
+                    }
+                },
                 card: {
                     DEFAULT: "hsl(var(--card))",
                     foreground: "hsl(var(--card-foreground))",
@@ -82,11 +109,12 @@ const config: Config = {
                 input: "hsl(var(--input))",
                 ring: "hsl(var(--ring))",
                 chart: {
-                    "1": "hsl(var(--chart-1))",
-                    "2": "hsl(var(--chart-2))",
-                    "3": "hsl(var(--chart-3))",
-                    "4": "hsl(var(--chart-4))",
-                    "5": "hsl(var(--chart-5))"
+                    "1": "hsl(14, 100%, 50%)",  // International Orange
+                    "2": "hsl(217, 91%, 60%)",   // Electric Blue
+                    "3": "hsl(160, 84%, 39%)",   // Emerald
+                    "4": "hsl(38, 92%, 50%)",    // Amber
+                    "5": "hsl(258, 90%, 66%)",   // Purple
+                    "6": "hsl(330, 81%, 60%)"    // Pink
                 }
             },
             borderRadius: {
@@ -96,14 +124,20 @@ const config: Config = {
                 none: '0px'
             },
             fontFamily: {
-                display: ['var(--font-playfair)', 'serif'],
+                display: ['Centaur-Display', 'var(--font-playfair)', 'serif'],
                 sans: ['var(--font-inter)', 'sans-serif'],
-                mono: ['var(--font-jetbrains)', 'monospace'],
+                mono: ['Centaur-Mono', 'var(--font-jetbrains)', 'monospace'],
+                'centaur': ['Centaur-Display', 'serif'],
+                'centaur-mono': ['Centaur-Mono', 'monospace'],
             },
             letterSpacing: {
                 'ultra-wide': '0.2em',
             },
             boxShadow: {
+                'elevation-1': '0 1px 3px rgba(0, 0, 0, 0.05)',
+                'elevation-2': '0 4px 12px rgba(0, 0, 0, 0.08)',
+                'elevation-3': '0 12px 24px rgba(0, 0, 0, 0.12)',
+                'elevation-4': '0 20px 40px rgba(0, 0, 0, 0.15)',
                 'brand': '0 10px 25px -5px rgba(255, 69, 0, 0.2)',
                 'brand-lg': '0 20px 40px -10px rgba(255, 69, 0, 0.3)',
             }

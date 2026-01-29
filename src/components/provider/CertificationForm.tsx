@@ -109,7 +109,7 @@ export function CertificationForm({ certification, trigger, onSuccess }: Certifi
         <Dialog open={open} onOpenChange={handleOpenChange}>
             <DialogTrigger asChild>
                 {trigger || (
-                    <Button variant="primary" size="sm">
+                    <Button variant="default" size="sm">
                         <Plus className="h-4 w-4 mr-1" />
                         Add Certification
                     </Button>
@@ -174,7 +174,7 @@ export function CertificationForm({ certification, trigger, onSuccess }: Certifi
                                 <Popover>
                                     <PopoverTrigger asChild>
                                         <Button
-                                            variant="outline"
+                                            variant="secondary"
                                             className={cn(
                                                 'w-full justify-start text-left font-normal',
                                                 !issuedDate && 'text-muted-foreground'
@@ -205,7 +205,7 @@ export function CertificationForm({ certification, trigger, onSuccess }: Certifi
                                 <Popover>
                                     <PopoverTrigger asChild>
                                         <Button
-                                            variant="outline"
+                                            variant="secondary"
                                             className={cn(
                                                 'w-full justify-start text-left font-normal',
                                                 !expiryDate && 'text-muted-foreground'
@@ -250,13 +250,13 @@ export function CertificationForm({ certification, trigger, onSuccess }: Certifi
                     <DialogFooter>
                         <Button
                             type="button"
-                            variant="outline"
+                            variant="secondary"
                             onClick={() => setOpen(false)}
                             disabled={isLoading}
                         >
                             Cancel
                         </Button>
-                        <Button type="submit" variant="primary" disabled={isLoading}>
+                        <Button type="submit" variant="default" disabled={isLoading}>
                             {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                             {isEditing ? 'Save Changes' : 'Add Certification'}
                         </Button>

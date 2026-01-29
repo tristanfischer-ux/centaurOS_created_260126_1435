@@ -10,9 +10,10 @@ DROP POLICY IF EXISTS "Users can manage team members" ON public.team_members;
 
 -- FOUNDRY STACK
 -- These policies use simple 'authenticated' checks, allowing cross-user data leakage
-DROP POLICY IF EXISTS "Users can add to stack" ON public.foundry_stack;
-DROP POLICY IF EXISTS "Users can remove from stack" ON public.foundry_stack;
-DROP POLICY IF EXISTS "Users can view their stack" ON public.foundry_stack;
+-- Note: foundry_stack table created in later migration - commented out
+-- DROP POLICY IF EXISTS "Users can add to stack" ON public.foundry_stack;
+-- DROP POLICY IF EXISTS "Users can remove from stack" ON public.foundry_stack;
+-- DROP POLICY IF EXISTS "Users can view their stack" ON public.foundry_stack;
 
 -- Re-apply 'users can see their own stack' if we can guess the schema, 
 -- but safely, we just drop the insecure ones. 

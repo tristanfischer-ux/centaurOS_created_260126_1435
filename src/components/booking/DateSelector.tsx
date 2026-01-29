@@ -234,7 +234,7 @@ export function DateSelector({
                     {/* Month Navigation */}
                     <div className="flex items-center gap-2">
                         <Button 
-                            variant="outline" 
+                            variant="secondary" 
                             size="icon"
                             onClick={goToPreviousMonth}
                             disabled={disabled}
@@ -245,7 +245,7 @@ export function DateSelector({
                             {format(currentMonth, 'MMMM yyyy')}
                         </span>
                         <Button 
-                            variant="outline" 
+                            variant="secondary" 
                             size="icon"
                             onClick={goToNextMonth}
                             disabled={disabled}

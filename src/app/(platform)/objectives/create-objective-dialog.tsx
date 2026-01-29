@@ -548,7 +548,7 @@ export function CreateObjectiveDialog({ children }: CreateObjectiveDialogProps) 
                                                             <CardContent>
                                                                 <div className="flex flex-wrap gap-2">
                                                                     {pack.category && <Badge variant="secondary" className="text-xs font-normal text-slate-500">{pack.category}</Badge>}
-                                                                    <Badge variant="outline" className="text-xs font-normal text-slate-500">{pack.items?.length || 0} Tasks</Badge>
+                                                                    <Badge variant="secondary" className="text-xs font-normal text-slate-500">{pack.items?.length || 0} Tasks</Badge>
                                                                 </div>
                                                             </CardContent>
                                                         </Card>
@@ -668,7 +668,7 @@ export function CreateObjectiveDialog({ children }: CreateObjectiveDialogProps) 
 
                                         {analyzedObjectives.length > 0 && (
                                             <Button
-                                                variant="outline"
+                                                variant="secondary"
                                                 onClick={handleCreateAll}
                                                 className="mb-4 w-full"
                                                 disabled={isLoading}
@@ -772,13 +772,13 @@ export function CreateObjectiveDialog({ children }: CreateObjectiveDialogProps) 
                         {mode === 'import' && selectedAnalysisIndex !== null && "AI generated tasks will be created."}
                     </div>
 
-                    <Button variant="outline" onClick={() => setOpen(false)} disabled={isLoading}>
+                    <Button variant="secondary" onClick={() => setOpen(false)} disabled={isLoading}>
                         Cancel
                     </Button>
 
                     <Button
                         onClick={handleCreate}
-                        variant="primary"
+                        variant="default"
                         disabled={isLoading || (mode === 'pack' && !selectedPack) || (mode === 'import' && selectedAnalysisIndex === null) || !title.trim()}
                         className="min-w-[140px] shadow-sm"
                     >

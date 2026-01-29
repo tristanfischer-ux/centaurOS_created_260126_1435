@@ -369,7 +369,7 @@ export function ThreadDrawer({
                         <div className="flex gap-2 pt-2 border-t border-border">
                             <Button
                                 size="sm"
-                                variant="outline"
+                                variant="secondary"
                                 onClick={() => setShowForward(true)}
                                 disabled={isActionLoading}
                             >
@@ -380,7 +380,7 @@ export function ThreadDrawer({
                             {isAIAssignee && (
                                 <Button
                                     size="sm"
-                                    variant="outline"
+                                    variant="secondary"
                                     onClick={handleTriggerAI}
                                     disabled={isActionLoading}
                                     className="border-purple-200 text-purple-700 hover:bg-purple-50"
@@ -597,7 +597,7 @@ export function ThreadDrawer({
                             className="min-h-[100px]"
                         />
                         <DialogFooter>
-                            <Button variant="outline" onClick={() => {
+                            <Button variant="secondary" onClick={() => {
                                 setRejectDialogOpen(false)
                                 setRejectReason('')
                             }} disabled={isActionLoading}>

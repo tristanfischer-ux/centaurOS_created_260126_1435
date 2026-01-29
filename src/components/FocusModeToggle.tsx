@@ -188,7 +188,7 @@ export function FocusModeToggle({ compact = false, showLabel = true, className }
                     </div>
 
                     <DialogFooter>
-                        <Button variant="outline" onClick={() => setShowDialog(false)}>
+                        <Button variant="secondary" onClick={() => setShowDialog(false)}>
                             Cancel
                         </Button>
                         <Button 
@@ -270,7 +270,7 @@ export function UrgentOverrideButton({
     return (
         <>
             <Button
-                variant="outline"
+                variant="secondary"
                 size="sm"
                 onClick={() => setShowDialog(true)}
                 className="text-amber-600 border-amber-200 hover:bg-amber-50"
@@ -303,7 +303,7 @@ export function UrgentOverrideButton({
                     </div>
 
                     <DialogFooter>
-                        <Button variant="outline" onClick={() => setShowDialog(false)}>
+                        <Button variant="secondary" onClick={() => setShowDialog(false)}>
                             Cancel
                         </Button>
                         <Button 

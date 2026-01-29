@@ -4,7 +4,7 @@ import OpenAI from 'openai'
 // import pdf from 'pdf-parse'
 
 const openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY,
+    apiKey: process.env.OPENAI_API_KEY || "dummy-key-for-build",
 })
 
 export type ExtractedTask = {

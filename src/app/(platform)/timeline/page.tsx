@@ -4,6 +4,9 @@ import { GanttView, JoinedTask } from '@/components/timeline/GanttView'
 import { TimelineListView } from '@/components/timeline/TimelineListView'
 import { CreateTaskDialog } from '@/app/(platform)/tasks/create-task-dialog'
 
+// Force dynamic rendering to ensure fresh data on router.refresh()
+export const dynamic = 'force-dynamic'
+
 export default async function TimelinePage() {
     const supabase = await createClient()
 
@@ -13,13 +16,14 @@ export default async function TimelinePage() {
         redirect('/login')
     }
 
-    // Fetch Tasks with Joins
+    // Fetch Tasks with Joins (including multiple assignees)
     const { data: tasks, error } = await supabase
         .from('tasks')
         .select(`
         *,
         profiles:assignee_id(*),
-        objectives:objective_id(*)
+        objectives:objective_id(*),
+        task_assignees(profile:profiles(id, full_name, role, email))
     `)
         .order('start_date', { ascending: true })
 
@@ -47,10 +51,13 @@ export default async function TimelinePage() {
 
     return (
         <div className="space-y-6 h-full flex flex-col">
-            <div className="flex-none flex items-center justify-between flex-wrap gap-4">
-                <div>
-                    <h1 className="text-3xl font-bold tracking-tight text-white mb-2">Campaign Timeline</h1>
-                    <p className="text-muted-foreground">Visualizing the Foundry&apos;s execution vector.</p>
+            <div className="flex-none flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-slate-100">
+                <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-3 mb-1">
+                        <div className="h-8 w-1 bg-orange-600 rounded-full shadow-[0_0_8px_rgba(234,88,12,0.6)]" />
+                        <h1 className="text-2xl sm:text-3xl font-display font-semibold text-foreground tracking-tight">Timeline</h1>
+                    </div>
+                    <p className="text-muted-foreground mt-1 text-sm font-medium pl-4">When tasks are due</p>
                 </div>
                 <CreateTaskDialog
                     objectives={objectivesList}
@@ -65,6 +72,8 @@ export default async function TimelinePage() {
                     tasks={tasks as unknown as JoinedTask[]}
                     objectives={objectives || []}
                     profiles={profiles || []}
+                    members={members}
+                    currentUserId={user.id}
                 />
             </div>
 

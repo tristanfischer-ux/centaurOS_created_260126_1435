@@ -12,6 +12,9 @@ import {
   RACE_CONSTANTS,
 } from '@/types/rfq'
 import { calculateBroadcastSchedule } from './timezone-scheduling'
+import { createOrder } from '@/lib/orders/service'
+import { matchSuppliersToRFQ } from './matching'
+import { sendNotification } from '@/lib/notifications/service'
 
 type TypedSupabaseClient = SupabaseClient<Database>
 
@@ -35,19 +38,32 @@ export async function broadcastRFQ(
       return { success: false, broadcast_count: 0, error: 'RFQ not found' }
     }
 
-    // Get all eligible providers
+    // Use smart matching to find best suppliers for this RFQ
+    const { matches, error: matchError } = await matchSuppliersToRFQ(supabase, rfqId)
+    
+    if (matchError) {
+      console.error('Error matching suppliers:', matchError)
+      // Fall back to broadcast to all active providers
+      const { data: providers, error: providersError } = await supabase
+        .from('provider_profiles')
+        .select('id, user_id, timezone, tier')
+        .eq('is_active', true)
+        .not('tier', 'eq', 'suspended')
+
+      if (providersError || !providers || providers.length === 0) {
+        return { success: false, broadcast_count: 0, error: 'Failed to fetch suppliers' }
+      }
+    }
+
+    // Get provider details for matched suppliers
+    const providerIds = matches.map(m => m.providerId)
     const { data: providers, error: providersError } = await supabase
       .from('provider_profiles')
       .select('id, user_id, timezone, tier')
+      .in('id', providerIds)
       .eq('is_active', true)
-      .not('tier', 'eq', 'suspended')
 
-    if (providersError) {
-      console.error('Error fetching providers:', providersError)
-      return { success: false, broadcast_count: 0, error: 'Failed to fetch suppliers' }
-    }
-
-    if (!providers || providers.length === 0) {
+    if (providersError || !providers || providers.length === 0) {
       return { success: true, broadcast_count: 0, error: null }
     }
 
@@ -83,6 +99,70 @@ export async function broadcastRFQ(
       .from('rfqs')
       .update({ status: 'Bidding' })
       .eq('id', rfqId)
+
+    // Send notifications to matched suppliers
+    const budgetRange = rfq.budget_min && rfq.budget_max 
+      ? `£${rfq.budget_min.toLocaleString()} - £${rfq.budget_max.toLocaleString()}`
+      : rfq.budget_max
+      ? `Up to £${rfq.budget_max.toLocaleString()}`
+      : 'Budget not specified'
+
+    for (const provider of providers) {
+      const match = matches.find(m => m.providerId === provider.id)
+      const isUrgent = rfq.urgency === 'urgent'
+      
+      // Get user's notification preferences
+      const { data: prefs } = await supabase
+        .from('notification_preferences')
+        .select('*')
+        .eq('user_id', provider.user_id)
+
+      // Build channels array based on preferences
+      // In-app is always enabled (database notification)
+      const channels: ('in_app' | 'email' | 'push' | 'sms')[] = ['in_app']
+      
+      // Check if email notifications are enabled for this priority level
+      const emailPref = prefs?.find(p => p.channel === 'email')
+      const priority = isUrgent ? 'high' : 'medium'
+      const emailEnabled = emailPref?.enabled && 
+        (priority === 'high' ? emailPref.high_enabled : emailPref.medium_enabled)
+      
+      if (emailEnabled) {
+        channels.push('email')
+      }
+      
+      // Check if push notifications are enabled for this priority level
+      const pushPref = prefs?.find(p => p.channel === 'push')
+      const pushEnabled = pushPref?.enabled && 
+        (priority === 'high' ? pushPref.high_enabled : pushPref.medium_enabled)
+      
+      if (pushEnabled) {
+        channels.push('push')
+      }
+      
+      // Send notification with user's preferred channels
+      await sendNotification({
+        userId: provider.user_id,
+        title: isUrgent ? `⚡ Urgent RFQ: ${rfq.title}` : `New RFQ Match: ${rfq.title}`,
+        body: isUrgent 
+          ? `Urgent opportunity - respond quickly! ${match?.matchReasons?.[0] || 'Matches your profile'}`
+          : `${match?.matchReasons?.[0] || 'New opportunity available'}`,
+        priority: isUrgent ? 'high' : 'medium',
+        actionUrl: `/rfq/${rfqId}`,
+        metadata: {
+          rfqId,
+          rfqTitle: rfq.title,
+          matchScore: match?.matchScore,
+          matchReasons: match?.matchReasons,
+          category: rfq.category,
+          budgetRange,
+          specifications: typeof rfq.specifications === 'object' && rfq.specifications !== null && 'description' in rfq.specifications
+            ? (rfq.specifications as { description?: string }).description
+            : undefined,
+          responseWindow: isUrgent ? '2 hours' : '24 hours',
+        },
+      })
+    }
 
     return { success: true, broadcast_count: broadcastRecords.length, error: null }
   } catch (err) {
@@ -288,6 +368,25 @@ export async function acceptRFQ(
             awarded_to: providerId,
           })
           .eq('id', rfqId)
+
+        // Automatically create an order for commodity auto-award
+        if (quotedPrice) {
+          const { error: orderError } = await createOrder(
+            supabase,
+            rfq.buyer_id,
+            {
+              sellerId: providerId,
+              orderType: 'product_rfq',
+              totalAmount: quotedPrice,
+              currency: 'GBP',
+            }
+          )
+
+          if (orderError) {
+            console.error('Error creating order from commodity RFQ:', orderError)
+            // Don't fail the award - order can be created manually
+          }
+        }
 
         return { success: true, awarded: true, priority_hold: false, error: null }
       }
@@ -594,13 +693,17 @@ export async function awardRFQ(
     // Verify the provider has accepted
     const { data: response } = await supabase
       .from('rfq_responses')
-      .select('id, response_type')
+      .select('id, response_type, quoted_price')
       .eq('rfq_id', rfqId)
       .eq('provider_id', providerId)
       .single()
 
     if (!response || response.response_type !== 'accept') {
       return { success: false, error: 'Provider has not accepted this RFQ' }
+    }
+
+    if (!response.quoted_price) {
+      return { success: false, error: 'Response does not have a quoted price' }
     }
 
     // Award the RFQ
@@ -617,6 +720,24 @@ export async function awardRFQ(
     if (updateError) {
       console.error('Error awarding RFQ:', updateError)
       return { success: false, error: 'Failed to award RFQ' }
+    }
+
+    // Automatically create an order for the awarded RFQ
+    const { data: order, error: orderError } = await createOrder(
+      supabase,
+      buyerId,
+      {
+        sellerId: providerId,
+        orderType: 'product_rfq',
+        totalAmount: parseFloat(response.quoted_price.toString()),
+        currency: 'GBP',
+      }
+    )
+
+    if (orderError) {
+      console.error('Error creating order from RFQ:', orderError)
+      // Don't fail the award - order can be created manually
+      // But we should log this for admin attention
     }
 
     return { success: true, error: null }

@@ -60,7 +60,7 @@ export const ReviewCard = memo(function ReviewCard({
                                         {displayName}
                                     </span>
                                     {review.is_verified_purchase && (
-                                        <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 text-xs">
+                                        <Badge variant="secondary" className="bg-emerald-50 text-emerald-700 border-emerald-200 text-xs">
                                             <CheckCircle2 className="w-3 h-3 mr-1" />
                                             Verified
                                         </Badge>

@@ -89,8 +89,8 @@ export function HistoryDrawer({ open, onOpenChange, taskId, taskTitle }: History
                 return <Badge variant="secondary">Status Change</Badge>
             case 'ASSIGNED': return <Badge variant="secondary">Assigned</Badge>
             case 'FORWARDED': return <Badge variant="warning">Forwarded</Badge>
-            case 'UPDATED': return <Badge variant="outline">Updated</Badge>
-            default: return <Badge variant="outline">{item.action_type}</Badge>
+            case 'UPDATED': return <Badge variant="secondary">Updated</Badge>
+            default: return <Badge variant="secondary">{item.action_type}</Badge>
         }
     }
 
@@ -179,7 +179,7 @@ export function HistoryDrawer({ open, onOpenChange, taskId, taskTitle }: History
 
                 <SheetFooter className="p-6 border-t border-border mt-auto">
                     <SheetClose asChild>
-                        <Button variant="outline">Close</Button>
+                        <Button variant="secondary">Close</Button>
                     </SheetClose>
                 </SheetFooter>
             </SheetContent>

@@ -77,10 +77,13 @@ export default async function GuildPage() {
 
     return (
         <div className="space-y-6">
-            <div>
-                <h1 className="text-3xl font-bold tracking-tight text-foreground mb-2">The Guild</h1>
-                <p className="text-muted-foreground">
-                    Virtual connectivity, physical reality. Connect, learn, and grow together.
+            <div className="pb-4 border-b border-slate-100">
+                <div className="flex items-center gap-3 mb-1">
+                    <div className="h-8 w-1 bg-orange-600 rounded-full shadow-[0_0_8px_rgba(234,88,12,0.6)]" />
+                    <h1 className="text-2xl sm:text-3xl font-display font-semibold text-foreground tracking-tight">The Guild</h1>
+                </div>
+                <p className="text-muted-foreground mt-1 text-sm font-medium pl-4">
+                    Virtual connectivity, physical reality. Connect, learn, and grow together
                 </p>
             </div>
 

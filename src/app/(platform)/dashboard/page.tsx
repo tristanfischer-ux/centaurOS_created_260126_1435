@@ -50,11 +50,10 @@ export default async function DashboardPage() {
     interface DashboardTask {
         id: string
         title: string
-        status: "Pending" | "Accepted" | "Rejected" | "Amended" | "Amended_Pending_Approval" | "Completed" | "Pending_Peer_Review" | "Pending_Executive_Approval" | "in_progress"
+        status: "Pending" | "Accepted" | "Rejected" | "Amended" | "Amended_Pending_Approval" | "Completed" | "Pending_Peer_Review" | "Pending_Executive_Approval"
         end_date: string | null
         created_at?: string
         updated_at?: string
-        priority?: string
         assignee?: {
             id: string
             full_name: string | null
@@ -72,7 +71,6 @@ export default async function DashboardPage() {
         title: string
         progress: number
         status: "on_track" | "at_risk" | "off_track" | "completed" | "cancelled" | "not_started"
-        end_date: string | null
         created_at: string
     }
 
@@ -95,18 +93,16 @@ export default async function DashboardPage() {
             status,
             end_date,
             created_at,
-            priority,
             assignee:profiles!assignee_id(id, full_name, role, email),
             objective:objectives!objective_id(id, title)
         `)
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .in('status', ['Pending', 'Accepted', 'in_progress'] as any)
+        .in('status', ['Pending', 'Accepted'])
 
     // Apply filter based on whether user has task_assignees entries
     if (assignedIds.length > 0) {
         // User could be direct assignee OR in task_assignees - use .in() for both
         const allRelevantTaskIds = [...new Set(assignedIds)]
-        myTasksQuery = myTasksQuery.or(`assignee_id.eq.${user.id},id.in.(${allRelevantTaskIds.map(id => `"${id}"`).join(',')})`)
+        myTasksQuery = myTasksQuery.or(`assignee_id.eq.${user.id},id.in.(${allRelevantTaskIds.join(',')})`)
     } else {
         // No task_assignees entries, just filter by direct assignment
         myTasksQuery = myTasksQuery.eq('assignee_id', user.id)
@@ -117,7 +113,7 @@ export default async function DashboardPage() {
         .limit(10)
 
     if (myTasksError) {
-        console.error('Error fetching my tasks:', myTasksError)
+        console.error('Error fetching my tasks:', JSON.stringify(myTasksError, null, 2), 'Message:', myTasksError.message, 'Code:', myTasksError.code)
     }
 
     const myTasks = (myTasksData || []) as unknown as DashboardTask[]
@@ -200,19 +196,23 @@ export default async function DashboardPage() {
     const recentTasks = (recentTasksData || []) as unknown as DashboardTask[]
 
     // Fetch Active Objectives with progress
-    const { data: objectivesData } = await supabase
+    // Note: objective status uses lowercase values: on_track, at_risk, off_track, completed, cancelled, not_started
+    const { data: objectivesData, error: objectivesError } = await supabase
         .from('objectives')
         .select(`
             id,
             title,
             progress,
             status,
-            end_date,
             created_at
         `)
-        .neq('status', 'Completed')
+        .not('status', 'in', '("completed","cancelled")')
         .order('created_at', { ascending: false })
         .limit(5)
+
+    if (objectivesError) {
+        console.error('Error fetching objectives:', JSON.stringify(objectivesError, null, 2), 'Message:', objectivesError.message, 'Code:', objectivesError.code)
+    }
 
     const objectives = (objectivesData || []) as unknown as DashboardObjective[]
 
@@ -254,18 +254,18 @@ export default async function DashboardPage() {
         .slice(0, 10)
 
     return (
-        <div className="space-y-6">
+        <div className="space-y-8">
             {/* Header */}
-            <div className="flex flex-col fold:flex-row fold:items-center fold:justify-between gap-3 xs:gap-4 pb-4 border-b border-slate-100">
+            <div className="flex flex-col fold:flex-row fold:items-center fold:justify-between gap-3 xs:gap-4 pb-6 border-b border-blue-200">
                 <div className="min-w-0 flex-1">
                     {/* Responsive heading: smaller on Galaxy Fold outer, scales up */}
                     <div className="flex items-center gap-3 mb-1">
                         <div className="h-8 w-1 bg-orange-600 rounded-full shadow-[0_0_8px_rgba(234,88,12,0.6)]" />
-                        <h1 className="text-2xl xs:text-3xl sm:text-4xl font-display font-semibold text-slate-900 tracking-tight truncate">
+                        <h1 className="text-2xl xs:text-3xl sm:text-4xl font-display font-semibold text-foreground tracking-tight truncate">
                             Welcome back, {userName}
                         </h1>
                     </div>
-                    <p className="text-slate-500 mt-1 text-xs xs:text-sm sm:text-base font-medium pl-4">
+                    <p className="text-muted-foreground mt-1 text-xs xs:text-sm sm:text-base font-medium pl-4">
                         Foundry Status: <span className="text-orange-600 font-bold uppercase tracking-wider">Operational</span>
                     </p>
                 </div>
@@ -276,7 +276,7 @@ export default async function DashboardPage() {
                         teams={teams}
                         currentUserId={user.id}
                     >
-                        <Button size="sm" className="bg-slate-900 hover:bg-slate-800 text-white font-medium shadow-md transition-all duration-200">
+                        <Button size="sm" className="font-medium shadow-md">
                             <Plus className="h-4 w-4 mr-2" /> New Task
                         </Button>
                     </CreateTaskDialog>
@@ -286,7 +286,7 @@ export default async function DashboardPage() {
 
             {/* Remote Team Widgets - Executive/Founder View */}
             {(profile?.role === 'Executive' || profile?.role === 'Founder') && (
-                <div className="grid grid-cols-1 xs:grid-cols-2 fold:grid-cols-2 lg:grid-cols-4 gap-3 xs:gap-4">
+                <div className="grid grid-cols-1 xs:grid-cols-2 fold:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
                     <TeamPulseWidget members={members} />
                     <PendingApprovalsWidget userRole={profile?.role || ''} />
                     <BlockersWidget userRole={profile?.role || ''} />
@@ -303,10 +303,10 @@ export default async function DashboardPage() {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
                 {/* Main Content - Left Column (2/3) */}
-                <div className="lg:col-span-2 space-y-6">
+                <div className="lg:col-span-2 space-y-8">
 
                     {/* My Tasks Section */}
-                    <Card className="bg-white border-slate-100 shadow-[0_2px_15px_rgba(0,0,0,0.03)] border-t-2 border-t-orange-500">
+                    <Card className="bg-white border-blue-200 border-t-2 border-t-orange-500">
                         <CardHeader>
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-2">
@@ -355,15 +355,15 @@ export default async function DashboardPage() {
                             ) : (
                                 <div className="space-y-3">
                                     {myTasks.slice(0, 5).map((task) => (
-                                        <div key={task.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-3 rounded-lg border border-slate-100 bg-slate-50/50 hover:bg-white hover:border-orange-200 hover:shadow-sm transition-all duration-200 group">
+                                        <div key={task.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-lg border border-blue-200 bg-slate-50/50 hover:bg-white hover:border-orange-200 hover:shadow-sm transition-all duration-200 group">
                                             <div className="flex items-start gap-3 mb-2 sm:mb-0">
                                                 <Badge variant={
-                                                    task.status === "in_progress" ? "default" :
+                                                    task.status === "Accepted" ? "default" :
                                                         task.status === "Completed" ? "secondary" :
-                                                            "outline"
+                                                            "secondary"
                                                 } className={cn(
                                                     "mt-0.5 capitalize",
-                                                    task.status === "in_progress" ? "bg-orange-600 hover:bg-orange-700" :
+                                                    task.status === "Accepted" ? "bg-orange-600 hover:bg-orange-700" :
                                                         task.status === "Completed" ? "bg-slate-200 text-slate-700 hover:bg-slate-300" :
                                                             "border-slate-300 text-slate-500"
                                                 )}>
@@ -391,17 +391,6 @@ export default async function DashboardPage() {
                                                 </div>
                                             </div>
 
-                                            <div className="flex items-center gap-2 pl-10 sm:pl-0">
-                                                {task.priority && (
-                                                    <Badge variant="outline" className={cn(
-                                                        "text-[10px] uppercase tracking-wider h-5",
-                                                        task.priority === "high" ? "border-amber-200 text-amber-700 bg-amber-50" :
-                                                            "border-slate-200 text-slate-500 bg-white"
-                                                    )}>
-                                                        {task.priority}
-                                                    </Badge>
-                                                )}
-                                            </div>
                                         </div>
                                     ))}
                                 </div>
@@ -410,7 +399,7 @@ export default async function DashboardPage() {
                     </Card>
 
                     {/* Active Objectives */}
-                    <Card className="bg-white border-slate-100 shadow-[0_2px_15px_rgba(0,0,0,0.03)]">
+                    <Card className="bg-white border-blue-200">
                         <CardHeader>
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-2">
@@ -431,7 +420,7 @@ export default async function DashboardPage() {
                         </CardHeader>
                         <CardContent>
                             {!objectives || objectives.length === 0 ? (
-                                <div className="flex flex-col items-center justify-center py-8 text-center border-2 border-dashed border-slate-100 rounded-lg bg-slate-50/50">
+                                <div className="flex flex-col items-center justify-center py-8 text-center border-2 border-dashed border-blue-200 rounded-lg bg-slate-50/50">
                                     <div className="h-10 w-10 rounded-full bg-slate-100 flex items-center justify-center mb-3">
                                         <Target className="h-5 w-5 text-slate-400" />
                                     </div>
@@ -440,7 +429,7 @@ export default async function DashboardPage() {
                                         Set high-level goals for your company to align your team.
                                     </p>
                                     <CreateObjectiveDialog>
-                                        <Button variant="outline" size="sm" className="border-slate-200 hover:border-orange-500 hover:text-orange-700">
+                                        <Button variant="secondary" size="sm" className="border-slate-200 hover:border-orange-500 hover:text-orange-700">
                                             Define Objective
                                         </Button>
                                     </CreateObjectiveDialog>
@@ -448,7 +437,7 @@ export default async function DashboardPage() {
                             ) : (
                                 <div className="grid gap-4 sm:grid-cols-2">
                                     {objectives.slice(0, 4).map((objective) => (
-                                        <div key={objective.id} className="p-4 rounded-lg border border-slate-100 bg-white hover:border-orange-200 hover:shadow-sm transition-all duration-200 group">
+                                        <div key={objective.id} className="p-5 rounded-lg border border-blue-200 bg-white hover:border-orange-200 hover:shadow-sm transition-all duration-200 group">
                                             <div className="flex justify-between items-start mb-2">
                                                 <h4 className="font-medium text-sm text-slate-900 group-hover:text-orange-900 transition-colors line-clamp-1" title={objective.title}>
                                                     {objective.title}
@@ -479,12 +468,10 @@ export default async function DashboardPage() {
                                             </div>
 
                                             <div className="flex items-center gap-3 mt-3 text-xs text-slate-400">
-                                                {objective.end_date && (
-                                                    <span className="flex items-center">
-                                                        <Clock className="h-3 w-3 mr-1" />
-                                                        {new Date(objective.end_date).toLocaleDateString()}
-                                                    </span>
-                                                )}
+                                                <span className="flex items-center">
+                                                    <Clock className="h-3 w-3 mr-1" />
+                                                    {new Date(objective.created_at).toLocaleDateString()}
+                                                </span>
                                             </div>
                                         </div>
                                     ))}
@@ -496,40 +483,40 @@ export default async function DashboardPage() {
                 </div>
 
                 {/* Sidebar Content - Right Column (1/3) */}
-                <div className="space-y-6">
+                <div className="space-y-8">
 
                     {/* Quick Actions */}
-                    <Card className="bg-white border-slate-100 shadow-[0_2px_15px_rgba(0,0,0,0.03)]">
+                    <Card className="bg-white border-blue-200">
                         <CardHeader>
                             <CardTitle className="font-display text-lg text-slate-900">Quick Actions</CardTitle>
                             <CardDescription className="text-slate-500">Foundry operations</CardDescription>
                         </CardHeader>
-                        <CardContent className="space-y-3">
+                        <CardContent className="space-y-4">
                             <CreateTaskDialog
                                 objectives={objectivesForDialog}
                                 members={members}
                                 teams={teams}
                                 currentUserId={user.id}
                             >
-                                <Button variant="outline" className="w-full justify-start h-10 border-slate-200 hover:border-orange-500/50 hover:bg-orange-50/50 hover:text-orange-700 transition-all duration-300 group">
+                                <Button variant="secondary" className="w-full justify-start h-10 border-slate-200 hover:border-orange-500/50 hover:bg-orange-50/50 hover:text-orange-700 transition-all duration-300 group">
                                     <Plus className="h-4 w-4 mr-2 group-hover:text-orange-600" />
                                     Create Task
                                 </Button>
                             </CreateTaskDialog>
                             <CreateObjectiveDialog>
-                                <Button variant="outline" className="w-full justify-start h-10 border-slate-200 hover:border-orange-500/50 hover:bg-orange-50/50 hover:text-orange-700 transition-all duration-300 group">
+                                <Button variant="secondary" className="w-full justify-start h-10 border-slate-200 hover:border-orange-500/50 hover:bg-orange-50/50 hover:text-orange-700 transition-all duration-300 group">
                                     <Target className="h-4 w-4 mr-2 group-hover:text-orange-600" />
                                     Create Objective
                                 </Button>
                             </CreateObjectiveDialog>
                             <Link href="/team" className="block">
-                                <Button variant="outline" className="w-full justify-start h-10 border-slate-200 hover:border-orange-500/50 hover:bg-orange-50/50 hover:text-orange-700 transition-all duration-300 group">
+                                <Button variant="secondary" className="w-full justify-start h-10 border-slate-200 hover:border-orange-500/50 hover:bg-orange-50/50 hover:text-orange-700 transition-all duration-300 group">
                                     <Users className="h-4 w-4 mr-2 group-hover:text-orange-600" />
                                     Invite Team Member
                                 </Button>
                             </Link>
                             <Link href="/marketplace" className="block">
-                                <Button variant="outline" className="w-full justify-start h-10 border-slate-200 hover:border-orange-500/50 hover:bg-orange-50/50 hover:text-orange-700 transition-all duration-300 group">
+                                <Button variant="secondary" className="w-full justify-start h-10 border-slate-200 hover:border-orange-500/50 hover:bg-orange-50/50 hover:text-orange-700 transition-all duration-300 group">
                                     <ShoppingBag className="h-4 w-4 mr-2 group-hover:text-orange-600" />
                                     View Marketplace
                                 </Button>
@@ -538,7 +525,7 @@ export default async function DashboardPage() {
                     </Card>
 
                     {/* Upcoming Deadlines */}
-                    <Card className="bg-white border-slate-100 shadow-[0_2px_15px_rgba(0,0,0,0.03)]">
+                    <Card className="bg-white border-blue-200">
                         <CardHeader>
                             <div className="flex items-center gap-2">
                                 <Calendar className="h-5 w-5 text-slate-400" />
@@ -583,7 +570,7 @@ export default async function DashboardPage() {
                                     <h5 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Coming Up</h5>
                                     {upcomingTasks.map(task => (
                                         <Link key={task.id} href="/tasks" className="block group">
-                                            <div className="flex items-center justify-between p-2.5 rounded border border-slate-100 bg-white hover:border-orange-200 transition-all">
+                                                <div className="flex items-center justify-between p-2.5 rounded border border-blue-200 bg-white hover:border-orange-200 transition-all">
                                                 <div className="min-w-0">
                                                     <p className="text-sm font-medium text-slate-700 truncate group-hover:text-orange-800 transition-colors">{task.title}</p>
                                                     <p className="text-xs text-slate-400 mt-0.5">
@@ -600,7 +587,7 @@ export default async function DashboardPage() {
                     </Card>
 
                     {/* Recent Activity */}
-                    <Card className="bg-white border-slate-100 shadow-[0_2px_15px_rgba(0,0,0,0.03)]">
+                    <Card className="bg-white border-blue-200">
                         <CardHeader>
                             <div className="flex items-center gap-2">
                                 <MessageSquare className="h-5 w-5 text-slate-400" />

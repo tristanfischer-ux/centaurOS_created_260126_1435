@@ -67,7 +67,7 @@ async function MigrationContent() {
                         Transition existing marketplace listings to the transactional system
                     </p>
                 </div>
-                <Badge variant="outline" className="text-sm">
+                <Badge variant="secondary" className="text-sm">
                     {stats.migrationRate}% migrated
                 </Badge>
             </div>
@@ -173,7 +173,7 @@ async function MigrationContent() {
                                 </p>
                             </div>
                         </div>
-                        <Button variant="outline" className="border-blue-300 hover:bg-blue-100">
+                        <Button variant="secondary" className="border-blue-300 hover:bg-blue-100">
                             <RefreshCw className="h-4 w-4 mr-2" />
                             Add to Queue
                         </Button>

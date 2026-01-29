@@ -21,7 +21,7 @@ export default async function RFQPage() {
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) {
-    redirect('/auth/signin')
+    redirect('/login')
   }
 
   // Check if user is a provider
@@ -37,14 +37,17 @@ export default async function RFQPage() {
   return (
     <div className="container mx-auto py-6 space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">RFQ Race</h1>
-          <p className="text-muted-foreground">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-slate-100">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-3 mb-1">
+            <div className="h-8 w-1 bg-orange-600 rounded-full shadow-[0_0_8px_rgba(234,88,12,0.6)]" />
+            <h1 className="text-2xl sm:text-3xl font-display font-semibold text-foreground tracking-tight">RFQ Race</h1>
+          </div>
+          <p className="text-muted-foreground mt-1 text-sm font-medium pl-4">
             Create requests and compete for opportunities
           </p>
         </div>
-        <Button asChild>
+        <Button asChild className="bg-slate-900 hover:bg-slate-800 text-white font-medium shadow-md">
           <Link href="/rfq/create">
             <Plus className="w-4 h-4 mr-2" />
             Create RFQ
@@ -98,7 +101,7 @@ export default async function RFQPage() {
                   <p className="text-sm text-muted-foreground">Total</p>
                   <p className="text-2xl font-bold">{counts.data.total}</p>
                 </div>
-                <Badge variant="outline" className="text-lg">All</Badge>
+                <Badge variant="secondary" className="text-lg">All</Badge>
               </div>
             </CardContent>
           </Card>

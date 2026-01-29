@@ -65,7 +65,7 @@ export function ApplicationsView({ initialApplications }: ApplicationsViewProps)
                         {statusFilters.map((statusFilter) => (
                             <Button
                                 key={statusFilter.value}
-                                variant={filter === statusFilter.value ? 'default' : 'outline'}
+                                variant={filter === statusFilter.value ? 'default' : 'secondary'}
                                 size="sm"
                                 onClick={() => setFilter(statusFilter.value)}
                             >

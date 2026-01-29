@@ -36,13 +36,13 @@ interface InvoiceListProps {
 }
 
 // Document type labels and colors
-const documentTypeConfig: Record<InvoiceDocumentType, { label: string; variant: "default" | "secondary" | "outline" }> = {
+const documentTypeConfig: Record<InvoiceDocumentType, { label: string; variant: "default" | "secondary" | "secondary" }> = {
   invoice: { label: "Invoice", variant: "default" },
   receipt: { label: "Receipt", variant: "secondary" },
-  statement: { label: "Statement", variant: "outline" },
+  statement: { label: "Statement", variant: "secondary" },
   credit_note: { label: "Credit Note", variant: "secondary" },
-  self_bill: { label: "Self-Bill", variant: "outline" },
-  platform_fee: { label: "Platform Fee", variant: "outline" },
+  self_bill: { label: "Self-Bill", variant: "secondary" },
+  platform_fee: { label: "Platform Fee", variant: "secondary" },
 }
 
 // Format currency
@@ -173,7 +173,7 @@ export function InvoiceList({
           </div>
           {orderId && (
             <Button
-              variant="outline"
+              variant="secondary"
               size="sm"
               className="mt-4"
               onClick={loadInvoices}

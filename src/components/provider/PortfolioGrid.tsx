@@ -166,7 +166,7 @@ function PortfolioGridCard({ item, showFeaturedHighlight, onClick }: PortfolioGr
                 {/* Featured Badge */}
                 {showFeaturedHighlight && item.is_featured && (
                     <Badge
-                        variant="outline"
+                        variant="secondary"
                         className="absolute top-2 left-2 bg-amber-50/90 text-amber-700 border-amber-200"
                     >
                         <Star className="w-3 h-3 mr-1 fill-amber-500" />

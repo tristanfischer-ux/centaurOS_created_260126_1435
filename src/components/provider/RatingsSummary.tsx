@@ -28,7 +28,7 @@ export const RatingsSummary = memo(function RatingsSummary({
         if (isNewProvider) {
             return (
                 <div className={cn('flex items-center gap-1.5', className)}>
-                    <Badge variant="outline" className="bg-violet-50 text-violet-700 border-violet-200">
+                    <Badge variant="secondary" className="bg-violet-50 text-violet-700 border-violet-200">
                         <Sparkles className="w-3 h-3 mr-1" />
                         New
                     </Badge>

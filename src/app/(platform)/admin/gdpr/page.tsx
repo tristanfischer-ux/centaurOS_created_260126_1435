@@ -189,7 +189,7 @@ export default function AdminGDPRPage() {
             Manage data requests and ensure compliance
           </p>
         </div>
-        <Button variant="outline" onClick={fetchData} disabled={loading}>
+        <Button variant="secondary" onClick={fetchData} disabled={loading}>
           <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} />
           Refresh
         </Button>
@@ -240,7 +240,7 @@ export default function AdminGDPRPage() {
           {/* Tabs */}
           <div className="flex gap-2">
             <Button
-              variant={selectedTab === "pending" ? "default" : "outline"}
+              variant={selectedTab === "pending" ? "default" : "secondary"}
               onClick={() => setSelectedTab("pending")}
             >
               Pending
@@ -251,7 +251,7 @@ export default function AdminGDPRPage() {
               )}
             </Button>
             <Button
-              variant={selectedTab === "all" ? "default" : "outline"}
+              variant={selectedTab === "all" ? "default" : "secondary"}
               onClick={() => setSelectedTab("all")}
             >
               All Requests
@@ -411,7 +411,7 @@ export default function AdminGDPRPage() {
                         {processing ? <Loader2 className="h-4 w-4 animate-spin" /> : "Confirm Denial"}
                       </Button>
                       <Button
-                        variant="outline"
+                        variant="secondary"
                         size="sm"
                         onClick={() => {
                           setShowDenyDialog(false)
@@ -440,7 +440,7 @@ export default function AdminGDPRPage() {
                       Process
                     </Button>
                     <Button
-                      variant="outline"
+                      variant="secondary"
                       onClick={() => setShowDenyDialog(true)}
                       disabled={!!processing}
                     >
@@ -489,21 +489,21 @@ export default function AdminGDPRPage() {
                     <Eye className="h-4 w-4 text-blue-500" />
                     Access Requests
                   </span>
-                  <Badge variant="outline">{stats.requestsByType.access}</Badge>
+                  <Badge variant="secondary">{stats.requestsByType.access}</Badge>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-sm flex items-center gap-2">
                     <Download className="h-4 w-4 text-green-500" />
                     Export Requests
                   </span>
-                  <Badge variant="outline">{stats.requestsByType.export}</Badge>
+                  <Badge variant="secondary">{stats.requestsByType.export}</Badge>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-sm flex items-center gap-2">
                     <Trash2 className="h-4 w-4 text-orange-500" />
                     Deletion Requests
                   </span>
-                  <Badge variant="outline">{stats.requestsByType.deletion}</Badge>
+                  <Badge variant="secondary">{stats.requestsByType.deletion}</Badge>
                 </div>
               </CardContent>
             </Card>

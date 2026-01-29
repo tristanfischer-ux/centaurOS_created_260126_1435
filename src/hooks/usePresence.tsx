@@ -37,7 +37,7 @@ export function usePresence(options: UsePresenceOptions = {}) {
 
   const supabase = createClient()
 
-  // Update presence via direct upsert
+  // Update presence via RPC function (bypasses RLS for reliable updates)
   const updatePresence = useCallback(async (
     status: PresenceStatus,
     currentTaskId?: string | null,
@@ -45,33 +45,41 @@ export function usePresence(options: UsePresenceOptions = {}) {
   ) => {
     try {
       const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return null
+      if (!user) {
+        console.debug('Cannot update presence: No authenticated user')
+        return null
+      }
       
       const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone
+      
+      // Use RPC function for reliable upsert with SECURITY DEFINER
       const { data, error } = await supabase
-        .from('presence')
-        .upsert({
-          user_id: user.id,
-          status: status,
-          current_task_id: currentTaskId || null,
-          last_seen: new Date().toISOString(),
-          timezone: timezone,
-          status_message: statusMessage || null
-        }, {
-          onConflict: 'user_id'
+        .rpc('upsert_presence', {
+          p_status: status,
+          p_current_task_id: currentTaskId || null,
+          p_timezone: timezone,
+          p_status_message: statusMessage || null
         })
-        .select()
-        .single()
       
       if (error) {
-        console.error('Error updating presence:', error)
+        // Properly log the error with all details
+        console.error('Error updating presence:', {
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code
+        })
         return null
       }
       
       setMyPresence(data as UserPresence)
       return data as UserPresence
     } catch (err) {
-      console.error('Failed to update presence:', err)
+      // Properly log caught errors
+      console.error('Failed to update presence:', {
+        error: err instanceof Error ? err.message : String(err),
+        stack: err instanceof Error ? err.stack : undefined
+      })
       return null
     }
   }, [supabase])
@@ -130,11 +138,19 @@ export function usePresence(options: UsePresenceOptions = {}) {
         .select('*')
         .order('last_seen', { ascending: false })
       
-      if (!error && data) {
+      if (error) {
+        console.debug('Presence fetch error:', {
+          message: error.message,
+          code: error.code
+        })
+        return
+      }
+      
+      if (data) {
         setTeamPresence(data as UserPresence[])
       }
     } catch (err) {
-      console.debug('Presence fetch failed:', err)
+      console.debug('Presence fetch failed:', err instanceof Error ? err.message : String(err))
     }
   }, [supabase])
 
@@ -146,77 +162,100 @@ export function usePresence(options: UsePresenceOptions = {}) {
   // Initialize presence and subscriptions
   useEffect(() => {
     let mounted = true
+    let initialized = false
 
     const init = async () => {
-      // Check if user is authenticated
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user || !mounted) return
+      try {
+        // Check if user is authenticated
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user || !mounted) return
 
-      // Set initial online status
-      await updatePresence('online')
-      
-      // Fetch current team presence
-      await fetchTeamPresence()
+        // Verify user has a profile before setting up presence
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('id', user.id)
+          .single()
 
-      // Subscribe to presence changes
-      channelRef.current = supabase
-        .channel('presence-changes')
-        .on(
-          'postgres_changes',
-          {
-            event: '*',
-            schema: 'public',
-            table: 'presence'
-          },
-          (payload) => {
-            if (!mounted) return
-            
-            if (payload.eventType === 'DELETE') {
-              setTeamPresence(prev => 
-                prev.filter(p => p.id !== (payload.old as UserPresence).id)
-              )
-            } else {
-              const newPresence = payload.new as UserPresence
-              setTeamPresence(prev => {
-                const existing = prev.findIndex(p => p.user_id === newPresence.user_id)
-                if (existing >= 0) {
-                  const updated = [...prev]
-                  updated[existing] = newPresence
-                  return updated
-                }
-                return [...prev, newPresence]
-              })
+        if (profileError || !profile) {
+          console.debug('Presence: User profile not ready yet')
+          return
+        }
+
+        // Set initial online status
+        const initialPresence = await updatePresence('online')
+        if (!initialPresence || !mounted) return
+
+        initialized = true
+        
+        // Fetch current team presence
+        await fetchTeamPresence()
+
+        // Subscribe to presence changes
+        channelRef.current = supabase
+          .channel('presence-changes')
+          .on(
+            'postgres_changes',
+            {
+              event: '*',
+              schema: 'public',
+              table: 'presence'
+            },
+            (payload) => {
+              if (!mounted) return
               
-              // Update my presence if it's mine
-              if (newPresence.user_id === user.id) {
-                setMyPresence(newPresence)
+              if (payload.eventType === 'DELETE') {
+                setTeamPresence(prev => 
+                  prev.filter(p => p.id !== (payload.old as UserPresence).id)
+                )
+              } else {
+                const newPresence = payload.new as UserPresence
+                setTeamPresence(prev => {
+                  const existing = prev.findIndex(p => p.user_id === newPresence.user_id)
+                  if (existing >= 0) {
+                    const updated = [...prev]
+                    updated[existing] = newPresence
+                    return updated
+                  }
+                  return [...prev, newPresence]
+                })
+                
+                // Update my presence if it's mine
+                if (newPresence.user_id === user.id) {
+                  setMyPresence(newPresence)
+                }
               }
             }
+          )
+          .subscribe((status) => {
+            setIsConnected(status === 'SUBSCRIBED')
+          })
+
+        // Start heartbeat only if initialized successfully
+        heartbeatRef.current = setInterval(async () => {
+          if (!mounted || !initialized) return
+          
+          const currentStatus = myPresence?.status
+          if (currentStatus && currentStatus !== 'offline') {
+            await updatePresence(currentStatus, myPresence?.current_task_id)
           }
-        )
-        .subscribe((status) => {
-          setIsConnected(status === 'SUBSCRIBED')
+        }, heartbeatInterval)
+
+        // Set up activity listeners
+        const activityEvents = ['mousedown', 'keydown', 'touchstart', 'scroll']
+        activityEvents.forEach(event => {
+          window.addEventListener(event, recordActivity, { passive: true })
         })
 
-      // Start heartbeat
-      heartbeatRef.current = setInterval(() => {
-        if (mounted && myPresence?.status !== 'offline') {
-          updatePresence(myPresence?.status || 'online', myPresence?.current_task_id)
-        }
-      }, heartbeatInterval)
-
-      // Set up activity listeners
-      const activityEvents = ['mousedown', 'keydown', 'touchstart', 'scroll']
-      activityEvents.forEach(event => {
-        window.addEventListener(event, recordActivity, { passive: true })
-      })
-
-      // Initial away timeout
-      awayTimeoutRef.current = setTimeout(() => {
-        if (mounted && myPresence?.status === 'online') {
-          goAway()
-        }
-      }, awayTimeout)
+        // Initial away timeout
+        awayTimeoutRef.current = setTimeout(() => {
+          if (mounted && myPresence?.status === 'online') {
+            goAway()
+          }
+        }, awayTimeout)
+      } catch (err) {
+        console.debug('Presence initialization failed:', err instanceof Error ? err.message : String(err))
+      }
     }
 
     init()
@@ -237,8 +276,10 @@ export function usePresence(options: UsePresenceOptions = {}) {
         clearTimeout(awayTimeoutRef.current)
       }
 
-      // Set offline on unmount
-      goOffline()
+      // Set offline on unmount only if we were initialized
+      if (initialized) {
+        goOffline()
+      }
 
       const activityEvents = ['mousedown', 'keydown', 'touchstart', 'scroll']
       activityEvents.forEach(event => {

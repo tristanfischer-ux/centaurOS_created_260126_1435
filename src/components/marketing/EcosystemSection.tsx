@@ -32,7 +32,7 @@ export function EcosystemSection() {
                     <span className="text-xs font-bold tracking-[0.3em] text-international-orange uppercase block mb-6">
                         The Infrastructure
                     </span>
-                    <h2 className="text-4xl md:text-5xl font-playfair font-medium text-slate-900 leading-tight mb-6">
+                    <h2 className="text-4xl md:text-5xl font-display font-medium text-slate-900 leading-tight mb-6">
                         THE OPERATING SYSTEM.
                     </h2>
                     <p className="text-lg text-slate-600 leading-relaxed font-light">
@@ -63,7 +63,7 @@ export function EcosystemSection() {
                                 <span className="text-xs font-bold tracking-[0.3em] text-international-orange uppercase block mb-4 transform translate-y-2 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-500">
                                     {item.label}
                                 </span>
-                                <h3 className="text-3xl font-playfair font-medium text-white tracking-tight mb-4">
+                                <h3 className="text-3xl font-display font-medium text-white tracking-tight mb-4">
                                     {item.title}
                                 </h3>
                                 <p className="text-slate-300 leading-relaxed text-sm mb-6 max-w-sm">

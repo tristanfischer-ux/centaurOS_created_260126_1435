@@ -115,7 +115,7 @@ export function InvoicePreview({
           <div className="text-center py-8">
             <p className="text-destructive mb-4">{error}</p>
             {orderId && (
-              <Button variant="outline" onClick={loadPreview}>
+              <Button variant="secondary" onClick={loadPreview}>
                 <RefreshCw className="h-4 w-4 mr-2" />
                 Retry
               </Button>
@@ -147,7 +147,7 @@ export function InvoicePreview({
     <div className="relative">
       <div className="absolute top-2 right-2 z-10 flex gap-2">
         <Button
-          variant="outline"
+          variant="secondary"
           size="sm"
           onClick={() => setFullscreen(!fullscreen)}
         >
@@ -158,7 +158,7 @@ export function InvoicePreview({
           )}
         </Button>
         {invoiceId && (
-          <Button variant="outline" size="sm" onClick={handleDownload}>
+          <Button variant="secondary" size="sm" onClick={handleDownload}>
             <Download className="h-4 w-4 mr-2" />
             Download
           </Button>
@@ -240,7 +240,7 @@ export function InvoicePreviewModal({
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         {trigger || (
-          <Button variant="outline" size="sm">
+          <Button variant="secondary" size="sm">
             <FileText className="h-4 w-4 mr-2" />
             Preview Invoice
           </Button>

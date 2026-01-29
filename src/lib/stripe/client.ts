@@ -1,15 +1,27 @@
 import Stripe from 'stripe'
 
-// Validate environment variable
-const stripeSecretKey = process.env.STRIPE_SECRET_KEY
-if (!stripeSecretKey) {
-  throw new Error('Missing STRIPE_SECRET_KEY environment variable')
+// Lazy initialization of Stripe client to avoid build-time errors
+let stripeInstance: Stripe | null = null
+
+function getStripeClient(): Stripe {
+  if (!stripeInstance) {
+    const stripeSecretKey = process.env.STRIPE_SECRET_KEY
+    if (!stripeSecretKey) {
+      throw new Error('Missing STRIPE_SECRET_KEY environment variable')
+    }
+    stripeInstance = new Stripe(stripeSecretKey, {
+      apiVersion: '2025-02-24.acacia',
+      typescript: true,
+    })
+  }
+  return stripeInstance
 }
 
-// Initialize Stripe with the secret key
-export const stripe = new Stripe(stripeSecretKey, {
-  apiVersion: '2025-02-24.acacia',
-  typescript: true,
+// Export a proxy that lazily initializes the Stripe client
+export const stripe = new Proxy({} as Stripe, {
+  get(_target, prop) {
+    return getStripeClient()[prop as keyof Stripe]
+  }
 })
 
 // Type for Stripe Connect account

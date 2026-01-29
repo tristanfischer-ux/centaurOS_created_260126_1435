@@ -268,7 +268,7 @@ export function TimesheetApprovalCard({
           {canTakeAction && (
             <div className="flex items-center justify-end gap-2 pt-4 border-t">
               <Button
-                variant="outline"
+                variant="secondary"
                 onClick={() => setShowDisputeDialog(true)}
                 disabled={isApproving || isDisputing}
               >

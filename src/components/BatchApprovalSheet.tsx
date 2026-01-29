@@ -156,7 +156,7 @@ export function BatchApprovalSheet({ onApprovalComplete, trigger }: BatchApprova
             <Dialog open={open} onOpenChange={setOpen}>
                 <DialogTrigger asChild>
                     {trigger || (
-                        <Button variant="outline" size="sm" className="relative">
+                        <Button variant="secondary" size="sm" className="relative">
                             <ClipboardList className="h-4 w-4 mr-2" />
                             Approvals
                             {pendingCount > 0 && (
@@ -339,7 +339,7 @@ export function BatchApprovalSheet({ onApprovalComplete, trigger }: BatchApprova
                                     }
                                 </span>
                                 <Button
-                                    variant="outline"
+                                    variant="secondary"
                                     size="sm"
                                     onClick={loadTasks}
                                     disabled={isLoading}
@@ -369,7 +369,7 @@ export function BatchApprovalSheet({ onApprovalComplete, trigger }: BatchApprova
                         className="min-h-[100px]"
                     />
                     <DialogFooter>
-                        <Button variant="outline" onClick={() => setRejectDialogOpen(false)}>
+                        <Button variant="secondary" onClick={() => setRejectDialogOpen(false)}>
                             Cancel
                         </Button>
                         <Button

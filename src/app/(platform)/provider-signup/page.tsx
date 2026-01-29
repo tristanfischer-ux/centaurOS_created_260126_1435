@@ -220,14 +220,14 @@ async function SignupContent({ listingId }: { listingId?: string }) {
                                 </p>
                             </div>
                             <div className="flex gap-3 justify-center">
-                                <Link href={`/auth/signin?redirect=/provider-signup${listingId ? `?listing=${listingId}` : ''}`}>
+                                <Link href={`/login?redirect=/provider-signup${listingId ? `?listing=${listingId}` : ''}`}>
                                     <Button>
                                         Sign In
                                         <ArrowRight className="ml-2 h-4 w-4" />
                                     </Button>
                                 </Link>
-                                <Link href={`/auth/signup?redirect=/provider-signup${listingId ? `?listing=${listingId}` : ''}`}>
-                                    <Button variant="outline">
+                                <Link href={`/join?redirect=/provider-signup${listingId ? `?listing=${listingId}` : ''}`}>
+                                    <Button variant="secondary">
                                         Create Account
                                     </Button>
                                 </Link>

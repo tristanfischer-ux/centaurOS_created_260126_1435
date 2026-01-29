@@ -31,13 +31,13 @@ const statusConfig = {
         label: "Verify Answer",
         description: "This answer has not been verified yet.",
         icon: Shield,
-        buttonVariant: "outline" as const,
+        buttonVariant: "secondary" as const,
     },
     endorsed: {
         label: "Endorse to Verify",
         description: "This answer has been endorsed. Promote to verified?",
         icon: Shield,
-        buttonVariant: "outline" as const,
+        buttonVariant: "secondary" as const,
     },
     verified: {
         label: "Verified",
@@ -161,7 +161,7 @@ export function VerifyButton({
                     {currentStatus === "unverified" && (
                         <div className="flex gap-2">
                             <Button
-                                variant={selectedAction === "endorse" ? "default" : "outline"}
+                                variant={selectedAction === "endorse" ? "default" : "secondary"}
                                 size="sm"
                                 onClick={() => setSelectedAction("endorse")}
                                 className={cn(
@@ -173,7 +173,7 @@ export function VerifyButton({
                                 Endorse
                             </Button>
                             <Button
-                                variant={selectedAction === "verify" ? "default" : "outline"}
+                                variant={selectedAction === "verify" ? "default" : "secondary"}
                                 size="sm"
                                 onClick={() => setSelectedAction("verify")}
                                 className={cn(

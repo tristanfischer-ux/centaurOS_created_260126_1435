@@ -5,7 +5,7 @@ import '@testing-library/jest-dom'
 describe('Button Component', () => {
     describe('Semantic Variants', () => {
         it('should render primary variant with correct classes', () => {
-            const { container } = render(<Button variant="primary">Primary Button</Button>)
+            const { container } = render(<Button variant="default">Primary Button</Button>)
             const button = screen.getByText('Primary Button')
             expect(button).toHaveClass('bg-slate-900', 'hover:bg-slate-800', 'text-white')
         })
@@ -29,7 +29,7 @@ describe('Button Component', () => {
         })
 
         it('should render certified variant with correct classes', () => {
-            const { container } = render(<Button variant="certified">Certified Button</Button>)
+            const { container } = render(<Button variant="success">Certified Button</Button>)
             const button = screen.getByText('Certified Button')
             expect(button).toHaveClass('bg-purple-600', 'hover:bg-purple-700', 'text-white')
         })

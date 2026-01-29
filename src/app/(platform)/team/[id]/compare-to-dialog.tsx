@@ -58,7 +58,7 @@ export function CompareToDialog({ currentMember, allMembers }: CompareToDialogPr
     return (
         <>
             <Button
-                variant="outline"
+                variant="secondary"
                 onClick={() => setOpen(true)}
                 className="gap-2"
             >
@@ -168,7 +168,7 @@ export function CompareToDialog({ currentMember, allMembers }: CompareToDialogPr
                             </table>
 
                             <div className="mt-4 pt-4 border-t border-slate-200 flex justify-between">
-                                <Button variant="outline" onClick={resetState}>
+                                <Button variant="secondary" onClick={resetState}>
                                     ← Compare with someone else
                                 </Button>
                                 <Button onClick={() => setOpen(false)}>

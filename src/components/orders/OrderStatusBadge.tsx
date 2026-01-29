@@ -23,7 +23,7 @@ const statusConfig: Record<
   OrderStatus,
   {
     label: string
-    variant: "default" | "secondary" | "destructive" | "warning" | "success" | "info" | "outline"
+    variant: "default" | "secondary" | "destructive" | "warning" | "success" | "info" | "secondary"
     icon: React.ComponentType<{ className?: string }>
     description: string
   }

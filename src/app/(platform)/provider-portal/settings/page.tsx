@@ -261,7 +261,7 @@ export default function ProviderSettingsPage() {
                                         <Popover>
                                             <PopoverTrigger asChild>
                                                 <Button
-                                                    variant="outline"
+                                                    variant="secondary"
                                                     className={cn(
                                                         "w-full justify-start text-left font-normal",
                                                         !outOfOfficeUntil && "text-muted-foreground"

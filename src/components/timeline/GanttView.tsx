@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo, useRef, useEffect } from "react"
+import { useState, useMemo, useRef, useEffect, useCallback } from "react"
 import { Gantt, Task as GanttTask, ViewMode } from "gantt-task-react"
 import "gantt-task-react/dist/index.css"
 import { Database } from "@/types/database.types"
@@ -8,7 +8,11 @@ import { MultiSelect } from "@/components/ui/multi-select"
 
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
-import { ChevronLeft, ChevronRight, CalendarDays, ArrowUpDown } from "lucide-react"
+import {
+    Dialog,
+    DialogContent,
+} from "@/components/ui/dialog"
+import { ChevronLeft, ChevronRight, CalendarDays, ArrowUpDown, X } from "lucide-react"
 import { updateTaskDates } from "@/actions/tasks"
 import {
     Select,
@@ -22,26 +26,47 @@ import { toast } from "sonner"
 import { useRouter } from "next/navigation"
 import { format, addDays, subDays, addWeeks, subWeeks, addMonths, subMonths } from "date-fns"
 import { getStatusHex } from "@/lib/status-colors"
+import { TaskCard } from "@/app/(platform)/tasks/task-card"
+
+// Profile type for assignees
+type AssigneeProfile = {
+    id: string
+    full_name: string | null
+    role: string | null
+    email: string | null
+}
 
 // Types for joined data
 export type JoinedTask = Database["public"]["Tables"]["tasks"]["Row"] & {
     profiles: Database["public"]["Tables"]["profiles"]["Row"] | null
     objectives: Database["public"]["Tables"]["objectives"]["Row"] | null
+    task_assignees?: { profile: AssigneeProfile | null }[]
 }
 
 
+
+type Member = {
+    id: string
+    full_name: string
+    role: string
+}
 
 export type GanttViewProps = {
     tasks: JoinedTask[]
     objectives: Database["public"]["Tables"]["objectives"]["Row"][]
     profiles: Database["public"]["Tables"]["profiles"]["Row"][]
+    members?: Member[]
+    currentUserId?: string
 }
 
-// Extended GanttTask with task number and assignee for avatars
+// Extended GanttTask with task number and assignees for avatars
 interface ExtendedGanttTask extends GanttTask {
     taskNumber?: number
     assigneeName?: string | null
     assigneeRole?: string | null
+    assignees?: AssigneeProfile[] // All assignees for multi-assignee display
+    taskProgress?: number // Actual progress percentage from DB
+    taskStatus?: string | null // Task status for legend reference
 }
 
 // Get initials from full name
@@ -145,23 +170,54 @@ function CustomTaskListHeader({ headerHeight }: { headerHeight: number }) {
     )
 }
 
-// Custom Table Row Component
+// Multi-assignee avatar stack component
+function AssigneeAvatarStack({ assignees, maxDisplay = 3 }: { assignees: AssigneeProfile[], maxDisplay?: number }) {
+    if (!assignees || assignees.length === 0) {
+        return <InitialsAvatar name={null} size="xs" />
+    }
+
+    const displayedAssignees = assignees.slice(0, maxDisplay)
+    const remainingCount = assignees.length - maxDisplay
+
+    return (
+        <div className="flex items-center -space-x-1.5">
+            {displayedAssignees.map((assignee, idx) => (
+                <div key={assignee.id} style={{ zIndex: maxDisplay - idx }} className="ring-1 ring-white rounded-full">
+                    <InitialsAvatar
+                        name={assignee.full_name}
+                        size="xs"
+                        isAI={assignee.role === 'AI_Agent'}
+                    />
+                </div>
+            ))}
+            {remainingCount > 0 && (
+                <div className="h-5 w-5 bg-slate-300 rounded-full flex items-center justify-center text-[8px] font-semibold text-slate-600 ring-1 ring-white">
+                    +{remainingCount}
+                </div>
+            )}
+        </div>
+    )
+}
+
+// Custom Table Row Component - receives sortedTasks from closure to maintain our sort order
 function CustomTaskListTable({
-    tasks,
     rowHeight,
-    onExpanderClick
+    onExpanderClick,
+    sortedTasks
 }: {
-    tasks: ExtendedGanttTask[]
+    tasks: ExtendedGanttTask[] // Still required by Gantt library signature, but we ignore it
     rowHeight: number
     onExpanderClick: (task: GanttTask) => void
+    sortedTasks: ExtendedGanttTask[] // Our properly sorted tasks from closure
 }) {
     return (
         <div>
-            {tasks.map(task => {
+            {sortedTasks.map(task => {
                 // Extract task number from name if present (e.g., "Task 19: Review" -> 19)
                 const taskNumMatch = task.name.match(/^Task (\d+):/i)
                 const taskNum = task.taskNumber || (taskNumMatch ? taskNumMatch[1] : '-')
                 const displayName = task.name.replace(/^Task \d+:\s*/i, '')
+                const progressPct = task.taskProgress ?? task.progress
 
                 return (
                     <div
@@ -172,12 +228,28 @@ function CustomTaskListTable({
                     >
                         <div className="w-10 px-2 text-center text-slate-400 text-xs font-mono">{taskNum}</div>
                         <div className="flex-1 px-2 min-w-[120px] flex items-center gap-2">
-                            <InitialsAvatar
-                                name={task.assigneeName}
-                                size="xs"
-                                isAI={task.assigneeRole === 'AI_Agent'}
-                            />
+                            {/* Show multiple assignees if available, otherwise fall back to single */}
+                            {task.assignees && task.assignees.length > 0 ? (
+                                <AssigneeAvatarStack assignees={task.assignees} />
+                            ) : (
+                                <InitialsAvatar
+                                    name={task.assigneeName}
+                                    size="xs"
+                                    isAI={task.assigneeRole === 'AI_Agent'}
+                                />
+                            )}
                             <span className="text-slate-900 truncate">{displayName}</span>
+                            {/* Progress percentage badge */}
+                            {progressPct > 0 && progressPct < 100 && (
+                                <span className="ml-auto shrink-0 text-[10px] font-medium text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">
+                                    {progressPct}%
+                                </span>
+                            )}
+                            {progressPct === 100 && (
+                                <span className="ml-auto shrink-0 text-[10px] font-medium text-green-600 bg-green-50 px-1.5 py-0.5 rounded">
+                                    100%
+                                </span>
+                            )}
                         </div>
                         <div className="w-20 px-2 text-center text-slate-500 text-xs">
                             {format(task.start, 'd MMM')}
@@ -194,11 +266,13 @@ function CustomTaskListTable({
 
 // Custom Tooltip Component
 const CustomTooltip = ({ task }: { task: GanttTask, fontSize: string, fontFamily: string }) => {
+    const extendedTask = task as ExtendedGanttTask
     const startDate = task.start
     const endDate = task.end
     // Calculate duration in days (inclusive)
     const diffTime = Math.abs(endDate.getTime() - startDate.getTime())
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+    const progress = extendedTask.taskProgress ?? task.progress
 
     return (
         <div style={{
@@ -220,19 +294,36 @@ const CustomTooltip = ({ task }: { task: GanttTask, fontSize: string, fontFamily
             <div className="text-slate-500 mb-1">
                 {format(startDate, 'MMM d')} - {format(endDate, 'MMM d, yyyy')}
             </div>
-            <div className="text-amber-600 text-xs font-semibold">
-                Duration: {diffDays} day{diffDays !== 1 ? 's' : ''}
+            <div className="flex items-center gap-3 mt-2">
+                <div className="text-amber-600 text-xs font-semibold">
+                    Duration: {diffDays} day{diffDays !== 1 ? 's' : ''}
+                </div>
+                <div className="text-blue-600 text-xs font-semibold">
+                    Progress: {progress}%
+                </div>
             </div>
+            {extendedTask.assignees && extendedTask.assignees.length > 0 && (
+                <div className="text-slate-500 text-xs mt-1.5 border-t border-slate-100 pt-1.5">
+                    Assigned: {extendedTask.assignees.map(a => a.full_name || 'Unknown').join(', ')}
+                </div>
+            )}
         </div>
     )
 }
 
-export function GanttView({ tasks, objectives, profiles }: GanttViewProps) {
+export function GanttView({ tasks, objectives, profiles, members = [], currentUserId = '' }: GanttViewProps) {
     const router = useRouter()
     const [viewMode, setViewMode] = useState<ViewMode>(ViewMode.Day)
     const [selectedObjectives, setSelectedObjectives] = useState<string[]>([])
+    
+    // Task detail modal state
+    const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null)
+    const selectedTask = useMemo(() => {
+        if (!selectedTaskId) return null
+        return tasks.find(t => t.id === selectedTaskId) || null
+    }, [selectedTaskId, tasks])
     const [selectedMembers, setSelectedMembers] = useState<string[]>([])
-    const [sortBy, setSortBy] = useState<'start_date' | 'end_date'>('end_date')
+    const [sortBy, setSortBy] = useState<'start_date' | 'end_date' | 'task_number' | 'alphabetical'>('end_date')
 
     // Optimistic local state for task dates (prevents "bounce back")
     const [localDateOverrides, setLocalDateOverrides] = useState<Record<string, { start: Date, end: Date }>>({})
@@ -251,6 +342,48 @@ export function GanttView({ tasks, objectives, profiles }: GanttViewProps) {
             }
         }
     }, [])
+
+    // Clear optimistic overrides when server data matches our updates (confirming sync)
+    useEffect(() => {
+        if (Object.keys(localDateOverrides).length === 0) return
+        
+        // Helper to compare dates at day level (ignoring time precision)
+        const isSameDay = (date1: Date, date2: Date) => {
+            return date1.getFullYear() === date2.getFullYear() &&
+                   date1.getMonth() === date2.getMonth() &&
+                   date1.getDate() === date2.getDate()
+        }
+        
+        // Check each override to see if server data now matches
+        const updatedOverrides = { ...localDateOverrides }
+        let hasChanges = false
+        
+        for (const [taskId, override] of Object.entries(localDateOverrides)) {
+            const serverTask = tasks.find(t => t.id === taskId)
+            if (serverTask) {
+                const serverStart = serverTask.start_date ? new Date(serverTask.start_date) : null
+                const serverEnd = serverTask.end_date ? new Date(serverTask.end_date) : null
+                
+                // If server data matches our optimistic update (comparing at day level)
+                const startMatches = serverStart && isSameDay(serverStart, override.start)
+                const endMatches = serverEnd && isSameDay(serverEnd, override.end)
+                
+                if (startMatches && endMatches) {
+                    delete updatedOverrides[taskId]
+                    hasChanges = true
+                    // Clear the timeout since we've confirmed sync
+                    if (dateChangeTimeoutRef.current) {
+                        clearTimeout(dateChangeTimeoutRef.current)
+                        dateChangeTimeoutRef.current = null
+                    }
+                }
+            }
+        }
+        
+        if (hasChanges) {
+            setLocalDateOverrides(updatedOverrides)
+        }
+    }, [tasks, localDateOverrides])
 
     // Navigate dates left/right
     const navigateDate = (direction: 'prev' | 'next') => {
@@ -299,23 +432,45 @@ export function GanttView({ tasks, objectives, profiles }: GanttViewProps) {
     }, [tasks, selectedObjectives, selectedMembers])
 
     // Transform to Gantt Library Format (with optimistic overrides and assignee info)
-    // SORTED BY DEADLINE (end_date) - tasks due sooner appear first
-    // Transform to Gantt Library Format (with optimistic overrides and assignee info)
-    // SORTED BY DEADLINE (end_date) - tasks due sooner appear first
+    // Sort FIRST, then slice to limit - order matters!
     const ganttTasks: ExtendedGanttTask[] = useMemo(() => {
-        return filteredTasks
-            .slice(0, 50)
-            .sort((a, b) => {
-                if (sortBy === 'start_date') {
-                    const aStart = a.start_date ? new Date(a.start_date).getTime() : Infinity
-                    const bStart = b.start_date ? new Date(b.start_date).getTime() : Infinity
-                    return aStart - bStart
+        // Helper to safely parse date, returns timestamp or Infinity for invalid/missing dates
+        const parseDate = (dateStr: string | null | undefined): number => {
+            if (!dateStr) return Infinity
+            const parsed = new Date(dateStr)
+            if (isNaN(parsed.getTime())) return Infinity
+            return parsed.getTime()
+        }
+
+        const sorted = [...filteredTasks].sort((a, b) => {
+            if (sortBy === 'task_number') {
+                return (a.task_number || 0) - (b.task_number || 0)
+            }
+            if (sortBy === 'alphabetical') {
+                const aTitle = (a.title || '').toLowerCase()
+                const bTitle = (b.title || '').toLowerCase()
+                return aTitle.localeCompare(bTitle)
+            }
+            if (sortBy === 'start_date') {
+                const aStart = parseDate(a.start_date)
+                const bStart = parseDate(b.start_date)
+                // Secondary sort by task number for same dates
+                if (aStart === bStart) {
+                    return (a.task_number || 0) - (b.task_number || 0)
                 }
-                // Default: Sort by deadline (end_date) - soonest first
-                const aEnd = a.end_date ? new Date(a.end_date).getTime() : Infinity
-                const bEnd = b.end_date ? new Date(b.end_date).getTime() : Infinity
-                return aEnd - bEnd
-            })
+                return aStart - bStart
+            }
+            // Default: Sort by deadline (end_date) - soonest first
+            const aEnd = parseDate(a.end_date)
+            const bEnd = parseDate(b.end_date)
+            // Secondary sort by task number for same dates
+            if (aEnd === bEnd) {
+                return (a.task_number || 0) - (b.task_number || 0)
+            }
+            return aEnd - bEnd
+        })
+        
+        return sorted.slice(0, 50)
             .map(task => {
                 // Check for optimistic override first
                 const override = localDateOverrides[task.id]
@@ -337,23 +492,40 @@ export function GanttView({ tasks, objectives, profiles }: GanttViewProps) {
                 const color = getBarColor({ status: task.status, end_date: task.end_date })
                 const progress = getProgress(task.status)
 
+                // Get all assignees from task_assignees
+                const allAssignees: AssigneeProfile[] = (task.task_assignees || [])
+                    .map(ta => ta.profile)
+                    .filter((p): p is AssigneeProfile => p !== null)
+
+                // Use actual progress from DB if available, otherwise derive from status
+                const actualProgress = typeof task.progress === 'number' ? task.progress : progress
+
                 return {
                     start: startDate,
                     end: endDate,
                     name: task.title || "Untitled Task",
                     id: task.id,
                     type: "task" as const,
-                    progress: progress,
+                    progress: actualProgress,
                     isDisabled: false, // ENABLED for drag-drop (dates)
                     styles: {
                         progressColor: color,
                         progressSelectedColor: color,
                         backgroundColor: color,
                     },
-                    // Assignee info for avatar
+                    // Assignee info for avatar (primary)
                     assigneeName: task.profiles?.full_name,
                     assigneeRole: task.profiles?.role,
-                    taskNumber: task.task_number
+                    taskNumber: task.task_number,
+                    // All assignees for multi-display
+                    assignees: allAssignees.length > 0 ? allAssignees : (task.profiles ? [{
+                        id: task.profiles.id,
+                        full_name: task.profiles.full_name,
+                        role: task.profiles.role,
+                        email: task.profiles.email
+                    }] : []),
+                    taskProgress: actualProgress,
+                    taskStatus: task.status
                 }
             })
 
@@ -384,9 +556,10 @@ export function GanttView({ tasks, objectives, profiles }: GanttViewProps) {
                 toast.error(result.error)
             } else {
                 toast.success(`Rescheduled: ${task.name}`)
-                // Clear the override after successful server update and refresh
+                // Trigger server refresh to get updated data
                 router.refresh()
-                // Keep override until refresh completes, then clear after a short delay
+                // The optimistic override will be cleared by the useEffect when server data matches
+                // Use a fallback timeout of 10 seconds in case server refresh is delayed
                 if (dateChangeTimeoutRef.current) {
                     clearTimeout(dateChangeTimeoutRef.current)
                 }
@@ -396,7 +569,7 @@ export function GanttView({ tasks, objectives, profiles }: GanttViewProps) {
                         delete next[task.id]
                         return next
                     })
-                }, 500)
+                }, 10000)
             }
         } catch {
             // Revert optimistic update on error
@@ -409,9 +582,9 @@ export function GanttView({ tasks, objectives, profiles }: GanttViewProps) {
         }
     }
 
-    // Handler: Double-click opens task detail
+    // Handler: Double-click opens task detail modal
     const handleDoubleClick = (task: GanttTask) => {
-        router.push(`/tasks?highlight=${task.id}`)
+        setSelectedTaskId(task.id)
     }
 
     // Handler: Click shows task info
@@ -420,14 +593,54 @@ export function GanttView({ tasks, objectives, profiles }: GanttViewProps) {
         // toast.info(`${task.name} • ${task.start.toLocaleDateString()} → ${task.end.toLocaleDateString()}`)
     }
 
+    // Memoized TaskListTable wrapper to pass sorted tasks and prevent unnecessary re-renders
+    const TaskListTableWithSortedTasks = useCallback(
+        (props: { tasks: ExtendedGanttTask[]; rowHeight: number; onExpanderClick: (task: GanttTask) => void }) => (
+            <CustomTaskListTable
+                {...props}
+                sortedTasks={ganttTasks}
+            />
+        ),
+        [ganttTasks]
+    )
+
 
 
     return (
         <div className="space-y-4">
-            <div className="text-xs text-slate-500 text-right px-1 flex justify-end gap-4">
-                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-slate-400"></span> Drag bar to reschedule</span>
-                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-slate-400"></span> Drag edges to resize duration</span>
-
+            {/* Color Legend */}
+            <div className="flex flex-wrap items-center justify-between gap-4 px-1">
+                <div className="flex flex-wrap items-center gap-3 text-xs">
+                    <span className="text-slate-500 font-medium">Status:</span>
+                    <span className="flex items-center gap-1.5">
+                        <span className="w-3 h-3 rounded-sm" style={{ backgroundColor: '#9ca3af' }}></span>
+                        <span className="text-slate-600">Pending</span>
+                    </span>
+                    <span className="flex items-center gap-1.5">
+                        <span className="w-3 h-3 rounded-sm" style={{ backgroundColor: '#3b82f6' }}></span>
+                        <span className="text-slate-600">Accepted</span>
+                    </span>
+                    <span className="flex items-center gap-1.5">
+                        <span className="w-3 h-3 rounded-sm" style={{ backgroundColor: '#22c55e' }}></span>
+                        <span className="text-slate-600">Completed</span>
+                    </span>
+                    <span className="flex items-center gap-1.5">
+                        <span className="w-3 h-3 rounded-sm" style={{ backgroundColor: '#f59e0b' }}></span>
+                        <span className="text-slate-600">Due Soon</span>
+                    </span>
+                    <span className="flex items-center gap-1.5">
+                        <span className="w-3 h-3 rounded-sm" style={{ backgroundColor: '#ef4444' }}></span>
+                        <span className="text-slate-600">Overdue</span>
+                    </span>
+                    <span className="flex items-center gap-1.5">
+                        <span className="w-3 h-3 rounded-sm" style={{ backgroundColor: '#a855f7' }}></span>
+                        <span className="text-slate-600">Pending Approval</span>
+                    </span>
+                </div>
+                <div className="text-xs text-slate-500 flex gap-4">
+                    <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-slate-400"></span> Drag bar to reschedule</span>
+                    <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-slate-400"></span> Drag edges to resize duration</span>
+                </div>
             </div>
             {/* Control Bar */}
             <Card className="p-4 flex flex-wrap gap-4 items-center justify-between shadow-sm">
@@ -450,7 +663,7 @@ export function GanttView({ tasks, objectives, profiles }: GanttViewProps) {
                 </div>
 
                 <div className="flex items-center gap-2">
-                    <Select value={sortBy} onValueChange={(v) => setSortBy(v as 'start_date' | 'end_date')}>
+                    <Select value={sortBy} onValueChange={(v) => setSortBy(v as 'start_date' | 'end_date' | 'task_number' | 'alphabetical')}>
                         <SelectTrigger className="w-[140px] h-8 text-xs">
                             <ArrowUpDown className="w-3 h-3 mr-2 text-muted-foreground" />
                             <SelectValue placeholder="Sort by" />
@@ -458,6 +671,8 @@ export function GanttView({ tasks, objectives, profiles }: GanttViewProps) {
                         <SelectContent>
                             <SelectItem value="end_date">Deadline</SelectItem>
                             <SelectItem value="start_date">Start Date</SelectItem>
+                            <SelectItem value="task_number">Task #</SelectItem>
+                            <SelectItem value="alphabetical">A-Z</SelectItem>
                         </SelectContent>
                     </Select>
 
@@ -494,7 +709,7 @@ export function GanttView({ tasks, objectives, profiles }: GanttViewProps) {
                             <Tooltip>
                                 <TooltipTrigger asChild>
                                     <Button
-                                        variant="outline"
+                                        variant="secondary"
                                         size="sm"
                                         onClick={() => navigateDate('prev')}
                                         className="min-h-[44px] min-w-[44px] h-9 w-9 p-0"
@@ -511,7 +726,7 @@ export function GanttView({ tasks, objectives, profiles }: GanttViewProps) {
                             <Tooltip>
                                 <TooltipTrigger asChild>
                                     <Button
-                                        variant="outline"
+                                        variant="secondary"
                                         size="sm"
                                         onClick={goToToday}
                                         className="h-9 px-3 text-xs"
@@ -529,7 +744,7 @@ export function GanttView({ tasks, objectives, profiles }: GanttViewProps) {
                             <Tooltip>
                                 <TooltipTrigger asChild>
                                     <Button
-                                        variant="outline"
+                                        variant="secondary"
                                         size="sm"
                                         onClick={() => navigateDate('next')}
                                         className="min-h-[44px] min-w-[44px] h-9 w-9 p-0"
@@ -554,6 +769,7 @@ export function GanttView({ tasks, objectives, profiles }: GanttViewProps) {
             ) : (
                 <div className="bg-card rounded-lg overflow-hidden shadow-md">
                     <Gantt
+                        key={`gantt-${sortBy}`} // Force re-render when sort changes
                         tasks={ganttTasks}
                         viewMode={viewMode}
                         viewDate={dateOffset}
@@ -561,15 +777,55 @@ export function GanttView({ tasks, objectives, profiles }: GanttViewProps) {
                         columnWidth={viewMode === ViewMode.Month ? 300 : viewMode === ViewMode.Week ? 150 : 65}
                         barFill={80} // Thicker bars for easier grabbing
                         onDateChange={handleDateChange}
-
                         onDoubleClick={handleDoubleClick}
                         onClick={handleClick}
                         TaskListHeader={CustomTaskListHeader}
-                        TaskListTable={CustomTaskListTable}
+                        TaskListTable={TaskListTableWithSortedTasks}
                         TooltipContent={CustomTooltip}
                     />
                 </div>
             )}
+
+            {/* Task Detail Modal */}
+            <Dialog open={!!selectedTask} onOpenChange={(open) => !open && setSelectedTaskId(null)}>
+                <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto p-0 bg-transparent border-0 shadow-none">
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        className="absolute right-2 top-2 z-50 h-8 w-8 rounded-full bg-white/90 hover:bg-white shadow-md"
+                        onClick={() => setSelectedTaskId(null)}
+                    >
+                        <X className="h-4 w-4" />
+                    </Button>
+                    {selectedTask && (
+                        <TaskCard
+                            task={{
+                                ...selectedTask,
+                                assignee: selectedTask.profiles ? {
+                                    id: selectedTask.profiles.id,
+                                    full_name: selectedTask.profiles.full_name,
+                                    role: selectedTask.profiles.role || 'Apprentice',
+                                    email: selectedTask.profiles.email || ''
+                                } : null,
+                                assignees: selectedTask.task_assignees?.map(ta => ({
+                                    id: ta.profile?.id || '',
+                                    full_name: ta.profile?.full_name || null,
+                                    role: ta.profile?.role || 'Apprentice',
+                                    email: ta.profile?.email || ''
+                                })).filter(a => a.id) || [],
+                                objective: selectedTask.objectives ? {
+                                    id: selectedTask.objectives.id,
+                                    title: selectedTask.objectives.title || 'Untitled'
+                                } : null
+                            }}
+                            currentUserId={currentUserId}
+                            members={members}
+                            expanded={true}
+                            onToggle={() => {}}
+                        />
+                    )}
+                </DialogContent>
+            </Dialog>
         </div>
     )
 }

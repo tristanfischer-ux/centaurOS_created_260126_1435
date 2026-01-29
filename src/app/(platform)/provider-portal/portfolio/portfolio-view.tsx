@@ -114,7 +114,7 @@ export function PortfolioManagementView({ items, error }: PortfolioManagementVie
                         </p>
                         <PortfolioItemDialog
                             trigger={
-                                <Button variant="primary">
+                                <Button variant="default">
                                     <Plus className="w-4 h-4 mr-2" />
                                     Add Your First Item
                                 </Button>
@@ -203,7 +203,7 @@ function PortfolioCard({ item, onEdit, onDelete, onToggleFeatured }: PortfolioCa
                 {/* Featured Badge */}
                 {item.is_featured && (
                     <Badge
-                        variant="outline"
+                        variant="secondary"
                         className="absolute top-2 left-2 bg-amber-50/90 text-amber-700 border-amber-200"
                     >
                         <Star className="w-3 h-3 mr-1 fill-amber-500" />

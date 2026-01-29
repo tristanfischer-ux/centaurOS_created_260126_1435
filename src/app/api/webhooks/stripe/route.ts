@@ -70,9 +70,9 @@ async function logStripeEvent(
       {
         stripe_event_id: event.id,
         event_type: event.type,
-        data: JSON.parse(JSON.stringify(event.data.object)),
-        status,
-        error_message: errorMessage || null,
+        payload: JSON.parse(JSON.stringify(event.data.object)),
+        processed: status === 'processed',
+        error: errorMessage || null,
         created_at: new Date(event.created * 1000).toISOString(),
         processed_at: status === 'processed' ? new Date().toISOString() : null,
       },
@@ -173,10 +173,10 @@ async function handlePaymentIntentFailed(paymentIntent: Stripe.PaymentIntent): P
 
       await sendNotification({
         userId: buyerId,
-        type: 'payment_failed',
+        priority: 'high',
         title: 'Payment Failed',
-        message: `Your payment of ${formatAmount(Number(order?.total_amount || paymentIntent.amount), order?.currency || paymentIntent.currency)} for order ${order?.order_number || orderId} could not be processed. ${paymentIntent.last_payment_error?.message || 'Please try again.'}`,
-        link: `/marketplace/orders/${orderId}`,
+        body: `Your payment of ${formatAmount(Number(order?.total_amount || paymentIntent.amount), order?.currency || paymentIntent.currency)} for order ${order?.order_number || orderId} could not be processed. ${paymentIntent.last_payment_error?.message || 'Please try again.'}`,
+        actionUrl: `/marketplace/orders/${orderId}`,
         metadata: {
           orderId,
           paymentIntentId: paymentIntent.id,
@@ -234,10 +234,10 @@ async function handleAccountUpdated(account: Stripe.Account): Promise<void> {
     try {
       await sendNotification({
         userId,
-        type: 'stripe_onboarding_complete',
+        priority: 'medium',
         title: 'Payment Setup Complete',
-        message: 'Your Stripe account is now fully set up. You can start receiving payments for your services.',
-        link: '/provider-portal/settings',
+        body: 'Your Stripe account is now fully set up. You can start receiving payments for your services.',
+        actionUrl: '/provider-portal/settings',
         metadata: {
           stripeAccountId: account.id,
         },
@@ -304,10 +304,10 @@ async function handleTransferCreated(transfer: Stripe.Transfer): Promise<void> {
       const milestoneInfo = milestoneId ? ` for milestone completion` : ''
       await sendNotification({
         userId: seller.user.id,
-        type: 'transfer_created',
+        priority: 'medium',
         title: 'Payment Transfer Initiated',
-        message: `A transfer of ${formatAmount(transfer.amount, transfer.currency)}${milestoneInfo} for order ${order.order_number} has been initiated to your Stripe account.`,
-        link: `/provider-portal/orders/${orderId}`,
+        body: `A transfer of ${formatAmount(transfer.amount, transfer.currency)}${milestoneInfo} for order ${order.order_number} has been initiated to your Stripe account.`,
+        actionUrl: `/provider-portal/orders/${orderId}`,
         metadata: {
           orderId,
           orderNumber: order.order_number,
@@ -405,10 +405,10 @@ async function handleChargeDisputeCreated(dispute: Stripe.Dispute): Promise<void
     if (seller?.user?.id) {
       await sendNotification({
         userId: seller.user.id,
-        type: 'charge_dispute',
+        priority: 'high',
         title: 'Payment Dispute Filed',
-        message: disputeMessage,
-        link: `/provider-portal/orders/${order.id}`,
+        body: disputeMessage,
+        actionUrl: `/provider-portal/orders/${order.id}`,
         metadata: {
           orderId: order.id,
           orderNumber: order.order_number,
@@ -421,10 +421,10 @@ async function handleChargeDisputeCreated(dispute: Stripe.Dispute): Promise<void
     if (buyer?.id) {
       await sendNotification({
         userId: buyer.id,
-        type: 'charge_dispute',
+        priority: 'high',
         title: 'Payment Dispute Filed',
-        message: disputeMessage,
-        link: `/marketplace/orders/${order.id}`,
+        body: disputeMessage,
+        actionUrl: `/marketplace/orders/${order.id}`,
         metadata: {
           orderId: order.id,
           orderNumber: order.order_number,
@@ -470,13 +470,13 @@ async function handlePayoutPaid(payout: Stripe.Payout): Promise<void> {
   await supabase.from('stripe_events').upsert({
     stripe_event_id: `payout_${payout.id}`,
     event_type: 'payout.paid',
-    data: {
+    payload: {
       payoutId: payout.id,
       amount: payout.amount,
       currency: payout.currency,
       arrivalDate: payout.arrival_date,
     },
-    status: 'processed',
+    processed: true,
     processed_at: new Date().toISOString(),
   }, {
     onConflict: 'stripe_event_id',

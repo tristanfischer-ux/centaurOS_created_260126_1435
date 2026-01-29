@@ -301,7 +301,7 @@ export default function ProviderApplicationPage() {
                                     />
                                     <Button 
                                         type="button" 
-                                        variant="outline"
+                                        variant="secondary"
                                         onClick={addCapability}
                                         disabled={!newCapability.trim() || capabilities.length >= 10}
                                     >
@@ -413,7 +413,7 @@ export default function ProviderApplicationPage() {
                     <div className="flex justify-between pt-4">
                         {step > 1 ? (
                             <Button 
-                                variant="outline" 
+                                variant="secondary" 
                                 onClick={() => setStep(step - 1)}
                                 disabled={isPending}
                             >

@@ -302,7 +302,7 @@ export function DataRequestStatusCard({
         {/* Cancel button for pending requests */}
         {request.status === "pending" && (
           <Button
-            variant="outline"
+            variant="secondary"
             size="sm"
             onClick={handleCancel}
             disabled={loading}

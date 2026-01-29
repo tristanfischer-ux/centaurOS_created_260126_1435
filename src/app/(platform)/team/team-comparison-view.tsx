@@ -10,7 +10,8 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
-import { Check, X, GitCompare, Users, MoreHorizontal, Pencil, Trash2, Loader2, AlertTriangle, Mail, Phone, LayoutGrid, List } from "lucide-react"
+import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "@/components/ui/table"
+import { Check, X, GitCompare, Users, MoreHorizontal, Pencil, Trash2, Loader2, AlertTriangle, Mail, Phone, LayoutGrid, List, ChevronUp, ChevronDown, User } from "lucide-react"
 import { createTeam, addTeamMember, deleteMember } from "@/actions/team"
 import { deleteTeam, updateTeamName } from "@/actions/teams"
 import Link from "next/link"
@@ -295,6 +296,21 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
         { label: "Rejected", getValue: (m: Member) => m.rejectedTasks, caution: true },
     ]
 
+    // Track expanded member cards
+    const [expandedMemberIds, setExpandedMemberIds] = useState<Set<string>>(new Set())
+    
+    const toggleMemberExpand = (memberId: string) => {
+        setExpandedMemberIds(prev => {
+            const next = new Set(prev)
+            if (next.has(memberId)) {
+                next.delete(memberId)
+            } else {
+                next.add(memberId)
+            }
+            return next
+        })
+    }
+
     const MemberCard = ({ member, type }: { member: Member, type: 'founder' | 'executive' | 'apprentice' | 'ai_agent' }) => {
         const isSelected = selectedIds.has(member.id)
         const isFounder = type === 'founder'
@@ -304,68 +320,74 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
         const isDropTarget = dropTargetId === member.id && draggedMemberId !== member.id
         const isPairing = pairingMemberId === member.id
         const isDeleting = deletingMemberId === member.id
+        const isExpanded = expandedMemberIds.has(member.id)
 
         // Centaur Status
         const pairedAI = member.pairedAI?.[0]
         const isCentaur = !!member.paired_ai_id && !!pairedAI
 
+        // Get member's current task titles from pre-computed data
+        const activeTaskTitles = [...(member.taskTitles?.active || []), ...(member.taskTitles?.pending || [])]
+
         // Determine styles based on type
+        let accentColor = 'bg-slate-400'
         let borderClass = 'border-slate-200'
         let ringClass = 'ring-slate-500 border-slate-500'
-        let hoverBorderClass = 'group-hover:border-blue-400 group-active:border-blue-500'
         let bgCheckClass = 'bg-slate-500'
         let avatarBorderClass = 'border border-slate-200'
         let avatarBgClass = 'bg-slate-100 text-slate-500'
         let badgeClass = 'bg-slate-100 text-slate-600'
 
         if (isAIAgent) {
-            borderClass = 'border-indigo-200 bg-indigo-50/30'
+            accentColor = 'bg-indigo-500'
+            borderClass = 'border-indigo-200'
             ringClass = 'ring-slate-500 border-slate-500'
-            hoverBorderClass = 'group-hover:border-indigo-400 group-active:border-indigo-500'
             bgCheckClass = 'bg-slate-500'
             avatarBorderClass = 'border-2 border-indigo-300'
             avatarBgClass = 'bg-indigo-100 text-indigo-700 font-bold'
             badgeClass = 'text-indigo-600 border-indigo-200 bg-indigo-50'
         } else if (isFounder) {
-            // ... existing founder styles ...
+            accentColor = 'bg-purple-500'
             borderClass = 'border-purple-200'
             ringClass = 'ring-slate-500 border-slate-500'
-            hoverBorderClass = 'group-hover:border-purple-400 group-active:border-purple-500'
             bgCheckClass = 'bg-slate-500'
             avatarBorderClass = 'border-2 border-purple-500'
             avatarBgClass = 'bg-purple-100 text-purple-700 font-bold'
             badgeClass = 'text-purple-600 border-purple-200 bg-purple-50'
         } else if (isExecutive) {
-            // ... existing executive styles ...
+            accentColor = 'bg-amber-500'
             borderClass = 'border-amber-200'
             ringClass = 'ring-slate-500 border-slate-500'
-            hoverBorderClass = 'group-hover:border-amber-500 group-active:border-amber-600'
-            // Keeping original logic for brevity in replace
-            hoverBorderClass = 'group-hover:border-amber-400 group-active:border-amber-500'
             bgCheckClass = 'bg-slate-500'
             avatarBorderClass = 'border-2 border-amber-500'
             avatarBgClass = 'bg-amber-100 text-amber-700 font-bold'
             badgeClass = 'text-amber-600 border-amber-200 bg-amber-50'
+        } else {
+            // Apprentice
+            accentColor = 'bg-blue-500'
+            borderClass = 'border-blue-200'
+            avatarBorderClass = 'border-2 border-blue-400'
+            avatarBgClass = 'bg-blue-100 text-blue-700 font-bold'
+            badgeClass = 'text-blue-600 border-blue-200 bg-blue-50'
         }
 
         // Centaur Override
         if (isCentaur) {
             borderClass = 'border-amber-400 shadow-md ring-1 ring-amber-400/50'
-            hoverBorderClass = 'group-hover:border-amber-500 group-active:border-amber-600'
         }
 
         const cardContent = (
             <Card className={`
-                bg-white border shadow-sm transition-all cursor-pointer relative
+                bg-white border shadow-sm transition-all cursor-pointer relative group/card
                 ${borderClass}
-                ${hoverBorderClass}
+                hover:border-slate-400 hover:shadow-md hover:-translate-y-[2px] active:translate-y-0 active:shadow-sm
                 ${compareMode && isSelected ? `ring-2 ${ringClass}` : ''}
                 ${isDragging ? 'opacity-50 scale-95' : ''}
                 ${isDropTarget ? 'ring-2 ring-green-500 border-green-500 bg-green-50' : ''}
                 ${isPairing || isDeleting ? 'opacity-60' : ''}
             `}>
                 {compareMode && (
-                    <div className={`absolute top-2 right-2 h-6 w-6 rounded-full flex items-center justify-center text-white text-xs
+                    <div className={`absolute top-2 right-2 h-6 w-6 rounded-full flex items-center justify-center text-white text-xs z-10
                         ${isSelected ? bgCheckClass : 'bg-slate-200'}
                     `}>
                         {isSelected ? <Check className="h-4 w-4" /> : null}
@@ -374,7 +396,6 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
 
                 {isDropTarget && (
                     <div className="absolute inset-0 flex items-center justify-center bg-green-500/10 rounded-lg z-10 backdrop-blur-[1px]">
-                        {/* Dynamic Drop Text based on what we are dragging */}
                         <div className="bg-green-600 text-white px-3 py-1.5 rounded-full text-xs font-medium flex items-center gap-1 shadow-sm">
                             <Zap className="h-3 w-3 fill-white" />
                             {draggedMemberId && aiAgents.some(a => a.id === draggedMemberId) ? 'Pair Centaur' : 'Combine / Team'}
@@ -389,54 +410,63 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                         </div>
                     </div>
                 )}
-                <CardHeader className="flex flex-row items-center gap-4 pb-2 relative">
-                    {/* Main Avatar with Presence */}
-                    <div className="relative">
-                        <Avatar className={`h-12 w-12 ${avatarBorderClass}`}>
-                            <AvatarFallback className={avatarBgClass}>
-                                {isAIAgent ? <Brain className="h-6 w-6" /> : getInitials(member.full_name)}
-                            </AvatarFallback>
-                        </Avatar>
 
-                        {/* Presence Indicator */}
-                        {!isAIAgent && (
-                            <PresenceIndicator
-                                status={getPresenceForUser(member.id)?.status || 'offline'}
-                                presence={getPresenceForUser(member.id)}
-                                size="md"
-                            />
-                        )}
+                {/* Collapsed View - Always Visible */}
+                <CardHeader className="p-4 pb-2">
+                    <div className="flex items-center gap-3">
+                        {/* Role Accent Bar */}
+                        <div className={`w-1 h-12 ${accentColor} rounded-full self-stretch`} />
+                        
+                        {/* Avatar with Presence */}
+                        <div className="relative">
+                            <Avatar className={`h-10 w-10 ${avatarBorderClass}`}>
+                                <AvatarFallback className={avatarBgClass}>
+                                    {isAIAgent ? <Brain className="h-5 w-5" /> : getInitials(member.full_name)}
+                                </AvatarFallback>
+                            </Avatar>
+                            {!isAIAgent && (
+                                <PresenceIndicator
+                                    status={getPresenceForUser(member.id)?.status || 'offline'}
+                                    presence={getPresenceForUser(member.id)}
+                                    size="sm"
+                                />
+                            )}
+                            {isCentaur && (
+                                <div className="absolute -bottom-1 -right-1 bg-white rounded-full p-[1px] shadow-sm border border-slate-200">
+                                    <Avatar className="h-4 w-4 border border-indigo-200">
+                                        <AvatarFallback className="bg-indigo-100 text-indigo-700 text-[6px]">
+                                            <Brain className="h-2 w-2" />
+                                        </AvatarFallback>
+                                    </Avatar>
+                                </div>
+                            )}
+                        </div>
 
-                        {/* Paired AI Badge (Little Avatar) */}
-                        {isCentaur && (
-                            <div className="absolute -bottom-1 -right-2 bg-white rounded-full p-[2px] shadow-sm border border-slate-200" title={`Paired with ${pairedAI.full_name}`}>
-                                <Avatar className="h-6 w-6 border border-indigo-200">
-                                    <AvatarFallback className="bg-indigo-100 text-indigo-700 text-[8px]">
-                                        <Brain className="h-3 w-3" />
-                                    </AvatarFallback>
-                                </Avatar>
-                            </div>
-                        )}
-                    </div>
-
-                    <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between">
+                        {/* Name & Role */}
+                        <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2">
-                                <CardTitle className="text-lg text-slate-900 truncate">
+                                <h3 className="font-semibold text-slate-900 truncate text-sm">
                                     {member.full_name}
-                                </CardTitle>
+                                </h3>
                                 {isCentaur && (
-                                    <Badge variant="secondary" className="text-[10px] bg-amber-100 text-amber-700 h-5 px-1.5 border-amber-200">
+                                    <Badge variant="secondary" className="text-[9px] bg-amber-100 text-amber-700 h-4 px-1 border-amber-200">
                                         Centaur
                                     </Badge>
                                 )}
                             </div>
+                            <Badge variant="secondary" className={`text-[9px] mt-0.5 ${badgeClass}`}>
+                                {member.role}
+                            </Badge>
+                        </div>
+
+                        {/* Expand/Collapse & Menu */}
+                        <div className="flex items-center gap-1">
                             <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
                                     <Button
                                         variant="ghost"
                                         type="button"
-                                        className="h-6 w-6 p-0 text-slate-400 hover:text-slate-600 opacity-0 group-hover:opacity-100 transition-opacity"
+                                        className="h-6 w-6 p-0 text-slate-400 hover:text-slate-600 opacity-0 group-hover/card:opacity-100 transition-opacity"
                                         onClick={(e) => {
                                             e.preventDefault()
                                             e.stopPropagation()
@@ -448,84 +478,137 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end" sideOffset={8}>
                                     <DropdownMenuItem
+                                        onClick={(e) => {
+                                            e.stopPropagation()
+                                            window.location.href = `/team/${member.id}`
+                                        }}
+                                    >
+                                        <User className="mr-2 h-4 w-4" /> View Profile
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem
                                         className="text-red-600 focus:text-red-600 focus:bg-red-50"
                                         onClick={(e) => {
                                             e.stopPropagation()
                                             setMemberToDelete(member.id)
                                         }}
                                     >
-                                        <Trash2 className="mr-2 h-4 w-4" /> Delete Person
+                                        <Trash2 className="mr-2 h-4 w-4" /> Remove
                                     </DropdownMenuItem>
                                 </DropdownMenuContent>
                             </DropdownMenu>
                         </div>
-                        <div className="flex items-center gap-2 mt-1">
-                            <Badge variant="outline" className={`text-[10px] ${badgeClass}`}>
-                                {member.role}
-                            </Badge>
-                            {isCentaur && (
-                                <div className="text-[10px] text-slate-400 flex items-center gap-1" title="Unpair">
-                                    <span className="truncate max-w-[80px]">w/ {pairedAI.full_name}</span>
-                                    <button
-                                        aria-label="Unpair Centaur"
-                                        onClick={(e) => {
-                                            e.preventDefault()
-                                            e.stopPropagation()
-                                            startTransition(async () => {
-                                                await unpairCentaur(member.id)
-                                                toast.success("Centaur unpaired")
-                                            })
-                                        }}
-                                        className="hover:bg-red-100 hover:text-red-600 active:bg-red-200 active:text-red-700 rounded p-0.5 transition-colors"
-                                    >
-                                        <Unplug className="h-3 w-3" />
-                                    </button>
+                    </div>
+
+                    {/* Email (truncated in collapsed) */}
+                    {member.email && (
+                        <div className="flex items-center gap-2 text-xs text-slate-500 mt-2 ml-4">
+                            <Mail className="h-3 w-3 text-slate-400" />
+                            <span className="truncate">{member.email}</span>
+                        </div>
+                    )}
+
+                    {/* Stats Row */}
+                    <div className="flex items-center justify-between mt-3 ml-4">
+                        <div className="flex gap-3 text-xs">
+                            <span className="text-green-600 font-medium">{member.completedTasks} done</span>
+                            <span className="text-blue-600 font-medium">{member.activeTasks} active</span>
+                            <span className="text-slate-400">{member.pendingTasks} pending</span>
+                        </div>
+                        <button
+                            onClick={(e) => {
+                                e.preventDefault()
+                                e.stopPropagation()
+                                if (!compareMode) toggleMemberExpand(member.id)
+                            }}
+                            className="text-slate-400 hover:text-slate-600 transition-colors p-1"
+                        >
+                            {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                        </button>
+                    </div>
+                </CardHeader>
+
+                {/* Expanded View */}
+                {isExpanded && (
+                    <CardContent className="pt-0 pb-4 px-4 space-y-3 border-t border-slate-100 mt-2">
+                        {/* Full Contact Info */}
+                        <div className="space-y-1 pt-3">
+                            {member.phone_number && (
+                                <div className="flex items-center gap-2 text-xs text-slate-600">
+                                    <Phone className="h-3 w-3 text-slate-400" />
+                                    <span>{member.phone_number}</span>
                                 </div>
                             )}
                         </div>
-                    </div>
-                </CardHeader>
-                <CardContent className="text-sm text-slate-500 space-y-3">
-                    {/* Contact Info */}
-                    <div className="space-y-1">
-                        {member.email && (
-                            <div className="flex items-center gap-2 text-xs">
-                                <Mail className="h-3 w-3 text-slate-400" />
-                                <span className="truncate">{member.email}</span>
+
+                        {/* Bio */}
+                        {member.bio && (
+                            <p className="text-xs text-slate-600 italic bg-slate-50 p-2 rounded">
+                                {member.bio}
+                            </p>
+                        )}
+
+                        {/* Centaur Pairing Info */}
+                        {isCentaur && pairedAI && (
+                            <div className="flex items-center gap-2 text-xs bg-amber-50 p-2 rounded border border-amber-200">
+                                <Brain className="h-4 w-4 text-amber-600" />
+                                <span className="text-amber-700">Paired with <strong>{pairedAI.full_name}</strong></span>
+                                <button
+                                    onClick={(e) => {
+                                        e.preventDefault()
+                                        e.stopPropagation()
+                                        startTransition(async () => {
+                                            await unpairCentaur(member.id)
+                                            toast.success("Centaur unpaired")
+                                        })
+                                    }}
+                                    className="ml-auto text-amber-600 hover:text-red-600 transition-colors"
+                                >
+                                    <Unplug className="h-3 w-3" />
+                                </button>
                             </div>
                         )}
-                        {member.phone_number && (
-                            <div className="flex items-center gap-2 text-xs">
-                                <Phone className="h-3 w-3 text-slate-400" />
-                                <span className="truncate">{member.phone_number}</span>
+
+                        {/* Current Tasks */}
+                        {activeTaskTitles.length > 0 && (
+                            <div className="space-y-2">
+                                <h4 className="text-xs font-semibold text-slate-700 uppercase tracking-wider">Current Tasks</h4>
+                                <div className="space-y-1">
+                                    {activeTaskTitles.slice(0, 3).map((title, idx) => (
+                                        <div key={idx} className="flex items-center text-xs bg-slate-50 p-2 rounded">
+                                            <span className="truncate text-slate-700">{title}</span>
+                                        </div>
+                                    ))}
+                                    {activeTaskTitles.length > 3 && (
+                                        <div className="text-xs text-slate-500 text-center">
+                                            +{activeTaskTitles.length - 3} more tasks
+                                        </div>
+                                    )}
+                                </div>
                             </div>
                         )}
-                    </div>
 
-                    {/* Bio */}
-                    {member.bio && (
-                        <p className="text-xs text-slate-600 line-clamp-2 italic">
-                            {member.bio}
-                        </p>
-                    )}
-
-                    <div className="flex gap-4 text-xs pt-1 border-t border-slate-100">
-                        <span className="text-green-600">{member.completedTasks} done</span>
-                        <span className="text-blue-600">{member.activeTasks} active</span>
-                        <span className="text-slate-400">{member.pendingTasks} pending</span>
-                    </div>
-
-                    {/* Touch-friendly action buttons (mobile only) */}
-                    {!compareMode && (
-                        <div className="flex gap-2 mt-2 sm:hidden pt-2 border-t border-slate-100">
+                        {/* Action Buttons */}
+                        <div className="flex gap-2 pt-2 border-t border-slate-100">
+                            <Button 
+                                variant="secondary" 
+                                size="sm" 
+                                className="flex-1 text-xs h-8"
+                                onClick={(e) => {
+                                    e.preventDefault()
+                                    e.stopPropagation()
+                                    window.location.href = `/team/${member.id}`
+                                }}
+                            >
+                                <User className="h-3 w-3 mr-1" />
+                                Profile
+                            </Button>
                             {member.role !== 'AI_Agent' && aiAgents.length > 0 && !isCentaur && (
                                 <Button 
-                                    variant="outline" 
+                                    variant="secondary" 
                                     size="sm" 
                                     onClick={(e) => {
                                         e.preventDefault()
                                         e.stopPropagation()
-                                        // Pair with first available AI agent
                                         const availableAI = aiAgents.find(ai => ai.id !== member.paired_ai_id)
                                         if (availableAI) {
                                             setPairingMemberId(member.id)
@@ -540,42 +623,32 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                                             })
                                         }
                                     }}
-                                    disabled={isPairing || pairingMemberId === member.id}
-                                    className="flex-1 text-xs"
+                                    disabled={isPairing}
+                                    className="flex-1 text-xs h-8"
                                 >
-                                    {isPairing && pairingMemberId === member.id ? (
-                                        <>
-                                            <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                                            Pairing...
-                                        </>
-                                    ) : (
-                                        <>
-                                            <Zap className="h-3 w-3 mr-1" />
-                                            Pair AI
-                                        </>
-                                    )}
+                                    <Zap className="h-3 w-3 mr-1" />
+                                    Pair AI
                                 </Button>
                             )}
                             <Button 
-                                variant="outline" 
+                                variant="secondary" 
                                 size="sm" 
                                 onClick={(e) => {
                                     e.preventDefault()
                                     e.stopPropagation()
-                                    // Open team creation dialog with this member
                                     setQuickTeamMemberIds([member.id])
                                     setTeamName("")
                                     setTeamError(null)
                                     setShowQuickTeamDialog(true)
                                 }}
-                                className="flex-1 text-xs"
+                                className="flex-1 text-xs h-8"
                             >
                                 <Users className="h-3 w-3 mr-1" />
-                                Add to Team
+                                Team
                             </Button>
                         </div>
-                    )}
-                </CardContent>
+                    </CardContent>
+                )}
             </Card>
         )
 
@@ -666,7 +739,7 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                     </div>
                 </td>
                 <td className="px-4 py-3">
-                    <Badge variant="outline" className={`text-[10px] ${badgeClass} font-normal`}>
+                    <Badge variant="secondary" className={`text-[10px] ${badgeClass} font-normal`}>
                         {member.role}
                     </Badge>
                 </td>
@@ -749,10 +822,13 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
     return (
         <div className="space-y-6">
             {/* Header */}
-            <div className="flex items-center justify-between">
-                <div>
-                    <h1 className="text-3xl font-bold tracking-tight text-slate-900 mb-2">Foundry Roster</h1>
-                    <p className="text-muted-foreground">Manage your Executives and Apprentices.</p>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-slate-100">
+                <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-3 mb-1">
+                        <div className="h-8 w-1 bg-orange-600 rounded-full shadow-[0_0_8px_rgba(234,88,12,0.6)]" />
+                        <h1 className="text-2xl sm:text-3xl font-display font-semibold text-foreground tracking-tight">Team</h1>
+                    </div>
+                    <p className="text-muted-foreground mt-1 text-sm font-medium pl-4">Manage your team members and roles</p>
                 </div>
                 <div className="flex items-center gap-2">
                     <RefreshButton />
@@ -769,7 +845,7 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                         </Button>
                     )}
                     <Button
-                        variant={compareMode ? "default" : "outline"}
+                        variant={compareMode ? "default" : "secondary"}
                         onClick={toggleCompareMode}
                         className={compareMode ? "bg-slate-800" : ""}
                     >
@@ -1026,7 +1102,7 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
 
                                             <div className="flex items-center gap-2">
                                                 {team.is_auto_generated && (
-                                                    <Badge variant="outline" className="text-[10px] text-slate-400">Auto</Badge>
+                                                    <Badge variant="secondary" className="text-[10px] text-slate-400">Auto</Badge>
                                                 )}
 
                                                 {/* Team Actions Dropdown */}
@@ -1083,66 +1159,63 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
 
             {/* Comparison Dialog */}
             <Dialog open={showComparison} onOpenChange={setShowComparison}>
-                <DialogContent className="max-w-4xl bg-white">
+                <DialogContent size="lg" className="bg-white">
                     <DialogHeader>
                         <DialogTitle className="text-slate-900">Compare Team Members</DialogTitle>
                         <DialogDescription>Side-by-side comparison of selected members</DialogDescription>
                     </DialogHeader>
 
-                    <div className="overflow-x-auto">
-                        <table className="w-full">
-                            {/* Member Headers */}
-                            <thead>
-                                <tr className="border-b border-slate-200">
-                                    <th className="py-4 px-4 text-left text-slate-500 font-medium w-32"></th>
-                                    {selectedMembers.map(member => (
-                                        <th key={member.id} className="py-4 px-6 text-center min-w-[160px]">
-                                            <div className="flex flex-col items-center gap-2">
-                                                <Avatar className="h-16 w-16 border-2 border-slate-200">
-                                                    <AvatarFallback className="bg-slate-100 text-slate-600 text-lg font-bold">
-                                                        {member.full_name?.substring(0, 2).toUpperCase()}
-                                                    </AvatarFallback>
-                                                </Avatar>
-                                                <span className="font-semibold text-slate-900">{member.full_name}</span>
-                                            </div>
-                                        </th>
-                                    ))}
-                                </tr>
-                            </thead>
-                            {/* Comparison Rows */}
-                            <tbody>
-                                {comparisonRows.map((row, idx) => (
-                                    <tr key={row.label} className={`${idx % 2 === 0 ? 'bg-slate-50' : 'bg-white'}`}>
-                                        <td className="py-3 px-4 text-slate-500 font-medium text-sm">{row.label}</td>
-                                        {selectedMembers.map(member => {
-                                            const value = row.getValue(member)
-                                            const isNumeric = typeof value === 'number'
-
-                                            // Find best value for highlighting
-                                            const allValues = selectedMembers.map(m => row.getValue(m))
-                                            const numericValues = allValues.filter(v => typeof v === 'number') as number[]
-                                            const maxVal = Math.max(...numericValues)
-                                            const isBest = isNumeric && row.good && value === maxVal
-                                            const isWorst = isNumeric && row.caution && value === maxVal && value > 0
-
-                                            return (
-                                                <td
-                                                    key={member.id}
-                                                    className={`py-3 px-6 text-center font-medium
-                                                        ${isBest ? 'text-green-600 bg-green-50' : ''}
-                                                        ${isWorst ? 'text-red-600 bg-red-50' : ''}
-                                                        ${!isBest && !isWorst ? 'text-slate-900' : ''}
-                                                    `}
-                                                >
-                                                    {value}
-                                                </td>
-                                            )
-                                        })}
-                                    </tr>
+                    <Table>
+                        <TableHeader>
+                            <TableRow className="border-b">
+                                <TableHead className="w-32"></TableHead>
+                                {selectedMembers.map(member => (
+                                    <TableHead key={member.id} className="text-center min-w-[160px]">
+                                        <div className="flex flex-col items-center gap-2">
+                                            <Avatar className="h-16 w-16 border-2 border-slate-200">
+                                                <AvatarFallback className="bg-slate-100 text-slate-600 text-lg font-bold">
+                                                    {member.full_name?.substring(0, 2).toUpperCase()}
+                                                </AvatarFallback>
+                                            </Avatar>
+                                            <span className="font-semibold text-slate-900">{member.full_name}</span>
+                                        </div>
+                                    </TableHead>
                                 ))}
-                            </tbody>
-                        </table>
-                    </div>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {comparisonRows.map((row, idx) => (
+                                <TableRow key={row.label} className={idx % 2 === 0 ? 'bg-slate-50' : 'bg-white'}>
+                                    <TableCell className="text-slate-500 font-medium text-sm">{row.label}</TableCell>
+                                    {selectedMembers.map(member => {
+                                        const value = row.getValue(member)
+                                        const isNumeric = typeof value === 'number'
+
+                                        // Find best value for highlighting
+                                        const allValues = selectedMembers.map(m => row.getValue(m))
+                                        const numericValues = allValues.filter(v => typeof v === 'number') as number[]
+                                        const maxVal = Math.max(...numericValues)
+                                        const isBest = isNumeric && row.good && value === maxVal
+                                        const isWorst = isNumeric && row.caution && value === maxVal && value > 0
+
+                                        return (
+                                            <TableCell
+                                                key={member.id}
+                                                className={cn(
+                                                    "text-center font-medium",
+                                                    isBest && "text-green-600 bg-green-50",
+                                                    isWorst && "text-red-600 bg-red-50",
+                                                    !isBest && !isWorst && "text-slate-900"
+                                                )}
+                                            >
+                                                {value}
+                                            </TableCell>
+                                        )
+                                    })}
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
                 </DialogContent>
             </Dialog>
 
@@ -1231,7 +1304,7 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                         )}
 
                         <div className="flex justify-end gap-3 pt-2">
-                            <Button variant="outline" onClick={() => {
+                            <Button variant="secondary" onClick={() => {
                                 setShowQuickTeamDialog(false)
                                 setQuickTeamMemberIds([])
                                 setTeamName("")
@@ -1269,7 +1342,7 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                         </div>
                     </div>
                     <DialogFooter>
-                        <Button variant="outline" onClick={() => setTeamToEdit(null)}>Cancel</Button>
+                        <Button variant="secondary" onClick={() => setTeamToEdit(null)}>Cancel</Button>
                         <Button onClick={handleUpdateName} disabled={isPending || !newName.trim()} className="bg-blue-600 hover:bg-blue-700 text-white">
                             {isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : "Save Changes"}
                         </Button>

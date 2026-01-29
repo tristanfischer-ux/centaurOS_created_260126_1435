@@ -2,6 +2,7 @@ import { getMarketplaceListings } from '@/actions/marketplace'
 import { createClient } from '@/lib/supabase/server'
 import { getFoundryIdCached } from '@/lib/supabase/foundry-context'
 import { MarketplaceView } from './marketplace-view'
+import { CreateRFQDialog } from './create-rfq-dialog'
 
 // Force dynamic since we're fetching data that might change
 export const dynamic = 'force-dynamic'
@@ -56,10 +57,27 @@ export default async function MarketplacePage() {
     }
 
     return (
-        <MarketplaceView
-            initialListings={marketplaceListings}
-            recommendations={recommendations}
-            teamMembers={teamMembers}
-        />
+        <div className="space-y-8">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-6 border-b border-blue-200">
+                <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-3 mb-1">
+                        <div className="h-8 w-1 bg-orange-600 rounded-full shadow-[0_0_8px_rgba(234,88,12,0.6)]" />
+                        <h1 className="text-2xl sm:text-3xl sm:text-4xl font-display font-semibold text-foreground tracking-tight">
+                            Marketplace
+                        </h1>
+                    </div>
+                    <p className="text-muted-foreground text-sm font-medium pl-4">Discover people, products, services, and AI</p>
+                </div>
+                <div className="flex gap-2 flex-wrap shrink-0">
+                    <CreateRFQDialog />
+                </div>
+            </div>
+
+            <MarketplaceView
+                initialListings={marketplaceListings}
+                recommendations={recommendations}
+                teamMembers={teamMembers}
+            />
+        </div>
     )
 }

@@ -58,7 +58,7 @@ const STATUS_CONFIG: Record<RetainerStatus, {
 }> = {
   pending: { label: 'Pending', variant: 'secondary', icon: Clock },
   active: { label: 'Active', variant: 'default', icon: CheckCircle },
-  paused: { label: 'Paused', variant: 'outline', icon: Pause },
+  paused: { label: 'Paused', variant: 'secondary', icon: Pause },
   cancelled: { label: 'Cancelled', variant: 'destructive', icon: XCircle },
 }
 
@@ -283,7 +283,7 @@ export function RetainerCard({
 
           {/* Actions */}
           <div className="flex items-center justify-end gap-2 pt-2">
-            <Button variant="outline" size="sm" asChild>
+            <Button variant="secondary" size="sm" asChild>
               <Link href={`/retainers/${retainer.id}/timesheet`}>
                 <Clock className="h-4 w-4 mr-2" />
                 Timesheet

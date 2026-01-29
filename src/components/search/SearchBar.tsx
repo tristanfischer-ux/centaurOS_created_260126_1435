@@ -147,7 +147,7 @@ export function SearchBar({
         {onAiSearchToggle && (
           <Button
             type="button"
-            variant={aiSearchEnabled ? "default" : "outline"}
+            variant={aiSearchEnabled ? "default" : "secondary"}
             size="icon"
             onClick={() => {
               if (aiSearchEnabled && value.trim() && onAiSearch) {
@@ -208,7 +208,7 @@ export function SearchBar({
                     <Search className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
                   )}
                   {suggestion.type === "category" && (
-                    <Badge variant="outline" className="text-[10px]">
+                    <Badge variant="secondary" className="text-[10px]">
                       {suggestion.category}
                     </Badge>
                   )}

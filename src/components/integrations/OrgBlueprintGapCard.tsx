@@ -145,7 +145,7 @@ export function OrgBlueprintGapCard({
             </CardDescription>
           </div>
           <Button
-            variant="outline"
+            variant="secondary"
             size="sm"
             asChild
           >
@@ -222,7 +222,7 @@ export function OrgBlueprintGapCard({
                 )}
                 <div className="flex gap-2">
                   <Button
-                    variant="outline"
+                    variant="secondary"
                     size="sm"
                     className="flex-1"
                     asChild

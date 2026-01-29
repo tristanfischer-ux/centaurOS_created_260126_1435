@@ -57,14 +57,14 @@ export function TransactionLimitCard({
     return "bg-emerald-500"
   }
 
-  const getTierBadgeVariant = (tier: string): "default" | "secondary" | "outline" | "destructive" => {
+  const getTierBadgeVariant = (tier: string): "default" | "secondary" | "secondary" | "destructive" => {
     switch (tier) {
       case "trusted":
         return "default"
       case "established":
         return "secondary"
       default:
-        return "outline"
+        return "secondary"
     }
   }
 

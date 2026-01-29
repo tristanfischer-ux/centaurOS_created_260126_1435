@@ -166,25 +166,27 @@ CREATE POLICY "Global Read for Service Providers" ON public.service_providers
     FOR SELECT USING (auth.role() = 'authenticated');
 
 -- AI TOOLS
-ALTER TABLE public.ai_tools ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS "Global Read for AI Tools" ON public.ai_tools;
-CREATE POLICY "Global Read for AI Tools" ON public.ai_tools
-    FOR SELECT USING (auth.role() = 'authenticated');
+-- Note: ai_tools table doesn't exist yet - commented out
+-- ALTER TABLE public.ai_tools ENABLE ROW LEVEL SECURITY;
+-- DROP POLICY IF EXISTS "Global Read for AI Tools" ON public.ai_tools;
+-- CREATE POLICY "Global Read for AI Tools" ON public.ai_tools
+--     FOR SELECT USING (auth.role() = 'authenticated');
 
 -- MANUFACTURING RFQS
-ALTER TABLE public.manufacturing_rfqs ENABLE ROW LEVEL SECURITY;
+-- Note: manufacturing_rfqs table doesn't exist yet - commented out
+-- ALTER TABLE public.manufacturing_rfqs ENABLE ROW LEVEL SECURITY;
 
-DROP POLICY IF EXISTS "Users can view own RFQs" ON public.manufacturing_rfqs;
-CREATE POLICY "Users can view own RFQs" ON public.manufacturing_rfqs
-    FOR SELECT USING (
-        foundry_id = get_my_foundry_id()
-    );
+-- DROP POLICY IF EXISTS "Users can view own RFQs" ON public.manufacturing_rfqs;
+-- CREATE POLICY "Users can view own RFQs" ON public.manufacturing_rfqs
+--     FOR SELECT USING (
+--         foundry_id = get_my_foundry_id()
+--     );
 
-DROP POLICY IF EXISTS "Users can create RFQs" ON public.manufacturing_rfqs;
-CREATE POLICY "Users can create RFQs" ON public.manufacturing_rfqs
-    FOR INSERT WITH CHECK (
-        foundry_id = get_my_foundry_id()
-    );
+-- DROP POLICY IF EXISTS "Users can create RFQs" ON public.manufacturing_rfqs;
+-- CREATE POLICY "Users can create RFQs" ON public.manufacturing_rfqs
+--     FOR INSERT WITH CHECK (
+--         foundry_id = get_my_foundry_id()
+--     );
 
 -- =============================================
 -- END OF MIGRATION

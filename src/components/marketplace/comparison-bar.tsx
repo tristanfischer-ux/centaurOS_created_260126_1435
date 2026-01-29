@@ -77,7 +77,7 @@ export function ComparisonBar({ selectedItems, onClear, onCompare, onRemove }: C
                         </Button>
                         <Button
                             size="sm"
-                            variant="brand"
+                            variant="default"
                             onClick={onCompare}
                             className="h-8 px-4"
                             disabled={selectedItems.length < 2}

@@ -319,7 +319,7 @@ export function TimesheetForm({
           {isEditable && (
             <div className="flex items-center justify-end gap-2 pt-4">
               <Button
-                variant="outline"
+                variant="secondary"
                 onClick={handleSave}
                 disabled={isSaving || isSubmitting}
               >

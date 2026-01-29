@@ -60,14 +60,14 @@ export function DisputeTimeline({
   className,
 }: DisputeTimelineProps) {
   const getStatusBadge = () => {
-    const variants: Record<DisputeStatus, { variant: "default" | "secondary" | "destructive" | "outline"; label: string }> = {
+    const variants: Record<DisputeStatus, { variant: "default" | "secondary" | "destructive" | "secondary"; label: string }> = {
       open: { variant: "destructive", label: "Open" },
       under_review: { variant: "default", label: "Under Review" },
       mediation: { variant: "secondary", label: "In Mediation" },
       arbitration: { variant: "secondary", label: "In Arbitration" },
-      resolved: { variant: "outline", label: "Resolved" },
+      resolved: { variant: "secondary", label: "Resolved" },
       escalated: { variant: "destructive", label: "Escalated" },
-      cancelled: { variant: "outline", label: "Cancelled" },
+      cancelled: { variant: "secondary", label: "Cancelled" },
     }
 
     const { variant, label } = variants[status]

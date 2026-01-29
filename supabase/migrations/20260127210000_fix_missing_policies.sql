@@ -47,14 +47,15 @@ CREATE POLICY "Users can delete own comments" ON public.task_comments
 -- Currently has: SELECT (foundry-scoped), INSERT, DELETE (own files)
 -- Missing: UPDATE
 -- Users can only update files they uploaded
+-- Note: task_files table created in later migration - commented out
 
-DROP POLICY IF EXISTS "Users can update own task files" ON public.task_files;
-CREATE POLICY "Users can update own task files" ON public.task_files
-    FOR UPDATE USING (
-        uploaded_by = auth.uid()
-    ) WITH CHECK (
-        uploaded_by = auth.uid()
-    );
+-- DROP POLICY IF EXISTS "Users can update own task files" ON public.task_files;
+-- CREATE POLICY "Users can update own task files" ON public.task_files
+--     FOR UPDATE USING (
+--         uploaded_by = auth.uid()
+--     ) WITH CHECK (
+--         uploaded_by = auth.uid()
+--     );
 
 -- =============================================
 -- 4. MANUFACTURING_RFQS: Add missing UPDATE/DELETE policies
@@ -62,20 +63,21 @@ CREATE POLICY "Users can update own task files" ON public.task_files
 -- Currently has: SELECT, INSERT (foundry-scoped)
 -- Missing: UPDATE, DELETE
 -- Users can update/delete RFQs in their foundry
+-- Note: manufacturing_rfqs table doesn't exist yet - commented out
 
-DROP POLICY IF EXISTS "Users can update RFQs in their foundry" ON public.manufacturing_rfqs;
-CREATE POLICY "Users can update RFQs in their foundry" ON public.manufacturing_rfqs
-    FOR UPDATE USING (
-        foundry_id = get_my_foundry_id()
-    ) WITH CHECK (
-        foundry_id = get_my_foundry_id()
-    );
+-- DROP POLICY IF EXISTS "Users can update RFQs in their foundry" ON public.manufacturing_rfqs;
+-- CREATE POLICY "Users can update RFQs in their foundry" ON public.manufacturing_rfqs
+--     FOR UPDATE USING (
+--         foundry_id = get_my_foundry_id()
+--     ) WITH CHECK (
+--         foundry_id = get_my_foundry_id()
+--     );
 
-DROP POLICY IF EXISTS "Users can delete RFQs in their foundry" ON public.manufacturing_rfqs;
-CREATE POLICY "Users can delete RFQs in their foundry" ON public.manufacturing_rfqs
-    FOR DELETE USING (
-        foundry_id = get_my_foundry_id()
-    );
+-- DROP POLICY IF EXISTS "Users can delete RFQs in their foundry" ON public.manufacturing_rfqs;
+-- CREATE POLICY "Users can delete RFQs in their foundry" ON public.manufacturing_rfqs
+--     FOR DELETE USING (
+--         foundry_id = get_my_foundry_id()
+--     );
 
 -- =============================================
 -- 5. TASK_HISTORY: Fix overly permissive SELECT policy

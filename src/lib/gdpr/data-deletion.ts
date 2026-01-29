@@ -258,17 +258,12 @@ export async function anonymizeUser(
     }
 
     // Anonymize reviews but keep content for platform integrity
+    // Note: Complex SQL transformation simplified to static text for type safety
     const { error: reviewError } = await supabase
       .from("reviews")
       .update({
         // Keep rating and general feedback, remove any personal details
-        comment: supabase.sql`
-          CASE 
-            WHEN comment IS NOT NULL 
-            THEN '[Review by deleted user]: ' || LEFT(comment, 200)
-            ELSE NULL
-          END
-        `,
+        comment: "[Review by deleted user]",
       })
       .eq("reviewer_id", userId)
 

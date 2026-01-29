@@ -369,7 +369,7 @@ export function RetainerSetup({
 
       {/* Actions */}
       <div className="flex items-center justify-between pt-4">
-        <Button variant="outline" onClick={onCancel}>
+        <Button variant="secondary" onClick={onCancel}>
           Cancel
         </Button>
         <Button onClick={handleSubmit} disabled={isSubmitting || !selectedPricing}>

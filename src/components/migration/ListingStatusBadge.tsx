@@ -208,17 +208,17 @@ export function ListingCTAButton({
         },
         invite_sent: {
             label: 'Contact Provider',
-            variant: 'outline' as const,
+            variant: 'secondary' as const,
             action: onContact
         },
         pending_signup: {
             label: 'Contact Provider',
-            variant: 'outline' as const,
+            variant: 'secondary' as const,
             action: onContact
         },
         contact_only: {
             label: 'View Contact',
-            variant: 'outline' as const,
+            variant: 'secondary' as const,
             action: onContact
         }
     }

@@ -317,7 +317,7 @@ export function BuyerOnboarding({
                 {/* Navigation */}
                 <div className="flex items-center justify-between pt-4 border-t">
                     <Button
-                        variant="outline"
+                        variant="secondary"
                         onClick={goBack}
                         disabled={currentStepIndex === 0}
                     >
@@ -401,7 +401,7 @@ export function BuyerOnboardingBanner({
                     </div>
                     <div className="flex items-center gap-2">
                         <Button
-                            variant="outline"
+                            variant="secondary"
                             size="sm"
                             onClick={() => {
                                 localStorage.setItem(ONBOARDING_STORAGE_KEY, 'true')

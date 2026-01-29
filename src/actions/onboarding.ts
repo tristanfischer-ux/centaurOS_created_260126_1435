@@ -52,3 +52,133 @@ export async function createSampleData() {
   
   return { success: true }
 }
+
+/**
+ * Marketplace Onboarding Functions
+ */
+
+interface OnboardingData {
+  marketplace_tour_completed?: boolean
+  marketplace_tour_skipped?: boolean
+  first_marketplace_action?: string
+  first_marketplace_action_at?: string
+  first_marketplace_action_listing_id?: string
+  dashboard_tour_completed?: boolean
+  guild_tour_completed?: boolean
+}
+
+/**
+ * Complete the marketplace onboarding tour
+ */
+export async function completeMarketplaceOnboarding(skipped: boolean = false) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  
+  if (!user) return { error: 'Unauthorized' }
+
+  // Get current profile to read existing onboarding_data
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('onboarding_data')
+    .eq('id', user.id)
+    .single()
+
+  // Merge with existing onboarding data
+  const currentData = (profile?.onboarding_data as OnboardingData) || {}
+  const updatedData: OnboardingData = {
+    ...currentData,
+    marketplace_tour_completed: true,
+    marketplace_tour_skipped: skipped
+  }
+
+  const { error } = await supabase
+    .from('profiles')
+    .update({ 
+      onboarding_data: updatedData as any,
+      updated_at: new Date().toISOString()
+    })
+    .eq('id', user.id)
+
+  if (error) {
+    console.error('Error completing marketplace onboarding:', error)
+    return { error: 'Failed to update onboarding status' }
+  }
+
+  revalidatePath('/marketplace')
+  return { success: true }
+}
+
+/**
+ * Check if user needs to see the marketplace onboarding
+ */
+export async function getMarketplaceOnboardingStatus() {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  
+  if (!user) return { needsOnboarding: false, error: 'Unauthorized' }
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('onboarding_data')
+    .eq('id', user.id)
+    .single()
+
+  const onboardingData = (profile?.onboarding_data as OnboardingData) || {}
+  const needsOnboarding = !onboardingData.marketplace_tour_completed
+
+  return { 
+    needsOnboarding,
+    wasSkipped: onboardingData.marketplace_tour_skipped,
+    firstAction: onboardingData.first_marketplace_action,
+    firstActionAt: onboardingData.first_marketplace_action_at
+  }
+}
+
+/**
+ * Record the user's first marketplace action
+ */
+export async function recordMarketplaceAction(
+  actionType: 'add_to_stack' | 'create_rfq' | 'book_listing' | 'view_listing' | 'contact_provider',
+  listingId?: string
+) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  
+  if (!user) return { error: 'Unauthorized' }
+
+  // Get current profile
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('onboarding_data')
+    .eq('id', user.id)
+    .single()
+
+  const currentData = (profile?.onboarding_data as OnboardingData) || {}
+
+  // Only record if this is the first action
+  if (currentData.first_marketplace_action) {
+    return { success: true, alreadyRecorded: true }
+  }
+
+  const updatedData: OnboardingData = {
+    ...currentData,
+    first_marketplace_action: actionType,
+    first_marketplace_action_at: new Date().toISOString(),
+    first_marketplace_action_listing_id: listingId
+  }
+
+  const { error } = await supabase
+    .from('profiles')
+    .update({ 
+      onboarding_data: updatedData as any,
+      updated_at: new Date().toISOString()
+    })
+    .eq('id', user.id)
+
+  if (error) {
+    console.error('Error recording marketplace action:', error)
+    return { error: 'Failed to record action' }
+  }
+
+  return { success: true, alreadyRecorded: false }
+}

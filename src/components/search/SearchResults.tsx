@@ -86,7 +86,7 @@ export function SearchResults({
         {/* Sort dropdown */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="sm" className="h-8">
+            <Button variant="secondary" size="sm" className="h-8">
               <ArrowUpDown className="h-3.5 w-3.5 mr-2" />
               {SORT_OPTIONS.find(o => o.value === sortBy)?.label || "Sort"}
               <ChevronDown className="h-3.5 w-3.5 ml-2" />
@@ -193,7 +193,7 @@ export function SearchResults({
       {hasMore && (
         <div className="flex justify-center mt-8">
           <Button
-            variant="outline"
+            variant="secondary"
             onClick={onLoadMore}
             disabled={isLoading}
           >
@@ -246,7 +246,7 @@ function ResultCard({
         <div className="flex items-start justify-between gap-2">
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1">
-              <Badge variant="outline" className="text-[10px] uppercase tracking-wider">
+              <Badge variant="secondary" className="text-[10px] uppercase tracking-wider">
                 {result.subcategory}
               </Badge>
               {result.is_verified && (
@@ -374,7 +374,7 @@ function ResultListItem({
           <div className="flex items-start justify-between gap-4">
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-1">
-                <Badge variant="outline" className="text-[10px] uppercase tracking-wider">
+                <Badge variant="secondary" className="text-[10px] uppercase tracking-wider">
                   {result.subcategory}
                 </Badge>
                 {result.is_verified && (

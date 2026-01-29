@@ -46,7 +46,7 @@ export class ErrorBoundary extends Component<Props, State> {
             We encountered an unexpected error. Your work has been saved. Please try refreshing the page.
           </p>
           <div className="flex gap-4">
-            <Button variant="outline" onClick={() => this.setState({ hasError: false })}>
+            <Button variant="secondary" onClick={() => this.setState({ hasError: false })}>
               Try Again
             </Button>
             <Button onClick={() => window.location.reload()}>

@@ -157,7 +157,7 @@ export function BuyerDashboardView({
                                 </CardDescription>
                             </div>
                             <Button 
-                                variant="outline" 
+                                variant="secondary" 
                                 size="sm"
                                 onClick={() => router.push('/my-orders')}
                             >
@@ -203,7 +203,7 @@ export function BuyerDashboardView({
                                 </CardDescription>
                             </div>
                             <Button 
-                                variant="outline" 
+                                variant="secondary" 
                                 size="sm"
                                 onClick={() => router.push('/marketplace')}
                             >
@@ -243,7 +243,7 @@ export function BuyerDashboardView({
                         </CardHeader>
                         <CardContent className="space-y-2">
                             <Button 
-                                variant="outline" 
+                                variant="secondary" 
                                 className="w-full justify-start"
                                 onClick={() => router.push('/marketplace')}
                             >
@@ -251,7 +251,7 @@ export function BuyerDashboardView({
                                 Find Providers
                             </Button>
                             <Button 
-                                variant="outline" 
+                                variant="secondary" 
                                 className="w-full justify-start"
                                 onClick={() => router.push('/my-orders')}
                             >
@@ -259,7 +259,7 @@ export function BuyerDashboardView({
                                 View Orders
                             </Button>
                             <Button 
-                                variant="outline" 
+                                variant="secondary" 
                                 className="w-full justify-start"
                                 onClick={() => router.push('/buyer/analytics')}
                             >
@@ -267,7 +267,7 @@ export function BuyerDashboardView({
                                 View Analytics
                             </Button>
                             <Button 
-                                variant="outline" 
+                                variant="secondary" 
                                 className="w-full justify-start"
                                 onClick={() => setShowOnboarding(true)}
                             >
@@ -319,7 +319,7 @@ export function BuyerDashboardView({
                                                 </p>
                                             </div>
                                             {provider.isAvailable && (
-                                                <Badge variant="outline" className="text-emerald-600 border-emerald-200 text-xs">
+                                                <Badge variant="secondary" className="text-emerald-600 border-emerald-200 text-xs">
                                                     Available
                                                 </Badge>
                                             )}
@@ -395,11 +395,11 @@ function ProviderCard({ provider, onClick }: ProviderCardProps) {
                         {provider.currency} {provider.dayRate?.toLocaleString()}/day
                     </span>
                     {provider.isAvailable ? (
-                        <Badge variant="outline" className="text-emerald-600 border-emerald-200">
+                        <Badge variant="secondary" className="text-emerald-600 border-emerald-200">
                             Available
                         </Badge>
                     ) : (
-                        <Badge variant="outline" className="text-slate-500">
+                        <Badge variant="secondary" className="text-slate-500">
                             Busy
                         </Badge>
                     )}

@@ -7,26 +7,20 @@ import { cn } from "@/lib/utils"
 /**
  * Button Variant Usage Guidelines:
  * 
- * PRIMARY ACTIONS (one per view):
- * - `brand`     : Main CTA for landing pages, marketing (orange, uppercase)
- * - `primary`   : Main CTA for app interfaces (slate, professional)
- * - `default`   : Alternative primary in forms/dialogs
+ * CORE VARIANTS (7 total):
+ * 
+ * PRIMARY ACTIONS:
+ * - `default`   : International orange CTA - main brand action (uses accent token)
  * 
  * SECONDARY ACTIONS:
- * - `outline`   : Secondary actions, cancel buttons
- * - `secondary` : Lower emphasis alternatives
- * - `ghost`     : Minimal UI, icon buttons, navigation
+ * - `secondary` : Outline with border - subtle secondary actions
+ * - `ghost`     : Transparent, text only - minimal UI, icon buttons, navigation
+ * - `link`      : No padding, underline on hover - inline text links with button semantics
  * 
  * STATUS ACTIONS:
- * - `success`   : Confirmation, approve, complete actions
- * - `warning`   : Actions needing attention (uses brand orange)
- * - `danger`    : Delete, remove, destructive actions
- * - `destructive`: Same as danger but uses destructive theme color
- * 
- * SPECIAL:
- * - `brand-secondary`: Electric blue for secondary brand CTAs
- * - `certified`: Purple for certification/verification badges
- * - `link`: Text links that need button semantics
+ * - `success`   : Emerald for positive actions - approve, confirm, complete (uses status.success)
+ * - `warning`   : Amber for caution - actions needing attention (uses status.warning)
+ * - `destructive`: Red for danger - delete, remove, critical actions (uses destructive token)
  * 
  * SIZES:
  * - `default` (h-11): Standard size for most buttons
@@ -35,44 +29,40 @@ import { cn } from "@/lib/utils"
  * - `icon` (h-11 w-11): Square icon-only buttons
  * 
  * BEST PRACTICES:
- * 1. One primary CTA per view - others should be secondary/outline
- * 2. Use `ghost` for icon buttons and minimal UI
+ * 1. One primary CTA per view - others should be secondary/ghost
+ * 2. Use semantic status variants for user feedback (success/warning/destructive)
  * 3. Always provide accessible names for icon-only buttons
  * 4. Use loading state (disabled + spinner) during async operations
+ * 5. For certifications/badges, use Badge component instead of button variant
  */
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm font-medium ring-offset-background transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 touch-action-manipulation",
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm font-medium ring-offset-background transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 touch-action-manipulation rounded-md",
   {
     variants: {
       variant: {
-        // Default uses International Orange
-        default: "bg-primary text-primary-foreground hover:bg-primary/90",
-        // Brand CTA - Industrial style with shadow
-        brand: "bg-international-orange hover:bg-international-orange-hover text-white font-mono uppercase tracking-widest shadow-brand hover:shadow-brand-lg hover:scale-[1.02]",
-        // Secondary brand action with Electric Blue
-        "brand-secondary": "bg-electric-blue hover:bg-electric-blue-hover text-white font-mono uppercase tracking-wider",
-        destructive:
-          "bg-destructive text-destructive-foreground hover:bg-destructive/90",
-        // Industrial outline style - using bg tint instead of border
-        outline:
-          "bg-slate-100 text-slate-900 hover:bg-slate-900 hover:text-white font-mono uppercase tracking-wider dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-100 dark:hover:text-slate-900",
+        // Default - International orange primary action
+        default: "bg-accent text-accent-foreground hover:bg-accent/90 shadow-sm",
+        // Secondary - Outline with border
         secondary:
-          "bg-secondary text-secondary-foreground hover:bg-secondary/80",
+          "border-2 border-input bg-background hover:bg-accent/10 hover:text-accent-foreground",
+        // Ghost - Transparent, text only
         ghost: "hover:bg-accent/10 hover:text-accent-foreground",
+        // Link - No padding, underline on hover
         link: "text-primary underline-offset-4 hover:underline",
-        // Solid slate - professional
-        primary: "bg-slate-900 hover:bg-slate-800 text-white dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200",
-        success: "bg-green-600 hover:bg-green-700 text-white",
-        warning: "bg-international-orange hover:bg-international-orange-hover text-white",
-        danger: "bg-red-600 hover:bg-red-700 text-white",
-        certified: "bg-purple-600 hover:bg-purple-700 text-white",
+        // Success - Emerald for positive actions
+        success: "bg-status-success text-status-success-foreground hover:bg-status-success/90 shadow-sm",
+        // Warning - Amber for caution
+        warning: "bg-status-warning text-status-warning-foreground hover:bg-status-warning/90 shadow-sm",
+        // Destructive - Red for danger
+        destructive:
+          "bg-destructive text-destructive-foreground hover:bg-destructive/90 shadow-sm",
       },
       size: {
-        default: "h-11 px-4 py-2",
+        default: "h-11 min-h-[44px] px-4 py-2",
         sm: "h-9 min-h-[44px] md:min-h-0 px-3",
-        lg: "h-12 px-8 py-3 text-base",
-        icon: "h-11 w-11",
+        lg: "h-12 min-h-[44px] px-8 py-3 text-base",
+        icon: "h-11 w-11 min-h-[44px]",
       },
     },
     defaultVariants: {

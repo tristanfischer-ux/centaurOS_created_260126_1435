@@ -126,7 +126,7 @@ export function PortfolioItemDialog({ item, trigger, onSuccess }: PortfolioItemD
         <Dialog open={open} onOpenChange={handleOpenChange}>
             <DialogTrigger asChild>
                 {trigger || (
-                    <Button variant="primary" size="sm">
+                    <Button variant="default" size="sm">
                         <Plus className="h-4 w-4 mr-1" />
                         Add Portfolio Item
                     </Button>
@@ -187,7 +187,7 @@ export function PortfolioItemDialog({ item, trigger, onSuccess }: PortfolioItemD
                                 />
                                 <Button
                                     type="button"
-                                    variant="outline"
+                                    variant="secondary"
                                     size="icon"
                                     onClick={handleAddImageUrl}
                                 >
@@ -262,7 +262,7 @@ export function PortfolioItemDialog({ item, trigger, onSuccess }: PortfolioItemD
                             <Popover>
                                 <PopoverTrigger asChild>
                                     <Button
-                                        variant="outline"
+                                        variant="secondary"
                                         className={cn(
                                             'w-full justify-start text-left font-normal',
                                             !completionDate && 'text-muted-foreground'
@@ -306,13 +306,13 @@ export function PortfolioItemDialog({ item, trigger, onSuccess }: PortfolioItemD
                     <DialogFooter>
                         <Button
                             type="button"
-                            variant="outline"
+                            variant="secondary"
                             onClick={() => setOpen(false)}
                             disabled={isLoading}
                         >
                             Cancel
                         </Button>
-                        <Button type="submit" variant="primary" disabled={isLoading}>
+                        <Button type="submit" variant="default" disabled={isLoading}>
                             {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                             {isEditing ? 'Save Changes' : 'Add Item'}
                         </Button>

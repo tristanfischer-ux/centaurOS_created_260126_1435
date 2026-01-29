@@ -241,7 +241,7 @@ function MilestoneItem({
             {canDispute && milestone.status === 'submitted' && (
               <Button
                 size="sm"
-                variant="outline"
+                variant="secondary"
                 onClick={() => setShowDisputeDialog(true)}
                 disabled={isLoading}
               >
@@ -269,7 +269,7 @@ function MilestoneItem({
             rows={4}
           />
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowSubmitDialog(false)}>
+            <Button variant="secondary" onClick={() => setShowSubmitDialog(false)}>
               Cancel
             </Button>
             <Button onClick={handleSubmit} disabled={isLoading}>
@@ -306,7 +306,7 @@ function MilestoneItem({
             rows={4}
           />
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowDisputeDialog(false)}>
+            <Button variant="secondary" onClick={() => setShowDisputeDialog(false)}>
               Cancel
             </Button>
             <Button
@@ -442,7 +442,7 @@ export function MilestoneTracker({
             {Object.entries(STATUS_CONFIG).map(([key, config]) => (
               <Badge
                 key={key}
-                variant="outline"
+                variant="secondary"
                 className={cn('text-xs', config.color)}
               >
                 {config.icon}

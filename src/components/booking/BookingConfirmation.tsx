@@ -239,7 +239,7 @@ export function BookingConfirmation({
                     </Button>
                 )}
                 {onMessageProvider && confirmation.conversationId && (
-                    <Button variant="outline" onClick={onMessageProvider} className="flex-1">
+                    <Button variant="secondary" onClick={onMessageProvider} className="flex-1">
                         <MessageSquare className="h-4 w-4 mr-2" />
                         Message Provider
                     </Button>

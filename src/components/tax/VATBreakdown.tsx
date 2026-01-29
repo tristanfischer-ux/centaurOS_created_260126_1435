@@ -53,16 +53,16 @@ function formatPercentage(rate: number): string {
 // Tax treatment badge colors
 function getTaxTreatmentVariant(
   treatment: TaxTreatment
-): "default" | "secondary" | "outline" | "destructive" {
+): "default" | "secondary" | "secondary" | "destructive" {
   switch (treatment) {
     case "standard":
       return "default"
     case "reverse_charge":
       return "secondary"
     case "zero_rated":
-      return "outline"
+      return "secondary"
     case "exempt":
-      return "outline"
+      return "secondary"
     default:
       return "default"
   }

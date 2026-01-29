@@ -157,6 +157,19 @@ export function MyOrdersView({
 
     return (
         <div className="space-y-6">
+            {/* Header */}
+            <div className="pb-4 border-b border-slate-100">
+                <div className="flex items-center gap-3 mb-1">
+                    <div className="h-8 w-1 bg-primary rounded-full shadow-[0_0_8px_rgba(234,88,12,0.6)]" />
+                    <h1 className="text-2xl sm:text-3xl font-display font-semibold text-foreground tracking-tight">
+                        My Orders
+                    </h1>
+                </div>
+                <p className="text-muted-foreground mt-1 text-sm font-medium pl-4">
+                    View and manage your marketplace orders
+                </p>
+            </div>
+
             {/* Search and Filters */}
             <div className="flex flex-col sm:flex-row gap-4">
                 <div className="relative flex-1">

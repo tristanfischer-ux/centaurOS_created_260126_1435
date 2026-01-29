@@ -208,7 +208,7 @@ export function OrderSummaryCard({
 
                                 {/* Quick Actions */}
                                 <Button
-                                    variant="outline"
+                                    variant="secondary"
                                     size="sm"
                                     onClick={() => onViewDetails?.(order.id)}
                                 >
@@ -218,7 +218,7 @@ export function OrderSummaryCard({
 
                                 {onMessageProvider && (
                                     <Button
-                                        variant="outline"
+                                        variant="secondary"
                                         size="sm"
                                         onClick={() => onMessageProvider(order.id)}
                                     >

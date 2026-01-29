@@ -45,9 +45,8 @@ export const MarketplaceResultsList = memo(function MarketplaceResultsList({
                     title={hasActiveFilters ? "No items match your filters" : "No listings found in this category yet"}
                     description={hasActiveFilters ? "Try adjusting your filters or search terms." : "Check back later or browse other categories."}
                     action={hasActiveFilters ? (
-                        <Button variant="outline" onClick={onClearFilters}>Clear filters</Button>
+                        <Button variant="secondary" onClick={onClearFilters}>Clear filters</Button>
                     ) : undefined}
-                    live
                 />
             </div>
         )
@@ -91,7 +90,7 @@ export const MarketplaceResultsList = memo(function MarketplaceResultsList({
                                 <div className="flex items-start justify-between gap-4">
                                     <div className="flex-1 min-w-0">
                                         <div className="flex items-center gap-2 mb-1">
-                                            <Badge variant="outline" className="text-[10px] uppercase tracking-wider">
+                                            <Badge variant="secondary" className="text-[10px] uppercase tracking-wider">
                                                 {item.subcategory}
                                             </Badge>
                                             {item.is_verified && (

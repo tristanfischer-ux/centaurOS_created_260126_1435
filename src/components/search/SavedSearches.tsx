@@ -154,14 +154,14 @@ function SavedSearchCard({
               {filterSummary.slice(0, 3).map((filter, idx) => (
                 <Badge
                   key={idx}
-                  variant="outline"
+                  variant="secondary"
                   className="text-[10px] font-normal"
                 >
                   {filter}
                 </Badge>
               ))}
               {filterSummary.length > 3 && (
-                <Badge variant="outline" className="text-[10px] font-normal">
+                <Badge variant="secondary" className="text-[10px] font-normal">
                   +{filterSummary.length - 3} more
                 </Badge>
               )}
@@ -345,7 +345,7 @@ export function SaveSearchDialog({
                 </p>
               </div>
               <Button
-                variant={alertEnabled ? "default" : "outline"}
+                variant={alertEnabled ? "default" : "secondary"}
                 size="sm"
                 onClick={() => setAlertEnabled(!alertEnabled)}
               >
@@ -386,7 +386,7 @@ export function SaveSearchDialog({
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
+          <Button variant="secondary" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
           <Button onClick={handleSave} disabled={isSaving}>

@@ -96,7 +96,7 @@ export function QuestionCard({ question, className }: QuestionCardProps) {
                                     {verificationInfo.label}
                                 </Badge>
                                 {question.visibility === "foundry" && (
-                                    <Badge variant="outline" className="text-[10px] uppercase tracking-wider">
+                                    <Badge variant="secondary" className="text-[10px] uppercase tracking-wider">
                                         Private
                                     </Badge>
                                 )}

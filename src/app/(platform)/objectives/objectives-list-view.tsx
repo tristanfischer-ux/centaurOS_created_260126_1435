@@ -163,15 +163,15 @@ export function ObjectivesListView({ objectives, objectivesForDialog, members, t
     }
 
     return (
-        <div className="space-y-4">
+        <div className="space-y-6">
             {/* Controls */}
             <div className="flex items-center justify-between">
                 <div className="flex gap-2">
                     <RefreshButton />
-                    <Button variant="outline" size="sm" onClick={expandAll}>
+                    <Button variant="secondary" size="sm" onClick={expandAll}>
                         Expand All
                     </Button>
-                    <Button variant="outline" size="sm" onClick={collapseAll}>
+                    <Button variant="secondary" size="sm" onClick={collapseAll}>
                         Collapse All
                     </Button>
                 </div>
@@ -250,7 +250,7 @@ export function ObjectivesListView({ objectives, objectivesForDialog, members, t
             </AlertDialog>
 
             {/* Objectives List */}
-            <div className="space-y-3">
+            <div className="space-y-4">
                 {/* Select All Header (Optional, but good for bulk actions) */}
                 {objectives.length > 0 && (
                     <div className="flex items-center px-4 py-2 bg-muted/50 rounded-md">
@@ -296,7 +296,7 @@ export function ObjectivesListView({ objectives, objectivesForDialog, members, t
                         >
                             {/* Objective Header */}
                             <div
-                                className="flex items-center gap-4 p-4 cursor-pointer hover:bg-accent/50 active:bg-accent transition-colors"
+                                className="flex items-center gap-4 p-5 cursor-pointer hover:bg-accent/50 active:bg-accent transition-colors"
                                 onClick={() => toggleExpand(objective.id)}
                             >
                                 {/* Checkbox */}
@@ -362,7 +362,7 @@ export function ObjectivesListView({ objectives, objectivesForDialog, members, t
                                         <span className="text-xs text-muted-foreground ml-1">completed</span>
                                     </div>
                                     <Progress value={progress} className="w-24 h-2" />
-                                    <Badge variant="outline" className="text-xs">
+                                    <Badge variant="secondary" className="text-xs">
                                         {progress}%
                                     </Badge>
 
@@ -394,7 +394,7 @@ export function ObjectivesListView({ objectives, objectivesForDialog, members, t
                                                 const StatusIcon = statusConfig.icon
 
                                                 return (
-                                                    <div key={task.id} className="flex items-center gap-2 sm:gap-4 p-3 pl-8 sm:pl-14 hover:bg-card transition-colors">
+                                                    <div key={task.id} className="flex items-center gap-2 sm:gap-4 p-4 pl-9 sm:pl-16 hover:bg-card transition-colors">
                                                         <StatusIcon className={`h-4 w-4 shrink-0 ${statusConfig.color.split(' ')[1]}`} />
 
                                                         <Link href={`/tasks?task=${task.id}`} className="flex-1 min-w-0 text-sm text-foreground hover:text-amber-600 dark:hover:text-amber-400 truncate">
@@ -448,7 +448,7 @@ export function ObjectivesListView({ objectives, objectivesForDialog, members, t
                                             currentUserId={currentUserId}
                                             defaultObjectiveId={objective.id}
                                         >
-                                            <Button variant="outline" size="sm" className="w-full">
+                                            <Button variant="secondary" size="sm" className="w-full">
                                                 <Plus className="h-4 w-4 mr-2" />
                                                 Add Task to this Objective
                                             </Button>

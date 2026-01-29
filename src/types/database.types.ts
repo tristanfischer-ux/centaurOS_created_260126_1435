@@ -12,31 +12,6 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.1"
   }
-  graphql_public: {
-    Tables: {
-      [_ in never]: never
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      graphql: {
-        Args: {
-          extensions?: Json
-          operationName?: string
-          query?: string
-          variables?: Json
-        }
-        Returns: Json
-      }
-    }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
-  }
   public: {
     Tables: {
       admin_audit_log: {
@@ -2264,6 +2239,7 @@ export type Database = {
           foundry_id: string
           full_name: string | null
           id: string
+          onboarding_data: Json
           paired_ai_id: string | null
           phone_number: string | null
           role: Database["public"]["Enums"]["member_role"]
@@ -2280,6 +2256,7 @@ export type Database = {
           foundry_id: string
           full_name?: string | null
           id: string
+          onboarding_data?: Json
           paired_ai_id?: string | null
           phone_number?: string | null
           role?: Database["public"]["Enums"]["member_role"]
@@ -2296,6 +2273,7 @@ export type Database = {
           foundry_id?: string
           full_name?: string | null
           id?: string
+          onboarding_data?: Json
           paired_ai_id?: string | null
           phone_number?: string | null
           role?: Database["public"]["Enums"]["member_role"]
@@ -3226,6 +3204,51 @@ export type Database = {
           provider_type?: Database["public"]["Enums"]["provider_type"]
         }
         Relationships: []
+      }
+      signup_intents: {
+        Row: {
+          created_at: string
+          fulfilled_at: string | null
+          id: string
+          intent_type: string
+          listing_id: string | null
+          metadata: Json
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          fulfilled_at?: string | null
+          id?: string
+          intent_type: string
+          listing_id?: string | null
+          metadata?: Json
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          fulfilled_at?: string | null
+          id?: string
+          intent_type?: string
+          listing_id?: string | null
+          metadata?: Json
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "signup_intents_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "marketplace_listings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "signup_intents_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_search_ranking"
+            referencedColumns: ["listing_id"]
+          },
+        ]
       }
       standup_summaries: {
         Row: {
@@ -4226,6 +4249,7 @@ export type Database = {
         Args: { search_query: string }
         Returns: undefined
       }
+      is_admin: { Args: never; Returns: boolean }
       refresh_all_analytics: { Args: never; Returns: undefined }
       refresh_buyer_stats: { Args: never; Returns: undefined }
       refresh_platform_stats: { Args: never; Returns: undefined }
@@ -4520,9 +4544,6 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
-  graphql_public: {
-    Enums: {},
-  },
   public: {
     Enums: {
       admin_role: [

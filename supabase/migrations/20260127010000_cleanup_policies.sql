@@ -16,10 +16,12 @@ DROP POLICY IF EXISTS "Users can add team members" ON public.team_members;
 DROP POLICY IF EXISTS "Users can remove team members" ON public.team_members;
 
 -- AI TOOLS (Public access removal if present)
-DROP POLICY IF EXISTS "Everyone can view ai tools" ON public.ai_tools;
+-- Note: ai_tools table doesn't exist yet - commented out
+-- DROP POLICY IF EXISTS "Everyone can view ai tools" ON public.ai_tools;
 
 -- MANUFACTURING RFQS (Public access removal if present)
-DROP POLICY IF EXISTS "Everyone can view rfqs" ON public.manufacturing_rfqs;
+-- Note: manufacturing_rfqs table doesn't exist yet - commented out
+-- DROP POLICY IF EXISTS "Everyone can view rfqs" ON public.manufacturing_rfqs;
 
 -- OBJECTIVES (If any leftovers)
 DROP POLICY IF EXISTS "Users can create objectives" ON public.objectives;

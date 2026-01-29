@@ -66,7 +66,7 @@ export function ListingDetailDrawer({ open, onOpenChange, listing }: ListingDeta
                     {/* Subcategory badge + Verified */}
                     <div className="flex items-center gap-2">
                         <Badge 
-                            variant="outline" 
+                            variant="secondary" 
                             className={cn(
                                 "uppercase text-[10px] tracking-wider font-semibold border-0",
                                 categoryBadgeStyles[category]
@@ -124,7 +124,7 @@ export function ListingDetailDrawer({ open, onOpenChange, listing }: ListingDeta
                 {/* Footer Actions */}
                 <div className="p-4 border-t border-border bg-muted/30 flex gap-3">
                     <Button 
-                        variant="outline" 
+                        variant="secondary" 
                         className="flex-1"
                         onClick={handleAddToComparison}
                     >
@@ -132,7 +132,7 @@ export function ListingDetailDrawer({ open, onOpenChange, listing }: ListingDeta
                         Add to Comparison
                     </Button>
                     <Button 
-                        variant="brand" 
+                        variant="default" 
                         className="flex-1"
                         onClick={handleContact}
                     >

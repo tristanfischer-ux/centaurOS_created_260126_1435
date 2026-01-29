@@ -160,7 +160,7 @@ export function RatingBadge({
     )
   }
 
-  const variant = average >= 4.5 ? "default" : average >= 3.5 ? "secondary" : "outline"
+  const variant = average >= 4.5 ? "default" : average >= 3.5 ? "secondary" : "secondary"
 
   return (
     <Badge variant={variant} className={cn("gap-1", className)}>

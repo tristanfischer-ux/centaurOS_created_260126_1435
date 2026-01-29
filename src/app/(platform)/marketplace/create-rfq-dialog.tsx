@@ -223,7 +223,7 @@ export function CreateRFQDialog() {
     return (
         <Dialog open={open} onOpenChange={handleOpenChange}>
             <DialogTrigger asChild>
-                <Button size="sm" variant="primary">Create RFQ</Button>
+                <Button size="sm" variant="default" className="shadow-md">Create RFQ</Button>
             </DialogTrigger>
             <DialogContent className="sm:max-w-[425px] bg-white text-slate-900 border-slate-200">
                 <DialogHeader>
@@ -273,7 +273,7 @@ export function CreateRFQDialog() {
                             <Button
                                 type="button"
                                 size="icon"
-                                variant={isRecording ? "destructive" : "outline"}
+                                variant={isRecording ? "destructive" : "secondary"}
                                 onClick={isRecording ? stopRecording : startRecording}
                                 disabled={isTranscribing}
                                 className={isRecording ? "animate-pulse" : ""}
@@ -374,8 +374,8 @@ export function CreateRFQDialog() {
                         </>
                     )}
                     <DialogFooter className="gap-2 pt-4 border-t border-slate-100">
-                        <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
-                        <Button type="submit" variant="primary" disabled={isLoading}>
+                        <Button variant="secondary" onClick={() => setOpen(false)}>Cancel</Button>
+                        <Button type="submit" variant="default" disabled={isLoading}>
                             {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                             Submit RFQ
                         </Button>

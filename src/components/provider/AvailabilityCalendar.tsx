@@ -203,7 +203,7 @@ export function AvailabilityCalendar({
                     {/* Month Navigation */}
                     <div className="flex items-center gap-2">
                         <Button 
-                            variant="outline" 
+                            variant="secondary" 
                             size="icon"
                             onClick={goToPreviousMonth}
                             disabled={isLoading}
@@ -214,7 +214,7 @@ export function AvailabilityCalendar({
                             {format(currentMonth, 'MMMM yyyy')}
                         </span>
                         <Button 
-                            variant="outline" 
+                            variant="secondary" 
                             size="icon"
                             onClick={goToNextMonth}
                             disabled={isLoading}
@@ -233,7 +233,7 @@ export function AvailabilityCalendar({
                                 <DropdownMenu>
                                     <DropdownMenuTrigger asChild>
                                         <Button 
-                                            variant="outline" 
+                                            variant="secondary" 
                                             size="sm"
                                             disabled={isLoading || isPending}
                                             className="text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
@@ -262,7 +262,7 @@ export function AvailabilityCalendar({
                                 <DropdownMenu>
                                     <DropdownMenuTrigger asChild>
                                         <Button 
-                                            variant="outline" 
+                                            variant="secondary" 
                                             size="sm"
                                             disabled={isLoading || isPending}
                                             className="text-slate-600 hover:text-slate-700"
@@ -294,7 +294,7 @@ export function AvailabilityCalendar({
                         {showBulkActions && !showQuickActions && (
                             <>
                                 <Button 
-                                    variant="outline" 
+                                    variant="secondary" 
                                     size="sm"
                                     onClick={handleBulkOpen}
                                     disabled={isLoading || isPending}
@@ -303,7 +303,7 @@ export function AvailabilityCalendar({
                                     Open Entire Month
                                 </Button>
                                 <Button 
-                                    variant="outline" 
+                                    variant="secondary" 
                                     size="sm"
                                     onClick={handleBulkBlock}
                                     disabled={isLoading || isPending}

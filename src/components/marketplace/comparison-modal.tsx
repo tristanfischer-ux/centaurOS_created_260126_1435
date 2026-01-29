@@ -142,7 +142,7 @@ export function ComparisonModal({ open, onOpenChange, items }: ComparisonModalPr
                     <div className="flex items-center justify-between">
                         <DialogTitle className="text-xl font-semibold">Compare Listings</DialogTitle>
                         <Button
-                            variant="outline"
+                            variant="secondary"
                             size="sm"
                             onClick={analyzeWithAI}
                             disabled={isAnalyzing || items.length < 2}
@@ -234,7 +234,7 @@ export function ComparisonModal({ open, onOpenChange, items }: ComparisonModalPr
                                         <div>
                                             <h3 className="font-semibold text-base">{item.title}</h3>
                                             <Badge 
-                                                variant="outline" 
+                                                variant="secondary" 
                                                 className={cn(
                                                     "mt-1 uppercase text-[10px] tracking-wider font-semibold border-0",
                                                     categoryBadgeStyles[item.category]
@@ -303,7 +303,7 @@ export function ComparisonModal({ open, onOpenChange, items }: ComparisonModalPr
                                             <th key={item.id} className="text-left py-3 px-4 min-w-[180px] align-top">
                                                 <div className="font-bold text-base leading-tight">{item.title}</div>
                                                 <Badge 
-                                                    variant="outline" 
+                                                    variant="secondary" 
                                                     className={cn(
                                                         "mt-2 uppercase text-[10px] tracking-wider font-semibold border-0",
                                                         categoryBadgeStyles[item.category]

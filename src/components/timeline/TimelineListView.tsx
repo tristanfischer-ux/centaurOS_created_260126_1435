@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import { Database } from "@/types/database.types"
 import { Badge } from "@/components/ui/badge"
 import { Calendar, Clock, ChevronRight, ChevronDown, Target, Check, Plus, Calendar as CalendarIcon } from "lucide-react"
@@ -118,40 +118,41 @@ function groupTasksByDueDate(tasks: JoinedTask[]) {
 
 
 // Mini timeline bar component with avatar
-function MiniTimelineBar({ task, windowStart, windowEnd }: {
+// Uses stable timestamp to avoid SSR/hydration mismatch
+function MiniTimelineBar({ task, windowStart, windowEnd, stableNow }: {
     task: JoinedTask
     windowStart: Date
     windowEnd: Date
+    stableNow: number // Timestamp passed from parent to ensure consistency
 }) {
     const windowDuration = windowEnd.getTime() - windowStart.getTime()
 
-    const taskStart = task.start_date ? new Date(task.start_date) : new Date()
+    const taskStart = task.start_date ? new Date(task.start_date) : new Date(stableNow)
     const taskEnd = task.end_date ? new Date(task.end_date) : new Date(taskStart.getTime() + 86400000 * 2)
 
-    // Calculate positions as percentages
-    const startPercent = Math.max(0, Math.min(100,
+    // Calculate positions as percentages (rounded to avoid floating point precision issues)
+    const startPercent = Math.round(Math.max(0, Math.min(100,
         ((taskStart.getTime() - windowStart.getTime()) / windowDuration) * 100
-    ))
-    const endPercent = Math.max(0, Math.min(100,
+    )) * 100) / 100
+    const endPercent = Math.round(Math.max(0, Math.min(100,
         ((taskEnd.getTime() - windowStart.getTime()) / windowDuration) * 100
-    ))
-    const widthPercent = Math.max(8, endPercent - startPercent) // Minimum 8% width for avatar visibility
+    )) * 100) / 100
+    const widthPercent = Math.round(Math.max(8, endPercent - startPercent) * 100) / 100 // Minimum 8% width for avatar visibility
 
     // Calculate progress through the task
-    const now = new Date()
     let progressPercent = 0
     if (task.status === 'Completed') {
         progressPercent = 100
-    } else if (now > taskEnd) {
+    } else if (stableNow > taskEnd.getTime()) {
         progressPercent = 100 // Overdue
-    } else if (now > taskStart) {
-        progressPercent = ((now.getTime() - taskStart.getTime()) / (taskEnd.getTime() - taskStart.getTime())) * 100
+    } else if (stableNow > taskStart.getTime()) {
+        progressPercent = Math.round(((stableNow - taskStart.getTime()) / (taskEnd.getTime() - taskStart.getTime())) * 10000) / 100
     }
 
-    // Today marker position
-    const todayPercent = Math.max(0, Math.min(100,
-        ((now.getTime() - windowStart.getTime()) / windowDuration) * 100
-    ))
+    // Today marker position (rounded)
+    const todayPercent = Math.round(Math.max(0, Math.min(100,
+        ((stableNow - windowStart.getTime()) / windowDuration) * 100
+    )) * 100) / 100
 
     const isAI = task.profiles?.role === 'AI_Agent'
 
@@ -177,7 +178,7 @@ function MiniTimelineBar({ task, windowStart, windowEnd }: {
                 className={`absolute top-0.5 bottom-0.5 rounded-full ${getStatusBarClass(task.status)}`}
                 style={{
                     left: `${startPercent}%`,
-                    width: `${(widthPercent * progressPercent) / 100}%`,
+                    width: `${Math.round((widthPercent * progressPercent) / 100 * 100) / 100}%`,
                 }}
             />
 
@@ -199,6 +200,17 @@ function MiniTimelineBar({ task, windowStart, windowEnd }: {
 export function TimelineListView({ tasks, members, currentUserId }: TimelineListViewProps) {
     const [expandedDate, setExpandedDate] = useState<string | null>(null)
     const [collapsedTasks, setCollapsedTasks] = useState<Set<string>>(new Set())
+    // Use stable timestamp to avoid hydration mismatch - starts as noon today for SSR consistency
+    const [stableNow, setStableNow] = useState<number>(() => {
+        const d = new Date()
+        d.setHours(12, 0, 0, 0) // Use noon as stable initial value
+        return d.getTime()
+    })
+
+    // Update to real "now" after hydration completes
+    useEffect(() => {
+        setStableNow(Date.now())
+    }, [])
 
     // Sorted members for picker
     const sortedMembers = useMemo(() =>
@@ -233,22 +245,28 @@ export function TimelineListView({ tasks, members, currentUserId }: TimelineList
         return new Date(a).getTime() - new Date(b).getTime()
     })
 
-    // Calculate timeline window (today - 3 days to today + 11 days = 2 week window)
-    const now = new Date()
-    const windowStart = new Date(now)
-    windowStart.setDate(windowStart.getDate() - 3)
-    windowStart.setHours(0, 0, 0, 0)
+    // Calculate timeline window using stable timestamp
+    const windowStart = useMemo(() => {
+        const d = new Date(stableNow)
+        d.setDate(d.getDate() - 3)
+        d.setHours(0, 0, 0, 0)
+        return d
+    }, [stableNow])
 
-    const windowEnd = new Date(now)
-    windowEnd.setDate(windowEnd.getDate() + 11)
-    windowEnd.setHours(23, 59, 59, 999)
+    const windowEnd = useMemo(() => {
+        const d = new Date(stableNow)
+        d.setDate(d.getDate() + 11)
+        d.setHours(23, 59, 59, 999)
+        return d
+    }, [stableNow])
 
     // Generate date markers for the timeline header
-    const dateMarkers = (() => {
+    const dateMarkers = useMemo(() => {
         const markers: { label: string; isToday: boolean }[] = []
         const current = new Date(windowStart)
+        const todayStr = new Date(stableNow).toDateString()
         while (current <= windowEnd) {
-            const isToday = current.toDateString() === now.toDateString()
+            const isToday = current.toDateString() === todayStr
             markers.push({
                 label: current.toLocaleDateString('en-US', { day: 'numeric' }),
                 isToday
@@ -256,7 +274,7 @@ export function TimelineListView({ tasks, members, currentUserId }: TimelineList
             current.setDate(current.getDate() + 1)
         }
         return markers
-    })()
+    }, [windowStart, windowEnd, stableNow])
 
     // Handlers
     const handleAssigneeToggle = async (taskId: string, currentAssignees: { id: string }[], memberId: string) => {
@@ -530,6 +548,7 @@ export function TimelineListView({ tasks, members, currentUserId }: TimelineList
                                                             task={task}
                                                             windowStart={windowStart}
                                                             windowEnd={windowEnd}
+                                                            stableNow={stableNow}
                                                         />
                                                     </div>
 

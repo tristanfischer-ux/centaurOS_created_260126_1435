@@ -70,20 +70,23 @@ export function QuickAddTask({ objectives, members, currentUserId, teams = [], o
                 data-quick-add-trigger
                 onClick={() => setIsExpanded(true)}
                 aria-label="Add a new task (keyboard shortcut: N)"
-                className="w-full flex items-center gap-2 px-4 py-3 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg bg-muted/50 transition-all"
+                className="w-full flex items-center gap-3 px-4 py-3.5 text-slate-500 hover:text-slate-900 border-2 border-dashed border-slate-200 hover:border-slate-400 rounded-lg bg-slate-50/50 hover:bg-white transition-all duration-200 group"
             >
-                <Plus className="w-4 h-4" aria-hidden="true" />
-                <span className="text-sm">Add a task... (press N)</span>
+                <div className="flex items-center justify-center w-6 h-6 rounded-full bg-slate-200 group-hover:bg-orange-500 transition-colors duration-200">
+                    <Plus className="w-3.5 h-3.5 text-slate-500 group-hover:text-white transition-colors duration-200" aria-hidden="true" />
+                </div>
+                <span className="text-sm font-medium">Add a task...</span>
+                <kbd className="ml-auto px-2 py-0.5 text-[10px] font-mono bg-slate-100 group-hover:bg-slate-200 text-slate-400 group-hover:text-slate-600 rounded border border-slate-200 transition-colors duration-200">N</kbd>
             </button>
         )
     }
 
     return (
-        <form onSubmit={handleSubmit} className="flex gap-2 p-2 rounded-lg bg-card shadow-md" role="form" aria-label="Quick add task">
+        <form onSubmit={handleSubmit} className="flex gap-2 p-3 rounded-lg bg-white border-2 border-orange-200 shadow-lg ring-2 ring-orange-100" role="form" aria-label="Quick add task">
             <Input
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                placeholder="Task title..."
+                placeholder="What needs to be done?"
                 autoFocus
                 disabled={isLoading}
                 aria-label="Task title"
@@ -93,15 +96,16 @@ export function QuickAddTask({ objectives, members, currentUserId, teams = [], o
                         setTitle('')
                     }
                 }}
-                className="flex-1"
+                className="flex-1 border-slate-200 focus-visible:ring-orange-500"
             />
-            <Button type="submit" size="sm" disabled={isLoading || !title.trim()} aria-label={isLoading ? "Creating task..." : "Create task"}>
+            <Button type="submit" size="sm" disabled={isLoading || !title.trim()} aria-label={isLoading ? "Creating task..." : "Create task"} className="bg-orange-600 hover:bg-orange-700 text-white">
                 {isLoading ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" /> : <Plus className="w-4 h-4" aria-hidden="true" />}
+                <span className="ml-1 hidden sm:inline">Add</span>
             </Button>
             <Button type="button" size="sm" variant="ghost" onClick={() => {
                 setIsExpanded(false)
                 setTitle('')
-            }} aria-label="Cancel">
+            }} aria-label="Cancel" className="text-slate-500 hover:text-slate-700">
                 <X className="w-4 h-4" aria-hidden="true" />
             </Button>
         </form>

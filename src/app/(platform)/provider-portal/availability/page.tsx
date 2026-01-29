@@ -106,7 +106,7 @@ export default async function AvailabilityPage() {
                     </p>
                 </div>
                 <Link href="/provider-portal/pricing">
-                    <Button variant="outline" className="gap-2">
+                    <Button variant="secondary" className="gap-2">
                         <Settings className="h-4 w-4" />
                         Pricing Settings
                     </Button>
@@ -239,7 +239,7 @@ export default async function AvailabilityPage() {
                                         Download your availability as an iCal file
                                     </p>
                                     <Button 
-                                        variant="outline" 
+                                        variant="secondary" 
                                         size="sm" 
                                         className="mt-2"
                                         disabled
@@ -262,7 +262,7 @@ export default async function AvailabilityPage() {
                                         Two-way sync with Google Calendar
                                     </p>
                                     <Button 
-                                        variant="outline" 
+                                        variant="secondary" 
                                         size="sm" 
                                         className="mt-2"
                                         disabled
@@ -285,7 +285,7 @@ export default async function AvailabilityPage() {
                                         Sync with Microsoft Outlook
                                     </p>
                                     <Button 
-                                        variant="outline" 
+                                        variant="secondary" 
                                         size="sm" 
                                         className="mt-2"
                                         disabled

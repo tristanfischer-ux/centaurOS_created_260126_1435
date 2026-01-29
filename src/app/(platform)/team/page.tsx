@@ -123,15 +123,12 @@ export default async function TeamPage() {
     const aiAgents = membersWithMetrics.filter(p => p.role === 'AI_Agent')
 
     return (
-        <div className="relative">
-            {/* Add Member button in top right - utilizing InviteMemberDialog in the view instead */}
-            <TeamComparisonView
-                founders={founders}
-                executives={executives}
-                apprentices={apprentices}
-                aiAgents={aiAgents}
-                teams={teams || []}
-            />
-        </div>
+        <TeamComparisonView
+            founders={founders}
+            executives={executives}
+            apprentices={apprentices}
+            aiAgents={aiAgents}
+            teams={teams || []}
+        />
     )
 }

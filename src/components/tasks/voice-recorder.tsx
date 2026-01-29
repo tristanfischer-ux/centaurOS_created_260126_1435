@@ -181,7 +181,7 @@ export function VoiceRecorder({ onTaskParsed, className }: VoiceRecorderProps) {
             <Button
                 type="button" // Important so it doesn't submit parent forms
                 size="default"
-                variant={isRecording ? "destructive" : "outline"}
+                variant={isRecording ? "destructive" : "secondary"}
                 className={`${isRecording ? "animate-pulse" : ""} ${className} relative`}
                 onClick={isRecording ? stopRecording : startRecording}
                 disabled={isProcessing}

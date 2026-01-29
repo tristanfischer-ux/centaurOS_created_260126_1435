@@ -1,9 +1,10 @@
 "use client"
 
+import React from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
-import { LayoutDashboard, Users, CheckSquare, Clock, Store, Target, Compass, LayoutGrid, MessageCircleQuestion, ShieldAlert } from "lucide-react"
+import { LayoutDashboard, Users, CheckSquare, Clock, Store, Target, Compass, LayoutGrid, MessageCircleQuestion, ShieldAlert, FileText } from "lucide-react"
 import { NotificationCenter } from "@/components/NotificationCenter"
 import { ThemeToggle } from "@/components/ThemeToggle"
 import { ZoomControl } from "@/components/ZoomControl"
@@ -28,16 +29,24 @@ function isRouteActive(pathname: string, href: string): boolean {
 // Keep in sync with package.json version
 const APP_VERSION = "1.0.3"
 
-const mainNavigation = [
+// Navigation groups with spacers between them
+const coreNavigation = [
     { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-    { name: "Org Blueprint", href: "/org-blueprint", icon: LayoutGrid, tooltip: "Business function coverage and gap analysis" },
-    { name: "Advisory", href: "/advisory", icon: MessageCircleQuestion, tooltip: "Ask questions and get expert guidance" },
     { name: "Objectives", href: "/objectives", icon: Target },
     { name: "Tasks", href: "/tasks", icon: CheckSquare },
-    { name: "Team", href: "/team", icon: Users },
     { name: "Timeline", href: "/timeline", icon: Clock, tooltip: "Gantt chart view of all tasks" },
+    { name: "Team", href: "/team", icon: Users },
+]
+
+const communityNavigation = [
     { name: "Marketplace", href: "/marketplace", icon: Store, tooltip: "Browse and compare service providers" },
+    { name: "RFQs", href: "/rfq", icon: FileText, tooltip: "Request quotes from suppliers or respond to opportunities" },
     { name: "Guild", href: "/guild", icon: Compass, tooltip: "Community events and resources" },
+    { name: "Advice", href: "/advisory", icon: MessageCircleQuestion, tooltip: "Ask questions and get expert guidance" },
+]
+
+const strategicNavigation = [
+    { name: "Org Blueprint", href: "/org-blueprint", icon: LayoutGrid, tooltip: "Business function coverage and gap analysis" },
 ]
 
 export function Sidebar({ foundryName, foundryId, userName, userRole, isAdmin }: { foundryName?: string; foundryId?: string; userName?: string; userRole?: string; isAdmin?: boolean }) {
@@ -80,46 +89,67 @@ export function Sidebar({ foundryName, foundryId, userName, userRole, isAdmin }:
                 </div>
             </div>
 
-            <nav className="flex-1 space-y-0.5 px-3 py-2">
-                {mainNavigation.map((item) => {
-                    const isActive = isRouteActive(pathname, item.href)
-                    const navLink = (
-                        <Link
-                            href={item.href}
-                            className={cn(
-                                isActive
-                                    ? "bg-cyan-50 text-cyan-900 font-semibold"
-                                    : "text-slate-500 hover:bg-slate-50 hover:text-slate-900",
-                                "group flex items-center px-3 py-2 text-sm transition-all duration-200 rounded-md"
-                            )}
-                        >
-                            <item.icon
+            <nav className="flex-1 space-y-1.5 px-3 py-3">
+                {/* Helper function to render nav items */}
+                {(() => {
+                    const renderNavItem = (item: { name: string; href: string; icon: React.ComponentType<{ className?: string }>; tooltip?: string }) => {
+                        const isActive = isRouteActive(pathname, item.href)
+                        const navLink = (
+                            <Link
+                                href={item.href}
                                 className={cn(
-                                    isActive ? "text-cyan-600" : "text-slate-400 group-hover:text-slate-600",
-                                    "mr-3 h-4 w-4 flex-shrink-0 transition-colors"
+                                    isActive
+                                        ? "bg-cyan-50 text-cyan-900 font-semibold"
+                                        : "text-slate-500 hover:bg-slate-50 hover:text-slate-900",
+                                    "group flex items-center px-3 py-2.5 text-sm transition-all duration-200 rounded-md"
                                 )}
-                                aria-hidden="true"
-                            />
-                            {item.name}
-                        </Link>
-                    )
-
-                    // Wrap with tooltip if item has a tooltip description
-                    if (item.tooltip) {
-                        return (
-                            <Tooltip key={item.name} delayDuration={300}>
-                                <TooltipTrigger asChild>
-                                    {navLink}
-                                </TooltipTrigger>
-                                <TooltipContent side="right" className="max-w-[200px]">
-                                    <p>{item.tooltip}</p>
-                                </TooltipContent>
-                            </Tooltip>
+                            >
+                                <item.icon
+                                    className={cn(
+                                        isActive ? "text-cyan-600" : "text-slate-400 group-hover:text-slate-600",
+                                        "mr-3 h-4 w-4 flex-shrink-0 transition-colors"
+                                    )}
+                                    aria-hidden="true"
+                                />
+                                {item.name}
+                            </Link>
                         )
+
+                        if (item.tooltip) {
+                            return (
+                                <Tooltip key={item.name} delayDuration={300}>
+                                    <TooltipTrigger asChild>
+                                        {navLink}
+                                    </TooltipTrigger>
+                                    <TooltipContent side="right" className="max-w-[200px]">
+                                        <p>{item.tooltip}</p>
+                                    </TooltipContent>
+                                </Tooltip>
+                            )
+                        }
+
+                        return <div key={item.name}>{navLink}</div>
                     }
 
-                    return <div key={item.name}>{navLink}</div>
-                })}
+                    return (
+                        <>
+                            {/* Core Navigation: Dashboard, Objectives, Tasks, Timeline, Team */}
+                            {coreNavigation.map(renderNavItem)}
+                            
+                            {/* Spacer */}
+                            <div className="my-3 border-t border-slate-100" />
+                            
+                            {/* Community Navigation: Marketplace, Guild */}
+                            {communityNavigation.map(renderNavItem)}
+                            
+                            {/* Spacer */}
+                            <div className="my-3 border-t border-slate-100" />
+                            
+                            {/* Strategic Navigation: Org Blueprint, Advisory */}
+                            {strategicNavigation.map(renderNavItem)}
+                        </>
+                    )
+                })()}
 
                 {/* Admin Panel Link - Only visible to admins */}
                 {isAdmin && (
@@ -131,7 +161,7 @@ export function Sidebar({ foundryName, foundryId, userName, userRole, isAdmin }:
                                 isRouteActive(pathname, "/admin")
                                     ? "bg-cyan-50 text-cyan-900 font-semibold"
                                     : "text-slate-500 hover:bg-slate-50 hover:text-slate-900",
-                                "group flex items-center px-3 py-2 text-sm transition-all duration-200 rounded-md"
+                                "group flex items-center px-3 py-2.5 text-sm transition-all duration-200 rounded-md"
                             )}
                         >
                             <ShieldAlert

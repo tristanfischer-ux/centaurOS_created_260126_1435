@@ -74,7 +74,7 @@ export function CreateTeamDialog({ members }: { members: Member[] }) {
     return (
         <Dialog open={open} onOpenChange={handleOpenChange}>
             <DialogTrigger asChild>
-                <Button variant="primary">
+                <Button variant="default">
                     <Plus className="h-4 w-4 mr-2" />
                     New Team
                 </Button>
@@ -121,8 +121,8 @@ export function CreateTeamDialog({ members }: { members: Member[] }) {
                         </div>
                     </div>
                     <DialogFooter className="gap-2 pt-4 border-t border-border">
-                        <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
-                        <Button type="submit" variant="primary" disabled={loading}>
+                        <Button variant="secondary" onClick={() => setOpen(false)}>Cancel</Button>
+                        <Button type="submit" variant="default" disabled={loading}>
                             {loading ? "Creating..." : "Create Team"}
                         </Button>
                     </DialogFooter>

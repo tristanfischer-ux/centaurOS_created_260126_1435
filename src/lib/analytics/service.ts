@@ -157,10 +157,12 @@ export async function getSupplierAnalytics(
     }
     
     // Get reviews
-    const { data: reviews } = await supabase
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const reviewsResult = await (supabase as any)
       .from('provider_reviews')
       .select('rating, created_at')
       .eq('reviewee_id', providerId)
+    const reviews = reviewsResult.data as { rating: number; created_at: string }[] | null
     
     // Calculate metrics
     const allOrders = orders || []
@@ -223,13 +225,13 @@ export async function getSupplierAnalytics(
     )
     
     // Rating trend
-    const periodReviews = (reviews || []).filter(r => 
+    const periodReviews: { rating: number; created_at: string }[] = (reviews || []).filter(r => 
       new Date(r.created_at) >= start && new Date(r.created_at) <= end
     )
     const ratingTrend = generateTimeSeries(
       periodReviews,
       'created_at',
-      (r) => r.rating,
+      (r: { rating: number; created_at: string }) => r.rating,
       period,
       'average'
     )
@@ -759,7 +761,7 @@ async function getTopProviders(
       created_at,
       seller:provider_profiles!orders_seller_id_fkey(
         id, 
-        display_name,
+        headline,
         user:profiles(full_name, avatar_url)
       )
     `)
@@ -782,14 +784,14 @@ async function getTopProviders(
     const sellerId = o.seller_id
     const seller = o.seller as {
       id: string
-      display_name: string
+      headline: string | null
       user: { full_name: string | null; avatar_url: string | null } | null
     } | null
     
     if (!providerStats[sellerId]) {
       providerStats[sellerId] = {
         id: sellerId,
-        name: seller?.display_name || seller?.user?.full_name || 'Unknown',
+        name: seller?.user?.full_name || seller?.headline || 'Unknown',
         avatarUrl: seller?.user?.avatar_url || undefined,
         totalOrders: 0,
         totalSpend: 0,
@@ -818,7 +820,7 @@ async function getPlatformTopProviders(
     .from('provider_profiles')
     .select(`
       id,
-      display_name,
+      headline,
       tier,
       user:profiles(full_name, avatar_url)
     `)
@@ -835,10 +837,12 @@ async function getPlatformTopProviders(
       .select('total_amount, status')
       .eq('seller_id', p.id)
     
-    const { data: reviews } = await supabase
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const reviewsResult = await (supabase as any)
       .from('provider_reviews')
       .select('rating')
       .eq('reviewee_id', p.id)
+    const reviews = reviewsResult.data as { rating: number }[] | null
     
     const completedOrders = (orders || []).filter(o => o.status === 'completed')
     const totalGmv = completedOrders.reduce((sum, o) => sum + o.total_amount, 0)
@@ -850,7 +854,7 @@ async function getPlatformTopProviders(
     
     results.push({
       id: p.id,
-      name: p.display_name || user?.full_name || 'Unknown',
+      name: user?.full_name || p.headline || 'Unknown',
       avatarUrl: user?.avatar_url || undefined,
       totalGmv,
       totalOrders: completedOrders.length,

@@ -135,7 +135,7 @@ export function CertificationsView({ certifications, error }: CertificationsView
                         </p>
                         <CertificationForm
                             trigger={
-                                <Button variant="primary">
+                                <Button variant="default">
                                     <Plus className="w-4 h-4 mr-2" />
                                     Add Your First Certification
                                 </Button>

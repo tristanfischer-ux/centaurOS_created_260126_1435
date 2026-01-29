@@ -401,7 +401,7 @@ export function PricingForm({
                             </div>
                             
                             {minimumDays > 1 && (
-                                <Badge variant="outline" className="mb-3">
+                                <Badge variant="secondary" className="mb-3">
                                     {minimumDays} day minimum
                                 </Badge>
                             )}
@@ -441,7 +441,7 @@ export function PricingForm({
             <div className="flex items-center justify-between">
                 <div>
                     {hasChanges && (
-                        <Badge variant="outline" className="text-amber-600 border-amber-200">
+                        <Badge variant="secondary" className="text-amber-600 border-amber-200">
                             Unsaved changes
                         </Badge>
                     )}

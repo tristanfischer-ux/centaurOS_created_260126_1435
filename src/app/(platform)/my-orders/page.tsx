@@ -56,11 +56,18 @@ export default async function MyOrdersPage() {
 
     return (
         <div className="container max-w-5xl mx-auto py-8 px-4">
-            <div className="mb-8">
-                <h1 className="text-3xl font-bold">My Orders</h1>
-                <p className="text-muted-foreground mt-1">
-                    View and manage your marketplace orders
-                </p>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-slate-100 mb-8">
+                <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-3 mb-1">
+                        <div className="h-8 w-1 bg-primary rounded-full shadow-[0_0_8px_rgba(234,88,12,0.6)]" />
+                        <h1 className="text-2xl sm:text-3xl font-display font-semibold text-foreground tracking-tight">
+                            My Orders
+                        </h1>
+                    </div>
+                    <p className="text-muted-foreground text-sm font-medium pl-4">
+                        View and manage your marketplace orders
+                    </p>
+                </div>
             </div>
 
             <Suspense fallback={<OrdersLoadingSkeleton />}>

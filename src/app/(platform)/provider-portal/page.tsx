@@ -16,6 +16,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { ProviderOnboardingProgress } from "@/components/provider/ProviderOnboardingProgress"
 import { StripeAccountStatus } from "@/components/provider/StripeAccountStatus"
 import { EarningsCard } from "@/components/provider/EarningsCard"
+import { RFQWidget } from "@/components/provider-portal/RFQWidget"
 import { 
     ShoppingCart, 
     Calendar, 
@@ -84,11 +85,14 @@ async function DashboardContent() {
     return (
         <div className="space-y-6">
             {/* Header */}
-            <div className="flex items-center justify-between">
-                <div>
-                    <h1 className="text-2xl font-bold text-slate-900">Provider Dashboard</h1>
-                    <p className="text-muted-foreground mt-1">
-                        Welcome back! Here&apos;s an overview of your provider activity.
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-slate-100">
+                <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-3 mb-1">
+                        <div className="h-8 w-1 bg-orange-600 rounded-full shadow-[0_0_8px_rgba(234,88,12,0.6)]" />
+                        <h1 className="text-2xl sm:text-3xl font-display font-semibold text-foreground tracking-tight">Provider Dashboard</h1>
+                    </div>
+                    <p className="text-muted-foreground mt-1 text-sm font-medium pl-4">
+                        Welcome back! Here&apos;s an overview of your provider activity
                     </p>
                 </div>
                 {profile.out_of_office && (
@@ -170,12 +174,15 @@ async function DashboardContent() {
                     currency={profile.currency}
                 />
 
-                {/* Profile Completion */}
-                <ProviderOnboardingProgress
-                    steps={onboardingSteps}
-                    completionPercent={stats?.profileCompletionPercent}
-                />
+                {/* RFQ Widget */}
+                <RFQWidget />
             </div>
+
+            {/* Profile Completion */}
+            <ProviderOnboardingProgress
+                steps={onboardingSteps}
+                completionPercent={stats?.profileCompletionPercent}
+            />
 
             {/* Analytics Link Card */}
             <Card className="bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-100">
@@ -190,7 +197,7 @@ async function DashboardContent() {
                         </div>
                     </div>
                     <Link href="/provider-portal/analytics">
-                        <Button variant="outline" className="border-blue-200 hover:bg-blue-100">
+                        <Button variant="secondary" className="border-blue-200 hover:bg-blue-100">
                             View Analytics
                             <ArrowRight className="ml-2 h-4 w-4" />
                         </Button>

@@ -11,8 +11,9 @@ import { cn } from "@/lib/utils"
 import { 
     ChevronDown, ShieldCheck, MapPin, GraduationCap, Clock, Briefcase,
     Bot, Sparkles, BarChart3, Zap, Shield, Factory, Cpu, X,
-    Building2, DollarSign, Target, Award, Layers, Star, Mail, Plus
+    Building2, DollarSign, Target, Award, Layers, Star, Mail, Plus, FileText
 } from "lucide-react"
+import Link from "next/link"
 
 interface MarketCardProps {
     listing: MarketplaceListing
@@ -63,9 +64,9 @@ export const MarketCard = memo(function MarketCard({
 
     return (
         <Card className={cn(
-            "group relative flex flex-col shadow-sm transition-all duration-200 overflow-hidden",
-            isSelected && "ring-2 ring-ring",
-            isExpanded && "shadow-lg ring-1 ring-slate-200"
+            "group relative flex flex-col border-blue-200 hover:border-orange-200 hover:shadow-sm transition-all duration-200 overflow-hidden bg-white",
+            isSelected && "ring-2 ring-orange-500 border-orange-500",
+            isExpanded && "shadow-md border-orange-200"
         )}>
             <CardContent className="p-4 relative z-10">
                 {/* Header */}
@@ -74,7 +75,7 @@ export const MarketCard = memo(function MarketCard({
                         {isAI && AITypeIcon && (
                             <AITypeIcon className="w-4 h-4 text-violet-600" />
                         )}
-                        <Badge variant="outline" className={cn("uppercase text-[10px] tracking-wider font-semibold border-0", categoryBadgeStyles[listing.category])}>
+                        <Badge variant="secondary" className={cn("uppercase text-[10px] tracking-wider font-semibold border-0", categoryBadgeStyles[listing.category])}>
                             {listing.subcategory}
                         </Badge>
                     </div>
@@ -114,18 +115,18 @@ export const MarketCard = memo(function MarketCard({
 
             {/* Expanded Content - Details only - NO flex-grow, only shows when expanded */}
             {isExpanded && (
-                <div className="border-t border-slate-100 bg-slate-50/50 p-4">
+                <div className="border-t border-blue-200 bg-slate-50 p-4">
                     <ExpandedDetails listing={listing} attrs={attrs} />
                 </div>
             )}
 
             {/* Action buttons - shown when expanded */}
             {isExpanded && (
-                <div className="flex gap-2 px-4 pb-3 pt-2 border-t border-slate-100 bg-white">
+                <div className="flex gap-2 px-4 pb-3 pt-2 border-t border-blue-200 bg-white">
                     <Button 
-                        variant="outline" 
+                        variant="secondary" 
                         size="sm"
-                        className="flex-1 text-xs"
+                        className="flex-1 text-xs border-slate-200 hover:border-orange-500/50 hover:bg-orange-50/50 hover:text-orange-700"
                         onClick={(e) => {
                             e.stopPropagation()
                             onToggleSelect(listing.id)
@@ -136,8 +137,8 @@ export const MarketCard = memo(function MarketCard({
                     </Button>
                     <Button 
                         size="sm"
-                        variant="brand"
-                        className="flex-1 text-xs"
+                        variant="default"
+                        className="flex-1 text-xs shadow-md"
                         onClick={(e) => {
                             e.stopPropagation()
                             console.log('Contact:', listing.id)
@@ -149,13 +150,13 @@ export const MarketCard = memo(function MarketCard({
                 </div>
             )}
 
-            <CardFooter className="relative z-10 flex items-center justify-between pt-3 pb-3 px-4 bg-slate-50">
+            <CardFooter className="relative z-10 flex items-center justify-between pt-3 pb-3 px-4 bg-slate-50 border-t border-blue-200">
                 <div className="flex items-center gap-2">
                     <Checkbox
                         id={`compare-${listing.id}`}
                         checked={isSelected}
                         onCheckedChange={() => onToggleSelect(listing.id)}
-                        className="h-4 w-4 bg-slate-200 data-[state=checked]:bg-foreground text-foreground focus:ring-ring"
+                        className="h-4 w-4 data-[state=checked]:bg-orange-600 data-[state=checked]:border-orange-600"
                         aria-label={`Select ${listing.title} for comparison`}
                     />
                     <label
@@ -166,18 +167,33 @@ export const MarketCard = memo(function MarketCard({
                     </label>
                 </div>
 
-                <Button 
-                    size="sm" 
-                    variant="ghost" 
-                    className="text-xs gap-1"
-                    onClick={handleToggleExpand}
-                >
-                    {isExpanded ? 'Less' : 'More'}
-                    <ChevronDown className={cn(
-                        "h-3 w-3 transition-transform duration-200",
-                        isExpanded && "rotate-180"
-                    )} />
-                </Button>
+                <div className="flex items-center gap-2">
+                    {isExpanded && (
+                        <Button 
+                            size="sm" 
+                            variant="secondary"
+                            className="text-xs gap-1 border-slate-200 hover:border-orange-500/50 hover:bg-orange-50/50 hover:text-orange-700"
+                            asChild
+                        >
+                            <Link href="/rfq/create">
+                                <FileText className="w-3 h-3" />
+                                Request Quote
+                            </Link>
+                        </Button>
+                    )}
+                    <Button 
+                        size="sm" 
+                        variant="ghost" 
+                        className="text-xs gap-1 hover:bg-slate-100"
+                        onClick={handleToggleExpand}
+                    >
+                        {isExpanded ? 'Less' : 'More'}
+                        <ChevronDown className={cn(
+                            "h-3 w-3 transition-transform duration-200",
+                            isExpanded && "rotate-180"
+                        )} />
+                    </Button>
+                </div>
             </CardFooter>
         </Card>
     )

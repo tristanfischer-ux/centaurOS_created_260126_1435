@@ -28,7 +28,7 @@ function SubmitButton() {
     const { pending } = useFormStatus()
 
     return (
-        <Button type="submit" variant="primary" disabled={pending}>
+        <Button type="submit" variant="default" disabled={pending}>
             {pending ? (
                 <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -69,7 +69,7 @@ export function AddMemberDialog() {
     return (
         <Dialog open={open} onOpenChange={handleOpenChange}>
             <DialogTrigger asChild>
-                <Button variant="primary" className="gap-2 font-bold">
+                <Button variant="default" className="gap-2 font-bold">
                     <UserPlus className="h-4 w-4" />
                     Add Member
                 </Button>
@@ -135,7 +135,7 @@ export function AddMemberDialog() {
                         )}
                     </div>
                     <DialogFooter className="gap-2 pt-4 border-t border-slate-100">
-                        <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
+                        <Button variant="secondary" onClick={() => setOpen(false)}>Cancel</Button>
                         <SubmitButton />
                     </DialogFooter>
                 </form>

@@ -137,7 +137,7 @@ export function BlueprintWidget({ summary }: BlueprintWidgetProps) {
 
                 {/* View Full Assessment Link */}
                 <Link href="/org-blueprint" className="block">
-                    <Button variant="outline" size="sm" className="w-full">
+                    <Button variant="secondary" size="sm" className="w-full">
                         View Full Assessment
                         <ArrowRight className="h-4 w-4 ml-1" />
                     </Button>

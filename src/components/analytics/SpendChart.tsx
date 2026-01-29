@@ -238,7 +238,7 @@ export function SpendChart({
                     paddingAngle={2}
                     dataKey="value"
                     nameKey="category"
-                    label={({ category, percentage }) => `${category} (${percentage}%)`}
+                    label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
                     labelLine={{ strokeWidth: 1 }}
                   >
                     {categoryData.map((_, index) => (

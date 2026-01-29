@@ -183,7 +183,7 @@ export function FunctionCard({ businessFunction, onUpdate }: FunctionCardProps) 
                     <div className="flex items-center gap-2 flex-wrap">
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                                <Button variant="outline" size="sm" disabled={isUpdating}>
+                                <Button variant="secondary" size="sm" disabled={isUpdating}>
                                     {isUpdating ? (
                                         <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />
                                     ) : (
@@ -250,7 +250,7 @@ export function FunctionCard({ businessFunction, onUpdate }: FunctionCardProps) 
                                     </div>
                                 </div>
                                 <DialogFooter>
-                                    <Button variant="outline" onClick={() => setIsNotesDialogOpen(false)}>
+                                    <Button variant="secondary" onClick={() => setIsNotesDialogOpen(false)}>
                                         Cancel
                                     </Button>
                                     <Button onClick={handleSaveNotes} disabled={isUpdating}>

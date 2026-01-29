@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect, KeyboardEvent } from 'react'
+import { createPortal } from 'react-dom'
 import { Textarea } from '@/components/ui/textarea'
 import { getMentionAtCursor } from '@/lib/mentions'
 import { cn } from '@/lib/utils'
@@ -32,7 +33,20 @@ export function MentionInput({
   const [suggestions, setSuggestions] = useState<Profile[]>([])
   const [selectedIndex, setSelectedIndex] = useState(0)
   const [mentionInfo, setMentionInfo] = useState<{ start: number; end: number } | null>(null)
+  const [dropdownPosition, setDropdownPosition] = useState<{ top: number; left: number; width: number } | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const [mounted, setMounted] = useState(false)
+
+  const updateDropdownPosition = () => {
+    if (textareaRef.current) {
+      const rect = textareaRef.current.getBoundingClientRect()
+      setDropdownPosition({
+        top: rect.top,
+        left: rect.left,
+        width: Math.min(rect.width, 320) // max-w-xs equivalent
+      })
+    }
+  }
 
   const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const newValue = e.target.value
@@ -50,6 +64,7 @@ export function MentionInput({
       setMentionInfo({ start: mention.start, end: mention.end })
       setShowSuggestions(filtered.length > 0)
       setSelectedIndex(0)
+      updateDropdownPosition()
     } else {
       setShowSuggestions(false)
     }
@@ -101,6 +116,11 @@ export function MentionInput({
     }
   }
 
+  // Set mounted state
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
   // Close suggestions when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -115,31 +135,45 @@ export function MentionInput({
     }
   }, [showSuggestions])
 
-  return (
-    <div className="relative flex-1 w-full">
-      <Textarea
-        ref={textareaRef}
-        value={value}
-        onChange={handleChange}
-        onKeyDown={handleKeyDown}
-        placeholder={placeholder}
-        className={cn("w-full", className)}
-      />
-      
-      {showSuggestions && suggestions.length > 0 && (
-        <div 
-          role="listbox"
-          aria-label="Mention suggestions"
-          aria-live="polite"
-          aria-atomic="false"
-          className="absolute bottom-full mb-1 left-0 w-full max-w-xs bg-popover border rounded-lg shadow-lg z-50 overflow-hidden"
-        >
-          <div className="p-1 text-xs text-muted-foreground border-b" aria-hidden="true">
-            Type to filter, ↑↓ to navigate, Enter to select
-          </div>
-          <div aria-live="polite" className="sr-only">
-            {suggestions.length} suggestion{suggestions.length !== 1 ? 's' : ''} available
-          </div>
+  // Update position on scroll/resize
+  useEffect(() => {
+    if (showSuggestions) {
+      updateDropdownPosition()
+      window.addEventListener('scroll', updateDropdownPosition, true)
+      window.addEventListener('resize', updateDropdownPosition)
+      return () => {
+        window.removeEventListener('scroll', updateDropdownPosition, true)
+        window.removeEventListener('resize', updateDropdownPosition)
+      }
+    }
+  }, [showSuggestions])
+
+  const renderDropdown = () => {
+    if (!showSuggestions || suggestions.length === 0 || !dropdownPosition || !mounted) {
+      return null
+    }
+
+    return createPortal(
+      <div 
+        role="listbox"
+        aria-label="Mention suggestions"
+        aria-live="polite"
+        aria-atomic="false"
+        className="fixed bg-popover border rounded-lg shadow-lg z-[100] overflow-hidden"
+        style={{
+          top: dropdownPosition.top - 4,
+          left: dropdownPosition.left,
+          width: dropdownPosition.width,
+          transform: 'translateY(-100%)'
+        }}
+      >
+        <div className="p-1 text-xs text-muted-foreground border-b" aria-hidden="true">
+          Type to filter, ↑↓ to navigate, Enter to select
+        </div>
+        <div aria-live="polite" className="sr-only">
+          {suggestions.length} suggestion{suggestions.length !== 1 ? 's' : ''} available
+        </div>
+        <div className="max-h-[200px] overflow-y-auto">
           {suggestions.map((profile, index) => (
             <button
               key={profile.id}
@@ -156,14 +190,29 @@ export function MentionInput({
               <div className="w-6 h-6 rounded-full bg-muted flex items-center justify-center text-xs" aria-hidden="true">
                 {profile.full_name[0]}
               </div>
-              <div>
-                <div className="font-medium">{profile.full_name}</div>
-                <div className="text-xs text-muted-foreground">{profile.email}</div>
+              <div className="flex-1 min-w-0">
+                <div className="font-medium truncate">{profile.full_name}</div>
+                <div className="text-xs text-muted-foreground truncate">{profile.email}</div>
               </div>
             </button>
           ))}
         </div>
-      )}
+      </div>,
+      document.body
+    )
+  }
+
+  return (
+    <div className="relative flex-1 w-full">
+      <Textarea
+        ref={textareaRef}
+        value={value}
+        onChange={handleChange}
+        onKeyDown={handleKeyDown}
+        placeholder={placeholder}
+        className={cn("w-full", className)}
+      />
+      {renderDropdown()}
     </div>
   )
 }

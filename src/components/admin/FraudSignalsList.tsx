@@ -113,11 +113,11 @@ export function FraudSignalsList({
   }
 
   const getSeverityBadge = (severity: FraudSeverity) => {
-    const config: Record<FraudSeverity, { variant: "default" | "secondary" | "destructive" | "outline"; icon: React.ReactNode }> = {
+    const config: Record<FraudSeverity, { variant: "default" | "secondary" | "destructive" | "secondary"; icon: React.ReactNode }> = {
       critical: { variant: "destructive", icon: <ShieldAlert className="h-3 w-3" /> },
       high: { variant: "destructive", icon: <AlertTriangle className="h-3 w-3" /> },
       medium: { variant: "secondary", icon: <Shield className="h-3 w-3" /> },
-      low: { variant: "outline", icon: null },
+      low: { variant: "secondary", icon: null },
     }
 
     const { variant, icon } = config[severity]
@@ -202,7 +202,7 @@ export function FraudSignalsList({
             <div className="flex items-center gap-2">
               <ShieldAlert className="h-5 w-5 text-muted-foreground" />
               <CardTitle>Fraud Signals</CardTitle>
-              <Badge variant="outline">{signals.length}</Badge>
+              <Badge variant="secondary">{signals.length}</Badge>
             </div>
             <div className="relative w-64">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -253,7 +253,7 @@ export function FraudSignalsList({
                         </div>
                       </div>
                       <div className="flex items-center gap-3">
-                        <Badge variant="outline">
+                        <Badge variant="secondary">
                           {userSignals.length} signal{userSignals.length !== 1 ? "s" : ""}
                         </Badge>
                         <ChevronRight className="h-4 w-4 text-muted-foreground" />
@@ -296,13 +296,13 @@ export function FraudSignalsList({
 
                       <div className="flex items-center gap-2">
                         {signal.action_taken ? (
-                          <Badge variant="outline" className="gap-1">
+                          <Badge variant="secondary" className="gap-1">
                             <CheckCircle className="h-3 w-3" />
                             Resolved
                           </Badge>
                         ) : (
                           <Button
-                            variant="outline"
+                            variant="secondary"
                             size="sm"
                             onClick={(e) => {
                               e.stopPropagation()
@@ -370,7 +370,7 @@ export function FraudSignalsList({
 
           <DialogFooter>
             <Button
-              variant="outline"
+              variant="secondary"
               onClick={() => {
                 setSelectedSignal(null)
                 setClearReason("")

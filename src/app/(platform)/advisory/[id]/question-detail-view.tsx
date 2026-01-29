@@ -188,12 +188,12 @@ export function QuestionDetailView({
                             {verificationInfo.label}
                         </Badge>
                         {question.visibility === "foundry" ? (
-                            <Badge variant="outline" className="text-xs uppercase tracking-wider gap-1">
+                            <Badge variant="secondary" className="text-xs uppercase tracking-wider gap-1">
                                 <Building2 className="h-3 w-3" />
                                 Private
                             </Badge>
                         ) : (
-                            <Badge variant="outline" className="text-xs uppercase tracking-wider gap-1">
+                            <Badge variant="secondary" className="text-xs uppercase tracking-wider gap-1">
                                 <Globe className="h-3 w-3" />
                                 Public
                             </Badge>
@@ -226,7 +226,7 @@ export function QuestionDetailView({
                                         {question.asker.full_name}
                                     </span>
                                     {question.asker.role && (
-                                        <Badge variant="outline" className="text-[10px]">
+                                        <Badge variant="secondary" className="text-[10px]">
                                             {question.asker.role}
                                         </Badge>
                                     )}

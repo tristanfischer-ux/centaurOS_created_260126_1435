@@ -10,14 +10,7 @@ import {
     MapPin, 
     Lock, 
     Calendar, 
-    Users, 
-    BookOpen, 
-    ExternalLink,
-    Cpu,
-    Factory,
-    FileText,
-    GraduationCap,
-    Shield
+    Users
 } from "lucide-react"
 
 interface GuildEvent {
@@ -42,49 +35,6 @@ interface GuildTabsProps {
     members: Member[]
     isExecutive: boolean
 }
-
-const resources = [
-    {
-        id: "getting-started",
-        title: "Getting Started Guide",
-        description: "Learn the fundamentals of the Centaur OS platform and how to maximize your productivity.",
-        icon: GraduationCap,
-        category: "Guide",
-        href: "/help"
-    },
-    {
-        id: "ai-tools",
-        title: "AI Tools & Integrations",
-        description: "Explore the AI agents and automation tools available to enhance your workflow.",
-        icon: Cpu,
-        category: "Documentation",
-        href: "/help"
-    },
-    {
-        id: "manufacturing",
-        title: "Manufacturing Network",
-        description: "Connect with vetted manufacturing partners and service providers in the marketplace.",
-        icon: Factory,
-        category: "Network",
-        href: "/marketplace"
-    },
-    {
-        id: "best-practices",
-        title: "Best Practices",
-        description: "Proven methodologies for task delegation, approval workflows, and team coordination.",
-        icon: FileText,
-        category: "Guide",
-        href: "/help"
-    },
-    {
-        id: "community-guidelines",
-        title: "Community Guidelines",
-        description: "Standards and expectations for Guild members to ensure productive collaboration.",
-        icon: Shield,
-        category: "Policy",
-        href: "/help"
-    },
-]
 
 export function GuildTabs({ events, members, isExecutive }: GuildTabsProps) {
     const getInitials = (name: string | null) => {
@@ -111,7 +61,7 @@ export function GuildTabs({ events, members, isExecutive }: GuildTabsProps) {
 
     return (
         <Tabs defaultValue="events" className="space-y-6">
-            <TabsList className="grid w-full grid-cols-3 max-w-md">
+            <TabsList className="grid w-full grid-cols-2 max-w-xs">
                 <TabsTrigger value="events" className="gap-2">
                     <Calendar className="h-4 w-4" />
                     <span className="hidden sm:inline">Events</span>
@@ -119,10 +69,6 @@ export function GuildTabs({ events, members, isExecutive }: GuildTabsProps) {
                 <TabsTrigger value="network" className="gap-2">
                     <Users className="h-4 w-4" />
                     <span className="hidden sm:inline">Network</span>
-                </TabsTrigger>
-                <TabsTrigger value="resources" className="gap-2">
-                    <BookOpen className="h-4 w-4" />
-                    <span className="hidden sm:inline">Resources</span>
                 </TabsTrigger>
             </TabsList>
 
@@ -159,7 +105,7 @@ export function GuildTabs({ events, members, isExecutive }: GuildTabsProps) {
                                 </div>
                                 <div className="flex-1 p-6">
                                     <div className="flex flex-wrap gap-2 mb-2">
-                                        <Badge variant="outline" className="text-muted-foreground">
+                                        <Badge variant="secondary" className="text-muted-foreground">
                                             <MapPin className="mr-1 h-3 w-3" /> {event.location_geo || "TBD"}
                                         </Badge>
                                         {event.is_executive_only && (
@@ -170,7 +116,7 @@ export function GuildTabs({ events, members, isExecutive }: GuildTabsProps) {
                                     </div>
                                     <h3 className="text-lg font-semibold text-foreground mb-2">{event.title}</h3>
                                     <p className="text-muted-foreground text-sm mb-4">{event.description}</p>
-                                    <Button size="sm" variant="brand">
+                                    <Button size="sm" variant="default">
                                         RSVP
                                     </Button>
                                 </div>
@@ -211,7 +157,7 @@ export function GuildTabs({ events, members, isExecutive }: GuildTabsProps) {
                                         </p>
                                         <div className="flex items-center gap-2 mt-1">
                                             <Badge 
-                                                variant="outline" 
+                                                variant="secondary" 
                                                 className={`text-[10px] ${getRoleBadgeClass(member.role)}`}
                                             >
                                                 {member.role || "Member"}
@@ -227,41 +173,6 @@ export function GuildTabs({ events, members, isExecutive }: GuildTabsProps) {
                             </Card>
                         ))
                     )}
-                </div>
-            </TabsContent>
-
-            {/* Resources Tab */}
-            <TabsContent value="resources" className="space-y-4">
-                <p className="text-sm text-muted-foreground">
-                    Knowledge base and documentation to help you succeed.
-                </p>
-
-                <div className="grid gap-4 sm:grid-cols-2">
-                    {resources.map(resource => (
-                        <Card key={resource.id} className="p-5 bg-card hover:shadow-md transition-shadow group">
-                            <div className="flex items-start gap-4">
-                                <div className="p-2 bg-muted rounded-lg group-hover:bg-international-orange/10 transition-colors">
-                                    <resource.icon className="h-5 w-5 text-muted-foreground group-hover:text-international-orange transition-colors" />
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                    <div className="flex items-center gap-2 mb-1">
-                                        <h3 className="font-medium text-foreground">{resource.title}</h3>
-                                        <Badge variant="outline" className="text-[10px]">
-                                            {resource.category}
-                                        </Badge>
-                                    </div>
-                                    <p className="text-sm text-muted-foreground mb-3">
-                                        {resource.description}
-                                    </p>
-                                    <Button variant="ghost" size="sm" className="h-8 px-2 -ml-2 text-muted-foreground hover:text-international-orange" asChild>
-                                        <a href={resource.href}>
-                                            Learn more <ExternalLink className="ml-1 h-3 w-3" />
-                                        </a>
-                                    </Button>
-                                </div>
-                            </div>
-                        </Card>
-                    ))}
                 </div>
             </TabsContent>
         </Tabs>

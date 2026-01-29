@@ -238,7 +238,7 @@ export function ReviewForm({
         {/* Actions */}
         <div className="flex justify-end gap-3 pt-4">
           {onCancel && (
-            <Button variant="outline" onClick={onCancel} disabled={isSubmitting}>
+            <Button variant="secondary" onClick={onCancel} disabled={isSubmitting}>
               Cancel
             </Button>
           )}

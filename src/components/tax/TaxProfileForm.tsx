@@ -320,7 +320,7 @@ export function TaxProfileForm({
                 </div>
                 <Button
                   type="button"
-                  variant="outline"
+                  variant="secondary"
                   onClick={handleVerifyVAT}
                   disabled={!vatNumber || vatValidation.valid !== true || verifying}
                 >
@@ -398,7 +398,7 @@ export function TaxProfileForm({
 
         <CardFooter className="flex justify-between">
           {onCancel && (
-            <Button type="button" variant="outline" onClick={onCancel}>
+            <Button type="button" variant="secondary" onClick={onCancel}>
               Cancel
             </Button>
           )}

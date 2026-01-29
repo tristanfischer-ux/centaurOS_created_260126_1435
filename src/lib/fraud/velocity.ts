@@ -88,6 +88,7 @@ export async function getTransactionLimits(
 
     // Build response
     const now = new Date()
+    const typedDbLimits = dbLimits as TransactionLimit[] | null
     const limits: UserLimits = {
       tier,
       accountAgeDays,
@@ -96,9 +97,9 @@ export async function getTransactionLimits(
         used: 0,
         remaining: tierLimits.single,
       },
-      daily: buildLimitInfo("daily", tierLimits.daily, dbLimits, now),
-      weekly: buildLimitInfo("weekly", tierLimits.weekly, dbLimits, now),
-      monthly: buildLimitInfo("monthly", tierLimits.monthly, dbLimits, now),
+      daily: buildLimitInfo("daily", tierLimits.daily, typedDbLimits, now),
+      weekly: buildLimitInfo("weekly", tierLimits.weekly, typedDbLimits, now),
+      monthly: buildLimitInfo("monthly", tierLimits.monthly, typedDbLimits, now),
     }
 
     return { data: limits, error: null }

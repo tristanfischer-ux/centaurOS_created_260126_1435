@@ -41,11 +41,11 @@ interface OrderActionsProps {
 
 const variantMap: Record<
   OrderAction["variant"],
-  "default" | "destructive" | "outline" | "secondary" | "ghost" | "success" | "warning"
+  "default" | "destructive" | "secondary" | "secondary" | "ghost" | "success" | "warning"
 > = {
   default: "default",
   destructive: "destructive",
-  outline: "outline",
+  outline: "secondary",
   secondary: "secondary",
   success: "success",
   warning: "warning",
@@ -272,7 +272,7 @@ export function OrderQuickAction({
   orderId: string
   action: string
   label: string
-  variant?: "default" | "destructive" | "outline" | "secondary" | "success" | "warning"
+  variant?: "default" | "destructive" | "secondary" | "secondary" | "success" | "warning"
   className?: string
   onComplete?: () => void
 }) {

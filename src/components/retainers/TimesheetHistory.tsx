@@ -227,7 +227,7 @@ export function TimesheetHistory({
                       {onSelectTimesheet && (
                         <div className="mt-3 pt-3 border-t">
                           <Button
-                            variant="outline"
+                            variant="secondary"
                             size="sm"
                             onClick={() => onSelectTimesheet(timesheet)}
                           >

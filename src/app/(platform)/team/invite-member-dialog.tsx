@@ -93,7 +93,7 @@ export function InviteMemberDialog() {
     return (
         <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
-                <Button variant="outline">
+                <Button variant="secondary">
                     <UserPlus className="h-4 w-4" />
                     Invite Member
                 </Button>
@@ -176,7 +176,7 @@ export function InviteMemberDialog() {
                         </p>
                     </div>
                     <DialogFooter className="gap-2 pt-4 border-t border-border">
-                        <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
+                        <Button variant="secondary" onClick={() => setOpen(false)}>Cancel</Button>
                         <Button type="submit" disabled={isLoading}>
                             {isLoading ? (
                                 <>

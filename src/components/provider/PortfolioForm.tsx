@@ -233,7 +233,7 @@ export function PortfolioForm({
                     />
                     <Button
                         type="button"
-                        variant="outline"
+                        variant="secondary"
                         size="icon"
                         onClick={handleAddImageUrl}
                     >
@@ -307,7 +307,7 @@ export function PortfolioForm({
                 <Popover>
                     <PopoverTrigger asChild>
                         <Button
-                            variant="outline"
+                            variant="secondary"
                             className={cn(
                                 'w-full justify-start text-left font-normal',
                                 !completionDate && 'text-muted-foreground'
@@ -352,14 +352,14 @@ export function PortfolioForm({
                 {onCancel && (
                     <Button
                         type="button"
-                        variant="outline"
+                        variant="secondary"
                         onClick={onCancel}
                         disabled={isLoading}
                     >
                         Cancel
                     </Button>
                 )}
-                <Button type="submit" variant="primary" disabled={isLoading || isUploading}>
+                <Button type="submit" variant="default" disabled={isLoading || isUploading}>
                     {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                     {isEditing ? 'Save Changes' : 'Add Item'}
                 </Button>

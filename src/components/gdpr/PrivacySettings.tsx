@@ -145,7 +145,7 @@ export function PrivacySettings({ initialRequests = [] }: PrivacySettingsProps) 
           </p>
         </div>
         <Button
-          variant="outline"
+          variant="secondary"
           size="sm"
           onClick={fetchData}
           disabled={loading}
@@ -272,7 +272,7 @@ export function PrivacySettings({ initialRequests = [] }: PrivacySettingsProps) 
         <CardContent className="space-y-4">
           {/* Export Summary */}
           {!exportSummary ? (
-            <Button variant="outline" onClick={handleLoadExportSummary}>
+            <Button variant="secondary" onClick={handleLoadExportSummary}>
               <Eye className="h-4 w-4 mr-2" />
               View Data Summary
             </Button>
@@ -291,7 +291,7 @@ export function PrivacySettings({ initialRequests = [] }: PrivacySettingsProps) 
                         {item.description}
                       </p>
                     </div>
-                    <Badge variant="outline">{item.itemCount} items</Badge>
+                    <Badge variant="secondary">{item.itemCount} items</Badge>
                   </div>
                 ))}
               </div>
@@ -303,7 +303,7 @@ export function PrivacySettings({ initialRequests = [] }: PrivacySettingsProps) 
           {/* Deletion Eligibility */}
           {!deletionEligibility ? (
             <Button
-              variant="outline"
+              variant="secondary"
               onClick={handleCheckDeletionEligibility}
               disabled={loadingEligibility}
             >

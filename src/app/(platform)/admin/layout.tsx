@@ -48,7 +48,7 @@ export default async function AdminLayout({
                     Please contact a platform administrator if you believe this is an error.
                 </p>
                 <Link href="/dashboard">
-                    <Button variant="outline">
+                    <Button variant="secondary">
                         <ArrowLeft className="h-4 w-4 mr-2" />
                         Return to Dashboard
                     </Button>

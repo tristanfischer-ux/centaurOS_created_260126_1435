@@ -562,67 +562,51 @@ export function MarketplaceView({ initialListings, recommendations = [], teamMem
     const showFiltersButton = ['People', 'AI', 'Products'].includes(activeTab)
 
     return (
-        <div className="container mx-auto py-8">
+        <div className="space-y-6">
             <div className="flex flex-col gap-6">
-{/* Header - responsive for Galaxy Fold */}
-                <div className="flex flex-col gap-2">
-                    <div className="flex flex-col xs:flex-row xs:items-start fold:items-center justify-between gap-3">
-                        <div className="flex flex-col gap-1 xs:gap-2 min-w-0 flex-1">
-                            <h1 className="text-xl xs:text-2xl fold:text-2xl lg:text-3xl font-bold tracking-tight truncate">
-                                Centaur Marketplace
-                            </h1>
-                            <p className="text-xs xs:text-sm text-muted-foreground line-clamp-2 xs:line-clamp-none">
-                                Access global expertise, industrial capacity, and autonomous agents.
-                            </p>
-                        </div>
-                        <div className="shrink-0">
-                            <CreateRFQDialog />
-                        </div>
-                    </div>
-                </div>
 
-                                {/* AI Recommendations Panel */}
-                                {recommendations.length > 0 && (
-                                    <Card className="bg-gradient-to-r from-amber-50 to-orange-50 border-amber-200">
-                                        <div className="p-4">
-                                            <div className="flex items-center gap-2 mb-3">
-                                                <Sparkles className="h-5 w-5 text-amber-600" />
-                                                <h3 className="font-semibold text-amber-900">Recommended for Your Foundry</h3>
+                {/* AI Recommendations Panel */}
+                {recommendations.length > 0 && (
+                    <Card className="bg-gradient-to-r from-amber-50 to-orange-50 border-amber-200">
+                        <div className="p-4">
+                            <div className="flex items-center gap-2 mb-3">
+                                <Sparkles className="h-5 w-5 text-amber-600" />
+                                <h3 className="font-semibold text-amber-900">Recommended for Your Foundry</h3>
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                                {recommendations.map((rec) => (
+                                    <button
+                                        key={rec.id}
+                                        onClick={() => {
+                                            setActiveTab(rec.category)
+                                            if (rec.search_term) {
+                                                setSearchQuery(rec.search_term)
+                                            }
+                                        }}
+                                        className="flex items-center gap-2 px-3 py-2 bg-white rounded border border-amber-200 hover:border-amber-400 hover:shadow-sm transition-all text-left"
+                                    >
+                                        <div>
+                                            <div className="flex items-center gap-1.5">
+                                                <Badge variant="secondary" className="text-[10px] bg-amber-100 text-amber-700 border-amber-300">
+                                                    {rec.source_type === 'coverage_gap' ? 'Gap' : rec.source_type === 'advisory' ? 'Q&A' : 'AI'}
+                                                </Badge>
+                                                <span className="text-sm font-medium text-slate-900">
+                                                    {rec.search_term || rec.subcategory || rec.category}
+                                                </span>
                                             </div>
-                                            <div className="flex flex-wrap gap-2">
-                                                {recommendations.map((rec) => (
-                                                    <button
-                                                        key={rec.id}
-                                                        onClick={() => {
-                                                            setActiveTab(rec.category)
-                                                            if (rec.search_term) {
-                                                                setSearchQuery(rec.search_term)
-                                                            }
-                                                        }}
-                                                        className="flex items-center gap-2 px-3 py-2 bg-white rounded-lg border border-amber-200 hover:border-amber-400 hover:shadow-sm transition-all text-left"
-                                                    >
-                                                        <div>
-                                                            <div className="flex items-center gap-1.5">
-                                                                <Badge variant="outline" className="text-[10px] bg-amber-100 text-amber-700 border-amber-300">
-                                                                    {rec.source_type === 'coverage_gap' ? 'Gap' : rec.source_type === 'advisory' ? 'Q&A' : 'AI'}
-                                                                </Badge>
-                                                                <span className="text-sm font-medium text-slate-900">
-                                                                    {rec.search_term || rec.subcategory || rec.category}
-                                                                </span>
-                                                            </div>
-                                                            {rec.reasoning && (
-                                                                <p className="text-xs text-slate-500 mt-0.5 line-clamp-1 max-w-[200px]">
-                                                                    {rec.reasoning}
-                                                                </p>
-                                                            )}
-                                                        </div>
-                                                        <ArrowRight className="h-3 w-3 text-amber-600 shrink-0" />
-                                                    </button>
-                                                ))}
-                                            </div>
+                                            {rec.reasoning && (
+                                                <p className="text-xs text-slate-500 mt-0.5 line-clamp-1 max-w-[200px]">
+                                                    {rec.reasoning}
+                                                </p>
+                                            )}
                                         </div>
-                                    </Card>
-                                )}
+                                        <ArrowRight className="h-3 w-3 text-amber-600 shrink-0" />
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    </Card>
+                )}
 
                 <Tabs value={activeTab} onValueChange={(val) => { setActiveTab(val); clearSelection(); clearFilters(); setShowFilters(false); updateURL(searchQuery, val) }} className="w-full">
                     <div className="flex flex-col gap-4 mb-6">
@@ -669,7 +653,7 @@ export function MarketplaceView({ initialListings, recommendations = [], teamMem
                                     }}
                                 >
                                     <Button
-                                        variant="outline"
+                                        variant="secondary"
                                         size="icon"
                                         title="Save this search"
                                         disabled={!searchQuery && selectedSubcategories.size === 0}
@@ -694,7 +678,7 @@ export function MarketplaceView({ initialListings, recommendations = [], teamMem
 
                                 {showFiltersButton && (
                                     <Button 
-                                        variant="outline" 
+                                        variant="secondary" 
                                         size="default"
                                         onClick={() => setShowFilters(!showFilters)}
                                         className={showFilters ? 'bg-slate-100' : ''}
@@ -735,7 +719,7 @@ export function MarketplaceView({ initialListings, recommendations = [], teamMem
 
                         {/* People Filters Panel */}
                         {activeTab === 'People' && showFilters && (
-                            <div className="bg-muted/50 rounded-lg p-4 space-y-4 hidden md:block">
+                            <div className="bg-slate-50 rounded border border-blue-200 p-4 space-y-4 hidden md:block">
                                 <div className="flex items-center justify-between">
                                     <h3 className="font-medium text-sm">Filter People</h3>
                                     {hasActiveFilters && (
@@ -789,7 +773,7 @@ export function MarketplaceView({ initialListings, recommendations = [], teamMem
 
                         {/* AI Filters Panel */}
                         {activeTab === 'AI' && showFilters && (
-                            <div className="bg-primary/5 rounded-lg p-4 space-y-4 hidden md:block">
+                            <div className="bg-violet-50 rounded border border-violet-200 p-4 space-y-4 hidden md:block">
                                 <div className="flex items-center justify-between">
                                     <h3 className="font-medium text-sm">Filter AI Tools</h3>
                                     {hasActiveFilters && (
@@ -842,7 +826,7 @@ export function MarketplaceView({ initialListings, recommendations = [], teamMem
 
                         {/* Products Filters Panel */}
                         {activeTab === 'Products' && showFilters && (
-                            <div className="bg-muted rounded-lg p-4 space-y-4 hidden md:block">
+                            <div className="bg-slate-50 rounded border border-blue-200 p-4 space-y-4 hidden md:block">
                                 <div className="flex items-center justify-between">
                                     <h3 className="font-medium text-sm">Filter Products & Manufacturers</h3>
                                     {hasActiveFilters && (
@@ -996,10 +980,10 @@ export function MarketplaceView({ initialListings, recommendations = [], teamMem
                                 <button
                                     key={sub}
                                     onClick={() => toggleSubcategory(sub)}
-                                    className={`px-3 py-1.5 text-xs font-medium transition-all ${
+                                    className={`px-3 py-1.5 text-xs font-medium rounded border transition-all ${
                                         selectedSubcategories.has(sub)
-                                            ? 'bg-international-orange text-white'
-                                            : 'bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground'
+                                            ? 'bg-orange-600 text-white border-orange-600 shadow-sm'
+                                            : 'bg-white text-slate-600 border-slate-200 hover:border-orange-500/50 hover:bg-orange-50/50 hover:text-orange-700'
                                     }`}
                                 >
                                     {sub}
@@ -1008,7 +992,7 @@ export function MarketplaceView({ initialListings, recommendations = [], teamMem
                             {selectedSubcategories.size > 0 && (
                                 <button
                                     onClick={() => setSelectedSubcategories(new Set())}
-                                    className="px-2 py-1.5 text-xs text-muted-foreground hover:text-foreground flex items-center gap-1"
+                                    className="px-2 py-1.5 text-xs text-muted-foreground hover:text-orange-600 flex items-center gap-1 rounded border border-transparent hover:border-slate-200 transition-all"
                                 >
                                     <X className="h-3 w-3" />
                                     Clear
@@ -1112,7 +1096,7 @@ export function MarketplaceView({ initialListings, recommendations = [], teamMem
                                                                 {listing && (
                                                                     <Button
                                                                         size="sm"
-                                                                        variant="outline"
+                                                                        variant="secondary"
                                                                         onClick={() => toggleSelect(listing.id)}
                                                                         className="shrink-0"
                                                                     >
@@ -1174,7 +1158,7 @@ export function MarketplaceView({ initialListings, recommendations = [], teamMem
                             <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
                         </div>
                     ) : viewMode === 'grid' ? (
-                        <div className="grid grid-cols-1 fold:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 xs:gap-5 fold:gap-5 lg:gap-6 animate-in fade-in duration-500">
+                        <div className="grid grid-cols-1 fold:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 xs:gap-5 fold:gap-5 lg:gap-6 animate-fade-in">
                             {filteredItems.map(item => (
                                 <MarketCard
                                     key={item.id}
@@ -1187,11 +1171,11 @@ export function MarketplaceView({ initialListings, recommendations = [], teamMem
                             ))}
                         </div>
                     ) : (
-                        <div className="space-y-3 animate-in fade-in duration-500">
+                        <div className="space-y-3 animate-fade-in">
                             {filteredItems.map(item => {
                                 const attrs = item.attributes || {}
                                 return (
-                                    <Card key={item.id} className="p-4 hover:shadow-md transition-shadow">
+                                    <Card key={item.id} className="p-4 border-blue-200 hover:border-orange-200 hover:shadow-sm transition-all">
                                         <div className="flex items-start gap-4">
                                             {/* Checkbox */}
                                             <Checkbox
@@ -1205,7 +1189,7 @@ export function MarketplaceView({ initialListings, recommendations = [], teamMem
                                                 <div className="flex items-start justify-between gap-4">
                                                     <div className="flex-1 min-w-0">
                                                         <div className="flex items-center gap-2 mb-1">
-                                                            <Badge variant="outline" className="text-[10px] uppercase tracking-wider">
+                                                            <Badge variant="secondary" className="text-[10px] uppercase tracking-wider">
                                                                 {item.subcategory}
                                                             </Badge>
                                                             {item.is_verified && (
@@ -1278,13 +1262,13 @@ export function MarketplaceView({ initialListings, recommendations = [], teamMem
                     )}
 
                     {filteredItems.length === 0 && initialListings.length > 0 && (
-                        <div className="col-span-full bg-muted/50 rounded-xl">
+                        <div className="col-span-full">
                             <EmptyState
-                                icon={<Store className="h-12 w-12" />}
+                                icon={<Store className="h-12 w-12 text-slate-300" />}
                                 title={hasActiveFilters ? "No items match your filters" : "No listings found in this category yet"}
                                 description={hasActiveFilters ? "Try adjusting your filters or search terms." : "Check back later or browse other categories."}
                                 action={hasActiveFilters ? (
-                                    <Button variant="outline" onClick={clearFilters}>Clear filters</Button>
+                                    <Button variant="secondary" onClick={clearFilters} className="border-slate-200 hover:border-orange-500 hover:text-orange-700">Clear filters</Button>
                                 ) : undefined}
                             />
                         </div>

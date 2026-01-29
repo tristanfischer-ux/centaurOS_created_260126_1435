@@ -58,12 +58,12 @@ export default async function ObjectiveDetailPage({ params }: { params: Promise<
                                     <Badge variant={
                                         task.status === 'Accepted' ? 'default' :
                                             task.status === 'Completed' ? 'secondary' :
-                                                task.status === 'Rejected' ? 'destructive' : 'outline'
+                                                task.status === 'Rejected' ? 'destructive' : 'secondary'
                                     } className="mb-2">
                                         {task.status}
                                     </Badge>
                                     {task.assignee?.role === 'AI_Agent' && (
-                                        <Badge variant="outline" className="border-purple-200 text-purple-600 bg-purple-50">
+                                        <Badge variant="secondary" className="border-purple-200 text-purple-600 bg-purple-50">
                                             🤖 AI Agent
                                         </Badge>
                                     )}

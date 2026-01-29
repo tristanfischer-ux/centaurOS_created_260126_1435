@@ -11,11 +11,13 @@ import {
     CreditCard, 
     Settings,
     ArrowRight,
-    Store
+    Store,
+    FileSearch
 } from "lucide-react"
 
 const providerNavigation = [
     { name: "Dashboard", href: "/provider-portal", icon: LayoutDashboard },
+    { name: "RFQs", href: "/rfq?tab=available", icon: FileSearch },
     { name: "Profile", href: "/provider-portal/profile", icon: User },
     { name: "Payments", href: "/provider-portal/payments", icon: CreditCard },
     { name: "Settings", href: "/provider-portal/settings", icon: Settings },
@@ -107,8 +109,8 @@ export default async function ProviderPortalLayout({ children }: ProviderPortalL
                             <Store className="h-5 w-5 text-international-orange" />
                         </div>
                         <div>
-                            <h2 className="font-semibold text-sm">Provider Portal</h2>
-                            <p className="text-xs text-muted-foreground capitalize">
+                            <h2 className="font-display text-sm font-semibold">Provider Portal</h2>
+                            <p className="text-xs text-muted-foreground font-medium capitalize">
                                 {profile.tier} tier
                             </p>
                         </div>

@@ -160,9 +160,7 @@ export async function createObjective(formData: FormData) {
                     status: 'Pending' as const,
                     assignee_id: assigneeId,
                     start_date: now.toISOString(),
-                    end_date: nextWeek.toISOString(),
-                    risk_level: 'Low' as const,
-                    client_visible: true
+                    end_date: nextWeek.toISOString()
                 }
             })
 
@@ -209,9 +207,7 @@ export async function createObjective(formData: FormData) {
                 creator_id: user.id,
                 foundry_id,
                 status: 'Pending' as const,
-                assignee_id: task.role === 'AI_Agent' ? aiAgentId : user.id, // Assign to creator by default
-                risk_level: 'Low' as const,
-                client_visible: true
+                assignee_id: task.role === 'AI_Agent' ? aiAgentId : user.id // Assign to creator by default
             }))
         ]
     }

@@ -214,7 +214,7 @@ export function DisputeForm({
               Drag and drop files here, or
             </p>
             <label htmlFor="file-upload">
-              <Button variant="outline" size="sm" asChild>
+              <Button variant="secondary" size="sm" asChild>
                 <span>Browse Files</span>
               </Button>
               <input
@@ -245,7 +245,7 @@ export function DisputeForm({
               }}
             />
             <Button
-              variant="outline"
+              variant="secondary"
               onClick={(e) => {
                 const input = (e.target as HTMLElement)
                   .parentElement?.querySelector("input") as HTMLInputElement
@@ -285,7 +285,7 @@ export function DisputeForm({
         {/* Actions */}
         <div className="flex justify-end gap-3 pt-4 border-t">
           {onCancel && (
-            <Button variant="outline" onClick={onCancel} disabled={isSubmitting}>
+            <Button variant="secondary" onClick={onCancel} disabled={isSubmitting}>
               Cancel
             </Button>
           )}

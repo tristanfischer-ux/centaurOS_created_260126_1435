@@ -72,12 +72,12 @@ export default async function TasksPage() {
 
     return (
         <TasksView
-            tasks={tasksWithData}
-            objectives={objectivesList}
-            members={members}
-            teams={teams}
-            currentUserId={user.id}
-            currentUserRole={currentUserRole}
+                tasks={tasksWithData}
+                objectives={objectivesList}
+                members={members}
+                teams={teams}
+                currentUserId={user.id}
+                currentUserRole={currentUserRole}
         />
     )
 }

@@ -33,7 +33,7 @@ export function BusinessModelSection() {
                     <span className="text-xs font-bold tracking-[0.3em] text-international-orange uppercase block mb-6">
                         The Hierarchy
                     </span>
-                    <h2 className="text-4xl md:text-5xl font-playfair font-medium text-slate-900 leading-tight mb-6">
+                    <h2 className="text-4xl md:text-5xl font-display font-medium text-slate-900 leading-tight mb-6">
                         Roles in the machine.
                     </h2>
                     <p className="text-lg text-slate-600 leading-relaxed font-light">
@@ -64,7 +64,7 @@ export function BusinessModelSection() {
                             <div className="absolute inset-0 p-8 flex flex-col justify-end">
                                 <span className="inline-block w-12 h-1 bg-international-orange mb-6 transform -translate-x-full group-hover:translate-x-0 transition-transform duration-500" />
 
-                                <h3 className="text-2xl font-bold text-white mb-4 tracking-tight font-playfair">
+                                <h3 className="text-2xl font-bold text-white mb-4 tracking-tight font-display">
                                     {role.title}
                                 </h3>
 

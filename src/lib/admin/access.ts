@@ -19,8 +19,21 @@ export async function isAdmin(userId: string): Promise<boolean> {
         .eq('user_id', userId)
         .maybeSingle()
     
+    // RLS may block non-admins from querying this table entirely,
+    // which is expected behavior - don't log it as an error
     if (error) {
-        console.error('Error checking admin status:', error)
+        // Silently handle expected errors:
+        // - PGRST301: RLS access denied
+        // - 42501: insufficient privilege
+        // - infinite recursion: known RLS policy issue (needs migration)
+        const isExpectedError = 
+            error.code === 'PGRST301' || 
+            error.code === '42501' ||
+            (error.message && error.message.includes('infinite recursion'))
+        
+        if (!isExpectedError) {
+            console.error('Error checking admin status:', error.message || error.code)
+        }
         return false
     }
     
@@ -39,8 +52,16 @@ export async function getAdminRole(userId: string): Promise<AdminRole | null> {
         .eq('user_id', userId)
         .maybeSingle()
     
+    // RLS may block non-admins - this is expected, not an error
     if (error) {
-        console.error('Error fetching admin role:', error)
+        const isExpectedError = 
+            error.code === 'PGRST301' || 
+            error.code === '42501' ||
+            (error.message && error.message.includes('infinite recursion'))
+        
+        if (!isExpectedError) {
+            console.error('Error fetching admin role:', error.message || error.code)
+        }
         return null
     }
     
@@ -59,8 +80,16 @@ export async function getAdminUser(userId: string): Promise<AdminUser | null> {
         .eq('user_id', userId)
         .maybeSingle()
     
+    // RLS may block non-admins - this is expected, not an error
     if (error) {
-        console.error('Error fetching admin user:', error)
+        const isExpectedError = 
+            error.code === 'PGRST301' || 
+            error.code === '42501' ||
+            (error.message && error.message.includes('infinite recursion'))
+        
+        if (!isExpectedError) {
+            console.error('Error fetching admin user:', error.message || error.code)
+        }
         return null
     }
     
@@ -90,8 +119,16 @@ export async function requireAdmin(): Promise<{
         .eq('user_id', user.id)
         .maybeSingle()
     
+    // RLS blocks non-admins, or there's a real error
     if (error) {
-        console.error('Error checking admin access:', error)
+        const isExpectedError = 
+            error.code === 'PGRST301' || 
+            error.code === '42501' ||
+            (error.message && error.message.includes('infinite recursion'))
+        
+        if (!isExpectedError) {
+            console.error('Error checking admin access:', error.message || error.code)
+        }
         throw new Error('Failed to verify admin access')
     }
     

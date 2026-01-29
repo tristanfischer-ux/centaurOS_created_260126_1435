@@ -194,7 +194,7 @@ export function DataRequestForm({
           </p>
         </CardContent>
         <CardFooter>
-          <Button onClick={resetForm} variant="outline">
+          <Button onClick={resetForm} variant="secondary">
             Submit Another Request
           </Button>
         </CardFooter>
@@ -334,7 +334,7 @@ export function DataRequestForm({
       </CardContent>
 
       <CardFooter className="flex justify-between">
-        <Button variant="outline" onClick={resetForm} disabled={loading}>
+        <Button variant="secondary" onClick={resetForm} disabled={loading}>
           Cancel
         </Button>
         <Button

@@ -49,6 +49,7 @@ import { RubberStampModal } from "@/components/smart-airlock/RubberStampModal"
 import { ClientNudgeButton } from "@/components/smart-airlock/ClientNudgeButton"
 import { Checkbox } from "@/components/ui/checkbox"
 import { getStatusColor } from "@/lib/status-colors"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 
 type Task = Database["public"]["Tables"]["tasks"]["Row"] & {
     assignee?: { id: string, full_name: string | null, role: string, email: string, avatar_url?: string | null } | null
@@ -113,6 +114,7 @@ export const TaskCard = memo(function TaskCard(props: TaskCardProps) {
     const [showHistory, setShowHistory] = useState(false)
     const [rubberStampOpen, setRubberStampOpen] = useState(false)
     const [assigneePopoverOpen, setAssigneePopoverOpen] = useState(false)
+    const [assigneePopoverOpen2, setAssigneePopoverOpen2] = useState(false)
 
 
     // Normalize assignees list (handle backward compatibility or fallback)
@@ -128,12 +130,34 @@ export const TaskCard = memo(function TaskCard(props: TaskCardProps) {
 
 
     const getRiskBadge = (level: string | null) => {
-        switch (level) {
-            case 'High': return <Badge variant="destructive" className="gap-1 shadow-sm font-mono tracking-tighter"><ShieldAlert className="w-3 h-3" /> HIGH RISK</Badge>
-            case 'Medium': return <Badge variant="warning" className="gap-1 shadow-sm font-mono tracking-tighter"><ShieldCheck className="w-3 h-3" /> MEDIUM RISK</Badge>
-            case 'Low': return <Badge variant="outline" className="gap-1 text-slate-500 bg-slate-50 border-slate-200 font-mono tracking-tighter"><ShieldCheck className="w-3 h-3" /> LOW RISK</Badge>
-            default: return null
+        const riskInfo = {
+            High: {
+                badge: <Badge variant="destructive" className="gap-1 shadow-sm font-mono tracking-tighter cursor-help"><ShieldAlert className="w-3 h-3" /> HIGH RISK</Badge>,
+                tooltip: "Financial or legal impact. Requires executive approval before release to client."
+            },
+            Medium: {
+                badge: <Badge variant="warning" className="gap-1 shadow-sm font-mono tracking-tighter cursor-help"><ShieldCheck className="w-3 h-3" /> MEDIUM RISK</Badge>,
+                tooltip: "Requires peer review before completion. Important but manageable impact."
+            },
+            Low: {
+                badge: <Badge variant="secondary" className="gap-1 text-slate-500 bg-slate-50 border-slate-200 font-mono tracking-tighter cursor-help"><ShieldCheck className="w-3 h-3" /> LOW RISK</Badge>,
+                tooltip: "Routine task. Can be completed without additional approvals."
+            }
         }
+        
+        const info = riskInfo[level as keyof typeof riskInfo]
+        if (!info) return null
+        
+        return (
+            <Tooltip delayDuration={200}>
+                <TooltipTrigger asChild>
+                    {info.badge}
+                </TooltipTrigger>
+                <TooltipContent side="top" className="max-w-[220px] text-xs">
+                    <p>{info.tooltip}</p>
+                </TooltipContent>
+            </Tooltip>
+        )
     }
 
     // Handlers (keep existing ones...)
@@ -303,7 +327,7 @@ export const TaskCard = memo(function TaskCard(props: TaskCardProps) {
                                 {task.objective.title}
                             </div>
                         )}
-                        <h3 className="font-playfair font-semibold text-lg text-slate-900 leading-tight group-hover/card:text-blue-700 transition-colors duration-200 tracking-tight">
+                        <h3 className="font-display font-semibold text-lg text-foreground leading-tight group-hover/card:text-blue-700 transition-colors duration-200 tracking-tight">
                             {task.title}
                         </h3>
 
@@ -315,10 +339,18 @@ export const TaskCard = memo(function TaskCard(props: TaskCardProps) {
                                     Start: {format(new Date(task.start_date), "MMM d")}
                                 </span>
                             )}
-                            <span className="flex items-center gap-1" title="Documents">
+                            <button 
+                                className="flex items-center gap-1 text-muted-foreground hover:text-foreground transition-colors cursor-pointer" 
+                                title="View attachments"
+                                onClick={(e) => {
+                                    e.stopPropagation()
+                                    setShowThread(true)
+                                    setShowHistory(false)
+                                }}
+                            >
                                 <Paperclip className="w-3 h-3" />
                                 {task.task_files?.length || 0}
-                            </span>
+                            </button>
                         </div>
                     </div>
 
@@ -370,7 +402,7 @@ export const TaskCard = memo(function TaskCard(props: TaskCardProps) {
                                         </div>
                                     </div>
                                 </PopoverTrigger>
-                                <PopoverContent className="w-[calc(100vw-2rem)] max-w-[240px] sm:w-[240px] overflow-y-auto max-h-[60vh] p-0" align="end" onClick={(e) => e.stopPropagation()}>
+                                <PopoverContent className="z-[100] w-[calc(100vw-2rem)] max-w-[240px] sm:w-[240px] overflow-y-auto max-h-[60vh] p-0 bg-white border shadow-lg" align="end" sideOffset={8} collisionPadding={16} onClick={(e) => e.stopPropagation()} onOpenAutoFocus={(e) => e.preventDefault()}>
                                     <Command>
                                         <CommandInput placeholder="Assign to member..." />
                                         <CommandList>
@@ -382,18 +414,25 @@ export const TaskCard = memo(function TaskCard(props: TaskCardProps) {
                                                         <CommandItem
                                                             key={member.id}
                                                             value={member.full_name || ''}
-                                                            onSelect={() => handleAssigneeToggle(member.id)}
+                                                            onSelect={(e) => {
+                                                                handleAssigneeToggle(member.id)
+                                                                // Keep popover open for multi-select
+                                                            }}
+                                                            className="cursor-pointer"
                                                         >
                                                             <div className="flex items-center gap-2 w-full">
+                                                                <div className={cn(
+                                                                    "h-4 w-4 rounded border flex items-center justify-center shrink-0",
+                                                                    isSelected ? "bg-blue-600 border-blue-600" : "border-slate-300"
+                                                                )}>
+                                                                    {isSelected && <Check className="h-3 w-3 text-white" />}
+                                                                </div>
                                                                 <Avatar className="h-6 w-6 relative shadow-sm shrink-0">
                                                                     <AvatarFallback className="text-[10px] bg-indigo-50 text-indigo-700 font-medium flex items-center justify-center">
                                                                         {getInitials(member.full_name)}
                                                                     </AvatarFallback>
                                                                 </Avatar>
                                                                 <span className="truncate flex-1">{member.full_name}</span>
-                                                                {isSelected && (
-                                                                    <Check className="ml-auto h-4 w-4 opacity-100 text-blue-600" />
-                                                                )}
                                                             </div>
                                                         </CommandItem>
                                                     )
@@ -401,6 +440,16 @@ export const TaskCard = memo(function TaskCard(props: TaskCardProps) {
                                             </CommandGroup>
                                         </CommandList>
                                     </Command>
+                                    <div className="border-t p-2">
+                                        <Button 
+                                            size="sm" 
+                                            variant="ghost" 
+                                            className="w-full text-xs"
+                                            onClick={() => setAssigneePopoverOpen(false)}
+                                        >
+                                            Done
+                                        </Button>
+                                    </div>
                                 </PopoverContent>
                             </Popover>
                         </div>
@@ -408,16 +457,20 @@ export const TaskCard = memo(function TaskCard(props: TaskCardProps) {
                 </div>
 
                 <div className="flex items-center justify-between text-xs text-muted-foreground pt-1">
-                    <Popover>
+                    <Popover open={assigneePopoverOpen2} onOpenChange={setAssigneePopoverOpen2}>
                         <PopoverTrigger asChild>
                             <div className="flex items-center gap-1 cursor-pointer hover:text-blue-600 active:text-blue-700 transition-colors duration-200 group/assignee touch-manipulation" onClick={(e) => e.stopPropagation()}>
-                                {task.assignee?.role === 'AI_Agent' ? <Bot className="w-3 h-3" /> : <div className="w-3" />}
-                                <span className="truncate max-w-[100px] border-b border-transparent group-hover/assignee:border-blue-200">
-                                    {task.assignee?.full_name || "Unassigned"}
+                                {currentAssignees.some(a => a.role === 'AI_Agent') ? <Bot className="w-3 h-3" /> : <div className="w-3" />}
+                                <span className="truncate max-w-[120px] border-b border-transparent group-hover/assignee:border-blue-200">
+                                    {currentAssignees.length > 0 
+                                        ? currentAssignees.length === 1 
+                                            ? currentAssignees[0].full_name 
+                                            : `${currentAssignees.length} assignees`
+                                        : "Unassigned"}
                                 </span>
                             </div>
                         </PopoverTrigger>
-                        <PopoverContent className="w-[calc(100vw-2rem)] max-w-[240px] sm:w-[240px] overflow-y-auto max-h-[60vh] p-0" align="start" onClick={(e) => e.stopPropagation()}>
+                        <PopoverContent className="z-[100] w-[calc(100vw-2rem)] max-w-[240px] sm:w-[240px] overflow-y-auto max-h-[60vh] p-0 bg-white border shadow-lg" align="start" sideOffset={8} collisionPadding={16} onClick={(e) => e.stopPropagation()} onOpenAutoFocus={(e) => e.preventDefault()}>
                             <Command>
                                 <CommandInput placeholder="Assign to member..." />
                                 <CommandList>
@@ -429,18 +482,25 @@ export const TaskCard = memo(function TaskCard(props: TaskCardProps) {
                                                 <CommandItem
                                                     key={member.id}
                                                     value={member.full_name || ''}
-                                                    onSelect={() => handleAssigneeToggle(member.id)}
+                                                    onSelect={() => {
+                                                        handleAssigneeToggle(member.id)
+                                                        // Keep popover open for multi-select
+                                                    }}
+                                                    className="cursor-pointer"
                                                 >
                                                     <div className="flex items-center gap-2 w-full">
+                                                        <div className={cn(
+                                                            "h-4 w-4 rounded border flex items-center justify-center shrink-0",
+                                                            isSelected ? "bg-blue-600 border-blue-600" : "border-slate-300"
+                                                        )}>
+                                                            {isSelected && <Check className="h-3 w-3 text-white" />}
+                                                        </div>
                                                         <Avatar className="h-6 w-6 relative shadow-sm shrink-0">
                                                             <AvatarFallback className="text-[10px] bg-indigo-50 text-indigo-700 font-medium flex items-center justify-center">
                                                                 {getInitials(member.full_name)}
                                                             </AvatarFallback>
                                                         </Avatar>
                                                         <span className="truncate flex-1">{member.full_name}</span>
-                                                        {isSelected && (
-                                                            <Check className="ml-auto h-4 w-4 opacity-100 text-blue-600" />
-                                                        )}
                                                     </div>
                                                 </CommandItem>
                                             )
@@ -448,6 +508,16 @@ export const TaskCard = memo(function TaskCard(props: TaskCardProps) {
                                     </CommandGroup>
                                 </CommandList>
                             </Command>
+                            <div className="border-t p-2">
+                                <Button 
+                                    size="sm" 
+                                    variant="ghost" 
+                                    className="w-full text-xs"
+                                    onClick={() => setAssigneePopoverOpen2(false)}
+                                >
+                                    Done
+                                </Button>
+                            </div>
                         </PopoverContent>
                     </Popover>
 
@@ -570,141 +640,147 @@ export const TaskCard = memo(function TaskCard(props: TaskCardProps) {
                     <Separator className="bg-slate-200" />
 
                     <CardFooter className="bg-slate-50 p-4 flex flex-col gap-4">
-                        {/* Primary Workflow Actions */}
-                        {(isAssignee || userRole === 'Executive' || isCreator) && (
-                            <div className="flex gap-4 w-full">
-                                {task.status === 'Pending' && isAssignee && (
-                                    <>
-                                        <Button
-                                            onClick={handleAccept}
-                                            variant="success"
-                                            disabled={isLoading}
-                                            className="flex-1 shadow-sm font-medium"
-                                        >
-                                            <Check className="h-4 w-4" /> Accept
-                                        </Button>
+                        {/* Primary Workflow Actions - Only render section if actions are available */}
+                        {(() => {
+                            const showAcceptReject = task.status === 'Pending' && isAssignee
+                            const showMarkComplete = task.status === 'Accepted' && (isAssignee || userRole === 'Executive' || isCreator)
+                            const showCertify = task.status === 'Pending_Executive_Approval' && isExecutive
+                            const hasPrimaryActions = showAcceptReject || showMarkComplete || showCertify
 
-                                        <Dialog open={rejectOpen} onOpenChange={setRejectOpen}>
-                                            <DialogTrigger asChild>
+                            if (!hasPrimaryActions) return null
+
+                            return (
+                                <>
+                                    <div className="flex gap-4 w-full">
+                                        {showAcceptReject && (
+                                            <>
                                                 <Button
-                                                    variant="outline"
+                                                    onClick={handleAccept}
+                                                    variant="success"
                                                     disabled={isLoading}
-                                                    className="flex-1 border-red-200 text-red-700 hover:bg-red-50 hover:border-red-300 shadow-sm font-medium"
+                                                    className="flex-1 shadow-sm font-medium"
                                                 >
-                                                    <X className="h-4 w-4" /> Reject
+                                                    <Check className="h-4 w-4" /> Accept
                                                 </Button>
-                                            </DialogTrigger>
-                                            <DialogContent className="bg-white shadow-xl text-slate-900">
-                                                <DialogHeader><DialogTitle>Reject Task</DialogTitle></DialogHeader>
-                                                <form action={handleReject} className="space-y-4">
-                                                    <Textarea name="reason" placeholder="Reason for rejection..." required className="bg-slate-50" />
-                                                    <Button type="submit" variant="destructive" className="w-full">Confirm Rejection</Button>
-                                                </form>
-                                            </DialogContent>
-                                        </Dialog>
-                                    </>
-                                )}
 
-                                {task.status === 'Accepted' && (
-                                    <Button
-                                        onClick={handleComplete}
-                                        disabled={isLoading}
-                                        className="w-full bg-slate-900 hover:bg-slate-800 text-white shadow-sm font-medium"
-                                    >
-                                        <Check className="h-4 w-4" /> Mark Complete
-                                    </Button>
-                                )}
+                                                <Dialog open={rejectOpen} onOpenChange={setRejectOpen}>
+                                                    <DialogTrigger asChild>
+                                                        <Button
+                                                            variant="secondary"
+                                                            disabled={isLoading}
+                                                            className="flex-1 border-red-200 text-red-700 hover:bg-red-50 hover:border-red-300 shadow-sm font-medium"
+                                                        >
+                                                            <X className="h-4 w-4" /> Reject
+                                                        </Button>
+                                                    </DialogTrigger>
+                                                    <DialogContent className="bg-white shadow-xl text-slate-900">
+                                                        <DialogHeader><DialogTitle>Reject Task</DialogTitle></DialogHeader>
+                                                        <form action={handleReject} className="space-y-4">
+                                                            <Textarea name="reason" placeholder="Reason for rejection..." required className="bg-slate-50" />
+                                                            <Button type="submit" variant="destructive" className="w-full">Confirm Rejection</Button>
+                                                        </form>
+                                                    </DialogContent>
+                                                </Dialog>
+                                            </>
+                                        )}
 
-                                {task.status === 'Pending_Executive_Approval' && isExecutive && (
-                                    <Button
-                                        onClick={() => setRubberStampOpen(true)}
-                                        variant="certified"
-                                        disabled={isLoading}
-                                        className="w-full shadow-sm font-medium"
-                                    >
-                                        <ShieldCheck className="h-4 w-4" /> Certify Release
-                                    </Button>
-                                )}
-                            </div>
-                        )}
+                                        {showMarkComplete && (
+                                            <Button
+                                                onClick={handleComplete}
+                                                disabled={isLoading}
+                                                className="w-full bg-slate-900 hover:bg-slate-800 text-white shadow-sm font-medium"
+                                            >
+                                                <Check className="h-4 w-4" /> Mark Complete
+                                            </Button>
+                                        )}
 
-                        <Separator className="bg-slate-200/60" />
+                                        {showCertify && (
+                                            <Button
+                                                onClick={() => setRubberStampOpen(true)}
+                                                variant="success"
+                                                disabled={isLoading}
+                                                className="w-full shadow-sm font-medium"
+                                            >
+                                                <ShieldCheck className="h-4 w-4" /> Certify Release
+                                            </Button>
+                                        )}
+                                    </div>
+                                    <Separator className="bg-slate-200/60" />
+                                </>
+                            )
+                        })()}
 
-                        {/* Secondary & Meta Actions */}
+                        {/* Secondary & Meta Actions - Always show consistent layout */}
                         <div className="flex items-center justify-between w-full">
-                            {/* Tools Area */}
+                            {/* Tools Area - Always visible for consistent layout */}
                             <div className="flex items-center gap-1">
-                                {(isAssignee || isCreator || userRole === 'Executive') && (
-                                    <>
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => setEditOpen(true)}
+                                    disabled={isLoading}
+                                    className="text-muted-foreground hover:text-blue-600 hover:bg-blue-50 active:text-blue-700 active:bg-blue-100 active:scale-[0.98] transition-all duration-200 px-2"
+                                    title="Edit Details"
+                                >
+                                    <Pencil className="h-4 w-4" /> Edit
+                                </Button>
+
+                                <Dialog open={forwardOpen} onOpenChange={setForwardOpen}>
+                                    <DialogTrigger asChild>
                                         <Button
                                             variant="ghost"
                                             size="sm"
-                                            onClick={() => setEditOpen(true)}
                                             disabled={isLoading}
-                                            className="text-muted-foreground hover:text-blue-600 hover:bg-blue-50 active:text-blue-700 active:bg-blue-100 active:scale-[0.98] transition-all duration-200 px-2"
-                                            title="Edit Details"
+                                            className="text-muted-foreground hover:text-amber-600 hover:bg-amber-50 active:text-amber-700 active:bg-amber-100 active:scale-[0.98] transition-all duration-200 px-2"
+                                            title="Forward or Reassign"
                                         >
-                                            <Pencil className="h-4 w-4" /> Edit
+                                            <ArrowRight className="h-4 w-4" /> Forward
                                         </Button>
+                                    </DialogTrigger>
+                                    <DialogContent className="bg-white shadow-xl text-slate-900">
+                                        <DialogHeader><DialogTitle>Forward Task</DialogTitle></DialogHeader>
+                                        <form action={handleForward} className="space-y-4">
+                                            <div className="grid gap-2">
+                                                <label className="text-sm font-medium">New Assignee</label>
+                                                <Select name="new_assignee_id" required>
+                                                    <SelectTrigger className="bg-white">
+                                                        <SelectValue placeholder="Select person..." />
+                                                    </SelectTrigger>
+                                                    <SelectContent className="bg-white shadow-lg z-50">
+                                                        {sortedMembers.map(member => (
+                                                            <SelectItem key={member.id} value={member.id}>
+                                                                <div className="flex items-center gap-2">
+                                                                    <Avatar className="h-5 w-5 shadow-sm shrink-0">
+                                                                        <AvatarFallback className="text-[9px] bg-indigo-50 text-indigo-700 font-medium flex items-center justify-center">
+                                                                            {getInitials(member.full_name)}
+                                                                        </AvatarFallback>
+                                                                    </Avatar>
+                                                                    <span>
+                                                                        {member.full_name}
+                                                                        {member.role === 'AI_Agent' && ' 🤖'}
+                                                                    </span>
+                                                                </div>
+                                                            </SelectItem>
+                                                        ))}
+                                                    </SelectContent>
+                                                </Select>
+                                            </div>
+                                            <Textarea name="reason" placeholder="Handover notes..." required className="bg-slate-50" />
+                                            <Button type="submit" variant="warning" className="w-full">Forward Task</Button>
+                                        </form>
+                                    </DialogContent>
+                                </Dialog>
 
-                                        <Dialog open={forwardOpen} onOpenChange={setForwardOpen}>
-                                            <DialogTrigger asChild>
-                                                <Button
-                                                    variant="ghost"
-                                                    size="sm"
-                                                    disabled={isLoading}
-                                                    className="text-muted-foreground hover:text-amber-600 hover:bg-amber-50 active:text-amber-700 active:bg-amber-100 active:scale-[0.98] transition-all duration-200 px-2"
-                                                    title="Forward or Reassign"
-                                                >
-                                                    <ArrowRight className="h-4 w-4" /> Forward
-                                                </Button>
-                                            </DialogTrigger>
-                                            <DialogContent className="bg-white shadow-xl text-slate-900">
-                                                <DialogHeader><DialogTitle>Forward Task</DialogTitle></DialogHeader>
-                                                <form action={handleForward} className="space-y-4">
-                                                    <div className="grid gap-2">
-                                                        <label className="text-sm font-medium">New Assignee</label>
-                                                        <Select name="new_assignee_id" required>
-                                                            <SelectTrigger className="bg-white">
-                                                                <SelectValue placeholder="Select person..." />
-                                                            </SelectTrigger>
-                                                            <SelectContent className="bg-white shadow-lg z-50">
-                                                                {sortedMembers.map(member => (
-                                                                    <SelectItem key={member.id} value={member.id}>
-                                                                        <div className="flex items-center gap-2">
-                                                                            <Avatar className="h-5 w-5 shadow-sm shrink-0">
-                                                                                <AvatarFallback className="text-[9px] bg-indigo-50 text-indigo-700 font-medium flex items-center justify-center">
-                                                                                    {getInitials(member.full_name)}
-                                                                                </AvatarFallback>
-                                                                            </Avatar>
-                                                                            <span>
-                                                                                {member.full_name}
-                                                                                {member.role === 'AI_Agent' && ' 🤖'}
-                                                                            </span>
-                                                                        </div>
-                                                                    </SelectItem>
-                                                                ))}
-                                                            </SelectContent>
-                                                        </Select>
-                                                    </div>
-                                                    <Textarea name="reason" placeholder="Handover notes..." required className="bg-slate-50" />
-                                                    <Button type="submit" variant="warning" className="w-full">Forward Task</Button>
-                                                </form>
-                                            </DialogContent>
-                                        </Dialog>
-
-                                        <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            onClick={handleDuplicate}
-                                            disabled={isLoading}
-                                            className="text-muted-foreground hover:text-indigo-600 hover:bg-indigo-50 active:text-indigo-700 active:bg-indigo-100 active:scale-[0.98] transition-all duration-200 px-2"
-                                            title="Duplicate Task"
-                                        >
-                                            <Copy className="h-4 w-4" /> Copy
-                                        </Button>
-                                    </>
-                                )}
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={handleDuplicate}
+                                    disabled={isLoading}
+                                    className="text-muted-foreground hover:text-indigo-600 hover:bg-indigo-50 active:text-indigo-700 active:bg-indigo-100 active:scale-[0.98] transition-all duration-200 px-2"
+                                    title="Duplicate Task"
+                                >
+                                    <Copy className="h-4 w-4" /> Copy
+                                </Button>
                             </div>
 
                             {/* Meta Area - History & Notes */}

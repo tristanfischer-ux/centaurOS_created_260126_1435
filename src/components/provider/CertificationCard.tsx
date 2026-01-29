@@ -64,12 +64,12 @@ export const CertificationCard = memo(function CertificationCard({
                             </h3>
                             {/* Verification Status */}
                             {certification.is_verified ? (
-                                <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 shrink-0">
+                                <Badge variant="secondary" className="bg-emerald-50 text-emerald-700 border-emerald-200 shrink-0">
                                     <CheckCircle2 className="w-3 h-3 mr-1" />
                                     Verified
                                 </Badge>
                             ) : (
-                                <Badge variant="outline" className="bg-slate-50 text-slate-600 border-slate-200 shrink-0">
+                                <Badge variant="secondary" className="bg-slate-50 text-slate-600 border-slate-200 shrink-0">
                                     <Clock className="w-3 h-3 mr-1" />
                                     Pending
                                 </Badge>
@@ -195,7 +195,7 @@ export const CertificationBadge = memo(function CertificationBadge({
 
     return (
         <Badge 
-            variant="outline" 
+            variant="secondary" 
             className={cn(
                 certification.is_verified 
                     ? 'bg-emerald-50 text-emerald-700 border-emerald-200'

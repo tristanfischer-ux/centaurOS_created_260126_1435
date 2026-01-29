@@ -174,7 +174,7 @@ export function RFQResponseForm({
         </CardContent>
         {onCancel && (
           <CardFooter>
-            <Button variant="outline" onClick={onCancel} className="w-full">
+            <Button variant="secondary" onClick={onCancel} className="w-full">
               Cancel
             </Button>
           </CardFooter>
@@ -239,7 +239,7 @@ export function RFQResponseForm({
         </CardContent>
         <CardFooter className="flex gap-3">
           <Button
-            variant="outline"
+            variant="secondary"
             onClick={() => setMode('select')}
             disabled={isPending}
             className="flex-1"
@@ -300,7 +300,7 @@ export function RFQResponseForm({
         </CardContent>
         <CardFooter className="flex gap-3">
           <Button
-            variant="outline"
+            variant="secondary"
             onClick={() => setMode('select')}
             disabled={isPending}
             className="flex-1"
@@ -361,7 +361,7 @@ export function RFQResponseForm({
         </CardContent>
         <CardFooter className="flex gap-3">
           <Button
-            variant="outline"
+            variant="secondary"
             onClick={() => setMode('select')}
             disabled={isPending}
             className="flex-1"

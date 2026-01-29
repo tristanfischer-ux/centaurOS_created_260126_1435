@@ -1,7 +1,9 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import Link from 'next/link'
 import { 
   Target, CheckSquare, Users, 
-  Keyboard, Mic
+  Keyboard, Mic, ArrowLeft
 } from 'lucide-react'
 
 export default function HelpPage() {
@@ -56,16 +58,27 @@ export default function HelpPage() {
   ]
 
   return (
-    <div className="max-w-5xl mx-auto p-6 space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold text-slate-900 mb-2">Help Center</h1>
-        <p className="text-muted-foreground">
+    <div className="space-y-6">
+      {/* Back Button */}
+      <Button variant="ghost" size="sm" asChild className="gap-2 text-muted-foreground hover:text-foreground -ml-2">
+        <Link href="/dashboard">
+          <ArrowLeft className="h-4 w-4" />
+          Back to Dashboard
+        </Link>
+      </Button>
+
+      <div className="pb-4 border-b border-slate-100">
+        <div className="flex items-center gap-3 mb-1">
+          <div className="h-8 w-1 bg-orange-600 rounded-full shadow-[0_0_8px_rgba(234,88,12,0.6)]" />
+          <h1 className="text-2xl sm:text-3xl font-display font-semibold text-foreground tracking-tight">Help Center</h1>
+        </div>
+        <p className="text-muted-foreground mt-1 text-sm font-medium pl-4">
           Learn how to use CentaurOS effectively
         </p>
       </div>
 
       {/* Keyboard Shortcuts Card */}
-      <Card>
+      <Card className="bg-white border-slate-100 shadow-[0_2px_15px_rgba(0,0,0,0.03)]">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Keyboard className="h-5 w-5" />

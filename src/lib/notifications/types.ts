@@ -61,6 +61,11 @@ export type EmailTemplate =
     | 'booking_request'
     | 'payment_received'
     | 'order_status_update'
+    | 'rfq_new_match'
+    | 'rfq_urgent_match'
+    | 'rfq_priority_hold_won'
+    | 'rfq_awarded_to_you'
+    | 'rfq_outbid'
     | 'generic'
 
 export interface PushNotificationOptions {

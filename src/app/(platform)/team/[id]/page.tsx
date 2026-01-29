@@ -88,63 +88,95 @@ export default async function ProfilePage({ params }: { params: Promise<{ id: st
                                 currentMember={currentMemberMetrics}
                                 allMembers={allMembersWithMetrics}
                             />
-                            <Badge variant="outline" className="text-lg px-4 py-1 bg-slate-50">
+                            <Badge variant="secondary" className="text-lg px-4 py-1 bg-slate-50">
                                 {profile.role}
                             </Badge>
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-3 gap-6 mt-8 border-t border-slate-100 pt-6">
-                        <div className="flex items-center gap-3">
-                            <div className="p-2 bg-blue-50 text-blue-600 rounded-lg">
-                                <Briefcase className="w-5 h-5" />
+                    {(() => {
+                        const activeTasks = tasks?.filter(t => t.status === 'Pending' || t.status === 'Accepted') || []
+                        const completedTasks = tasks?.filter(t => t.status === 'Completed') || []
+                        return (
+                            <div className="grid grid-cols-3 gap-6 mt-8 border-t border-slate-100 pt-6">
+                                <div className="flex items-center gap-3">
+                                    <div className="p-2 bg-blue-50 text-blue-600 rounded-lg">
+                                        <Briefcase className="w-5 h-5" />
+                                    </div>
+                                    <div>
+                                        <div className="text-sm text-slate-500">Active Tasks</div>
+                                        <div className="font-semibold text-slate-900">{activeTasks.length}</div>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                    <div className="p-2 bg-green-50 text-green-600 rounded-lg">
+                                        <Shield className="w-5 h-5" />
+                                    </div>
+                                    <div>
+                                        <div className="text-sm text-slate-500">Completed</div>
+                                        <div className="font-semibold text-slate-900">{completedTasks.length}</div>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                    <div className="p-2 bg-amber-50 text-amber-600 rounded-lg">
+                                        <Award className="w-5 h-5" />
+                                    </div>
+                                    <div>
+                                        <div className="text-sm text-slate-500">Reputation</div>
+                                        <div className="font-semibold text-slate-900">Good</div>
+                                    </div>
+                                </div>
                             </div>
-                            <div>
-                                <div className="text-sm text-slate-500">Active Tasks</div>
-                                <div className="font-semibold text-slate-900">{tasks?.filter(t => t.status === 'Accepted').length || 0}</div>
-                            </div>
-                        </div>
-                        <div className="flex items-center gap-3">
-                            <div className="p-2 bg-green-50 text-green-600 rounded-lg">
-                                <Shield className="w-5 h-5" />
-                            </div>
-                            <div>
-                                <div className="text-sm text-slate-500">Completed</div>
-                                <div className="font-semibold text-slate-900">{tasks?.filter(t => t.status === 'Completed').length || 0}</div>
-                            </div>
-                        </div>
-                        <div className="flex items-center gap-3">
-                            <div className="p-2 bg-amber-50 text-amber-600 rounded-lg">
-                                <Award className="w-5 h-5" />
-                            </div>
-                            <div>
-                                <div className="text-sm text-slate-500">Reputation</div>
-                                <div className="font-semibold text-slate-900">Good</div>
-                            </div>
-                        </div>
-                    </div>
+                        )
+                    })()}
                 </div>
             </div>
 
-            {/* Task History */}
-            <div>
-                <h2 className="text-xl font-bold text-slate-900 mb-4">Task History</h2>
-                <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
-                    {tasks?.length === 0 ? (
-                        <div className="p-8 text-center text-slate-500">No tasks assigned yet.</div>
-                    ) : (
-                        tasks?.map(task => (
-                            <div key={task.id} className="p-4 border-b border-slate-100 last:border-0 hover:bg-slate-50 flex justify-between items-center">
-                                <div>
-                                    <div className="font-medium text-slate-900">{task.title}</div>
-                                    <div className="text-sm text-slate-500 truncate max-w-md">{task.description}</div>
+            {/* Current Tasks */}
+            {(() => {
+                const activeTasks = tasks?.filter(t => t.status === 'Pending' || t.status === 'Accepted') || []
+                return activeTasks.length > 0 ? (
+                    <div>
+                        <h2 className="text-xl font-bold text-slate-900 mb-4">Current Tasks</h2>
+                        <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
+                            {activeTasks.map(task => (
+                                <div key={task.id} className="p-4 border-b border-slate-100 last:border-0 hover:bg-slate-50 flex justify-between items-center">
+                                    <div>
+                                        <div className="font-medium text-slate-900">{task.title}</div>
+                                        <div className="text-sm text-slate-500 truncate max-w-md">{task.description}</div>
+                                    </div>
+                                    <Badge variant={task.status === 'Accepted' ? 'default' : 'secondary'}>{task.status}</Badge>
                                 </div>
-                                <Badge variant="secondary">{task.status}</Badge>
-                            </div>
-                        ))
-                    )}
-                </div>
-            </div>
+                            ))}
+                        </div>
+                    </div>
+                ) : null
+            })()}
+
+            {/* Completed Tasks */}
+            {(() => {
+                const completedTasks = tasks?.filter(t => t.status === 'Completed') || []
+                return (
+                    <div>
+                        <h2 className="text-xl font-bold text-slate-900 mb-4">Completed Tasks</h2>
+                        <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
+                            {completedTasks.length === 0 ? (
+                                <div className="p-8 text-center text-slate-500">No completed tasks yet.</div>
+                            ) : (
+                                completedTasks.map(task => (
+                                    <div key={task.id} className="p-4 border-b border-slate-100 last:border-0 hover:bg-slate-50 flex justify-between items-center">
+                                        <div>
+                                            <div className="font-medium text-slate-900">{task.title}</div>
+                                            <div className="text-sm text-slate-500 truncate max-w-md">{task.description}</div>
+                                        </div>
+                                        <Badge variant="secondary" className="bg-green-50 text-green-700 border-green-200">Completed</Badge>
+                                    </div>
+                                ))
+                            )}
+                        </div>
+                    </div>
+                )
+            })()}
         </div>
     )
 }

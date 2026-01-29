@@ -252,7 +252,7 @@ function StatusBadge({ status, className }: StatusBadgeProps) {
   const { label, color, Icon } = config[status] || config['Open']
 
   return (
-    <Badge variant="outline" className={cn('text-xs', color, className)}>
+    <Badge variant="secondary" className={cn('text-xs', color, className)}>
       <Icon className="w-3 h-3 mr-1" />
       {label}
     </Badge>

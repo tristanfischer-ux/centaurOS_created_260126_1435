@@ -99,7 +99,7 @@ export default async function AdminDashboardPage() {
                             />
                         </div>
                         <Link href="/admin/health">
-                            <Button variant="outline" size="sm">
+                            <Button variant="secondary" size="sm">
                                 View Details
                                 <ArrowRight className="h-4 w-4 ml-2" />
                             </Button>
@@ -266,13 +266,13 @@ export default async function AdminDashboardPage() {
                 <CardContent>
                     <div className="flex flex-wrap gap-3">
                         <Link href="/admin/applications">
-                            <Button variant="outline">
+                            <Button variant="secondary">
                                 <ClipboardList className="h-4 w-4 mr-2" />
                                 Review Applications
                             </Button>
                         </Link>
                         <Link href="/admin/health">
-                            <Button variant="outline">
+                            <Button variant="secondary">
                                 <Activity className="h-4 w-4 mr-2" />
                                 View System Health
                             </Button>

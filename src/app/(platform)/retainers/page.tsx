@@ -125,14 +125,17 @@ export default async function RetainersPage() {
   return (
     <div className="container max-w-4xl py-8">
       {/* Header */}
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <h1 className="text-3xl font-bold">Retainers</h1>
-          <p className="text-muted-foreground mt-1">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-slate-100 mb-8">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-3 mb-1">
+            <div className="h-8 w-1 bg-orange-600 rounded-full shadow-[0_0_8px_rgba(234,88,12,0.6)]" />
+            <h1 className="text-2xl sm:text-3xl font-display font-semibold text-foreground tracking-tight">Retainers</h1>
+          </div>
+          <p className="text-muted-foreground mt-1 text-sm font-medium pl-4">
             Manage your ongoing retainer agreements
           </p>
         </div>
-        <Button asChild>
+        <Button asChild className="bg-slate-900 hover:bg-slate-800 text-white font-medium shadow-md">
           <Link href="/marketplace?category=People">
             <Plus className="h-4 w-4 mr-2" />
             New Retainer

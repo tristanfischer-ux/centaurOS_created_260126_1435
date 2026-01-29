@@ -41,7 +41,7 @@ export function DatePickerWithShortcuts({
         <Popover open={open} onOpenChange={setOpen}>
             <PopoverTrigger asChild>
                 <Button
-                    variant={"outline"}
+                    variant={"secondary"}
                     className={cn(
                         "w-full justify-start text-left font-normal",
                         !date && "text-muted-foreground",
@@ -56,7 +56,7 @@ export function DatePickerWithShortcuts({
                 {/* Quick Date Shortcuts */}
                 <div className="flex gap-1 p-2 border-b border-border">
                     <Button
-                        variant="outline"
+                        variant="secondary"
                         size="sm"
                         onClick={() => handleQuickDate(new Date())}
                         className="text-xs h-7"
@@ -64,7 +64,7 @@ export function DatePickerWithShortcuts({
                         Today
                     </Button>
                     <Button
-                        variant="outline"
+                        variant="secondary"
                         size="sm"
                         onClick={() => handleQuickDate(addDays(new Date(), 1))}
                         className="text-xs h-7"
@@ -72,7 +72,7 @@ export function DatePickerWithShortcuts({
                         Tomorrow
                     </Button>
                     <Button
-                        variant="outline"
+                        variant="secondary"
                         size="sm"
                         onClick={() => handleQuickDate(addDays(new Date(), 7))}
                         className="text-xs h-7"
@@ -80,7 +80,7 @@ export function DatePickerWithShortcuts({
                         +7d
                     </Button>
                     <Button
-                        variant="outline"
+                        variant="secondary"
                         size="sm"
                         onClick={() => handleQuickDate(addDays(new Date(), 14))}
                         className="text-xs h-7"
@@ -88,7 +88,7 @@ export function DatePickerWithShortcuts({
                         +14d
                     </Button>
                     <Button
-                        variant="outline"
+                        variant="secondary"
                         size="sm"
                         onClick={handleClear}
                         className="text-xs h-7"

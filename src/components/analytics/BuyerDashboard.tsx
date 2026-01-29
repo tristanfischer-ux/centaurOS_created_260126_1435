@@ -160,7 +160,7 @@ export function BuyerDashboard({
             </SelectContent>
           </Select>
           <Button
-            variant="outline"
+            variant="secondary"
             size="icon"
             onClick={handleRefresh}
             disabled={isRefreshing}
@@ -168,7 +168,7 @@ export function BuyerDashboard({
             <RefreshCw className={cn("h-4 w-4", isRefreshing && "animate-spin")} />
           </Button>
           <Button
-            variant="outline"
+            variant="secondary"
             onClick={() => handleExport('csv')}
             disabled={isExporting}
           >
@@ -352,7 +352,7 @@ export function BuyerDashboard({
                     outerRadius={80}
                     dataKey="value"
                     nameKey="category"
-                    label={({ category, percentage }) => `${category} (${percentage}%)`}
+                    label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
                   >
                     {analytics.spendByCategory.map((_, index) => (
                       <Cell key={`cell-${index}`} fill={CATEGORY_COLORS[index % CATEGORY_COLORS.length]} />

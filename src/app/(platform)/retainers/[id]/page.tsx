@@ -52,7 +52,7 @@ const STATUS_CONFIG: Record<RetainerStatus, {
 }> = {
   pending: { label: 'Pending Approval', variant: 'secondary', color: 'bg-amber-500' },
   active: { label: 'Active', variant: 'default', color: 'bg-emerald-500' },
-  paused: { label: 'Paused', variant: 'outline', color: 'bg-gray-400' },
+  paused: { label: 'Paused', variant: 'secondary', color: 'bg-gray-400' },
   cancelled: { label: 'Cancelled', variant: 'destructive', color: 'bg-red-500' },
 }
 
@@ -147,13 +147,13 @@ export default async function RetainerDetailPage({ params }: RetainerDetailPageP
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" asChild>
+          <Button variant="secondary" asChild>
             <Link href={`/retainers/${id}/timesheet`}>
               <Clock className="h-4 w-4 mr-2" />
               Timesheet
             </Link>
           </Button>
-          <Button variant="outline" size="icon">
+          <Button variant="secondary" size="icon">
             <Settings className="h-4 w-4" />
           </Button>
         </div>
@@ -299,31 +299,31 @@ export default async function RetainerDetailPage({ params }: RetainerDetailPageP
               <CardTitle>Quick Actions</CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
-              <Button className="w-full justify-start" variant="outline" asChild>
+              <Button className="w-full justify-start" variant="secondary" asChild>
                 <Link href={`/retainers/${id}/timesheet`}>
                   <Clock className="h-4 w-4 mr-2" />
                   {role === 'seller' ? 'Log Hours' : 'View Timesheet'}
                 </Link>
               </Button>
-              <Button className="w-full justify-start" variant="outline">
+              <Button className="w-full justify-start" variant="secondary">
                 <MessageSquare className="h-4 w-4 mr-2" />
                 Message
               </Button>
               <Separator className="my-4" />
               {retainer.status === 'active' && (
-                <Button className="w-full justify-start" variant="outline">
+                <Button className="w-full justify-start" variant="secondary">
                   <Pause className="h-4 w-4 mr-2" />
                   Pause Retainer
                 </Button>
               )}
               {retainer.status === 'paused' && (
-                <Button className="w-full justify-start" variant="outline">
+                <Button className="w-full justify-start" variant="secondary">
                   <Play className="h-4 w-4 mr-2" />
                   Resume Retainer
                 </Button>
               )}
               {['active', 'paused'].includes(retainer.status) && (
-                <Button className="w-full justify-start text-destructive" variant="outline">
+                <Button className="w-full justify-start text-destructive" variant="secondary">
                   <XCircle className="h-4 w-4 mr-2" />
                   Cancel Retainer
                 </Button>

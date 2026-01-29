@@ -303,7 +303,7 @@ export function InlineBatchApproval({ onApprovalComplete }: InlineBatchApprovalP
                         className="min-h-[100px] bg-white border-slate-200"
                     />
                     <DialogFooter>
-                        <Button variant="outline" onClick={() => setRejectDialogOpen(false)}>Cancel</Button>
+                        <Button variant="secondary" onClick={() => setRejectDialogOpen(false)}>Cancel</Button>
                         <Button
                             variant="destructive"
                             onClick={handleBatchReject}

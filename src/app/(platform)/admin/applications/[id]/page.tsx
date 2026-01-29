@@ -126,7 +126,7 @@ export default function ApplicationDetailPage({
                 <h2 className="text-lg font-semibold mb-2">Failed to load application</h2>
                 <p className="text-muted-foreground mb-4">{error}</p>
                 <Link href="/admin/applications">
-                    <Button variant="outline">
+                    <Button variant="secondary">
                         <ArrowLeft className="h-4 w-4 mr-2" />
                         Back to Applications
                     </Button>
@@ -158,7 +158,7 @@ export default function ApplicationDetailPage({
                             {application.status.replace('_', ' ')}
                         </Badge>
                         {application.assigned_tier && (
-                            <Badge variant="outline" className="capitalize">
+                            <Badge variant="secondary" className="capitalize">
                                 {application.assigned_tier.replace('_', ' ')}
                             </Badge>
                         )}

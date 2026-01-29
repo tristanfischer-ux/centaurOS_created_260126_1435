@@ -197,7 +197,7 @@ export function DelegationManager({ members, currentUserId, userRole }: Delegati
                                                         <span className="font-medium text-slate-900">
                                                             {delegate?.full_name || 'Unknown'}
                                                         </span>
-                                                        <Badge variant="outline" className="text-xs">
+                                                        <Badge variant="secondary" className="text-xs">
                                                             {delegate?.role}
                                                         </Badge>
                                                         {isExpired && (
@@ -320,7 +320,7 @@ export function DelegationManager({ members, currentUserId, userRole }: Delegati
                                                     </AvatarFallback>
                                                 </Avatar>
                                                 <span>{member.full_name}</span>
-                                                <Badge variant="outline" className="text-xs ml-1">
+                                                <Badge variant="secondary" className="text-xs ml-1">
                                                     {member.role}
                                                 </Badge>
                                             </div>
@@ -363,7 +363,7 @@ export function DelegationManager({ members, currentUserId, userRole }: Delegati
                     </div>
 
                     <DialogFooter>
-                        <Button variant="outline" onClick={() => {
+                        <Button variant="secondary" onClick={() => {
                             setShowCreateDialog(false)
                             resetForm()
                         }}>

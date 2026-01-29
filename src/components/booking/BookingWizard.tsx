@@ -343,7 +343,7 @@ export function BookingWizard({ listing, provider, onCancel }: BookingWizardProp
                                         <p className="text-muted-foreground">{listing.title}</p>
                                         <div className="flex items-center gap-2 mt-1">
                                             <Badge variant="secondary">{listing.category}</Badge>
-                                            <Badge variant="outline">{listing.subcategory}</Badge>
+                                            <Badge variant="secondary">{listing.subcategory}</Badge>
                                         </div>
                                     </div>
                                     {provider.dayRate && (
@@ -478,7 +478,7 @@ export function BookingWizard({ listing, provider, onCancel }: BookingWizardProp
                                         <p className="text-muted-foreground">{listing.title}</p>
                                         <div className="flex items-center gap-2 mt-1">
                                             <Badge variant="secondary">{listing.category}</Badge>
-                                            <Badge variant="outline">{listing.subcategory}</Badge>
+                                            <Badge variant="secondary">{listing.subcategory}</Badge>
                                         </div>
                                     </div>
                                     {provider.dayRate && (
@@ -802,7 +802,7 @@ export function BookingWizard({ listing, provider, onCancel }: BookingWizardProp
             {currentStep !== 'confirmation' && currentStep !== 'payment' && (
                 <div className="flex items-center justify-between mt-8 pt-6 border-t">
                     <Button
-                        variant="outline"
+                        variant="secondary"
                         onClick={(currentStep === 'dates' && !showEngagementChoice) || currentStep === 'engagement_type' ? onCancel : goBack}
                     >
                         <ArrowLeft className="h-4 w-4 mr-2" />

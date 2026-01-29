@@ -30,7 +30,7 @@ export default async function RFQDetailPage({ params }: RFQDetailPageProps) {
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) {
-    redirect('/auth/signin')
+    redirect('/login')
   }
 
   // Get RFQ details

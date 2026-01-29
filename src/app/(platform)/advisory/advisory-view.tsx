@@ -13,11 +13,18 @@ import {
     Shield,
     LayoutGrid,
     List,
-    HelpCircle
+    HelpCircle,
+    GraduationCap,
+    Cpu,
+    Factory,
+    FileText,
+    ExternalLink,
+    BookOpen
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
+import { Card } from "@/components/ui/card"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
     Select,
@@ -70,6 +77,49 @@ const VISIBILITY_OPTIONS = [
     { value: "all", label: "All Questions" },
     { value: "public", label: "Public" },
     { value: "foundry", label: "Private to Foundry" },
+]
+
+const RESOURCES = [
+    {
+        id: "getting-started",
+        title: "Getting Started Guide",
+        description: "Learn the fundamentals of the Centaur OS platform and how to maximize your productivity.",
+        icon: GraduationCap,
+        category: "Guide",
+        href: "/help"
+    },
+    {
+        id: "ai-tools",
+        title: "AI Tools & Integrations",
+        description: "Explore the AI agents and automation tools available to enhance your workflow.",
+        icon: Cpu,
+        category: "Documentation",
+        href: "/help"
+    },
+    {
+        id: "manufacturing",
+        title: "Manufacturing Network",
+        description: "Connect with vetted manufacturing partners and service providers in the marketplace.",
+        icon: Factory,
+        category: "Network",
+        href: "/marketplace"
+    },
+    {
+        id: "best-practices",
+        title: "Best Practices",
+        description: "Proven methodologies for task delegation, approval workflows, and team coordination.",
+        icon: FileText,
+        category: "Guide",
+        href: "/help"
+    },
+    {
+        id: "community-guidelines",
+        title: "Community Guidelines",
+        description: "Standards and expectations for Guild members to ensure productive collaboration.",
+        icon: Shield,
+        category: "Policy",
+        href: "/help"
+    },
 ]
 
 export function AdvisoryView({ 
@@ -224,17 +274,20 @@ export function AdvisoryView({
         <div className="space-y-6">
             {/* Header */}
             <div className="flex flex-col gap-4">
-                <div className="flex items-center justify-between">
-                    <div>
-                        <h1 className="text-3xl font-bold tracking-tight text-foreground mb-2 flex items-center gap-3">
-                            Advisory Forum
-                            <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-muted text-muted-foreground text-sm font-medium">
-                                <span className="text-foreground font-semibold">{questions.length}</span>
-                                <span className="text-xs uppercase tracking-wider">questions</span>
-                            </span>
-                        </h1>
-                        <p className="text-muted-foreground">
-                            AI-powered insights verified by human experts through democratic workflow.
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-slate-100">
+                    <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-3 mb-1">
+                            <div className="h-8 w-1 bg-orange-600 rounded-full shadow-[0_0_8px_rgba(234,88,12,0.6)]" />
+                            <h1 className="text-2xl sm:text-3xl font-display font-semibold text-slate-900 tracking-tight flex items-center gap-3">
+                                Advisory Forum
+                                <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-orange-50 text-orange-700 text-sm font-medium rounded-full">
+                                    <span className="font-semibold">{questions.length}</span>
+                                    <span className="text-xs uppercase tracking-wider">questions</span>
+                                </span>
+                            </h1>
+                        </div>
+                        <p className="text-slate-500 mt-1 text-sm font-medium pl-4">
+                            AI-powered insights verified by human experts through democratic workflow
                         </p>
                     </div>
                     <AskModal onSubmit={handleAskQuestion} />
@@ -273,7 +326,7 @@ export function AdvisoryView({
                             />
                         </div>
                         <Button 
-                            variant="outline" 
+                            variant="secondary" 
                             onClick={() => setShowFilters(!showFilters)}
                             className={cn(showFilters && "bg-slate-100")}
                         >
@@ -503,6 +556,45 @@ export function AdvisoryView({
                     ))}
                 </motion.div>
             )}
+
+            {/* Resources Section */}
+            <div className="mt-12 pt-8 border-t border-slate-200">
+                <div className="flex items-center gap-2 mb-4">
+                    <BookOpen className="h-5 w-5 text-orange-600" />
+                    <h2 className="text-lg font-semibold text-slate-900">Resources</h2>
+                </div>
+                <p className="text-sm text-muted-foreground mb-6">
+                    Knowledge base and documentation to help you succeed.
+                </p>
+
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                    {RESOURCES.map(resource => (
+                        <Card key={resource.id} className="p-5 bg-card hover:shadow-md transition-shadow group">
+                            <div className="flex items-start gap-4">
+                                <div className="p-2 bg-muted rounded-lg group-hover:bg-orange-50 transition-colors">
+                                    <resource.icon className="h-5 w-5 text-muted-foreground group-hover:text-orange-600 transition-colors" />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-2 mb-1">
+                                        <h3 className="font-medium text-foreground">{resource.title}</h3>
+                                        <Badge variant="secondary" className="text-[10px]">
+                                            {resource.category}
+                                        </Badge>
+                                    </div>
+                                    <p className="text-sm text-muted-foreground mb-3">
+                                        {resource.description}
+                                    </p>
+                                    <Button variant="ghost" size="sm" className="h-8 px-2 -ml-2 text-muted-foreground hover:text-orange-600" asChild>
+                                        <a href={resource.href}>
+                                            Learn more <ExternalLink className="ml-1 h-3 w-3" />
+                                        </a>
+                                    </Button>
+                                </div>
+                            </div>
+                        </Card>
+                    ))}
+                </div>
+            </div>
         </div>
     )
 }

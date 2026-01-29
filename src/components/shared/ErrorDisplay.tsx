@@ -66,7 +66,7 @@ export function ErrorDisplay({
                 <p>{message}</p>
                 {onRetry && (
                     <Button
-                        variant="outline"
+                        variant="secondary"
                         size="sm"
                         onClick={onRetry}
                         className="mt-3"

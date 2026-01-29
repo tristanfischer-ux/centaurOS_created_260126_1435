@@ -47,10 +47,10 @@ function LoginForm() {
                         ← Return to Site
                     </span>
                 </Link>
-                <h1 className="text-4xl font-playfair font-semibold text-slate-900 tracking-tight">
+                <h1 className="text-4xl font-display font-semibold text-foreground tracking-tight">
                     Welcome Back.
                 </h1>
-                <p className="text-slate-500 text-sm leading-relaxed">
+                <p className="text-muted-foreground text-sm leading-relaxed">
                     Enter your credentials to access the Centaur Operating System.
                 </p>
             </div>
@@ -67,9 +67,9 @@ function LoginForm() {
                             id="email"
                             name="email"
                             type="email"
-                            placeholder="officer@centaur.dynamics"
+                            placeholder="you@company.com"
                             autoFocus
-                            autoComplete="email"
+                            autoComplete="off"
                             required
                             className="h-11 bg-white border-slate-200 focus:border-cyan-500 focus:ring-cyan-500/20 transition-all font-medium"
                         />
@@ -118,7 +118,7 @@ export default function LoginPage() {
 
                 <div className="relative z-20 flex flex-col justify-end p-12 h-full text-slate-900 pb-20">
                     <div className="h-1 w-20 bg-cyan-500 mb-8 shadow-[0_0_15px_rgba(6,182,212,0.6)]" />
-                    <h2 className="text-5xl font-playfair font-medium leading-[1.1] mb-6 tracking-tight drop-shadow-sm">
+                    <h2 className="text-5xl font-display font-medium leading-[1.1] mb-6 tracking-tight drop-shadow-sm">
                         We build atoms at the
                         <br />
                         <span className="text-cyan-600">speed of bits.</span>

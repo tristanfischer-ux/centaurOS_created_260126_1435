@@ -181,7 +181,7 @@ export function MessageDrawerTrigger({
   return (
     <>
       <Button
-        variant="outline"
+        variant="secondary"
         onClick={() => setOpen(true)}
         className={cn('gap-2', className)}
       >

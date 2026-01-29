@@ -120,14 +120,14 @@ export function DisputeQueue({
   }
 
   const getStatusBadge = (status: DisputeStatus) => {
-    const config: Record<DisputeStatus, { variant: "default" | "secondary" | "destructive" | "outline"; icon: React.ReactNode }> = {
+    const config: Record<DisputeStatus, { variant: "default" | "secondary" | "destructive" | "secondary"; icon: React.ReactNode }> = {
       open: { variant: "destructive", icon: <AlertTriangle className="h-3 w-3" /> },
       under_review: { variant: "default", icon: <Clock className="h-3 w-3" /> },
       mediation: { variant: "secondary", icon: <Scale className="h-3 w-3" /> },
       arbitration: { variant: "secondary", icon: <Gavel className="h-3 w-3" /> },
-      resolved: { variant: "outline", icon: <CheckCircle className="h-3 w-3" /> },
+      resolved: { variant: "secondary", icon: <CheckCircle className="h-3 w-3" /> },
       escalated: { variant: "destructive", icon: <AlertTriangle className="h-3 w-3" /> },
-      cancelled: { variant: "outline", icon: null },
+      cancelled: { variant: "secondary", icon: null },
     }
 
     const { variant, icon } = config[status]
@@ -167,7 +167,7 @@ export function DisputeQueue({
           <div className="flex items-center gap-2">
             <AlertTriangle className="h-5 w-5 text-muted-foreground" />
             <CardTitle>Dispute Queue</CardTitle>
-            <Badge variant="outline">{filteredDisputes.length}</Badge>
+            <Badge variant="secondary">{filteredDisputes.length}</Badge>
           </div>
           <Select
             value={filter}
@@ -242,7 +242,7 @@ export function DisputeQueue({
 
                     {dispute.assigned_to && dispute.assignee && (
                       <div className="mt-2 text-xs">
-                        <Badge variant="outline" className="gap-1">
+                        <Badge variant="secondary" className="gap-1">
                           <User className="h-3 w-3" />
                           Assigned to {dispute.assignee.full_name}
                         </Badge>
@@ -254,7 +254,7 @@ export function DisputeQueue({
                   <div className="flex items-center gap-2">
                     {!dispute.assigned_to && (
                       <Button
-                        variant="outline"
+                        variant="secondary"
                         size="sm"
                         onClick={() => handleAssign(dispute.id)}
                         disabled={isLoading === dispute.id}

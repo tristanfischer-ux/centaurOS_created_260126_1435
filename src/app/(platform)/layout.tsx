@@ -72,7 +72,7 @@ export default async function PlatformLayout({
                         <KeyboardShortcutsDialog />
                         <MobileZoomControl />
                         <Sidebar foundryName={foundryName} foundryId={foundryId} userName={profile?.full_name || user.email || "User"} userRole={profile?.role || "Member"} isAdmin={userIsAdmin} />
-                        <ZoomableContent className="flex-1 overflow-y-auto bg-white">
+                        <ZoomableContent className="flex-1 overflow-y-auto overflow-x-hidden bg-white">
                             {/* 
                               Responsive padding:
                               - xxs (280px): p-2 - Galaxy Fold outer
@@ -83,7 +83,7 @@ export default async function PlatformLayout({
                               
                               Bottom padding accounts for mobile nav height (64px + safe area)
                             */}
-                            <main className="p-2 xs:p-3 sm:p-4 fold:p-5 lg:p-8 pb-24 xs:pb-28 sm:pb-32 lg:pb-8 px-safe">
+                            <main className="p-4 xs:p-4 sm:p-5 fold:p-6 lg:p-8 pb-24 xs:pb-28 sm:pb-32 lg:pb-8 px-safe">
                                 <ErrorBoundary>
                                     {children}
                                 </ErrorBoundary>

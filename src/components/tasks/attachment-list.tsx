@@ -1,9 +1,9 @@
 "use client"
 
-import { useState, useMemo } from "react"
-import { FileIcon, X, Loader2, Paperclip, FileText, Image, Eye } from "lucide-react"
+import { useState, useMemo, useEffect } from "react"
+import { FileIcon, X, Loader2, Paperclip, FileText, Image, Eye, Download } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Dialog, DialogContent } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { toast } from "sonner"
 import { deleteTaskAttachment } from "@/actions/tasks"
@@ -27,6 +27,8 @@ interface AttachmentListProps {
 export function AttachmentList({ taskId, attachments, canDelete = false, onDelete }: AttachmentListProps) {
     const [deletingId, setDeletingId] = useState<string | null>(null)
     const [previewFile, setPreviewFile] = useState<Attachment | null>(null)
+    const [fileUrls, setFileUrls] = useState<Record<string, string>>({})
+    const [downloadingId, setDownloadingId] = useState<string | null>(null)
     const supabase = useMemo(() => createClient(), [])
 
     // Helper to get file type
@@ -45,13 +47,71 @@ export function AttachmentList({ taskId, attachments, canDelete = false, onDelet
         return (bytes / (1024 * 1024)).toFixed(1) + ' MB'
     }
 
-    // Get public URL from file_path
-    const getFileUrl = (filePath: string) => {
-        const { data } = supabase.storage
-            .from('task-files')
-            .getPublicUrl(filePath)
-        return data.publicUrl
+    // Get signed URL for file (valid for 1 hour)
+    const getFileUrl = async (filePath: string) => {
+        // Check if we already have a URL cached
+        if (fileUrls[filePath]) {
+            return fileUrls[filePath]
+        }
+
+        try {
+            const { data, error } = await supabase.storage
+                .from('task-files')
+                .createSignedUrl(filePath, 3600) // 1 hour expiry
+
+            if (error) {
+                console.error('Error creating signed URL:', error)
+                return null
+            }
+
+            // Cache the URL
+            setFileUrls(prev => ({ ...prev, [filePath]: data.signedUrl }))
+            return data.signedUrl
+        } catch (err) {
+            console.error('Exception creating signed URL:', err)
+            return null
+        }
     }
+
+    // Download file
+    const handleDownload = async (file: Attachment) => {
+        setDownloadingId(file.id)
+        try {
+            const { data, error } = await supabase.storage
+                .from('task-files')
+                .download(file.file_path)
+
+            if (error) {
+                toast.error('Failed to download file')
+                console.error('Download error:', error)
+                return
+            }
+
+            // Create blob URL and trigger download
+            const url = URL.createObjectURL(data)
+            const a = document.createElement('a')
+            a.href = url
+            a.download = file.file_name
+            document.body.appendChild(a)
+            a.click()
+            document.body.removeChild(a)
+            URL.revokeObjectURL(url)
+            
+            toast.success('Download started')
+        } catch (err) {
+            console.error('Download exception:', err)
+            toast.error('Failed to download file')
+        } finally {
+            setDownloadingId(null)
+        }
+    }
+
+    // Preload URLs for all attachments
+    useEffect(() => {
+        attachments.forEach(file => {
+            getFileUrl(file.file_path)
+        })
+    }, [attachments])
 
     const handleDelete = async (fileId: string, filePath: string) => {
         if (!confirm("Are you sure you want to delete this attachment?")) return
@@ -81,12 +141,12 @@ export function AttachmentList({ taskId, attachments, canDelete = false, onDelet
             <div className="space-y-2">
                 {attachments.map((file) => {
                     const fileType = getFileType(file.file_name)
-                    const fileUrl = getFileUrl(file.file_path)
+                    const fileUrl = fileUrls[file.file_path]
                     
                     return (
                         <div key={file.id} className="flex items-center justify-between p-2 bg-slate-50 border border-slate-100 rounded-md group hover:border-slate-200 transition-colors">
                             <div className="flex items-center gap-4 min-w-0 flex-1">
-                                {fileType === 'image' ? (
+                                {fileType === 'image' && fileUrl ? (
                                     <div className="w-10 h-10 rounded overflow-hidden bg-slate-100 flex-shrink-0">
                                         <img 
                                             src={fileUrl} 
@@ -94,6 +154,10 @@ export function AttachmentList({ taskId, attachments, canDelete = false, onDelet
                                             loading="lazy"
                                             className="w-full h-full object-cover cursor-pointer"
                                             onClick={() => setPreviewFile(file)}
+                                            onError={(e) => {
+                                                // Hide broken image
+                                                e.currentTarget.style.display = 'none'
+                                            }}
                                         />
                                     </div>
                                 ) : (
@@ -134,6 +198,28 @@ export function AttachmentList({ taskId, attachments, canDelete = false, onDelet
                                         </TooltipContent>
                                     </Tooltip>
                                 </TooltipProvider>
+                                <TooltipProvider>
+                                    <Tooltip>
+                                        <TooltipTrigger asChild>
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                className="min-h-[44px] min-w-[44px] h-9 w-9 p-0 text-slate-400 hover:text-slate-600"
+                                                disabled={downloadingId === file.id}
+                                                onClick={() => handleDownload(file)}
+                                            >
+                                                {downloadingId === file.id ? (
+                                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                                ) : (
+                                                    <Download className="h-4 w-4" />
+                                                )}
+                                            </Button>
+                                        </TooltipTrigger>
+                                        <TooltipContent>
+                                            <p>Download attachment</p>
+                                        </TooltipContent>
+                                    </Tooltip>
+                                </TooltipProvider>
                                 {canDelete && (
                                     <TooltipProvider>
                                         <Tooltip>
@@ -169,37 +255,68 @@ export function AttachmentList({ taskId, attachments, canDelete = false, onDelet
                 <DialogContent className="max-w-4xl max-h-[90vh] p-0">
                     {previewFile && (
                         <div className="p-4">
-                            <div className="mb-2">
-                                <h3 className="text-sm font-medium text-slate-900 truncate">{previewFile.file_name}</h3>
-                                <p className="text-xs text-slate-400">{formatFileSize(previewFile.file_size)}</p>
-                            </div>
-                            {getFileType(previewFile.file_name) === 'image' && (
+                            <DialogHeader className="mb-2">
+                                <div className="flex items-center justify-between">
+                                    <div className="flex-1 min-w-0">
+                                        <DialogTitle className="text-sm font-medium text-slate-900 truncate">
+                                            {previewFile.file_name}
+                                        </DialogTitle>
+                                        <p className="text-xs text-slate-400">{formatFileSize(previewFile.file_size)}</p>
+                                    </div>
+                                    <Button
+                                        variant="secondary"
+                                        size="sm"
+                                        className="ml-4"
+                                        onClick={() => handleDownload(previewFile)}
+                                        disabled={downloadingId === previewFile.id}
+                                    >
+                                        {downloadingId === previewFile.id ? (
+                                            <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                                        ) : (
+                                            <Download className="h-4 w-4 mr-2" />
+                                        )}
+                                        Download
+                                    </Button>
+                                </div>
+                            </DialogHeader>
+                            {getFileType(previewFile.file_name) === 'image' && fileUrls[previewFile.file_path] && (
                                 <img 
-                                    src={getFileUrl(previewFile.file_path)} 
+                                    src={fileUrls[previewFile.file_path]} 
                                     alt={previewFile.file_name}
                                     loading="lazy"
                                     className="w-full h-auto max-h-[80vh] object-contain rounded"
+                                    onError={() => {
+                                        toast.error('Failed to load image preview')
+                                    }}
                                 />
                             )}
-                            {getFileType(previewFile.file_name) === 'pdf' && (
+                            {getFileType(previewFile.file_name) === 'pdf' && fileUrls[previewFile.file_path] && (
                                 <iframe 
-                                    src={getFileUrl(previewFile.file_path)}
+                                    src={fileUrls[previewFile.file_path]}
                                     className="w-full h-[80vh] rounded border"
                                     title={previewFile.file_name}
+                                    onError={() => {
+                                        toast.error('Failed to load PDF preview')
+                                    }}
                                 />
                             )}
-                            {getFileType(previewFile.file_name) === 'other' && (
+                            {(getFileType(previewFile.file_name) === 'other' || !fileUrls[previewFile.file_path]) && (
                                 <div className="flex flex-col items-center justify-center h-[60vh] text-slate-400">
                                     <FileIcon className="h-16 w-16 mb-4" />
-                                    <p className="text-sm">Preview not available for this file type</p>
-                                    <a 
-                                        href={getFileUrl(previewFile.file_path)} 
-                                        target="_blank" 
-                                        rel="noopener noreferrer"
-                                        className="mt-4 text-sm text-blue-600 hover:underline"
+                                    <p className="text-sm mb-2">Preview not available for this file type</p>
+                                    <Button
+                                        variant="secondary"
+                                        size="sm"
+                                        onClick={() => handleDownload(previewFile)}
+                                        disabled={downloadingId === previewFile.id}
                                     >
-                                        Open in new tab
-                                    </a>
+                                        {downloadingId === previewFile.id ? (
+                                            <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                                        ) : (
+                                            <Download className="h-4 w-4 mr-2" />
+                                        )}
+                                        Download File
+                                    </Button>
                                 </div>
                             )}
                         </div>

@@ -112,7 +112,7 @@ export const SupplierRFQFeed = memo(function SupplierRFQFeed({
           )}
         </div>
         <Button
-          variant="outline"
+          variant="secondary"
           size="sm"
           onClick={fetchRFQs}
           disabled={isLoading}
@@ -207,7 +207,7 @@ export const SupplierRFQFeed = memo(function SupplierRFQFeed({
           <div className="flex items-center gap-2">
             <Zap className="w-5 h-5 text-amber-600" />
             <h3 className="font-semibold text-amber-700">Urgent RFQs</h3>
-            <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200">
+            <Badge variant="secondary" className="bg-amber-50 text-amber-700 border-amber-200">
               {urgentRFQs.length}
             </Badge>
           </div>
@@ -231,7 +231,7 @@ export const SupplierRFQFeed = memo(function SupplierRFQFeed({
             <div className="flex items-center gap-2">
               <Clock className="w-5 h-5 text-muted-foreground" />
               <h3 className="font-semibold">Standard RFQs</h3>
-              <Badge variant="outline">
+              <Badge variant="secondary">
                 {standardRFQs.length}
               </Badge>
             </div>
@@ -307,7 +307,7 @@ export function SupplierRFQFeedMinimal({
       <CardHeader className="pb-3">
         <CardTitle className="text-base flex items-center justify-between">
           Available RFQs
-          <Badge variant="outline">{rfqs.length}</Badge>
+          <Badge variant="secondary">{rfqs.length}</Badge>
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-2">
@@ -324,7 +324,7 @@ export function SupplierRFQFeedMinimal({
               </div>
             </div>
             {rfq.urgency === 'urgent' && (
-              <Badge variant="outline" className="ml-2 bg-amber-50 text-amber-700 border-amber-200">
+              <Badge variant="secondary" className="ml-2 bg-amber-50 text-amber-700 border-amber-200">
                 <Zap className="w-3 h-3" />
               </Badge>
             )}

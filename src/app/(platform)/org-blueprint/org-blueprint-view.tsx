@@ -19,6 +19,7 @@ import {
     CoverageSummary,
     initializeBusinessFunctions 
 } from '@/actions/org-blueprint'
+import { BusinessFunctionCategory } from '@/types/org-blueprint'
 import { toast } from 'sonner'
 import {
     Building2,
@@ -33,8 +34,11 @@ import {
     List,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { CoverageRadar } from '@/components/org-blueprint/coverage-radar'
+import { AssessmentModal } from '@/components/org-blueprint/assessment-modal'
 
 type CoverageStatus = 'covered' | 'partial' | 'gap' | 'not_needed'
+type FunctionCategory = 'finance' | 'legal' | 'sales' | 'marketing' | 'product' | 'operations' | 'people' | 'customer' | 'strategy'
 
 // Category colors
 const CATEGORY_COLORS: Record<string, string> = {
@@ -57,6 +61,76 @@ const STATUS_COLORS: Record<CoverageStatus, { bg: string; text: string; label: s
     'not_needed': { bg: 'bg-gray-100', text: 'text-gray-500', label: 'N/A' },
 }
 
+// FunctionCard component for grid view
+function FunctionCard({ 
+    businessFunction, 
+    onUpdate 
+}: { 
+    businessFunction: BusinessFunctionWithCoverage
+    onUpdate: () => void 
+}) {
+    const statusConfig = STATUS_COLORS[businessFunction.coverage_status]
+    
+    // Subtle left border color based on status
+    const borderColorClass = businessFunction.coverage_status === 'covered' 
+        ? 'border-l-green-500' 
+        : businessFunction.coverage_status === 'partial'
+        ? 'border-l-yellow-500'
+        : businessFunction.coverage_status === 'gap'
+        ? 'border-l-slate-300'
+        : 'border-l-slate-200'
+    
+    return (
+        <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className={cn(
+                "p-4 border border-slate-200 rounded-lg hover:shadow-md transition-all bg-white border-l-4",
+                borderColorClass
+            )}
+        >
+            <div className="flex items-start justify-between mb-2">
+                <div className="flex items-center gap-2">
+                    <div
+                        className="w-2 h-2 rounded-full flex-shrink-0"
+                        style={{ backgroundColor: CATEGORY_COLORS[businessFunction.category] }}
+                    />
+                    <span className="text-xs text-muted-foreground capitalize">
+                        {businessFunction.category}
+                    </span>
+                </div>
+                <Badge variant="secondary" className={cn('text-xs', statusConfig.text)}>
+                    {statusConfig.label}
+                </Badge>
+            </div>
+            
+            <h3 className="font-medium text-sm mb-1 line-clamp-2">
+                {businessFunction.name}
+            </h3>
+            
+            {businessFunction.description && (
+                <p className="text-xs text-muted-foreground line-clamp-2 mb-2">
+                    {businessFunction.description}
+                </p>
+            )}
+            
+            {businessFunction.covered_by && (
+                <div className="flex items-center gap-1 text-xs text-green-600">
+                    <CheckCircle2 className="h-3 w-3" />
+                    <span className="truncate">{businessFunction.covered_by}</span>
+                </div>
+            )}
+            
+            {businessFunction.coverage_status === 'gap' && (
+                <div className="flex items-center gap-1 text-xs text-amber-600 mt-1">
+                    <AlertTriangle className="h-3 w-3" />
+                    <span>Coverage needed</span>
+                </div>
+            )}
+        </motion.div>
+    )
+}
+
 interface OrgBlueprintViewProps {
     functions: BusinessFunctionWithCoverage[]
     summary: CoverageSummary | null
@@ -73,7 +147,7 @@ export function OrgBlueprintView({ functions: initialFunctions, summary: initial
     const [searchQuery, setSearchQuery] = useState('')
     const [categoryFilter, setCategoryFilter] = useState<string>('all')
     const [statusFilter, setStatusFilter] = useState<CoverageStatus | 'all'>('all')
-    const [selectedRadarCategory, setSelectedRadarCategory] = useState<string | null>(null)
+    const [selectedRadarCategory, setSelectedRadarCategory] = useState<BusinessFunctionCategory | null>(null)
     
     // Get unique categories from data
     const allCategories = useMemo(() => 
@@ -103,7 +177,7 @@ export function OrgBlueprintView({ functions: initialFunctions, summary: initial
     }
 
     // Radar category click handler
-    const handleRadarCategoryClick = (category: string) => {
+    const handleRadarCategoryClick = (category: BusinessFunctionCategory) => {
         if (selectedRadarCategory === category) {
             setSelectedRadarCategory(null)
             setCategoryFilter('all')
@@ -166,11 +240,14 @@ export function OrgBlueprintView({ functions: initialFunctions, summary: initial
     if (functions.length === 0) {
         return (
             <div className="space-y-6">
-                <div>
-                    <h1 className="text-3xl font-bold tracking-tight text-foreground mb-2">
-                        Org Blueprint
-                    </h1>
-                    <p className="text-muted-foreground">
+                <div className="pb-4 border-b border-slate-100">
+                    <div className="flex items-center gap-3 mb-1">
+                        <div className="h-8 w-1 bg-orange-600 rounded-full shadow-[0_0_8px_rgba(234,88,12,0.6)]" />
+                        <h1 className="text-2xl sm:text-3xl font-display font-semibold text-foreground tracking-tight">
+                            Org Blueprint
+                        </h1>
+                    </div>
+                    <p className="text-muted-foreground mt-1 text-sm font-medium pl-4">
                         Map your organizational capabilities and identify coverage gaps
                     </p>
                 </div>
@@ -211,27 +288,64 @@ export function OrgBlueprintView({ functions: initialFunctions, summary: initial
     return (
         <div className="space-y-6">
             {/* Header */}
-            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-                <div>
-                    <h1 className="text-3xl font-bold tracking-tight text-foreground mb-2 flex items-center gap-3">
-                        Org Blueprint
-                        {summary && (
-                            <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-muted text-muted-foreground text-sm font-medium">
-                                <span className="text-foreground font-semibold">{summary.overallCoveragePercentage}%</span>
-                                <span className="text-xs uppercase tracking-wider">coverage</span>
-                            </span>
-                        )}
-                    </h1>
-                    <p className="text-muted-foreground">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-slate-100">
+                <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-3 mb-1">
+                        <div className="h-8 w-1 bg-orange-600 rounded-full shadow-[0_0_8px_rgba(234,88,12,0.6)]" />
+                        <h1 className="text-2xl sm:text-3xl font-display font-semibold text-foreground tracking-tight flex items-center gap-3">
+                            Org Blueprint
+                            {summary && (
+                                <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-orange-50 text-orange-700 text-sm font-medium rounded-full">
+                                    <span className="font-semibold">{summary.overallCoveragePercentage}%</span>
+                                    <span className="text-xs uppercase tracking-wider">coverage</span>
+                                </span>
+                            )}
+                        </h1>
+                    </div>
+                    <p className="text-muted-foreground mt-1 text-sm font-medium pl-4">
                         Map your organizational capabilities and identify coverage gaps
                     </p>
                 </div>
                 <AssessmentModal functions={functions} onComplete={handleRefresh}>
-                    <Button>
+                    <Button className="bg-slate-900 hover:bg-slate-800 text-white font-medium shadow-md">
                         <Sparkles className="h-4 w-4 mr-2" />
                         Quick Assessment
                     </Button>
                 </AssessmentModal>
+            </div>
+
+            {/* How it Works Banner */}
+            <div className="bg-gradient-to-r from-slate-50 to-orange-50 border border-slate-200 rounded-lg p-5">
+                <div className="flex items-start gap-4">
+                    <div className="p-2 bg-orange-100 rounded-lg shrink-0">
+                        <Building2 className="h-6 w-6 text-orange-600" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                        <h3 className="font-semibold text-slate-900 mb-1">What is Org Blueprint?</h3>
+                        <p className="text-sm text-slate-600 mb-3">
+                            Org Blueprint maps all the key business functions your company needs — from finance and legal to marketing and operations. 
+                            It helps you see where you have coverage (internal team or external providers) and where you have gaps that need to be filled.
+                        </p>
+                        <div className="flex flex-wrap gap-4 text-xs">
+                            <div className="flex items-center gap-2">
+                                <div className="w-3 h-3 rounded-full bg-green-500"></div>
+                                <span className="text-slate-600"><strong>Covered:</strong> Handled by your team</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
+                                <span className="text-slate-600"><strong>Partial:</strong> External provider</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <div className="w-3 h-3 rounded-full bg-slate-300"></div>
+                                <span className="text-slate-600"><strong>Gap:</strong> Needs coverage</span>
+                            </div>
+                        </div>
+                        <p className="text-xs text-slate-500 mt-3">
+                            <strong>Tip:</strong> Click "Quick Assessment" to walk through each function and mark your coverage status. 
+                            You can then browse the Marketplace to find providers for any gaps.
+                        </p>
+                    </div>
+                </div>
             </div>
 
             {/* Summary Cards & Radar Chart */}
@@ -300,7 +414,7 @@ export function OrgBlueprintView({ functions: initialFunctions, summary: initial
                                 whileTap={{ scale: 0.98 }}
                             >
                                 <div className="h-5 w-5 rounded-full bg-gray-300 mb-2" />
-                                <div className="text-2xl font-bold text-gray-600">{summary.notNeeded}</div>
+                                <div className="text-2xl font-bold text-gray-600">{summary.notApplicable}</div>
                                 <div className="text-xs text-gray-500 uppercase tracking-wider">N/A</div>
                             </motion.button>
                         </div>
@@ -413,7 +527,7 @@ export function OrgBlueprintView({ functions: initialFunctions, summary: initial
                     title="No functions match your filters"
                     description="Try adjusting your filters to see more functions."
                     action={
-                        <Button variant="outline" onClick={clearFilters}>
+                        <Button variant="secondary" onClick={clearFilters}>
                             Clear Filters
                         </Button>
                     }

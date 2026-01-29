@@ -54,7 +54,7 @@ const taskTypeLabels: Record<TaskType, { label: string; variant: 'default' | 'se
   onboarding: { label: 'Onboarding', variant: 'info' },
   check_in: { label: 'Check-in', variant: 'secondary' },
   milestone_review: { label: 'Milestone', variant: 'default' },
-  completion: { label: 'Completion', variant: 'outline' },
+  completion: { label: 'Completion', variant: 'secondary' },
 }
 
 export function OrderTasksList({
@@ -190,7 +190,7 @@ export function OrderTasksList({
               <Button
                 onClick={handleInitializeTasks}
                 disabled={isInitializing}
-                variant="outline"
+                variant="secondary"
                 size="sm"
               >
                 {isInitializing ? (

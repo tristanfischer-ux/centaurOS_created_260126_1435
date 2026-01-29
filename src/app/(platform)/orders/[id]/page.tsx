@@ -41,7 +41,7 @@ export default async function OrderDetailPage({ params }: OrderDetailPageProps) 
             <p className="text-sm text-muted-foreground mt-1">
               You don&apos;t have permission to view this order.
             </p>
-            <Button variant="outline" asChild className="mt-4">
+            <Button variant="secondary" asChild className="mt-4">
               <Link href="/orders">
                 <ChevronLeft className="h-4 w-4 mr-2" />
                 Back to Orders

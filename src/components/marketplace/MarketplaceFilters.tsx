@@ -213,7 +213,7 @@ export function MarketplaceFilters({
             <div className="md:hidden">
                 <Sheet open={isOpen} onOpenChange={setIsOpen}>
                     <SheetTrigger asChild>
-                        <Button variant="outline" size="default" className="relative">
+                        <Button variant="secondary" size="default" className="relative">
                             <SlidersHorizontal className="h-4 w-4 mr-2" />
                             Filters
                             {activeFilterCount > 0 && (
@@ -236,7 +236,7 @@ export function MarketplaceFilters({
                         <SheetFooter className="flex-row gap-2">
                             {hasActiveFilters && (
                                 <Button 
-                                    variant="outline" 
+                                    variant="secondary" 
                                     onClick={() => { clearFilters(); setIsOpen(false); }} 
                                     className="flex-1"
                                 >
@@ -254,7 +254,7 @@ export function MarketplaceFilters({
             {/* Desktop: Inline button (existing behavior controlled by parent) */}
             <div className="hidden md:block">
                 <Button 
-                    variant="outline" 
+                    variant="secondary" 
                     size="default"
                     className="relative"
                 >

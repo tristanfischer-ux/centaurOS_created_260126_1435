@@ -71,8 +71,8 @@ export function InlineHistory({ taskId, isOpen, onClose }: InlineHistoryProps) {
                 return <Badge variant="secondary" className="text-[10px]">Status Change</Badge>
             case 'ASSIGNED': return <Badge variant="secondary" className="text-[10px]">Assigned</Badge>
             case 'FORWARDED': return <Badge variant="warning" className="text-[10px]">Forwarded</Badge>
-            case 'UPDATED': return <Badge variant="outline" className="text-[10px]">Updated</Badge>
-            default: return <Badge variant="outline" className="text-[10px]">{item.action_type}</Badge>
+            case 'UPDATED': return <Badge variant="secondary" className="text-[10px]">Updated</Badge>
+            default: return <Badge variant="secondary" className="text-[10px]">{item.action_type}</Badge>
         }
     }
 

@@ -61,7 +61,7 @@ export async function checkAvailability(
     // Build lookup map
     const slotMap = new Map<string, BookingStatus>()
     slots?.forEach(slot => {
-        slotMap.set(slot.date, slot.status)
+        slotMap.set(slot.date, slot.status as BookingStatus)
     })
     
     // Categorize dates

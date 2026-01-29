@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { getFoundryIdCached } from '@/lib/supabase/foundry-context'
+import { FunctionCategory } from '@/types/org-blueprint'
 
 // Database types (matching the migration schema)
 interface DBBusinessFunction {
@@ -47,15 +48,15 @@ export interface CoverageSummary {
     covered: number
     partial: number
     gaps: number
-    notNeeded: number
+    notApplicable: number
     overallCoveragePercentage: number
     byCategory: {
-        category: string
+        category: FunctionCategory
         total: number
         covered: number
         partial: number
         gaps: number
-        notNeeded: number
+        notApplicable: number
         coveragePercentage: number
     }[]
 }
@@ -135,20 +136,20 @@ export async function getCoverageSummary(): Promise<{ data: CoverageSummary | nu
         const covered = categoryFunctions.filter(f => f.coverage_status === 'covered').length
         const partial = categoryFunctions.filter(f => f.coverage_status === 'partial').length
         const gaps = categoryFunctions.filter(f => f.coverage_status === 'gap').length
-        const notNeeded = categoryFunctions.filter(f => f.coverage_status === 'not_needed').length
+        const notApplicable = categoryFunctions.filter(f => f.coverage_status === 'not_needed').length
 
-        const applicableTotal = total - notNeeded
+        const applicableTotal = total - notApplicable
         const coveragePercentage = applicableTotal > 0
             ? Math.round(((covered + partial * 0.5) / applicableTotal) * 100)
             : 100
 
         return {
-            category,
+            category: category as FunctionCategory,
             total,
             covered,
             partial,
             gaps,
-            notNeeded,
+            notApplicable,
             coveragePercentage,
         }
     })
@@ -157,9 +158,9 @@ export async function getCoverageSummary(): Promise<{ data: CoverageSummary | nu
     const covered = functions.filter(f => f.coverage_status === 'covered').length
     const partial = functions.filter(f => f.coverage_status === 'partial').length
     const gaps = functions.filter(f => f.coverage_status === 'gap').length
-    const notNeeded = functions.filter(f => f.coverage_status === 'not_needed').length
+    const notApplicable = functions.filter(f => f.coverage_status === 'not_needed').length
 
-    const applicableTotal = totalFunctions - notNeeded
+    const applicableTotal = totalFunctions - notApplicable
     const overallCoveragePercentage = applicableTotal > 0
         ? Math.round(((covered + partial * 0.5) / applicableTotal) * 100)
         : 100
@@ -170,7 +171,7 @@ export async function getCoverageSummary(): Promise<{ data: CoverageSummary | nu
             covered,
             partial,
             gaps,
-            notNeeded,
+            notApplicable,
             overallCoveragePercentage,
             byCategory,
         },

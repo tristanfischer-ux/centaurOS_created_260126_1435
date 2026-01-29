@@ -80,6 +80,126 @@ const EMAIL_TEMPLATES: Record<EmailTemplate, (data: Record<string, unknown>) => 
         `
     }),
     
+    rfq_new_match: (data) => ({
+        subject: `New RFQ Match: ${data.title || 'Opportunity'}`,
+        html: `
+            <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
+                <h2 style="color: #1a1a1a;">🎯 New RFQ Matches Your Expertise</h2>
+                <p>A new request for quote has been posted that matches your profile:</p>
+                <div style="background: #e3f2fd; padding: 16px; border-radius: 8px; margin: 16px 0; border-left: 4px solid #2196f3;">
+                    <h3 style="margin: 0 0 8px 0; color: #333;">${data.title || 'Untitled'}</h3>
+                    <p style="margin: 0; color: #666;">${data.category ? `Category: ${data.category}` : ''}</p>
+                    ${data.budgetRange ? `<p style="margin: 4px 0 0 0; color: #666;">Budget: ${data.budgetRange}</p>` : ''}
+                    ${data.matchScore ? `<p style="margin: 8px 0 0 0; color: #1976d2; font-weight: 500;">Match Score: ${data.matchScore}%</p>` : ''}
+                    ${data.matchReasons ? `<p style="margin: 4px 0 0 0; color: #666; font-size: 13px;">Why you're a great fit: ${Array.isArray(data.matchReasons) ? data.matchReasons.join(', ') : data.matchReasons}</p>` : ''}
+                </div>
+                <p style="color: #666;">Act quickly to be among the first suppliers to respond!</p>
+                ${data.actionUrl ? `<a href="${data.actionUrl}" style="display: inline-block; background: #2196f3; color: white; padding: 12px 24px; border-radius: 6px; text-decoration: none;">View RFQ & Respond</a>` : ''}
+                <hr style="border: none; border-top: 1px solid #eee; margin: 24px 0;" />
+                <p style="color: #888; font-size: 12px;">You're receiving this because this RFQ matches your supplier profile.</p>
+            </div>
+        `
+    }),
+    
+    rfq_urgent_match: (data) => ({
+        subject: `⚡ URGENT: ${data.title || 'Time-Sensitive RFQ'}`,
+        html: `
+            <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
+                <div style="background: #fff3cd; padding: 12px; border-radius: 6px; border-left: 4px solid #ff9800; margin-bottom: 16px;">
+                    <h2 style="margin: 0; color: #e65100; display: flex; align-items: center; gap: 8px;">⚡ URGENT RFQ - Respond Within ${data.responseWindow || '2 Hours'}</h2>
+                </div>
+                <p>An urgent request for quote needs immediate attention:</p>
+                <div style="background: #fff8e1; padding: 16px; border-radius: 8px; margin: 16px 0; border-left: 4px solid #ff9800;">
+                    <h3 style="margin: 0 0 8px 0; color: #333;">${data.title || 'Untitled'}</h3>
+                    <p style="margin: 0; color: #666;">${data.specifications || 'Quick turnaround required'}</p>
+                    ${data.budgetRange ? `<p style="margin: 8px 0 0 0; color: #666;">Budget: ${data.budgetRange}</p>` : ''}
+                    ${data.deadline ? `<p style="margin: 4px 0 0 0; color: #e65100; font-weight: 500;">Deadline: ${data.deadline}</p>` : ''}
+                </div>
+                <p style="color: #e65100; font-weight: 500;">⏱ First to respond may win automatically!</p>
+                ${data.actionUrl ? `<a href="${data.actionUrl}" style="display: inline-block; background: #ff9800; color: white; padding: 14px 28px; border-radius: 6px; text-decoration: none; font-weight: 600;">Respond Now</a>` : ''}
+                <hr style="border: none; border-top: 1px solid #eee; margin: 24px 0;" />
+                <p style="color: #888; font-size: 12px;">Urgent RFQs require immediate response for consideration.</p>
+            </div>
+        `
+    }),
+    
+    rfq_priority_hold_won: (data) => ({
+        subject: `🎉 You Have Priority Hold: ${data.title || 'RFQ'}`,
+        html: `
+            <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
+                <div style="background: #e8f5e9; padding: 16px; border-radius: 8px; border-left: 4px solid #4caf50; margin-bottom: 16px;">
+                    <h2 style="margin: 0; color: #2e7d32;">🎉 Congratulations! You Have Priority Hold</h2>
+                </div>
+                <p>You were the first to respond, and you now have exclusive access to negotiate:</p>
+                <div style="background: #f5f5f5; padding: 16px; border-radius: 8px; margin: 16px 0;">
+                    <h3 style="margin: 0 0 8px 0; color: #333;">${data.title || 'Untitled'}</h3>
+                    <p style="margin: 0; color: #666;">Your quoted price: ${data.quotedPrice || 'N/A'}</p>
+                    ${data.expiresAt ? `<p style="margin: 8px 0 0 0; color: #d32f2f; font-weight: 500;">⏳ Priority hold expires: ${data.expiresAt}</p>` : ''}
+                </div>
+                <p>The buyer will review your quote and may award the RFQ to you during this priority window.</p>
+                ${data.actionUrl ? `<a href="${data.actionUrl}" style="display: inline-block; background: #4caf50; color: white; padding: 12px 24px; border-radius: 6px; text-decoration: none;">View RFQ Status</a>` : ''}
+                <hr style="border: none; border-top: 1px solid #eee; margin: 24px 0;" />
+                <p style="color: #888; font-size: 12px;">Priority hold gives you exclusive negotiation rights for a limited time.</p>
+            </div>
+        `
+    }),
+    
+    rfq_awarded_to_you: (data) => ({
+        subject: `🏆 You Won: ${data.title || 'RFQ Awarded'}`,
+        html: `
+            <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
+                <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 24px; border-radius: 8px; margin-bottom: 16px; text-align: center;">
+                    <h2 style="margin: 0; color: white; font-size: 28px;">🏆 Congratulations!</h2>
+                    <p style="margin: 8px 0 0 0; color: white; opacity: 0.9;">You've been awarded the RFQ</p>
+                </div>
+                <p>Great news! The buyer has selected you for their project:</p>
+                <div style="background: #f5f5f5; padding: 16px; border-radius: 8px; margin: 16px 0;">
+                    <h3 style="margin: 0 0 8px 0; color: #333;">${data.title || 'Untitled'}</h3>
+                    <p style="margin: 0; color: #666;">Buyer: ${data.buyerName || 'N/A'}</p>
+                    <p style="margin: 8px 0 0 0; color: #666;">Winning Quote: ${data.quotedPrice || 'N/A'}</p>
+                    ${data.orderCreated ? `<p style="margin: 8px 0 0 0; color: #4caf50; font-weight: 500;">✓ Order automatically created</p>` : ''}
+                </div>
+                <div style="background: #e3f2fd; padding: 12px; border-radius: 6px; margin: 16px 0;">
+                    <h4 style="margin: 0 0 8px 0; color: #1976d2;">Next Steps:</h4>
+                    <ol style="margin: 0; padding-left: 20px; color: #666;">
+                        <li>Review the order details</li>
+                        <li>Confirm delivery timeline</li>
+                        <li>Begin work once payment is secured</li>
+                    </ol>
+                </div>
+                ${data.actionUrl ? `<a href="${data.actionUrl}" style="display: inline-block; background: #667eea; color: white; padding: 12px 24px; border-radius: 6px; text-decoration: none;">View Order Details</a>` : ''}
+                <hr style="border: none; border-top: 1px solid #eee; margin: 24px 0;" />
+                <p style="color: #888; font-size: 12px;">Payment will be held in escrow and released upon delivery completion.</p>
+            </div>
+        `
+    }),
+    
+    rfq_outbid: (data) => ({
+        subject: `RFQ Update: ${data.title || 'Another Supplier Responded First'}`,
+        html: `
+            <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
+                <h2 style="color: #1a1a1a;">RFQ Status Update</h2>
+                <p>Thank you for your interest in this RFQ:</p>
+                <div style="background: #f5f5f5; padding: 16px; border-radius: 8px; margin: 16px 0;">
+                    <h3 style="margin: 0 0 8px 0; color: #333;">${data.title || 'Untitled'}</h3>
+                    <p style="margin: 0; color: #666;">Another supplier responded faster and ${data.awarded ? 'was awarded the project' : 'currently has priority hold'}.</p>
+                </div>
+                ${!data.awarded ? `<p style="color: #666;">You may still have a chance if the priority hold is released. We'll notify you if the RFQ reopens.</p>` : ''}
+                <div style="background: #e3f2fd; padding: 12px; border-radius: 6px; margin: 16px 0;">
+                    <h4 style="margin: 0 0 8px 0; color: #1976d2;">💡 Tips for Next Time:</h4>
+                    <ul style="margin: 0; padding-left: 20px; color: #666;">
+                        <li>Enable push notifications for instant alerts</li>
+                        <li>Keep your profile and rates up to date</li>
+                        <li>Respond quickly to urgent RFQs</li>
+                    </ul>
+                </div>
+                ${data.similarRFQsUrl ? `<a href="${data.similarRFQsUrl}" style="display: inline-block; background: #0066cc; color: white; padding: 12px 24px; border-radius: 6px; text-decoration: none;">Browse Similar RFQs</a>` : ''}
+                <hr style="border: none; border-top: 1px solid #eee; margin: 24px 0;" />
+                <p style="color: #888; font-size: 12px;">Keep an eye out for more opportunities that match your expertise.</p>
+            </div>
+        `
+    }),
+    
     generic: (data) => ({
         subject: String(data.subject || data.title || 'Notification from CentaurOS'),
         html: `

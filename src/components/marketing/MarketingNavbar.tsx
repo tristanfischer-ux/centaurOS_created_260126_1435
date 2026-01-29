@@ -20,41 +20,44 @@ export function MarketingNavbar() {
             className={cn(
                 "fixed top-0 left-0 right-0 z-50 transition-all duration-500",
                 scrolled
-                    ? "bg-black/90 backdrop-blur-md py-4"
+                    ? "bg-white/90 backdrop-blur-md py-4 border-b border-slate-100 shadow-sm"
                     : "bg-transparent py-6"
             )}
         >
             <div className="max-w-7xl mx-auto px-6 flex items-center justify-between">
                 {/* Logo */}
-                <Link href="/" className="group">
-                    <span className="text-white text-sm font-bold tracking-[0.3em] uppercase">
+                <Link href="/" className="group flex items-center gap-2">
+                    <div className="w-8 h-8 bg-slate-900 rounded-full flex items-center justify-center group-hover:bg-international-orange transition-colors">
+                        <span className="text-white text-xs font-mono font-bold">C</span>
+                    </div>
+                    <span className="text-slate-900 text-sm font-bold tracking-[0.3em] uppercase group-hover:text-international-orange transition-colors">
                         CENTAUR DYNAMICS
                     </span>
                 </Link>
 
                 {/* Navigation Links */}
                 <div className="hidden md:flex items-center gap-12">
-                    <Link 
-                        href="#centaurs" 
-                        className="text-white/70 text-xs font-medium tracking-[0.2em] uppercase hover:text-white transition-colors"
+                    <Link
+                        href="#centaurs"
+                        className="text-slate-500 text-xs font-medium tracking-[0.2em] uppercase hover:text-slate-900 transition-colors"
                     >
                         THE CENTAURS
                     </Link>
-                    <Link 
-                        href="#network" 
-                        className="text-white/70 text-xs font-medium tracking-[0.2em] uppercase hover:text-white transition-colors"
+                    <Link
+                        href="#network"
+                        className="text-slate-500 text-xs font-medium tracking-[0.2em] uppercase hover:text-slate-900 transition-colors"
                     >
                         THE NETWORK
                     </Link>
-                    <Link 
-                        href="#os" 
-                        className="text-white/70 text-xs font-medium tracking-[0.2em] uppercase hover:text-white transition-colors"
+                    <Link
+                        href="#os"
+                        className="text-slate-500 text-xs font-medium tracking-[0.2em] uppercase hover:text-slate-900 transition-colors"
                     >
                         THE OS
                     </Link>
-                    <Link 
+                    <Link
                         href="/login"
-                        className="text-white text-xs font-medium tracking-[0.2em] uppercase hover:text-white/70 transition-colors"
+                        className="bg-slate-900 text-white px-6 py-2 text-xs font-bold tracking-[0.2em] uppercase hover:bg-international-orange transition-colors"
                     >
                         LOGIN
                     </Link>

@@ -217,7 +217,7 @@ export function AnswerThread({
                                     </Badge>
                                 )}
                                 {answer.author.role && !answer.is_ai_generated && (
-                                    <Badge variant="outline" className="text-[10px] uppercase tracking-wider">
+                                    <Badge variant="secondary" className="text-[10px] uppercase tracking-wider">
                                         {answer.author.role}
                                     </Badge>
                                 )}

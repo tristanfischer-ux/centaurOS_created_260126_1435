@@ -92,7 +92,7 @@ export function UserRiskCard({
     }
   }
 
-  const getBadgeVariant = (): "default" | "secondary" | "destructive" | "outline" => {
+  const getBadgeVariant = (): "default" | "secondary" | "destructive" | "secondary" => {
     switch (riskLevel) {
       case "critical":
       case "high":
@@ -100,7 +100,7 @@ export function UserRiskCard({
       case "medium":
         return "secondary"
       default:
-        return "outline"
+        return "secondary"
     }
   }
 
@@ -213,7 +213,7 @@ export function UserRiskCard({
                   className="flex items-center justify-between p-2 rounded bg-muted/50"
                 >
                   <span className="text-sm">{factor.description}</span>
-                  <Badge variant="outline" className="text-xs">
+                  <Badge variant="secondary" className="text-xs">
                     +{factor.weight}
                   </Badge>
                 </div>
@@ -225,13 +225,13 @@ export function UserRiskCard({
         {/* Actions */}
         <div className="flex gap-2 pt-2">
           {onViewDetails && (
-            <Button variant="outline" className="flex-1" onClick={onViewDetails}>
+            <Button variant="secondary" className="flex-1" onClick={onViewDetails}>
               View Details
               <ExternalLink className="h-4 w-4 ml-2" />
             </Button>
           )}
           {onManageLimits && (
-            <Button variant="outline" className="flex-1" onClick={onManageLimits}>
+            <Button variant="secondary" className="flex-1" onClick={onManageLimits}>
               Manage Limits
               <TrendingUp className="h-4 w-4 ml-2" />
             </Button>

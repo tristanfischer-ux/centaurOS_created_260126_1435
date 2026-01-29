@@ -166,7 +166,7 @@ export function OnboardingWelcome({ forceShow = false, onComplete }: OnboardingW
 
                 <DialogFooter className="flex-row justify-between sm:justify-between gap-2 mt-4">
                     <Button
-                        variant="outline"
+                        variant="secondary"
                         onClick={handlePrev}
                         disabled={currentStep === 0}
                         className="flex-1 sm:flex-initial"

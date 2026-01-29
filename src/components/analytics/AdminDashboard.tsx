@@ -171,7 +171,7 @@ export function AdminDashboard({
             </SelectContent>
           </Select>
           <Button
-            variant="outline"
+            variant="secondary"
             size="icon"
             onClick={handleRefresh}
             disabled={isRefreshing}
@@ -179,7 +179,7 @@ export function AdminDashboard({
             <RefreshCw className={cn("h-4 w-4", isRefreshing && "animate-spin")} />
           </Button>
           <Button
-            variant="outline"
+            variant="secondary"
             onClick={() => handleExport('csv')}
             disabled={isExporting}
           >
@@ -442,7 +442,7 @@ export function AdminDashboard({
                     outerRadius={70}
                     dataKey="value"
                     nameKey="category"
-                    label={({ category }) => category}
+                    label={({ name }) => name}
                   >
                     {analytics.categoryDistribution.map((_, index) => (
                       <Cell 

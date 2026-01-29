@@ -46,7 +46,7 @@ export default async function BookingPage({ params }: BookingPageProps) {
                         For Products, Services, and AI, please submit an RFQ (Request for Quote).
                     </p>
                     <div className="flex justify-center gap-4">
-                        <Button variant="outline" asChild>
+                        <Button variant="secondary" asChild>
                             <Link href={`/marketplace`}>
                                 <ArrowLeft className="h-4 w-4 mr-2" />
                                 Back to Marketplace
@@ -68,7 +68,7 @@ export default async function BookingPage({ params }: BookingPageProps) {
                         This listing does not have an associated provider profile. 
                         The provider may need to complete their profile setup.
                     </p>
-                    <Button variant="outline" asChild>
+                    <Button variant="secondary" asChild>
                         <Link href="/marketplace">
                             <ArrowLeft className="h-4 w-4 mr-2" />
                             Back to Marketplace
@@ -88,7 +88,7 @@ export default async function BookingPage({ params }: BookingPageProps) {
                         This provider is currently not accepting new bookings. 
                         Please check back later or browse other providers.
                     </p>
-                    <Button variant="outline" asChild>
+                    <Button variant="secondary" asChild>
                         <Link href="/marketplace">
                             <ArrowLeft className="h-4 w-4 mr-2" />
                             Back to Marketplace
@@ -109,7 +109,7 @@ export default async function BookingPage({ params }: BookingPageProps) {
                         This provider has not set their day rate yet. 
                         Please contact them directly or check back later.
                     </p>
-                    <Button variant="outline" asChild>
+                    <Button variant="secondary" asChild>
                         <Link href="/marketplace">
                             <ArrowLeft className="h-4 w-4 mr-2" />
                             Back to Marketplace

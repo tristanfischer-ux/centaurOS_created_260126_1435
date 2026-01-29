@@ -37,7 +37,7 @@ export function ClientNudgeButton({ taskId, disabled, lastNudge }: ClientNudgeBu
 
     return (
         <Button
-            variant="outline"
+            variant="secondary"
             size="sm"
             onClick={handleNudge}
             disabled={isLoading || isCoolingDown || hasNudged}
