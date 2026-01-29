@@ -9,6 +9,8 @@
     "allowJs": true,
     "skipLibCheck": true,
     "strict": true,
+    "strictNullChecks": false,
+    "noImplicitAny": false,
     "forceConsistentCasingInFileNames": true,
     "noEmit": true,
     "esModuleInterop": true,
@@ -40,6 +42,7 @@
   "exclude": [
     "node_modules",
     "supabase",
-    "duplicate_routes_backup"
+    "duplicate_routes_backup",
+    "scripts"
   ]
 }

@@ -12,16 +12,55 @@ import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { CreateRFQDialog } from "./create-rfq-dialog"
 import { useState, useMemo, useEffect, useCallback } from "react"
-import { Loader2, Store, Search, X, SlidersHorizontal, MapPin, Briefcase, GraduationCap, Bot, Factory, Zap, Shield, LayoutGrid, List, ShieldCheck, Clock, Sparkles, Users, ArrowRight } from "lucide-react"
+import { Loader2, Store, Search, X, SlidersHorizontal, MapPin, Briefcase, GraduationCap, Bot, Factory, Zap, Shield, LayoutGrid, List, ShieldCheck, Clock, Sparkles, Users, ArrowRight, Bookmark, Star, TrendingUp } from "lucide-react"
 import { toast } from "sonner"
 import { Card } from "@/components/ui/card"
 import { Checkbox } from "@/components/ui/checkbox"
+import { useSearchParams, useRouter, usePathname } from "next/navigation"
+import { SearchBar, ActiveFilterBadges } from "@/components/search"
+import { SaveSearchDialog } from "@/components/search/SavedSearches"
+import { 
+    SearchSuggestion, 
+    RecentSearch, 
+    PopularSearch,
+    AppliedFilters,
+    MarketplaceCategory,
+    SortOption,
+    SORT_OPTIONS,
+    searchParamsToURL,
+    urlToSearchParams
+} from "@/types/search"
+import { 
+    getRecentSearches, 
+    getPopularSearches, 
+    saveSearchQuery,
+    getAutocomplete
+} from "@/actions/search"
+
+interface MarketplaceRecommendation {
+    id: string
+    source_type: 'advisory' | 'coverage_gap' | 'ai_suggestion' | 'manual'
+    category: 'People' | 'Products' | 'Services' | 'AI'
+    subcategory: string | null
+    search_term: string | null
+    reasoning: string | null
+    priority: number
+    created_at: string
+}
+
+interface TeamMember {
+    id: string
+    full_name: string | null
+    role: string
+}
 
 interface MarketplaceViewProps {
     initialListings: MarketplaceListing[]
+    recommendations?: MarketplaceRecommendation[]
+    teamMembers?: TeamMember[]
 }
 
-export function MarketplaceView({ initialListings }: MarketplaceViewProps) {
+export function MarketplaceView({ initialListings, recommendations = [], teamMembers = [] }: MarketplaceViewProps) {
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
     const [isComparisonOpen, setIsComparisonOpen] = useState(false)
     const [activeTab, setActiveTab] = useState("People")
@@ -91,6 +130,120 @@ export function MarketplaceView({ initialListings }: MarketplaceViewProps) {
         reasoning: string
         useCases: string[]
     }[]>([])
+
+    // Advanced search state
+    const router = useRouter()
+    const pathname = usePathname()
+    const urlSearchParams = useSearchParams()
+    const [showSuggestions, setShowSuggestions] = useState(false)
+    const [suggestions, setSuggestions] = useState<SearchSuggestion[]>([])
+    const [recentSearches, setRecentSearches] = useState<RecentSearch[]>([])
+    const [popularSearches, setPopularSearches] = useState<PopularSearch[]>([])
+    const [saveSearchOpen, setSaveSearchOpen] = useState(false)
+    const [sortBy, setSortBy] = useState<SortOption>('relevance')
+
+    // Load search suggestions and history
+    useEffect(() => {
+        const loadSearchData = async () => {
+            const [recentResult, popularResult] = await Promise.all([
+                getRecentSearches(),
+                getPopularSearches(5, false)
+            ])
+            setRecentSearches(recentResult.searches)
+            setPopularSearches(popularResult.searches)
+        }
+        loadSearchData()
+    }, [])
+
+    // Fetch autocomplete suggestions
+    useEffect(() => {
+        const fetchSuggestions = async () => {
+            if (searchQuery.length < 2) {
+                setSuggestions([])
+                return
+            }
+            const { suggestions: newSuggestions } = await getAutocomplete(
+                searchQuery, 
+                activeTab as MarketplaceCategory
+            )
+            setSuggestions(newSuggestions.map(s => ({
+                ...s,
+                category: s.category as MarketplaceCategory | undefined
+            })) as SearchSuggestion[])
+        }
+        const timer = setTimeout(fetchSuggestions, 200)
+        return () => clearTimeout(timer)
+    }, [searchQuery, activeTab])
+
+    // Sync with URL params on mount
+    useEffect(() => {
+        if (urlSearchParams) {
+            const params = urlToSearchParams(urlSearchParams)
+            if (params.query) setSearchQuery(params.query)
+            if (params.category) setActiveTab(params.category)
+            if (params.subcategories) setSelectedSubcategories(new Set(params.subcategories))
+            if (params.location) setLocationFilter(params.location)
+            if (params.sortBy) setSortBy(params.sortBy)
+        }
+    }, [])
+
+    // Update URL with search params
+    const updateURL = useCallback((query: string, category: string) => {
+        const params = new URLSearchParams()
+        if (query) params.set('q', query)
+        if (category && category !== 'People') params.set('cat', category)
+        if (selectedSubcategories.size > 0) params.set('sub', Array.from(selectedSubcategories).join(','))
+        if (locationFilter !== 'all') params.set('loc', locationFilter)
+        if (sortBy !== 'relevance') params.set('sort', sortBy)
+        
+        const newURL = params.toString() ? `${pathname}?${params.toString()}` : pathname
+        router.push(newURL, { scroll: false })
+    }, [pathname, router, selectedSubcategories, locationFilter, sortBy])
+
+    // Handle suggestion selection
+    const handleSuggestionSelect = (suggestion: SearchSuggestion) => {
+        setSearchQuery(suggestion.text)
+        if (suggestion.category) {
+            setActiveTab(suggestion.category)
+        }
+        setShowSuggestions(false)
+    }
+
+    // Handle recent search selection
+    const handleRecentSelect = (recent: RecentSearch) => {
+        setSearchQuery(recent.query)
+        if (recent.filters?.category) {
+            setActiveTab(recent.filters.category)
+        }
+        setShowSuggestions(false)
+    }
+
+    // Handle popular search selection
+    const handlePopularSelect = (popular: PopularSearch) => {
+        setSearchQuery(popular.query)
+        if (popular.category) {
+            setActiveTab(popular.category)
+        }
+        setShowSuggestions(false)
+    }
+
+    // Save current search
+    const handleSaveSearch = async (name: string, alertEnabled: boolean, alertFrequency?: string) => {
+        const filters: AppliedFilters = {
+            query: searchQuery,
+            category: activeTab as MarketplaceCategory,
+            subcategories: Array.from(selectedSubcategories),
+            location: locationFilter !== 'all' ? locationFilter : undefined,
+        }
+        const result = await saveSearchQuery(name, searchQuery, filters, alertEnabled, alertFrequency as any)
+        if (result.success) {
+            toast.success('Search saved!')
+            // Reload recent searches
+            const { searches } = await getRecentSearches()
+            setRecentSearches(searches)
+        }
+        return result
+    }
 
     // Debounce search query
     useEffect(() => {
@@ -411,82 +564,178 @@ export function MarketplaceView({ initialListings }: MarketplaceViewProps) {
     return (
         <div className="container mx-auto py-8">
             <div className="flex flex-col gap-6">
+{/* Header - responsive for Galaxy Fold */}
                 <div className="flex flex-col gap-2">
-                    <div className="flex items-center justify-between">
-                        <div className="flex flex-col gap-2">
-                            <h1 className="text-3xl font-bold tracking-tight">Centaur Marketplace</h1>
-                            <p className="text-muted-foreground">Access global expertise, industrial capacity, and autonomous agents.</p>
+                    <div className="flex flex-col xs:flex-row xs:items-start fold:items-center justify-between gap-3">
+                        <div className="flex flex-col gap-1 xs:gap-2 min-w-0 flex-1">
+                            <h1 className="text-xl xs:text-2xl fold:text-2xl lg:text-3xl font-bold tracking-tight truncate">
+                                Centaur Marketplace
+                            </h1>
+                            <p className="text-xs xs:text-sm text-muted-foreground line-clamp-2 xs:line-clamp-none">
+                                Access global expertise, industrial capacity, and autonomous agents.
+                            </p>
                         </div>
-                        <CreateRFQDialog />
+                        <div className="shrink-0">
+                            <CreateRFQDialog />
+                        </div>
                     </div>
                 </div>
 
-                <Tabs value={activeTab} onValueChange={(val) => { setActiveTab(val); clearSelection(); clearFilters(); setShowFilters(false) }} className="w-full">
+                                {/* AI Recommendations Panel */}
+                                {recommendations.length > 0 && (
+                                    <Card className="bg-gradient-to-r from-amber-50 to-orange-50 border-amber-200">
+                                        <div className="p-4">
+                                            <div className="flex items-center gap-2 mb-3">
+                                                <Sparkles className="h-5 w-5 text-amber-600" />
+                                                <h3 className="font-semibold text-amber-900">Recommended for Your Foundry</h3>
+                                            </div>
+                                            <div className="flex flex-wrap gap-2">
+                                                {recommendations.map((rec) => (
+                                                    <button
+                                                        key={rec.id}
+                                                        onClick={() => {
+                                                            setActiveTab(rec.category)
+                                                            if (rec.search_term) {
+                                                                setSearchQuery(rec.search_term)
+                                                            }
+                                                        }}
+                                                        className="flex items-center gap-2 px-3 py-2 bg-white rounded-lg border border-amber-200 hover:border-amber-400 hover:shadow-sm transition-all text-left"
+                                                    >
+                                                        <div>
+                                                            <div className="flex items-center gap-1.5">
+                                                                <Badge variant="outline" className="text-[10px] bg-amber-100 text-amber-700 border-amber-300">
+                                                                    {rec.source_type === 'coverage_gap' ? 'Gap' : rec.source_type === 'advisory' ? 'Q&A' : 'AI'}
+                                                                </Badge>
+                                                                <span className="text-sm font-medium text-slate-900">
+                                                                    {rec.search_term || rec.subcategory || rec.category}
+                                                                </span>
+                                                            </div>
+                                                            {rec.reasoning && (
+                                                                <p className="text-xs text-slate-500 mt-0.5 line-clamp-1 max-w-[200px]">
+                                                                    {rec.reasoning}
+                                                                </p>
+                                                            )}
+                                                        </div>
+                                                        <ArrowRight className="h-3 w-3 text-amber-600 shrink-0" />
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </Card>
+                                )}
+
+                <Tabs value={activeTab} onValueChange={(val) => { setActiveTab(val); clearSelection(); clearFilters(); setShowFilters(false); updateURL(searchQuery, val) }} className="w-full">
                     <div className="flex flex-col gap-4 mb-6">
                         {/* Search and Filter Controls */}
                         <div className="flex flex-col sm:flex-row gap-3">
-                            <div className="relative flex-1 max-w-md flex gap-2">
-                                <div className="relative flex-1">
-                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                                    <Input
-                                        type="search"
-                                        placeholder={aiSearchEnabled ? "Describe what you're looking for..." : getSearchPlaceholder()}
-                                        value={searchQuery}
-                                        onChange={(e) => setSearchQuery(e.target.value)}
-                                        onKeyDown={(e) => {
-                                            if (e.key === 'Enter' && aiSearchEnabled) {
-                                                e.preventDefault()
-                                                handleAiSearch()
-                                            }
-                                        }}
-                                        className="pl-9 w-full"
-                                    />
-                                </div>
-                                <Button
-                                    variant={aiSearchEnabled ? "default" : "outline"}
-                                    size="icon"
-                                    onClick={() => {
-                                        if (aiSearchEnabled && searchQuery.trim()) {
-                                            handleAiSearch()
-                                        } else {
-                                            setAiSearchEnabled(!aiSearchEnabled)
-                                            if (!aiSearchEnabled) {
-                                                toast.info('AI Search enabled - describe what you need')
-                                            }
-                                        }
+                            {/* Enhanced SearchBar with suggestions */}
+                            <SearchBar
+                                value={searchQuery}
+                                onChange={setSearchQuery}
+                                onSearch={() => updateURL(searchQuery, activeTab)}
+                                onClear={() => { setSearchQuery(''); clearFilters() }}
+                                suggestions={suggestions}
+                                recentSearches={recentSearches}
+                                popularSearches={popularSearches}
+                                isLoading={isAiSearching}
+                                placeholder={aiSearchEnabled ? "Describe what you're looking for..." : getSearchPlaceholder()}
+                                showSuggestions={showSuggestions}
+                                onShowSuggestionsChange={setShowSuggestions}
+                                onSuggestionSelect={handleSuggestionSelect}
+                                onRecentSelect={handleRecentSelect}
+                                onPopularSelect={handlePopularSelect}
+                                aiSearchEnabled={aiSearchEnabled}
+                                onAiSearchToggle={() => {
+                                    setAiSearchEnabled(!aiSearchEnabled)
+                                    if (!aiSearchEnabled) {
+                                        toast.info('AI Search enabled - describe what you need')
+                                    }
+                                }}
+                                onAiSearch={handleAiSearch}
+                                className="flex-1 max-w-lg"
+                            />
+                            
+                            <div className="flex gap-2">
+                                {/* Save Search Button */}
+                                <SaveSearchDialog
+                                    isOpen={saveSearchOpen}
+                                    onOpenChange={setSaveSearchOpen}
+                                    onSave={handleSaveSearch}
+                                    query={searchQuery}
+                                    filters={{
+                                        category: activeTab as MarketplaceCategory,
+                                        subcategories: Array.from(selectedSubcategories),
+                                        location: locationFilter !== 'all' ? locationFilter : undefined,
                                     }}
-                                    disabled={isAiSearching}
-                                    title={aiSearchEnabled ? "Search with AI" : "Enable AI Search"}
-                                    className={aiSearchEnabled ? "bg-violet-600 hover:bg-violet-700" : ""}
                                 >
-                                    {isAiSearching ? (
-                                        <Loader2 className="h-4 w-4 animate-spin" />
-                                    ) : (
-                                        <Sparkles className="h-4 w-4" />
-                                    )}
-                                </Button>
+                                    <Button
+                                        variant="outline"
+                                        size="icon"
+                                        title="Save this search"
+                                        disabled={!searchQuery && selectedSubcategories.size === 0}
+                                    >
+                                        <Bookmark className="h-4 w-4" />
+                                    </Button>
+                                </SaveSearchDialog>
+
+                                {/* Sort dropdown */}
+                                <Select value={sortBy} onValueChange={(val) => setSortBy(val as SortOption)}>
+                                    <SelectTrigger className="w-[140px]">
+                                        <SelectValue placeholder="Sort by" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {SORT_OPTIONS.map((option) => (
+                                            <SelectItem key={option.value} value={option.value}>
+                                                {option.label}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+
+                                {showFiltersButton && (
+                                    <Button 
+                                        variant="outline" 
+                                        size="default"
+                                        onClick={() => setShowFilters(!showFilters)}
+                                        className={showFilters ? 'bg-slate-100' : ''}
+                                    >
+                                        <SlidersHorizontal className="h-4 w-4 mr-2" />
+                                        Filters
+                                        {hasActiveFilters && (
+                                            <Badge className="ml-2 h-5 w-5 p-0 flex items-center justify-center text-[10px]">
+                                                !
+                                            </Badge>
+                                        )}
+                                    </Button>
+                                )}
                             </div>
-                            {showFiltersButton && (
-                                <Button 
-                                    variant="outline" 
-                                    size="default"
-                                    onClick={() => setShowFilters(!showFilters)}
-                                    className={showFilters ? 'bg-slate-100' : ''}
-                                >
-                                    <SlidersHorizontal className="h-4 w-4 mr-2" />
-                                    Filters
-                                    {hasActiveFilters && (
-                                        <Badge className="ml-2 h-5 w-5 p-0 flex items-center justify-center text-[10px]">
-                                            !
-                                        </Badge>
-                                    )}
-                                </Button>
-                            )}
                         </div>
+                        
+                        {/* Trending searches - show when search is empty */}
+                        {!searchQuery && popularSearches.length > 0 && (
+                            <div className="flex flex-wrap items-center gap-2">
+                                <span className="text-xs text-muted-foreground flex items-center gap-1">
+                                    <TrendingUp className="h-3 w-3" />
+                                    Trending:
+                                </span>
+                                {popularSearches.slice(0, 5).map((popular, idx) => (
+                                    <button
+                                        key={`${popular.query}-${idx}`}
+                                        onClick={() => {
+                                            setSearchQuery(popular.query)
+                                            if (popular.category) setActiveTab(popular.category)
+                                        }}
+                                        className="px-2 py-1 text-xs rounded-full border hover:bg-muted transition-colors"
+                                    >
+                                        {popular.query}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
 
                         {/* People Filters Panel */}
                         {activeTab === 'People' && showFilters && (
-                            <div className="bg-slate-50 rounded-lg p-4 space-y-4">
+                            <div className="bg-muted/50 rounded-lg p-4 space-y-4 hidden md:block">
                                 <div className="flex items-center justify-between">
                                     <h3 className="font-medium text-sm">Filter People</h3>
                                     {hasActiveFilters && (
@@ -540,7 +789,7 @@ export function MarketplaceView({ initialListings }: MarketplaceViewProps) {
 
                         {/* AI Filters Panel */}
                         {activeTab === 'AI' && showFilters && (
-                            <div className="bg-violet-50 rounded-lg p-4 space-y-4">
+                            <div className="bg-primary/5 rounded-lg p-4 space-y-4 hidden md:block">
                                 <div className="flex items-center justify-between">
                                     <h3 className="font-medium text-sm">Filter AI Tools</h3>
                                     {hasActiveFilters && (
@@ -593,7 +842,7 @@ export function MarketplaceView({ initialListings }: MarketplaceViewProps) {
 
                         {/* Products Filters Panel */}
                         {activeTab === 'Products' && showFilters && (
-                            <div className="bg-slate-100 rounded-lg p-4 space-y-4">
+                            <div className="bg-muted rounded-lg p-4 space-y-4 hidden md:block">
                                 <div className="flex items-center justify-between">
                                     <h3 className="font-medium text-sm">Filter Products & Manufacturers</h3>
                                     {hasActiveFilters && (
@@ -728,12 +977,15 @@ export function MarketplaceView({ initialListings }: MarketplaceViewProps) {
                                 Select up to 3 items to compare
                             </p>
                         )}
-                        <TabsList className="grid w-full max-w-md grid-cols-4">
-                            <TabsTrigger value="People">People</TabsTrigger>
-                            <TabsTrigger value="Products">Products</TabsTrigger>
-                            <TabsTrigger value="Services">Services</TabsTrigger>
-                            <TabsTrigger value="AI">AI</TabsTrigger>
-                        </TabsList>
+                        {/* Tabs - scrollable on ultra-narrow, grid on wider */}
+                        <div className="overflow-x-auto -mx-2 xs:mx-0 px-2 xs:px-0 pb-1">
+                            <TabsList className="inline-flex xs:grid w-auto xs:w-full max-w-md xs:grid-cols-4 min-w-max xs:min-w-0">
+                                <TabsTrigger value="People" className="px-3 xs:px-4">People</TabsTrigger>
+                                <TabsTrigger value="Products" className="px-3 xs:px-4">Products</TabsTrigger>
+                                <TabsTrigger value="Services" className="px-3 xs:px-4">Services</TabsTrigger>
+                                <TabsTrigger value="AI" className="px-3 xs:px-4">AI</TabsTrigger>
+                            </TabsList>
+                        </div>
                     </div>
 
                     {/* Subcategory quick filters - multi-select pills */}
@@ -788,12 +1040,27 @@ export function MarketplaceView({ initialListings }: MarketplaceViewProps) {
                                         <div className="flex gap-3 items-end">
                                             <div className="flex-1 max-w-xs">
                                                 <label className="text-xs font-medium text-violet-700 mb-1.5 block">Team Member</label>
-                                                <Input
-                                                    placeholder="Enter member ID (from team page)"
-                                                    value={selectedMemberId}
-                                                    onChange={(e) => setSelectedMemberId(e.target.value)}
-                                                    className="bg-white"
-                                                />
+                                                {teamMembers.length > 0 ? (
+                                                    <Select value={selectedMemberId} onValueChange={setSelectedMemberId}>
+                                                        <SelectTrigger className="bg-white">
+                                                            <SelectValue placeholder="Select a team member" />
+                                                        </SelectTrigger>
+                                                        <SelectContent>
+                                                            {teamMembers.map((member) => (
+                                                                <SelectItem key={member.id} value={member.id}>
+                                                                    {member.full_name || 'Unnamed'} ({member.role})
+                                                                </SelectItem>
+                                                            ))}
+                                                        </SelectContent>
+                                                    </Select>
+                                                ) : (
+                                                    <Input
+                                                        placeholder="Enter member ID"
+                                                        value={selectedMemberId}
+                                                        onChange={(e) => setSelectedMemberId(e.target.value)}
+                                                        className="bg-white"
+                                                    />
+                                                )}
                                             </div>
                                             <Button
                                                 onClick={() => handleCentaurMatch(selectedMemberId)}
@@ -907,7 +1174,7 @@ export function MarketplaceView({ initialListings }: MarketplaceViewProps) {
                             <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
                         </div>
                     ) : viewMode === 'grid' ? (
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 animate-in fade-in duration-500">
+                        <div className="grid grid-cols-1 fold:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 xs:gap-5 fold:gap-5 lg:gap-6 animate-in fade-in duration-500">
                             {filteredItems.map(item => (
                                 <MarketCard
                                     key={item.id}
@@ -1011,7 +1278,7 @@ export function MarketplaceView({ initialListings }: MarketplaceViewProps) {
                     )}
 
                     {filteredItems.length === 0 && initialListings.length > 0 && (
-                        <div className="col-span-full bg-slate-100/50 rounded-xl">
+                        <div className="col-span-full bg-muted/50 rounded-xl">
                             <EmptyState
                                 icon={<Store className="h-12 w-12" />}
                                 title={hasActiveFilters ? "No items match your filters" : "No listings found in this category yet"}

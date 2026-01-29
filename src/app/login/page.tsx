@@ -4,21 +4,22 @@ import { Suspense } from 'react'
 import { useFormStatus } from 'react-dom'
 import { useSearchParams } from 'next/navigation'
 import { login } from './actions'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
+import Image from 'next/image'
+import Link from 'next/link'
 
 function SubmitButton() {
     const { pending } = useFormStatus()
-    
+
     return (
-        <Button 
-            formAction={login} 
-            className="w-full bg-slate-900 hover:bg-slate-800 text-white"
+        <Button
+            formAction={login}
+            className="w-full h-12 bg-slate-900 hover:bg-slate-800 text-white font-medium tracking-wide uppercase text-sm transition-all duration-300 shadow-md hover:shadow-lg"
             disabled={pending}
         >
-            {pending ? 'Signing in...' : 'Sign In'}
+            {pending ? 'Initializing Session...' : 'Access Foundry'}
         </Button>
     )
 }
@@ -26,11 +27,12 @@ function SubmitButton() {
 function ErrorMessage() {
     const searchParams = useSearchParams()
     const error = searchParams.get('error')
-    
+
     if (!error) return null
-    
+
     return (
-        <div className="p-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded-md">
+        <div className="p-4 text-sm text-red-600 bg-red-50 border border-red-100 rounded-sm mb-6 flex items-center gap-3">
+            <span className="h-2 w-2 rounded-full bg-red-500 animate-pulse" />
             {error}
         </div>
     )
@@ -38,53 +40,105 @@ function ErrorMessage() {
 
 function LoginForm() {
     return (
-        <Card className="w-full max-w-md">
-            <CardHeader className="space-y-1">
-                <CardTitle className="text-2xl font-bold text-center text-international-orange">CentaurOS</CardTitle>
-                <CardDescription className="text-center">
-                    Enter your email to sign in to your Foundry
-                </CardDescription>
-            </CardHeader>
-            <form>
-                <CardContent className="space-y-4">
-                    <Suspense fallback={null}>
-                        <ErrorMessage />
-                    </Suspense>
+        <div className="w-full max-w-sm mx-auto space-y-8 relative z-10">
+            <div className="space-y-2">
+                <Link href="/" className="inline-block mb-12 group">
+                    <span className="text-xs font-bold tracking-[0.3em] uppercase text-slate-400 group-hover:text-cyan-600 transition-colors">
+                        ← Return to Site
+                    </span>
+                </Link>
+                <h1 className="text-4xl font-playfair font-semibold text-slate-900 tracking-tight">
+                    Welcome Back.
+                </h1>
+                <p className="text-slate-500 text-sm leading-relaxed">
+                    Enter your credentials to access the Centaur Operating System.
+                </p>
+            </div>
+
+            <form className="space-y-6">
+                <Suspense fallback={null}>
+                    <ErrorMessage />
+                </Suspense>
+
+                <div className="space-y-4">
                     <div className="space-y-2">
-                        <Label htmlFor="email">Email</Label>
-                        <Input 
-                            id="email" 
-                            name="email" 
-                            type="email" 
-                            placeholder="m@example.com" 
+                        <Label htmlFor="email" className="text-xs uppercase tracking-wider text-slate-500 font-medium">Email Address</Label>
+                        <Input
+                            id="email"
+                            name="email"
+                            type="email"
+                            placeholder="officer@centaur.dynamics"
                             autoFocus
                             autoComplete="email"
-                            required 
+                            required
+                            className="h-11 bg-white border-slate-200 focus:border-cyan-500 focus:ring-cyan-500/20 transition-all font-medium"
                         />
                     </div>
                     <div className="space-y-2">
-                        <Label htmlFor="password">Password</Label>
-                        <Input 
-                            id="password" 
-                            name="password" 
-                            type="password" 
+                        <Label htmlFor="password" className="text-xs uppercase tracking-wider text-slate-500 font-medium">Password</Label>
+                        <Input
+                            id="password"
+                            name="password"
+                            type="password"
                             autoComplete="current-password"
-                            required 
+                            required
+                            className="h-11 bg-white border-slate-200 focus:border-cyan-500 focus:ring-cyan-500/20 transition-all font-medium font-mono tracking-widest"
                         />
                     </div>
-                </CardContent>
-                <CardFooter>
-                    <SubmitButton />
-                </CardFooter>
+                </div>
+
+                <SubmitButton />
+
+                <div className="text-center pt-4">
+                    <span className="text-xs text-slate-400">
+                        Protected by Centaur Security Layer v4.3
+                    </span>
+                </div>
             </form>
-        </Card>
+        </div>
     )
 }
 
 export default function LoginPage() {
     return (
-        <div className="flex items-center justify-center min-h-screen bg-slate-50">
-            <LoginForm />
+        <div className="min-h-screen flex w-full bg-white">
+            {/* Left Side - Hero Image */}
+            <div className="hidden lg:flex w-1/2 relative bg-slate-50 overflow-hidden">
+                <Image
+                    src="/images/login-portal-hero.png"
+                    alt="Centaur Dynamics Foundry Entrance"
+                    fill
+                    className="object-cover"
+                    priority
+                    quality={100}
+                />
+
+                {/* Subtle Gradient for Text Readability */}
+                <div className="absolute inset-0 z-10 bg-gradient-to-t from-white/90 via-white/20 to-transparent" />
+
+                <div className="relative z-20 flex flex-col justify-end p-12 h-full text-slate-900 pb-20">
+                    <div className="h-1 w-20 bg-cyan-500 mb-8 shadow-[0_0_15px_rgba(6,182,212,0.6)]" />
+                    <h2 className="text-5xl font-playfair font-medium leading-[1.1] mb-6 tracking-tight drop-shadow-sm">
+                        We build atoms at the
+                        <br />
+                        <span className="text-cyan-600">speed of bits.</span>
+                    </h2>
+                    <div className="flex items-center gap-4 text-sm font-mono text-slate-600 tracking-wider uppercase font-semibold">
+                        <span>System Status: Optimal</span>
+                        <span className="h-2 w-2 rounded-full bg-cyan-500 animate-pulse shadow-[0_0_10px_rgba(6,182,212,0.8)]" />
+                        <span>Latency: 12ms</span>
+                    </div>
+                </div>
+            </div>
+
+            {/* Right Side - Login Form */}
+            <div className="w-full lg:w-1/2 flex items-center justify-center p-8 lg:p-12 relative bg-white">
+                {/* Background Pattern for Right Side */}
+                <div
+                    className="absolute inset-0 opacity-[0.03] pointer-events-none bg-[radial-gradient(#ea580c_1px,transparent_1px)] bg-[length:32px_32px]"
+                />
+                <LoginForm />
+            </div>
         </div>
     )
 }

@@ -11,7 +11,7 @@ export default async function GuildPage() {
     }
 
     // Get User Profile for Role and Foundry
-    const { data: profile } = await supabase.from('profiles').select('*, foundry:foundries(name)').eq('id', user.id).single()
+    const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single()
     const isExecutive = profile?.role === 'Executive' || profile?.role === 'Founder'
     const foundryId = profile?.foundry_id
 
@@ -40,7 +40,7 @@ export default async function GuildPage() {
     if (foundryId) {
         const result = await supabase
             .from('profiles')
-            .select('id, full_name, role, email, foundry:foundries(name)')
+            .select('id, full_name, role, email')
             .eq('foundry_id', foundryId)
             .neq('id', user.id) // Exclude current user
             .order('role', { ascending: true })

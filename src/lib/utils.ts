@@ -19,3 +19,7 @@ export function getInitials(name: string | null | undefined): string {
     const lastInitial = parts[parts.length - 1][0] || ""
     return (firstInitial + lastInitial).toUpperCase() || "??"
 }
+
+export function formatStatus(status: string): string {
+    return status.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')
+}

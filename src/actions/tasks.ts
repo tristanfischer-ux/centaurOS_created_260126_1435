@@ -99,7 +99,7 @@ export async function createTask(formData: FormData) {
 
     const validation = validate(createTaskSchema, rawData)
     if (!validation.success) {
-        return { error: validation.error }
+        return { error: 'error' in validation ? validation.error : 'Validation failed' }
     }
 
     const { title: validatedTitle, description: validatedDescription, assigneeIds: validatedAssigneeIds, objectiveId: validatedObjectiveId, deadline, riskLevel, fileCount } = validation.data
@@ -456,7 +456,7 @@ export async function addTaskComment(taskId: string, content: string) {
     // Validate using Zod schema
     const validation = validate(addCommentSchema, { taskId, content })
     if (!validation.success) {
-        return { error: validation.error }
+        return { error: 'error' in validation ? validation.error : 'Validation failed' }
     }
 
     const { content: validatedContent } = validation.data
@@ -836,8 +836,8 @@ export async function updateTaskDates(taskId: string, startDate: string, endDate
             endDate: endDate?.trim() ? endDate.trim() : null
         })
         if (!validation.success) {
-            console.error('Validation error:', validation.error, { startDate, endDate })
-            return { error: validation.error }
+            console.error('Validation error:', 'error' in validation ? validation.error : 'unknown', { startDate, endDate })
+            return { error: 'error' in validation ? validation.error : 'Validation failed' }
         }
 
         const { startDate: validatedStartDate, endDate: validatedEndDate } = validation.data

@@ -31,9 +31,11 @@ const jetbrains = JetBrains_Mono({
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  maximumScale: 5,
+  maximumScale: 3,  // Reduced from 5 to prevent layout issues at extreme zoom
   userScalable: true,
   themeColor: "#FFFFFF",
+  // Enable viewport-fit for proper safe area handling on iOS
+  viewportFit: "cover",
 }
 
 export const metadata: Metadata = {

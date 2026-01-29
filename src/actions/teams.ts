@@ -98,7 +98,7 @@ export async function updateTeamName(teamId: string, name: string) {
     // Validate using Zod schema
     const validation = validate(updateTeamNameSchema, { teamId, name: name || '' })
     if (!validation.success) {
-        return { error: validation.error }
+        return { error: 'error' in validation ? validation.error : 'Validation failed' }
     }
 
     const { name: validatedName } = validation.data

@@ -44,7 +44,7 @@ export async function createMember(formData: FormData) {
 
     const validation = validate(inviteMemberSchema, rawData)
     if (!validation.success) {
-        return { error: validation.error }
+        return { error: 'error' in validation ? validation.error : 'Validation failed' }
     }
 
     const { email: validatedEmail, name: validatedName, role: validatedRole } = validation.data
@@ -153,7 +153,7 @@ export async function createTeam(name: string, memberIds: string[]) {
 
     const validation = validate(createTeamSchema, rawData)
     if (!validation.success) {
-        return { error: validation.error }
+        return { error: 'error' in validation ? validation.error : 'Validation failed' }
     }
 
     const { name: validatedName, memberIds: validatedMemberIds } = validation.data

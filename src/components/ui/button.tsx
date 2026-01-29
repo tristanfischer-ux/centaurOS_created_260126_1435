@@ -4,6 +4,43 @@ import { cva, type VariantProps } from "class-variance-authority"
 
 import { cn } from "@/lib/utils"
 
+/**
+ * Button Variant Usage Guidelines:
+ * 
+ * PRIMARY ACTIONS (one per view):
+ * - `brand`     : Main CTA for landing pages, marketing (orange, uppercase)
+ * - `primary`   : Main CTA for app interfaces (slate, professional)
+ * - `default`   : Alternative primary in forms/dialogs
+ * 
+ * SECONDARY ACTIONS:
+ * - `outline`   : Secondary actions, cancel buttons
+ * - `secondary` : Lower emphasis alternatives
+ * - `ghost`     : Minimal UI, icon buttons, navigation
+ * 
+ * STATUS ACTIONS:
+ * - `success`   : Confirmation, approve, complete actions
+ * - `warning`   : Actions needing attention (uses brand orange)
+ * - `danger`    : Delete, remove, destructive actions
+ * - `destructive`: Same as danger but uses destructive theme color
+ * 
+ * SPECIAL:
+ * - `brand-secondary`: Electric blue for secondary brand CTAs
+ * - `certified`: Purple for certification/verification badges
+ * - `link`: Text links that need button semantics
+ * 
+ * SIZES:
+ * - `default` (h-11): Standard size for most buttons
+ * - `sm` (h-9): Compact buttons, table actions, badges
+ * - `lg` (h-12): Hero CTAs, prominent actions
+ * - `icon` (h-11 w-11): Square icon-only buttons
+ * 
+ * BEST PRACTICES:
+ * 1. One primary CTA per view - others should be secondary/outline
+ * 2. Use `ghost` for icon buttons and minimal UI
+ * 3. Always provide accessible names for icon-only buttons
+ * 4. Use loading state (disabled + spinner) during async operations
+ */
+
 const buttonVariants = cva(
   "inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm font-medium ring-offset-background transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 touch-action-manipulation",
   {

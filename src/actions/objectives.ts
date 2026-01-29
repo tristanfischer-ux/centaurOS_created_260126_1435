@@ -38,7 +38,7 @@ export async function createObjective(formData: FormData) {
 
     const validation = validate(createObjectiveSchema, rawData)
     if (!validation.success) {
-        return { error: validation.error }
+        return { error: 'error' in validation ? validation.error : 'Validation failed' }
     }
 
     const { title: validatedTitle, description: validatedDescription, playbookId: validatedPlaybookId, selectedTaskIds: validatedSelectedTaskIds } = validation.data

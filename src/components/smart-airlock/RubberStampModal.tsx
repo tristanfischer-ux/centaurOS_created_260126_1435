@@ -7,6 +7,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { ShieldAlert, Stamp } from 'lucide-react'
 import { approveTask } from '@/actions/tasks'
 import { toast } from 'sonner'
+import { motion, AnimatePresence } from 'framer-motion'
 
 interface RubberStampModalProps {
     taskId: string
@@ -21,6 +22,7 @@ export function RubberStampModal({ taskId, isOpen, onClose }: RubberStampModalPr
         liability: false
     })
     const [isSubmitting, setIsSubmitting] = useState(false)
+    const [isStamped, setIsStamped] = useState(false)
 
     const allChecked = checks.pricing && checks.accreditation && checks.liability
 
@@ -30,76 +32,114 @@ export function RubberStampModal({ taskId, isOpen, onClose }: RubberStampModalPr
 
         const result = await approveTask(taskId)
 
-        setIsSubmitting(false)
         if (result.error) {
             toast.error(result.error)
+            setIsSubmitting(false)
         } else {
-            toast.success("Task Certified & Released")
-            onClose()
+            // Trigger Animation
+            setIsStamped(true)
+
+            // Wait for animation to finish before closing
+            setTimeout(() => {
+                toast.success("Task Certified & Released")
+                onClose()
+                // Reset state after close
+                setTimeout(() => {
+                    setIsStamped(false)
+                    setIsSubmitting(false)
+                    setChecks({ pricing: false, accreditation: false, liability: false })
+                }, 300)
+            }, 1000)
         }
     }
 
     return (
-        <Dialog open={isOpen} onOpenChange={onClose}>
-            <DialogContent className="sm:max-w-md bg-zinc-950 border-red-900/50 text-zinc-100">
+        <Dialog open={isOpen} onOpenChange={() => !isSubmitting && onClose()}>
+            <DialogContent className="sm:max-w-md bg-white border-red-100 text-slate-900 overflow-hidden relative shadow-brand-lg">
+
+                {/* STAMP ANIMATION OVERLAY */}
+                <AnimatePresence>
+                    {isStamped && (
+                        <motion.div
+                            initial={{ scale: 3, opacity: 0, rotate: -20 }}
+                            animate={{ scale: 1, opacity: 1, rotate: -10 }}
+                            exit={{ opacity: 0 }}
+                            transition={{
+                                type: "spring",
+                                stiffness: 300,
+                                damping: 15,
+                                mass: 1.5
+                            }}
+                            className="absolute inset-0 z-50 flex items-center justify-center pointer-events-none"
+                        >
+                            <div className="border-8 border-red-600 rounded px-8 py-2 text-red-600 font-black text-6xl tracking-widest uppercase opacity-90 mix-blend-multiply shadow-[0_0_50px_rgba(220,38,38,0.2)] transform -rotate-12 bg-white/10 backdrop-blur-[2px]">
+                                CERTIFIED
+                            </div>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
+
                 <DialogHeader>
-                    <div className="flex items-center gap-2 text-red-500 mb-2">
+                    <div className="flex items-center gap-2 text-red-600 mb-2">
                         <ShieldAlert className="w-6 h-6" />
-                        <span className="text-sm font-mono uppercase tracking-widest">Executive Airlock</span>
+                        <span className="text-sm font-mono uppercase tracking-widest font-bold">Executive Airlock</span>
                     </div>
-                    <DialogTitle className="text-xl font-serif text-white">Certification Required</DialogTitle>
-                    <DialogDescription className="text-zinc-400">
+                    <DialogTitle className="text-2xl font-serif text-slate-900 font-bold">Certification Required</DialogTitle>
+                    <DialogDescription className="text-slate-500 font-medium">
                         This is a High Risk operation. You must verify the following before releasing to client.
                     </DialogDescription>
                 </DialogHeader>
 
-                <div className="flex flex-col gap-4 py-4">
-                    <div className="flex items-start space-x-3 p-3 rounded-lg border border-red-900/20 bg-red-950/10 hover:bg-red-950/20 transition-colors">
+                <div className="flex flex-col gap-4 py-4 relative">
+                    <div className="flex items-start space-x-3 p-3 rounded-lg border border-red-100 bg-red-50/50 hover:bg-red-50 transition-colors">
                         <Checkbox
                             id="pricing"
                             checked={checks.pricing}
                             onCheckedChange={(c) => setChecks(prev => ({ ...prev, pricing: !!c }))}
-                            className="border-red-500/50 data-[state=checked]:bg-red-600 data-[state=checked]:border-red-600"
+                            disabled={isSubmitting}
+                            className="border-red-300 data-[state=checked]:bg-red-600 data-[state=checked]:border-red-600"
                         />
                         <div className="grid gap-1.5 leading-none">
-                            <label htmlFor="pricing" className="text-sm font-medium leading-none text-red-200 cursor-pointer">
+                            <label htmlFor="pricing" className="text-sm font-semibold leading-none text-red-900 cursor-pointer">
                                 I have checked the pricing
                             </label>
-                            <p className="text-xs text-red-400/60">
+                            <p className="text-xs text-red-700/80">
                                 Margins and quote accuracy verified.
                             </p>
                         </div>
                     </div>
 
-                    <div className="flex items-start space-x-3 p-3 rounded-lg border border-red-900/20 bg-red-950/10 hover:bg-red-950/20 transition-colors">
+                    <div className="flex items-start space-x-3 p-3 rounded-lg border border-red-100 bg-red-50/50 hover:bg-red-50 transition-colors">
                         <Checkbox
                             id="accreditation"
                             checked={checks.accreditation}
                             onCheckedChange={(c) => setChecks(prev => ({ ...prev, accreditation: !!c }))}
-                            className="border-red-500/50 data-[state=checked]:bg-red-600 data-[state=checked]:border-red-600"
+                            disabled={isSubmitting}
+                            className="border-red-300 data-[state=checked]:bg-red-600 data-[state=checked]:border-red-600"
                         />
                         <div className="grid gap-1.5 leading-none">
-                            <label htmlFor="accreditation" className="text-sm font-medium leading-none text-red-200 cursor-pointer">
+                            <label htmlFor="accreditation" className="text-sm font-semibold leading-none text-red-900 cursor-pointer">
                                 I have verified supplier accreditation
                             </label>
-                            <p className="text-xs text-red-400/60">
+                            <p className="text-xs text-red-700/80">
                                 Vendor is cleared for this risk level.
                             </p>
                         </div>
                     </div>
 
-                    <div className="flex items-start space-x-3 p-3 rounded-lg border border-red-900/20 bg-red-950/10 hover:bg-red-950/20 transition-colors">
+                    <div className="flex items-start space-x-3 p-3 rounded-lg border border-red-100 bg-red-50/50 hover:bg-red-50 transition-colors">
                         <Checkbox
                             id="liability"
                             checked={checks.liability}
                             onCheckedChange={(c) => setChecks(prev => ({ ...prev, liability: !!c }))}
-                            className="border-red-500/50 data-[state=checked]:bg-red-600 data-[state=checked]:border-red-600"
+                            disabled={isSubmitting}
+                            className="border-red-300 data-[state=checked]:bg-red-600 data-[state=checked]:border-red-600"
                         />
                         <div className="grid gap-1.5 leading-none">
-                            <label htmlFor="liability" className="text-sm font-medium leading-none text-red-200 cursor-pointer">
+                            <label htmlFor="liability" className="text-sm font-semibold leading-none text-red-900 cursor-pointer">
                                 I accept liability for this output
                             </label>
-                            <p className="text-xs text-red-400/60">
+                            <p className="text-xs text-red-700/80">
                                 Personal executive sign-off.
                             </p>
                         </div>
@@ -107,15 +147,21 @@ export function RubberStampModal({ taskId, isOpen, onClose }: RubberStampModalPr
                 </div>
 
                 <DialogFooter className="sm:justify-between">
-                    <Button variant="ghost" onClick={onClose} className="text-zinc-500 hover:text-zinc-300">
+                    <Button variant="ghost" onClick={onClose} disabled={isSubmitting} className="text-zinc-500 hover:text-zinc-300">
                         Cancel
                     </Button>
                     <Button
                         onClick={handleApprove}
                         disabled={!allChecked || isSubmitting}
-                        className="bg-red-600 hover:bg-red-700 text-white gap-2 font-mono uppercase tracking-wide"
+                        className={`gap-2 font-mono uppercase tracking-wide transition-all duration-300 ${isStamped ? "bg-red-700 text-white scale-105" : "bg-red-600 hover:bg-red-700 text-white"
+                            }`}
                     >
-                        {isSubmitting ? 'Stamping...' : (
+                        {isStamped ? (
+                            <>
+                                <Stamp className="w-4 h-4 mr-2" />
+                                CERTIFIED
+                            </>
+                        ) : isSubmitting ? 'Stamping...' : (
                             <>
                                 <Stamp className="w-4 h-4" />
                                 Certify & Release

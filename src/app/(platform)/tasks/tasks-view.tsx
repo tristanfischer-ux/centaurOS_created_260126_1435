@@ -1,11 +1,15 @@
 "use client"
 
+import Image from "next/image"
+
 import { useState, useEffect, useCallback } from "react"
 import { useAutoRefresh } from "@/hooks/useAutoRefresh"
 import { RefreshButton } from "@/components/RefreshButton"
 import { TaskCard } from "./task-card"
 import { Button } from "@/components/ui/button"
-import { LayoutGrid, List, X, Trash2, CheckSquare, Loader2, Check, UserPlus, Filter, ChevronDown } from "lucide-react"
+import { LayoutGrid, List, X, Trash2, CheckSquare, Loader2, Check, UserPlus, Filter, ChevronDown, Bot } from "lucide-react"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { getInitials } from "@/lib/utils"
 import { deleteTasks, acceptTask, completeTask, updateTaskAssignees } from "@/actions/tasks"
 import { toast } from "sonner"
 import { CreateTaskDialog } from "./create-task-dialog"
@@ -83,10 +87,10 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
     const [assigneeFilter, setAssigneeFilter] = useState<string | 'unassigned' | 'all'>('all')
     const [sortBy, setSortBy] = useState<'due_date_asc' | 'due_date_desc' | 'created_desc'>('due_date_asc')
     const [filtersOpen, setFiltersOpen] = useState(false)
-    
+
     // Filter Presets State
     const [activePreset, setActivePreset] = useState<string | null>(null)
-    
+
     // Load active preset from localStorage on mount
     useEffect(() => {
         const savedPreset = localStorage.getItem('tasks-active-preset')
@@ -94,7 +98,7 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
             setActivePreset(savedPreset)
         }
     }, [])
-    
+
     // Save active preset to localStorage when it changes
     useEffect(() => {
         if (activePreset) {
@@ -116,7 +120,7 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                 const tagName = activeElement?.tagName
                 const isInput = tagName === 'INPUT' || tagName === 'TEXTAREA'
                 const isContentEditable = activeElement?.getAttribute('contenteditable') === 'true'
-                
+
                 if (!isInput && !isContentEditable) {
                     e.preventDefault()
                     // Trigger quick add expansion
@@ -133,25 +137,25 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
 
     // Filter Presets
     const filterPresets = [
-        { 
-            id: 'my-tasks', 
-            label: 'My Tasks', 
-            filter: (task: Task) => task.assignee_id === currentUserId 
+        {
+            id: 'my-tasks',
+            label: 'My Tasks',
+            filter: (task: Task) => task.assignee_id === currentUserId
         },
-        { 
-            id: 'overdue', 
-            label: 'Overdue', 
-            filter: (task: Task) => task.end_date && new Date(task.end_date) < new Date() && task.status !== 'Completed' 
+        {
+            id: 'overdue',
+            label: 'Overdue',
+            filter: (task: Task) => task.end_date && new Date(task.end_date) < new Date() && task.status !== 'Completed'
         },
-        { 
-            id: 'this-week', 
-            label: 'This Week', 
-            filter: (task: Task) => task.end_date && isThisWeek(new Date(task.end_date)) 
+        {
+            id: 'this-week',
+            label: 'This Week',
+            filter: (task: Task) => task.end_date && isThisWeek(new Date(task.end_date))
         },
-        { 
-            id: 'needs-action', 
-            label: 'Needs Action', 
-            filter: (task: Task) => ['Pending', 'Accepted'].includes(task.status || '') 
+        {
+            id: 'needs-action',
+            label: 'Needs Action',
+            filter: (task: Task) => ['Pending', 'Accepted'].includes(task.status || '')
         },
     ]
 
@@ -462,8 +466,8 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                             const activeFilterCount = statusFilter.length + (assigneeFilter !== 'all' ? 1 : 0)
                             return (
                                 <>
-                                    <Button 
-                                        variant="outline" 
+                                    <Button
+                                        variant="outline"
                                         onClick={() => setFiltersOpen(!filtersOpen)}
                                         className="mb-2"
                                     >
@@ -474,7 +478,7 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                                         )}
                                         <ChevronDown className={cn("w-4 h-4 ml-2 transition-transform", filtersOpen && "rotate-180")} />
                                     </Button>
-                                    
+
                                     {filtersOpen && (
                                         <div className="p-4 border rounded-lg bg-slate-50 space-y-4">
                                             <div className="flex flex-wrap items-center gap-3">
@@ -586,34 +590,54 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                             </div>
                         ))}
                         {sortedTasks.length === 0 && (
-                            <div className="col-span-full border-2 border-dashed border-slate-200 rounded-lg bg-slate-50/50">
+                            <>
                                 {tasks.length === 0 ? (
-                                    <EmptyState
-                                        icon={<Inbox className="h-12 w-12" />}
-                                        title="No tasks yet"
-                                        description="Create your first task to get started with task management."
-                                    />
+                                    <div className="col-span-full border border-slate-800 rounded-xl bg-slate-950 p-12 flex flex-col items-center justify-center text-center relative overflow-hidden group min-h-[500px]">
+                                        {/* Blueprint Background Pattern */}
+                                        <div className="absolute inset-0 opacity-20 pointer-events-none bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px]"></div>
+                                        <div className="absolute inset-0 bg-[radial-gradient(circle_800px_at_50%_50%,#1e293b,transparent)] opacity-40 pointer-events-none"></div>
+
+                                        <div className="relative z-10 w-64 h-64 mb-8 opacity-80 transition-all duration-700 group-hover:opacity-100 group-hover:scale-105 group-hover:rotate-1">
+                                            <Image
+                                                src="/images/tasks-empty-state.png"
+                                                alt="No tasks blueprint"
+                                                fill
+                                                className="object-contain drop-shadow-2xl"
+                                                priority
+                                            />
+                                        </div>
+                                        <h3 className="text-2xl font-playfair font-medium text-slate-100 mb-3 relative z-10 tracking-tight">System Idle</h3>
+                                        <p className="text-slate-400 max-w-sm mb-8 relative z-10 font-mono text-xs tracking-wide leading-relaxed">
+                                            NO PROCESSING TASKS IN QUEUE.<br />
+                                            INITIALIZE NEW DIRECTIVES TO BEGIN OPERATIONS.
+                                        </p>
+                                        <div className="relative z-10">
+                                            {/* We can reproduce the button trigger here if needed, or guide user to the quick add */}
+                                        </div>
+                                    </div>
                                 ) : (
-                                    <EmptyState
-                                        icon={<Inbox className="h-8 w-8" />}
-                                        title="No tasks match your filters"
-                                        description="Try adjusting your filters to see more tasks."
-                                        action={
-                                            <Button
-                                                variant="link"
-                                                onClick={() => {
-                                                    setStatusFilter([])
-                                                    setAssigneeFilter('all')
-                                                    setActivePreset(null)
-                                                }}
-                                                className="text-blue-600"
-                                            >
-                                                Reset Filters
-                                            </Button>
-                                        }
-                                    />
+                                    <div className="col-span-full border-2 border-dashed border-slate-200 rounded-lg bg-slate-50/50">
+                                        <EmptyState
+                                            icon={<Inbox className="h-8 w-8" />}
+                                            title="No tasks match your filters"
+                                            description="Try adjusting your filters to see more tasks."
+                                            action={
+                                                <Button
+                                                    variant="link"
+                                                    onClick={() => {
+                                                        setStatusFilter([])
+                                                        setAssigneeFilter('all')
+                                                        setActivePreset(null)
+                                                    }}
+                                                    className="text-blue-600"
+                                                >
+                                                    Reset Filters
+                                                </Button>
+                                            }
+                                        />
+                                    </div>
                                 )}
-                            </div>
+                            </>
                         )}
                     </div>
                 ) : (
@@ -665,7 +689,7 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                                                 }}
                                             >
                                                 {isSelectionMode && (
-                                                    <div 
+                                                    <div
                                                         className="flex-shrink-0"
                                                         onClick={(e) => {
                                                             e.stopPropagation()
@@ -685,7 +709,7 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                                                 )} />
                                                 <div className="flex-1 min-w-0">
                                                     <div className="flex items-center gap-2 mb-1">
-                                                        <span className="font-medium text-foreground truncate">{task.title}</span>
+                                                        <span className="font-playfair font-medium text-foreground truncate text-base tracking-tight">{task.title}</span>
                                                         <StatusBadge status={task.status} />
                                                     </div>
                                                     <div className="flex items-center gap-4 text-xs text-muted-foreground">
@@ -697,8 +721,18 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                                                     <div className="flex items-center gap-1 text-muted-foreground w-32">
                                                         {task.assignee ? (
                                                             <>
-                                                                {task.assignee.role === "AI_Agent" ? "🤖" : "👤"}
-                                                                <span className="truncate">{task.assignee.full_name}</span>
+                                                                <Avatar className="h-5 w-5 border border-white bg-slate-100">
+                                                                    {task.assignee.role === "AI_Agent" ? (
+                                                                        <AvatarImage src="/images/ai-agent-avatar.png" className="object-cover" />
+                                                                    ) : null}
+                                                                    <AvatarFallback className={cn(
+                                                                        "text-[8px] text-white",
+                                                                        task.assignee.role === "AI_Agent" ? "bg-purple-600" : "bg-slate-600"
+                                                                    )}>
+                                                                        {task.assignee.role === "AI_Agent" ? <Bot className="w-3 h-3" /> : getInitials(task.assignee.full_name)}
+                                                                    </AvatarFallback>
+                                                                </Avatar>
+                                                                <span className={cn("truncate", task.assignee.role === "AI_Agent" && "text-purple-700 font-medium")}>{task.assignee.full_name}</span>
                                                             </>
                                                         ) : (
                                                             <span className="text-muted-foreground italic">Unassigned</span>
@@ -755,7 +789,7 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                                             }}
                                         >
                                             {isSelectionMode && (
-                                                <div 
+                                                <div
                                                     className="flex-shrink-0"
                                                     onClick={(e) => {
                                                         e.stopPropagation()
@@ -771,7 +805,7 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                                             )}
                                             <div className="flex-1 min-w-0">
                                                 <div className="flex items-center gap-2 mb-1">
-                                                    <span className="font-medium text-foreground truncate">{task.title}</span>
+                                                    <span className="font-playfair font-medium text-foreground truncate text-base tracking-tight">{task.title}</span>
                                                     <StatusBadge status={task.status} />
                                                 </div>
                                                 <div className="flex items-center gap-4 text-xs text-muted-foreground">
@@ -783,8 +817,18 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                                                 <div className="flex items-center gap-1 text-muted-foreground w-32">
                                                     {task.assignee ? (
                                                         <>
-                                                            {task.assignee.role === "AI_Agent" ? "🤖" : "👤"}
-                                                            <span className="truncate">{task.assignee.full_name}</span>
+                                                            <Avatar className="h-5 w-5 border border-white bg-slate-100">
+                                                                {task.assignee.role === "AI_Agent" ? (
+                                                                    <AvatarImage src="/images/ai-agent-avatar.png" className="object-cover" />
+                                                                ) : null}
+                                                                <AvatarFallback className={cn(
+                                                                    "text-[8px] text-white",
+                                                                    task.assignee.role === "AI_Agent" ? "bg-purple-600" : "bg-slate-600"
+                                                                )}>
+                                                                    {task.assignee.role === "AI_Agent" ? <Bot className="w-3 h-3" /> : getInitials(task.assignee.full_name)}
+                                                                </AvatarFallback>
+                                                            </Avatar>
+                                                            <span className={cn("truncate", task.assignee.role === "AI_Agent" && "text-purple-700 font-medium")}>{task.assignee.full_name}</span>
                                                         </>
                                                     ) : (
                                                         <span className="text-muted-foreground italic">Unassigned</span>
@@ -804,97 +848,99 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
             </div>
 
             {/* Bulk Action Toolbar */}
-            {selectedTaskIds.size > 0 && (
-                <div className="fixed bottom-20 sm:bottom-4 left-1/2 -translate-x-1/2 bg-slate-900 text-white rounded-lg shadow-lg p-4 flex items-center gap-3 z-50">
-                    <span className="text-sm font-medium">{selectedTaskIds.size} selected</span>
-                    <Button 
-                        size="sm" 
-                        variant="outline" 
-                        onClick={handleBulkAccept}
-                        disabled={isBulkOperating}
-                        className="bg-white text-slate-900 hover:bg-slate-100"
-                    >
-                        <Check className="w-4 h-4 mr-1" />
-                        Accept
-                    </Button>
-                    <Button 
-                        size="sm" 
-                        variant="outline" 
-                        onClick={handleBulkComplete}
-                        disabled={isBulkOperating}
-                        className="bg-white text-slate-900 hover:bg-slate-100"
-                    >
-                        <CheckSquare className="w-4 h-4 mr-1" />
-                        Complete
-                    </Button>
-                    <Popover open={assignDialogOpen} onOpenChange={setAssignDialogOpen}>
-                        <PopoverTrigger asChild>
-                            <Button 
-                                size="sm" 
-                                variant="outline"
-                                disabled={isBulkOperating}
-                                className="bg-white text-slate-900 hover:bg-slate-100"
-                            >
-                                <UserPlus className="w-4 h-4 mr-1" />
-                                Assign
-                            </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-[240px] p-0" align="end">
-                            <Command>
-                                <CommandInput placeholder="Search members..." />
-                                <CommandList>
-                                    <CommandEmpty>No members found.</CommandEmpty>
-                                    <CommandGroup>
-                                        {members.map((member) => (
-                                            <CommandItem
-                                                key={member.id}
-                                                value={member.full_name || ''}
-                                                onSelect={() => {
-                                                    setAssignDialogOpen(false)
-                                                    handleBulkAssign(member.id)
-                                                }}
-                                            >
-                                                {member.full_name} {member.role === 'AI_Agent' ? '🤖' : ''}
-                                            </CommandItem>
-                                        ))}
-                                    </CommandGroup>
-                                </CommandList>
-                            </Command>
-                        </PopoverContent>
-                    </Popover>
-                    <Button 
-                        size="sm" 
-                        variant="destructive" 
-                        onClick={handleBulkDelete}
-                        disabled={isBulkDeleting || isBulkOperating}
-                        className="bg-red-600 hover:bg-red-700"
-                    >
-                        {isBulkDeleting ? (
-                            <>
-                                <Loader2 className="w-4 h-4 mr-1 animate-spin" />
-                                Deleting...
-                            </>
-                        ) : (
-                            <>
-                                <Trash2 className="w-4 h-4 mr-1" />
-                                Delete
-                            </>
-                        )}
-                    </Button>
-                    <Button 
-                        size="sm" 
-                        variant="ghost" 
-                        onClick={() => {
-                            setIsSelectionMode(false)
-                            setSelectedTaskIds(new Set())
-                        }}
-                        disabled={isBulkOperating || isBulkDeleting}
-                        className="text-white hover:bg-slate-800"
-                    >
-                        Cancel
-                    </Button>
-                </div>
-            )}
+            {
+                selectedTaskIds.size > 0 && (
+                    <div className="fixed bottom-20 sm:bottom-4 left-1/2 -translate-x-1/2 bg-slate-900 text-white rounded-lg shadow-lg p-4 flex items-center gap-3 z-50">
+                        <span className="text-sm font-medium">{selectedTaskIds.size} selected</span>
+                        <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={handleBulkAccept}
+                            disabled={isBulkOperating}
+                            className="bg-white text-slate-900 hover:bg-slate-100"
+                        >
+                            <Check className="w-4 h-4 mr-1" />
+                            Accept
+                        </Button>
+                        <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={handleBulkComplete}
+                            disabled={isBulkOperating}
+                            className="bg-white text-slate-900 hover:bg-slate-100"
+                        >
+                            <CheckSquare className="w-4 h-4 mr-1" />
+                            Complete
+                        </Button>
+                        <Popover open={assignDialogOpen} onOpenChange={setAssignDialogOpen}>
+                            <PopoverTrigger asChild>
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    disabled={isBulkOperating}
+                                    className="bg-white text-slate-900 hover:bg-slate-100"
+                                >
+                                    <UserPlus className="w-4 h-4 mr-1" />
+                                    Assign
+                                </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-[240px] p-0" align="end">
+                                <Command>
+                                    <CommandInput placeholder="Search members..." />
+                                    <CommandList>
+                                        <CommandEmpty>No members found.</CommandEmpty>
+                                        <CommandGroup>
+                                            {members.map((member) => (
+                                                <CommandItem
+                                                    key={member.id}
+                                                    value={member.full_name || ''}
+                                                    onSelect={() => {
+                                                        setAssignDialogOpen(false)
+                                                        handleBulkAssign(member.id)
+                                                    }}
+                                                >
+                                                    {member.full_name} {member.role === 'AI_Agent' ? '🤖' : ''}
+                                                </CommandItem>
+                                            ))}
+                                        </CommandGroup>
+                                    </CommandList>
+                                </Command>
+                            </PopoverContent>
+                        </Popover>
+                        <Button
+                            size="sm"
+                            variant="destructive"
+                            onClick={handleBulkDelete}
+                            disabled={isBulkDeleting || isBulkOperating}
+                            className="bg-red-600 hover:bg-red-700"
+                        >
+                            {isBulkDeleting ? (
+                                <>
+                                    <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                                    Deleting...
+                                </>
+                            ) : (
+                                <>
+                                    <Trash2 className="w-4 h-4 mr-1" />
+                                    Delete
+                                </>
+                            )}
+                        </Button>
+                        <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => {
+                                setIsSelectionMode(false)
+                                setSelectedTaskIds(new Set())
+                            }}
+                            disabled={isBulkOperating || isBulkDeleting}
+                            className="text-white hover:bg-slate-800"
+                        >
+                            Cancel
+                        </Button>
+                    </div>
+                )
+            }
 
             {/* Task Detail Drawer */}
             <ThreadDrawer

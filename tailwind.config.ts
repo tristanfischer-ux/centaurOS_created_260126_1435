@@ -8,6 +8,17 @@ const config: Config = {
         "./src/app/**/*.{js,ts,jsx,tsx,mdx}",
     ],
     theme: {
+        // Custom breakpoints for foldable devices
+        screens: {
+            'xxs': '280px',  // Galaxy Fold outer screen (closed)
+            'xs': '320px',   // Small phones, Galaxy Fold threshold
+            'sm': '640px',   // Standard Tailwind
+            'fold': '653px', // Galaxy Fold inner screen (open)
+            'md': '768px',   // Standard Tailwind - tablet/desktop split
+            'lg': '1024px',  // Standard Tailwind
+            'xl': '1280px',  // Standard Tailwind
+            '2xl': '1536px', // Standard Tailwind
+        },
         extend: {
             colors: {
                 background: 'var(--background)',

@@ -101,7 +101,7 @@ export async function submitRFQ(formData: {
 
     const validation = validate(createRFQSchema, rawData)
     if (!validation.success) {
-        return { error: validation.error }
+        return { error: 'error' in validation ? validation.error : 'Validation failed' }
     }
 
     const { title: validatedTitle, specifications: validatedSpecifications, budgetRange: validatedBudgetRange } = validation.data
@@ -140,15 +140,14 @@ export interface MarketplaceListing {
 export async function getMarketplaceListings(category?: string) {
     const supabase = await createClient()
 
-    // marketplace_listings table exists but may not be in generated Database types
-    // Type assertion needed for table name since it's not in Database['public']['Tables']
     let query = supabase
-        .from('marketplace_listings' as never)
+        .from('marketplace_listings')
         .select('*')
         .order('is_verified', { ascending: false })
 
     if (category) {
-        query = query.eq('category', category)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        query = query.eq('category', category as any)
     }
 
     const { data, error } = await query
@@ -158,6 +157,164 @@ export async function getMarketplaceListings(category?: string) {
         return []
     }
 
-    // Properly type the result using the MarketplaceListing interface
     return (data || []) as MarketplaceListing[]
+}
+
+// ==========================================
+// MARKETPLACE RECOMMENDATIONS
+// ==========================================
+
+export interface MarketplaceRecommendation {
+    id: string
+    source_type: 'advisory' | 'coverage_gap' | 'ai_suggestion' | 'manual'
+    category: 'People' | 'Products' | 'Services' | 'AI'
+    subcategory: string | null
+    search_term: string | null
+    reasoning: string | null
+    priority: number
+    created_at: string
+}
+
+/**
+ * Get marketplace recommendations using the database function
+ */
+export async function getMarketplaceRecommendations(limit: number = 10): Promise<{
+    data: MarketplaceRecommendation[]
+    error: string | null
+}> {
+    try {
+        const supabase = await createClient()
+        const foundryId = await getFoundryIdCached()
+        
+        if (!foundryId) {
+            return { data: [], error: 'No foundry context' }
+        }
+
+        const { data, error } = await supabase.rpc('get_marketplace_recommendations', {
+            p_foundry_id: foundryId,
+            p_limit: limit
+        })
+
+        if (error) {
+            console.error('Error fetching marketplace recommendations:', error)
+            return { data: [], error: error.message }
+        }
+
+        return { data: (data || []) as MarketplaceRecommendation[], error: null }
+    } catch (err) {
+        console.error('Failed to fetch marketplace recommendations:', err)
+        return { data: [], error: 'Failed to fetch recommendations' }
+    }
+}
+
+/**
+ * Generate recommendations from coverage gaps using the database function
+ */
+export async function generateGapRecommendations(): Promise<{
+    count: number
+    error: string | null
+}> {
+    try {
+        const supabase = await createClient()
+        const foundryId = await getFoundryIdCached()
+        
+        if (!foundryId) {
+            return { count: 0, error: 'No foundry context' }
+        }
+
+        const { data, error } = await supabase.rpc('generate_gap_recommendations', {
+            p_foundry_id: foundryId
+        })
+
+        if (error) {
+            console.error('Error generating gap recommendations:', error)
+            return { count: 0, error: error.message }
+        }
+
+        revalidatePath('/marketplace')
+        return { count: data || 0, error: null }
+    } catch (err) {
+        console.error('Failed to generate gap recommendations:', err)
+        return { count: 0, error: 'Failed to generate recommendations' }
+    }
+}
+
+/**
+ * Dismiss a marketplace recommendation
+ */
+export async function dismissRecommendation(recommendationId: string): Promise<{
+    success: boolean
+    error: string | null
+}> {
+    try {
+        const supabase = await createClient()
+        const { data: { user } } = await supabase.auth.getUser()
+        
+        if (!user) {
+            return { success: false, error: 'Not authenticated' }
+        }
+
+        const { error } = await supabase
+            .from('marketplace_recommendations')
+            .update({
+                is_dismissed: true,
+                dismissed_at: new Date().toISOString(),
+                dismissed_by: user.id
+            })
+            .eq('id', recommendationId)
+
+        if (error) {
+            console.error('Error dismissing recommendation:', error)
+            return { success: false, error: error.message }
+        }
+
+        revalidatePath('/marketplace')
+        return { success: true, error: null }
+    } catch (err) {
+        console.error('Failed to dismiss recommendation:', err)
+        return { success: false, error: 'Failed to dismiss recommendation' }
+    }
+}
+
+/**
+ * Create a manual recommendation
+ */
+export async function createManualRecommendation(data: {
+    category: 'People' | 'Products' | 'Services' | 'AI'
+    subcategory?: string
+    searchTerm: string
+    reasoning?: string
+    priority?: number
+}): Promise<{ success: boolean; error: string | null }> {
+    try {
+        const supabase = await createClient()
+        const foundryId = await getFoundryIdCached()
+        
+        if (!foundryId) {
+            return { success: false, error: 'No foundry context' }
+        }
+
+        const { error } = await supabase
+            .from('marketplace_recommendations')
+            .insert({
+                foundry_id: foundryId,
+                source_type: 'manual',
+                category: data.category,
+                subcategory: data.subcategory || null,
+                search_term: data.searchTerm,
+                reasoning: data.reasoning || null,
+                priority: data.priority || 50
+            })
+
+        if (error) {
+            console.error('Error creating manual recommendation:', error)
+            return { success: false, error: error.message }
+        }
+
+        revalidatePath('/marketplace')
+        return { success: true, error: null }
+    } catch (err) {
+        console.error('Failed to create manual recommendation:', err)
+        return { success: false, error: 'Failed to create recommendation' }
+    }
 }

@@ -3,11 +3,27 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
-import { LayoutDashboard, Users, CheckSquare, Clock, Store, Target, Compass, LayoutGrid, MessageCircleQuestion } from "lucide-react"
+import { LayoutDashboard, Users, CheckSquare, Clock, Store, Target, Compass, LayoutGrid, MessageCircleQuestion, ShieldAlert } from "lucide-react"
 import { NotificationCenter } from "@/components/NotificationCenter"
 import { ThemeToggle } from "@/components/ThemeToggle"
 import { ZoomControl } from "@/components/ZoomControl"
 import { useZoomContext } from "@/components/ZoomProvider"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
+
+/**
+ * Determines if a navigation item should be marked as active
+ * Uses exact matching for root routes and prefix matching for nested routes
+ */
+function isRouteActive(pathname: string, href: string): boolean {
+    // Exact match for root-level routes
+    if (pathname === href) return true
+
+    // For nested routes, check if pathname starts with href followed by /
+    // This prevents /dashboard from matching /dashboard-settings
+    if (pathname.startsWith(href + '/')) return true
+
+    return false
+}
 
 // Keep in sync with package.json version
 const APP_VERSION = "1.0.3"
@@ -24,20 +40,20 @@ const mainNavigation = [
     { name: "Guild", href: "/guild", icon: Compass, tooltip: "Community events and resources" },
 ]
 
-export function Sidebar({ foundryName, foundryId, userName, userRole }: { foundryName?: string; foundryId?: string; userName?: string; userRole?: string }) {
+export function Sidebar({ foundryName, foundryId, userName, userRole, isAdmin }: { foundryName?: string; foundryId?: string; userName?: string; userRole?: string; isAdmin?: boolean }) {
     const pathname = usePathname()
     const { setZoom } = useZoomContext()
 
     return (
-        <div className="hidden md:flex h-screen w-64 flex-col bg-card text-foreground">
+        <div className="hidden md:flex h-screen w-64 flex-col bg-white border-r border-slate-100 text-slate-900">
             {/* App Header - Centaur Dynamics Branding */}
-            <div className="px-4 pt-5 pb-4">
+            <div className="px-5 pt-8 pb-6">
                 <div className="flex items-center justify-between">
                     <Link href="/dashboard" className="group flex items-center gap-2">
-                        <span className="font-display text-xl font-bold tracking-[0.12em] uppercase text-international-orange group-hover:text-international-orange-hover transition-colors">
+                        <span className="font-display text-xl font-bold tracking-[0.05em] text-cyan-950 group-hover:text-cyan-700 transition-colors">
                             CentaurOS
                         </span>
-                        <span className="w-1.5 h-1.5 rounded-full bg-international-orange animate-pulse"></span>
+                        <span className="w-1.5 h-1.5 rounded-full bg-cyan-500 animate-pulse shadow-[0_0_8px_rgba(6,182,212,0.8)]"></span>
                     </Link>
                     <div className="flex items-center gap-0.5">
                         <ThemeToggle />
@@ -45,7 +61,7 @@ export function Sidebar({ foundryName, foundryId, userName, userRole }: { foundr
                     </div>
                 </div>
             </div>
-            
+
             {/* Foundry & User Info - Combined */}
             <div className="px-4 pb-4">
                 <div className="text-sm font-semibold text-foreground uppercase tracking-wider truncate">
@@ -64,23 +80,22 @@ export function Sidebar({ foundryName, foundryId, userName, userRole }: { foundr
                 </div>
             </div>
 
-            <nav className="flex-1 space-y-0.5 px-2 py-2">
+            <nav className="flex-1 space-y-0.5 px-3 py-2">
                 {mainNavigation.map((item) => {
-                    const isActive = pathname.startsWith(item.href)
-                    return (
+                    const isActive = isRouteActive(pathname, item.href)
+                    const navLink = (
                         <Link
-                            key={item.name}
                             href={item.href}
                             className={cn(
                                 isActive
-                                    ? "bg-international-orange/10 text-international-orange"
-                                    : "text-muted-foreground hover:bg-muted hover:text-foreground",
-                                "group flex items-center px-3 py-2.5 text-sm font-medium transition-all duration-150"
+                                    ? "bg-cyan-50 text-cyan-900 font-semibold"
+                                    : "text-slate-500 hover:bg-slate-50 hover:text-slate-900",
+                                "group flex items-center px-3 py-2 text-sm transition-all duration-200 rounded-md"
                             )}
                         >
                             <item.icon
                                 className={cn(
-                                    isActive ? "text-international-orange" : "text-muted-foreground group-hover:text-foreground",
+                                    isActive ? "text-cyan-600" : "text-slate-400 group-hover:text-slate-600",
                                     "mr-3 h-4 w-4 flex-shrink-0 transition-colors"
                                 )}
                                 aria-hidden="true"
@@ -88,7 +103,48 @@ export function Sidebar({ foundryName, foundryId, userName, userRole }: { foundr
                             {item.name}
                         </Link>
                     )
+
+                    // Wrap with tooltip if item has a tooltip description
+                    if (item.tooltip) {
+                        return (
+                            <Tooltip key={item.name} delayDuration={300}>
+                                <TooltipTrigger asChild>
+                                    {navLink}
+                                </TooltipTrigger>
+                                <TooltipContent side="right" className="max-w-[200px]">
+                                    <p>{item.tooltip}</p>
+                                </TooltipContent>
+                            </Tooltip>
+                        )
+                    }
+
+                    return <div key={item.name}>{navLink}</div>
                 })}
+
+                {/* Admin Panel Link - Only visible to admins */}
+                {isAdmin && (
+                    <>
+                        <div className="my-4 border-t border-slate-100" />
+                        <Link
+                            href="/admin"
+                            className={cn(
+                                isRouteActive(pathname, "/admin")
+                                    ? "bg-cyan-50 text-cyan-900 font-semibold"
+                                    : "text-slate-500 hover:bg-slate-50 hover:text-slate-900",
+                                "group flex items-center px-3 py-2 text-sm transition-all duration-200 rounded-md"
+                            )}
+                        >
+                            <ShieldAlert
+                                className={cn(
+                                    isRouteActive(pathname, "/admin") ? "text-cyan-600" : "text-slate-400 group-hover:text-slate-600",
+                                    "mr-3 h-4 w-4 flex-shrink-0 transition-colors"
+                                )}
+                                aria-hidden="true"
+                            />
+                            Admin Panel
+                        </Link>
+                    </>
+                )}
             </nav>
 
             <div className="p-4 mt-auto space-y-3">
@@ -96,7 +152,7 @@ export function Sidebar({ foundryName, foundryId, userName, userRole }: { foundr
                 <div className="flex justify-center">
                     <ZoomControl onZoomChange={setZoom} />
                 </div>
-                
+
                 {/* Version info */}
                 <div className="text-[10px] text-muted-foreground text-center font-mono tracking-wider opacity-50">
                     <kbd className="px-1 py-0.5 bg-muted text-[9px]">⌘K</kbd> search · v{APP_VERSION}

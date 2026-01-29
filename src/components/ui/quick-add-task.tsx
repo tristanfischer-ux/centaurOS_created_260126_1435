@@ -69,22 +69,24 @@ export function QuickAddTask({ objectives, members, currentUserId, teams = [], o
             <button
                 data-quick-add-trigger
                 onClick={() => setIsExpanded(true)}
-                className="w-full flex items-center gap-2 px-4 py-3 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg bg-slate-50 transition-all"
+                aria-label="Add a new task (keyboard shortcut: N)"
+                className="w-full flex items-center gap-2 px-4 py-3 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg bg-muted/50 transition-all"
             >
-                <Plus className="w-4 h-4" />
+                <Plus className="w-4 h-4" aria-hidden="true" />
                 <span className="text-sm">Add a task... (press N)</span>
             </button>
         )
     }
 
     return (
-        <form onSubmit={handleSubmit} className="flex gap-2 p-2 rounded-lg bg-card shadow-md">
+        <form onSubmit={handleSubmit} className="flex gap-2 p-2 rounded-lg bg-card shadow-md" role="form" aria-label="Quick add task">
             <Input
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder="Task title..."
                 autoFocus
                 disabled={isLoading}
+                aria-label="Task title"
                 onKeyDown={(e) => {
                     if (e.key === 'Escape') {
                         setIsExpanded(false)
@@ -93,14 +95,14 @@ export function QuickAddTask({ objectives, members, currentUserId, teams = [], o
                 }}
                 className="flex-1"
             />
-            <Button type="submit" size="sm" disabled={isLoading || !title.trim()}>
-                {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+            <Button type="submit" size="sm" disabled={isLoading || !title.trim()} aria-label={isLoading ? "Creating task..." : "Create task"}>
+                {isLoading ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" /> : <Plus className="w-4 h-4" aria-hidden="true" />}
             </Button>
             <Button type="button" size="sm" variant="ghost" onClick={() => {
                 setIsExpanded(false)
                 setTitle('')
-            }}>
-                <X className="w-4 h-4" />
+            }} aria-label="Cancel">
+                <X className="w-4 h-4" aria-hidden="true" />
             </Button>
         </form>
     )

@@ -4,7 +4,20 @@ import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
-type RealtimeTable = 'tasks' | 'objectives' | 'profiles' | 'teams' | 'task_comments' | 'task_files' | 'presence'
+type RealtimeTable = 
+    | 'tasks' 
+    | 'objectives' 
+    | 'profiles' 
+    | 'teams' 
+    | 'task_comments' 
+    | 'task_files' 
+    | 'presence'
+    | 'standups'
+    | 'standup_summaries'
+    | 'approval_delegations'
+    | 'notifications'
+    | 'advisory_questions'
+    | 'advisory_answers'
 
 interface UseAutoRefreshOptions {
     tables: RealtimeTable[]

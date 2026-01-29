@@ -12,6 +12,7 @@ import { PresenceProvider } from "@/components/PresenceProvider";
 import { ZoomProvider, MobileZoomControl, ZoomableContent } from "@/components/ZoomProvider";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
+import { isAdmin } from "@/lib/admin/access";
 
 export default async function PlatformLayout({
     children,
@@ -59,6 +60,9 @@ export default async function PlatformLayout({
         }
     }
 
+    // Check if user has admin access
+    const userIsAdmin = await isAdmin(user.id);
+
     return (
         <TooltipProvider>
             <PresenceProvider>
@@ -67,9 +71,19 @@ export default async function PlatformLayout({
                         <CommandPalette />
                         <KeyboardShortcutsDialog />
                         <MobileZoomControl />
-                        <Sidebar foundryName={foundryName} foundryId={foundryId} userName={profile?.full_name || user.email || "User"} userRole={profile?.role || "Member"} />
+                        <Sidebar foundryName={foundryName} foundryId={foundryId} userName={profile?.full_name || user.email || "User"} userRole={profile?.role || "Member"} isAdmin={userIsAdmin} />
                         <ZoomableContent className="flex-1 overflow-y-auto bg-white">
-                            <main className="p-4 sm:p-6 lg:p-8 pb-32 lg:pb-8">
+                            {/* 
+                              Responsive padding:
+                              - xxs (280px): p-2 - Galaxy Fold outer
+                              - xs (320px): p-3 - Small phones
+                              - sm (640px): p-4 - Standard mobile
+                              - fold (653px): p-5 - Galaxy Fold inner
+                              - lg (1024px): p-8 - Desktop
+                              
+                              Bottom padding accounts for mobile nav height (64px + safe area)
+                            */}
+                            <main className="p-2 xs:p-3 sm:p-4 fold:p-5 lg:p-8 pb-24 xs:pb-28 sm:pb-32 lg:pb-8 px-safe">
                                 <ErrorBoundary>
                                     {children}
                                 </ErrorBoundary>

@@ -23,7 +23,7 @@ import {
 } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { format } from "date-fns"
-import { Calendar as CalendarIcon, Check, X, ArrowRight, Bot, MessageSquare, ChevronDown, ChevronUp, AlertCircle, Copy, Pencil, History as HistoryIcon, ShieldAlert, Eye, EyeOff, ShieldCheck, Paperclip, Plus } from "lucide-react"
+import { Calendar as CalendarIcon, Check, X, ArrowRight, Bot, MessageSquare, ChevronDown, ChevronUp, Copy, Pencil, History as HistoryIcon, ShieldAlert, Eye, EyeOff, ShieldCheck, Paperclip, Plus } from "lucide-react"
 import { Calendar } from "@/components/ui/calendar"
 import {
     Popover,
@@ -83,7 +83,7 @@ export const TaskCard = memo(function TaskCard(props: TaskCardProps) {
     const isAITask = task.assignees?.some(a => a.role === 'AI_Agent') || task.assignee?.role === 'AI_Agent'
     const isOverdue = task.end_date ? new Date(task.end_date) < new Date() : false
     const isExecutive = userRole === 'Executive' || userRole === 'Founder'
-    
+
     // Check if task is due soon (within 24 hours)
     const isDueSoon = task.end_date && !isOverdue && task.status !== 'Completed' ? (() => {
         const endDate = new Date(task.end_date)
@@ -113,7 +113,7 @@ export const TaskCard = memo(function TaskCard(props: TaskCardProps) {
     const [showHistory, setShowHistory] = useState(false)
     const [rubberStampOpen, setRubberStampOpen] = useState(false)
     const [assigneePopoverOpen, setAssigneePopoverOpen] = useState(false)
-    const [assigneeNamePopoverOpen, setAssigneeNamePopoverOpen] = useState(false)
+
 
     // Normalize assignees list (handle backward compatibility or fallback)
     const currentAssignees = task.assignees && task.assignees.length > 0
@@ -129,9 +129,10 @@ export const TaskCard = memo(function TaskCard(props: TaskCardProps) {
 
     const getRiskBadge = (level: string | null) => {
         switch (level) {
-            case 'High': return <Badge variant="destructive" className="gap-1"><ShieldAlert className="w-3 h-3" /> High Risk</Badge>
-            case 'Medium': return <Badge variant="warning" className="gap-1"><ShieldCheck className="w-3 h-3" /> Medium Risk</Badge>
-            default: return null // Low risk doesn't need a badge to reduce noise? Or maybe text-green-600?
+            case 'High': return <Badge variant="destructive" className="gap-1 shadow-sm font-mono tracking-tighter"><ShieldAlert className="w-3 h-3" /> HIGH RISK</Badge>
+            case 'Medium': return <Badge variant="warning" className="gap-1 shadow-sm font-mono tracking-tighter"><ShieldCheck className="w-3 h-3" /> MEDIUM RISK</Badge>
+            case 'Low': return <Badge variant="outline" className="gap-1 text-slate-500 bg-slate-50 border-slate-200 font-mono tracking-tighter"><ShieldCheck className="w-3 h-3" /> LOW RISK</Badge>
+            default: return null
         }
     }
 
@@ -252,15 +253,15 @@ export const TaskCard = memo(function TaskCard(props: TaskCardProps) {
     return (
         <Card
             className={cn(
-                "bg-white transition-all duration-200 flex flex-col h-full group/card relative",
-                isSelectionMode ? "cursor-pointer" : "hover:bg-slate-50 hover:shadow-lg hover:scale-[1.01] active:bg-slate-100 active:scale-[0.99] active:shadow-xl transition-all duration-200",
-                isSelected && isSelectionMode ? "ring-2 ring-slate-500 bg-slate-50/10" : ""
+                "bg-white transition-all duration-300 flex flex-col h-full group/card relative border border-slate-200",
+                isSelectionMode ? "cursor-pointer" : "hover:border-slate-400 hover:shadow-md hover:-translate-y-[2px] active:translate-y-0 active:shadow-sm",
+                isSelected && isSelectionMode ? "ring-2 ring-blue-500 bg-blue-50/10 border-blue-400" : ""
             )}
             onClick={isSelectionMode ? handleCardClick : undefined}
         >
             {isSelectionMode && (
-                <div 
-                    className="absolute top-4 left-4 z-50 pointer-events-auto" 
+                <div
+                    className="absolute top-4 left-4 z-50 pointer-events-auto"
                     onClick={(e) => {
                         e.stopPropagation()
                         if (onToggleSelection) onToggleSelection()
@@ -268,7 +269,7 @@ export const TaskCard = memo(function TaskCard(props: TaskCardProps) {
                 >
                     <Checkbox
                         checked={isSelected}
-                        onCheckedChange={(checked) => {
+                        onCheckedChange={() => {
                             if (onToggleSelection) onToggleSelection()
                         }}
                         aria-label={`Select task ${task.title}`}
@@ -302,7 +303,7 @@ export const TaskCard = memo(function TaskCard(props: TaskCardProps) {
                                 {task.objective.title}
                             </div>
                         )}
-                        <h3 className="font-semibold text-foreground leading-tight group-hover/card:text-blue-700 transition-colors duration-200">
+                        <h3 className="font-playfair font-semibold text-lg text-slate-900 leading-tight group-hover/card:text-blue-700 transition-colors duration-200 tracking-tight">
                             {task.title}
                         </h3>
 
@@ -347,12 +348,17 @@ export const TaskCard = memo(function TaskCard(props: TaskCardProps) {
                                         <div className="flex -space-x-2">
                                             {currentAssignees.length > 0 ? (
                                                 currentAssignees.map((assignee, i) => (
-                                                    <Avatar key={assignee.id} className="h-8 w-8 border-2 border-white ring-1 ring-slate-100" style={{ zIndex: 10 - i }}>
-                                                        {assignee.avatar_url ? (
+                                                    <Avatar key={assignee.id} className="h-8 w-8 border-2 border-white ring-1 ring-slate-100 bg-white" style={{ zIndex: 10 - i }}>
+                                                        {assignee.role === "AI_Agent" ? (
+                                                            <AvatarImage src="/images/ai-agent-avatar.png" className="object-cover" />
+                                                        ) : assignee.avatar_url ? (
                                                             <AvatarImage src={assignee.avatar_url} />
                                                         ) : null}
-                                                        <AvatarFallback className="bg-gradient-to-br from-indigo-500 to-purple-600 text-[10px] text-white font-medium">
-                                                            {getInitials(assignee.full_name)}
+                                                        <AvatarFallback className={cn(
+                                                            "text-[10px] font-medium text-white",
+                                                            assignee.role === "AI_Agent" ? "bg-purple-600" : "bg-gradient-to-br from-slate-600 to-slate-800"
+                                                        )}>
+                                                            {assignee.role === "AI_Agent" ? <Bot className="w-3 h-3" /> : getInitials(assignee.full_name)}
                                                         </AvatarFallback>
                                                     </Avatar>
                                                 ))

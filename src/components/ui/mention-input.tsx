@@ -127,21 +127,33 @@ export function MentionInput({
       />
       
       {showSuggestions && suggestions.length > 0 && (
-        <div className="absolute bottom-full mb-1 left-0 w-full max-w-xs bg-popover border rounded-lg shadow-lg z-50 overflow-hidden">
-          <div className="p-1 text-xs text-muted-foreground border-b">
+        <div 
+          role="listbox"
+          aria-label="Mention suggestions"
+          aria-live="polite"
+          aria-atomic="false"
+          className="absolute bottom-full mb-1 left-0 w-full max-w-xs bg-popover border rounded-lg shadow-lg z-50 overflow-hidden"
+        >
+          <div className="p-1 text-xs text-muted-foreground border-b" aria-hidden="true">
             Type to filter, ↑↓ to navigate, Enter to select
+          </div>
+          <div aria-live="polite" className="sr-only">
+            {suggestions.length} suggestion{suggestions.length !== 1 ? 's' : ''} available
           </div>
           {suggestions.map((profile, index) => (
             <button
               key={profile.id}
               type="button"
+              role="option"
+              aria-selected={index === selectedIndex}
+              id={`mention-option-${profile.id}`}
               onClick={() => insertMention(profile)}
               className={cn(
                 'w-full px-3 py-2 text-left text-sm flex items-center gap-2',
-                index === selectedIndex ? 'bg-slate-100' : 'hover:bg-slate-50'
+                index === selectedIndex ? 'bg-accent' : 'hover:bg-muted'
               )}
             >
-              <div className="w-6 h-6 rounded-full bg-slate-200 flex items-center justify-center text-xs">
+              <div className="w-6 h-6 rounded-full bg-muted flex items-center justify-center text-xs" aria-hidden="true">
                 {profile.full_name[0]}
               </div>
               <div>

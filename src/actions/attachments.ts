@@ -21,7 +21,7 @@ export async function uploadTaskAttachment(taskId: string, formData: FormData) {
         fileType: file.type
     })
     if (!validation.success) {
-        return { error: validation.error }
+        return { error: 'error' in validation ? validation.error : 'Validation failed' }
     }
 
     // Get user's foundry_id using cached helper
@@ -54,8 +54,9 @@ export async function uploadTaskAttachment(taskId: string, formData: FormData) {
     const fileExt = file.name.split('.').pop()
     const fileName = `${taskId}/${Date.now()}.${fileExt}`
 
+    // Use task-files bucket (consolidated storage with proper RLS policies)
     const { error: uploadError } = await supabase.storage
-        .from('task-attachments')
+        .from('task-files')
         .upload(fileName, file)
 
     if (uploadError) {
@@ -65,7 +66,7 @@ export async function uploadTaskAttachment(taskId: string, formData: FormData) {
 
     // Get public URL
     const { data: urlData } = supabase.storage
-        .from('task-attachments')
+        .from('task-files')
         .getPublicUrl(fileName)
 
     // Store reference as a system comment (keeping this for the thread)
@@ -123,9 +124,9 @@ export async function getTaskAttachments(taskId: string) {
         return [] // User doesn't have access to this task's foundry
     }
 
-    // List files in task folder
+    // List files in task folder (using consolidated task-files bucket)
     const { data, error } = await supabase.storage
-        .from('task-attachments')
+        .from('task-files')
         .list(taskId)
 
     if (error || !data) return []
@@ -133,7 +134,7 @@ export async function getTaskAttachments(taskId: string) {
     // Get public URLs for each
     return data.map(file => {
         const { data: urlData } = supabase.storage
-            .from('task-attachments')
+            .from('task-files')
             .getPublicUrl(`${taskId}/${file.name}`)
         // Check if urlData exists before accessing publicUrl
         if (!urlData) {
