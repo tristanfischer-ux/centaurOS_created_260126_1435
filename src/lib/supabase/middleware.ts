@@ -63,6 +63,17 @@ export async function updateSession(request: NextRequest) {
     // Check if route is public
     const isPublicRoute = PUBLIC_ROUTES.some(route => pathname.startsWith(route))
 
+    // Special handling for app domain root: authenticated users go to dashboard
+    if (hostname.includes('centauros.io') && pathname === '/') {
+        if (user) {
+            // User is logged in, redirect to dashboard
+            const dashboardUrl = request.nextUrl.clone()
+            dashboardUrl.pathname = '/dashboard'
+            return NextResponse.redirect(dashboardUrl)
+        }
+        // User not logged in, let middleware below handle redirect to marketing
+    }
+
     if (!user && !isPublicRoute) {
         // no user, redirect to login page on marketing domain
         const marketingDomain = process.env.NEXT_PUBLIC_MARKETING_DOMAIN || 'https://centaurdynamics.io'
