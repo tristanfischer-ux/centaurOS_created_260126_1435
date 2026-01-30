@@ -75,15 +75,15 @@ export default async function PlatformLayout({
                         <ZoomableContent className="flex-1 overflow-y-auto overflow-x-hidden bg-white">
                             {/* 
                               Responsive padding:
-                              - xxs (280px): p-2 - Galaxy Fold outer
-                              - xs (320px): p-3 - Small phones
-                              - sm (640px): p-4 - Standard mobile
-                              - fold (653px): p-5 - Galaxy Fold inner
+                              - xs (320px): p-4 - Small phones
+                              - sm (640px): p-5 - Standard mobile
+                              - fold (653px): p-6 - Galaxy Fold inner
                               - lg (1024px): p-8 - Desktop
                               
                               Bottom padding accounts for mobile nav height (64px + safe area)
+                              Explicit right padding ensures content doesn't touch screen edge
                             */}
-                            <main className="p-4 xs:p-4 sm:p-5 fold:p-6 lg:p-8 pb-24 xs:pb-28 sm:pb-32 lg:pb-8 px-safe">
+                            <main className="p-4 xs:p-4 sm:p-5 fold:p-6 lg:p-8 pb-24 xs:pb-28 sm:pb-32 lg:pb-8 pr-4 sm:pr-5 fold:pr-6 lg:pr-8">
                                 <ErrorBoundary>
                                     {children}
                                 </ErrorBoundary>

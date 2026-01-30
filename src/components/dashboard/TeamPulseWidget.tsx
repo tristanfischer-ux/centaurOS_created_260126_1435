@@ -48,36 +48,36 @@ export function TeamPulseWidget({ members }: TeamPulseWidgetProps) {
     return (
         <Card>
             <CardHeader className="pb-3">
-                <div className="flex items-center justify-between">
-                    <div>
+                <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
                         <CardTitle className="text-base flex items-center gap-2">
-                            <Activity className="h-4 w-4 text-slate-600" />
-                            Team Pulse
+                            <Activity className="h-4 w-4 shrink-0 text-slate-600" />
+                            <span className="truncate">Team Pulse</span>
                         </CardTitle>
-                        <CardDescription>Real-time team availability</CardDescription>
+                        <CardDescription className="truncate">Real-time team availability</CardDescription>
                     </div>
-                    <Badge variant="secondary" className="text-xs">
+                    <Badge variant="secondary" className="text-xs shrink-0 tabular-nums">
                         {onlineCount + focusCount} active
                     </Badge>
                 </div>
             </CardHeader>
             <CardContent className="space-y-4">
                 {/* Status summary */}
-                <div className="flex gap-4 text-xs">
+                <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs">
                     <div className="flex items-center gap-1.5">
-                        <span className="h-2 w-2 rounded-full bg-green-500" />
+                        <span className="h-2 w-2 shrink-0 rounded-full bg-green-500" />
                         <span className="text-slate-600">{onlineCount} online</span>
                     </div>
                     <div className="flex items-center gap-1.5">
-                        <span className="h-2 w-2 rounded-full bg-purple-500" />
+                        <span className="h-2 w-2 shrink-0 rounded-full bg-purple-500" />
                         <span className="text-slate-600">{focusCount} focus</span>
                     </div>
                     <div className="flex items-center gap-1.5">
-                        <span className="h-2 w-2 rounded-full bg-yellow-500" />
+                        <span className="h-2 w-2 shrink-0 rounded-full bg-yellow-500" />
                         <span className="text-slate-600">{awayCount} away</span>
                     </div>
                     <div className="flex items-center gap-1.5">
-                        <span className="h-2 w-2 rounded-full bg-gray-400" />
+                        <span className="h-2 w-2 shrink-0 rounded-full bg-gray-400" />
                         <span className="text-slate-600">{offlineCount} offline</span>
                     </div>
                 </div>
