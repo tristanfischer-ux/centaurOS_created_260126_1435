@@ -77,7 +77,7 @@ export function HistoryDrawer({ open, onOpenChange, taskId, taskTitle }: History
     const getActionBadges = (item: TaskHistoryItem) => {
         switch (item.action_type) {
             case 'CREATED': return <Badge variant="info">Created</Badge>
-            case 'COMPLETED': return <Badge className="bg-slate-900 border-slate-900 text-white hover:bg-slate-800">Completed</Badge>
+            case 'COMPLETED': return <Badge className="bg-accent border-accent text-white hover:bg-accent/90">Completed</Badge>
             case 'STATUS_CHANGE':
                 if (item.changes && typeof item.changes === 'object' && 'new_status' in item.changes) {
                     const changes = item.changes as { new_status?: string }

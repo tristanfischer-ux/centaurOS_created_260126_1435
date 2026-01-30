@@ -88,7 +88,7 @@ export async function logOTJTTime(input: OTJTLogInput) {
   
   if (error) {
     console.error('Error logging OTJT time:', error)
-    return { error: error.message }
+    return { error: sanitizeErrorMessage(error) }
   }
   
   // Notify mentor for approval
@@ -142,7 +142,7 @@ export async function approveOTJTLog(logId: string) {
     })
     .eq('id', logId)
   
-  if (error) return { error: error.message }
+  if (error) return { error: sanitizeErrorMessage(error) }
   
   revalidatePath('/apprenticeship')
   return { success: true }
@@ -191,7 +191,7 @@ export async function rejectOTJTLog(logId: string, reason: string) {
     })
     .eq('id', logId)
   
-  if (error) return { error: error.message }
+  if (error) return { error: sanitizeErrorMessage(error) }
   
   // Notify apprentice of rejection
   await createRejectionNotification(enrollment.apprentice_id, logId, reason)
@@ -222,7 +222,7 @@ export async function queryOTJTLog(logId: string, message: string) {
     })
     .eq('id', logId)
   
-  if (error) return { error: error.message }
+  if (error) return { error: sanitizeErrorMessage(error) }
   
   revalidatePath('/apprenticeship')
   return { success: true }
@@ -301,7 +301,7 @@ export async function getOTJTLogs(
   
   if (error) {
     console.error('Error fetching OTJT logs:', error)
-    return { error: error.message }
+    return { error: sanitizeErrorMessage(error) }
   }
   
   return { logs: logs as OTJTLog[] }
@@ -499,7 +499,7 @@ export async function getPendingOTJTApprovals() {
   
   if (error) {
     console.error('Error fetching pending approvals:', error)
-    return { error: error.message }
+    return { error: sanitizeErrorMessage(error) }
   }
   
   return { logs }

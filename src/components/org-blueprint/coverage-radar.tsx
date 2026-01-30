@@ -91,7 +91,7 @@ export function CoverageRadar({
                         fill="none"
                         stroke="currentColor"
                         strokeWidth="1"
-                        className="text-slate-200"
+                        className="text-muted-foreground/30"
                         strokeDasharray={index < 3 ? "4,4" : undefined}
                     />
                 ))}
@@ -106,7 +106,7 @@ export function CoverageRadar({
                         y2={line.y2}
                         stroke="currentColor"
                         strokeWidth="1"
-                        className="text-slate-200"
+                        className="text-muted-foreground/30"
                     />
                 ))}
 
@@ -265,7 +265,7 @@ export function CoverageRadarCompact({
                     fill="none"
                     stroke="currentColor"
                     strokeWidth="1"
-                    className="text-slate-200"
+                    className="text-muted-foreground/30"
                 />
 
                 {/* Coverage area */}

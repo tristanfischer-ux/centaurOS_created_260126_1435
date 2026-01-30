@@ -228,7 +228,7 @@ export function FullTaskView({ open, onOpenChange, task, members, currentUserId 
     const getActionBadge = (actionType: string, changes: any) => {
         switch (actionType) {
             case 'CREATED': return <Badge variant="info" className="text-[10px]">Created</Badge>
-            case 'COMPLETED': return <Badge className="bg-slate-900 text-white text-[10px]">Completed</Badge>
+            case 'COMPLETED': return <Badge className="bg-foreground text-background text-[10px]">Completed</Badge>
             case 'STATUS_CHANGE':
                 if (changes && typeof changes === 'object' && 'new_status' in changes) {
                     const statusColor = getStatusColor(changes.new_status)
@@ -250,7 +250,7 @@ export function FullTaskView({ open, onOpenChange, task, members, currentUserId 
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="max-w-[calc(100vw-300px)] w-full h-[90vh] p-0 gap-0 flex flex-col overflow-hidden">
                 {/* Header */}
-                <DialogHeader className="p-6 pb-4 border-b border-slate-100 shrink-0">
+                <DialogHeader className="p-6 pb-4 border-b border shrink-0">
                     <div className="flex items-start justify-between gap-4">
                         <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 mb-2 flex-wrap">
@@ -266,7 +266,7 @@ export function FullTaskView({ open, onOpenChange, task, members, currentUserId 
                                 {task.title}
                             </DialogTitle>
                             {task.objective && (
-                                <p className="text-sm text-blue-600 mt-1">
+                                <p className="text-sm text-electric-blue mt-1">
                                     {task.objective.title}
                                 </p>
                             )}
@@ -312,7 +312,7 @@ export function FullTaskView({ open, onOpenChange, task, members, currentUserId 
                                         <span className="text-muted-foreground">Due:</span>
                                         <span className={cn(
                                             "font-medium",
-                                            task.end_date && new Date(task.end_date) < new Date() && task.status !== 'Completed' && "text-red-600"
+                                            task.end_date && new Date(task.end_date) < new Date() && task.status !== 'Completed' && "text-destructive"
                                         )}>
                                             {task.end_date ? format(new Date(task.end_date), "MMM d, yyyy") : "Not set"}
                                         </span>
@@ -334,7 +334,7 @@ export function FullTaskView({ open, onOpenChange, task, members, currentUserId 
                                                                 ) : null}
                                                                 <AvatarFallback className={cn(
                                                                     "text-[10px] text-white",
-                                                                    a.role === "AI_Agent" ? "bg-purple-600" : "bg-slate-600"
+                                                                    a.role === "AI_Agent" ? "bg-purple-600" : "bg-muted"
                                                                 )}>
                                                                     {a.role === "AI_Agent" ? <Bot className="w-3 h-3" /> : getInitials(a.full_name)}
                                                                 </AvatarFallback>
@@ -363,7 +363,7 @@ export function FullTaskView({ open, onOpenChange, task, members, currentUserId 
                             <div
                                 className={cn(
                                     "border-2 border-dashed rounded-lg p-4 text-center transition-colors cursor-pointer",
-                                    isUploading ? "border-blue-300 bg-blue-50 cursor-wait" : isDragging ? "border-blue-500 bg-blue-50" : "border hover:border-slate-300",
+                                    isUploading ? "border-electric-blue bg-electric-blue-light cursor-wait" : isDragging ? "border-electric-blue bg-electric-blue-light" : "border hover:border-muted",
                                     isUploading && "pointer-events-none"
                                 )}
                                 onClick={() => !isUploading && fileInputRef.current?.click()}
@@ -379,8 +379,8 @@ export function FullTaskView({ open, onOpenChange, task, members, currentUserId 
                             >
                                 {isUploading ? (
                                     <div className="flex items-center justify-center gap-2">
-                                        <Loader2 className="h-5 w-5 text-blue-600 animate-spin" />
-                                        <span className="text-blue-600 font-medium">Uploading...</span>
+                                        <Loader2 className="h-5 w-5 text-electric-blue animate-spin" />
+                                        <span className="text-electric-blue font-medium">Uploading...</span>
                                     </div>
                                 ) : (
                                     <div className="flex items-center justify-center gap-2">
@@ -457,16 +457,16 @@ export function FullTaskView({ open, onOpenChange, task, members, currentUserId 
                                 </div>
                             ) : humanNotes.length === 0 ? (
                                 <div className="bg-muted rounded-lg p-8 text-center">
-                                    <MessageSquare className="h-8 w-8 text-slate-300 mx-auto mb-2" />
+                                    <MessageSquare className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
                                     <p className="text-muted-foreground">No notes yet. Be the first to add one!</p>
                                 </div>
                             ) : (
                                 <div className="space-y-3">
                                     {humanNotes.map((comment) => (
-                                        <div key={comment.id} className="bg-background border border-slate-200 rounded-lg p-4">
+                                        <div key={comment.id} className="bg-background border rounded-lg p-4">
                                             <div className="flex items-start gap-3">
                                                 <Avatar className="h-8 w-8 shrink-0">
-                                                    <AvatarFallback className="text-xs bg-blue-100 text-blue-700 font-medium">
+                                                    <AvatarFallback className="text-xs bg-electric-blue-light text-electric-blue font-medium">
                                                         {comment.user?.full_name?.substring(0, 2).toUpperCase() || 'U'}
                                                     </AvatarFallback>
                                                 </Avatar>
@@ -509,7 +509,7 @@ export function FullTaskView({ open, onOpenChange, task, members, currentUserId 
                                 </div>
                             ) : (history.length === 0 && systemLogs.length === 0) ? (
                                 <div className="bg-muted rounded-lg p-8 text-center">
-                                    <History className="h-8 w-8 text-slate-300 mx-auto mb-2" />
+                                    <History className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
                                     <p className="text-muted-foreground">No activity logged yet.</p>
                                 </div>
                             ) : (
@@ -526,7 +526,7 @@ export function FullTaskView({ open, onOpenChange, task, members, currentUserId 
                                                 <div key={`${entry.type}-${entry.type === 'history' ? entry.item.id : entry.item.id}`} className="relative pl-6">
                                                     <div className={cn(
                                                         "absolute -left-[5px] top-1.5 h-2 w-2 rounded-full",
-                                                        entry.type === 'history' ? "bg-slate-400" : "bg-blue-400"
+                                                        entry.type === 'history' ? "bg-muted-foreground" : "bg-electric-blue"
                                                     )} />
                                                     {entry.type === 'history' ? (
                                                         <div className="flex items-center gap-2 flex-wrap text-sm">

@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { getFoundryIdCached } from '@/lib/supabase/foundry-context'
 import { FunctionCategory } from '@/types/org-blueprint'
+import { sanitizeErrorMessage } from '@/lib/security/sanitize'
 
 // Database types (matching the migration schema)
 interface DBBusinessFunction {
@@ -92,7 +93,7 @@ export async function getBusinessFunctions(): Promise<{ data: BusinessFunctionWi
 
     if (coverageError) {
         console.error('Error fetching coverage:', coverageError)
-        return { data: null, error: coverageError.message }
+        return { data: null, error: sanitizeErrorMessage(coverageError) }
     }
 
     // Create a map of coverage by function_id
@@ -231,7 +232,7 @@ export async function initializeBusinessFunctions(): Promise<{ error: string | n
 
     if (error) {
         console.error('Error initializing coverage:', error)
-        return { error: error.message }
+        return { error: sanitizeErrorMessage(error) }
     }
 
     revalidatePath('/org-blueprint')
@@ -268,7 +269,7 @@ export async function updateFunctionStatus(
 
     if (error) {
         console.error('Error updating function status:', error)
-        return { error: error.message }
+        return { error: sanitizeErrorMessage(error) }
     }
 
     revalidatePath('/org-blueprint')
@@ -307,7 +308,7 @@ export async function saveAssessment(answers: {
 
         if (error) {
             console.error('Error updating function:', error)
-            return { error: `Failed to update function: ${error.message}` }
+            return { error: `Failed to update function: ${sanitizeErrorMessage(error)}` }
         }
     }
 

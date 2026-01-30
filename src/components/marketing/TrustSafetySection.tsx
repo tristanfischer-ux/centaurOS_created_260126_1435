@@ -4,7 +4,7 @@ import { BadgeCheck } from "lucide-react";
 
 export function TrustSafetySection() {
     return (
-        <section className="py-24 bg-slate-900 text-white relative overflow-hidden">
+        <section className="py-24 bg-foreground text-background relative overflow-hidden">
             <div className="absolute inset-0 opacity-10 bg-[url('https://grainy-gradients.vercel.app/noise.svg')]"></div>
 
             <div className="container mx-auto px-6 text-center relative z-10">
@@ -14,7 +14,7 @@ export function TrustSafetySection() {
 
                 <h2 className="text-4xl md:text-5xl font-display mb-6 tracking-tight">VERIFIED EXECUTION.</h2>
 
-                <p className="text-xl md:text-2xl font-light text-slate-300 max-w-3xl mx-auto mb-12">
+                <p className="text-xl md:text-2xl font-light text-muted-foreground max-w-3xl mx-auto mb-12">
                     Speed without safety is negligence. Every critical output is verified by a Senior Fractional Executive before it reaches you.
                     The 'Centaur Stamp' is our guarantee of quality.
                 </p>

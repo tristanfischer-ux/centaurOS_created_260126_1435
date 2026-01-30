@@ -22,7 +22,7 @@ const COVERAGE_ITEMS: CoverageItem[] = [
     },
     {
         label: "Gap",
-        color: "bg-slate-300",
+        color: "bg-muted-foreground/50",
         icon: AlertTriangle,
     },
 ]

@@ -42,19 +42,19 @@ const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 
 function getStatusColor(status: AvailabilityStatus | null, isCurrentMonth: boolean): string {
     if (!isCurrentMonth) {
-        return 'bg-muted text-slate-300'
+        return 'bg-muted text-muted-foreground'
     }
     
     switch (status) {
         case 'available':
-            return 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200 border-emerald-200'
+            return 'bg-status-success-light text-status-success-dark hover:bg-status-success-light/80 border-status-success'
         case 'booked':
-            return 'bg-blue-100 text-blue-800 border cursor-not-allowed'
+            return 'bg-status-info-light text-status-info-dark border cursor-not-allowed'
         case 'blocked':
-            return 'bg-slate-200 text-muted-foreground hover:bg-slate-300 border-slate-300'
+            return 'bg-muted text-muted-foreground hover:bg-muted/80 border-muted'
         default:
             // Default: treat as available (no slot = available)
-            return 'bg-background text-foreground hover:bg-emerald-50 border-slate-200'
+            return 'bg-background text-foreground hover:bg-status-success-light border-muted'
     }
 }
 
@@ -175,9 +175,9 @@ export function AvailabilityCalendar({
 
     if (error) {
         return (
-            <Card className={cn("border-red-100 bg-red-50/50", className)}>
+            <Card className={cn("border-destructive/20 bg-status-error-light/50", className)}>
                 <CardContent className="pt-6">
-                    <p className="text-red-600 text-center">{error}</p>
+                    <p className="text-destructive text-center">{error}</p>
                 </CardContent>
             </Card>
         )
@@ -236,7 +236,7 @@ export function AvailabilityCalendar({
                                             variant="secondary" 
                                             size="sm"
                                             disabled={isLoading || isPending}
-                                            className="text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
+                                            className="text-status-success-dark hover:text-status-success-dark hover:bg-status-success-light"
                                         >
                                             <CalendarCheck className="h-4 w-4 mr-1.5" />
                                             Make Available
@@ -298,7 +298,7 @@ export function AvailabilityCalendar({
                                     size="sm"
                                     onClick={handleBulkOpen}
                                     disabled={isLoading || isPending}
-                                    className="text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
+                                    className="text-status-success-dark hover:text-status-success-dark hover:bg-status-success-light"
                                 >
                                     Open Entire Month
                                 </Button>
@@ -321,19 +321,19 @@ export function AvailabilityCalendar({
                 {/* Stats Bar */}
                 <div className="flex gap-4 mb-4 text-sm">
                     <div className="flex items-center gap-1.5">
-                        <div className="w-3 h-3 rounded bg-emerald-100 border border-emerald-200" />
+                        <div className="w-3 h-3 rounded bg-status-success-light border border-status-success" />
                         <span className="text-muted-foreground">
                             Available: <strong>{stats.available}</strong>
                         </span>
                     </div>
                     <div className="flex items-center gap-1.5">
-                        <div className="w-3 h-3 rounded bg-blue-100 border border-blue-200" />
+                        <div className="w-3 h-3 rounded bg-status-info-light border border-status-info" />
                         <span className="text-muted-foreground">
                             Booked: <strong>{stats.booked}</strong>
                         </span>
                     </div>
                     <div className="flex items-center gap-1.5">
-                        <div className="w-3 h-3 rounded bg-slate-200 border border-slate-300" />
+                        <div className="w-3 h-3 rounded bg-muted border border-muted" />
                         <span className="text-muted-foreground">
                             Blocked: <strong>{stats.blocked}</strong>
                         </span>
@@ -343,8 +343,8 @@ export function AvailabilityCalendar({
                 {/* Calendar Grid */}
                 <div className="relative">
                     {(isLoading || isPending) && (
-                        <div className="absolute inset-0 bg-white/50 flex items-center justify-center z-10 rounded-lg">
-                            <div className="animate-spin h-6 w-6 border-2 border-slate-300 border-t-slate-600 rounded-full" />
+                        <div className="absolute inset-0 bg-background/50 flex items-center justify-center z-10 rounded-lg">
+                            <div className="animate-spin h-6 w-6 border-2 border-muted border-t-foreground rounded-full" />
                         </div>
                     )}
 
@@ -374,7 +374,7 @@ export function AvailabilityCalendar({
                                     className={cn(
                                         "relative aspect-square p-1 rounded-lg border text-sm font-medium transition-all",
                                         getStatusColor(day.status, day.isCurrentMonth),
-                                        isToday(day.date) && day.isCurrentMonth && "ring-2 ring-amber-400 ring-offset-1",
+                                        isToday(day.date) && day.isCurrentMonth && "ring-2 ring-status-warning ring-offset-1",
                                         isPast && day.isCurrentMonth && "opacity-50",
                                         isClickable && "cursor-pointer",
                                         !isClickable && "cursor-default"
@@ -386,12 +386,12 @@ export function AvailabilityCalendar({
                                     
                                     {/* Booked indicator */}
                                     {day.isBooked && (
-                                        <Lock className="absolute top-0.5 right-0.5 h-3 w-3 text-blue-500" />
+                                        <Lock className="absolute top-0.5 right-0.5 h-3 w-3 text-status-info" />
                                     )}
 
                                     {/* Today indicator */}
                                     {isToday(day.date) && day.isCurrentMonth && (
-                                        <span className="absolute bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 bg-amber-500 rounded-full" />
+                                        <span className="absolute bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 bg-status-warning rounded-full" />
                                     )}
                                 </button>
                             )
@@ -401,7 +401,7 @@ export function AvailabilityCalendar({
 
                 {/* Legend */}
                 {showLegend && (
-                    <div className="mt-6 pt-4 border-t border-slate-100">
+                    <div className="mt-6 pt-4 border-t border-muted">
                         <p className="text-xs text-muted-foreground">
                             <strong>Click</strong> on a day to toggle availability. 
                             <span className="inline-flex items-center gap-1 ml-2">
@@ -449,7 +449,7 @@ export function AvailabilityPreview({ providerId, className }: AvailabilityPrevi
             </CardHeader>
             <CardContent>
                 <div className="flex items-center justify-between mb-3">
-                    <span className="text-2xl font-bold text-emerald-600">
+                    <span className="text-2xl font-bold text-status-success-dark">
                         {available}
                     </span>
                     <span className="text-sm text-muted-foreground">
@@ -465,10 +465,10 @@ export function AvailabilityPreview({ providerId, className }: AvailabilityPrevi
                             className={cn(
                                 "aspect-square rounded-sm",
                                 day.status === 'available' || day.status === null 
-                                    ? 'bg-emerald-200' 
+                                    ? 'bg-status-success-light' 
                                     : day.status === 'booked' 
-                                        ? 'bg-blue-200' 
-                                        : 'bg-slate-200'
+                                        ? 'bg-status-info-light' 
+                                        : 'bg-muted'
                             )}
                         />
                     ))}
@@ -476,13 +476,13 @@ export function AvailabilityPreview({ providerId, className }: AvailabilityPrevi
 
                 <div className="mt-3 flex gap-3 text-xs text-muted-foreground">
                     <span className="flex items-center gap-1">
-                        <div className="w-2 h-2 rounded-sm bg-emerald-200" /> Available
+                        <div className="w-2 h-2 rounded-sm bg-status-success-light" /> Available
                     </span>
                     <span className="flex items-center gap-1">
-                        <div className="w-2 h-2 rounded-sm bg-blue-200" /> Booked
+                        <div className="w-2 h-2 rounded-sm bg-status-info-light" /> Booked
                     </span>
                     <span className="flex items-center gap-1">
-                        <div className="w-2 h-2 rounded-sm bg-slate-200" /> Blocked
+                        <div className="w-2 h-2 rounded-sm bg-muted" /> Blocked
                     </span>
                 </div>
             </CardContent>

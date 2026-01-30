@@ -25,7 +25,7 @@ const osComponents = [
 
 export function EcosystemSection() {
     return (
-        <section id="os" className="py-32 bg-white">
+        <section id="os" className="py-32 bg-background">
             <div className="max-w-7xl mx-auto px-6">
                 {/* Section Header */}
                 <div className="mb-20 max-w-2xl">
@@ -45,7 +45,7 @@ export function EcosystemSection() {
                     {osComponents.map((item, index) => (
                         <div
                             key={item.title}
-                            className="group relative h-[600px] w-full bg-slate-900 overflow-hidden"
+                            className="group relative h-[600px] w-full bg-foreground overflow-hidden"
                         >
                             {/* Background Image */}
                             <Image
@@ -66,11 +66,11 @@ export function EcosystemSection() {
                                 <h3 className="text-3xl font-display font-medium text-white tracking-tight mb-4">
                                     {item.title}
                                 </h3>
-                                <p className="text-slate-300 leading-relaxed text-sm mb-6 max-w-sm">
+                                <p className="text-muted-foreground leading-relaxed text-sm mb-6 max-w-sm">
                                     &ldquo;{item.description}&rdquo;
                                 </p>
 
-                                <div className="h-[1px] w-full bg-slate-700 mt-6 mb-6 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-700 origin-left" />
+                                <div className="h-[1px] w-full bg-muted mt-6 mb-6 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-700 origin-left" />
 
                                 <div className="flex items-center gap-2 text-xs font-mono text-muted-foreground uppercase tracking-widest">
                                     <span className="w-2 h-2 bg-international-orange rounded-full" />

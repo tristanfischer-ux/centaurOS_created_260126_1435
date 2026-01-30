@@ -172,7 +172,7 @@ export function CertificationsView({ certifications, error }: CertificationsView
                 <div className="space-y-4">
                     <div className="flex items-center justify-between">
                         <h2 className="text-lg font-semibold flex items-center gap-2">
-                            <span className="w-2 h-2 rounded-full bg-slate-400" />
+                            <span className="w-2 h-2 rounded-full bg-muted-foreground" />
                             Pending Verification ({pending.length})
                         </h2>
                     </div>

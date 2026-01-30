@@ -34,9 +34,9 @@ export function TalentSection() {
                 </div>
 
                 {/* Visual / Image Placeholder */}
-                <div className="aspect-square bg-slate-200 relative overflow-hidden grayscale hover:grayscale-0 transition-all duration-700">
+                <div className="aspect-square bg-muted relative overflow-hidden grayscale hover:grayscale-0 transition-all duration-700">
                     {/* Abstract visual of a bust or sleek "scholar" */}
-                    <div className="absolute inset-0 bg-slate-300 animate-pulse"></div>
+                    <div className="absolute inset-0 bg-muted animate-pulse"></div>
                     <div className="absolute bottom-4 left-4 font-mono text-white text-xs z-10">
                         FIGURE: 04<br />CLASS: ARCHITECT
                     </div>

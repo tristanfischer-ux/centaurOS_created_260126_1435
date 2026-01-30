@@ -70,13 +70,13 @@ export function QuickAddTask({ objectives, members, currentUserId, teams = [], o
                 data-quick-add-trigger
                 onClick={() => setIsExpanded(true)}
                 aria-label="Add a new task (keyboard shortcut: N)"
-                className="w-full flex items-center gap-3 px-4 py-3.5 text-muted-foreground hover:text-foreground border-2 border-dashed border hover:border-slate-400 rounded-lg bg-muted/50 hover:bg-background transition-all duration-200 group"
+                className="w-full flex items-center gap-3 px-4 py-3.5 text-muted-foreground hover:text-foreground border-2 border-dashed border hover:border rounded-lg bg-muted/50 hover:bg-background transition-all duration-200 group"
             >
-                <div className="flex items-center justify-center w-6 h-6 rounded-full bg-slate-200 group-hover:bg-orange-500 transition-colors duration-200">
+                <div className="flex items-center justify-center w-6 h-6 rounded-full bg-muted group-hover:bg-international-orange transition-colors duration-200">
                     <Plus className="w-3.5 h-3.5 text-muted-foreground group-hover:text-white transition-colors duration-200" aria-hidden="true" />
                 </div>
                 <span className="text-sm font-medium">Add a task...</span>
-                <kbd className="ml-auto px-2 py-0.5 text-[10px] font-mono bg-muted group-hover:bg-slate-200 text-muted-foreground group-hover:text-muted-foreground rounded border border-slate-200 transition-colors duration-200">N</kbd>
+                <kbd className="ml-auto px-2 py-0.5 text-[10px] font-mono bg-muted group-hover:bg-secondary text-muted-foreground group-hover:text-muted-foreground rounded border border-muted transition-colors duration-200">N</kbd>
             </button>
         )
     }

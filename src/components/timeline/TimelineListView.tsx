@@ -51,7 +51,7 @@ function getInitials(fullName: string | null | undefined): string {
 
 // Avatar color based on name (consistent color per person)
 function getAvatarColor(name: string | null | undefined): string {
-    if (!name) return "bg-slate-400"
+    if (!name) return "bg-muted-foreground/50"
     const colors = [
         "bg-blue-500", "bg-green-500", "bg-purple-500", "bg-pink-500",
         "bg-indigo-500", "bg-teal-500", "bg-orange-500", "bg-cyan-500"

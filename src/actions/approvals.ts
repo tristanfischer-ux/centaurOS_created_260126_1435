@@ -4,6 +4,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { getFoundryIdCached } from '@/lib/supabase/foundry-context'
+import { sanitizeErrorMessage } from '@/lib/security/sanitize'
 
 export interface ApprovalDelegation {
     id: string
@@ -48,7 +49,7 @@ export async function getMyDelegations(): Promise<{ data: ApprovalDelegation[]; 
 
         if (error) {
             console.error('Error fetching delegations:', error)
-            return { data: [], error: error.message }
+            return { data: [], error: sanitizeErrorMessage(error) }
         }
 
         return { 
@@ -85,7 +86,7 @@ export async function getDelegationsToMe(): Promise<{ data: ApprovalDelegation[]
 
         if (error) {
             console.error('Error fetching delegations to me:', error)
-            return { data: [], error: error.message }
+            return { data: [], error: sanitizeErrorMessage(error) }
         }
 
         return { 
@@ -135,7 +136,7 @@ export async function createDelegation(formData: {
 
         if (error) {
             console.error('Error creating delegation:', error)
-            return { data: null, error: error.message }
+            return { data: null, error: sanitizeErrorMessage(error) }
         }
 
         revalidatePath('/settings')
@@ -169,7 +170,7 @@ export async function revokeDelegation(delegationId: string): Promise<{ error: s
 
         if (error) {
             console.error('Error revoking delegation:', error)
-            return { error: error.message }
+            return { error: sanitizeErrorMessage(error) }
         }
 
         revalidatePath('/settings')
@@ -292,7 +293,7 @@ export async function escalateTask(taskId: string, reason?: string): Promise<{ e
 
         if (error) {
             console.error('Error escalating task:', error)
-            return { error: error.message }
+            return { error: sanitizeErrorMessage(error) }
         }
 
         revalidatePath('/tasks')
@@ -322,7 +323,7 @@ export async function getAllDelegations(): Promise<{ data: ApprovalDelegation[];
 
         if (error) {
             console.error('Error fetching all delegations:', error)
-            return { data: [], error: error.message }
+            return { data: [], error: sanitizeErrorMessage(error) }
         }
 
         return { 

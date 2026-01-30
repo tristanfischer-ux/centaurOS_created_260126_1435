@@ -305,7 +305,7 @@ export function CreateObjectiveDialog({ children }: CreateObjectiveDialogProps) 
         <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
                 {children || (
-                    <Button size="sm" className="bg-background text-black hover:bg-gray-200 border border-transparent shadow-sm">
+                    <Button size="sm" className="bg-background text-foreground hover:bg-muted border border-transparent shadow-sm">
                         <Plus className="h-4 w-4" /> New Objective
                     </Button>
                 )}
@@ -355,7 +355,7 @@ export function CreateObjectiveDialog({ children }: CreateObjectiveDialogProps) 
                                     className={cn(
                                         "flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-all duration-200",
                                         mode === m
-                                            ? "bg-slate-900 text-white shadow-md"
+                                            ? "bg-foreground text-background shadow-md"
                                             : "bg-background text-muted-foreground hover:bg-muted shadow-sm",
                                         isDisabled && "opacity-50 cursor-not-allowed"
                                     )}
@@ -369,7 +369,7 @@ export function CreateObjectiveDialog({ children }: CreateObjectiveDialogProps) 
                 </div>
 
                 {/* Main Content Area */}
-                <ScrollArea className="flex-1 bg-white">
+                <ScrollArea className="flex-1 bg-background">
                     <div className="p-6">
 
                         {/* MANUAL MODE */}
@@ -479,7 +479,7 @@ export function CreateObjectiveDialog({ children }: CreateObjectiveDialogProps) 
                                                             onClick={() => setSelectedCategory(selectedCategory === cat ? null : cat)}
                                                             className={cn(
                                                                 "px-3 py-1 rounded-full text-sm",
-                                                                selectedCategory === cat ? "bg-slate-900 text-white" : "bg-muted"
+                                                                selectedCategory === cat ? "bg-foreground text-background" : "bg-muted"
                                                             )}
                                                         >
                                                             {cat}
@@ -492,7 +492,7 @@ export function CreateObjectiveDialog({ children }: CreateObjectiveDialogProps) 
                                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                                             {isPackLoading ? (
                                                 <div className="col-span-full flex items-center justify-center py-20">
-                                                    <Loader2 className="w-8 h-8 animate-spin text-slate-300" />
+                                                    <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
                                                 </div>
                                             ) : packError ? (
                                                 <div className="col-span-full border-2 border-dashed border-destructive/20 rounded-lg">
@@ -541,8 +541,8 @@ export function CreateObjectiveDialog({ children }: CreateObjectiveDialogProps) 
                                                             }}
                                                         >
                                                             <CardHeader className="space-y-1">
-                                                                <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center mb-2 group-hover:bg-blue-50 group-hover:text-blue-600 transition-colors">
-                                                                    <Icon className="w-5 h-5 text-muted-foreground group-hover:text-blue-600" />
+                                                                <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center mb-2 group-hover:bg-electric-blue-light group-hover:text-electric-blue transition-colors">
+                                                                    <Icon className="w-5 h-5 text-muted-foreground group-hover:text-electric-blue" />
                                                                 </div>
                                                                 <CardTitle className="text-lg">{pack.title}</CardTitle>
                                                                 <CardDescription className="line-clamp-2">{pack.description}</CardDescription>
@@ -589,7 +589,7 @@ export function CreateObjectiveDialog({ children }: CreateObjectiveDialogProps) 
                                                     </div>
                                                     <span>{selectedTaskIds.length} of {selectedPack.items?.length || 0} selected</span>
                                                 </div>
-                                                <div className="divide-y divide-slate-100">
+                                                <div className="divide-y divide-muted">
                                                     {selectedPack.items?.map((item) => (
                                                         <div key={item.id} className="p-4 flex items-start gap-4 hover:bg-muted/50 transition-colors">
                                                             <div className="mt-1">
@@ -625,7 +625,7 @@ export function CreateObjectiveDialog({ children }: CreateObjectiveDialogProps) 
                                 {!analyzedObjectives.length && !isAnalyzing ? (
                                     <div className="w-full">
                                         <div
-                                            className="bg-muted/50 rounded-xl p-12 flex flex-col items-center justify-center text-center space-y-4 hover:bg-blue-50/20 transition-all cursor-pointer group relative"
+                                            className="bg-muted/50 rounded-xl p-12 flex flex-col items-center justify-center text-center space-y-4 hover:bg-electric-blue-light/20 transition-all cursor-pointer group relative"
                                         >
                                             <Input
                                                 type="file"
@@ -633,8 +633,8 @@ export function CreateObjectiveDialog({ children }: CreateObjectiveDialogProps) 
                                                 className="absolute inset-0 opacity-0 cursor-pointer h-full z-10"
                                                 onChange={handleFileUpload}
                                             />
-                                            <div className="w-16 h-16 rounded-full bg-blue-50 flex items-center justify-center group-hover:scale-110 transition-transform">
-                                                <Upload className="w-8 h-8 text-blue-600" />
+                                            <div className="w-16 h-16 rounded-full bg-electric-blue-light flex items-center justify-center group-hover:scale-110 transition-transform">
+                                                <Upload className="w-8 h-8 text-electric-blue" />
                                             </div>
                                             <div className="space-y-2">
                                                 <h3 className="text-lg font-semibold text-foreground">Upload Business Plan</h3>
@@ -648,7 +648,7 @@ export function CreateObjectiveDialog({ children }: CreateObjectiveDialogProps) 
                                 ) : isAnalyzing ? (
                                     <div className="flex flex-col items-center justify-center py-20 space-y-6">
                                         <div className="relative">
-                                            <div className="w-16 h-16 rounded-full bg-muted border-t-4 border-t-blue-600 animate-spin"></div>
+                                            <div className="w-16 h-16 rounded-full bg-muted border-t-4 border-t-electric-blue animate-spin"></div>
                                             <div className="absolute inset-0 flex items-center justify-center">
                                                 <img src="/icons/sparkles.svg" className="w-6 h-6 opacity-20" alt="" />
                                             </div>
@@ -701,13 +701,13 @@ export function CreateObjectiveDialog({ children }: CreateObjectiveDialogProps) 
                                                     className={cn(
                                                         "p-4 rounded-xl border text-left cursor-pointer transition-all",
                                                         selectedAnalysisIndex === idx
-                                                            ? "border-blue-600 bg-blue-50/30 ring-1 ring-blue-600 shadow-sm"
-                                                            : "hover:shadow-md bg-white"
+                                                            ? "border-electric-blue bg-electric-blue-light/30 ring-1 ring-electric-blue shadow-sm"
+                                                            : "hover:shadow-md bg-background"
                                                     )}
                                                 >
                                                     <div className="flex justify-between items-start mb-2">
                                                         <h4 className="font-semibold text-foreground">{obj.title}</h4>
-                                                        {selectedAnalysisIndex === idx && <Check className="w-4 h-4 text-blue-600" />}
+                                                        {selectedAnalysisIndex === idx && <Check className="w-4 h-4 text-electric-blue" />}
                                                     </div>
                                                     <p className="text-sm text-muted-foreground line-clamp-2">{obj.description}</p>
                                                     <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
@@ -743,7 +743,7 @@ export function CreateObjectiveDialog({ children }: CreateObjectiveDialogProps) 
                                                         setDescription(e.target.value)
                                                         setDescriptionError(null)
                                                     }}
-                                                    className={cn("resize-none h-24 bg-white", descriptionError && "border-destructive")}
+                                                    className={cn("resize-none h-24 bg-background", descriptionError && "border-destructive")}
                                                     aria-describedby={descriptionError ? "description-error-import" : undefined}
                                                     aria-invalid={!!descriptionError}
                                                 />

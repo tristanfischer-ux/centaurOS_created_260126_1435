@@ -585,11 +585,11 @@ export function MarketplaceView({
 
                 {/* AI Recommendations Panel */}
                 {recommendations.length > 0 && (
-                    <Card className="bg-gradient-to-r from-amber-50 to-orange-50 border-amber-200">
+                    <Card className="bg-gradient-to-r from-status-warning-light to-orange-50 border-status-warning">
                         <div className="p-4">
                             <div className="flex items-center gap-2 mb-3">
-                                <Sparkles className="h-5 w-5 text-amber-600" />
-                                <h3 className="font-semibold text-amber-900">Recommended for You</h3>
+                                <Sparkles className="h-5 w-5 text-status-warning" />
+                                <h3 className="font-semibold text-foreground">Recommended for You</h3>
                             </div>
                             <div className="flex flex-wrap gap-2">
                                 {recommendations.map((rec) => (
@@ -601,11 +601,11 @@ export function MarketplaceView({
                                                 setSearchQuery(rec.search_term)
                                             }
                                         }}
-                                        className="flex items-center gap-2 px-3 py-2 bg-background rounded border border-amber-200 hover:border-amber-400 hover:shadow-sm transition-all text-left"
+                                        className="flex items-center gap-2 px-3 py-2 bg-background rounded border border-status-warning hover:border-status-warning hover:shadow-sm transition-all text-left"
                                     >
                                         <div>
                                             <div className="flex items-center gap-1.5">
-                                                <Badge variant="secondary" className="text-[10px] bg-amber-100 text-amber-700 border-amber-300">
+                                                <Badge variant="secondary" className="text-[10px] bg-status-warning-light text-status-warning-dark border-status-warning">
                                                     {rec.source_type === 'coverage_gap' ? 'Gap' : rec.source_type === 'advisory' ? 'Q&A' : 'AI'}
                                                 </Badge>
                                                 <span className="text-sm font-medium text-foreground">
@@ -618,7 +618,7 @@ export function MarketplaceView({
                                                 </p>
                                             )}
                                         </div>
-                                        <ArrowRight className="h-3 w-3 text-amber-600 shrink-0" />
+                                        <ArrowRight className="h-3 w-3 text-status-warning shrink-0" />
                                     </button>
                                 ))}
                             </div>
@@ -716,7 +716,7 @@ export function MarketplaceView({
 
                         {/* People Filters Panel */}
                         {activeTab === 'People' && showFilters && (
-                            <div className="bg-muted rounded border border-slate-200 p-4 space-y-4 hidden md:block">
+                            <div className="bg-muted rounded border border-muted p-4 space-y-4 hidden md:block">
                                 <div className="flex items-center justify-between">
                                     <h3 className="font-medium text-sm">Filter People</h3>
                                     {hasActiveFilters && (
@@ -823,7 +823,7 @@ export function MarketplaceView({
 
                         {/* Products Filters Panel */}
                         {activeTab === 'Products' && showFilters && (
-                            <div className="bg-muted rounded border border-slate-200 p-4 space-y-4 hidden md:block">
+                            <div className="bg-muted rounded border border-muted p-4 space-y-4 hidden md:block">
                                 <div className="flex items-center justify-between">
                                     <h3 className="font-medium text-sm">Filter Products & Manufacturers</h3>
                                     {hasActiveFilters && (
@@ -1168,7 +1168,7 @@ export function MarketplaceView({
                                 const attrs = item.attributes || {}
                                 const primaryMetric = attrs.rate || attrs.cost || attrs.price || null
                                 return (
-                                    <Card key={item.id} className="group relative p-4 border-slate-200 hover:border-orange-300 hover:shadow-md transition-all">
+                                    <Card key={item.id} className="group relative p-4 border hover:border-accent hover:shadow-md transition-all">
                                         {/* Compare button - hover */}
                                         <button
                                             onClick={() => toggleSelect(item.id)}
@@ -1176,7 +1176,7 @@ export function MarketplaceView({
                                                 "absolute top-4 right-4 z-10 w-8 h-8 rounded-full flex items-center justify-center transition-all duration-200",
                                                 selectedIds.has(item.id)
                                                     ? "bg-orange-500 text-white shadow-md"
-                                                    : "bg-white/90 text-slate-600 shadow-md border border-slate-200 opacity-0 group-hover:opacity-100"
+                                                    : "bg-background/90 text-muted-foreground shadow-md border border-muted opacity-0 group-hover:opacity-100"
                                             )}
                                             title={selectedIds.has(item.id) ? "Remove from comparison" : "Add to comparison"}
                                         >
@@ -1193,7 +1193,7 @@ export function MarketplaceView({
                                                                 {item.subcategory}
                                                             </Badge>
                                                             {item.is_verified && (
-                                                                <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                                                                <ShieldCheck className="w-4 h-4 text-status-success" />
                                                             )}
                                                         </div>
                                                         <h3 className="font-semibold text-foreground truncate">{item.title}</h3>
@@ -1241,12 +1241,12 @@ export function MarketplaceView({
                                                     {(attrs.skills || attrs.expertise) && (
                                                         <div className="flex gap-1">
                                                             {(attrs.skills || attrs.expertise || []).slice(0, 3).map((skill: string, i: number) => (
-                                                                <span key={i} className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">
+                                                                <span key={i} className="px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
                                                                     {skill}
                                                                 </span>
                                                             ))}
                                                             {(attrs.skills || attrs.expertise || []).length > 3 && (
-                                                                <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-500">
+                                                                <span className="px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
                                                                     +{(attrs.skills || attrs.expertise).length - 3}
                                                                 </span>
                                                             )}
@@ -1264,7 +1264,7 @@ export function MarketplaceView({
                     {filteredItems.length === 0 && initialListings.length > 0 && (
                         <div className="col-span-full">
                             <EmptyState
-                                icon={<Store className="h-12 w-12 text-slate-300" />}
+                                icon={<Store className="h-12 w-12 text-muted-foreground" />}
                                 title={hasActiveFilters ? "No items match your filters" : "No listings found in this category yet"}
                                 description={hasActiveFilters ? "Try adjusting your filters or search terms." : "Check back later or browse other categories."}
                                 action={hasActiveFilters ? (

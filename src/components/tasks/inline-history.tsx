@@ -59,7 +59,7 @@ export function InlineHistory({ taskId, isOpen, onClose }: InlineHistoryProps) {
     const getActionBadge = (item: TaskHistoryItem) => {
         switch (item.action_type) {
             case 'CREATED': return <Badge variant="info" className="text-[10px]">Created</Badge>
-            case 'COMPLETED': return <Badge className="bg-slate-900 text-white text-[10px]">Completed</Badge>
+            case 'COMPLETED': return <Badge className="bg-accent text-white text-[10px]">Completed</Badge>
             case 'STATUS_CHANGE':
                 if (item.changes && typeof item.changes === 'object' && 'new_status' in item.changes) {
                     const changes = item.changes as { new_status?: string }
@@ -105,7 +105,7 @@ export function InlineHistory({ taskId, isOpen, onClose }: InlineHistoryProps) {
                     <div className="relative border-l border ml-1 space-y-3">
                         {history.map((item) => (
                             <div key={item.id} className="relative pl-4">
-                                <div className="absolute -left-[3px] top-1 h-1.5 w-1.5 rounded-full bg-slate-300" />
+                                <div className="absolute -left-[3px] top-1 h-1.5 w-1.5 rounded-full bg-muted-foreground/50" />
                                 <div className="flex items-center gap-2 flex-wrap">
                                     <span className="text-[10px] font-mono text-muted-foreground">
                                         {item.created_at && format(new Date(item.created_at), 'MMM d, HH:mm')}

@@ -4,6 +4,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import type { ProgressReviewInput, SkillAssessmentInput } from '@/types/apprenticeship'
+import { sanitizeErrorMessage } from '@/lib/security/sanitize'
 
 // =============================================
 // PROGRESS REVIEWS
@@ -43,7 +44,7 @@ export async function createProgressReview(input: ProgressReviewInput) {
   
   if (error) {
     console.error('Error creating review:', error)
-    return { error: error.message }
+    return { error: sanitizeErrorMessage(error) }
   }
   
   // Create follow-up tasks from action items (batch insert to fix N+1 pattern)
@@ -116,7 +117,7 @@ export async function completeProgressReview(
     .select('*, enrollment:apprenticeship_enrollments(apprentice_id, foundry_id)')
     .single()
   
-  if (error) return { error: error.message }
+  if (error) return { error: sanitizeErrorMessage(error) }
   
   // Create follow-up tasks (batch insert to fix N+1 pattern)
   if (input.actionItems && input.actionItems.length > 0 && review.enrollment) {
@@ -175,7 +176,7 @@ export async function signProgressReview(reviewId: string) {
     })
     .eq('id', reviewId)
   
-  if (error) return { error: error.message }
+  if (error) return { error: sanitizeErrorMessage(error) }
   
   revalidatePath('/apprenticeship')
   return { success: true }
@@ -214,7 +215,7 @@ export async function getProgressReviews(enrollmentId: string, options?: {
   
   const { data: reviews, error } = await query
   
-  if (error) return { error: error.message }
+  if (error) return { error: sanitizeErrorMessage(error) }
   
   return { reviews }
 }
@@ -237,7 +238,7 @@ export async function getUpcomingReviews(enrollmentId: string) {
     .order('scheduled_date', { ascending: true })
     .limit(5)
   
-  if (error) return { error: error.message }
+  if (error) return { error: sanitizeErrorMessage(error) }
   
   return { reviews }
 }
@@ -279,7 +280,7 @@ export async function assessSkill(input: SkillAssessmentInput) {
     .select()
     .single()
   
-  if (error) return { error: error.message }
+  if (error) return { error: sanitizeErrorMessage(error) }
   
   revalidatePath('/apprenticeship')
   return { success: true, assessment: data }
@@ -333,7 +334,7 @@ export async function getSkillAssessments(enrollmentId: string) {
     .eq('enrollment_id', enrollmentId)
     .order('updated_at', { ascending: false })
   
-  if (error) return { error: error.message }
+  if (error) return { error: sanitizeErrorMessage(error) }
   
   return { assessments }
 }
@@ -470,7 +471,7 @@ export async function startModule(completionId: string) {
     })
     .eq('id', completionId)
   
-  if (error) return { error: error.message }
+  if (error) return { error: sanitizeErrorMessage(error) }
   
   revalidatePath('/apprenticeship')
   return { success: true }
@@ -512,7 +513,7 @@ export async function completeModule(
     })
     .eq('id', completionId)
   
-  if (error) return { error: error.message }
+  if (error) return { error: sanitizeErrorMessage(error) }
   
   // Auto-log OTJT hours if learningModule counts as OTJT
   if (learningModule?.counts_as_otjt && learningModule.estimated_hours > 0) {
@@ -549,7 +550,7 @@ export async function getModuleProgress(enrollmentId: string) {
     .eq('enrollment_id', enrollmentId)
     .order('module(order_index)', { ascending: true })
   
-  if (error) return { error: error.message }
+  if (error) return { error: sanitizeErrorMessage(error) }
   
   const modules = completions || []
   const completed = modules.filter(m => m.status === 'completed').length

@@ -3,6 +3,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { getFoundryIdCached } from '@/lib/supabase/foundry-context'
+import { sanitizeErrorMessage } from '@/lib/security/sanitize'
 
 export interface SheetsIntegrationConfig {
     sheet_id: string | null
@@ -81,7 +82,7 @@ export async function getSheetsIntegration(): Promise<{
     
     if (error) {
         console.error('Error fetching sheets integration:', error)
-        return { config: null, error: error.message }
+        return { config: null, error: sanitizeErrorMessage(error) }
     }
     
     if (!data) {
@@ -186,7 +187,7 @@ export async function updateSheetsIntegration(updates: {
     
     if (error) {
         console.error('Error updating sheets integration:', error)
-        return { error: error.message }
+        return { error: sanitizeErrorMessage(error) }
     }
     
     const record = data as IntegrationRecord
@@ -235,8 +236,9 @@ export async function triggerManualSync(): Promise<{
         })
         
         if (error) {
-            await addSyncError(supabase, foundry_id, error.message)
-            return { error: `Sync failed: ${error.message}` }
+            const sanitizedError = sanitizeErrorMessage(error)
+            await addSyncError(supabase, foundry_id, sanitizedError)
+            return { error: `Sync failed: ${sanitizedError}` }
         }
         
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -254,9 +256,9 @@ export async function triggerManualSync(): Promise<{
         
         return { success: true }
     } catch (err) {
-        const message = err instanceof Error ? err.message : 'Unknown error'
-        await addSyncError(supabase, foundry_id, message)
-        return { error: `Sync failed: ${message}` }
+        const sanitizedError = sanitizeErrorMessage(err)
+        await addSyncError(supabase, foundry_id, sanitizedError)
+        return { error: `Sync failed: ${sanitizedError}` }
     }
 }
 

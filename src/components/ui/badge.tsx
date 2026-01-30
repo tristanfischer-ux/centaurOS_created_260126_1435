@@ -24,7 +24,7 @@ const badgeVariants = cva(
         outline: "text-foreground bg-muted/50",
         // System status badge - Industrial style
         system:
-          "bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm text-muted-foreground dark:text-slate-300 font-mono uppercase tracking-widest rounded-full",
+          "bg-white/50 dark:bg-muted/50 backdrop-blur-sm text-muted-foreground dark:text-muted-foreground font-mono uppercase tracking-widest rounded-full",
         // Brand badge - Orange accent
         brand:
           "bg-international-orange/10 text-international-orange font-mono uppercase tracking-wider",

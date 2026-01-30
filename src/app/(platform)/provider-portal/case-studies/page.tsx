@@ -585,7 +585,7 @@ export default function CaseStudiesPage() {
                                 )}
                                 
                                 {cs.testimonial_quote && (
-                                    <div className="bg-slate-50 rounded-lg p-3 text-sm">
+                                    <div className="bg-muted rounded-lg p-3 text-sm">
                                         <Quote className="h-4 w-4 text-muted-foreground mb-1" />
                                         <p className="italic line-clamp-2">"{cs.testimonial_quote}"</p>
                                         {cs.testimonial_author && (

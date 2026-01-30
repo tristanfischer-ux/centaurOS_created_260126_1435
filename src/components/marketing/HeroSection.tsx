@@ -45,7 +45,7 @@ export function HeroSection() {
                 <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
                     <Link
                         href="/login"
-                        className="min-w-[160px] bg-slate-900 text-white px-8 py-4 text-xs font-mono tracking-widest uppercase hover:bg-slate-800 transition-all duration-300 shadow-lg border border-slate-900"
+                        className="min-w-[160px] bg-foreground text-background px-8 py-4 text-xs font-mono tracking-widest uppercase hover:bg-foreground/90 transition-all duration-300 shadow-lg border border-foreground"
                     >
                         [ Login ]
                     </Link>

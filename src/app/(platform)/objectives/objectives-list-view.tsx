@@ -202,7 +202,7 @@ export function ObjectivesListView({ objectives, objectivesForDialog, members, t
                     <AlertDialogFooter>
                         <AlertDialogCancel disabled={isDeletingSingle}>Cancel</AlertDialogCancel>
                         <AlertDialogAction
-                            className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
+                            className="bg-destructive hover:bg-destructive/90 focus:ring-destructive"
                             onClick={handleDeleteSingle}
                             disabled={isDeletingSingle}
                         >
@@ -232,7 +232,7 @@ export function ObjectivesListView({ objectives, objectivesForDialog, members, t
                     <AlertDialogFooter>
                         <AlertDialogCancel disabled={isDeletingBulk}>Cancel</AlertDialogCancel>
                         <AlertDialogAction
-                            className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
+                            className="bg-destructive hover:bg-destructive/90 focus:ring-destructive"
                             onClick={handleDeleteBulk}
                             disabled={isDeletingBulk}
                         >
@@ -257,7 +257,7 @@ export function ObjectivesListView({ objectives, objectivesForDialog, members, t
                         <div className="flex items-center h-5 w-5 mr-4">
                             <input
                                 type="checkbox"
-                                className="h-4 w-4 rounded bg-slate-200 text-foreground focus:ring-ring cursor-pointer"
+                                className="h-4 w-4 rounded bg-muted text-foreground focus:ring-ring cursor-pointer"
                                 checked={selectedIds.size === objectives.length && objectives.length > 0}
                                 onChange={toggleSelectAll}
                                 aria-label="Select all objectives"
@@ -309,7 +309,7 @@ export function ObjectivesListView({ objectives, objectivesForDialog, members, t
                                 >
                                     <input
                                         type="checkbox"
-                                        className="h-4 w-4 rounded bg-slate-200 text-foreground focus:ring-ring cursor-pointer"
+                                        className="h-4 w-4 rounded bg-muted text-foreground focus:ring-ring cursor-pointer"
                                         checked={isSelected}
                                         onChange={() => { }} // Handled by div click
                                         aria-label={`Select objective ${objective.title}`}
@@ -328,13 +328,13 @@ export function ObjectivesListView({ objectives, objectivesForDialog, members, t
                                     )}
                                 </button>
 
-                                <div className="h-10 w-10 rounded-lg bg-amber-100 flex items-center justify-center shrink-0">
-                                    <Target className="h-5 w-5 text-amber-600" />
+                                <div className="h-10 w-10 rounded-lg bg-status-warning-light flex items-center justify-center shrink-0">
+                                    <Target className="h-5 w-5 text-status-warning" />
                                 </div>
 
                                 <div className="flex-1 min-w-0">
                                     <div className="flex items-center gap-2 flex-wrap">
-                                        <Link href={`/objectives/${objective.id}`} className="font-semibold text-foreground hover:text-amber-600 dark:hover:text-amber-400 transition-colors" onClick={(e) => e.stopPropagation()}>
+                                        <Link href={`/objectives/${objective.id}`} className="font-semibold text-foreground hover:text-status-warning transition-colors" onClick={(e) => e.stopPropagation()}>
                                             {objective.title}
                                         </Link>
                                         {hasOverdueTasks && (
@@ -397,7 +397,7 @@ export function ObjectivesListView({ objectives, objectivesForDialog, members, t
                                                     <div key={task.id} className="flex items-center gap-2 sm:gap-4 p-4 pl-9 sm:pl-16 hover:bg-card transition-colors">
                                                         <StatusIcon className={`h-4 w-4 shrink-0 ${statusConfig.color.split(' ')[1]}`} />
 
-                                                        <Link href={`/tasks?task=${task.id}`} className="flex-1 min-w-0 text-sm text-foreground hover:text-amber-600 dark:hover:text-amber-400 truncate">
+                                                        <Link href={`/tasks?task=${task.id}`} className="flex-1 min-w-0 text-sm text-foreground hover:text-status-warning truncate">
                                                             {task.title}
                                                         </Link>
 

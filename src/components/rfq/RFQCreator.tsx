@@ -262,6 +262,7 @@ export function RFQCreator({
               'flex-1 overflow-y-auto p-6 space-y-6',
               showPreview ? 'lg:border-r' : ''
             )}
+            style={{ isolation: 'isolate' }}
           >
             {/* Header with Orange Accent Bar */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-slate-100">

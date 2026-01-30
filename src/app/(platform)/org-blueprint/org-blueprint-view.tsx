@@ -78,15 +78,15 @@ function FunctionCard({
         : businessFunction.coverage_status === 'partial'
         ? 'border-l-yellow-500'
         : businessFunction.coverage_status === 'gap'
-        ? 'border-l-slate-300'
-        : 'border-l-slate-200'
+        ? 'border-l-muted-foreground/50'
+        : 'border-l-muted'
     
     return (
         <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             className={cn(
-                "p-4 border border-slate-200 rounded-lg hover:shadow-md transition-all bg-background border-l-4",
+                "p-4 border rounded-lg hover:shadow-md transition-all bg-background border-l-4",
                 borderColorClass
             )}
         >
@@ -241,7 +241,7 @@ export function OrgBlueprintView({ functions: initialFunctions, summary: initial
     if (functions.length === 0) {
         return (
             <div className="space-y-6">
-                <div className="pb-4 border-b border-slate-100">
+                <div className="pb-4 border-b border-muted">
                     <div className="flex items-center gap-3 mb-1">
                         <div className="h-8 w-1 bg-orange-600 rounded-full shadow-[0_0_8px_rgba(234,88,12,0.6)]" />
                         <h1 className="text-2xl sm:text-3xl font-display font-semibold text-foreground tracking-tight">
@@ -291,7 +291,7 @@ export function OrgBlueprintView({ functions: initialFunctions, summary: initial
             {/* Quick Assessment Button */}
             <div className="flex justify-end">
                 <AssessmentModal functions={functions} onComplete={handleRefresh}>
-                    <Button className="bg-slate-900 hover:bg-slate-800 text-white font-medium shadow-md">
+                    <Button className="bg-accent hover:bg-accent/90 text-white font-medium shadow-md">
                         <Sparkles className="h-4 w-4 mr-2" />
                         Quick Assessment
                     </Button>
@@ -299,7 +299,7 @@ export function OrgBlueprintView({ functions: initialFunctions, summary: initial
             </div>
 
             {/* How it Works Banner */}
-            <div className="bg-gradient-to-r from-slate-50 to-orange-50 border border-slate-200 rounded-lg p-5">
+            <div className="bg-gradient-to-r from-muted to-orange-50 border rounded-lg p-5">
                 <div className="flex items-start gap-4">
                     <div className="p-2 bg-orange-100 rounded-lg shrink-0">
                         <Building2 className="h-6 w-6 text-orange-600" />
@@ -320,7 +320,7 @@ export function OrgBlueprintView({ functions: initialFunctions, summary: initial
                                 <span className="text-muted-foreground"><strong>Partial:</strong> External provider</span>
                             </div>
                             <div className="flex items-center gap-2">
-                                <div className="w-3 h-3 rounded-full bg-slate-300"></div>
+                                <div className="w-3 h-3 rounded-full bg-muted-foreground/50"></div>
                                 <span className="text-muted-foreground"><strong>Gap:</strong> Needs coverage</span>
                             </div>
                         </div>

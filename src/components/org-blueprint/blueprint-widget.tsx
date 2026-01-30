@@ -38,7 +38,7 @@ export function BlueprintWidget({ summary }: BlueprintWidgetProps) {
                 </CardHeader>
                 <CardContent className="space-y-4">
                     <div className="text-center py-6">
-                        <Building2 className="h-10 w-10 mx-auto text-slate-300 mb-3" />
+                        <Building2 className="h-10 w-10 mx-auto text-muted-foreground/50 mb-3" />
                         <p className="text-sm text-muted-foreground mb-4">
                             Start your organizational assessment to identify gaps and opportunities
                         </p>

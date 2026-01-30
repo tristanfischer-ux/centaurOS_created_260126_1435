@@ -128,7 +128,7 @@ export function PendingInvitations() {
             {expanded && (
                 <Card className="border">
                     <CardContent className="p-0">
-                        <div className="divide-y divide-slate-100">
+                        <div className="divide-y divide-muted">
                             {pendingInvitations.map((invitation) => (
                                 <div 
                                     key={invitation.id}
@@ -150,7 +150,7 @@ export function PendingInvitations() {
                                                 <span>
                                                     Expires {formatDistanceToNow(new Date(invitation.expiresAt), { addSuffix: true })}
                                                 </span>
-                                                <span className="text-slate-300">|</span>
+                                                <span className="text-muted-foreground">|</span>
                                                 <span>Invited by {invitation.invitedByName}</span>
                                             </div>
                                         </div>

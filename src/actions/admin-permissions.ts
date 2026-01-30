@@ -4,6 +4,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { getFoundryIdCached } from '@/lib/supabase/foundry-context'
+import { sanitizeErrorMessage } from '@/lib/security/sanitize'
 
 // Type for admin permission record
 export interface FoundryAdminPermission {
@@ -163,7 +164,7 @@ export async function grantAdminPermission(profileId: string): Promise<{ success
         })
     
     if (error) {
-        return { error: error.message }
+        return { error: sanitizeErrorMessage(error) }
     }
     
     // Log action
@@ -219,7 +220,7 @@ export async function revokeAdminPermission(profileId: string): Promise<{ succes
         .eq('profile_id', profileId)
     
     if (error) {
-        return { error: error.message }
+        return { error: sanitizeErrorMessage(error) }
     }
     
     // Log action
@@ -271,7 +272,7 @@ export async function listAdminUsers(): Promise<{
         .eq('foundry_id', foundry_id)
     
     if (error) {
-        return { users: [], founders: founders || [], error: error.message }
+        return { users: [], founders: founders || [], error: sanitizeErrorMessage(error) }
     }
     
     return { 

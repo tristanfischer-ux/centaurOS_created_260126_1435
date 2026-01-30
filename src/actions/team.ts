@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { createTeamSchema, inviteMemberSchema, validate } from '@/lib/validations'
 import { getFoundryIdCached } from '@/lib/supabase/foundry-context'
+import { sanitizeErrorMessage } from '@/lib/security/sanitize'
 
 // ============ MEMBER ACTIONS ============
 
@@ -63,7 +64,7 @@ export async function createMember(formData: FormData) {
         })
 
     if (error) {
-        return { error: error.message }
+        return { error: sanitizeErrorMessage(error) }
     }
 
     revalidatePath('/team')
@@ -114,7 +115,7 @@ export async function pairCentaur(humanId: string, aiId: string) {
         .update({ paired_ai_id: aiId })
         .eq('id', humanId)
 
-    if (error) return { error: error.message }
+    if (error) return { error: sanitizeErrorMessage(error) }
 
     revalidatePath('/team')
     return { success: true }
@@ -161,7 +162,7 @@ export async function unpairCentaur(humanId: string) {
         .update({ paired_ai_id: null })
         .eq('id', humanId)
 
-    if (error) return { error: error.message }
+    if (error) return { error: sanitizeErrorMessage(error) }
 
     revalidatePath('/team')
     return { success: true }
@@ -200,7 +201,7 @@ export async function createTeam(name: string, memberIds: string[]) {
         .select()
         .single()
 
-    if (teamError) return { error: teamError.message }
+    if (teamError) return { error: sanitizeErrorMessage(teamError) }
 
     const memberInserts = validatedMemberIds.map(profileId => ({
         team_id: team.id,
@@ -211,7 +212,7 @@ export async function createTeam(name: string, memberIds: string[]) {
         .from('team_members')
         .insert(memberInserts)
 
-    if (memberError) return { error: memberError.message }
+    if (memberError) return { error: sanitizeErrorMessage(memberError) }
 
     revalidatePath('/team')
     return { success: true, teamId: team.id }
@@ -266,7 +267,7 @@ export async function getOrCreateAutoTeam(memberIds: string[]): Promise<{ teamId
         .select()
         .single()
 
-    if (teamError) return { teamId: null, error: teamError.message }
+    if (teamError) return { teamId: null, error: sanitizeErrorMessage(teamError) }
 
     const memberInserts = memberIds.map(profileId => ({
         team_id: team.id,
@@ -278,7 +279,7 @@ export async function getOrCreateAutoTeam(memberIds: string[]): Promise<{ teamId
     if (memberInsertError) {
         // Attempt to clean up the created team since member insert failed
         await supabase.from('teams').delete().eq('id', team.id)
-        return { teamId: null, error: `Failed to add team members: ${memberInsertError.message}` }
+        return { teamId: null, error: sanitizeErrorMessage(memberInsertError) }
     }
 
     revalidatePath('/team')
@@ -358,7 +359,7 @@ export async function addTeamMember(teamId: string, profileId: string) {
         .from('team_members')
         .insert({ team_id: teamId, profile_id: profileId })
 
-    if (error) return { error: error.message }
+    if (error) return { error: sanitizeErrorMessage(error) }
 
     revalidatePath('/team')
     return { success: true }
@@ -424,7 +425,7 @@ export async function removeTeamMember(teamId: string, profileId: string) {
         .select('profile_id')
         .eq('team_id', teamId)
 
-    if (countError) return { error: countError.message }
+    if (countError) return { error: sanitizeErrorMessage(countError) }
 
     // Verify team still has the expected number of members (prevent concurrent deletion race)
     if (!currentMembers || currentMembers.length < 2) {
@@ -437,7 +438,7 @@ export async function removeTeamMember(teamId: string, profileId: string) {
         .eq('team_id', teamId)
         .eq('profile_id', profileId)
 
-    if (error) return { error: error.message }
+    if (error) return { error: sanitizeErrorMessage(error) }
 
     // Re-check remaining members after deletion to ensure we still have valid count
     const { data: remaining, error: remainingError } = await supabase
@@ -528,7 +529,7 @@ export async function deleteMember(memberId: string) {
         .update({ creator_id: currentProfile.id })
         .eq('creator_id', memberId)
 
-    if (objError) return { error: `Failed to reassign objectives: ${objError.message}` }
+    if (objError) return { error: sanitizeErrorMessage(objError) }
 
     // 3. Reassign Tasks created by the member
     const { error: taskError } = await supabase
@@ -536,7 +537,7 @@ export async function deleteMember(memberId: string) {
         .update({ creator_id: currentProfile.id })
         .eq('creator_id', memberId)
 
-    if (taskError) return { error: `Failed to reassign tasks: ${taskError.message}` }
+    if (taskError) return { error: sanitizeErrorMessage(taskError) }
 
     // 4. Unassign Tasks assigned TO the member
     const { error: unassignError } = await supabase
@@ -544,7 +545,7 @@ export async function deleteMember(memberId: string) {
         .update({ assignee_id: null })
         .eq('assignee_id', memberId)
 
-    if (unassignError) return { error: `Failed to unassign tasks: ${unassignError.message}` }
+    if (unassignError) return { error: sanitizeErrorMessage(unassignError) }
 
     // 5. Delete from team_members (Manual cleanup if cascade missing)
     await supabase.from('team_members').delete().eq('profile_id', memberId)
@@ -558,7 +559,7 @@ export async function deleteMember(memberId: string) {
         .delete()
         .eq('id', memberId)
 
-    if (deleteError) return { error: `Failed to delete profile: ${deleteError.message}` }
+    if (deleteError) return { error: sanitizeErrorMessage(deleteError) }
 
     revalidatePath('/team')
     return { success: true }
@@ -585,7 +586,7 @@ export async function getTeamsForFoundry() {
         .eq('foundry_id', foundry_id)
         .order('created_at', { ascending: false })
 
-    if (error) return { teams: [], error: error.message }
+    if (error) return { teams: [], error: sanitizeErrorMessage(error) }
 
     const transformedTeams = teams?.map(team => ({
         ...team,
@@ -693,6 +694,8 @@ export async function assignToTask(taskId: string, profileIds: string[]) {
         .update({ assignee_id: profileIds[0] })
         .eq('id', taskId)
 
+    if (error) return { error: sanitizeErrorMessage(error) }
+
     revalidatePath('/tasks')
     revalidatePath('/team')
     return { success: true, teamId }
@@ -712,7 +715,7 @@ export async function getTaskAssignees(taskId: string) {
         `)
         .eq('task_id', taskId)
 
-    if (error) return { assignees: [], team: null, error: error.message }
+    if (error) return { assignees: [], team: null, error: sanitizeErrorMessage(error) }
 
     const assignees = data?.map(d => d.profiles) || []
     const team = data?.[0]?.teams || null

@@ -9,7 +9,7 @@ import type {
   RequiredSignature, 
   ApprenticeshipDocument 
 } from '@/types/apprenticeship'
-import { isValidUUID } from '@/lib/security/sanitize'
+import { isValidUUID, sanitizeErrorMessage } from '@/lib/security/sanitize'
 import type { Json } from '@/types/database.types'
 
 // =============================================
@@ -30,7 +30,7 @@ export async function getEnrollmentDocuments(enrollmentId: string) {
   
   if (error) {
     console.error('Error fetching documents:', error)
-    return { error: error.message }
+    return { error: sanitizeErrorMessage(error) }
   }
   
   return { documents: documents as unknown as ApprenticeshipDocument[] }
@@ -84,7 +84,7 @@ export async function getPendingSignatures() {
   
   if (error) {
     console.error('Error fetching pending signatures:', error)
-    return { error: error.message }
+    return { error: sanitizeErrorMessage(error) }
   }
   
   // Filter to only documents where this user needs to sign
@@ -124,7 +124,7 @@ export async function getDocument(documentId: string) {
   
   if (error) {
     console.error('Error fetching document:', error)
-    return { error: error.message }
+    return { error: sanitizeErrorMessage(error) }
   }
   
   return { document: document as unknown as ApprenticeshipDocument & { enrollment: unknown } }
@@ -204,7 +204,7 @@ export async function signDocument(documentId: string) {
   
   if (error) {
     console.error('Error signing document:', error)
-    return { error: error.message }
+    return { error: sanitizeErrorMessage(error) }
   }
   
   // If document is fully signed, update enrollment record
@@ -322,7 +322,7 @@ export async function createDocument(input: {
   
   if (error) {
     console.error('Error creating document:', error)
-    return { error: error.message }
+    return { error: sanitizeErrorMessage(error) }
   }
   
   // Create notifications for required signers

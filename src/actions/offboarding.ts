@@ -4,6 +4,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { getFoundryIdCached } from '@/lib/supabase/foundry-context'
+import { sanitizeErrorMessage } from '@/lib/security/sanitize'
 
 export type OffboardingAction = 'reassign_delete' | 'soft_delete' | 'anonymize'
 
@@ -317,7 +318,7 @@ export async function offboardMember(
                 .eq('id', memberId)
             
             if (deleteError) {
-                return { error: `Failed to delete profile: ${deleteError.message}` }
+                return { error: `Failed to delete profile: ${sanitizeErrorMessage(deleteError)}` }
             }
             break
         }
@@ -333,7 +334,7 @@ export async function offboardMember(
                 .eq('id', memberId)
             
             if (updateError) {
-                return { error: `Failed to deactivate profile: ${updateError.message}` }
+                return { error: `Failed to deactivate profile: ${sanitizeErrorMessage(updateError)}` }
             }
             
             // Revoke admin permissions
@@ -364,7 +365,7 @@ export async function offboardMember(
                 .eq('id', memberId)
             
             if (anonymizeError) {
-                return { error: `Failed to anonymize profile: ${anonymizeError.message}` }
+                return { error: `Failed to anonymize profile: ${sanitizeErrorMessage(anonymizeError)}` }
             }
             
             // Revoke admin permissions
@@ -408,7 +409,7 @@ export async function getOffboardingSettings(): Promise<{
         .maybeSingle()
     
     if (error) {
-        return { settings: null, error: error.message }
+        return { settings: null, error: sanitizeErrorMessage(error) }
     }
     
     // Return defaults if no settings exist
@@ -473,7 +474,7 @@ export async function updateOffboardingSettings(settings: {
         })
     
     if (error) {
-        return { error: error.message }
+        return { error: sanitizeErrorMessage(error) }
     }
     
     // Log action

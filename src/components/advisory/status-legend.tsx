@@ -22,7 +22,7 @@ const STATUS_ITEMS: StatusItem[] = [
     },
     {
         label: "Awaiting Review",
-        color: "bg-slate-300",
+        color: "bg-muted-foreground/50",
         icon: Clock,
     },
 ]

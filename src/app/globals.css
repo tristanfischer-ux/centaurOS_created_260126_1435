@@ -176,6 +176,15 @@
   }
 }
 
+/* Ensure Radix UI portals render above everything */
+[data-radix-popper-content-wrapper] {
+  z-index: 9999 !important;
+}
+
+[data-radix-select-content] {
+  z-index: 9999 !important;
+}
+
 /* Touch optimization */
 button,
 a,

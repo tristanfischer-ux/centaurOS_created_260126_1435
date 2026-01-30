@@ -93,7 +93,7 @@ function getStatusConfig(status: ListingTransactionStatus) {
             return {
                 Icon: AlertCircle,
                 label: 'Contact',
-                className: 'bg-muted text-muted-foreground hover:bg-muted border-slate-200',
+                className: 'bg-muted text-muted-foreground hover:bg-muted border',
                 description: 'Contact this provider directly'
             }
     }
@@ -118,7 +118,7 @@ export function StatusDot({ status, size = 'md', className }: StatusDotProps) {
         transactional: 'bg-green-500',
         invite_sent: 'bg-amber-500',
         pending_signup: 'bg-blue-500',
-        contact_only: 'bg-slate-400'
+        contact_only: 'bg-muted-foreground'
     }
     
     return (

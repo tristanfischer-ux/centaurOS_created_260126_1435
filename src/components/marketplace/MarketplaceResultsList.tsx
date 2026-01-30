@@ -70,7 +70,7 @@ export const MarketplaceResultsList = memo(function MarketplaceResultsList({
                 const attrs = item.attributes || {}
                 const primaryMetric = attrs.rate || attrs.cost || attrs.price || null
                 return (
-                    <Card key={item.id} className="group relative p-4 border-slate-200 hover:border-orange-300 hover:shadow-md transition-all">
+                    <Card key={item.id} className="group relative p-4 border hover:border-orange-300 hover:shadow-md transition-all">
                         {/* Compare button - hover */}
                         <button
                             onClick={() => onToggleSelect(item.id)}
@@ -78,7 +78,7 @@ export const MarketplaceResultsList = memo(function MarketplaceResultsList({
                                 "absolute top-4 right-4 z-10 w-8 h-8 rounded-full flex items-center justify-center transition-all duration-200",
                                 selectedIds.has(item.id)
                                     ? "bg-orange-500 text-white shadow-md"
-                                    : "bg-white/90 text-slate-600 shadow-md border border-slate-200 opacity-0 group-hover:opacity-100"
+                                    : "bg-white/90 text-muted-foreground shadow-md border opacity-0 group-hover:opacity-100"
                             )}
                             title={selectedIds.has(item.id) ? "Remove from comparison" : "Add to comparison"}
                         >
@@ -143,12 +143,12 @@ export const MarketplaceResultsList = memo(function MarketplaceResultsList({
                                     {(attrs.skills || attrs.expertise) && (
                                         <div className="flex gap-1 flex-wrap">
                                             {(attrs.skills || attrs.expertise || []).slice(0, 3).map((skill: string, i: number) => (
-                                                <span key={i} className="px-2 py-0.5 bg-slate-100 text-slate-600 rounded-full">
+                                                <span key={i} className="px-2 py-0.5 bg-muted text-muted-foreground rounded-full">
                                                     {skill}
                                                 </span>
                                             ))}
                                             {(attrs.skills || attrs.expertise || []).length > 3 && (
-                                                <span className="px-2 py-0.5 bg-slate-100 text-slate-500 rounded-full">
+                                                <span className="px-2 py-0.5 bg-muted text-muted-foreground rounded-full">
                                                     +{(attrs.skills || attrs.expertise).length - 3}
                                                 </span>
                                             )}

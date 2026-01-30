@@ -84,8 +84,8 @@ export function MigrationStatsOverview({
     migrationRate
 }: MigrationStatsOverviewProps) {
     const statItems = [
-        { label: 'Total Listings', value: totalListings, color: 'bg-muted0' },
-        { label: 'Pending', value: pendingCount, color: 'bg-slate-400' },
+        { label: 'Total Listings', value: totalListings, color: 'bg-muted' },
+        { label: 'Pending', value: pendingCount, color: 'bg-muted-foreground' },
         { label: 'Invited', value: invitedCount, color: 'bg-amber-500' },
         { label: 'In Progress', value: inProgressCount, color: 'bg-blue-500' },
         { label: 'Completed', value: completedCount, color: 'bg-green-500' },

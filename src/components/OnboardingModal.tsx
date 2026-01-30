@@ -223,7 +223,7 @@ export function OnboardingModal({ userRole }: OnboardingModalProps) {
           {/* Content */}
           <div className="pt-16 pb-10 px-10 text-center relative z-10 font-sans">
             <div className={cn(
-              'w-20 h-20 rounded-full mx-auto mb-8 flex items-center justify-center bg-muted border border-slate-100 shadow-sm',
+              'w-20 h-20 rounded-full mx-auto mb-8 flex items-center justify-center bg-muted border border-muted shadow-sm',
               step.color
             )}>
               <Icon className="w-8 h-8" strokeWidth={1.5} />
@@ -249,7 +249,7 @@ export function OnboardingModal({ userRole }: OnboardingModalProps) {
               <Button
                 onClick={handleNext}
                 className={cn(
-                  "min-w-[140px] h-11 text-xs uppercase tracking-widest font-semibold bg-slate-900 text-white hover:bg-orange-600 transition-colors duration-300 shadow-lg",
+                  "min-w-[140px] h-11 text-xs uppercase tracking-widest font-semibold bg-foreground text-background hover:bg-orange-600 transition-colors duration-300 shadow-lg",
                   currentStep === steps.length - 1 && "bg-orange-600 hover:bg-orange-500"
                 )}
               >
@@ -264,7 +264,7 @@ export function OnboardingModal({ userRole }: OnboardingModalProps) {
                   key={index}
                   className={cn(
                     "w-1.5 h-1.5 rounded-full transition-colors duration-300",
-                    index === currentStep ? "bg-slate-300" : "bg-muted"
+                    index === currentStep ? "bg-muted-foreground" : "bg-muted"
                   )}
                 />
               ))}

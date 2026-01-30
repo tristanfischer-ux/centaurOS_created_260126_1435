@@ -40,7 +40,7 @@ export function MarketplacePreviewSection({ listings, onBookClick }: Marketplace
                 {listings.map((listing) => (
                     <Card 
                         key={listing.id} 
-                        className="bg-slate-800/50 border-white/10 hover:border-blue-500/30 transition-all duration-300 group"
+                        className="bg-muted/50 border-white/10 hover:border-blue-500/30 transition-all duration-300 group"
                     >
                         <CardContent className="p-4">
                             {/* Header */}
@@ -150,7 +150,7 @@ export function PreviewSkeleton() {
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {[1, 2, 3].map((i) => (
-                    <Card key={i} className="bg-slate-800/50 border-white/10">
+                    <Card key={i} className="bg-muted/50 border-white/10">
                         <CardContent className="p-4">
                             <div className="flex justify-between items-start mb-3">
                                 <div className="h-5 w-20 bg-white/5 rounded animate-pulse" />

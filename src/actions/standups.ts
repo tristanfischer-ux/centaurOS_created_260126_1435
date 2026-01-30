@@ -4,6 +4,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { getFoundryIdCached } from '@/lib/supabase/foundry-context'
+import { sanitizeErrorMessage } from '@/lib/security/sanitize'
 
 export interface Standup {
     id: string
@@ -56,7 +57,7 @@ export async function getMyTodayStandup(): Promise<{ data: Standup | null; error
 
         if (error && error.code !== 'PGRST116') {
             console.error('Error fetching today standup:', error)
-            return { data: null, error: error.message }
+            return { data: null, error: sanitizeErrorMessage(error) }
         }
 
         return { 
@@ -115,7 +116,7 @@ export async function submitStandup(formData: {
 
         if (error) {
             console.error('Error submitting standup:', error)
-            return { data: null, error: error.message }
+            return { data: null, error: sanitizeErrorMessage(error) }
         }
 
         revalidatePath('/tasks')
@@ -154,7 +155,7 @@ export async function getTodayTeamStandups(): Promise<{ data: Standup[]; error: 
 
         if (error) {
             console.error('Error fetching team standups:', error)
-            return { data: [], error: error.message }
+            return { data: [], error: sanitizeErrorMessage(error) }
         }
 
         return { 
@@ -193,7 +194,7 @@ export async function getStandupsWithBlockers(): Promise<{ data: Standup[]; erro
 
         if (error) {
             console.error('Error fetching standups with blockers:', error)
-            return { data: [], error: error.message }
+            return { data: [], error: sanitizeErrorMessage(error) }
         }
 
         return { 
@@ -243,7 +244,7 @@ export async function getStandupStats(): Promise<{
 
         if (error) {
             console.error('Error fetching standup stats:', error)
-            return { data: null, error: error.message }
+            return { data: null, error: sanitizeErrorMessage(error) }
         }
 
         const submittedToday = todayStandups?.length || 0
@@ -312,7 +313,7 @@ export async function generateStandupSummary(): Promise<{ data: StandupSummary |
 
         if (error) {
             console.error('Error generating summary:', error)
-            return { data: null, error: error.message }
+            return { data: null, error: sanitizeErrorMessage(error) }
         }
 
         return { 
@@ -345,7 +346,7 @@ export async function getLatestSummary(): Promise<{ data: StandupSummary | null;
 
         if (error && error.code !== 'PGRST116') {
             console.error('Error fetching latest summary:', error)
-            return { data: null, error: error.message }
+            return { data: null, error: sanitizeErrorMessage(error) }
         }
 
         return { 

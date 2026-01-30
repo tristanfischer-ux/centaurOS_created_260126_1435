@@ -88,7 +88,7 @@ export function SpendChart({
   }) => {
     if (active && payload && payload.length) {
       return (
-        <div className="bg-background dark:bg-slate-800 p-3 border rounded-lg shadow-lg">
+        <div className="bg-background p-3 border rounded-lg shadow-lg">
           <p className="text-sm font-medium text-muted-foreground">{label}</p>
           <p className="text-sm font-semibold text-blue-600">
             {formatValue(payload[0].value)}
@@ -107,7 +107,7 @@ export function SpendChart({
     if (active && payload && payload.length) {
       const data = payload[0]
       return (
-        <div className="bg-background dark:bg-slate-800 p-3 border rounded-lg shadow-lg">
+        <div className="bg-background p-3 border rounded-lg shadow-lg">
           <p className="text-sm font-medium">{data.name}</p>
           <p className="text-sm font-semibold">{formatValue(data.value)}</p>
           <p className="text-xs text-muted-foreground">

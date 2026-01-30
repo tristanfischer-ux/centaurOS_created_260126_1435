@@ -296,7 +296,7 @@ export async function acceptTask(taskId: string) {
         .update({ status: 'Accepted' })
         .eq('id', taskId)
 
-    if (error) return { error: error.message }
+    if (error) return { error: sanitizeErrorMessage(error) }
 
     try {
         await logSystemEvent(taskId, 'Task Accepted', user.id)
@@ -336,7 +336,7 @@ export async function rejectTask(taskId: string, reason: string) {
         .update({ status: 'Rejected' })
         .eq('id', taskId)
 
-    if (error) return { error: error.message }
+    if (error) return { error: sanitizeErrorMessage(error) }
 
     try {
         await logSystemEvent(taskId, `Task Rejected. Reason: ${reason}`, user.id)
@@ -405,7 +405,7 @@ export async function forwardTask(taskId: string, newAssigneeId: string, reason:
         })
         .eq('id', taskId)
 
-    if (error) return { error: error.message }
+    if (error) return { error: sanitizeErrorMessage(error) }
 
     // Sync task_assignees table: delete old assignees and insert new one
     const { error: deleteError } = await supabase
@@ -484,7 +484,7 @@ export async function amendTask(taskId: string, updates: {
         })
         .eq('id', taskId)
 
-    if (error) return { error: error.message }
+    if (error) return { error: sanitizeErrorMessage(error) }
 
     // Fire-and-forget logging - errors shouldn't fail the main operation
     try {
@@ -526,7 +526,7 @@ export async function approveAmendment(taskId: string) {
         .update({ status: 'Accepted' }) // "Once User A accepts... automatically changes to Accepted"
         .eq('id', taskId)
 
-    if (error) return { error: error.message }
+    if (error) return { error: sanitizeErrorMessage(error) }
 
     // Fire-and-forget logging - errors shouldn't fail the main operation
     try {
@@ -571,7 +571,7 @@ export async function addTaskComment(taskId: string, content: string) {
         is_system_log: false
     })
 
-    if (error) return { error: error.message }
+    if (error) return { error: sanitizeErrorMessage(error) }
 
     revalidatePath('/tasks')
     return { success: true }
@@ -613,7 +613,7 @@ export async function completeTask(taskId: string) {
         .update(updates)
         .eq('id', taskId)
 
-    if (error) return { error: error.message }
+    if (error) return { error: sanitizeErrorMessage(error) }
 
     try {
         await logSystemEvent(taskId, `Task marked as ${nextStatus} (Risk: ${task.risk_level})`, user.id)
@@ -668,7 +668,7 @@ export async function approveTask(taskId: string) {
         })
         .eq('id', taskId)
 
-    if (error) return { error: error.message }
+    if (error) return { error: sanitizeErrorMessage(error) }
 
     // Fire-and-forget logging - errors shouldn't fail the main operation
     try {
@@ -719,7 +719,7 @@ export async function getPendingApprovals() {
         .in('status', ['Pending_Executive_Approval', 'Amended_Pending_Approval'])
         .order('created_at', { ascending: false })
 
-    if (error) return { error: error.message, data: [] }
+    if (error) return { error: sanitizeErrorMessage(error), data: [] }
 
     return { data: tasks || [] }
 }
@@ -747,7 +747,7 @@ export async function batchApproveTasks(taskIds: string[]) {
         })
         .in('id', taskIds)
 
-    if (error) return { error: error.message }
+    if (error) return { error: sanitizeErrorMessage(error) }
 
     // Log events for each task
     for (const taskId of taskIds) {
@@ -791,7 +791,7 @@ export async function batchRejectTasks(taskIds: string[], reason: string) {
         })
         .in('id', taskIds)
 
-    if (error) return { error: error.message }
+    if (error) return { error: sanitizeErrorMessage(error) }
 
     // Log events for each task
     for (const taskId of taskIds) {
@@ -958,7 +958,7 @@ export async function updateTaskDates(taskId: string, startDate: string, endDate
 
         if (error) {
             console.error('Supabase update error:', error)
-            return { error: error.message }
+            return { error: sanitizeErrorMessage(error) }
         }
 
         try {
@@ -1048,7 +1048,7 @@ export async function updateTaskProgress(taskId: string, progress: number) {
         .update({ progress: clampedProgress })
         .eq('id', taskId)
 
-    if (error) return { error: error.message }
+    if (error) return { error: sanitizeErrorMessage(error) }
 
     revalidatePath('/tasks')
     revalidatePath(`/tasks/${taskId}`) // If detailed view exists
@@ -1091,7 +1091,7 @@ export async function duplicateTask(originalTaskId: string) {
         client_visible: false // Reset visibility
     }).select().single()
 
-    if (insertError) return { error: insertError.message }
+    if (insertError) return { error: sanitizeErrorMessage(insertError) }
 
     // 3. Copy Assignees (if any)
     const { data: originalAssignees } = await supabase
@@ -1157,7 +1157,7 @@ export async function updateTaskDetails(taskId: string, updates: { title?: strin
         .update(updates)
         .eq('id', taskId)
 
-    if (error) return { error: error.message }
+    if (error) return { error: sanitizeErrorMessage(error) }
 
     try {
         await logSystemEvent(taskId, `Task details updated`, user.id)
@@ -1199,7 +1199,7 @@ export async function updateTaskAssignees(taskId: string, assigneeIds: string[])
         .update({ assignee_id: primaryAssigneeId })
         .eq('id', taskId)
 
-    if (taskError) return { error: taskError.message }
+    if (taskError) return { error: sanitizeErrorMessage(taskError) }
 
     // Sync task_assignees table
     // 1. Delete existing
@@ -1275,7 +1275,7 @@ export async function uploadTaskAttachment(taskId: string, formData: FormData) {
         .from('task-files')
         .upload(filePath, file)
 
-    if (uploadError) return { error: uploadError.message }
+    if (uploadError) return { error: sanitizeErrorMessage(uploadError) }
 
     const { error: dbError } = await supabase.from('task_files').insert({
         task_id: taskId,
@@ -1286,7 +1286,7 @@ export async function uploadTaskAttachment(taskId: string, formData: FormData) {
         uploaded_by: user.id
     })
 
-    if (dbError) return { error: dbError.message }
+    if (dbError) return { error: sanitizeErrorMessage(dbError) }
 
     try {
         await logSystemEvent(taskId, `Attachment added: ${file.name}`, user.id)
@@ -1326,7 +1326,7 @@ export async function deleteTaskAttachment(fileId: string, filePath: string, tas
         .delete()
         .eq('id', fileId)
 
-    if (dbError) return { error: dbError.message }
+    if (dbError) return { error: sanitizeErrorMessage(dbError) }
 
     // Log requires task ID. If we don't have it explicitly passed, we'd need to fetch before delete. 
     // Assuming taskId passed correctly.
@@ -1360,7 +1360,7 @@ export async function getTaskAttachments(taskId: string) {
         .eq('task_id', taskId)
         .order('created_at', { ascending: false })
 
-    if (error) return { error: error.message }
+    if (error) return { error: sanitizeErrorMessage(error) }
     return { data }
 }
 
@@ -1392,7 +1392,7 @@ export async function getTaskHistory(taskId: string) {
         .eq('task_id', taskId)
         .order('created_at', { ascending: false })
 
-    if (error) return { error: error.message }
+    if (error) return { error: sanitizeErrorMessage(error) }
     return { data }
 }
 
@@ -1429,7 +1429,7 @@ export async function getMentionsForUser(limit: number = 10) {
         .order('created_at', { ascending: false })
         .limit(limit)
 
-    if (error) return { error: error.message }
+    if (error) return { error: sanitizeErrorMessage(error) }
     return { data }
 }
 

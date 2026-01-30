@@ -320,7 +320,7 @@ export default function ProviderApplicationPage() {
                                                 {cap}
                                                 <button
                                                     onClick={() => removeCapability(index)}
-                                                    className="ml-2 hover:bg-slate-200 rounded-full p-0.5"
+                                                    className="ml-2 hover:bg-muted rounded-full p-0.5"
                                                 >
                                                     <X className="h-3 w-3" />
                                                 </button>

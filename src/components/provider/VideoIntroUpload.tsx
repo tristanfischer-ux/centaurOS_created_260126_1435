@@ -130,11 +130,11 @@ export function VideoIntroUpload({ currentVideoUrl, currentThumbnailUrl }: Video
                 {hasVideo && !showPreview && (
                     <button
                         onClick={() => setShowPreview(true)}
-                        className="relative w-full aspect-video rounded-lg overflow-hidden bg-slate-900 group"
+                        className="relative w-full aspect-video rounded-lg overflow-hidden bg-background group"
                     >
                         <div className="absolute inset-0 flex items-center justify-center">
                             <div className="w-16 h-16 rounded-full bg-white/90 flex items-center justify-center group-hover:scale-110 transition-transform">
-                                <Play className="w-8 h-8 text-slate-900 ml-1" />
+                                <Play className="w-8 h-8 text-foreground ml-1" />
                             </div>
                         </div>
                         <div className="absolute bottom-3 left-3 bg-black/60 text-white text-xs px-2 py-1 rounded">

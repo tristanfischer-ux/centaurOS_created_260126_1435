@@ -15,7 +15,7 @@ function SubmitButton() {
     return (
         <Button
             formAction={login}
-            className="w-full h-12 bg-slate-900 hover:bg-slate-800 text-white font-medium tracking-wide uppercase text-sm transition-all duration-300 shadow-md hover:shadow-lg"
+            className="w-full h-12 bg-accent hover:bg-accent/90 text-white font-medium tracking-wide uppercase text-sm transition-all duration-300 shadow-md hover:shadow-lg"
             disabled={pending}
         >
             {pending ? 'Initializing Session...' : 'Access Foundry'}

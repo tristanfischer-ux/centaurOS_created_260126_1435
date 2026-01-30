@@ -113,7 +113,7 @@ export function ApprenticePoolBrowser() {
         return (
             <Card className="border">
                 <CardContent className="p-8 text-center">
-                    <GraduationCap className="h-12 w-12 text-slate-300 mx-auto mb-4" />
+                    <GraduationCap className="h-12 w-12 text-muted-foreground/50 mx-auto mb-4" />
                     <h3 className="text-lg font-semibold text-foreground mb-2">No Apprentices Available</h3>
                     <p className="text-muted-foreground">
                         There are currently no apprentices in the Guild pool.
@@ -154,7 +154,7 @@ export function ApprenticePoolBrowser() {
                     </div>
 
                     {/* Apprentice List */}
-                    <div className="divide-y divide-slate-100 border border-slate-200 rounded-lg overflow-hidden">
+                    <div className="divide-y divide-muted border rounded-lg overflow-hidden">
                         {filteredApprentices.map((apprentice) => (
                             <div
                                 key={apprentice.id}

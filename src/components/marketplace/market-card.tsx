@@ -107,7 +107,7 @@ export const MarketCard = memo(function MarketCard({
     return (
         <Card 
             className={cn(
-                "group relative flex flex-col border-slate-200 hover:border-orange-300 hover:shadow-md transition-all duration-200 overflow-hidden bg-white",
+                "group relative flex flex-col border hover:border-orange-300 hover:shadow-md transition-all duration-200 overflow-hidden bg-white",
                 isSelected && "ring-2 ring-orange-500 border-orange-500"
             )}
             onMouseEnter={() => setIsHovered(true)}
@@ -124,7 +124,7 @@ export const MarketCard = memo(function MarketCard({
                     isSelected 
                         ? "bg-orange-500 text-white shadow-md" 
                         : isHovered 
-                            ? "bg-white/90 text-slate-600 shadow-md border border-slate-200 opacity-100"
+                            ? "bg-white/90 text-muted-foreground shadow-md border opacity-100"
                             : "opacity-0"
                 )}
                 title={isSelected ? "Remove from comparison" : "Add to comparison"}
@@ -210,12 +210,12 @@ export const MarketCard = memo(function MarketCard({
                 {(attrs.skills || attrs.expertise || attrs.integrations || attrs.certifications) && (
                     <div className="flex flex-wrap gap-1 mb-3">
                         {(attrs.skills || attrs.expertise || attrs.integrations || attrs.certifications || []).slice(0, 3).map((item: string, i: number) => (
-                            <span key={i} className="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">
+                            <span key={i} className="text-[10px] px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
                                 {item}
                             </span>
                         ))}
                         {(attrs.skills || attrs.expertise || attrs.integrations || attrs.certifications || []).length > 3 && (
-                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-500">
+                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
                                 +{(attrs.skills || attrs.expertise || attrs.integrations || attrs.certifications).length - 3}
                             </span>
                         )}
@@ -223,7 +223,7 @@ export const MarketCard = memo(function MarketCard({
                 )}
 
                 {/* Price + CTA Footer */}
-                <div className="flex items-center justify-between pt-3 border-t border-slate-100 mt-auto">
+                <div className="flex items-center justify-between pt-3 border-t border-muted mt-auto">
                     {primaryMetric ? (
                         <span className="text-sm font-bold text-foreground">{primaryMetric}</span>
                     ) : (

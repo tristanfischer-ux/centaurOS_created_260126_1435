@@ -57,10 +57,10 @@ export function GuildPageContent({ isManager, isApprentice }: GuildPageContentPr
         return (
             <div className="space-y-6">
                 {/* Header */}
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-slate-100">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-muted">
                     <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-3 mb-1">
-                            <div className="h-8 w-1 bg-blue-600 rounded-full shadow-[0_0_8px_rgba(37,99,235,0.6)]" />
+                            <div className="h-8 w-1 bg-electric-blue rounded-full shadow-[0_0_8px_rgba(37,99,235,0.6)]" />
                             <h1 className="text-2xl sm:text-3xl font-display font-semibold text-foreground tracking-tight">Guild</h1>
                         </div>
                         <p className="text-muted-foreground mt-1 text-sm font-medium pl-4">
@@ -101,10 +101,10 @@ export function GuildPageContent({ isManager, isApprentice }: GuildPageContentPr
         return (
             <div className="space-y-6">
                 {/* Header */}
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-slate-100">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-muted">
                     <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-3 mb-1">
-                            <div className="h-8 w-1 bg-blue-600 rounded-full shadow-[0_0_8px_rgba(37,99,235,0.6)]" />
+                            <div className="h-8 w-1 bg-electric-blue rounded-full shadow-[0_0_8px_rgba(37,99,235,0.6)]" />
                             <h1 className="text-2xl sm:text-3xl font-display font-semibold text-foreground tracking-tight">My Guild Assignments</h1>
                         </div>
                         <p className="text-muted-foreground mt-1 text-sm font-medium pl-4">
@@ -116,14 +116,14 @@ export function GuildPageContent({ isManager, isApprentice }: GuildPageContentPr
                 {loading ? (
                     <Card className="border">
                         <CardContent className="p-8 text-center">
-                            <Loader2 className="h-8 w-8 animate-spin text-blue-500 mx-auto mb-4" />
+                            <Loader2 className="h-8 w-8 animate-spin text-electric-blue mx-auto mb-4" />
                             <p className="text-muted-foreground">Loading your assignments...</p>
                         </CardContent>
                     </Card>
                 ) : myAssignments.length === 0 ? (
                     <Card className="border">
                         <CardContent className="p-8 text-center">
-                            <GraduationCap className="h-12 w-12 text-slate-300 mx-auto mb-4" />
+                            <GraduationCap className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
                             <h3 className="text-lg font-semibold text-foreground mb-2">No Assignments Yet</h3>
                             <p className="text-muted-foreground">
                                 You haven't been assigned to any projects yet. Companies can find you in the Guild pool and assign you to their projects.
@@ -137,7 +137,7 @@ export function GuildPageContent({ isManager, isApprentice }: GuildPageContentPr
                             <Card className="border">
                                 <CardHeader>
                                     <CardTitle className="flex items-center gap-2 text-lg">
-                                        <Briefcase className="h-5 w-5 text-green-600" />
+                                        <Briefcase className="h-5 w-5 text-status-success" />
                                         Active Assignments
                                     </CardTitle>
                                 </CardHeader>
@@ -145,7 +145,7 @@ export function GuildPageContent({ isManager, isApprentice }: GuildPageContentPr
                                     {activeAssignments.map((assignment) => (
                                         <div
                                             key={assignment.id}
-                                            className="p-4 border border-green-200 rounded-lg bg-green-50"
+                                            className="p-4 border border-status-success-light rounded-lg bg-status-success-light"
                                         >
                                             <div className="flex items-start justify-between">
                                                 <div>
@@ -162,11 +162,11 @@ export function GuildPageContent({ isManager, isApprentice }: GuildPageContentPr
                                                     <div className="flex items-center gap-2 text-xs text-muted-foreground mt-3">
                                                         <Clock className="h-3 w-3" />
                                                         <span>Started {formatDistanceToNow(new Date(assignment.startedAt), { addSuffix: true })}</span>
-                                                        <span className="text-slate-300">|</span>
+                                                        <span className="text-muted-foreground">|</span>
                                                         <span>Assigned by {assignment.assignedByName}</span>
                                                     </div>
                                                 </div>
-                                                <Badge className="bg-green-600">Active</Badge>
+                                                <Badge className="bg-status-success text-status-success-foreground">Active</Badge>
                                             </div>
                                         </div>
                                     ))}
@@ -187,7 +187,7 @@ export function GuildPageContent({ isManager, isApprentice }: GuildPageContentPr
                                     {pastAssignments.map((assignment) => (
                                         <div
                                             key={assignment.id}
-                                            className="p-4 border border-slate-200 rounded-lg opacity-70"
+                                            className="p-4 border border-muted rounded-lg opacity-70"
                                         >
                                             <div className="flex items-start justify-between">
                                                 <div>
@@ -201,8 +201,8 @@ export function GuildPageContent({ isManager, isApprentice }: GuildPageContentPr
                                                     variant="outline"
                                                     className={
                                                         assignment.status === 'completed'
-                                                            ? 'border text-blue-700'
-                                                            : 'border-red-200 text-red-700'
+                                                            ? 'border text-electric-blue'
+                                                            : 'border-destructive text-destructive'
                                                     }
                                                 >
                                                     {assignment.status}

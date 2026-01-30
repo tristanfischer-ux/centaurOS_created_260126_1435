@@ -79,10 +79,10 @@ function getInitials(fullName: string | null | undefined): string {
 
 // Avatar color based on name (consistent color per person)
 function getAvatarColor(name: string | null | undefined): string {
-    if (!name) return "bg-slate-400"
+    if (!name) return "bg-muted"
     const colors = [
-        "bg-blue-500", "bg-green-500", "bg-purple-500", "bg-pink-500",
-        "bg-indigo-500", "bg-teal-500", "bg-orange-500", "bg-cyan-500"
+        "bg-chart-2", "bg-chart-3", "bg-chart-5", "bg-chart-6",
+        "bg-chart-4", "bg-chart-1", "bg-chart-2", "bg-chart-3"
     ]
     let hash = 0
     for (let i = 0; i < name.length; i++) {
@@ -145,7 +145,7 @@ function InitialsAvatar({
     isAI?: boolean
 }) {
     const initials = getInitials(name)
-    const bgColor = isAI ? "bg-amber-500" : getAvatarColor(name)
+    const bgColor = isAI ? "bg-status-warning" : getAvatarColor(name)
     const sizeClasses = size === "xs" ? "h-5 w-5 text-[9px]" : "h-6 w-6 text-[10px]"
 
     return (
@@ -191,7 +191,7 @@ function AssigneeAvatarStack({ assignees, maxDisplay = 3 }: { assignees: Assigne
                 </div>
             ))}
             {remainingCount > 0 && (
-                <div className="h-5 w-5 bg-slate-300 rounded-full flex items-center justify-center text-[8px] font-semibold text-muted-foreground ring-1 ring-white">
+                <div className="h-5 w-5 bg-muted rounded-full flex items-center justify-center text-[8px] font-semibold text-muted-foreground ring-1 ring-white">
                     +{remainingCount}
                 </div>
             )}
@@ -241,12 +241,12 @@ function CustomTaskListTable({
                             <span className="text-foreground truncate">{displayName}</span>
                             {/* Progress percentage badge */}
                             {progressPct > 0 && progressPct < 100 && (
-                                <span className="ml-auto shrink-0 text-[10px] font-medium text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">
+                                <span className="ml-auto shrink-0 text-[10px] font-medium text-electric-blue bg-electric-blue-light px-1.5 py-0.5 rounded">
                                     {progressPct}%
                                 </span>
                             )}
                             {progressPct === 100 && (
-                                <span className="ml-auto shrink-0 text-[10px] font-medium text-green-600 bg-green-50 px-1.5 py-0.5 rounded">
+                                <span className="ml-auto shrink-0 text-[10px] font-medium text-status-success bg-status-success-light px-1.5 py-0.5 rounded">
                                     100%
                                 </span>
                             )}
@@ -295,15 +295,15 @@ const CustomTooltip = ({ task }: { task: GanttTask, fontSize: string, fontFamily
                 {format(startDate, 'MMM d')} - {format(endDate, 'MMM d, yyyy')}
             </div>
             <div className="flex items-center gap-3 mt-2">
-                <div className="text-amber-600 text-xs font-semibold">
+                <div className="text-status-warning text-xs font-semibold">
                     Duration: {diffDays} day{diffDays !== 1 ? 's' : ''}
                 </div>
-                <div className="text-blue-600 text-xs font-semibold">
+                <div className="text-electric-blue text-xs font-semibold">
                     Progress: {progress}%
                 </div>
             </div>
             {extendedTask.assignees && extendedTask.assignees.length > 0 && (
-                <div className="text-muted-foreground text-xs mt-1.5 border-t border-slate-100 pt-1.5">
+                <div className="text-muted-foreground text-xs mt-1.5 border-t border-muted pt-1.5">
                     Assigned: {extendedTask.assignees.map(a => a.full_name || 'Unknown').join(', ')}
                 </div>
             )}
@@ -638,8 +638,8 @@ export function GanttView({ tasks, objectives, profiles, members = [], currentUs
                     </span>
                 </div>
                 <div className="text-xs text-muted-foreground flex gap-4">
-                    <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-slate-400"></span> Drag bar to reschedule</span>
-                    <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-slate-400"></span> Drag edges to resize duration</span>
+                    <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-muted"></span> Drag bar to reschedule</span>
+                    <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-muted"></span> Drag edges to resize duration</span>
                 </div>
             </div>
             {/* Control Bar */}
@@ -792,7 +792,7 @@ export function GanttView({ tasks, objectives, profiles, members = [], currentUs
                     <Button
                         variant="ghost"
                         size="icon"
-                        className="absolute right-2 top-2 z-50 h-8 w-8 rounded-full bg-white/90 hover:bg-background shadow-md"
+                        className="absolute right-2 top-2 z-50 h-8 w-8 rounded-full bg-background/90 hover:bg-background shadow-md"
                         onClick={() => setSelectedTaskId(null)}
                     >
                         <X className="h-4 w-4" />

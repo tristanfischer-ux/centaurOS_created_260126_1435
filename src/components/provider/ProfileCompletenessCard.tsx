@@ -254,8 +254,8 @@ export function ProfileCompletenessCard({ profile, caseStudyCount, portfolioCoun
                                         href={field.editPath}
                                         className="flex items-center gap-3 p-2 rounded-lg hover:bg-background transition-colors group"
                                     >
-                                        <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center">
-                                            <Icon className="h-4 w-4 text-slate-600" />
+                                        <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center">
+                                            <Icon className="h-4 w-4 text-muted-foreground" />
                                         </div>
                                         <span className="flex-1 text-sm">{field.label}</span>
                                         <Badge variant="outline" className="text-xs">+{field.weight}%</Badge>

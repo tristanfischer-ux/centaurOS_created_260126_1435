@@ -319,10 +319,10 @@ export function DateSelector({
                                 className={cn(
                                     "relative aspect-square p-1 rounded-lg border text-sm font-medium transition-all",
                                     // Base styles
-                                    !isCurrentMonth && "bg-muted text-slate-300 cursor-default",
+                                    !isCurrentMonth && "bg-muted text-muted-foreground cursor-default",
                                     isCurrentMonth && isPast && "bg-muted text-muted-foreground cursor-not-allowed",
-                                    isCurrentMonth && !isPast && !isAvailable && "bg-slate-200 text-muted-foreground cursor-not-allowed",
-                                    isCurrentMonth && !isPast && isAvailable && "bg-background text-foreground border-slate-200",
+                                    isCurrentMonth && !isPast && !isAvailable && "bg-muted text-muted-foreground cursor-not-allowed",
+                                    isCurrentMonth && !isPast && isAvailable && "bg-background text-foreground border",
                                     // Hover state
                                     isClickable && "hover:bg-emerald-50 hover:border-emerald-200 cursor-pointer",
                                     // Selection preview
@@ -346,13 +346,13 @@ export function DateSelector({
                 {/* Legend */}
                 <div className="mt-4 flex flex-wrap gap-4 text-xs text-muted-foreground">
                     <span className="flex items-center gap-1">
-                        <div className="w-3 h-3 rounded bg-background border border-slate-200" /> Available
+                        <div className="w-3 h-3 rounded bg-background border" /> Available
                     </span>
                     <span className="flex items-center gap-1">
                         <div className="w-3 h-3 rounded bg-emerald-100 border border-emerald-200" /> Selected
                     </span>
                     <span className="flex items-center gap-1">
-                        <div className="w-3 h-3 rounded bg-slate-200 border border-slate-300" /> Unavailable
+                        <div className="w-3 h-3 rounded bg-muted border border-muted" /> Unavailable
                     </span>
                 </div>
 
@@ -368,7 +368,7 @@ export function DateSelector({
 
                 {/* Estimated Cost */}
                 {estimatedCost !== null && selectedDates.isValid && (
-                    <div className="mt-4 p-4 rounded-lg bg-muted border border-slate-200">
+                    <div className="mt-4 p-4 rounded-lg bg-muted border border-muted">
                         <div className="flex items-center justify-between">
                             <span className="text-sm text-muted-foreground">Estimated cost</span>
                             <span className="text-lg font-bold text-foreground">

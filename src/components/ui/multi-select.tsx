@@ -127,8 +127,8 @@ export function MultiSelect({
                                         className={cn(
                                             "h-4 w-4 rounded border flex items-center justify-center",
                                             isSelected
-                                                ? "bg-slate-900 border-slate-900"
-                                                : "border-slate-300"
+                                                ? "bg-foreground border-foreground"
+                                                : "border"
                                         )}
                                     >
                                         {isSelected && <Check className="h-3 w-3 text-white" />}
@@ -143,7 +143,7 @@ export function MultiSelect({
                     )}
                 </div>
                 {selected.length > 0 && (
-                    <div className="border-t border-slate-100 p-2">
+                    <div className="border-t border-muted p-2">
                         <Button
                             variant="ghost"
                             size="sm"

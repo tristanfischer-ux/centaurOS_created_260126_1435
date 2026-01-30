@@ -348,7 +348,7 @@ export function PricingForm({
                                 step="5"
                                 value={retainerDiscountPercent}
                                 onChange={(e) => setRetainerDiscountPercent(parseInt(e.target.value))}
-                                className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer"
+                                className="w-full h-2 bg-muted rounded-lg appearance-none cursor-pointer"
                             />
                             <div className="flex justify-between text-xs text-muted-foreground">
                                 <span>0%</span>

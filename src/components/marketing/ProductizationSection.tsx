@@ -38,7 +38,7 @@ export function ProductizationSection() {
                             className="group relative bg-background rounded-lg overflow-hidden hover:shadow-xl transition-all duration-500"
                         >
                             {/* Image Placeholder with Gradient */}
-                            <div className={`h-64 bg-gradient-to-b ${item.gradient} bg-slate-200 relative`}>
+                            <div className={`h-64 bg-gradient-to-b ${item.gradient} bg-muted relative`}>
                                 <div className="absolute inset-0 bg-gradient-to-t from-white to-transparent" />
                             </div>
                             

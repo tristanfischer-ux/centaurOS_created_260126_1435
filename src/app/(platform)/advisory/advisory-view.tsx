@@ -275,7 +275,7 @@ export function AdvisoryView({
         <div className="space-y-6">
             {/* Header */}
             <div className="flex flex-col gap-4">
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-slate-100">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-muted">
                     <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-3 mb-1">
                             <div className="h-8 w-1 bg-orange-600 rounded-full shadow-[0_0_8px_rgba(234,88,12,0.6)]" />
@@ -354,8 +354,8 @@ export function AdvisoryView({
                                 className={cn(
                                     "px-3 py-1.5 rounded-full text-sm font-medium transition-all duration-200",
                                     activePreset === preset.id
-                                        ? "bg-slate-900 text-white"
-                                        : "bg-muted text-muted-foreground hover:bg-slate-200"
+                                        ? "bg-foreground text-background"
+                                        : "bg-muted text-muted-foreground hover:bg-muted/80"
                                 )}
                             >
                                 {preset.label}
@@ -507,7 +507,7 @@ export function AdvisoryView({
                         }
                         action={
                             hasActiveFilters ? (
-                                <Button variant="link" onClick={clearFilters} className="text-blue-600">
+                                <Button variant="link" onClick={clearFilters} className="text-electric-blue">
                                     Reset Filters
                                 </Button>
                             ) : (
@@ -562,7 +562,7 @@ export function AdvisoryView({
             )}
 
             {/* Resources Section */}
-            <div className="mt-12 pt-8 border-t border-slate-200">
+            <div className="mt-12 pt-8 border-t border-muted">
                 <div className="flex items-center gap-2 mb-4">
                     <BookOpen className="h-5 w-5 text-orange-600" />
                     <h2 className="text-lg font-semibold text-foreground">Resources</h2>

@@ -215,7 +215,7 @@ export function UserAvatarStack({
         <div
           className={cn(
             sizeClasses[size],
-            "rounded-full bg-slate-200 text-muted-foreground flex items-center justify-center border-2 border-white",
+            "rounded-full bg-muted text-muted-foreground flex items-center justify-center border-2 border-white",
             textSizeClasses[size],
             "font-medium"
           )}

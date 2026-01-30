@@ -67,7 +67,7 @@ export default function HelpPage() {
         </Link>
       </Button>
 
-      <div className="pb-4 border-b border-slate-100">
+      <div className="pb-4 border-b border-muted">
         <div className="flex items-center gap-3 mb-1">
           <div className="h-8 w-1 bg-orange-600 rounded-full shadow-[0_0_8px_rgba(234,88,12,0.6)]" />
           <h1 className="text-2xl sm:text-3xl font-display font-semibold text-foreground tracking-tight">Help Center</h1>
@@ -78,7 +78,7 @@ export default function HelpPage() {
       </div>
 
       {/* Keyboard Shortcuts Card */}
-      <Card className="bg-background border-slate-100 shadow-[0_2px_15px_rgba(0,0,0,0.03)]">
+      <Card className="bg-background border shadow-[0_2px_15px_rgba(0,0,0,0.03)]">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Keyboard className="h-5 w-5" />
@@ -117,7 +117,7 @@ export default function HelpPage() {
                 <ul className="space-y-3">
                   {section.items.map(item => (
                     <li key={item.title} className="flex gap-3">
-                      <div className="w-1.5 h-1.5 rounded-full bg-slate-300 mt-2 flex-shrink-0" />
+                      <div className="w-1.5 h-1.5 rounded-full bg-muted-foreground/30 mt-2 flex-shrink-0" />
                       <div>
                         <p className="font-medium text-sm">{item.title}</p>
                         <p className="text-xs text-muted-foreground">{item.description}</p>

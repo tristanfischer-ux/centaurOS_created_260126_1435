@@ -621,7 +621,7 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                         {sortedTasks.length === 0 && (
                             <>
                                 {tasks.length === 0 ? (
-                                    <div className="col-span-full border border-slate-800 rounded-xl bg-slate-950 p-12 flex flex-col items-center justify-center text-center relative overflow-hidden group min-h-[500px]">
+                                    <div className="col-span-full border border-muted rounded-xl bg-muted p-12 flex flex-col items-center justify-center text-center relative overflow-hidden group min-h-[500px]">
                                         {/* Blueprint Background Pattern */}
                                         <div className="absolute inset-0 opacity-20 pointer-events-none bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px]"></div>
                                         <div className="absolute inset-0 bg-[radial-gradient(circle_800px_at_50%_50%,#1e293b,transparent)] opacity-40 pointer-events-none"></div>

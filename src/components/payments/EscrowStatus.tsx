@@ -51,31 +51,31 @@ const STATUS_CONFIG: Record<
 > = {
   pending: {
     label: 'Awaiting Payment',
-    color: 'bg-amber-100 text-amber-800',
+    color: 'bg-status-warning-light text-status-warning-dark',
     icon: <Clock className="h-4 w-4" />,
     description: 'Payment has not been received yet',
   },
   held: {
     label: 'Funds Held in Escrow',
-    color: 'bg-blue-100 text-blue-800',
+    color: 'bg-status-info-light text-status-info-dark',
     icon: <Shield className="h-4 w-4" />,
     description: 'Payment received and securely held',
   },
   partial_release: {
     label: 'Partially Released',
-    color: 'bg-purple-100 text-purple-800',
+    color: 'bg-muted text-foreground',
     icon: <TrendingUp className="h-4 w-4" />,
     description: 'Some funds released, balance remaining',
   },
   released: {
     label: 'Fully Released',
-    color: 'bg-green-100 text-green-800',
+    color: 'bg-status-success-light text-status-success-dark',
     icon: <CheckCircle2 className="h-4 w-4" />,
     description: 'All funds released to seller',
   },
   refunded: {
     label: 'Refunded',
-    color: 'bg-red-100 text-red-800',
+    color: 'bg-status-error-light text-status-error-dark',
     icon: <RefreshCw className="h-4 w-4" />,
     description: 'Funds returned to buyer',
   },
@@ -88,22 +88,22 @@ const TRANSACTION_CONFIG: Record<
   deposit: {
     label: 'Payment Deposited',
     icon: <Plus className="h-3 w-3" />,
-    color: 'text-blue-600',
+    color: 'text-electric-blue',
   },
   hold: {
     label: 'Funds Held in Escrow',
     icon: <Shield className="h-3 w-3" />,
-    color: 'text-blue-600',
+    color: 'text-electric-blue',
   },
   release: {
     label: 'Released to Seller',
     icon: <ArrowRight className="h-3 w-3" />,
-    color: 'text-green-600',
+    color: 'text-status-success',
   },
   refund: {
     label: 'Refunded to Buyer',
     icon: <RefreshCw className="h-3 w-3" />,
-    color: 'text-red-600',
+    color: 'text-destructive',
   },
   fee_deduction: {
     label: 'Platform Fee',
@@ -256,7 +256,7 @@ export function EscrowStatus({
       <CardHeader className="pb-4">
         <div className="flex items-center justify-between">
           <CardTitle className="flex items-center gap-2 text-lg">
-            <Shield className="h-5 w-5 text-blue-600" />
+            <Shield className="h-5 w-5 text-electric-blue" />
             Escrow Status
           </CardTitle>
           <Badge className={cn('flex items-center gap-1', statusConfig.color)}>
@@ -270,19 +270,19 @@ export function EscrowStatus({
       <CardContent className="space-y-6">
         {/* Balance Overview */}
         <div className="grid grid-cols-2 gap-4">
-          <div className="p-3 rounded-lg bg-muted dark:bg-slate-900">
+          <div className="p-3 rounded-lg bg-muted">
             <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
               <Wallet className="h-4 w-4" />
               Held in Escrow
             </div>
             <p className="text-lg font-bold">{formatCurrency(pendingRelease, currency)}</p>
           </div>
-          <div className="p-3 rounded-lg bg-muted dark:bg-slate-900">
+          <div className="p-3 rounded-lg bg-muted">
             <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
               <Building2 className="h-4 w-4" />
               Released
             </div>
-            <p className="text-lg font-bold text-green-600">
+            <p className="text-lg font-bold text-status-success">
               {formatCurrency(totalReleased, currency)}
             </p>
           </div>
@@ -313,7 +313,7 @@ export function EscrowStatus({
                 Transaction History
               </h4>
               <div className="relative">
-                <div className="absolute left-3 top-3 bottom-3 w-px bg-slate-200 dark:bg-slate-700" />
+                <div className="absolute left-3 top-3 bottom-3 w-px border-l border" />
                 <div className="space-y-4 relative">
                   {transactions.map((tx) => (
                     <TransactionItem key={tx.id} transaction={tx} currency={currency} />
@@ -326,12 +326,12 @@ export function EscrowStatus({
 
         {/* Escrow Protection Info */}
         {status === 'held' && (
-          <div className="p-3 rounded-lg bg-blue-50 dark:bg-blue-950 border border-blue-100 dark:border-blue-900">
+          <div className="p-3 rounded-lg bg-status-info-light border border-status-info">
             <div className="flex items-start gap-2">
-              <Shield className="h-4 w-4 text-blue-600 mt-0.5" />
+              <Shield className="h-4 w-4 text-status-info mt-0.5" />
               <div className="text-sm">
-                <p className="font-medium text-blue-700 dark:text-blue-300">Protected by Escrow</p>
-                <p className="text-blue-600 dark:text-blue-400 mt-0.5">
+                <p className="font-medium text-status-info-dark">Protected by Escrow</p>
+                <p className="text-status-info mt-0.5">
                   Funds are held securely until work is approved. The seller receives payment only after you confirm delivery.
                 </p>
               </div>
@@ -375,7 +375,7 @@ export function EscrowStatusCompact({
         </div>
         <div className="flex justify-between text-sm">
           <span className="text-muted-foreground">Released</span>
-          <span className="font-medium text-green-600">{formatCurrency(totalReleased, currency)}</span>
+          <span className="font-medium text-status-success">{formatCurrency(totalReleased, currency)}</span>
         </div>
       </div>
     </div>

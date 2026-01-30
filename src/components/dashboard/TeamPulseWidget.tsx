@@ -130,7 +130,7 @@ export function TeamPulseWidget({ members }: TeamPulseWidgetProps) {
                 {/* Empty state */}
                 {onlineMembers.length === 0 && focusMembers.length === 0 && (
                     <div className="text-center py-4">
-                        <Users className="h-8 w-8 mx-auto text-slate-300 mb-2" />
+                        <Users className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
                         <p className="text-sm text-muted-foreground">No team members active right now</p>
                     </div>
                 )}

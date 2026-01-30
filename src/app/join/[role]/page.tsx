@@ -195,7 +195,7 @@ export default function JoinPage({ params }: { params: Promise<{ role: string }>
     };
 
     return (
-        <div className="min-h-screen bg-slate-900 text-white">
+        <div className="min-h-screen bg-background text-foreground">
             {/* Navigation */}
             <nav className="absolute top-0 left-0 right-0 z-50 px-4 sm:px-6 py-4 sm:py-6">
                 <div className="max-w-7xl mx-auto flex items-center justify-between">
@@ -221,7 +221,7 @@ export default function JoinPage({ params }: { params: Promise<{ role: string }>
                             className="object-cover opacity-20"
                             priority
                         />
-                        <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-slate-900/80 to-slate-900/60" />
+                        <div className="absolute inset-0 bg-gradient-to-t from-background via-background/80 to-background/60" />
                     </div>
 
                     {/* Content */}
@@ -290,7 +290,7 @@ export default function JoinPage({ params }: { params: Promise<{ role: string }>
                             fill
                             className="object-cover opacity-30"
                         />
-                        <div className="absolute inset-0 bg-gradient-to-r from-slate-900 via-slate-900/90 to-slate-900/70" />
+                        <div className="absolute inset-0 bg-gradient-to-r from-background via-background/90 to-background/70" />
                         <div className="relative z-10 p-6 sm:p-8 md:p-12 lg:p-16 flex flex-col justify-center min-h-[40vh] md:min-h-screen">
                             <button
                                 onClick={() => setStage("hook")}
@@ -342,7 +342,7 @@ export default function JoinPage({ params }: { params: Promise<{ role: string }>
                                         id="name"
                                         name="name"
                                         placeholder="John Doe"
-                                        className="bg-background border-slate-300 focus:border-blue-500 focus:ring-blue-500 h-11 sm:h-12"
+                                        className="bg-background border focus:border-blue-500 focus:ring-blue-500 h-11 sm:h-12"
                                         required
                                     />
                                 </div>
@@ -354,7 +354,7 @@ export default function JoinPage({ params }: { params: Promise<{ role: string }>
                                         name="email"
                                         type="email"
                                         placeholder="you@example.com"
-                                        className="bg-background border-slate-300 focus:border-blue-500 focus:ring-blue-500 h-11 sm:h-12"
+                                        className="bg-background border focus:border-blue-500 focus:ring-blue-500 h-11 sm:h-12"
                                         required
                                     />
                                 </div>
@@ -371,7 +371,7 @@ export default function JoinPage({ params }: { params: Promise<{ role: string }>
                                             name={field.id}
                                             type={field.type || "text"}
                                             placeholder={field.placeholder}
-                                            className="bg-background border-slate-300 focus:border-blue-500 focus:ring-blue-500 h-11 sm:h-12"
+                                            className="bg-background border focus:border-blue-500 focus:ring-blue-500 h-11 sm:h-12"
                                             required={field.required}
                                         />
                                     </div>
@@ -385,7 +385,7 @@ export default function JoinPage({ params }: { params: Promise<{ role: string }>
                                             name="password"
                                             type="password"
                                             placeholder="Create a strong password"
-                                            className="bg-background border-slate-300 focus:border-blue-500 focus:ring-blue-500 h-11 sm:h-12"
+                                            className="bg-background border focus:border-blue-500 focus:ring-blue-500 h-11 sm:h-12"
                                             required
                                         />
                                     </div>
@@ -393,7 +393,7 @@ export default function JoinPage({ params }: { params: Promise<{ role: string }>
 
                                 <Button 
                                     type="submit"
-                                    className="w-full bg-slate-900 hover:bg-blue-600 text-white font-bold tracking-widest uppercase py-5 sm:py-6 h-auto text-sm transition-colors"
+                                    className="w-full bg-accent hover:bg-blue-600 text-white font-bold tracking-widest uppercase py-5 sm:py-6 h-auto text-sm transition-colors"
                                 >
                                     {config.ctaText}
                                 </Button>

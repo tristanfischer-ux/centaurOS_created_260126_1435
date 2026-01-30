@@ -29,7 +29,7 @@ const networkPartners = [
 
 export function NetworkSection() {
     return (
-        <section className="py-24 bg-background border-t border-slate-100" id="network">
+        <section className="py-24 bg-background border-t border" id="network">
             <div className="max-w-7xl mx-auto px-6">
                 <div className="mb-16">
                     <span className="text-xs font-bold tracking-[0.3em] text-international-orange uppercase block mb-6 font-centaur-mono">
@@ -70,13 +70,13 @@ export function NetworkSection() {
                             <div className="pt-8 border-t border-slate-100 flex gap-3 mt-auto">
                                 <Link
                                     href="/login"
-                                    className="flex-1 bg-muted hover:bg-slate-200 text-foreground py-3 text-center text-xs font-mono font-bold tracking-widest uppercase transition-colors"
+                                    className="flex-1 bg-muted hover:bg-secondary text-foreground py-3 text-center text-xs font-mono font-bold tracking-widest uppercase transition-colors"
                                 >
                                     Login
                                 </Link>
                                 <Link
                                     href={partner.joinLink}
-                                    className="flex-1 border border-slate-900 text-foreground py-3 text-center text-xs font-mono font-bold tracking-widest uppercase hover:bg-slate-900 hover:text-white transition-all"
+                                    className="flex-1 border border-foreground text-foreground py-3 text-center text-xs font-mono font-bold tracking-widest uppercase hover:bg-foreground hover:text-background transition-all"
                                 >
                                     Join Up
                                 </Link>

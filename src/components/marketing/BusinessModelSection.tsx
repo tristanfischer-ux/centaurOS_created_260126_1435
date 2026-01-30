@@ -47,7 +47,7 @@ export function BusinessModelSection() {
                         <Link
                             key={role.title}
                             href={role.href}
-                            className="group relative block h-[500px] w-full overflow-hidden bg-slate-900"
+                            className="group relative block h-[500px] w-full overflow-hidden bg-foreground"
                         >
                             {/* Background Image */}
                             <Image
@@ -58,17 +58,17 @@ export function BusinessModelSection() {
                             />
 
                             {/* Overlay */}
-                            <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-slate-900/40 to-transparent opacity-90 transition-opacity duration-300 group-hover:opacity-80" />
+                            <div className="absolute inset-0 bg-gradient-to-t from-foreground via-foreground/40 to-transparent opacity-90 transition-opacity duration-300 group-hover:opacity-80" />
 
                             {/* Content */}
                             <div className="absolute inset-0 p-8 flex flex-col justify-end">
                                 <span className="inline-block w-12 h-1 bg-international-orange mb-6 transform -translate-x-full group-hover:translate-x-0 transition-transform duration-500" />
 
-                                <h3 className="text-2xl font-bold text-white mb-4 tracking-tight font-display">
+                                <h3 className="text-2xl font-bold text-background mb-4 tracking-tight font-display">
                                     {role.title}
                                 </h3>
 
-                                <p className="text-slate-300 leading-relaxed text-sm mb-8 transform translate-y-4 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-500 delay-100">
+                                <p className="text-muted-foreground leading-relaxed text-sm mb-8 transform translate-y-4 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-500 delay-100">
                                     {role.description}
                                 </p>
 

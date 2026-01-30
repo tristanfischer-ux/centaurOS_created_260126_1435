@@ -4,7 +4,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import type { EnrollmentInput, Enrollment } from '@/types/apprenticeship'
-import { isValidUUID } from '@/lib/security/sanitize'
+import { isValidUUID, sanitizeErrorMessage } from '@/lib/security/sanitize'
 
 // NOTE: Types are in @/types/apprenticeship - import directly from there
 
@@ -65,7 +65,7 @@ export async function createEnrollment(input: EnrollmentInput) {
   
   if (error) {
     console.error('Error creating enrollment:', error)
-    return { error: error.message }
+    return { error: sanitizeErrorMessage(error) }
   }
   
   // Initialize module completions for all programme modules
@@ -135,7 +135,7 @@ export async function getFoundryEnrollments(foundryId: string) {
   
   if (error) {
     console.error('Error fetching enrollments:', error)
-    return { error: error.message }
+    return { error: sanitizeErrorMessage(error) }
   }
   
   return { enrollments: enrollments as unknown as Enrollment[] }
@@ -191,7 +191,7 @@ export async function getMenteeEnrollments() {
   
   if (error) {
     console.error('Error fetching mentee enrollments:', error)
-    return { error: error.message }
+    return { error: sanitizeErrorMessage(error) }
   }
   
   // Get pending OTJT approvals for each enrollment
@@ -253,7 +253,7 @@ export async function updateEnrollmentStatus(
     .eq('id', enrollmentId)
   
   if (error) {
-    return { error: error.message }
+    return { error: sanitizeErrorMessage(error) }
   }
   
   revalidatePath('/apprenticeship')
@@ -287,7 +287,7 @@ export async function assignMentors(
     .eq('id', enrollmentId)
   
   if (error) {
-    return { error: error.message }
+    return { error: sanitizeErrorMessage(error) }
   }
   
   // Create introduction tasks if mentors assigned
@@ -557,7 +557,7 @@ export async function getApprenticeProgrammes() {
   
   if (error) {
     console.error('Error fetching programmes:', error)
-    return { error: error.message }
+    return { error: sanitizeErrorMessage(error) }
   }
   
   return { programmes }
@@ -579,7 +579,7 @@ export async function getProgrammeWithModules(programmeId: string) {
     .single()
   
   if (error) {
-    return { error: error.message }
+    return { error: sanitizeErrorMessage(error) }
   }
   
   return { programme }
@@ -605,7 +605,7 @@ export async function getEligibleApprentices(foundryId: string) {
   
   if (error) {
     console.error('Error fetching apprentices:', error)
-    return { error: error.message }
+    return { error: sanitizeErrorMessage(error) }
   }
   
   // Filter out those with active enrollments
@@ -636,7 +636,7 @@ export async function getPotentialMentors(foundryId: string) {
   
   if (error) {
     console.error('Error fetching potential mentors:', error)
-    return { error: error.message }
+    return { error: sanitizeErrorMessage(error) }
   }
   
   return { mentors }
