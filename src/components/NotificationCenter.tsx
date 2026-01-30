@@ -130,63 +130,73 @@ export function NotificationCenter() {
   return (
     <Popover open={isOpen} onOpenChange={setIsOpen}>
       <PopoverTrigger asChild>
-        <button className="relative p-2 rounded-full hover:bg-slate-100 transition-colors">
-          <Bell className="h-5 w-5 text-slate-600" />
+        <button className="relative p-2 rounded-full hover:bg-foundry-100 transition-colors">
+          <Bell className="h-5 w-5 text-foundry-600" />
           {unreadCount > 0 && (
-            <span className="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-xs font-medium rounded-full h-5 w-5 flex items-center justify-center">
+            <span className="absolute -top-0.5 -right-0.5 bg-international-orange text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center shadow-sm">
               {unreadCount > 9 ? '9+' : unreadCount}
             </span>
           )}
         </button>
       </PopoverTrigger>
-      <PopoverContent className="w-80 p-0" align="end">
-        <div className="flex items-center justify-between p-3 border-b">
-          <h3 className="font-semibold">Notifications</h3>
+      <PopoverContent className="w-96 p-0 bg-white border-foundry-200" align="end">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-foundry-200 bg-foundry-50">
+          <h3 className="text-lg font-semibold text-foundry-900">Notifications</h3>
           {unreadCount > 0 && (
-            <Button variant="ghost" size="sm" onClick={markAllAsRead}>
-              <CheckCheck className="h-4 w-4 mr-1" />
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={markAllAsRead}
+              className="text-electric-blue hover:text-electric-blue/80 hover:bg-electric-blue/10"
+            >
+              <CheckCheck className="h-4 w-4 mr-2" />
               Mark all read
             </Button>
           )}
         </div>
-        <ScrollArea className="h-80">
+        <ScrollArea className="h-96">
           {notifications.length === 0 ? (
-            <div className="p-8 text-center text-muted-foreground">
-              <Bell className="h-8 w-8 mx-auto mb-2 opacity-50" />
-              <p>No notifications yet</p>
+            <div className="p-12 text-center">
+              <Bell className="h-12 w-12 mx-auto mb-4 text-foundry-300" />
+              <p className="text-foundry-600 font-medium mb-2">No notifications yet</p>
+              <p className="text-sm text-foundry-500">We'll let you know when something important happens</p>
             </div>
           ) : (
-            <div className="divide-y">
+            <div className="divide-y divide-foundry-200">
               {notifications.map(notification => (
                 <div
                   key={notification.id}
                   className={cn(
-                    'p-3 hover:bg-slate-50 cursor-pointer transition-colors',
-                    !notification.is_read && 'bg-blue-50/50'
+                    'p-6 hover:bg-foundry-50 cursor-pointer transition-colors space-y-3',
+                    !notification.is_read && 'bg-electric-blue/5 border-l-4 border-l-electric-blue'
                   )}
                   onClick={() => markAsRead(notification.id)}
                 >
                   <div className="flex gap-4">
-                    <span className="text-lg">{getIcon(notification.type)}</span>
-                    <div className="flex-1 min-w-0">
+                    <span className="text-2xl flex-shrink-0">{getIcon(notification.type)}</span>
+                    <div className="flex-1 min-w-0 space-y-2">
                       <p className={cn(
-                        'text-sm',
-                        !notification.is_read && 'font-medium'
+                        'text-base leading-relaxed text-foundry-900',
+                        !notification.is_read && 'font-semibold'
                       )}>
                         {notification.title}
                       </p>
                       {notification.message && (
-                        <p className="text-xs text-muted-foreground truncate">
+                        <p className="text-sm text-foundry-600 leading-relaxed">
                           {notification.message}
                         </p>
                       )}
-                      <p className="text-xs text-muted-foreground mt-1">
+                      <p className="text-xs text-foundry-500">
                         {formatDistanceToNow(new Date(notification.created_at), { addSuffix: true })}
                       </p>
                     </div>
                     {notification.link && (
-                      <Link href={notification.link} onClick={(e) => e.stopPropagation()}>
-                        <ExternalLink className="h-4 w-4 text-muted-foreground hover:text-foreground" />
+                      <Link 
+                        href={notification.link} 
+                        onClick={(e) => e.stopPropagation()}
+                        className="flex-shrink-0"
+                      >
+                        <ExternalLink className="h-4 w-4 text-electric-blue hover:text-electric-blue/80 transition-colors" />
                       </Link>
                     )}
                   </div>
