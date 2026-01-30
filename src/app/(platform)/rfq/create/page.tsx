@@ -3,7 +3,7 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { Button } from '@/components/ui/button'
 import { ArrowLeft } from 'lucide-react'
-import { RFQCreateForm } from '@/components/rfq/RFQCreateForm'
+import { RFQCreator } from '@/components/rfq/RFQCreator'
 
 export const metadata = {
   title: 'Create RFQ | CentaurOS',
@@ -19,17 +19,26 @@ export default async function CreateRFQPage() {
   }
 
   return (
-    <div className="container mx-auto py-6 max-w-2xl">
-      {/* Back button */}
-      <Button variant="ghost" asChild className="mb-6">
-        <Link href="/rfq">
-          <ArrowLeft className="w-4 h-4 mr-2" />
-          Back to RFQs
-        </Link>
-      </Button>
+    <div className="h-[calc(100vh-4rem)]">
+      {/* Back button - fixed at top */}
+      <div className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <div className="container mx-auto py-3 px-4">
+          <Button variant="ghost" size="sm" asChild>
+            <Link href="/rfq">
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Back to RFQs
+            </Link>
+          </Button>
+        </div>
+      </div>
 
-      {/* Form */}
-      <RFQCreateForm />
+      {/* Full-width RFQ Creator with side-by-side preview */}
+      <div className="h-[calc(100%-57px)]">
+        <RFQCreator
+          defaultPreviewOpen={true}
+          showPreviewToggle={true}
+        />
+      </div>
     </div>
   )
 }
