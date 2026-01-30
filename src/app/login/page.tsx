@@ -127,7 +127,10 @@ export default function LoginPage() {
                 <div className="absolute inset-0 z-10 bg-gradient-to-t from-white/90 via-white/20 to-transparent" />
 
                 <div className="relative z-20 flex flex-col justify-end p-12 h-full text-slate-900 pb-20">
-                    <div className="h-1 w-20 bg-cyan-500 mb-8 shadow-[0_0_15px_rgba(6,182,212,0.6)]" />
+                    <div className="h-1 w-20 bg-cyan-500 mb-6 shadow-[0_0_15px_rgba(6,182,212,0.6)]" />
+                    <h3 className="text-sm font-bold tracking-[0.2em] uppercase text-cyan-700 mb-2">
+                        Centaur Dynamics
+                    </h3>
                     <h2 className="text-5xl font-display font-medium leading-[1.1] mb-6 tracking-tight drop-shadow-sm">
                         We build atoms at the
                         <br />
