@@ -84,7 +84,7 @@ export function Sidebar({ foundryName, foundryId, userName, userRole, isAdmin }:
                     <div className="text-sm text-muted-foreground truncate">
                         {userName || "Loading..."}
                     </div>
-                    <span className="text-[10px] text-muted-foreground font-mono uppercase px-1.5 py-0.5 bg-muted">
+                    <span className="text-[10px] text-international-orange font-mono uppercase px-1.5 py-0.5 bg-orange-50 border border-orange-200 font-semibold tracking-wide">
                         {userRole || "Member"}
                     </span>
                 </div>
