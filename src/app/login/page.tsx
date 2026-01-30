@@ -39,14 +39,16 @@ function ErrorMessage() {
 }
 
 function LoginForm() {
+    const marketingDomain = process.env.NEXT_PUBLIC_MARKETING_DOMAIN || 'https://centaurdynamics.io'
+    
     return (
         <div className="w-full max-w-sm mx-auto space-y-8 relative z-10">
             <div className="space-y-2">
-                <Link href="/" className="inline-block mb-12 group">
+                <a href={marketingDomain} className="inline-block mb-12 group">
                     <span className="text-xs font-bold tracking-[0.3em] uppercase text-slate-400 group-hover:text-cyan-600 transition-colors">
                         ← Return to Site
                     </span>
-                </Link>
+                </a>
                 <h1 className="text-4xl font-display font-semibold text-foreground tracking-tight">
                     Welcome Back.
                 </h1>

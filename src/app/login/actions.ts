@@ -56,5 +56,7 @@ export async function login(formData: FormData) {
     await resetRateLimit('login', clientIP)
 
     revalidatePath('/', 'layout')
+    // Redirect to dashboard - since login is only accessible on app domain (centauros.io),
+    // this will redirect to centauros.io/dashboard
     redirect('/dashboard')
 }

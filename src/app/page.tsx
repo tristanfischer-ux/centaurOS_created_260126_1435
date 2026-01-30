@@ -4,6 +4,9 @@ import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
 
+// Domain configuration
+const APP_DOMAIN = process.env.NEXT_PUBLIC_APP_DOMAIN || 'https://centauros.io';
+
 export default function MarketingPage() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -27,9 +30,9 @@ export default function MarketingPage() {
             <a href="#os" className="text-sm text-slate-600 hover:text-slate-900 uppercase tracking-wider">
               The OS
             </a>
-            <Link href="/login" className="text-sm text-slate-600 hover:text-slate-900 uppercase tracking-wider">
+            <a href={`${APP_DOMAIN}/login`} className="text-sm text-slate-600 hover:text-slate-900 uppercase tracking-wider">
               Login
-            </Link>
+            </a>
           </div>
 
           {/* Mobile Hamburger Button */}
@@ -75,13 +78,13 @@ export default function MarketingPage() {
               >
                 The OS
               </a>
-              <Link 
-                href="/login" 
+              <a 
+                href={`${APP_DOMAIN}/login`}
                 className="text-sm text-slate-600 hover:text-slate-900 uppercase tracking-wider py-2"
                 onClick={() => setMobileMenuOpen(false)}
               >
                 Login
-              </Link>
+              </a>
             </div>
           </div>
         )}
@@ -152,12 +155,12 @@ export default function MarketingPage() {
               </p>
               {/* Action Buttons */}
               <div className="pt-4 md:pt-6 mt-4 border-t border-slate-100 flex gap-2 md:gap-3">
-                <Link
-                  href="/login"
+                <a
+                  href={`${APP_DOMAIN}/login`}
                   className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-900 py-2.5 md:py-3 text-center text-xs font-mono font-bold tracking-widest uppercase transition-colors"
                 >
                   Login
-                </Link>
+                </a>
                 <Link
                   href="/join/founder"
                   className="flex-1 bg-slate-900 hover:bg-slate-800 text-white py-2.5 md:py-3 text-center text-xs font-mono font-bold tracking-widest uppercase transition-colors"
@@ -186,12 +189,12 @@ export default function MarketingPage() {
               </p>
               {/* Action Buttons */}
               <div className="pt-4 md:pt-6 mt-4 border-t border-slate-100 flex gap-2 md:gap-3">
-                <Link
-                  href="/login"
+                <a
+                  href={`${APP_DOMAIN}/login`}
                   className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-900 py-2.5 md:py-3 text-center text-xs font-mono font-bold tracking-widest uppercase transition-colors"
                 >
                   Login
-                </Link>
+                </a>
                 <Link
                   href="/join/executive"
                   className="flex-1 bg-slate-900 hover:bg-slate-800 text-white py-2.5 md:py-3 text-center text-xs font-mono font-bold tracking-widest uppercase transition-colors"
@@ -220,12 +223,12 @@ export default function MarketingPage() {
               </p>
               {/* Action Buttons */}
               <div className="pt-4 md:pt-6 mt-4 border-t border-slate-100 flex gap-2 md:gap-3">
-                <Link
-                  href="/login"
+                <a
+                  href={`${APP_DOMAIN}/login`}
                   className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-900 py-2.5 md:py-3 text-center text-xs font-mono font-bold tracking-widest uppercase transition-colors"
                 >
                   Login
-                </Link>
+                </a>
                 <Link
                   href="/join/apprentice"
                   className="flex-1 bg-slate-900 hover:bg-slate-800 text-white py-2.5 md:py-3 text-center text-xs font-mono font-bold tracking-widest uppercase transition-colors"
@@ -263,12 +266,12 @@ export default function MarketingPage() {
               </p>
               {/* Action Buttons */}
               <div className="pt-4 md:pt-6 mt-4 border-t border-slate-100 flex gap-2 md:gap-3">
-                <Link
-                  href="/login"
+                <a
+                  href={`${APP_DOMAIN}/login`}
                   className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-900 py-2.5 md:py-3 text-center text-xs font-mono font-bold tracking-widest uppercase transition-colors"
                 >
                   Login
-                </Link>
+                </a>
                 <Link
                   href="/join/vc"
                   className="flex-1 border-2 border-slate-900 hover:bg-slate-900 text-slate-900 hover:text-white py-2.5 md:py-3 text-center text-xs font-mono font-bold tracking-widest uppercase transition-colors"
@@ -297,12 +300,12 @@ export default function MarketingPage() {
               </p>
               {/* Action Buttons */}
               <div className="pt-4 md:pt-6 mt-4 border-t border-slate-100 flex gap-2 md:gap-3">
-                <Link
-                  href="/login"
+                <a
+                  href={`${APP_DOMAIN}/login`}
                   className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-900 py-2.5 md:py-3 text-center text-xs font-mono font-bold tracking-widest uppercase transition-colors"
                 >
                   Login
-                </Link>
+                </a>
                 <Link
                   href="/join/factory"
                   className="flex-1 border-2 border-slate-900 hover:bg-slate-900 text-slate-900 hover:text-white py-2.5 md:py-3 text-center text-xs font-mono font-bold tracking-widest uppercase transition-colors"
@@ -331,12 +334,12 @@ export default function MarketingPage() {
               </p>
               {/* Action Buttons */}
               <div className="pt-4 md:pt-6 mt-4 border-t border-slate-100 flex gap-2 md:gap-3">
-                <Link
-                  href="/login"
+                <a
+                  href={`${APP_DOMAIN}/login`}
                   className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-900 py-2.5 md:py-3 text-center text-xs font-mono font-bold tracking-widest uppercase transition-colors"
                 >
                   Login
-                </Link>
+                </a>
                 <Link
                   href="/join/university"
                   className="flex-1 border-2 border-slate-900 hover:bg-slate-900 text-slate-900 hover:text-white py-2.5 md:py-3 text-center text-xs font-mono font-bold tracking-widest uppercase transition-colors"

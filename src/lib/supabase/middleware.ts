@@ -57,15 +57,16 @@ export async function updateSession(request: NextRequest) {
     } = await supabase.auth.getUser()
 
     const pathname = request.nextUrl.pathname
+    const hostname = request.headers.get('host') || ''
 
     // Check if route is public
     const isPublicRoute = PUBLIC_ROUTES.some(route => pathname.startsWith(route))
 
     if (!user && !isPublicRoute) {
-        // no user, redirect to login page
-        const redirectUrl = request.nextUrl.clone()
-        redirectUrl.pathname = '/login'
-        return NextResponse.redirect(redirectUrl)
+        // no user, redirect to login page on marketing domain
+        const marketingDomain = process.env.NEXT_PUBLIC_MARKETING_DOMAIN || 'https://centaurdynamics.io'
+        const loginUrl = new URL('/login', marketingDomain)
+        return NextResponse.redirect(loginUrl)
     }
 
     // Security: Check admin routes require proper role
