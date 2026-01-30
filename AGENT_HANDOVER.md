@@ -137,23 +137,33 @@ return { error: sanitizeErrorMessage(error) }
 
 ## REMAINING TASKS 🔧
 
-### Priority 3: Refactor God Components (PARTIALLY STARTED)
+### Priority 3: Refactor God Components (IN PROGRESS - 37% COMPLETE)
 
 **Components to Split:**
-1. `src/app/(platform)/marketplace/marketplace-view.tsx` - 1,293 lines
-2. `src/app/(platform)/team/team-comparison-view.tsx` - 1,467 lines
-3. `src/app/(platform)/tasks/task-card.tsx` - 1,073 lines
+1. ✅ `src/app/(platform)/tasks/task-card.tsx` - **1,073 → 675 lines (37% reduction)**
+   - Created `src/hooks/useTaskCardState.ts` (127 lines) - state management
+   - Created `src/hooks/useTaskActions.ts` (200 lines) - action handlers
+   - Created `src/components/tasks/forward-task-dialog.tsx` (199 lines) - forward dialog
+   - Created `src/components/tasks/task-action-buttons.tsx` (341 lines) - action buttons
+   - **Still needs**: CardHeader extraction, CardContent extraction to reach <300 lines
+2. ⏳ `src/app/(platform)/marketplace/marketplace-view.tsx` - 1,293 lines (not started)
+3. ⏳ `src/app/(platform)/team/team-comparison-view.tsx` - 1,467 lines (not started)
 
-**Progress:**
-- Created `src/hooks/useTaskCardState.ts` hook for task-card.tsx
-- Hook needs to be integrated into the component
-- Other files still need refactoring
+**Progress on task-card.tsx:**
+- ✅ Integrated `useTaskCardState` hook (saves 70 lines)
+- ✅ Integrated `useTaskActions` hook (saves 120 lines)
+- ✅ Extracted Forward Dialog component (saves 110 lines)
+- ✅ Extracted Action Buttons component (saves 160 lines)
+- **Total saved: 398 lines (37.1% reduction)**
+- **Current size: 675 lines**
+- **Target: <300 lines**
+- **Still needed**: Extract CardHeader (~150 lines) and CardContent (~100 lines)
 
-**Approach:**
-1. Use the created `useTaskCardState` hook in `task-card.tsx`
-2. Create similar hooks: `useMarketplaceFilters`, `useTeamComparison`
-3. Split into sub-components (e.g., `MarketplaceFilters`, `MarketplaceGrid`)
-4. Aim for <300 lines per component
+**Next Steps:**
+1. Continue task-card.tsx: Extract CardHeader component with assignee picker and badges
+2. Extract CardContent expanded view section
+3. Once task-card.tsx is <300 lines, move to marketplace-view.tsx
+4. Apply same patterns to team-comparison-view.tsx
 
 ### Priority 4: Add Test Coverage
 

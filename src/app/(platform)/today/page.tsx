@@ -9,6 +9,8 @@ import { CreateTaskDialog } from "../tasks/create-task-dialog"
 import { CreateObjectiveDialog } from "../objectives/create-objective-dialog"
 import { DailyPrioritizer } from "@/components/DailyPrioritizer"
 import { ActionItemsLegend } from "@/components/today/action-items-legend"
+import { StandupWidget } from "@/components/StandupWidget"
+import { TeamPulseWidget } from "@/components/dashboard/TeamPulseWidget"
 import { getMentionsForUser } from "@/actions/tasks"
 import Link from "next/link"
 import {
@@ -690,6 +692,12 @@ export default async function TodayPage() {
                                 )}
                             </CardContent>
                         </Card>
+
+                        {/* Daily Standup Widget */}
+                        <StandupWidget userRole={profile?.role || undefined} compact />
+
+                        {/* Team Pulse Widget */}
+                        <TeamPulseWidget members={members.map(m => ({ id: m.id, full_name: m.full_name, role: m.role || 'Member' }))} />
 
                         {/* Quick Links */}
                         <Card className="bg-background border">

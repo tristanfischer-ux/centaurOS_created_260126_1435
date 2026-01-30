@@ -7,7 +7,8 @@ import { createClient } from "@/lib/supabase/server"
 import { revalidatePath } from "next/cache"
 import { evaluateAllBadges as evaluateBadges } from "@/lib/badges/badge-rules"
 
-export { getProviderBadges as getBadges, type BadgeType, type ProviderBadge } from './trust-signals'
+// Note: Types BadgeType and ProviderBadge are exported from '@/actions/trust-signals'
+// Import them directly from there: import { type BadgeType, type ProviderBadge } from '@/actions/trust-signals'
 
 /**
  * Check and award any eligible badges for a provider

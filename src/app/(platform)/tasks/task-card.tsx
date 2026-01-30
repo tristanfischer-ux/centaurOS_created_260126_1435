@@ -23,7 +23,7 @@ import {
 } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { format } from "date-fns"
-import { Calendar as CalendarIcon, Check, X, ArrowRight, Bot, MessageSquare, ChevronDown, ChevronUp, Copy, Pencil, History as HistoryIcon, ShieldAlert, Eye, EyeOff, ShieldCheck, Paperclip, Plus, Upload, Loader2, Maximize2 } from "lucide-react"
+import { Calendar as CalendarIcon, Check, X, ArrowRight, Bot, MessageSquare, ChevronDown, ChevronUp, Copy, Pencil, History as HistoryIcon, ShieldAlert, Eye, EyeOff, ShieldCheck, Paperclip, Plus, Upload, Loader2, Maximize2, CheckCircle2, XCircle } from "lucide-react"
 import { Calendar } from "@/components/ui/calendar"
 import {
     Popover,
@@ -46,6 +46,8 @@ import { InlineThread } from "@/components/tasks/inline-thread"
 import { InlineHistory } from "@/components/tasks/inline-history"
 import { EditTaskDialog } from "@/components/tasks/edit-task-dialog"
 import { FullTaskView } from "@/components/tasks/full-task-view"
+import { ForwardTaskDialog } from "@/components/tasks/forward-task-dialog"
+import { TaskActionButtons } from "@/components/tasks/task-action-buttons"
 import { toast } from "sonner"
 import { RubberStampModal } from "@/components/smart-airlock/RubberStampModal"
 import { ClientNudgeButton } from "@/components/smart-airlock/ClientNudgeButton"
@@ -486,10 +488,61 @@ export const TaskCard = memo(function TaskCard(props: TaskCardProps) {
                                 <Markdown content={task.description} className="text-xs" />
                             </div>
                         )}
-                        <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                        <div className="flex items-center justify-between text-xs text-muted-foreground">
                             <div className="flex items-center gap-1">
                                 <CalendarIcon className="w-3 h-3" />
                                 <span>Due: {task.end_date ? format(new Date(task.end_date), "MMM d") : "-"}</span>
+                            </div>
+                            
+                            {/* Quick Actions - always visible */}
+                            <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                                {isAssignee && task.status === 'Pending' && (
+                                    <>
+                                        <Button
+                                            size="sm"
+                                            variant="ghost"
+                                            onClick={handleAccept}
+                                            disabled={isLoading}
+                                            className="h-7 px-2 text-status-success hover:bg-status-success-light"
+                                        >
+                                            <CheckCircle2 className="h-3.5 w-3.5 mr-1" />
+                                            Accept
+                                        </Button>
+                                        <Button
+                                            size="sm"
+                                            variant="ghost"
+                                            onClick={() => setRejectOpen(true)}
+                                            disabled={isLoading}
+                                            className="h-7 px-2 text-destructive hover:bg-status-error-light"
+                                        >
+                                            <XCircle className="h-3.5 w-3.5 mr-1" />
+                                            Reject
+                                        </Button>
+                                    </>
+                                )}
+                                {isAssignee && task.status === 'Accepted' && (
+                                    <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        onClick={handleComplete}
+                                        disabled={isLoading}
+                                        className="h-7 px-2 text-status-success hover:bg-status-success-light"
+                                    >
+                                        <CheckCircle2 className="h-3.5 w-3.5 mr-1" />
+                                        Complete
+                                    </Button>
+                                )}
+                                {isExecutive && (task.status === 'Pending_Executive_Approval' || task.status === 'Amended_Pending_Approval') && (
+                                    <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        onClick={() => setRubberStampOpen(true)}
+                                        className="h-7 px-2 text-international-orange hover:bg-orange-50"
+                                    >
+                                        <ShieldCheck className="h-3.5 w-3.5 mr-1" />
+                                        Certify
+                                    </Button>
+                                )}
                             </div>
                         </div>
                     </div>
@@ -592,315 +645,48 @@ export const TaskCard = memo(function TaskCard(props: TaskCardProps) {
 
                     <Separator className="bg-muted" />
 
-                    <CardFooter className="bg-muted p-4 flex flex-col gap-4 mt-auto">
-                        {/* Primary Workflow Actions - Only render section if actions are available */}
-                        {(() => {
-                            const showAcceptReject = task.status === 'Pending' && isAssignee
-                            const showMarkComplete = task.status === 'Accepted' && (isAssignee || userRole === 'Executive' || isCreator)
-                            const showCertify = task.status === 'Pending_Executive_Approval' && isExecutive
-                            const hasPrimaryActions = showAcceptReject || showMarkComplete || showCertify
-
-                            if (!hasPrimaryActions) return null
-
-                            return (
-                                <>
-                                    <div className="flex gap-4 w-full">
-                                        {showAcceptReject && (
-                                            <>
-                                                <Button
-                                                    onClick={handleAccept}
-                                                    variant="success"
-                                                    disabled={isLoading}
-                                                    className="flex-1 shadow-sm font-medium"
-                                                >
-                                                    <Check className="h-4 w-4" /> Accept
-                                                </Button>
-
-                                                <Dialog open={rejectOpen} onOpenChange={setRejectOpen}>
-                                                    <DialogTrigger asChild>
-                                                        <Button
-                                                            variant="secondary"
-                                                            disabled={isLoading}
-                                                            className="flex-1 border-destructive/30 text-destructive hover:bg-destructive/10 hover:border-destructive/50 shadow-sm font-medium"
-                                                        >
-                                                            <X className="h-4 w-4" /> Reject
-                                                        </Button>
-                                                    </DialogTrigger>
-                                                    <DialogContent className="bg-background shadow-xl text-foreground">
-                                                        <DialogHeader><DialogTitle>Reject Task</DialogTitle></DialogHeader>
-                                                        <form action={handleReject} className="space-y-4">
-                                                            <Textarea name="reason" placeholder="Reason for rejection..." required className="bg-muted" />
-                                                            <Button type="submit" variant="destructive" className="w-full">Confirm Rejection</Button>
-                                                        </form>
-                                                    </DialogContent>
-                                                </Dialog>
-                                            </>
-                                        )}
-
-                                        {showMarkComplete && (
-                                            <Button
-                                                onClick={handleComplete}
-                                                disabled={isLoading}
-                                                className="w-full bg-foreground hover:bg-foreground/90 text-background shadow-sm font-medium"
-                                            >
-                                                <Check className="h-4 w-4" /> Mark Complete
-                                            </Button>
-                                        )}
-
-                                        {showCertify && (
-                                            <Button
-                                                onClick={() => setRubberStampOpen(true)}
-                                                variant="success"
-                                                disabled={isLoading}
-                                                className="w-full shadow-sm font-medium"
-                                            >
-                                                <ShieldCheck className="h-4 w-4" /> Certify Release
-                                            </Button>
-                                        )}
-                                    </div>
-                                    <Separator className="bg-muted/60" />
-                                </>
-                            )
-                        })()}
-
-                        {/* Secondary & Meta Actions - Always show consistent layout */}
-                        <div className="flex items-center justify-between w-full gap-2 flex-wrap">
-                            {/* Tools Area - Always visible for consistent layout */}
-                            <div className="flex items-center gap-1 flex-wrap">
-                                <Tooltip>
-                                    <TooltipTrigger asChild>
-                                        <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            onClick={() => setEditOpen(true)}
-                                            disabled={isLoading}
-                                            className="text-muted-foreground hover:text-electric-blue hover:bg-electric-blue-light active:text-electric-blue active:bg-electric-blue-light/80 active:scale-[0.98] transition-all duration-200 px-2 shrink-0"
-                                        >
-                                            <Pencil className="h-4 w-4" /> <span className="hidden xs:inline">Edit</span>
-                                        </Button>
-                                    </TooltipTrigger>
-                                    <TooltipContent>Edit task details</TooltipContent>
-                                </Tooltip>
-
-                                <Dialog open={forwardOpen} onOpenChange={setForwardOpen}>
-                                    <Tooltip>
-                                        <TooltipTrigger asChild>
-                                            <DialogTrigger asChild>
-                                                <Button
-                                                    variant="ghost"
-                                                    size="sm"
-                                                    disabled={isLoading}
-                                                    className="text-muted-foreground hover:text-status-warning hover:bg-status-warning-light active:text-status-warning-dark active:bg-status-warning-light/80 active:scale-[0.98] transition-all duration-200 px-2 shrink-0"
-                                                >
-                                                    <ArrowRight className="h-4 w-4" /> <span className="hidden xs:inline">Forward</span>
-                                                </Button>
-                                            </DialogTrigger>
-                                        </TooltipTrigger>
-                                        <TooltipContent>Forward or reassign task</TooltipContent>
-                                    </Tooltip>
-                                    <DialogContent className="bg-background shadow-xl text-foreground max-w-lg">
-                                        <DialogHeader>
-                                            <DialogTitle>Forward Task</DialogTitle>
-                                            <p className="text-sm text-muted-foreground mt-1">
-                                                Reassign this task and provide context for the new assignee
-                                            </p>
-                                        </DialogHeader>
-                                        <form action={handleForward} className="space-y-4">
-                                            <div className="grid gap-2">
-                                                <label className="text-sm font-medium text-foreground">New Assignee</label>
-                                                <Select name="new_assignee_id" required>
-                                                    <SelectTrigger className="bg-background">
-                                                        <SelectValue placeholder="Select person..." />
-                                                    </SelectTrigger>
-                                                    <SelectContent className="bg-background shadow-lg z-50">
-                                                        {sortedMembers.map(member => (
-                                                            <SelectItem key={member.id} value={member.id}>
-                                                                <div className="flex items-center gap-3">
-                                                                    <UserAvatar 
-                                                                        name={member.full_name} 
-                                                                        role={member.role} 
-                                                                        size="md" 
-                                                                        showBorder
-                                                                    />
-                                                                    <span>
-                                                                        {member.full_name}
-                                                                        {member.role === 'AI_Agent' && ' 🤖'}
-                                                                    </span>
-                                                                </div>
-                                                            </SelectItem>
-                                                        ))}
-                                                    </SelectContent>
-                                                </Select>
-                                            </div>
-                                            <div className="grid gap-2">
-                                                <label className="text-sm font-medium text-foreground">Handover Information</label>
-                                                <p className="text-xs text-muted-foreground">
-                                                    Provide context, instructions, or any important details for the new assignee
-                                                </p>
-                                                <Textarea 
-                                                    name="reason" 
-                                                    placeholder="e.g., 'Please review the attached documents and coordinate with the legal team. The deadline is urgent - client needs this by end of week.'"
-                                                    required 
-                                                    className="bg-muted min-h-[120px] resize-y" 
-                                                />
-                                            </div>
-                                            
-                                            {/* Attachments Section */}
-                                            <div className="grid gap-2">
-                                                <div className="flex items-center justify-between">
-                                                    <label className="text-sm font-medium text-foreground flex items-center gap-2">
-                                                        <Paperclip className="h-4 w-4" />
-                                                        Attachments
-                                                    </label>
-                                                    <div>
-                                                        <input
-                                                            type="file"
-                                                            ref={forwardFileInputRef}
-                                                            onChange={handleForwardFileUpload}
-                                                            className="hidden"
-                                                            accept="*/*"
-                                                        />
-                                                        <Button
-                                                            type="button"
-                                                            variant="secondary"
-                                                            size="sm"
-                                                            onClick={() => forwardFileInputRef.current?.click()}
-                                                            disabled={forwardUploading}
-                                                            className="gap-2"
-                                                        >
-                                                            {forwardUploading ? (
-                                                                <Loader2 className="h-4 w-4 animate-spin" />
-                                                            ) : (
-                                                                <Upload className="h-4 w-4" />
-                                                            )}
-                                                            Add File
-                                                        </Button>
-                                                    </div>
-                                                </div>
-                                                <div className="bg-muted rounded-lg p-3 max-h-[200px] overflow-y-auto">
-                                                    {forwardAttachmentsLoading ? (
-                                                        <div className="flex items-center justify-center py-4 text-muted-foreground">
-                                                            <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                                                            Loading attachments...
-                                                        </div>
-                                                    ) : (
-                                                        <AttachmentList 
-                                                            taskId={task.id} 
-                                                            attachments={forwardAttachments}
-                                                            canDelete={true}
-                                                            onDelete={handleRemoveAttachment}
-                                                        />
-                                                    )}
-                                                </div>
-                                            </div>
-                                            
-                                            <div className="flex gap-2 pt-2">
-                                                <Button type="button" variant="secondary" onClick={() => setForwardOpen(false)} className="flex-1">
-                                                    Cancel
-                                                </Button>
-                                                <Button type="submit" variant="default" className="flex-1 bg-status-warning hover:bg-status-warning-dark">
-                                                    Forward Task
-                                                </Button>
-                                            </div>
-                                        </form>
-                                    </DialogContent>
-                                </Dialog>
-
-                                <Tooltip>
-                                    <TooltipTrigger asChild>
-                                        <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            onClick={handleDuplicate}
-                                            disabled={isLoading}
-                                            className="text-muted-foreground hover:text-indigo-600 hover:bg-indigo-50 active:text-indigo-700 active:bg-indigo-100 active:scale-[0.98] transition-all duration-200 px-2 shrink-0"
-                                        >
-                                            <Copy className="h-4 w-4" /> <span className="hidden xs:inline">Copy</span>
-                                        </Button>
-                                    </TooltipTrigger>
-                                    <TooltipContent>Duplicate this task</TooltipContent>
-                                </Tooltip>
-                            </div>
-
-                            {/* Meta Area - History & Notes */}
-                            <div className="flex items-center gap-1 flex-wrap">
-                                <Tooltip>
-                                    <TooltipTrigger asChild>
-                                        <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            className={cn(
-                                                "h-8 px-2 gap-1.5 text-xs transition-all duration-200 shrink-0",
-                                                showHistory ? "text-electric-blue bg-electric-blue-light" : "text-muted-foreground hover:text-foreground"
-                                            )}
-                                            onClick={() => { setShowHistory(!showHistory); setShowThread(false) }}
-                                        >
-                                            <HistoryIcon className="h-3.5 w-3.5" />
-                                            <span className="hidden xs:inline">Audit Log</span>
-                                        </Button>
-                                    </TooltipTrigger>
-                                    <TooltipContent>View task history</TooltipContent>
-                                </Tooltip>
-                                <Tooltip>
-                                    <TooltipTrigger asChild>
-                                        <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            className={cn(
-                                                "h-8 px-2 gap-1.5 text-xs transition-all duration-200 shrink-0",
-                                                showThread ? "text-electric-blue bg-electric-blue-light" : "text-muted-foreground hover:text-foreground"
-                                            )}
-                                            onClick={() => { setShowThread(!showThread); setShowHistory(false) }}
-                                        >
-                                            <MessageSquare className="h-3.5 w-3.5" />
-                                            <span className="hidden xs:inline">Notes</span>
-                                        </Button>
-                                    </TooltipTrigger>
-                                    <TooltipContent>Add notes and attachments</TooltipContent>
-                                </Tooltip>
-                                <Tooltip>
-                                    <TooltipTrigger asChild>
-                                        <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            className="h-8 px-2 gap-1.5 text-xs transition-all duration-200 shrink-0 text-muted-foreground hover:text-international-orange hover:bg-accent/10"
-                                            onClick={() => setFullViewOpen(true)}
-                                        >
-                                            <Maximize2 className="h-3.5 w-3.5" />
-                                            <span className="hidden xs:inline">Expand</span>
-                                        </Button>
-                                    </TooltipTrigger>
-                                    <TooltipContent>Open full view</TooltipContent>
-                                </Tooltip>
-                            </div>
-                        </div>
-
-                        {/* Special Actions Block */}
-                        {(isAITask || (!task.client_visible && task.status !== 'Completed')) && (
-                            <div className="flex flex-col gap-2 pt-2 mt-2 bg-muted/50 -mx-4 px-4 pb-2">
-                                {isAITask && (task.status === 'Pending' || task.status === 'Accepted') && (
-                                    <Button
-                                        onClick={handleRunAI}
-                                        disabled={aiRunning}
-                                        size="sm"
-                                        variant="secondary"
-                                        className="w-full bg-status-info-light text-status-info-dark hover:bg-status-info-light/80 border border-status-info"
-                                    >
-                                        <Bot className="h-4 w-4" /> {aiRunning ? 'AI Working...' : 'Trigger AI Agent'}
-                                    </Button>
-                                )}
-
-                                {!task.client_visible && task.status !== 'Completed' && (
-                                    <div className="w-full flex justify-center">
-                                        <ClientNudgeButton
-                                            taskId={task.id}
-                                            lastNudge={task.last_nudge_at}
-                                        />
-                                    </div>
-                                )}
-                            </div>
-                        )}
-                    </CardFooter>
+                    <TaskActionButtons
+                        task={{
+                            id: task.id,
+                            status: task.status,
+                            client_visible: task.client_visible,
+                            last_nudge_at: task.last_nudge_at,
+                        }}
+                        isAssignee={isAssignee}
+                        isCreator={isCreator}
+                        isExecutive={isExecutive}
+                        isAITask={isAITask}
+                        userRole={userRole}
+                        isLoading={isLoading}
+                        aiRunning={aiRunning}
+                        rejectOpen={rejectOpen}
+                        setRejectOpen={setRejectOpen}
+                        editOpen={editOpen}
+                        setEditOpen={setEditOpen}
+                        forwardOpen={forwardOpen}
+                        setForwardOpen={setForwardOpen}
+                        showHistory={showHistory}
+                        setShowHistory={setShowHistory}
+                        showThread={showThread}
+                        setShowThread={setShowThread}
+                        fullViewOpen={fullViewOpen}
+                        setFullViewOpen={setFullViewOpen}
+                        rubberStampOpen={rubberStampOpen}
+                        setRubberStampOpen={setRubberStampOpen}
+                        handleAccept={handleAccept}
+                        handleReject={handleReject}
+                        handleComplete={handleComplete}
+                        handleDuplicate={handleDuplicate}
+                        handleRunAI={handleRunAI}
+                        handleForward={handleForward}
+                        sortedMembers={sortedMembers}
+                        forwardAttachments={forwardAttachments}
+                        forwardAttachmentsLoading={forwardAttachmentsLoading}
+                        forwardUploading={forwardUploading}
+                        forwardFileInputRef={forwardFileInputRef}
+                        handleForwardFileUpload={handleForwardFileUpload}
+                        handleRemoveAttachment={handleRemoveAttachment}
+                    />
 
                     {/* Inline panels */}
                     <InlineHistory

@@ -6,12 +6,14 @@ import {
     FileSpreadsheet, 
     FileText,
     Loader2,
-    CheckCircle2
+    CheckCircle2,
+    Sheet
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
+import { cn } from '@/lib/utils'
 import { exportFoundryData, type ExportFormat, type ExportableTable } from '@/actions/data-export'
 
 interface DataExportTabProps {
@@ -27,10 +29,12 @@ const EXPORTABLE_TABLES: { id: ExportableTable; label: string; description: stri
     { id: 'orders', label: 'Orders', description: 'Marketplace orders (if applicable)' },
 ]
 
+type ExtendedExportFormat = ExportFormat | 'sheets'
+
 export function DataExportTab({ foundryId }: DataExportTabProps) {
     const [isPending, startTransition] = useTransition()
     const [selectedTables, setSelectedTables] = useState<ExportableTable[]>(['profiles', 'tasks', 'objectives'])
-    const [format, setFormat] = useState<ExportFormat>('csv')
+    const [format, setFormat] = useState<ExtendedExportFormat>('csv')
     const [dateFrom, setDateFrom] = useState('')
     const [dateTo, setDateTo] = useState('')
     const [success, setSuccess] = useState(false)
@@ -58,8 +62,11 @@ export function DataExportTab({ foundryId }: DataExportTabProps) {
         setSuccess(false)
         
         startTransition(async () => {
+            // Google Sheets uses CSV format for import
+            const exportFormat: ExportFormat = format === 'sheets' ? 'csv' : format
+            
             const result = await exportFoundryData(
-                format,
+                exportFormat,
                 selectedTables,
                 dateFrom ? { from: dateFrom, to: dateTo || undefined } : undefined
             )
@@ -67,48 +74,88 @@ export function DataExportTab({ foundryId }: DataExportTabProps) {
             if (result.error) {
                 setError(result.error)
             } else if (result.data) {
-                const blob = new Blob([result.data], { 
-                    type: format === 'csv' ? 'text/csv' : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-                })
-                const url = URL.createObjectURL(blob)
-                const a = document.createElement('a')
-                a.href = url
-                a.download = `foundry-export-${new Date().toISOString().split('T')[0]}.${format === 'csv' ? 'csv' : 'xlsx'}`
-                document.body.appendChild(a)
-                a.click()
-                document.body.removeChild(a)
-                URL.revokeObjectURL(url)
-                
-                setSuccess(true)
-                setTimeout(() => setSuccess(false), 3000)
+                if (format === 'sheets') {
+                    // For Google Sheets, open in a new tab with the data
+                    const blob = new Blob([result.data], { type: 'text/csv' })
+                    const url = URL.createObjectURL(blob)
+                    const a = document.createElement('a')
+                    a.href = url
+                    a.download = `foundry-export-${new Date().toISOString().split('T')[0]}.csv`
+                    document.body.appendChild(a)
+                    a.click()
+                    document.body.removeChild(a)
+                    URL.revokeObjectURL(url)
+                    
+                    // Open Google Sheets import page
+                    window.open('https://sheets.google.com/create', '_blank')
+                    
+                    setSuccess(true)
+                    setTimeout(() => setSuccess(false), 3000)
+                } else {
+                    const blob = new Blob([result.data], { 
+                        type: format === 'csv' ? 'text/csv' : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+                    })
+                    const url = URL.createObjectURL(blob)
+                    const a = document.createElement('a')
+                    a.href = url
+                    a.download = `foundry-export-${new Date().toISOString().split('T')[0]}.${format === 'csv' ? 'csv' : 'xlsx'}`
+                    document.body.appendChild(a)
+                    a.click()
+                    document.body.removeChild(a)
+                    URL.revokeObjectURL(url)
+                    
+                    setSuccess(true)
+                    setTimeout(() => setSuccess(false), 3000)
+                }
             }
         })
     }
     
     return (
         <div className="space-y-4">
-            {/* Format selection */}
+            {/* Format selection - optimized toggle buttons */}
             <div className="space-y-2">
-                <Label className="text-xs font-medium text-foundry-700">Export Format</Label>
-                <div className="flex gap-2">
-                    <Button
-                        variant={format === 'csv' ? 'default' : 'secondary'}
-                        size="sm"
+                <Label className="text-xs font-medium text-muted-foreground">Export Format</Label>
+                <div className="grid grid-cols-3 gap-1 p-1 bg-muted rounded-lg">
+                    <button
+                        type="button"
                         onClick={() => setFormat('csv')}
-                        className="flex-1 h-9"
+                        className={cn(
+                            "flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium rounded-md transition-colors",
+                            format === 'csv'
+                                ? "bg-background text-foreground shadow-sm"
+                                : "text-muted-foreground hover:text-foreground"
+                        )}
                     >
-                        <FileText className="h-4 w-4 mr-1.5" />
+                        <FileText className="h-3.5 w-3.5" />
                         CSV
-                    </Button>
-                    <Button
-                        variant={format === 'excel' ? 'default' : 'secondary'}
-                        size="sm"
+                    </button>
+                    <button
+                        type="button"
                         onClick={() => setFormat('excel')}
-                        className="flex-1 h-9"
+                        className={cn(
+                            "flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium rounded-md transition-colors",
+                            format === 'excel'
+                                ? "bg-background text-foreground shadow-sm"
+                                : "text-muted-foreground hover:text-foreground"
+                        )}
                     >
-                        <FileSpreadsheet className="h-4 w-4 mr-1.5" />
+                        <FileSpreadsheet className="h-3.5 w-3.5" />
                         Excel
-                    </Button>
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => setFormat('sheets')}
+                        className={cn(
+                            "flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium rounded-md transition-colors",
+                            format === 'sheets'
+                                ? "bg-background text-foreground shadow-sm"
+                                : "text-muted-foreground hover:text-foreground"
+                        )}
+                    >
+                        <Sheet className="h-3.5 w-3.5" />
+                        Sheets
+                    </button>
                 </div>
             </div>
             
@@ -178,15 +225,18 @@ export function DataExportTab({ foundryId }: DataExportTabProps) {
             </div>
             
             {error && (
-                <div className="p-2 text-xs bg-red-50 text-red-700 rounded-md">
+                <div className="p-2 text-xs bg-status-error-light text-status-error-dark rounded-md">
                     {error}
                 </div>
             )}
             
             {success && (
-                <div className="flex items-center gap-2 p-2 text-xs bg-green-50 text-green-700 rounded-md">
+                <div className="flex items-center gap-2 p-2 text-xs bg-status-success-light text-status-success-dark rounded-md">
                     <CheckCircle2 className="h-4 w-4" />
-                    Export downloaded successfully
+                    {format === 'sheets' 
+                        ? 'CSV downloaded! Import it in the new Google Sheets tab'
+                        : 'Export downloaded successfully'
+                    }
                 </div>
             )}
             

@@ -85,7 +85,7 @@ export default async function PlatformLayout({
                         <CommandPalette />
                         <KeyboardShortcutsDialog />
                         <MobileZoomControl />
-                        <Sidebar foundryName={foundryName} foundryId={foundryId} userName={profile?.full_name || user.email || "User"} userRole={profile?.role || "Member"} />
+                        <Sidebar foundryName={foundryName} foundryId={foundryId} userName={profile?.full_name || user.email || "User"} userRole={profile?.role || "Member"} isAdmin={profile?.role === "Founder" || profile?.role === "Executive" || hasAdminAccess} />
                         <ZoomableContent className="flex-1 overflow-y-auto bg-white">
                             <main className="p-4 sm:p-6 lg:p-8 pb-32 lg:pb-8">
                                 <ErrorBoundary>

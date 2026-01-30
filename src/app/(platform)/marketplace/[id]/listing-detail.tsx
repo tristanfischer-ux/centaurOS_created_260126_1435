@@ -33,9 +33,26 @@ import {
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { typography } from "@/lib/design-system"
+import { ProviderTrustSection } from "@/components/marketplace/ProviderTrustSection"
+import type { PortfolioItem, Certification, ProviderBadge } from "@/actions/trust-signals"
+import type { RatingsSummary, ProviderRating } from "@/actions/ratings"
+
+interface TrustSignalsData {
+    portfolio: PortfolioItem[]
+    certifications: Certification[]
+    badges: ProviderBadge[]
+}
+
+interface RatingsData {
+    summary: RatingsSummary | null
+    reviews: ProviderRating[]
+    error: string | null
+}
 
 interface MarketplaceListingDetailProps {
     listing: MarketplaceListing
+    trustSignals?: TrustSignalsData | null
+    ratings?: RatingsData | null
 }
 
 const categoryBadgeStyles = {
@@ -45,7 +62,7 @@ const categoryBadgeStyles = {
     'AI': 'bg-violet-50 text-violet-700'
 }
 
-export function MarketplaceListingDetail({ listing }: MarketplaceListingDetailProps) {
+export function MarketplaceListingDetail({ listing, trustSignals, ratings }: MarketplaceListingDetailProps) {
     const router = useRouter()
     const attrs = listing.attributes || {}
     const category = listing.category
@@ -136,6 +153,17 @@ export function MarketplaceListingDetail({ listing }: MarketplaceListingDetailPr
                 <div className="space-y-6">
                     {/* Key Metrics */}
                     <KeyMetricsCard category={category} attrs={attrs} />
+                    
+                    {/* Trust & Credentials Section */}
+                    {(trustSignals || ratings) && (
+                        <ProviderTrustSection
+                            ratingSummary={ratings?.summary}
+                            reviews={ratings?.reviews || []}
+                            badges={trustSignals?.badges || []}
+                            certifications={trustSignals?.certifications || []}
+                            portfolio={trustSignals?.portfolio || []}
+                        />
+                    )}
                 </div>
             </div>
         </div>

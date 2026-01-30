@@ -4,9 +4,10 @@ import React from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
-import { LayoutDashboard, Users, CheckSquare, Clock, Store, Target, Compass, LayoutGrid, MessageCircleQuestion, ShieldAlert, FileText, Sun, Bookmark } from "lucide-react"
+import { LayoutDashboard, Users, CheckSquare, Clock, Store, Target, Compass, LayoutGrid, MessageCircleQuestion, ShieldAlert, FileText, Sun, Bookmark, Settings, HelpCircle, GraduationCap, Repeat, ShoppingCart, Briefcase } from "lucide-react"
 import { NotificationCenter } from "@/components/NotificationCenter"
 import { ThemeToggle } from "@/components/ThemeToggle"
+import { FocusModeToggle } from "@/components/FocusModeToggle"
 import { ZoomControl } from "@/components/ZoomControl"
 import { useZoomContext } from "@/components/ZoomProvider"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
@@ -36,6 +37,7 @@ const coreNavigation = [
     { name: "Tasks", href: "/tasks", icon: CheckSquare, tooltip: "Manage and assign actionable items" },
     { name: "Timeline", href: "/timeline", icon: Clock, tooltip: "Gantt chart view of all tasks" },
     { name: "Team", href: "/team", icon: Users, tooltip: "Manage team members and roles" },
+    { name: "Retainers", href: "/retainers", icon: Repeat, tooltip: "Manage ongoing service retainers" },
     { name: "Saved Resources", href: "/saved-resources", icon: Bookmark, tooltip: "Your saved marketplace providers and tools" },
 ]
 
@@ -43,11 +45,17 @@ const communityNavigation = [
     { name: "Marketplace", href: "/marketplace", icon: Store, tooltip: "Browse and compare service providers" },
     { name: "RFQs", href: "/rfq", icon: FileText, tooltip: "Request quotes from suppliers or respond to opportunities" },
     { name: "Guild", href: "/guild", icon: Compass, tooltip: "Community events and resources" },
+    { name: "Apprenticeship", href: "/apprenticeship", icon: GraduationCap, tooltip: "Apprenticeship program and OTJT tracking" },
     { name: "Advice", href: "/advisory", icon: MessageCircleQuestion, tooltip: "Ask questions and get expert guidance" },
 ]
 
 const strategicNavigation = [
     { name: "Org Blueprint", href: "/org-blueprint", icon: LayoutGrid, tooltip: "Business function coverage and gap analysis" },
+]
+
+const supportNavigation = [
+    { name: "Help", href: "/help", icon: HelpCircle, tooltip: "Help center and documentation" },
+    { name: "Settings", href: "/settings", icon: Settings, tooltip: "Account and app settings" },
 ]
 
 export function Sidebar({ foundryName, foundryId, userName, userRole, isAdmin }: { foundryName?: string; foundryId?: string; userName?: string; userRole?: string; isAdmin?: boolean }) {
@@ -66,6 +74,7 @@ export function Sidebar({ foundryName, foundryId, userName, userRole, isAdmin }:
                         <span className="w-1.5 h-1.5 rounded-full bg-international-orange animate-pulse shadow-[0_0_8px_rgba(255,69,0,0.6)]"></span>
                     </Link>
                     <div className="flex items-center gap-0.5">
+                        <FocusModeToggle compact />
                         <ThemeToggle />
                         <NotificationCenter />
                     </div>
@@ -148,6 +157,12 @@ export function Sidebar({ foundryName, foundryId, userName, userRole, isAdmin }:
                             
                             {/* Strategic Navigation: Org Blueprint, Advisory */}
                             {strategicNavigation.map(renderNavItem)}
+                            
+                            {/* Spacer */}
+                            <div className="my-3 border-t border-slate-100" />
+                            
+                            {/* Support Navigation: Help, Settings */}
+                            {supportNavigation.map(renderNavItem)}
                         </>
                     )
                 })()}

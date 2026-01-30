@@ -9,6 +9,7 @@ import Link from 'next/link'
 import { removeFromStack } from '@/actions/marketplace'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
+import { typography } from '@/lib/design-system/typography'
 
 interface SavedResource {
     id: string
@@ -81,22 +82,22 @@ export function SavedResourcesView({ savedResources: initialResources, error }: 
             <div className="max-w-7xl mx-auto">
                 {/* Header */}
                 <div className="mb-8">
-                    <div className="flex items-center gap-3 mb-2">
-                        <Bookmark className="h-8 w-8 text-cyan-600" />
-                        <h1 className="text-3xl font-bold text-foreground">Saved Resources</h1>
+                    <div className={typography.pageHeader}>
+                        <div className={typography.pageHeaderAccent} />
+                        <h1 className={typography.h1}>Saved Resources</h1>
                     </div>
-                    <p className="text-muted-foreground text-lg">
+                    <p className={typography.pageSubtitle}>
                         Quick access to your saved marketplace providers and tools
                     </p>
                 </div>
 
                 {/* Empty State */}
                 {savedResources.length === 0 && (
-                    <Card className="bg-gradient-to-br from-cyan-50 to-blue-50 border-cyan-200">
+                    <Card className="bg-gradient-to-br from-orange-50 to-amber-50 border-orange-200">
                         <CardContent className="p-12 text-center">
                             <div className="max-w-md mx-auto space-y-4">
-                                <div className="w-16 h-16 bg-cyan-100 rounded-full flex items-center justify-center mx-auto">
-                                    <Bookmark className="h-8 w-8 text-cyan-600" />
+                                <div className="w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center mx-auto">
+                                    <Bookmark className="h-8 w-8 text-international-orange" />
                                 </div>
                                 <h2 className="text-xl font-semibold text-foreground">No Saved Resources Yet</h2>
                                 <p className="text-muted-foreground">

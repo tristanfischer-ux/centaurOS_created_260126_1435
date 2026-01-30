@@ -87,7 +87,7 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
     const [statusFilter, setStatusFilter] = useState<string[]>([])
     const [assigneeFilter, setAssigneeFilter] = useState<string | 'unassigned' | 'all'>('all')
     const [sortBy, setSortBy] = useState<'due_date_asc' | 'due_date_desc' | 'created_desc'>('due_date_asc')
-    const [filtersOpen, setFiltersOpen] = useState(false)
+    const [filtersOpen, setFiltersOpen] = useState(true)
 
     // Filter Presets State
     const [activePreset, setActivePreset] = useState<string | null>(null)

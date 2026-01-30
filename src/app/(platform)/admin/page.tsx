@@ -277,6 +277,12 @@ export default async function AdminDashboardPage() {
                                 View System Health
                             </Button>
                         </Link>
+                        <Link href="/admin/settings">
+                            <Button variant="secondary">
+                                <RefreshCw className="h-4 w-4 mr-2" />
+                                Admin Settings
+                            </Button>
+                        </Link>
                     </div>
                 </CardContent>
             </Card>
