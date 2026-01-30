@@ -99,27 +99,101 @@ function formatAmount(amount: number, currency: string): string {
 
 /**
  * Handles payment_intent.succeeded event
- * - Updates order escrow status to 'held'
- * - Creates escrow hold transaction
- * - Notifies the seller
+ * - For orders: Updates order escrow status to 'held', creates escrow hold transaction
+ * - For retainers: Marks timesheet as paid
+ * - Notifies the relevant parties
  */
 async function handlePaymentIntentSucceeded(paymentIntent: Stripe.PaymentIntent): Promise<void> {
-  const orderId = paymentIntent.metadata?.order_id
+  const referenceId = paymentIntent.metadata?.order_id
   const buyerId = paymentIntent.metadata?.buyer_id
 
   console.log('Payment succeeded:', {
     paymentIntentId: paymentIntent.id,
-    orderId,
+    referenceId,
     buyerId,
     amount: paymentIntent.amount,
     currency: paymentIntent.currency,
   })
 
-  if (!orderId) {
+  if (!referenceId) {
     console.error('No order_id in payment intent metadata')
     return
   }
 
+  const supabase = await createClient()
+
+  // Check if this is a retainer timesheet payment or a regular order
+  const { data: timesheet, error: timesheetError } = await supabase
+    .from('timesheet_entries')
+    .select(`
+      id,
+      status,
+      stripe_payment_intent_id,
+      retainer:retainers (
+        id,
+        seller_id,
+        seller:provider_profiles!retainers_seller_id_fkey (
+          user_id
+        )
+      )
+    `)
+    .eq('id', referenceId)
+    .single()
+
+  if (!timesheetError && timesheet) {
+    // This is a RETAINER PAYMENT - handle timesheet
+    console.log('Processing retainer payment for timesheet:', referenceId)
+    
+    // Verify this payment intent matches the one stored
+    if (timesheet.stripe_payment_intent_id !== paymentIntent.id) {
+      console.error('Payment intent mismatch for timesheet', {
+        expected: timesheet.stripe_payment_intent_id,
+        received: paymentIntent.id,
+      })
+      return
+    }
+
+    // Mark timesheet as paid NOW (payment confirmed via webhook)
+    const { error: updateError } = await supabase
+      .from('timesheet_entries')
+      .update({
+        status: 'paid',
+        paid_at: new Date().toISOString(),
+      })
+      .eq('id', referenceId)
+
+    if (updateError) {
+      console.error('Error marking timesheet as paid:', updateError)
+      return
+    }
+
+    console.log('Timesheet marked as paid:', referenceId)
+
+    // Notify seller about retainer payment
+    const seller = timesheet.retainer?.seller as { user_id: string } | null
+    if (seller?.user_id) {
+      try {
+        await sendNotification({
+          userId: seller.user_id,
+          priority: 'medium',
+          title: 'Retainer Payment Received',
+          body: `Payment of ${formatAmount(paymentIntent.amount, paymentIntent.currency)} for your retainer has been confirmed.`,
+          actionUrl: `/provider-portal/retainers/${timesheet.retainer?.id}`,
+          metadata: {
+            timesheetId: referenceId,
+            paymentIntentId: paymentIntent.id,
+            amount: paymentIntent.amount,
+          },
+        })
+      } catch (notifyError) {
+        console.error('Error sending retainer payment notification:', notifyError)
+      }
+    }
+
+    return
+  }
+
+  // This is a regular ORDER PAYMENT - use existing logic
   // Confirm the payment (creates hold transaction and updates order status)
   const result = await confirmPayment(paymentIntent.id)
 
@@ -133,26 +207,73 @@ async function handlePaymentIntentSucceeded(paymentIntent: Stripe.PaymentIntent)
 
 /**
  * Handles payment_intent.payment_failed event
- * - Updates order with failure information
+ * - For orders: Updates order with failure information
+ * - For retainers: Clears pending payment intent from timesheet
  * - Notifies the buyer
  */
 async function handlePaymentIntentFailed(paymentIntent: Stripe.PaymentIntent): Promise<void> {
-  const orderId = paymentIntent.metadata?.order_id
+  const referenceId = paymentIntent.metadata?.order_id
   const buyerId = paymentIntent.metadata?.buyer_id
 
   console.log('Payment failed:', {
     paymentIntentId: paymentIntent.id,
-    orderId,
+    referenceId,
     buyerId,
     error: paymentIntent.last_payment_error?.message,
   })
+
+  const supabase = await createClient()
+
+  // Check if this is a retainer timesheet payment
+  const { data: timesheet, error: timesheetError } = await supabase
+    .from('timesheet_entries')
+    .select('id, stripe_payment_intent_id, retainer:retainers (buyer_id)')
+    .eq('stripe_payment_intent_id', paymentIntent.id)
+    .single()
+
+  if (!timesheetError && timesheet) {
+    // This is a RETAINER PAYMENT failure
+    console.log('Retainer payment failed for timesheet:', timesheet.id)
+    
+    // Clear the payment intent so it can be retried
+    await supabase
+      .from('timesheet_entries')
+      .update({
+        stripe_payment_intent_id: null,
+        // Status remains 'approved' so it can be retried
+      })
+      .eq('id', timesheet.id)
+
+    // Notify the buyer about the failed payment
+    const retainerBuyerId = (timesheet.retainer as { buyer_id: string })?.buyer_id
+    if (retainerBuyerId) {
+      try {
+        await sendNotification({
+          userId: retainerBuyerId,
+          priority: 'high',
+          title: 'Retainer Payment Failed',
+          body: `Your retainer payment could not be processed. ${paymentIntent.last_payment_error?.message || 'Please update your payment method and try again.'}`,
+          actionUrl: '/retainers',
+          metadata: {
+            timesheetId: timesheet.id,
+            errorMessage: paymentIntent.last_payment_error?.message,
+          },
+        })
+      } catch (notifyError) {
+        console.error('Error sending retainer failure notification:', notifyError)
+      }
+    }
+
+    return
+  }
+
+  // Continue with regular order failure handling
+  const orderId = referenceId
 
   if (!orderId) {
     console.error('No order_id in payment intent metadata')
     return
   }
-
-  const supabase = await createClient()
 
   // Update order escrow status to indicate failure
   await supabase

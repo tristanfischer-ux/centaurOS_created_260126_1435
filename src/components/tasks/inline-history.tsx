@@ -19,7 +19,7 @@ interface InlineHistoryProps {
 type TaskHistoryItem = Database['public']['Tables']['task_history']['Row'] & {
     user: {
         full_name: string | null
-        email: string
+        email?: string | null
         role?: string | null
         avatar_url?: string | null
     } | null

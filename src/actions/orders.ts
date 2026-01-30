@@ -277,10 +277,10 @@ export async function approveCompletion(
     return { success: false, error: "Not authenticated" }
   }
 
-  // Verify user is the buyer
+  // Verify user is the buyer and get order details including escrow status
   const { data: order, error: fetchError } = await supabase
     .from("orders")
-    .select("buyer_id, seller_id, status")
+    .select("buyer_id, seller_id, status, escrow_status, total_amount, stripe_payment_intent_id")
     .eq("id", orderId)
     .single()
 
@@ -292,6 +292,30 @@ export async function approveCompletion(
     return { success: false, error: "Not authorized to approve this order" }
   }
 
+  // Security: Verify order is in correct status for completion
+  if (order.status !== "in_progress") {
+    return { success: false, error: `Cannot complete order in ${order.status} status` }
+  }
+
+  // Security: Verify payment was actually received before releasing escrow
+  // Check that escrow is being held (payment was made)
+  if (order.escrow_status !== "held") {
+    console.error(`[SECURITY] Attempt to release escrow without payment. Order ${orderId}, escrow_status: ${order.escrow_status}`)
+    return { 
+      success: false, 
+      error: "Cannot release payment - escrow is not held. Please ensure payment has been received." 
+    }
+  }
+
+  // Security: Verify payment intent exists (actual payment was processed)
+  if (!order.stripe_payment_intent_id) {
+    console.error(`[SECURITY] Attempt to release escrow without payment intent. Order ${orderId}`)
+    return { 
+      success: false, 
+      error: "Cannot release payment - no payment record found." 
+    }
+  }
+
   // Update status to completed and release escrow
   const { error: updateError } = await supabase
     .from("orders")
@@ -301,6 +325,8 @@ export async function approveCompletion(
       completed_at: new Date().toISOString(),
     })
     .eq("id", orderId)
+    // Additional safety: Only update if escrow is still held (prevent race conditions)
+    .eq("escrow_status", "held")
 
   if (updateError) {
     return { success: false, error: "Failed to approve completion" }

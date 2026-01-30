@@ -2,13 +2,38 @@
 
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
+import { headers } from 'next/headers'
 import { createClient } from '@/lib/supabase/server'
+import { rateLimit, getClientIP, resetRateLimit } from '@/lib/security/rate-limit'
+import { sanitizeEmail } from '@/lib/security/sanitize'
+import { logFailedLogin, logSuccessfulLogin } from '@/lib/security/audit-log'
 
 export async function login(formData: FormData) {
+    // Security: Get client IP for rate limiting
+    const headersList = await headers()
+    const clientIP = getClientIP(headersList)
+
+    // Security: Rate limit login attempts
+    const rateLimitResult = await rateLimit('login', clientIP)
+    if (!rateLimitResult.success) {
+        redirect(`/login?error=${encodeURIComponent('Too many login attempts. Please try again in 15 minutes.')}`)
+    }
+
     const supabase = await createClient()
 
-    const email = formData.get('email') as string
+    const rawEmail = formData.get('email') as string
     const password = formData.get('password') as string
+
+    // Security: Validate and sanitize email
+    const email = sanitizeEmail(rawEmail)
+    if (!email) {
+        redirect('/login?error=Invalid email address')
+    }
+
+    // Security: Basic password validation
+    if (!password || password.length < 1) {
+        redirect('/login?error=Password is required')
+    }
 
     const { error } = await supabase.auth.signInWithPassword({
         email,
@@ -16,8 +41,19 @@ export async function login(formData: FormData) {
     })
 
     if (error) {
-        redirect('/login?error=Could not authenticate')
+        // Security: Log failed login attempt
+        const userAgentHeader = headersList.get('user-agent') || undefined
+        await logFailedLogin(email, clientIP, userAgentHeader, error.message)
+        redirect('/login?error=Invalid email or password')
     }
+
+    // Success - log and reset rate limit for this IP
+    const { data: { user: loggedInUser } } = await supabase.auth.getUser()
+    if (loggedInUser) {
+        const userAgentHeader = headersList.get('user-agent') || undefined
+        await logSuccessfulLogin(loggedInUser.id, email, clientIP, userAgentHeader)
+    }
+    await resetRateLimit('login', clientIP)
 
     revalidatePath('/', 'layout')
     redirect('/dashboard')

@@ -8,12 +8,71 @@ import { logTaskHistory } from '@/lib/audit'
 import { createTaskSchema, updateTaskDatesSchema, addCommentSchema, validate } from '@/lib/validations'
 import { getFoundryIdCached } from '@/lib/supabase/foundry-context'
 import { withRetry } from '@/lib/retry'
+import { sanitizeFileName } from '@/lib/security/sanitize'
 
 // Nudge cooldown duration (1 hour)
 const NUDGE_COOLDOWN_MS = 60 * 60 * 1000
 
 export type TaskStatus = Database["public"]["Enums"]["task_status"]
 export type RiskLevel = Database["public"]["Enums"]["risk_level"]
+
+/**
+ * Security helper: Check if user can modify a task
+ * User must be: task creator, assignee, or have Executive/Founder role
+ * AND task must belong to user's foundry
+ */
+async function canModifyTask(
+    supabase: Awaited<ReturnType<typeof createClient>>,
+    taskId: string,
+    userId: string,
+    userFoundryId: string
+): Promise<{ allowed: boolean; error?: string; task?: { creator_id: string; assignee_id: string | null; foundry_id: string } }> {
+    // Fetch task with ownership info
+    const { data: task, error: taskError } = await supabase
+        .from('tasks')
+        .select('creator_id, assignee_id, foundry_id')
+        .eq('id', taskId)
+        .single()
+
+    if (taskError || !task) {
+        return { allowed: false, error: 'Task not found' }
+    }
+
+    // Verify task belongs to user's foundry
+    if (task.foundry_id !== userFoundryId) {
+        return { allowed: false, error: 'Unauthorized: Task belongs to a different foundry' }
+    }
+
+    // Check if user is creator or assignee
+    if (task.creator_id === userId || task.assignee_id === userId) {
+        return { allowed: true, task }
+    }
+
+    // Check if user is in task_assignees
+    const { data: assignee } = await supabase
+        .from('task_assignees')
+        .select('profile_id')
+        .eq('task_id', taskId)
+        .eq('profile_id', userId)
+        .single()
+
+    if (assignee) {
+        return { allowed: true, task }
+    }
+
+    // Check user role - Executives and Founders can modify any task in their foundry
+    const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', userId)
+        .single()
+
+    if (profile && (profile.role === 'Executive' || profile.role === 'Founder')) {
+        return { allowed: true, task }
+    }
+
+    return { allowed: false, error: 'Unauthorized: You do not have permission to modify this task' }
+}
 
 async function logSystemEvent(taskId: string, message: string, userId: string) {
     const supabase = await createClient()
@@ -154,8 +213,10 @@ export async function createTask(formData: FormData) {
             const file = formData.get(`file_${i}`) as File
             if (!file) continue
 
+            // Security: Sanitize filename to prevent path traversal
+            const safeFileName = sanitizeFileName(file.name)
             // Upload to Supabase Storage
-            const filePath = `${foundry_id}/${data.id}/${Date.now()}_${file.name}`
+            const filePath = `${foundry_id}/${data.id}/${Date.now()}_${safeFileName}`
             const { error: uploadError } = await supabase.storage
                 .from('task-files')
                 .upload(filePath, file)
@@ -261,6 +322,15 @@ export async function rejectTask(taskId: string, reason: string) {
     if (!user) return { error: 'Unauthorized' }
 
     if (!reason) return { error: 'Reason required for rejection' }
+
+    // Security: Verify user has permission to modify this task
+    const foundry_id = await getFoundryIdCached()
+    if (!foundry_id) return { error: 'User not in a foundry' }
+
+    const authCheck = await canModifyTask(supabase, taskId, user.id, foundry_id)
+    if (!authCheck.allowed) {
+        return { error: authCheck.error || 'Unauthorized' }
+    }
 
     const { error } = await supabase.from('tasks')
         .update({ status: 'Rejected' })
@@ -401,6 +471,15 @@ export async function amendTask(taskId: string, updates: {
 
     if (!updates.amendment_notes) return { error: 'Amendment notes required' }
 
+    // Security: Verify user has permission to modify this task
+    const foundry_id = await getFoundryIdCached()
+    if (!foundry_id) return { error: 'User not in a foundry' }
+
+    const authCheck = await canModifyTask(supabase, taskId, user.id, foundry_id)
+    if (!authCheck.allowed) {
+        return { error: authCheck.error || 'Unauthorized' }
+    }
+
     const { error } = await supabase.from('tasks')
         .update({
             status: 'Amended_Pending_Approval',
@@ -437,6 +516,16 @@ export async function approveAmendment(taskId: string) {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return { error: 'Unauthorized' }
+
+    // Security: Verify user has permission to approve amendments
+    // Should be the task creator or assignee who requested the amendment
+    const foundry_id = await getFoundryIdCached()
+    if (!foundry_id) return { error: 'User not in a foundry' }
+
+    const authCheck = await canModifyTask(supabase, taskId, user.id, foundry_id)
+    if (!authCheck.allowed) {
+        return { error: authCheck.error || 'Unauthorized' }
+    }
 
     const { error } = await supabase.from('tasks')
         .update({ status: 'Accepted' }) // "Once User A accepts... automatically changes to Accepted"
@@ -948,6 +1037,15 @@ export async function updateTaskProgress(taskId: string, progress: number) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return { error: 'Unauthorized' }
 
+    // Security: Verify user has permission to modify this task
+    const foundry_id = await getFoundryIdCached()
+    if (!foundry_id) return { error: 'User not in a foundry' }
+
+    const authCheck = await canModifyTask(supabase, taskId, user.id, foundry_id)
+    if (!authCheck.allowed) {
+        return { error: authCheck.error || 'Unauthorized' }
+    }
+
     // Clamp progress between 0 and 100
     const clampedProgress = Math.max(0, Math.min(100, Math.round(progress)))
 
@@ -1051,6 +1149,15 @@ export async function updateTaskDetails(taskId: string, updates: { title?: strin
 
     if (!updates.title && updates.description === undefined) return { success: true } // Nothing to update
 
+    // Security: Verify user has permission to modify this task
+    const foundry_id = await getFoundryIdCached()
+    if (!foundry_id) return { error: 'User not in a foundry' }
+
+    const authCheck = await canModifyTask(supabase, taskId, user.id, foundry_id)
+    if (!authCheck.allowed) {
+        return { error: authCheck.error || 'Unauthorized' }
+    }
+
     const { error } = await supabase.from('tasks')
         .update(updates)
         .eq('id', taskId)
@@ -1080,6 +1187,15 @@ export async function updateTaskAssignees(taskId: string, assigneeIds: string[])
     if (!user) return { error: 'Unauthorized' }
 
     if (assigneeIds.length === 0) return { error: 'Must have at least one assignee' }
+
+    // Security: Verify user has permission to modify this task
+    const foundry_id = await getFoundryIdCached()
+    if (!foundry_id) return { error: 'User not in a foundry' }
+
+    const authCheck = await canModifyTask(supabase, taskId, user.id, foundry_id)
+    if (!authCheck.allowed) {
+        return { error: authCheck.error || 'Unauthorized' }
+    }
 
     const primaryAssigneeId = assigneeIds[0]
 
@@ -1142,10 +1258,24 @@ export async function uploadTaskAttachment(taskId: string, formData: FormData) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user || !foundry_id) return { error: 'Unauthorized' }
 
+    // Security: Verify user has permission to modify this task
+    const authCheck = await canModifyTask(supabase, taskId, user.id, foundry_id)
+    if (!authCheck.allowed) {
+        return { error: authCheck.error || 'Unauthorized' }
+    }
+
     const file = formData.get('file') as File
     if (!file) return { error: 'No file provided' }
 
-    const filePath = `${foundry_id}/${taskId}/${Date.now()}_${file.name}`
+    // Security: Validate file size (max 25MB)
+    const MAX_FILE_SIZE = 25 * 1024 * 1024 // 25MB
+    if (file.size > MAX_FILE_SIZE) {
+        return { error: 'File size exceeds maximum limit of 25MB' }
+    }
+
+    // Security: Sanitize filename to prevent path traversal
+    const safeFileName = sanitizeFileName(file.name)
+    const filePath = `${foundry_id}/${taskId}/${Date.now()}_${safeFileName}`
     const { error: uploadError } = await supabase.storage
         .from('task-files')
         .upload(filePath, file)
@@ -1176,6 +1306,15 @@ export async function deleteTaskAttachment(fileId: string, filePath: string, tas
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return { error: 'Unauthorized' }
+
+    // Security: Verify user has permission to modify this task
+    const foundry_id = await getFoundryIdCached()
+    if (!foundry_id) return { error: 'User not in a foundry' }
+
+    const authCheck = await canModifyTask(supabase, taskId, user.id, foundry_id)
+    if (!authCheck.allowed) {
+        return { error: authCheck.error || 'Unauthorized' }
+    }
 
     // Delete from Storage
     const { error: storageError } = await supabase.storage
@@ -1208,9 +1347,21 @@ export async function deleteTaskAttachment(fileId: string, filePath: string, tas
 
 export async function getTaskAttachments(taskId: string) {
     const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return { error: 'Unauthorized' }
+
+    // Security: Verify user has permission to view this task
+    const foundry_id = await getFoundryIdCached()
+    if (!foundry_id) return { error: 'User not in a foundry' }
+
+    const authCheck = await canModifyTask(supabase, taskId, user.id, foundry_id)
+    if (!authCheck.allowed) {
+        return { error: authCheck.error || 'Unauthorized' }
+    }
+
     const { data, error } = await supabase
         .from('task_files')
-        .select('*')
+        .select('id, task_id, file_name, file_path, file_size, mime_type, uploaded_by, created_at')
         .eq('task_id', taskId)
         .order('created_at', { ascending: false })
 
@@ -1220,11 +1371,28 @@ export async function getTaskAttachments(taskId: string) {
 
 export async function getTaskHistory(taskId: string) {
     const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return { error: 'Unauthorized' }
+
+    // Security: Verify user has permission to view this task
+    const foundry_id = await getFoundryIdCached()
+    if (!foundry_id) return { error: 'User not in a foundry' }
+
+    const authCheck = await canModifyTask(supabase, taskId, user.id, foundry_id)
+    if (!authCheck.allowed) {
+        return { error: authCheck.error || 'Unauthorized' }
+    }
+
     const { data, error } = await supabase
         .from('task_history')
         .select(`
-            *,
-            user:profiles(full_name, email, role, avatar_url)
+            id,
+            task_id,
+            action_type,
+            changes,
+            user_id,
+            created_at,
+            user:profiles(full_name, role, avatar_url)
         `)
         .eq('task_id', taskId)
         .order('created_at', { ascending: false })
@@ -1240,13 +1408,24 @@ export async function deleteTasks(taskIds: string[]) {
 
     if (!taskIds || taskIds.length === 0) return { success: true, deletedCount: 0, failedIds: [] }
 
+    // Security: Verify user's foundry
+    const foundry_id = await getFoundryIdCached()
+    if (!foundry_id) return { error: 'User not in a foundry' }
+
     // Track results for partial failure handling
     const failedIds: string[] = []
     let deletedCount = 0
 
-    // Delete tasks individually to track partial failures
-    // This allows us to report which specific tasks failed while still completing successful deletions
+    // Delete tasks individually with authorization check for each
     for (const taskId of taskIds) {
+        // Security: Verify user has permission to delete this task
+        const authCheck = await canModifyTask(supabase, taskId, user.id, foundry_id)
+        if (!authCheck.allowed) {
+            console.error(`Unauthorized to delete task ${taskId}:`, authCheck.error)
+            failedIds.push(taskId)
+            continue
+        }
+
         const { error } = await supabase.from('tasks')
             .delete()
             .eq('id', taskId)

@@ -8,12 +8,14 @@ import { Database } from '@/types/database.types'
 import { WeeklyBilling, TimesheetStatus } from '@/types/retainers'
 import { format, subWeeks, startOfWeek, addDays, parseISO } from 'date-fns'
 import { createPaymentIntent } from '@/lib/stripe/escrow'
-import { markTimesheetPaid } from './timesheets'
+import { markTimesheetPaid, revertTimesheetToPending } from './timesheets'
+import { RETAINER_PLATFORM_FEE_PERCENT, DEFAULT_VAT_RATE } from '@/types/payments'
 
 type TypedSupabaseClient = SupabaseClient<Database>
 
-const PLATFORM_FEE_PERCENT = 10
-const VAT_RATE = 0.20
+// Use centralized fee constants
+const PLATFORM_FEE_PERCENT = RETAINER_PLATFORM_FEE_PERCENT
+const VAT_RATE = DEFAULT_VAT_RATE
 
 /**
  * Interface for weekly billing processing result
@@ -104,7 +106,7 @@ export async function processWeeklyBilling(
         // Convert to smallest currency unit (pence/cents)
         const amountInSmallestUnit = Math.round(total * 100)
 
-        // Create payment intent
+        // Create payment intent with metadata to identify this as a retainer payment
         const { paymentIntent, error: paymentError } = await createPaymentIntent({
           amount: amountInSmallestUnit,
           currency: timesheet.retainer.currency.toLowerCase(),
@@ -123,23 +125,28 @@ export async function processWeeklyBilling(
           continue
         }
 
-        // Mark timesheet as paid
-        const { success, error: markError } = await markTimesheetPaid(
-          supabase,
-          timesheet.id,
-          paymentIntent.id
-        )
+        // Store the pending payment intent ID WITHOUT marking as paid yet
+        // The webhook will confirm and mark as paid once payment succeeds
+        const { error: updateError } = await supabase
+          .from('timesheet_entries')
+          .update({
+            stripe_payment_intent_id: paymentIntent.id,
+            // Keep status as 'approved' - webhook will change to 'paid' on success
+          })
+          .eq('id', timesheet.id)
 
-        if (!success) {
+        if (updateError) {
+          console.error('Error storing payment intent on timesheet:', updateError)
           results.push({
             timesheetId: timesheet.id,
             retainerId: timesheet.retainer.id,
             success: false,
-            error: markError || 'Failed to mark timesheet as paid',
+            error: 'Failed to store payment intent',
           })
           continue
         }
 
+        // Payment initiated but not yet confirmed - webhook will finalize
         results.push({
           timesheetId: timesheet.id,
           retainerId: timesheet.retainer.id,
@@ -147,6 +154,8 @@ export async function processWeeklyBilling(
           amount: total,
           paymentIntentId: paymentIntent.id,
         })
+        
+        console.log(`Retainer payment initiated for timesheet ${timesheet.id}, PI: ${paymentIntent.id}. Awaiting webhook confirmation.`)
       } catch (err) {
         console.error(`Error processing timesheet ${timesheet.id}:`, err)
         results.push({
@@ -309,17 +318,22 @@ export async function chargeRetainerPayment(
       return { success: false, error: paymentError || 'Failed to create payment' }
     }
 
-    // Mark timesheet as paid
-    const { success, error: markError } = await markTimesheetPaid(
-      supabase,
-      timesheetId,
-      paymentIntent.id
-    )
+    // Store the pending payment intent ID WITHOUT marking as paid yet
+    // The webhook will confirm and mark as paid once payment succeeds
+    const { error: updateError } = await supabase
+      .from('timesheet_entries')
+      .update({
+        stripe_payment_intent_id: paymentIntent.id,
+        // Keep status as 'approved' - webhook will change to 'paid' on success
+      })
+      .eq('id', timesheetId)
 
-    if (!success) {
-      return { success: false, error: markError || 'Failed to mark as paid' }
+    if (updateError) {
+      console.error('Error storing payment intent on timesheet:', updateError)
+      return { success: false, error: 'Failed to store payment intent' }
     }
 
+    console.log(`Retainer payment initiated for timesheet ${timesheetId}, PI: ${paymentIntent.id}. Awaiting webhook confirmation.`)
     return { success: true, paymentIntentId: paymentIntent.id, error: null }
   } catch (err) {
     console.error('Error in chargeRetainerPayment:', err)

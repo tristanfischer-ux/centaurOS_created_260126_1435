@@ -27,6 +27,12 @@ import {
   OrderStatus,
 } from '@/types/payments'
 import { sendNotification } from '@/lib/notifications'
+import { 
+  checkVelocityLimits, 
+  detectFraudSignals, 
+  flagSuspiciousActivity,
+  updateVelocityUsage 
+} from '@/lib/fraud/detection'
 
 /**
  * Response type for initiatePayment
@@ -106,6 +112,94 @@ export async function initiatePayment(
     }
 
     const buyer = order.buyer as unknown as { id: string; email: string; full_name: string }
+
+    // ==========================================
+    // FRAUD DETECTION & VELOCITY LIMIT CHECKS
+    // ==========================================
+    
+    // Convert amount from pence to pounds for velocity checks
+    const amountInPounds = amount / 100
+
+    // Check velocity limits
+    const velocityCheck = await checkVelocityLimits(supabase, buyer.id, amountInPounds)
+    if (!velocityCheck.allowed) {
+      // Log the velocity violation
+      await flagSuspiciousActivity(
+        supabase,
+        buyer.id,
+        'velocity_violation',
+        {
+          attempted_amount: amountInPounds,
+          reason: velocityCheck.reason,
+          limits: velocityCheck.limits,
+          order_id: orderId,
+        }
+      )
+      
+      return {
+        paymentIntent: null,
+        order: null,
+        error: `Payment blocked: ${velocityCheck.reason}`,
+      }
+    }
+
+    // Run fraud detection checks
+    const fraudCheck = await detectFraudSignals(
+      supabase,
+      buyer.id,
+      'payment_initiation',
+      {
+        amount: amountInPounds,
+        order_id: orderId,
+        // Note: IP and device fingerprint would come from request context in production
+      }
+    )
+
+    if (fraudCheck.shouldBlock) {
+      // Log all fraud signals
+      for (const signal of fraudCheck.signals) {
+        await flagSuspiciousActivity(
+          supabase,
+          buyer.id,
+          signal.type,
+          {
+            ...signal.details,
+            order_id: orderId,
+            action: 'payment_blocked',
+          },
+          signal.severity
+        )
+      }
+
+      return {
+        paymentIntent: null,
+        order: null,
+        error: 'Payment blocked due to security review. Please contact support if you believe this is an error.',
+      }
+    }
+
+    // Log high-risk signals even if not blocking (for monitoring)
+    if (fraudCheck.riskScore >= 50) {
+      console.warn(`High risk payment initiated: User ${buyer.id}, Score: ${fraudCheck.riskScore}, Order: ${orderId}`)
+      for (const signal of fraudCheck.signals) {
+        await flagSuspiciousActivity(
+          supabase,
+          buyer.id,
+          signal.type,
+          {
+            ...signal.details,
+            order_id: orderId,
+            action: 'payment_allowed_with_warning',
+            risk_score: fraudCheck.riskScore,
+          },
+          signal.severity
+        )
+      }
+    }
+
+    // ==========================================
+    // END FRAUD DETECTION
+    // ==========================================
 
     // Create payment intent with Stripe
     const piResult = await createPaymentIntent({
@@ -240,6 +334,14 @@ export async function confirmPayment(
 
     if (result.error || !result.transaction) {
       return { transaction: null, error: result.error || 'Failed to hold payment' }
+    }
+
+    // Update velocity usage tracking now that payment is confirmed
+    const amountInPounds = Number(order.total_amount) / 100
+    const velocityUpdateResult = await updateVelocityUsage(supabase, order.buyer_id, amountInPounds)
+    if (!velocityUpdateResult.success) {
+      console.error('Failed to update velocity usage:', velocityUpdateResult.error)
+      // Don't fail the payment confirmation for velocity tracking errors
     }
 
     // Update order status to 'accepted' if still pending

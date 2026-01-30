@@ -17,6 +17,7 @@ import {
 } from '@/types/orders'
 import { canTransition, isTerminalStatus } from './status-machine'
 import { logOrderEvent } from './history'
+import { DEFAULT_PLATFORM_FEE_PERCENT, DEFAULT_VAT_RATE } from '@/types/payments'
 
 type TypedSupabaseClient = SupabaseClient<Database>
 
@@ -29,10 +30,85 @@ export async function createOrder(
   params: CreateOrderParams
 ): Promise<{ data: Order | null; error: string | null }> {
   try {
-    // Calculate VAT (default 20% UK VAT)
-    const vatRate = 0.20
+    // ==========================================
+    // SECURITY: VALIDATE LISTING PRICE
+    // ==========================================
+    // If order is based on a listing, validate the amount matches the listing price
+    if (params.listingId) {
+      const { data: listing, error: listingError } = await supabase
+        .from('marketplace_listings')
+        .select('price, currency')
+        .eq('id', params.listingId)
+        .single()
+
+      if (listingError || !listing) {
+        return { data: null, error: 'Listing not found' }
+      }
+
+      // Security: Verify the order amount matches the listing price
+      // Allow small tolerance for floating point issues
+      const tolerance = 0.01
+      if (Math.abs(params.totalAmount - listing.price) > tolerance) {
+        console.error(`[SECURITY] Price manipulation attempt: Order amount ${params.totalAmount} != Listing price ${listing.price}`)
+        return { 
+          data: null, 
+          error: 'Order amount does not match listing price' 
+        }
+      }
+
+      // Verify currency matches
+      if (params.currency && params.currency !== listing.currency) {
+        return { 
+          data: null, 
+          error: 'Currency mismatch between order and listing' 
+        }
+      }
+    }
+
+    // Validate amount is positive
+    if (params.totalAmount <= 0) {
+      return { data: null, error: 'Order amount must be positive' }
+    }
+
+    // ==========================================
+    // MILESTONE VALIDATION
+    // ==========================================
+    if (params.milestones && params.milestones.length > 0) {
+      // Validate all milestones have positive amounts
+      const invalidMilestones = params.milestones.filter(m => !m.amount || m.amount <= 0)
+      if (invalidMilestones.length > 0) {
+        return { 
+          data: null, 
+          error: 'All milestones must have a positive amount' 
+        }
+      }
+
+      // Validate milestone amounts sum to order total
+      const milestoneSum = params.milestones.reduce((sum, m) => sum + m.amount, 0)
+      
+      // Allow small floating point tolerance (0.01 = 1 penny)
+      const tolerance = 0.01
+      if (Math.abs(milestoneSum - params.totalAmount) > tolerance) {
+        return { 
+          data: null, 
+          error: `Milestone amounts must equal order total. Milestones sum: ${milestoneSum.toFixed(2)}, Order total: ${params.totalAmount.toFixed(2)}` 
+        }
+      }
+
+      // Validate milestone titles
+      const missingTitles = params.milestones.filter(m => !m.title || m.title.trim() === '')
+      if (missingTitles.length > 0) {
+        return { 
+          data: null, 
+          error: 'All milestones must have a title' 
+        }
+      }
+    }
+
+    // Calculate VAT and platform fee using centralized constants
+    const vatRate = DEFAULT_VAT_RATE
     const vatAmount = params.totalAmount * vatRate
-    const platformFee = params.totalAmount * 0.05 // 5% platform fee
+    const platformFee = params.totalAmount * (DEFAULT_PLATFORM_FEE_PERCENT / 100)
 
     // Insert the order
     const { data: order, error: orderError } = await supabase

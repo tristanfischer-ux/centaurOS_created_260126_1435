@@ -4,40 +4,40 @@ import '@testing-library/jest-dom'
 
 describe('Button Component', () => {
     describe('Semantic Variants', () => {
-        it('should render primary variant with correct classes', () => {
-            const { container } = render(<Button variant="default">Primary Button</Button>)
+        it('should render default variant with correct classes', () => {
+            render(<Button variant="default">Primary Button</Button>)
             const button = screen.getByText('Primary Button')
-            expect(button).toHaveClass('bg-slate-900', 'hover:bg-slate-800', 'text-white')
+            expect(button).toHaveClass('bg-accent', 'text-accent-foreground')
         })
 
         it('should render success variant with correct classes', () => {
-            const { container } = render(<Button variant="success">Success Button</Button>)
+            render(<Button variant="success">Success Button</Button>)
             const button = screen.getByText('Success Button')
-            expect(button).toHaveClass('bg-green-600', 'hover:bg-green-700', 'text-white')
+            expect(button).toHaveClass('bg-status-success', 'text-status-success-foreground')
         })
 
         it('should render warning variant with correct classes', () => {
-            const { container } = render(<Button variant="warning">Warning Button</Button>)
+            render(<Button variant="warning">Warning Button</Button>)
             const button = screen.getByText('Warning Button')
-            expect(button).toHaveClass('bg-amber-500', 'hover:bg-amber-600', 'text-white')
+            expect(button).toHaveClass('bg-status-warning', 'text-status-warning-foreground')
         })
 
-        it('should render danger variant with correct classes', () => {
-            const { container } = render(<Button variant="danger">Danger Button</Button>)
-            const button = screen.getByText('Danger Button')
-            expect(button).toHaveClass('bg-red-600', 'hover:bg-red-700', 'text-white')
+        it('should render destructive variant with correct classes', () => {
+            render(<Button variant="destructive">Destructive Button</Button>)
+            const button = screen.getByText('Destructive Button')
+            expect(button).toHaveClass('bg-destructive', 'text-destructive-foreground')
         })
 
-        it('should render certified variant with correct classes', () => {
-            const { container } = render(<Button variant="success">Certified Button</Button>)
-            const button = screen.getByText('Certified Button')
-            expect(button).toHaveClass('bg-purple-600', 'hover:bg-purple-700', 'text-white')
+        it('should render secondary variant with correct classes', () => {
+            render(<Button variant="secondary">Secondary Button</Button>)
+            const button = screen.getByText('Secondary Button')
+            expect(button).toHaveClass('border-2', 'border-input', 'bg-background')
         })
 
         it('should render default variant when no variant specified', () => {
-            const { container } = render(<Button>Default Button</Button>)
+            render(<Button>Default Button</Button>)
             const button = screen.getByText('Default Button')
-            expect(button).toHaveClass('bg-primary', 'text-primary-foreground')
+            expect(button).toHaveClass('bg-accent', 'text-accent-foreground')
         })
     })
 
@@ -45,7 +45,7 @@ describe('Button Component', () => {
         it('should render sm size with correct classes', () => {
             render(<Button size="sm">Small Button</Button>)
             const button = screen.getByText('Small Button')
-            expect(button).toHaveClass('h-9', 'min-h-[44px]', 'md:min-h-0', 'rounded-md', 'px-3')
+            expect(button).toHaveClass('h-9', 'min-h-[44px]', 'md:min-h-0', 'px-3')
         })
 
         it('should render default size with correct classes', () => {
@@ -57,7 +57,7 @@ describe('Button Component', () => {
         it('should render lg size with correct classes', () => {
             render(<Button size="lg">Large Button</Button>)
             const button = screen.getByText('Large Button')
-            expect(button).toHaveClass('h-11', 'rounded-md', 'px-8')
+            expect(button).toHaveClass('h-12', 'px-8')
         })
 
         it('should render icon size with correct classes', () => {
@@ -83,39 +83,33 @@ describe('Button Component', () => {
     })
 
     describe('buttonVariants utility', () => {
-        it('should generate correct classes for primary variant', () => {
-            const classes = buttonVariants({ variant: 'primary' })
-            expect(classes).toContain('bg-slate-900')
-            expect(classes).toContain('hover:bg-slate-800')
-            expect(classes).toContain('text-white')
+        it('should generate correct classes for default variant', () => {
+            const classes = buttonVariants({ variant: 'default' })
+            expect(classes).toContain('bg-accent')
+            expect(classes).toContain('text-accent-foreground')
         })
 
         it('should generate correct classes for success variant', () => {
             const classes = buttonVariants({ variant: 'success' })
-            expect(classes).toContain('bg-green-600')
-            expect(classes).toContain('hover:bg-green-700')
-            expect(classes).toContain('text-white')
+            expect(classes).toContain('bg-status-success')
+            expect(classes).toContain('text-status-success-foreground')
         })
 
         it('should generate correct classes for warning variant', () => {
             const classes = buttonVariants({ variant: 'warning' })
-            expect(classes).toContain('bg-amber-500')
-            expect(classes).toContain('hover:bg-amber-600')
-            expect(classes).toContain('text-white')
+            expect(classes).toContain('bg-status-warning')
+            expect(classes).toContain('text-status-warning-foreground')
         })
 
-        it('should generate correct classes for danger variant', () => {
-            const classes = buttonVariants({ variant: 'danger' })
-            expect(classes).toContain('bg-red-600')
-            expect(classes).toContain('hover:bg-red-700')
-            expect(classes).toContain('text-white')
+        it('should generate correct classes for destructive variant', () => {
+            const classes = buttonVariants({ variant: 'destructive' })
+            expect(classes).toContain('bg-destructive')
+            expect(classes).toContain('text-destructive-foreground')
         })
 
-        it('should generate correct classes for certified variant', () => {
-            const classes = buttonVariants({ variant: 'certified' })
-            expect(classes).toContain('bg-purple-600')
-            expect(classes).toContain('hover:bg-purple-700')
-            expect(classes).toContain('text-white')
+        it('should generate correct classes for ghost variant', () => {
+            const classes = buttonVariants({ variant: 'ghost' })
+            expect(classes).toContain('hover:bg-accent/10')
         })
     })
 })

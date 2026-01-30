@@ -6,6 +6,28 @@
  */
 
 import { EmailOptions, EmailTemplate, ChannelSendResult } from '../types'
+import { escapeHtml } from '@/lib/security/sanitize'
+
+/**
+ * Security: Sanitize all string values in template data to prevent XSS
+ */
+function sanitizeTemplateData(data: Record<string, unknown>): Record<string, unknown> {
+    const sanitized: Record<string, unknown> = {}
+    for (const [key, value] of Object.entries(data)) {
+        if (typeof value === 'string') {
+            // Escape HTML entities in string values
+            sanitized[key] = escapeHtml(value)
+        } else if (Array.isArray(value)) {
+            // Sanitize arrays of strings
+            sanitized[key] = value.map(item => 
+                typeof item === 'string' ? escapeHtml(item) : item
+            )
+        } else {
+            sanitized[key] = value
+        }
+    }
+    return sanitized
+}
 
 // Email templates for common notifications
 const EMAIL_TEMPLATES: Record<EmailTemplate, (data: Record<string, unknown>) => { subject: string; html: string }> = {
@@ -200,6 +222,57 @@ const EMAIL_TEMPLATES: Record<EmailTemplate, (data: Record<string, unknown>) => 
         `
     }),
     
+    team_invitation: (data) => ({
+        subject: `You're invited to join ${data.foundryName || 'a company'} on CentaurOS`,
+        html: `
+            <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
+                <div style="background: linear-gradient(135deg, #1e293b 0%, #334155 100%); padding: 32px; border-radius: 8px 8px 0 0; text-align: center;">
+                    <h1 style="margin: 0; color: white; font-size: 24px;">You're Invited!</h1>
+                </div>
+                <div style="background: #f8fafc; padding: 32px; border-radius: 0 0 8px 8px;">
+                    <p style="color: #475569; font-size: 16px; margin: 0 0 24px 0;">
+                        <strong>${data.invitedByName || 'Someone'}</strong> has invited you to join 
+                        <strong>${data.foundryName || 'their company'}</strong> on CentaurOS as <strong>${data.role || 'a team member'}</strong>.
+                    </p>
+                    
+                    <div style="background: white; padding: 20px; border-radius: 8px; border: 1px solid #e2e8f0; margin-bottom: 24px;">
+                        <div style="display: flex; align-items: center; margin-bottom: 12px;">
+                            <div style="width: 48px; height: 48px; background: #3b82f6; border-radius: 8px; display: flex; align-items: center; justify-content: center; margin-right: 16px;">
+                                <span style="color: white; font-size: 20px; font-weight: bold;">${(data.foundryName as string)?.charAt(0)?.toUpperCase() || 'C'}</span>
+                            </div>
+                            <div>
+                                <h3 style="margin: 0; color: #1e293b; font-size: 18px;">${data.foundryName || 'Company'}</h3>
+                                <p style="margin: 4px 0 0 0; color: #64748b; font-size: 14px;">Role: ${data.role || 'Team Member'}</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    ${data.customMessage ? `
+                    <div style="background: #f1f5f9; padding: 16px; border-radius: 8px; margin-bottom: 24px; border-left: 4px solid #3b82f6;">
+                        <p style="margin: 0; color: #475569; font-style: italic;">"${data.customMessage}"</p>
+                        <p style="margin: 8px 0 0 0; color: #94a3b8; font-size: 13px;">— ${data.invitedByName || 'Your inviter'}</p>
+                    </div>
+                    ` : ''}
+                    
+                    <div style="text-align: center;">
+                        <a href="${data.inviteUrl || '#'}" style="display: inline-block; background: #1e293b; color: white; padding: 14px 32px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 16px;">Accept Invitation</a>
+                    </div>
+                    
+                    <p style="color: #94a3b8; font-size: 13px; margin-top: 24px; text-align: center;">
+                        This invitation expires on ${data.expiresAt ? new Date(data.expiresAt as string).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) : '7 days from now'}.
+                    </p>
+                </div>
+                
+                <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 24px 0;" />
+                
+                <p style="color: #94a3b8; font-size: 12px; text-align: center; margin: 0;">
+                    If you didn't expect this invitation, you can safely ignore this email.<br/>
+                    <a href="#" style="color: #64748b;">Unsubscribe from team invitations</a>
+                </p>
+            </div>
+        `
+    }),
+    
     generic: (data) => ({
         subject: String(data.subject || data.title || 'Notification from CentaurOS'),
         html: `
@@ -226,14 +299,17 @@ export async function sendEmail(options: EmailOptions): Promise<ChannelSendResul
     const { to, subject, body, template = 'generic', templateData = {} } = options
 
     try {
-        // Generate email content from template
-        const templateFn = EMAIL_TEMPLATES[template]
-        const { subject: templateSubject, html } = templateFn({
+        // Security: Sanitize all template data to prevent XSS/HTML injection
+        const sanitizedData = sanitizeTemplateData({
             subject,
             title: subject,
             body,
             ...templateData
         })
+
+        // Generate email content from template
+        const templateFn = EMAIL_TEMPLATES[template]
+        const { subject: templateSubject, html } = templateFn(sanitizedData)
 
         // ============================================
         // STUB: Replace with actual email sending
@@ -283,15 +359,17 @@ export async function sendTemplatedEmail(
     template: EmailTemplate,
     data: Record<string, unknown>
 ): Promise<ChannelSendResult> {
+    // Security: Sanitize data before passing to template
+    const sanitizedData = sanitizeTemplateData(data)
     const templateFn = EMAIL_TEMPLATES[template]
-    const { subject } = templateFn(data)
+    const { subject } = templateFn(sanitizedData)
     
     return sendEmail({
         to,
         subject,
         body: '', // Body is generated from template
         template,
-        templateData: data
+        templateData: sanitizedData
     })
 }
 
@@ -312,4 +390,26 @@ export async function queueEmailForDigest(
     // 2. A scheduled job would batch and send digests
     
     return { success: true }
+}
+
+/**
+ * Send team invitation email
+ */
+export async function sendInvitationEmail(params: {
+    to: string
+    foundryName: string
+    role: string
+    invitedByName: string
+    inviteUrl: string
+    expiresAt: string
+    customMessage?: string
+}): Promise<ChannelSendResult> {
+    return sendTemplatedEmail(params.to, 'team_invitation', {
+        foundryName: params.foundryName,
+        role: params.role,
+        invitedByName: params.invitedByName,
+        inviteUrl: params.inviteUrl,
+        expiresAt: params.expiresAt,
+        customMessage: params.customMessage,
+    })
 }

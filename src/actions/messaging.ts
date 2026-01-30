@@ -303,6 +303,15 @@ export async function unarchiveConversation(
       return { success: false, error: 'Not authenticated' }
     }
 
+    // Security: Verify user is part of this conversation
+    const conversation = await getConversation(supabase, conversationId)
+    if (!conversation) {
+      return { success: false, error: 'Conversation not found' }
+    }
+    if (conversation.buyer_id !== user.id && conversation.seller_id !== user.id) {
+      return { success: false, error: 'Access denied' }
+    }
+
     await unarchiveConv(supabase, conversationId)
     
     revalidatePath('/messages')
@@ -335,7 +344,19 @@ export async function createSystemMessage(
       return { success: false, error: 'Not authenticated' }
     }
 
-    await sendSystemMessage(supabase, conversationId, content)
+    // Security: Verify user is part of this conversation
+    const conversation = await getConversation(supabase, conversationId)
+    if (!conversation) {
+      return { success: false, error: 'Conversation not found' }
+    }
+    if (conversation.buyer_id !== user.id && conversation.seller_id !== user.id) {
+      return { success: false, error: 'Access denied' }
+    }
+
+    // Security: Sanitize content to prevent injection
+    const sanitizedContent = content.trim().slice(0, 2000) // Limit length
+
+    await sendSystemMessage(supabase, conversationId, sanitizedContent)
     
     return { success: true }
   } catch (error) {

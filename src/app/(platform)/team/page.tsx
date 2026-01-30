@@ -30,31 +30,41 @@ export default async function TeamPage() {
         .eq('foundry_id', foundry_id)
 
     // Fetch all profiles for the current foundry
+    // Security: Only select necessary fields, don't expose email/phone to all team members
     const { data: profiles } = await supabase
         .from('profiles')
         .select(`
-            *,
-            paired_ai:profiles!paired_ai_id(id, full_name, role, email, avatar_url)
+            id,
+            full_name,
+            role,
+            avatar_url,
+            paired_ai_id,
+            bio,
+            paired_ai:profiles!paired_ai_id(id, full_name, role, avatar_url)
         `)
         .eq('foundry_id', foundry_id)
         .order('role', { ascending: true })
 
     // Fetch teams with members
+    // Security: Don't expose email in team member lists
     interface TeamMemberJoin {
         profile: {
             id: string
             full_name: string | null
             role: string | null
-            email: string | null
         } | null
     }
 
     const { data: rawTeams } = await supabase
         .from('teams')
         .select(`
-            *,
+            id,
+            name,
+            foundry_id,
+            is_auto_generated,
+            created_at,
             team_members(
-                profile:profiles(id, full_name, role, email)
+                profile:profiles(id, full_name, role)
             )
         `)
         .eq('foundry_id', foundry_id)
@@ -65,15 +75,15 @@ export default async function TeamPage() {
         members: (team.team_members as TeamMemberJoin[] | null)?.map(tm => tm.profile).filter((profile): profile is NonNullable<typeof profile> => profile !== null) || []
     })) || []
 
+    // Security: Removed email and phone_number from member metrics to prevent data exposure
     interface MemberMetrics {
         id: string
         full_name: string
-        email: string
         role: "Founder" | "Executive" | "Apprentice" | "AI_Agent"
+        avatar_url: string | null
         paired_ai_id: string | null
         bio: string | null
-        phone_number: string | null
-        pairedAI: { id: string, full_name: string | null, role: string, email: string, avatar_url: string | null }[]
+        pairedAI: { id: string, full_name: string | null, role: string, avatar_url: string | null }[]
         activeTasks: number
         completedTasks: number
         pendingTasks: number
@@ -92,16 +102,14 @@ export default async function TeamPage() {
         return {
             id: profile.id,
             full_name: profile.full_name || 'Unknown',
-            email: profile.email || '',
             role: profile.role || 'Apprentice',
+            avatar_url: profile.avatar_url || null,
             paired_ai_id: profile.paired_ai_id,
             bio: profile.bio,
-            phone_number: profile.phone_number,
             pairedAI: profile.paired_ai ? [{
                 id: profile.paired_ai.id,
                 full_name: profile.paired_ai.full_name,
                 role: profile.paired_ai.role,
-                email: profile.paired_ai.email || '',
                 avatar_url: profile.paired_ai.avatar_url
             }] : [],
             activeTasks: memberTasks.filter(t => t.status === 'Accepted').length,

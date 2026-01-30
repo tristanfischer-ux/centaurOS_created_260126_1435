@@ -5,6 +5,7 @@ import {
   EscrowTransactionType,
   DEFAULT_PLATFORM_FEE_PERCENT,
 } from '@/types/payments'
+import { isAccountReady } from './connect'
 
 // Maximum transaction amount: £1,000,000 (in pence)
 const MAX_TRANSACTION_AMOUNT = 100000000
@@ -427,7 +428,8 @@ export async function releaseEscrow(
 
     // Use atomic function to check available balance with row-level locking
     // This prevents race conditions when multiple releases are attempted simultaneously
-    const { data: balanceData, error: balanceError } = await supabase.rpc(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: balanceData, error: balanceError } = await (supabase as any).rpc(
       'get_escrow_balance_atomic',
       { p_order_id: orderId }
     )
@@ -499,6 +501,18 @@ export async function releaseEscrow(
         transaction: null,
         feeTransaction: null,
         error: 'Seller has not completed Stripe onboarding',
+      }
+    }
+
+    // IMPORTANT: Revalidate Stripe account status before transfer
+    // Account could have been restricted since initial onboarding
+    const accountStatus = await isAccountReady(sellerProfile.stripe_account_id)
+    if (accountStatus.error || !accountStatus.ready) {
+      return {
+        transfer: null,
+        transaction: null,
+        feeTransaction: null,
+        error: accountStatus.error || 'Seller Stripe account is not ready to receive payments. They may need to complete additional verification.',
       }
     }
 
@@ -611,7 +625,8 @@ export async function releaseAllEscrow(orderId: string): Promise<
     const supabase = await createClient()
 
     // Use atomic function to check available balance with row-level locking
-    const { data: balanceData, error: balanceError } = await supabase.rpc(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: balanceData, error: balanceError } = await (supabase as any).rpc(
       'get_escrow_balance_atomic',
       { p_order_id: orderId }
     )
@@ -722,7 +737,7 @@ export async function processRefund(
       }
     }
 
-    // Check if funds have already been released to seller
+    // Check if ALL funds have already been released to seller
     if (order.escrow_status === 'released') {
       return {
         refund: null,
@@ -731,17 +746,52 @@ export async function processRefund(
       }
     }
 
-    // Check existing refunds to prevent over-refunding
-    const { data: existingRefunds } = await supabase
+    // Get all escrow transactions to calculate available refundable amount
+    const { data: allTransactions, error: txError } = await supabase
       .from('escrow_transactions')
-      .select('amount')
+      .select('type, amount')
       .eq('order_id', orderId)
-      .eq('type', 'refund')
 
-    const totalRefunded = existingRefunds
-      ? existingRefunds.reduce((sum, r) => sum + Number(r.amount), 0)
-      : 0
+    if (txError) {
+      return {
+        refund: null,
+        transaction: null,
+        error: `Failed to check escrow balance: ${txError.message}`,
+      }
+    }
 
+    // Calculate what's actually refundable:
+    // = total held - amount already released to seller - amount already refunded - fees already deducted
+    const totalHeld = (allTransactions || [])
+      .filter((t) => t.type === 'hold')
+      .reduce((sum, t) => sum + Number(t.amount), 0)
+
+    const totalReleased = (allTransactions || [])
+      .filter((t) => t.type === 'release')
+      .reduce((sum, t) => sum + Number(t.amount), 0)
+
+    const totalRefunded = (allTransactions || [])
+      .filter((t) => t.type === 'refund')
+      .reduce((sum, t) => sum + Number(t.amount), 0)
+
+    const totalFees = (allTransactions || [])
+      .filter((t) => t.type === 'fee_deduction')
+      .reduce((sum, t) => sum + Number(t.amount), 0)
+
+    // Available to refund = held - released - refunded - fees
+    const availableToRefund = totalHeld - totalReleased - totalRefunded - totalFees
+
+    if (refundAmount > availableToRefund) {
+      return {
+        refund: null,
+        transaction: null,
+        error: `Refund amount (${refundAmount}) exceeds available balance (${availableToRefund}). ` +
+          `Total held: ${totalHeld}, Released to seller: ${totalReleased}, ` +
+          `Already refunded: ${totalRefunded}, Fees deducted: ${totalFees}`,
+      }
+    }
+
+    // Double-check: refund can't exceed original order total minus what we've already refunded
     if (totalRefunded + refundAmount > Number(order.total_amount)) {
       return {
         refund: null,

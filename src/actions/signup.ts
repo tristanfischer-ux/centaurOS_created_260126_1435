@@ -3,12 +3,40 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { headers } from "next/headers";
+import { rateLimit, getClientIP } from "@/lib/security/rate-limit";
+import { sanitizeEmail, escapeHtml } from "@/lib/security/sanitize";
 
 // Direct signup roles (Founder, Executive, Apprentice)
 type SignupRole = "founder" | "executive" | "apprentice";
 
 // Application roles (VC, Factory, University, Network)
 type ApplicationRole = "vc" | "factory" | "university" | "network";
+
+/**
+ * Security: Validate password strength
+ * Requires: min 8 chars, at least one uppercase, one lowercase, one number
+ */
+function validatePassword(password: string): { valid: boolean; error?: string } {
+  if (!password || password.length < 8) {
+    return { valid: false, error: "Password must be at least 8 characters long" };
+  }
+  if (!/[A-Z]/.test(password)) {
+    return { valid: false, error: "Password must contain at least one uppercase letter" };
+  }
+  if (!/[a-z]/.test(password)) {
+    return { valid: false, error: "Password must contain at least one lowercase letter" };
+  }
+  if (!/[0-9]/.test(password)) {
+    return { valid: false, error: "Password must contain at least one number" };
+  }
+  // Check for common weak passwords
+  const commonPasswords = ["password", "12345678", "qwerty123", "letmein123"];
+  if (commonPasswords.some(common => password.toLowerCase().includes(common))) {
+    return { valid: false, error: "Password is too common. Please choose a stronger password." };
+  }
+  return { valid: true };
+}
 
 function capitalizeRole(role: string): "Founder" | "Executive" | "Apprentice" {
   const mapping: Record<string, "Founder" | "Executive" | "Apprentice"> = {
@@ -20,21 +48,69 @@ function capitalizeRole(role: string): "Founder" | "Executive" | "Apprentice" {
 }
 
 /**
+ * Generate a URL-friendly slug from a company name
+ */
+function generateSlug(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, 50);
+}
+
+/**
  * Direct signup for Founders, Executives, and Apprentices
  * Creates auth user and profile immediately
+ * For Founders: also creates a foundry record with company details
  */
 export async function signup(formData: FormData) {
+  // Security: Get client IP for rate limiting
+  const headersList = await headers();
+  const clientIP = getClientIP(headersList);
+
+  // Security: Rate limit signup attempts
+  const rateLimitResult = await rateLimit("signup", clientIP);
+  if (!rateLimitResult.success) {
+    return redirect(`/join/general?error=${encodeURIComponent("Too many signup attempts. Please try again later.")}`);
+  }
+
   const supabase = await createClient();
 
-  const email = formData.get("email") as string;
+  const rawEmail = formData.get("email") as string;
   const password = formData.get("password") as string;
-  const fullName = formData.get("name") as string;
+  const rawFullName = formData.get("name") as string;
   const role = formData.get("role") as SignupRole;
   const intent = formData.get("intent") as string | null;
   const listingId = formData.get("listing_id") as string | null;
 
-  if (!email || !password || !fullName || !role) {
+  // Founder-specific fields
+  const rawCompanyName = formData.get("company_name") as string | null;
+  const industry = formData.get("industry") as string | null;
+  const stage = formData.get("stage") as string | null;
+
+  // Security: Validate and sanitize inputs
+  const email = sanitizeEmail(rawEmail);
+  if (!email) {
+    return redirect(`/join/${role || "general"}?error=Invalid email address`);
+  }
+
+  // Security: Sanitize name to prevent XSS
+  const fullName = rawFullName ? escapeHtml(rawFullName.trim().slice(0, 100)) : "";
+  const companyName = rawCompanyName ? escapeHtml(rawCompanyName.trim().slice(0, 100)) : null;
+
+  if (!fullName || !role) {
     return redirect(`/join/${role || "general"}?error=All fields are required`);
+  }
+
+  // Security: Validate password strength
+  const passwordValidation = validatePassword(password);
+  if (!passwordValidation.valid) {
+    return redirect(`/join/${role || "general"}?error=${encodeURIComponent(passwordValidation.error || "Invalid password")}`);
+  }
+
+  // Founders must provide a company name
+  if (role === "founder" && !companyName) {
+    return redirect(`/join/founder?error=Company name is required`);
   }
 
   // 1. Create auth user
@@ -60,11 +136,40 @@ export async function signup(formData: FormData) {
     return redirect(`/join/${role}?error=Failed to create account`);
   }
 
-  // 2. Create foundry for Founders, or use a shared foundry for others
-  const foundryId =
-    role === "founder"
-      ? `foundry_${authData.user.id.slice(0, 8)}` // Unique foundry for founders
-      : "centaur-guild"; // Shared foundry for execs and apprentices initially
+  let foundryId: string;
+
+  // 2. Create foundry for Founders, or use shared "centaur-guild" for others
+  if (role === "founder" && companyName) {
+    // Generate a unique slug
+    const baseSlug = generateSlug(companyName);
+    const uniqueSlug = `${baseSlug}-${authData.user.id.slice(0, 6)}`;
+
+    // Create the foundry record
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: foundry, error: foundryError } = await (supabase as any)
+      .from("foundries")
+      .insert({
+        name: companyName,
+        slug: uniqueSlug,
+        industry: industry || null,
+        stage: stage || null,
+        owner_id: authData.user.id,
+      })
+      .select("id")
+      .single();
+
+    if (foundryError) {
+      console.error("Foundry creation error:", foundryError);
+      // Fall back to string-based foundry ID if creation fails
+      foundryId = `foundry_${authData.user.id.slice(0, 8)}`;
+    } else {
+      // Use the UUID of the created foundry
+      foundryId = foundry.id;
+    }
+  } else {
+    // Executives and Apprentices join the shared Guild
+    foundryId = "centaur-guild";
+  }
 
   // 3. Create profile
   const { error: profileError } = await supabase.from("profiles").insert({

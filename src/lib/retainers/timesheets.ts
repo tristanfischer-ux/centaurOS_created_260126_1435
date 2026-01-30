@@ -19,10 +19,13 @@ import {
 } from '@/types/retainers'
 import { format, startOfWeek, addDays, getDay, parseISO } from 'date-fns'
 
+import { RETAINER_PLATFORM_FEE_PERCENT, DEFAULT_VAT_RATE } from '@/types/payments'
+
 type TypedSupabaseClient = SupabaseClient<Database>
 
-const PLATFORM_FEE_PERCENT = 10 // 10% platform fee
-const VAT_RATE = 0.20 // 20% VAT (UK standard rate)
+// Use centralized fee constants
+const PLATFORM_FEE_PERCENT = RETAINER_PLATFORM_FEE_PERCENT
+const VAT_RATE = DEFAULT_VAT_RATE
 
 /**
  * Get the Monday of the current week
@@ -658,6 +661,54 @@ export async function markTimesheetPaid(
     return { success: true, error: null }
   } catch (err) {
     console.error('Error in markTimesheetPaid:', err)
+    return { success: false, error: 'An unexpected error occurred' }
+  }
+}
+
+/**
+ * Revert timesheet from paid back to approved status
+ * Used when a payment fails after initial processing
+ */
+export async function revertTimesheetToPending(
+  supabase: TypedSupabaseClient,
+  timesheetId: string,
+  reason?: string
+): Promise<{ success: boolean; error: string | null }> {
+  try {
+    const { data: timesheet, error: fetchError } = await supabase
+      .from('timesheet_entries')
+      .select('status')
+      .eq('id', timesheetId)
+      .single()
+
+    if (fetchError || !timesheet) {
+      return { success: false, error: 'Timesheet not found' }
+    }
+
+    // Can only revert from paid status
+    if (timesheet.status !== 'paid') {
+      return { success: false, error: 'Can only revert timesheets that are marked as paid' }
+    }
+
+    const { error: updateError } = await supabase
+      .from('timesheet_entries')
+      .update({
+        status: 'approved', // Revert to approved so it can be retried
+        paid_at: null,
+        stripe_payment_intent_id: null,
+        // Store the failure reason in notes if the column exists
+      })
+      .eq('id', timesheetId)
+
+    if (updateError) {
+      console.error('Error reverting timesheet:', updateError)
+      return { success: false, error: 'Failed to revert timesheet' }
+    }
+
+    console.log(`Timesheet ${timesheetId} reverted to approved status. Reason: ${reason || 'Payment failed'}`)
+    return { success: true, error: null }
+  } catch (err) {
+    console.error('Error in revertTimesheetToPending:', err)
     return { success: false, error: 'An unexpected error occurred' }
   }
 }

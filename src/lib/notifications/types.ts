@@ -66,6 +66,7 @@ export type EmailTemplate =
     | 'rfq_priority_hold_won'
     | 'rfq_awarded_to_you'
     | 'rfq_outbid'
+    | 'team_invitation'
     | 'generic'
 
 export interface PushNotificationOptions {

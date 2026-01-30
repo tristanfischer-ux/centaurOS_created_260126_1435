@@ -157,10 +157,37 @@ export interface PlatformFeeConfig {
   maxFee?: number
 }
 
+// ==========================================
+// PLATFORM FEE CONFIGURATION (Single Source of Truth)
+// ==========================================
+
 /**
- * Default platform fee percentage (8%)
+ * Default platform fee percentage for standard orders (8%)
  */
 export const DEFAULT_PLATFORM_FEE_PERCENT = 8
+
+/**
+ * Platform fee percentage for retainers and bookings (10%)
+ * Higher rate includes escrow protection and ongoing management
+ */
+export const RETAINER_PLATFORM_FEE_PERCENT = 10
+
+/**
+ * UK VAT rate (20%)
+ */
+export const DEFAULT_VAT_RATE = 0.20
+
+/**
+ * Calculate platform fee for any amount
+ * @param amount Amount in smallest currency unit
+ * @param feePercent Fee percentage (default: 8% for orders)
+ */
+export function calculatePlatformFeeAmount(
+  amount: number,
+  feePercent: number = DEFAULT_PLATFORM_FEE_PERCENT
+): number {
+  return Math.round(amount * (feePercent / 100))
+}
 
 /**
  * Payment form props

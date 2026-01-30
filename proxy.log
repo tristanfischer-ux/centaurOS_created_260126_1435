@@ -1,0 +1,26 @@
+🚀 Ollama Proxy Server Starting...
+📍 Proxy listening on: http://localhost:8000
+🔗 Forwarding to Ollama: http://localhost:11434
+
+📊 Model Mappings:
+   gpt-4 → qwen2.5:14b-instruct-q4_K_M
+   gpt-4o → qwen2.5:14b-instruct-q4_K_M
+   gpt-4-turbo → qwen2.5:14b-instruct-q4_K_M
+   gpt-4-turbo-preview → qwen2.5:14b-instruct-q4_K_M
+   gpt-3.5-turbo → qwen2.5-coder:7b
+   gpt-3.5 → qwen2.5-coder:7b
+   claude-3-5-sonnet → deepseek-coder:6.7b
+   claude-3.5-sonnet → deepseek-coder:6.7b
+   claude-3-sonnet → deepseek-coder:6.7b
+   claude-3-opus → qwen2.5:14b-instruct-q4_K_M
+   claude-3-haiku → qwen2.5-coder:7b
+
+✅ Proxy server is ready!
+
+🔧 Now update Cursor settings:
+   Base URL: http://localhost:8000/v1
+   API Key: ollama
+
+💡 Use any model from Cursor's dropdown - they'll work with your local models!
+📋 Cursor requested model list → returning gpt-4, gpt-3.5-turbo, claude-3-5-sonnet
+📋 Cursor requested model list → returning gpt-4, gpt-3.5-turbo, claude-3-5-sonnet

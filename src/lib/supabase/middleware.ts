@@ -2,6 +2,22 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 import { Database } from '@/types/database.types'
 
+// Public routes that don't require authentication
+const PUBLIC_ROUTES = [
+    '/login',
+    '/auth',
+    '/join',
+    '/invite',
+    '/api/health',
+    '/api/webhooks',
+    '/api/marketplace/preview',
+]
+
+// Routes that require admin (Executive/Founder) role
+const ADMIN_ROUTES = [
+    '/admin',
+]
+
 export async function updateSession(request: NextRequest) {
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL
     const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
@@ -40,15 +56,37 @@ export async function updateSession(request: NextRequest) {
         data: { user },
     } = await supabase.auth.getUser()
 
-    if (
-        !user &&
-        !request.nextUrl.pathname.startsWith('/login') &&
-        !request.nextUrl.pathname.startsWith('/auth')
-    ) {
-        // no user, potentially respond by redirecting the user to the login page
-        const url = request.nextUrl.clone()
-        url.pathname = '/login'
-        return NextResponse.redirect(url)
+    const pathname = request.nextUrl.pathname
+
+    // Check if route is public
+    const isPublicRoute = PUBLIC_ROUTES.some(route => pathname.startsWith(route))
+
+    if (!user && !isPublicRoute) {
+        // no user, redirect to login page
+        const redirectUrl = request.nextUrl.clone()
+        redirectUrl.pathname = '/login'
+        return NextResponse.redirect(redirectUrl)
+    }
+
+    // Security: Check admin routes require proper role
+    if (user && ADMIN_ROUTES.some(route => pathname.startsWith(route))) {
+        // Fetch user's role from profile
+        const { data: profile } = await supabase
+            .from('profiles')
+            .select('role')
+            .eq('id', user.id)
+            .single()
+
+        const isAdmin = profile?.role === 'Executive' || profile?.role === 'Founder'
+
+        if (!isAdmin) {
+            // User doesn't have admin access - redirect to dashboard with error
+            console.warn(`[SECURITY] Non-admin user ${user.id} attempted to access ${pathname}`)
+            const redirectUrl = request.nextUrl.clone()
+            redirectUrl.pathname = '/dashboard'
+            redirectUrl.searchParams.set('error', 'Access denied')
+            return NextResponse.redirect(redirectUrl)
+        }
     }
 
     return response

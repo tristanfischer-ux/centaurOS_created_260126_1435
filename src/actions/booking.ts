@@ -10,13 +10,15 @@ import {
     PriceBreakdownItem 
 } from "@/types/booking"
 import { getFoundryIdCached } from "@/lib/supabase/foundry-context"
+import { RETAINER_PLATFORM_FEE_PERCENT, DEFAULT_VAT_RATE } from "@/types/payments"
 
 // ==========================================
 // CONSTANTS
 // ==========================================
 
-const PLATFORM_FEE_PERCENT = 10 // 10% platform fee
-const VAT_RATE = 0.20 // 20% VAT (UK standard rate)
+// Use centralized fee constants
+const PLATFORM_FEE_PERCENT = RETAINER_PLATFORM_FEE_PERCENT
+const VAT_RATE = DEFAULT_VAT_RATE
 const DEFAULT_MINIMUM_DAYS = 1
 
 // ==========================================

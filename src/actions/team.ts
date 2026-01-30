@@ -124,6 +124,37 @@ export async function unpairCentaur(humanId: string) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return { error: 'Unauthorized' }
 
+    const foundry_id = await getFoundryIdCached()
+    if (!foundry_id) return { error: 'User not in a foundry' }
+
+    // Security: Verify the human profile belongs to the same foundry
+    const { data: humanProfile, error: profileError } = await supabase
+        .from('profiles')
+        .select('foundry_id')
+        .eq('id', humanId)
+        .single()
+
+    if (profileError || !humanProfile) {
+        return { error: 'Profile not found' }
+    }
+
+    if (humanProfile.foundry_id !== foundry_id) {
+        return { error: 'Unauthorized: Profile belongs to a different foundry' }
+    }
+
+    // Security: Verify user has permission (Executive/Founder only, or self)
+    if (humanId !== user.id) {
+        const { data: currentProfile } = await supabase
+            .from('profiles')
+            .select('role')
+            .eq('id', user.id)
+            .single()
+
+        if (!currentProfile || (currentProfile.role !== 'Executive' && currentProfile.role !== 'Founder')) {
+            return { error: 'Unauthorized: Only Executives and Founders can unpair other members' }
+        }
+    }
+
     const { error } = await supabase
         .from('profiles')
         .update({ paired_ai_id: null })
@@ -449,14 +480,46 @@ export async function deleteMember(memberId: string) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return { error: 'Unauthorized' }
 
-    // 1. Get current user's profile ID to take ownership
+    const foundry_id = await getFoundryIdCached()
+    if (!foundry_id) return { error: 'User not in a foundry' }
+
+    // Security: Verify the member belongs to the same foundry
+    const { data: memberProfile, error: memberError } = await supabase
+        .from('profiles')
+        .select('foundry_id, role')
+        .eq('id', memberId)
+        .single()
+
+    if (memberError || !memberProfile) {
+        return { error: 'Member not found' }
+    }
+
+    if (memberProfile.foundry_id !== foundry_id) {
+        return { error: 'Unauthorized: Member belongs to a different foundry' }
+    }
+
+    // Security: Verify user has permission (Executive/Founder only)
     const { data: currentProfile } = await supabase
         .from('profiles')
-        .select('id')
+        .select('id, role')
         .eq('id', user.id)
         .single()
 
     if (!currentProfile) return { error: 'Current user profile not found' }
+
+    if (currentProfile.role !== 'Executive' && currentProfile.role !== 'Founder') {
+        return { error: 'Unauthorized: Only Executives and Founders can delete members' }
+    }
+
+    // Prevent deleting Founders (only another Founder can do this)
+    if (memberProfile.role === 'Founder' && currentProfile.role !== 'Founder') {
+        return { error: 'Unauthorized: Only Founders can delete other Founders' }
+    }
+
+    // Prevent deleting yourself
+    if (memberId === user.id) {
+        return { error: 'Cannot delete your own profile' }
+    }
 
     // 2. Reassign Objectives created by the member
     const { error: objError } = await supabase

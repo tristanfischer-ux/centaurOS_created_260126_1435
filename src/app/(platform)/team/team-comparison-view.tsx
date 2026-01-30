@@ -17,6 +17,7 @@ import { deleteTeam, updateTeamName } from "@/actions/teams"
 import Link from "next/link"
 import { CreateTeamDialog } from "./create-team-dialog"
 import { InviteMemberDialog } from "./invite-member-dialog"
+import { PendingInvitations } from "./pending-invitations"
 import { pairCentaur, unpairCentaur } from "@/actions/team"
 import { Brain, Unplug, Zap } from "lucide-react"
 import { toast } from "sonner"
@@ -45,7 +46,7 @@ import { cn } from "@/lib/utils"
 interface Member {
     id: string
     full_name: string | null
-    email: string | null
+    email?: string | null
     bio?: string | null
     phone_number?: string | null
     role: string
@@ -67,7 +68,7 @@ interface TeamMember {
     id: string
     full_name: string | null
     role: string | null
-    email: string | null
+    email?: string | null
 }
 
 interface Team {
@@ -879,6 +880,9 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                     {selectedIds.size > 0 && ` (${selectedIds.size} selected)`}
                 </div>
             )}
+
+            {/* Pending Invitations */}
+            <PendingInvitations />
 
             {/* Founders Section */}
             {founders.length > 0 && (

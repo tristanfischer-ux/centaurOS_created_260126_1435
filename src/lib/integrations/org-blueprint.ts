@@ -8,6 +8,7 @@
 import { SupabaseClient } from '@supabase/supabase-js'
 import { Database } from '@/types/database.types'
 import { OrderType } from '@/types/orders'
+import { DEFAULT_PLATFORM_FEE_PERCENT, DEFAULT_VAT_RATE } from '@/types/payments'
 
 type TypedSupabaseClient = SupabaseClient<Database>
 type MarketplaceCategory = Database['public']['Enums']['marketplace_category']
@@ -283,10 +284,10 @@ export async function createOrderFromGap(
       orderType = 'people_booking'
     }
 
-    // Calculate fees
-    const vatRate = 0.20
+    // Calculate fees using centralized constants
+    const vatRate = DEFAULT_VAT_RATE
     const vatAmount = totalAmount * vatRate
-    const platformFee = totalAmount * 0.05
+    const platformFee = totalAmount * (DEFAULT_PLATFORM_FEE_PERCENT / 100)
 
     // Create the order
     const { data: order, error: orderError } = await supabase

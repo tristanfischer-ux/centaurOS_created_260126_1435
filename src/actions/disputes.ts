@@ -124,15 +124,10 @@ export async function getDisputeDetail(disputeId: string): Promise<{
   // Determine if user can add evidence
   const canAddEvidenceStatuses: DisputeStatus[] = ["open", "under_review", "mediation"]
   if (!data) {
-    return { data: null, error: 'Dispute not found' }
+    return { data: null, error: 'Dispute not found', canAddEvidence: false, isParty: false }
   }
 
   const canAddEvidence = canAddEvidenceStatuses.includes(data.status as DisputeStatus)
-
-  // Check if user is a party
-  if (!data) {
-    return { data: null, error: 'Dispute not found' }
-  }
 
   const isParty =
     data.raised_by === user.id ||

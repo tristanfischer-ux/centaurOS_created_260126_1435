@@ -5,6 +5,7 @@
 
 import { SupabaseClient } from "@supabase/supabase-js"
 import { Database } from "@/types/database.types"
+import { processRefund, releaseEscrow, getEscrowBalance } from "@/lib/stripe/escrow"
 
 // Types
 // Note: "cancelled" is used in business logic but may not be in the database enum
@@ -370,13 +371,14 @@ export async function assignDispute(
 
 /**
  * Resolve a dispute
+ * Now includes actual execution of refunds/payments based on resolution
  */
 export async function resolveDispute(
   supabase: SupabaseClient<Database>,
   disputeId: string,
   resolverId: string,
   params: ResolveDisputeParams
-): Promise<{ success: boolean; error: string | null }> {
+): Promise<{ success: boolean; error: string | null; paymentDetails?: { refundId?: string; transferId?: string } }> {
   const { resolution, resolutionAmount, buyerRefundPercent, sellerPaymentPercent } = params
 
   // Get dispute with order details
@@ -385,7 +387,7 @@ export async function resolveDispute(
     .select(
       `
       *,
-      order:orders!disputes_order_id_fkey(total_amount, escrow_status)
+      order:orders!disputes_order_id_fkey(id, total_amount, escrow_status, stripe_payment_intent_id)
     `
     )
     .eq("id", disputeId)
@@ -401,38 +403,140 @@ export async function resolveDispute(
     return { success: false, error: `Cannot resolve dispute in ${currentStatus} status` }
   }
 
-  // Calculate resolution amount if percentages provided
-  let finalAmount = resolutionAmount
-  if (buyerRefundPercent !== undefined && !finalAmount) {
-    const orderTotal = (dispute.order as { total_amount: number }).total_amount || 0
-    finalAmount = orderTotal * (buyerRefundPercent / 100)
+  const order = dispute.order as { 
+    id: string
+    total_amount: number 
+    escrow_status: string
+    stripe_payment_intent_id: string | null
+  }
+  
+  // Calculate resolution amounts
+  const orderTotal = order.total_amount || 0
+  let buyerRefundAmount = resolutionAmount
+  if (buyerRefundPercent !== undefined && !buyerRefundAmount) {
+    buyerRefundAmount = Math.round(orderTotal * (buyerRefundPercent / 100))
+  }
+  
+  const sellerPaymentAmount = sellerPaymentPercent !== undefined 
+    ? Math.round(orderTotal * (sellerPaymentPercent / 100))
+    : (buyerRefundPercent !== undefined ? orderTotal - (buyerRefundAmount || 0) : 0)
+
+  let refundId: string | undefined
+  let transferId: string | undefined
+
+  // EXECUTE ACTUAL FINANCIAL TRANSACTIONS
+  try {
+    // Step 1: Process buyer refund if any
+    if (buyerRefundAmount && buyerRefundAmount > 0) {
+      // Check if funds are still in escrow
+      if (order.escrow_status === 'released') {
+        return { 
+          success: false, 
+          error: "Cannot refund - funds have already been released to the seller. Manual intervention required." 
+        }
+      }
+
+      if (!order.stripe_payment_intent_id) {
+        return { 
+          success: false, 
+          error: "Cannot refund - no payment intent found for this order." 
+        }
+      }
+
+      const refundResult = await processRefund({
+        orderId: order.id,
+        amount: buyerRefundAmount,
+        reason: `Dispute resolution: ${resolution}`,
+      })
+
+      if (refundResult.error || !refundResult.refund) {
+        return { 
+          success: false, 
+          error: `Failed to process refund: ${refundResult.error}` 
+        }
+      }
+
+      refundId = refundResult.refund.id
+      console.log(`Dispute ${disputeId}: Refunded ${buyerRefundAmount} to buyer (Refund ID: ${refundId})`)
+    }
+
+    // Step 2: Release remaining funds to seller if any
+    if (sellerPaymentAmount && sellerPaymentAmount > 0 && order.escrow_status !== 'released') {
+      // Get available escrow balance
+      const balanceResult = await getEscrowBalance(order.id)
+      
+      if (!balanceResult.error && balanceResult.balance && balanceResult.balance > 0) {
+        // Release remaining balance to seller (up to seller payment amount)
+        const releaseAmount = Math.min(sellerPaymentAmount, balanceResult.balance)
+        
+        if (releaseAmount > 0) {
+          const releaseResult = await releaseEscrow({
+            orderId: order.id,
+            amount: releaseAmount,
+          })
+
+          if (releaseResult.error) {
+            // Log but don't fail - refund already processed
+            console.error(`Dispute ${disputeId}: Failed to release to seller: ${releaseResult.error}`)
+          } else if (releaseResult.transfer) {
+            transferId = releaseResult.transfer.id
+            console.log(`Dispute ${disputeId}: Released ${releaseAmount} to seller (Transfer ID: ${transferId})`)
+          }
+        }
+      }
+    }
+
+  } catch (err) {
+    console.error('Error processing dispute resolution payments:', err)
+    return { 
+      success: false, 
+      error: `Payment processing failed: ${err instanceof Error ? err.message : 'Unknown error'}` 
+    }
   }
 
-  // Update dispute
+  // Update dispute record
   const { error: updateError } = await supabase
     .from("disputes")
     .update({
       status: "resolved",
       resolution,
-      resolution_amount: finalAmount || null,
+      resolution_amount: buyerRefundAmount || null,
       resolved_at: new Date().toISOString(),
     })
     .eq("id", disputeId)
 
   if (updateError) {
+    // Log payment details even if DB update fails
+    console.error('Dispute DB update failed but payments processed:', { refundId, transferId })
     return { success: false, error: updateError.message }
   }
 
-  // Update order status back from disputed
-  // The specific status depends on whether buyer got refund
-  const newOrderStatus = buyerRefundPercent === 100 ? "refunded" : "completed"
+  // Determine final order status
+  let newOrderStatus: string
+  let newEscrowStatus: string
+  
+  if (buyerRefundPercent === 100) {
+    newOrderStatus = 'cancelled'
+    newEscrowStatus = 'refunded'
+  } else if (sellerPaymentPercent === 100 || (buyerRefundPercent === 0 && !buyerRefundAmount)) {
+    newOrderStatus = 'completed'
+    newEscrowStatus = 'released'
+  } else {
+    // Split resolution
+    newOrderStatus = 'completed'
+    newEscrowStatus = buyerRefundAmount ? 'refunded' : 'released'
+  }
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   await (supabase as any)
     .from("orders")
-    .update({ status: newOrderStatus })
+    .update({ 
+      status: newOrderStatus,
+      escrow_status: newEscrowStatus,
+    })
     .eq("id", dispute.order_id)
 
-  // Log resolution
+  // Log resolution with payment details
   await logDisputeEvent(
     supabase,
     disputeId,
@@ -440,13 +544,20 @@ export async function resolveDispute(
     resolution,
     resolverId,
     {
-      resolution_amount: finalAmount,
+      resolution_amount: buyerRefundAmount,
       buyer_refund_percent: buyerRefundPercent,
       seller_payment_percent: sellerPaymentPercent,
+      refund_id: refundId,
+      transfer_id: transferId,
+      payments_executed: true,
     }
   )
 
-  return { success: true, error: null }
+  return { 
+    success: true, 
+    error: null,
+    paymentDetails: { refundId, transferId }
+  }
 }
 
 /**

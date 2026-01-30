@@ -19,7 +19,7 @@ interface RoleConfig {
     heroImage: string;
     ctaText: string;
     isApplication: boolean; // true for network partners
-    additionalFields?: { id: string; label: string; placeholder: string; type?: string }[];
+    additionalFields?: { id: string; label: string; placeholder: string; type?: string; required?: boolean }[];
 }
 
 const roleConfigs: Record<string, RoleConfig> = {
@@ -36,7 +36,12 @@ const roleConfigs: Record<string, RoleConfig> = {
         ],
         heroImage: "/images/founder-hologram.png",
         ctaText: "Begin Induction",
-        isApplication: false
+        isApplication: false,
+        additionalFields: [
+            { id: "company_name", label: "Company Name", placeholder: "Your startup name", required: true },
+            { id: "industry", label: "Industry", placeholder: "Hardware, SaaS, DeepTech...", required: false },
+            { id: "stage", label: "Stage", placeholder: "Pre-seed, Seed, Series A...", required: false }
+        ]
     },
     executive: {
         title: "EXECUTIVE",
@@ -354,16 +359,20 @@ export default function JoinPage({ params }: { params: Promise<{ role: string }>
                                     />
                                 </div>
 
-                                {/* Additional fields for applications */}
+                                {/* Additional fields for applications and founder details */}
                                 {config.additionalFields?.map((field) => (
                                     <div key={field.id} className="space-y-2">
-                                        <Label htmlFor={field.id} className="text-sm font-medium text-slate-700">{field.label}</Label>
+                                        <Label htmlFor={field.id} className="text-sm font-medium text-slate-700">
+                                            {field.label}
+                                            {field.required && <span className="text-red-500 ml-1">*</span>}
+                                        </Label>
                                         <Input
                                             id={field.id}
                                             name={field.id}
                                             type={field.type || "text"}
                                             placeholder={field.placeholder}
                                             className="bg-white border-slate-300 focus:border-blue-500 focus:ring-blue-500 h-11 sm:h-12"
+                                            required={field.required}
                                         />
                                     </div>
                                 ))}
