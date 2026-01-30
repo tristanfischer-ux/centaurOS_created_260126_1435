@@ -62,8 +62,8 @@ export async function createProgressReview(input: ProgressReviewInput) {
         creator_id: user.id,
         assignee_id: enrollment.apprentice_id,
         foundry_id: enrollment.foundry_id,
-        status: 'Pending',
-        risk_level: 'Low',
+        status: 'Pending' as const,
+        risk_level: 'Low' as const,
         end_date: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString() // Due in 2 weeks
       }))
       
@@ -126,8 +126,8 @@ export async function completeProgressReview(
       creator_id: user.id,
       assignee_id: review.enrollment.apprentice_id,
       foundry_id: review.enrollment.foundry_id,
-      status: 'Pending',
-      risk_level: 'Low',
+      status: 'Pending' as const,
+      risk_level: 'Low' as const,
       end_date: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString()
     }))
     
@@ -519,10 +519,10 @@ export async function completeModule(
     await supabase.from('otjt_time_logs').insert({
       enrollment_id: enrollmentId,
       log_date: new Date().toISOString().split('T')[0],
-      hours: module.estimated_hours,
+      hours: learningModule.estimated_hours,
       activity_type: 'learning_module',
-      description: `Completed module: ${module.title}`,
-      module_id: module.id,
+      description: `Completed module: ${learningModule.title}`,
+      module_id: learningModule.id,
       status: 'pending'
     })
   }

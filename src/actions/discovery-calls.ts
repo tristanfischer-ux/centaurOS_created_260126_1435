@@ -71,7 +71,7 @@ export async function getDiscoveryCallSettings() {
         return { settings: null, error: error.message }
     }
     
-    return { settings: data as DiscoveryCallSettings | null, error: null }
+    return { settings: data as unknown as DiscoveryCallSettings | null, error: null }
 }
 
 // Update or create discovery call settings

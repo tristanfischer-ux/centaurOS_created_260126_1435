@@ -34,10 +34,10 @@ interface PublicProfileViewProps {
 }
 
 const tierColors = {
-    premium: 'bg-amber-100 text-amber-800 border-amber-200',
-    verified: 'bg-blue-100 text-blue-800 border-blue-200',
-    standard: 'bg-slate-100 text-slate-700 border-slate-200',
-    pending: 'bg-slate-50 text-slate-500 border-slate-100',
+    premium: 'bg-status-warning-light text-status-warning-dark border-status-warning',
+    verified: 'bg-status-info-light text-status-info-dark border-status-info',
+    standard: 'bg-muted text-muted-foreground border-muted',
+    pending: 'bg-muted text-muted-foreground border-muted',
 }
 
 const tierLabels = {
@@ -109,7 +109,7 @@ export function PublicProfileView({ profile }: PublicProfileViewProps) {
                                     
                                     {profile.average_rating && (
                                         <Badge variant="secondary" className="text-xs">
-                                            <Star className="w-3 h-3 mr-1 fill-amber-400 text-amber-400" />
+                                            <Star className="w-3 h-3 mr-1 fill-status-warning text-status-warning" />
                                             {profile.average_rating.toFixed(1)}
                                             <span className="text-muted-foreground ml-1">
                                                 ({profile.total_reviews})
@@ -233,7 +233,7 @@ export function PublicProfileView({ profile }: PublicProfileViewProps) {
                                 ) : (
                                     <button
                                         onClick={() => setShowVideo(true)}
-                                        className="relative w-full aspect-video bg-slate-900 rounded-lg overflow-hidden group"
+                                        className="relative w-full aspect-video bg-foreground rounded-lg overflow-hidden group"
                                     >
                                         {profile.video_thumbnail_url ? (
                                             <img 
@@ -242,13 +242,13 @@ export function PublicProfileView({ profile }: PublicProfileViewProps) {
                                                 className="w-full h-full object-cover opacity-80 group-hover:opacity-60 transition-opacity"
                                             />
                                         ) : (
-                                            <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-slate-800 to-slate-900">
-                                                <span className="text-slate-400">Video Introduction</span>
+                                            <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-foreground/90 to-foreground">
+                                                <span className="text-muted-foreground">Video Introduction</span>
                                             </div>
                                         )}
                                         <div className="absolute inset-0 flex items-center justify-center">
-                                            <div className="w-16 h-16 rounded-full bg-white/90 flex items-center justify-center group-hover:scale-110 transition-transform">
-                                                <Play className="w-8 h-8 text-slate-900 ml-1" />
+                                            <div className="w-16 h-16 rounded-full bg-background/90 flex items-center justify-center group-hover:scale-110 transition-transform">
+                                                <Play className="w-8 h-8 text-foreground ml-1" />
                                             </div>
                                         </div>
                                     </button>
@@ -348,10 +348,10 @@ export function PublicProfileView({ profile }: PublicProfileViewProps) {
                                             {profile.badges.map((badge, i) => (
                                                 <div 
                                                     key={i}
-                                                    className="flex items-center gap-2 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg"
+                                                    className="flex items-center gap-2 px-3 py-2 bg-status-warning-light border border-status-warning rounded-lg"
                                                 >
-                                                    <Award className="w-4 h-4 text-amber-600" />
-                                                    <span className="text-sm font-medium text-amber-800">
+                                                    <Award className="w-4 h-4 text-status-warning" />
+                                                    <span className="text-sm font-medium text-status-warning-dark">
                                                         {badge.badge_type.replace(/_/g, ' ')}
                                                     </span>
                                                 </div>
@@ -365,12 +365,12 @@ export function PublicProfileView({ profile }: PublicProfileViewProps) {
                         {/* Case Studies Tab */}
                         <TabsContent value="case-studies" className="space-y-6 mt-6">
                             {profile.case_studies.map((cs) => (
-                                <Card key={cs.id} className={cn(cs.is_featured && 'border-amber-200 bg-amber-50/30')}>
+                                <Card key={cs.id} className={cn(cs.is_featured && 'border-status-warning bg-status-warning-light/30')}>
                                     <CardHeader>
                                         <div className="flex items-start justify-between">
                                             <div>
                                                 {cs.is_featured && (
-                                                    <Badge variant="secondary" className="mb-2 bg-amber-100 text-amber-800">
+                                                    <Badge variant="secondary" className="mb-2 bg-status-warning-light text-status-warning-dark">
                                                         Featured
                                                     </Badge>
                                                 )}
@@ -424,7 +424,7 @@ export function PublicProfileView({ profile }: PublicProfileViewProps) {
                                                         <p className="text-2xl font-bold text-foreground">
                                                             {metric.value}
                                                             {metric.change_percent && (
-                                                                <span className="text-sm text-green-600 ml-1">
+                                                                <span className="text-sm text-status-success ml-1">
                                                                     <TrendingUp className="w-3 h-3 inline" />
                                                                     {metric.change_percent}%
                                                                 </span>
@@ -438,7 +438,7 @@ export function PublicProfileView({ profile }: PublicProfileViewProps) {
                                         
                                         {/* Testimonial */}
                                         {cs.testimonial_quote && (
-                                            <div className="bg-slate-50 rounded-lg p-4 mt-4">
+                                            <div className="bg-muted rounded-lg p-4 mt-4">
                                                 <Quote className="w-5 h-5 text-muted-foreground mb-2" />
                                                 <p className="text-sm italic mb-2">"{cs.testimonial_quote}"</p>
                                                 {cs.testimonial_author && (
@@ -458,7 +458,7 @@ export function PublicProfileView({ profile }: PublicProfileViewProps) {
                         <TabsContent value="portfolio" className="mt-6">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 {profile.portfolio_items.map((item) => (
-                                    <Card key={item.id} className={cn(item.is_featured && 'border-amber-200')}>
+                                    <Card key={item.id} className={cn(item.is_featured && 'border-status-warning')}>
                                         {item.image_urls[0] && (
                                             <div className="aspect-video overflow-hidden rounded-t-lg">
                                                 <img 
@@ -501,18 +501,18 @@ export function PublicProfileView({ profile }: PublicProfileViewProps) {
                                     <CardContent className="flex items-center gap-4 py-4">
                                         <div className={cn(
                                             'w-12 h-12 rounded-lg flex items-center justify-center',
-                                            cert.is_verified ? 'bg-green-100' : 'bg-slate-100'
+                                            cert.is_verified ? 'bg-status-success-light' : 'bg-muted'
                                         )}>
                                             <Award className={cn(
                                                 'w-6 h-6',
-                                                cert.is_verified ? 'text-green-600' : 'text-slate-400'
+                                                cert.is_verified ? 'text-status-success' : 'text-muted-foreground'
                                             )} />
                                         </div>
                                         <div className="flex-1">
                                             <div className="flex items-center gap-2">
                                                 <h3 className="font-semibold">{cert.certification_name}</h3>
                                                 {cert.is_verified && (
-                                                    <Badge variant="secondary" className="text-xs bg-green-100 text-green-800">
+                                                    <Badge variant="secondary" className="text-xs bg-status-success-light text-status-success-dark">
                                                         <CheckCircle2 className="w-3 h-3 mr-1" />
                                                         Verified
                                                     </Badge>

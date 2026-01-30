@@ -176,7 +176,7 @@ export function CertificationsView({ certifications, error }: CertificationsView
                             Pending Verification ({pending.length})
                         </h2>
                     </div>
-                    <div className="rounded-lg border border bg-blue-50 p-3 flex items-start gap-2">
+                    <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 flex items-start gap-2">
                         <Info className="w-4 h-4 text-blue-600 mt-0.5 shrink-0" />
                         <p className="text-sm text-blue-800">
                             Add a verification URL to your certifications to request verification. 

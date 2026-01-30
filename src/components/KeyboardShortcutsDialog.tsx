@@ -76,7 +76,7 @@ export function KeyboardShortcutsDialog() {
                     <span className="text-sm text-foreground">{shortcut.description}</span>
                     <kbd className={cn(
                       "px-2.5 py-1 bg-muted rounded-md text-xs font-mono",
-                      "border border shadow-sm text-muted-foreground whitespace-nowrap"
+                      "border border-slate-200 shadow-sm text-muted-foreground whitespace-nowrap"
                     )}>
                       {shortcut.keys}
                     </kbd>

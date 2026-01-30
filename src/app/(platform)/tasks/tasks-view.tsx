@@ -384,7 +384,7 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
         <>
             <div className="space-y-8">
                 <div className="flex flex-col gap-4">
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-slate-100">
                         <div className="min-w-0 flex-1">
                             <div className="flex items-center gap-3 mb-1">
                                 <div className="h-8 w-1 bg-orange-600 rounded-full shadow-[0_0_8px_rgba(234,88,12,0.6)]" />
@@ -480,8 +480,8 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                                 className={cn(
                                     "px-3 py-1.5 rounded-full text-sm font-medium transition-all duration-200",
                                     activePreset === preset.id
-                                        ? "bg-slate-900 text-white"
-                                        : "bg-muted text-muted-foreground hover:bg-slate-200"
+                                        ? "bg-foreground text-background"
+                                        : "bg-muted text-muted-foreground hover:bg-secondary"
                                 )}
                             >
                                 {preset.label}
@@ -635,7 +635,7 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                                                 priority
                                             />
                                         </div>
-                                        <h3 className="text-2xl font-display font-medium text-slate-100 mb-3 relative z-10 tracking-tight">System Idle</h3>
+                                        <h3 className="text-2xl font-display font-medium text-foreground mb-3 relative z-10 tracking-tight">System Idle</h3>
                                         <p className="text-muted-foreground max-w-sm mb-8 relative z-10 font-mono text-xs tracking-wide leading-relaxed">
                                             NO PROCESSING TASKS IN QUEUE.<br />
                                             INITIALIZE NEW DIRECTIVES TO BEGIN OPERATIONS.
@@ -676,8 +676,8 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                             if (objectiveTasks.length === 0) return null
 
                             return (
-                                <div key={objective.id} className="border border rounded-lg overflow-hidden bg-white">
-                                    <div className="bg-muted px-4 py-3 border-b border flex justify-between items-center">
+                                <div key={objective.id} className="border border-slate-200 rounded-lg overflow-hidden bg-white">
+                                    <div className="bg-muted px-4 py-3 border-b border-slate-200 flex justify-between items-center">
                                         <h3 className="font-semibold text-foreground flex items-center gap-2">
                                             {isSelectionMode && (
                                                 <Checkbox
@@ -774,8 +774,8 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                         })}
 
                         {orphanedTasks.length > 0 && (
-                            <div className="border border rounded-lg overflow-hidden bg-white">
-                                <div className="bg-muted px-4 py-3 border-b border">
+                            <div className="border border-slate-200 rounded-lg overflow-hidden bg-white">
+                                <div className="bg-muted px-4 py-3 border-b border-slate-200">
                                     <h3 className="font-semibold text-muted-foreground flex items-center gap-2">
                                         {isSelectionMode && (
                                             <Checkbox
@@ -792,7 +792,7 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                                                 aria-label="Select all general tasks"
                                             />
                                         )}
-                                        <div className="bg-slate-400 w-2 h-2 rounded-full" />
+                                        <div className="bg-muted-foreground w-2 h-2 rounded-full" />
                                         General Tasks (No Objective)
                                     </h3>
                                 </div>
@@ -847,7 +847,7 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                                                                 ) : null}
                                                                 <AvatarFallback className={cn(
                                                                     "text-[8px] text-white",
-                                                                    task.assignee.role === "AI_Agent" ? "bg-purple-600" : "bg-slate-600"
+                                                                    task.assignee.role === "AI_Agent" ? "bg-purple-600" : "bg-muted-foreground"
                                                                 )}>
                                                                     {task.assignee.role === "AI_Agent" ? <Bot className="w-3 h-3" /> : getInitials(task.assignee.full_name)}
                                                                 </AvatarFallback>
@@ -874,7 +874,7 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
             {/* Bulk Action Toolbar */}
             {
                 selectedTaskIds.size > 0 && (
-                    <div className="fixed bottom-20 sm:bottom-4 left-1/2 -translate-x-1/2 bg-slate-900 text-white rounded-lg shadow-lg p-4 flex items-center gap-3 z-50">
+                    <div className="fixed bottom-20 sm:bottom-4 left-1/2 -translate-x-1/2 bg-foreground text-background rounded-lg shadow-lg p-4 flex items-center gap-3 z-50">
                         <span className="text-sm font-medium">{selectedTaskIds.size} selected</span>
                         <Button
                             size="sm"
@@ -958,7 +958,7 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                                 setSelectedTaskIds(new Set())
                             }}
                             disabled={isBulkOperating || isBulkDeleting}
-                            className="text-white hover:bg-slate-800"
+                            className="text-background hover:bg-foreground/90"
                         >
                             Cancel
                         </Button>

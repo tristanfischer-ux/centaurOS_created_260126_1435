@@ -67,7 +67,7 @@ export function InteractiveTaskItem({ task, members, currentUserId, variant = "d
                     onClick={() => setModalOpen(true)}
                     className="w-full text-left transition-all group hover:shadow-md active:shadow-sm"
                 >
-                    <div className="flex items-center justify-between p-4 rounded-lg border border bg-background hover:bg-foundry-50/30 hover:border-foundry-300 transition-colors">
+                    <div className="flex items-center justify-between p-4 rounded-lg border border-slate-200 bg-background hover:bg-foundry-50/30 hover:border-foundry-300 transition-colors">
                         <div className="flex-1 min-w-0 space-y-2">
                             <p className="text-sm font-medium text-foreground truncate group-hover:text-international-orange transition-colors">
                                 {task.title}

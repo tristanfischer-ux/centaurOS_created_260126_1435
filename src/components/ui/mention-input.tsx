@@ -196,7 +196,7 @@ export function MentionInput({
               <UserAvatar
                 name={profile.full_name}
                 size="sm"
-                className="border border shrink-0"
+                className="border border-slate-200 shrink-0"
               />
               <div className="flex-1 min-w-0">
                 <div className="font-medium truncate text-foreground">{profile.full_name}</div>

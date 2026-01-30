@@ -10,6 +10,7 @@ import type {
   ApprenticeshipDocument 
 } from '@/types/apprenticeship'
 import { isValidUUID } from '@/lib/security/sanitize'
+import type { Json } from '@/types/database.types'
 
 // =============================================
 // DOCUMENT RETRIEVAL
@@ -152,7 +153,7 @@ export async function signDocument(documentId: string) {
   if (!document) return { error: 'Document not found' }
   
   // Check if user is authorized to sign
-  const required = document.requires_signatures || []
+  const required = (document.requires_signatures || []) as unknown as RequiredSignature[]
   const userRequired = required.find((r: RequiredSignature) => r.user_id === user.id)
   
   if (!userRequired) {
@@ -160,7 +161,7 @@ export async function signDocument(documentId: string) {
   }
   
   // Check if already signed
-  const signatures = document.signatures || []
+  const signatures = (document.signatures || []) as unknown as Signature[]
   const alreadySigned = signatures.find((s: Signature) => s.user_id === user.id)
   
   if (alreadySigned) {
@@ -195,7 +196,7 @@ export async function signDocument(documentId: string) {
   const { error } = await supabase
     .from('apprenticeship_documents')
     .update({
-      signatures: updatedSignatures,
+      signatures: updatedSignatures as unknown as Json,
       status: newStatus,
       updated_at: new Date().toISOString()
     })
@@ -308,9 +309,9 @@ export async function createDocument(input: {
       document_type: input.documentType,
       title: input.title,
       description: input.description || null,
-      content: input.content || null,
+      content: (input.content || null) as unknown as Json,
       file_url: input.fileUrl || null,
-      requires_signatures: enrichedSignatures,
+      requires_signatures: enrichedSignatures as unknown as Json,
       status: enrichedSignatures.length > 0 ? 'pending_signatures' : 'draft',
       valid_from: input.validFrom || null,
       valid_until: input.validUntil || null,
@@ -337,14 +338,24 @@ async function createSignatureNotification(userId: string, documentId: string, d
   const supabase = await createClient()
   
   try {
-    await supabase.from('notifications').insert({
-      user_id: userId,
-      type: 'document_signature_required',
-      title: 'Document Requires Your Signature',
-      message: `Please review and sign: ${documentTitle}`,
-      data: { document_id: documentId },
-      read: false
-    })
+    // Get user's foundry_id for the notification
+    const { data: userProfile } = await supabase
+      .from('profiles')
+      .select('foundry_id')
+      .eq('id', userId)
+      .single()
+    
+    if (userProfile?.foundry_id) {
+      await supabase.from('notifications').insert({
+        user_id: userId,
+        foundry_id: userProfile.foundry_id,
+        type: 'document_signature_required',
+        title: 'Document Requires Your Signature',
+        message: `Please review and sign: ${documentTitle}`,
+        metadata: { document_id: documentId } as unknown as Json,
+        is_read: false
+      })
+    }
   } catch (error) {
     console.log('Could not create notification:', error)
   }

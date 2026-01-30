@@ -343,18 +343,18 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
         const activeTaskDetails = [...(member.taskDetails?.active || []), ...(member.taskDetails?.pending || [])]
 
         // Determine styles based on type
-        let accentColor = 'bg-slate-400'
-        let borderClass = 'border-slate-200'
-        let ringClass = 'ring-slate-500 border-slate-500'
+        let accentColor = 'bg-muted'
+        let borderClass = 'border'
+        let ringClass = 'ring-muted border-muted'
         let bgCheckClass = 'bg-muted0'
-        let avatarBorderClass = 'border border-slate-200'
+        let avatarBorderClass = 'border'
         let avatarBgClass = 'bg-muted text-muted-foreground'
         let badgeClass = 'bg-muted text-muted-foreground'
 
         if (isAIAgent) {
             accentColor = 'bg-indigo-500'
             borderClass = 'border-indigo-200'
-            ringClass = 'ring-slate-500 border-slate-500'
+            ringClass = 'ring-muted border-muted'
             bgCheckClass = 'bg-muted0'
             avatarBorderClass = 'border-2 border-indigo-300'
             avatarBgClass = 'bg-indigo-100 text-indigo-700 font-bold'
@@ -362,54 +362,54 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
         } else if (isFounder) {
             accentColor = 'bg-purple-500'
             borderClass = 'border-purple-200'
-            ringClass = 'ring-slate-500 border-slate-500'
+            ringClass = 'ring-muted border-muted'
             bgCheckClass = 'bg-muted0'
             avatarBorderClass = 'border-2 border-purple-500'
             avatarBgClass = 'bg-purple-100 text-purple-700 font-bold'
             badgeClass = 'text-purple-600 border-purple-200 bg-purple-50'
         } else if (isExecutive) {
-            accentColor = 'bg-amber-500'
-            borderClass = 'border-amber-200'
-            ringClass = 'ring-slate-500 border-slate-500'
+            accentColor = 'bg-status-warning'
+            borderClass = 'border-status-warning-light'
+            ringClass = 'ring-muted border-muted'
             bgCheckClass = 'bg-muted0'
-            avatarBorderClass = 'border-2 border-amber-500'
-            avatarBgClass = 'bg-amber-100 text-amber-700 font-bold'
-            badgeClass = 'text-amber-600 border-amber-200 bg-amber-50'
+            avatarBorderClass = 'border-2 border-status-warning'
+            avatarBgClass = 'bg-status-warning-light text-status-warning-dark font-bold'
+            badgeClass = 'text-status-warning-dark border-status-warning-light bg-status-warning-light'
         } else {
             // Apprentice
-            accentColor = 'bg-blue-500'
+            accentColor = 'bg-electric-blue'
             borderClass = 'border'
-            avatarBorderClass = 'border-2 border-blue-400'
-            avatarBgClass = 'bg-blue-100 text-blue-700 font-bold'
-            badgeClass = 'text-blue-600 border bg-blue-50'
+            avatarBorderClass = 'border-2 border-electric-blue-light'
+            avatarBgClass = 'bg-electric-blue-light text-electric-blue font-bold'
+            badgeClass = 'text-electric-blue border bg-electric-blue-light'
         }
 
         // Centaur Override
         if (isCentaur) {
-            borderClass = 'border-amber-400 shadow-md ring-1 ring-amber-400/50'
+            borderClass = 'border-status-warning shadow-md ring-1 ring-status-warning/50'
         }
 
         const cardContent = (
             <Card className={`
                 bg-background border shadow-sm transition-all cursor-pointer relative group/card
                 ${borderClass}
-                hover:border-slate-400 hover:shadow-md hover:-translate-y-[2px] active:translate-y-0 active:shadow-sm
+                hover:border-muted hover:shadow-md hover:-translate-y-[2px] active:translate-y-0 active:shadow-sm
                 ${compareMode && isSelected ? `ring-2 ${ringClass}` : ''}
                 ${isDragging ? 'opacity-50 scale-95' : ''}
-                ${isDropTarget ? 'ring-2 ring-green-500 border-green-500 bg-green-50' : ''}
+                ${isDropTarget ? 'ring-2 ring-status-success border-status-success bg-status-success-light' : ''}
                 ${isPairing || isDeleting ? 'opacity-60' : ''}
             `}>
                 {compareMode && (
                     <div className={`absolute top-2 right-2 h-6 w-6 rounded-full flex items-center justify-center text-white text-xs z-10
-                        ${isSelected ? bgCheckClass : 'bg-slate-200'}
+                        ${isSelected ? bgCheckClass : 'bg-muted'}
                     `}>
                         {isSelected ? <Check className="h-4 w-4" /> : null}
                     </div>
                 )}
 
                 {isDropTarget && (
-                    <div className="absolute inset-0 flex items-center justify-center bg-green-500/10 rounded-lg z-10 backdrop-blur-[1px]">
-                        <div className="bg-green-600 text-white px-3 py-1.5 rounded-full text-xs font-medium flex items-center gap-1 shadow-sm">
+                    <div className="absolute inset-0 flex items-center justify-center bg-status-success/10 rounded-lg z-10 backdrop-blur-[1px]">
+                        <div className="bg-status-success text-white px-3 py-1.5 rounded-full text-xs font-medium flex items-center gap-1 shadow-sm">
                             <Zap className="h-3 w-3 fill-white" />
                             {draggedMemberId && aiAgents.some(a => a.id === draggedMemberId) ? 'Pair Centaur' : 'Combine / Team'}
                         </div>
@@ -417,7 +417,7 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                 )}
                 {(isPairing || isDeleting) && (
                     <div className="absolute inset-0 flex items-center justify-center bg-muted0/10 rounded-lg z-10 backdrop-blur-[1px]">
-                        <div className="bg-slate-700 text-white px-3 py-1.5 rounded-full text-xs font-medium flex items-center gap-1 shadow-sm">
+                        <div className="bg-muted text-white px-3 py-1.5 rounded-full text-xs font-medium flex items-center gap-1 shadow-sm">
                             <Loader2 className="h-3 w-3 animate-spin" />
                             {isPairing ? 'Pairing...' : 'Removing...'}
                         </div>
@@ -445,7 +445,7 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                                 />
                             )}
                             {isCentaur && (
-                                <div className="absolute -bottom-1 -right-1 bg-background rounded-full p-[1px] shadow-sm border border-slate-200">
+                                <div className="absolute -bottom-1 -right-1 bg-background rounded-full p-[1px] shadow-sm border border-muted">
                                     <Avatar className="h-4 w-4 border border-indigo-200">
                                         <AvatarFallback className="bg-indigo-100 text-indigo-700 text-[6px]">
                                             <Brain className="h-2 w-2" />
@@ -462,7 +462,7 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                                     {member.full_name}
                                 </h3>
                                 {isCentaur && (
-                                    <Badge variant="secondary" className="text-[9px] bg-amber-100 text-amber-700 h-4 px-1 border-amber-200">
+                                    <Badge variant="secondary" className="text-[9px] bg-status-warning-light text-status-warning-dark h-4 px-1 border-status-warning-light">
                                         Centaur
                                     </Badge>
                                 )}
@@ -499,7 +499,7 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                                         <User className="mr-2 h-4 w-4" /> View Profile
                                     </DropdownMenuItem>
                                     <DropdownMenuItem
-                                        className="text-red-600 focus:text-red-600 focus:bg-red-50"
+                                        className="text-destructive focus:text-destructive focus:bg-destructive/10"
                                         onClick={(e) => {
                                             e.stopPropagation()
                                             setMemberToDelete(member.id)
@@ -523,8 +523,8 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                     {/* Stats Row */}
                     <div className="flex items-center justify-between mt-3 ml-4">
                         <div className="flex gap-3 text-xs">
-                            <span className="text-green-600 font-medium">{member.completedTasks} done</span>
-                            <span className="text-blue-600 font-medium">{member.activeTasks} active</span>
+                            <span className="text-status-success font-medium">{member.completedTasks} done</span>
+                            <span className="text-electric-blue font-medium">{member.activeTasks} active</span>
                             <span className="text-muted-foreground">{member.pendingTasks} pending</span>
                         </div>
                         <button
@@ -542,7 +542,7 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
 
                 {/* Expanded View */}
                 {isExpanded && (
-                    <CardContent className="pt-0 pb-4 px-4 space-y-3 border-t border-slate-100 mt-2">
+                    <CardContent className="pt-0 pb-4 px-4 space-y-3 border-t border-muted mt-2">
                         {/* Full Contact Info */}
                         <div className="space-y-1 pt-3">
                             {member.phone_number && (
@@ -562,9 +562,9 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
 
                         {/* Centaur Pairing Info */}
                         {isCentaur && pairedAI && (
-                            <div className="flex items-center gap-2 text-xs bg-amber-50 p-2 rounded border border-amber-200">
-                                <Brain className="h-4 w-4 text-amber-600" />
-                                <span className="text-amber-700">Paired with <strong>{pairedAI.full_name}</strong></span>
+                            <div className="flex items-center gap-2 text-xs bg-status-warning-light p-2 rounded border border-status-warning-light">
+                                <Brain className="h-4 w-4 text-status-warning-dark" />
+                                <span className="text-status-warning-dark">Paired with <strong>{pairedAI.full_name}</strong></span>
                                 <button
                                     onClick={(e) => {
                                         e.preventDefault()
@@ -574,7 +574,7 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                                             toast.success("Centaur unpaired")
                                         })
                                     }}
-                                    className="ml-auto text-amber-600 hover:text-red-600 transition-colors"
+                                    className="ml-auto text-status-warning-dark hover:text-destructive transition-colors"
                                 >
                                     <Unplug className="h-3 w-3" />
                                 </button>
@@ -593,14 +593,14 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                                         return (
                                             <div key={idx} className={cn(
                                                 "flex flex-col gap-1 text-xs p-2 rounded border",
-                                                isOverdue ? "bg-red-50 border-red-200" : "bg-muted border-slate-200"
+                                                isOverdue ? "bg-destructive/10 border-destructive" : "bg-muted border-muted"
                                             )}>
                                                 <div className="flex items-start justify-between gap-2">
                                                     <span className="truncate text-foreground font-medium flex-1">{task.title}</span>
                                                     {hasDeadline && (
                                                         <div className={cn(
                                                             "flex items-center gap-1 shrink-0",
-                                                            isOverdue ? "text-red-600" : "text-muted-foreground"
+                                                            isOverdue ? "text-destructive" : "text-muted-foreground"
                                                         )}>
                                                             {isOverdue ? (
                                                                 <AlertTriangle className="h-3 w-3" />
@@ -613,7 +613,7 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                                                 {hasDeadline && (
                                                     <div className={cn(
                                                         "flex items-center gap-1 text-[10px]",
-                                                        isOverdue ? "text-red-600" : "text-muted-foreground"
+                                                        isOverdue ? "text-destructive" : "text-muted-foreground"
                                                     )}>
                                                         <Calendar className="h-3 w-3" />
                                                         <span>
@@ -635,7 +635,7 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                         )}
 
                         {/* Action Buttons */}
-                        <div className="flex gap-2 pt-2 border-t border-slate-100">
+                        <div className="flex gap-2 pt-2 border-t border-muted">
                             <Button 
                                 variant="secondary" 
                                 size="sm" 
@@ -757,16 +757,16 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
         } else if (isFounder) {
             badgeClass = 'text-purple-600 border-purple-200 bg-purple-50'
         } else if (isExecutive) {
-            badgeClass = 'text-amber-600 border-amber-200 bg-amber-50'
+            badgeClass = 'text-status-warning-dark border-status-warning-light bg-status-warning-light'
         }
 
         return (
-            <tr className="group hover:bg-muted active:bg-muted transition-colors border-b border-slate-100 last:border-0">
+            <tr className="group hover:bg-muted active:bg-muted transition-colors border-b border-muted last:border-0">
                 <td className="px-4 py-3 pl-6">
                     <div className="flex items-center gap-3">
                         <Link href={`/team/${member.id}`} className="flex items-center gap-3">
                             <div className="relative">
-                                <Avatar className="h-9 w-9 border border-slate-200">
+                                <Avatar className="h-9 w-9 border border-muted">
                                     <AvatarFallback className="bg-muted text-muted-foreground text-xs">
                                         {isAIAgent ? <Brain className="h-4 w-4" /> : getInitials(member.full_name)}
                                     </AvatarFallback>
@@ -779,7 +779,7 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                                     />
                                 )}
                             </div>
-                            <span className="font-medium text-foreground group-hover:text-blue-600 group-active:text-blue-700 transition-colors">
+                            <span className="font-medium text-foreground group-hover:text-electric-blue group-active:text-electric-blue-hover transition-colors">
                                 {member.full_name}
                             </span>
                         </Link>
@@ -793,9 +793,9 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                 <td className="px-4 py-3">
                     {isCentaur && (
                         <div className="flex items-center gap-2">
-                            <Badge variant="secondary" className="text-[10px] bg-amber-100 text-amber-700 h-5 px-1.5 border-amber-200 gap-1 pl-1">
+                            <Badge variant="secondary" className="text-[10px] bg-status-warning-light text-status-warning-dark h-5 px-1.5 border-status-warning-light gap-1 pl-1">
                                 <Avatar className="h-3 w-3 inline-block">
-                                    <AvatarFallback className="bg-amber-200 text-amber-800 text-[6px]">AI</AvatarFallback>
+                                    <AvatarFallback className="bg-status-warning-light text-status-warning-dark text-[6px]">AI</AvatarFallback>
                                 </Avatar>
                                 {pairedAI.full_name}
                             </Badge>
@@ -809,7 +809,7 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                                         toast.success("Centaur unpaired")
                                     })
                                 }}
-                                className="text-slate-300 hover:text-red-500 hover:bg-red-50 active:text-red-600 active:bg-red-100 rounded p-1 transition-all opacity-0 group-hover:opacity-100"
+                                className="text-muted-foreground hover:text-destructive hover:bg-destructive/10 active:text-destructive active:bg-destructive/20 rounded p-1 transition-all opacity-0 group-hover:opacity-100"
                             >
                                 <Unplug className="h-3 w-3" />
                             </button>
@@ -819,12 +819,12 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                 <td className="px-4 py-3 text-muted-foreground">
                     <div className="flex flex-col gap-1 text-xs">
                         <div className="flex gap-3">
-                            <span className="text-green-600 font-medium">{member.completedTasks} done</span>
-                            <span className="text-blue-600 font-medium">{member.activeTasks} active</span>
+                            <span className="text-status-success font-medium">{member.completedTasks} done</span>
+                            <span className="text-electric-blue font-medium">{member.activeTasks} active</span>
                             <span className="text-muted-foreground">{member.pendingTasks} pending</span>
                         </div>
                         {member.taskTitles?.active && member.taskTitles.active.length > 0 && (
-                            <div className="text-blue-600 truncate max-w-[200px]">
+                            <div className="text-electric-blue truncate max-w-[200px]">
                                 <span className="font-semibold">Active:</span> {member.taskTitles.active[0]}
                                 {member.taskTitles.active.length > 1 && ` +${member.taskTitles.active.length - 1} more`}
                             </div>
@@ -854,7 +854,7 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                                 <Link href={`/team/${member.id}`}>View Profile</Link>
                             </DropdownMenuItem>
                             <DropdownMenuItem
-                                className="text-red-600 focus:text-red-600 focus:bg-red-50"
+                                className="text-destructive focus:text-destructive focus:bg-destructive/10"
                                 onClick={() => setMemberToDelete(member.id)}
                             >
                                 <Trash2 className="mr-2 h-4 w-4" /> Delete Person
@@ -869,7 +869,7 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
     return (
         <div className="space-y-6">
             {/* Header */}
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-slate-100">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-muted">
                 <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-3 mb-1">
                         <div className="h-8 w-1 bg-orange-600 rounded-full shadow-[0_0_8px_rgba(234,88,12,0.6)]" />
@@ -892,7 +892,7 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                     {compareMode && selectedIds.size >= 2 && (
                         <Button
                             onClick={() => setShowComparison(true)}
-                            className="bg-blue-600 hover:bg-blue-700 text-white"
+                            className="bg-electric-blue hover:bg-electric-blue-hover text-white"
                         >
                             <GitCompare className="h-4 w-4 mr-2" />
                             Compare {selectedIds.size}
@@ -901,12 +901,12 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                     <Button
                         variant={compareMode ? "default" : "secondary"}
                         onClick={toggleCompareMode}
-                        className={compareMode ? "bg-slate-800" : ""}
+                        className={compareMode ? "bg-muted" : ""}
                     >
                         {compareMode ? <X className="h-4 w-4 mr-2" /> : <GitCompare className="h-4 w-4 mr-2" />}
                         {compareMode ? "Cancel" : "Compare"}
                     </Button>
-                    <div className="flex bg-muted p-1 rounded-lg border border ml-2">
+                    <div className="flex bg-muted p-1 rounded-lg border border-muted ml-2">
                         <Button
                             variant="ghost"
                             size="sm"
@@ -928,7 +928,7 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
             </div>
 
             {compareMode && (
-                <div className="bg-blue-50 border border rounded-lg p-3 text-sm text-blue-700">
+                <div className="bg-electric-blue-light border border-electric-blue-light rounded-lg p-3 text-sm text-electric-blue">
                     Select 2-4 team members to compare. Click a card to select.
                     {selectedIds.size > 0 && ` (${selectedIds.size} selected)`}
                 </div>
@@ -940,7 +940,7 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
             {/* Founders Section */}
             {founders.length > 0 && (
                 <section className="space-y-4">
-                    <h2 className="text-xl font-semibold text-purple-600 uppercase tracking-wider border-b border pb-2">
+                    <h2 className="text-xl font-semibold text-purple-600 uppercase tracking-wider border-b border-muted pb-2">
                         Founders (Decide)
                     </h2>
                     {viewMode === 'grid' ? (
@@ -950,9 +950,9 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                             ))}
                         </div>
                     ) : (
-                        <div className="border border rounded-lg overflow-hidden">
+                        <div className="border border-muted rounded-lg overflow-hidden">
                             <table className="w-full text-sm text-left">
-                                <thead className="bg-muted text-muted-foreground font-medium border-b border-slate-200">
+                                <thead className="bg-muted text-muted-foreground font-medium border-b border-muted">
                                     <tr>
                                         <th className="px-4 py-3 pl-6">Profile</th>
                                         <th className="px-4 py-3">Role</th>
@@ -961,7 +961,7 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                                         <th className="px-4 py-3"></th>
                                     </tr>
                                 </thead>
-                                <tbody className="divide-y divide-slate-100 bg-white">
+                                <tbody className="divide-y divide-muted bg-background">
                                     {founders.map(member => (
                                         <MemberListItem key={member.id} member={member} type="founder" />
                                     ))}
@@ -974,7 +974,7 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
 
             {/* Executives Section */}
             <section className="space-y-4">
-                <h2 className="text-xl font-semibold text-amber-600 uppercase tracking-wider border-b border pb-2">
+                <h2 className="text-xl font-semibold text-status-warning-dark uppercase tracking-wider border-b border-muted pb-2">
                     Executives (Evaluate)
                 </h2>
                 {viewMode === 'grid' ? (
@@ -983,7 +983,7 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                             <MemberCard key={member.id} member={member} type="executive" />
                         ))}
                         {executives.length === 0 && (
-                            <div className="col-span-full border-2 border-dashed border rounded-lg">
+                            <div className="col-span-full border-2 border-dashed border-muted rounded-lg">
                                 <EmptyState
                                     icon={<Users className="h-8 w-8" />}
                                     title="No executives yet"
@@ -993,9 +993,9 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                         )}
                     </div>
                 ) : (
-                    <div className="border border rounded-lg overflow-hidden">
+                    <div className="border border-muted rounded-lg overflow-hidden">
                         <table className="w-full text-sm text-left">
-                            <thead className="bg-muted text-muted-foreground font-medium border-b border-slate-200">
+                            <thead className="bg-muted text-muted-foreground font-medium border-b border-muted">
                                 <tr>
                                     <th className="px-4 py-3 pl-6">Profile</th>
                                     <th className="px-4 py-3">Role</th>
@@ -1004,7 +1004,7 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                                     <th className="px-4 py-3"></th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-slate-100 bg-white">
+                            <tbody className="divide-y divide-muted bg-background">
                                 {executives.map(member => (
                                     <MemberListItem key={member.id} member={member} type="executive" />
                                 ))}
@@ -1027,7 +1027,7 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
 
             {/* Apprentices Section */}
             <section className="space-y-4">
-                <h2 className="text-xl font-semibold text-blue-600 uppercase tracking-wider border-b border pb-2">
+                <h2 className="text-xl font-semibold text-electric-blue uppercase tracking-wider border-b border-muted pb-2">
                     Apprentices (Do)
                 </h2>
                 {viewMode === 'grid' ? (
@@ -1036,7 +1036,7 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                             <MemberCard key={member.id} member={member} type="apprentice" />
                         ))}
                         {apprentices.length === 0 && (
-                            <div className="col-span-full border-2 border-dashed border rounded-lg">
+                            <div className="col-span-full border-2 border-dashed border-muted rounded-lg">
                                 <EmptyState
                                     icon={<Users className="h-8 w-8" />}
                                     title="No apprentices yet"
@@ -1046,9 +1046,9 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                         )}
                     </div>
                 ) : (
-                    <div className="border border rounded-lg overflow-hidden">
+                    <div className="border border-muted rounded-lg overflow-hidden">
                         <table className="w-full text-sm text-left">
-                            <thead className="bg-muted text-muted-foreground font-medium border-b border-slate-200">
+                            <thead className="bg-muted text-muted-foreground font-medium border-b border-muted">
                                 <tr>
                                     <th className="px-4 py-3 pl-6">Profile</th>
                                     <th className="px-4 py-3">Role</th>
@@ -1057,7 +1057,7 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                                     <th className="px-4 py-3"></th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-slate-100 bg-white">
+                            <tbody className="divide-y divide-muted bg-background">
                                 {apprentices.map(member => (
                                     <MemberListItem key={member.id} member={member} type="apprentice" />
                                 ))}
@@ -1109,7 +1109,7 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
             {/* Teams Section */}
             {teams.length > 0 && (
                 <section className="space-y-4">
-                    <h2 className="text-xl font-semibold text-green-600 uppercase tracking-wider border-b border pb-2">
+                    <h2 className="text-xl font-semibold text-status-success uppercase tracking-wider border-b border-muted pb-2">
                         Teams
                     </h2>
                     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -1121,7 +1121,7 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                                     key={team.id}
                                     className={`
                                         bg-background border shadow-sm transition-all group relative
-                                        ${isDropTarget ? 'ring-2 ring-green-500 border-green-500 bg-green-50' : 'hover:border-green-400 active:border-green-500'}
+                                        ${isDropTarget ? 'ring-2 ring-status-success border-status-success bg-status-success-light' : 'hover:border-status-success active:border-status-success'}
                                     `}
                                     onDragOver={(e) => {
                                         e.preventDefault()
@@ -1146,8 +1146,8 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                                     }}
                                 >
                                     {isDropTarget && (
-                                        <div className="absolute inset-0 flex items-center justify-center bg-green-500/10 rounded-lg z-10">
-                                            <div className="bg-green-600 text-white px-3 py-1 rounded-full text-xs font-medium flex items-center gap-1">
+                                        <div className="absolute inset-0 flex items-center justify-center bg-status-success/10 rounded-lg z-10">
+                                            <div className="bg-status-success text-white px-3 py-1 rounded-full text-xs font-medium flex items-center gap-1">
                                                 <Users className="h-3 w-3" />
                                                 Add to Team
                                             </div>
@@ -1169,7 +1169,7 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                                                             <MoreHorizontal className="h-4 w-4" />
                                                         </Button>
                                                     </DropdownMenuTrigger>
-                                                    <DropdownMenuContent align="end" className="w-[160px] bg-background border-slate-200" sideOffset={8}>
+                                                    <DropdownMenuContent align="end" className="w-[160px] bg-background border-muted" sideOffset={8}>
                                                         <DropdownMenuItem onClick={() => {
                                                             setTeamToEdit({ id: team.id, name: team.name })
                                                             setNewName(team.name)
@@ -1178,7 +1178,7 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                                                         </DropdownMenuItem>
                                                         <DropdownMenuItem
                                                             onClick={() => setTeamToDelete(team.id)}
-                                                            className="text-red-600 focus:text-red-600 focus:bg-red-50"
+                                                            className="text-destructive focus:text-destructive focus:bg-destructive/10"
                                                         >
                                                             <Trash2 className="mr-2 h-4 w-4" /> Delete
                                                         </DropdownMenuItem>
@@ -1192,14 +1192,14 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                                             {/* Member avatars */}
                                             <div className="flex -space-x-2">
                                                 {(team.members || []).slice(0, 4).map(member => (
-                                                    <Avatar key={member.id} className="h-8 w-8 border-2 border-white">
-                                                        <AvatarFallback className="bg-green-100 text-green-700 text-xs font-bold">
+                                                    <Avatar key={member.id} className="h-8 w-8 border-2 border-background">
+                                                        <AvatarFallback className="bg-status-success-light text-status-success-dark text-xs font-bold">
                                                             {getInitials(member.full_name)}
                                                         </AvatarFallback>
                                                     </Avatar>
                                                 ))}
                                                 {(team.members || []).length > 4 && (
-                                                    <div className="h-8 w-8 rounded-full bg-slate-200 border-2 border-white flex items-center justify-center text-xs text-muted-foreground">
+                                                    <div className="h-8 w-8 rounded-full bg-muted border-2 border-background flex items-center justify-center text-xs text-muted-foreground">
                                                         +{(team.members || []).length - 4}
                                                     </div>
                                                 )}
@@ -1229,7 +1229,7 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                                 {selectedMembers.map(member => (
                                     <TableHead key={member.id} className="text-center min-w-[160px]">
                                         <div className="flex flex-col items-center gap-2">
-                                            <Avatar className="h-16 w-16 border-2 border-slate-200">
+                                            <Avatar className="h-16 w-16 border-2 border-muted">
                                                 <AvatarFallback className="bg-muted text-muted-foreground text-lg font-bold">
                                                     {member.full_name?.substring(0, 2).toUpperCase()}
                                                 </AvatarFallback>
@@ -1242,7 +1242,7 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                         </TableHeader>
                         <TableBody>
                             {comparisonRows.map((row, idx) => (
-                                <TableRow key={row.label} className={idx % 2 === 0 ? 'bg-muted' : 'bg-white'}>
+                                <TableRow key={row.label} className={idx % 2 === 0 ? 'bg-muted' : 'bg-background'}>
                                     <TableCell className="text-muted-foreground font-medium text-sm">{row.label}</TableCell>
                                     {selectedMembers.map(member => {
                                         const value = row.getValue(member)
@@ -1260,8 +1260,8 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                                                 key={member.id}
                                                 className={cn(
                                                     "text-center font-medium",
-                                                    isBest && "text-green-600 bg-green-50",
-                                                    isWorst && "text-red-600 bg-red-50",
+                                                    isBest && "text-status-success bg-status-success-light",
+                                                    isWorst && "text-destructive bg-destructive/10",
                                                     !isBest && !isWorst && "text-foreground"
                                                 )}
                                             >
@@ -1281,7 +1281,7 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                 <DialogContent size="sm">
                     <DialogHeader>
                         <DialogTitle className="flex items-center gap-2 text-foreground">
-                            <Users className="h-5 w-5 text-green-600" />
+                            <Users className="h-5 w-5 text-status-success" />
                             Create Team
                         </DialogTitle>
                         <DialogDescription>
@@ -1297,14 +1297,14 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                         <div className="flex items-center justify-center gap-4 py-4 flex-wrap">
                             {quickTeamMembers.map((member, idx) => (
                                 <div key={member.id} className="flex flex-col items-center relative">
-                                    <Avatar className="h-14 w-14 border-2 border-green-500">
-                                        <AvatarFallback className="bg-green-100 text-green-700 font-bold">
+                                    <Avatar className="h-14 w-14 border-2 border-status-success">
+                                        <AvatarFallback className="bg-status-success-light text-status-success-dark font-bold">
                                             {getInitials(member.full_name)}
                                         </AvatarFallback>
                                     </Avatar>
                                     <span className="text-sm font-medium text-foreground mt-2">{member.full_name?.split(' ')[0]}</span>
                                     {idx < quickTeamMembers.length - 1 && (
-                                        <span className="absolute top-7 left-[calc(100%+0.5rem)] text-2xl text-green-600">+</span>
+                                        <span className="absolute top-7 left-[calc(100%+0.5rem)] text-2xl text-status-success">+</span>
                                     )}
                                 </div>
                             ))}
@@ -1314,7 +1314,7 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                         {quickTeamMemberIds.length === 1 && (
                             <div className="space-y-2">
                                 <Label>Add Members</Label>
-                                <div className="max-h-40 overflow-y-auto border border rounded-md p-2 space-y-1">
+                                <div className="max-h-40 overflow-y-auto border border-muted rounded-md p-2 space-y-1">
                                     {allMembers
                                         .filter(m => !quickTeamMemberIds.includes(m.id))
                                         .map(member => (
@@ -1331,7 +1331,7 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                                                 className={cn(
                                                     "w-full text-left px-2 py-1.5 rounded text-sm transition-colors",
                                                     quickTeamMemberIds.includes(member.id)
-                                                        ? "bg-green-50 text-green-700 border border-green-200"
+                                                        ? "bg-status-success-light text-status-success-dark border border-status-success-light"
                                                         : "hover:bg-muted"
                                                 )}
                                             >
@@ -1355,7 +1355,7 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                         </div>
 
                         {teamError && (
-                            <div className="text-sm text-red-600 bg-red-50 p-3 rounded-lg">
+                            <div className="text-sm text-destructive bg-destructive/10 p-3 rounded-lg">
                                 {teamError}
                             </div>
                         )}
@@ -1371,7 +1371,7 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                             <Button
                                 onClick={handleCreateQuickTeam}
                                 disabled={isPending || !teamName.trim() || quickTeamMemberIds.length < 2}
-                                className="bg-green-600 hover:bg-green-700"
+                                className="bg-status-success hover:bg-status-success-dark"
                             >
                                 {isPending ? "Creating..." : "Create Team"}
                             </Button>
@@ -1394,13 +1394,13 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                                 onChange={(e) => setNewName(e.target.value)}
                                 placeholder="Team Name"
                                 autoFocus
-                                className="bg-background border-slate-300"
+                                className="bg-background border-muted"
                             />
                         </div>
                     </div>
                     <DialogFooter>
                         <Button variant="secondary" onClick={() => setTeamToEdit(null)}>Cancel</Button>
-                        <Button onClick={handleUpdateName} disabled={isPending || !newName.trim()} className="bg-blue-600 hover:bg-blue-700 text-white">
+                        <Button onClick={handleUpdateName} disabled={isPending || !newName.trim()} className="bg-electric-blue hover:bg-electric-blue-hover text-white">
                             {isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : "Save Changes"}
                         </Button>
                     </DialogFooter>
@@ -1409,9 +1409,9 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
 
             {/* Delete Confirmation Dialog */}
             <AlertDialog open={!!teamToDelete} onOpenChange={(open) => !open && setTeamToDelete(null)}>
-                <AlertDialogContent className="bg-background text-foreground border-slate-200">
+                <AlertDialogContent className="bg-background text-foreground border-muted">
                     <AlertDialogHeader>
-                        <AlertDialogTitle className="flex items-center gap-2 text-red-600">
+                        <AlertDialogTitle className="flex items-center gap-2 text-destructive">
                             <AlertTriangle className="h-5 w-5" />
                             Delete Team?
                         </AlertDialogTitle>
@@ -1421,7 +1421,7 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                     </AlertDialogHeader>
                     <AlertDialogFooter>
                         <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction onClick={handleDeleteTeam} className="bg-red-600 hover:bg-red-700 focus:ring-red-600">
+                        <AlertDialogAction onClick={handleDeleteTeam} className="bg-destructive hover:bg-destructive/90 focus:ring-destructive">
                             Delete Team
                         </AlertDialogAction>
                     </AlertDialogFooter>
@@ -1430,9 +1430,9 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
 
             {/* Member Delete/Archive Confirmation */}
             <AlertDialog open={!!memberToDelete} onOpenChange={(open) => !open && setMemberToDelete(null)}>
-                <AlertDialogContent className="bg-background text-foreground border-slate-200">
+                <AlertDialogContent className="bg-background text-foreground border-muted">
                     <AlertDialogHeader>
-                        <AlertDialogTitle className="flex items-center gap-2 text-red-600">
+                        <AlertDialogTitle className="flex items-center gap-2 text-destructive">
                             <AlertTriangle className="h-5 w-5" />
                             Remove Person?
                         </AlertDialogTitle>
@@ -1446,7 +1446,7 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                     </AlertDialogHeader>
                     <AlertDialogFooter>
                         <AlertDialogCancel disabled={!!deletingMemberId}>Cancel</AlertDialogCancel>
-                        <AlertDialogAction onClick={handleDeleteMember} disabled={!!deletingMemberId} className="bg-red-600 hover:bg-red-700 focus:ring-red-600">
+                        <AlertDialogAction onClick={handleDeleteMember} disabled={!!deletingMemberId} className="bg-destructive hover:bg-destructive/90 focus:ring-destructive">
                             {deletingMemberId ? (
                                 <>
                                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />

@@ -228,7 +228,7 @@ async function buildProfileResponse(supabase: Awaited<ReturnType<typeof createCl
             challenge: cs.challenge,
             approach: cs.approach,
             outcome: cs.outcome,
-            metrics: cs.metrics || [],
+            metrics: (cs.metrics || []) as unknown as { label: string; value: string; change_percent?: number }[],
             testimonial_quote: cs.testimonial_quote,
             testimonial_author: cs.testimonial_author,
             testimonial_role: cs.testimonial_role,

@@ -41,11 +41,11 @@ export default async function SettingsPage() {
                         </div>
                         <div>
                             <Label>Role</Label>
-                            <div className="p-2 bg-muted rounded border border font-mono text-amber-600">{profile?.role}</div>
+                            <div className="p-2 bg-muted rounded border border-slate-200 font-mono text-amber-600">{profile?.role}</div>
                         </div>
                         <div>
                             <Label>Foundry ID</Label>
-                            <div className="p-2 bg-muted rounded border border text-xs font-mono">{profile?.foundry_id}</div>
+                            <div className="p-2 bg-muted rounded border border-slate-200 text-xs font-mono">{profile?.foundry_id}</div>
                         </div>
                     </div>
                 </CardContent>

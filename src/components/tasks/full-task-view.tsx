@@ -250,7 +250,7 @@ export function FullTaskView({ open, onOpenChange, task, members, currentUserId 
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="max-w-[calc(100vw-300px)] w-full h-[90vh] p-0 gap-0 flex flex-col overflow-hidden">
                 {/* Header */}
-                <DialogHeader className="p-6 pb-4 border-b border shrink-0">
+                <DialogHeader className="p-6 pb-4 border-b border-slate-100 shrink-0">
                     <div className="flex items-start justify-between gap-4">
                         <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 mb-2 flex-wrap">
@@ -463,7 +463,7 @@ export function FullTaskView({ open, onOpenChange, task, members, currentUserId 
                             ) : (
                                 <div className="space-y-3">
                                     {humanNotes.map((comment) => (
-                                        <div key={comment.id} className="bg-background border border rounded-lg p-4">
+                                        <div key={comment.id} className="bg-background border border-slate-200 rounded-lg p-4">
                                             <div className="flex items-start gap-3">
                                                 <Avatar className="h-8 w-8 shrink-0">
                                                     <AvatarFallback className="text-xs bg-blue-100 text-blue-700 font-medium">

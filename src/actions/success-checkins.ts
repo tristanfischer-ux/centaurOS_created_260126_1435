@@ -50,7 +50,7 @@ export async function getOrderCheckins(orderId: string) {
         .eq('order_id', orderId)
         .order('scheduled_for', { ascending: true })
     
-    return { checkins: (data || []) as SuccessCheckin[], error: error?.message || null }
+    return { checkins: (data || []) as unknown as SuccessCheckin[], error: error?.message || null }
 }
 
 // Get upcoming check-ins for provider

@@ -308,10 +308,11 @@ export async function getExportStats(): Promise<{
     ]
     
     for (const { table, query } of tables) {
-        const { count } = await supabase
-            .from(query)
+        // Use type assertion to avoid deep type instantiation error
+        const { count } = await (supabase
+            .from(query as 'profiles')
             .select('id', { count: 'exact', head: true })
-            .eq('foundry_id', foundry_id)
+            .eq('foundry_id', foundry_id) as unknown as Promise<{ count: number | null }>)
         
         stats[table] = count || 0
     }

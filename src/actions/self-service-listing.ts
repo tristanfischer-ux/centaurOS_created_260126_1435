@@ -3,6 +3,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import type { Json } from '@/types/database.types'
 
 export interface SelfServiceListingInput {
     title: string
@@ -38,10 +39,10 @@ export async function createSelfServiceListing(input: SelfServiceListingInput) {
         .from('marketplace_listings')
         .insert({
             title: input.title,
-            category: input.category,
+            category: input.category as 'People' | 'Products' | 'Services' | 'AI',
             subcategory: input.subcategory,
             description: input.description,
-            attributes: input.attributes || {},
+            attributes: (input.attributes || {}) as unknown as Json,
             created_by_provider_id: provider.id,
             is_self_created: true,
             approval_status: 'pending',
@@ -91,13 +92,13 @@ export async function updateSelfServiceListing(listingId: string, input: Partial
     }
     
     // Update the listing - resets to pending approval if content changed
+    const updateData: Record<string, unknown> = {
+        ...input,
+        approval_status: 'pending' // Require re-approval after edit
+    }
     const { error } = await supabase
         .from('marketplace_listings')
-        .update({
-            ...input,
-            approval_status: 'pending', // Require re-approval after edit
-            updated_at: new Date().toISOString()
-        })
+        .update(updateData)
         .eq('id', listingId)
     
     if (error) return { success: false, error: error.message }

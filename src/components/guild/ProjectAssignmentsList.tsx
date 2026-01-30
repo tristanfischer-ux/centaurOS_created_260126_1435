@@ -120,7 +120,7 @@ export function ProjectAssignmentsList() {
                 {activeAssignments.length > 0 && (
                     <div className="space-y-2">
                         <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Active</h4>
-                        <div className="divide-y divide-slate-100 border border rounded-lg overflow-hidden">
+                        <div className="divide-y divide-slate-100 border border-slate-200 rounded-lg overflow-hidden">
                             {activeAssignments.map((assignment) => (
                                 <div
                                     key={assignment.id}
@@ -188,7 +188,7 @@ export function ProjectAssignmentsList() {
                 {completedAssignments.length > 0 && (
                     <div className="space-y-2">
                         <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">History</h4>
-                        <div className="divide-y divide-slate-100 border border rounded-lg overflow-hidden opacity-70">
+                        <div className="divide-y divide-slate-100 border border-slate-200 rounded-lg overflow-hidden opacity-70">
                             {completedAssignments.slice(0, 5).map((assignment) => (
                                 <div
                                     key={assignment.id}

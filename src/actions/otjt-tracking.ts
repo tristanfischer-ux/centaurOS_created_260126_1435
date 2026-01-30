@@ -10,6 +10,7 @@ import type {
   WeeklySummary 
 } from '@/types/apprenticeship'
 import { isValidUUID } from '@/lib/security/sanitize'
+import type { Json } from '@/types/database.types'
 
 // =============================================
 // LOGGING OTJT HOURS
@@ -517,14 +518,24 @@ async function createApprovalNotification(
   
   // Check if notifications table exists
   try {
-    await supabase.from('notifications').insert({
-      user_id: mentorId,
-      type: 'otjt_approval_required',
-      title: 'OTJT Hours Pending Approval',
-      message: 'An apprentice has logged training hours that need your approval.',
-      data: { log_id: logId, enrollment_id: enrollmentId },
-      read: false
-    })
+    // Get mentor's foundry_id
+    const { data: mentorProfile } = await supabase
+      .from('profiles')
+      .select('foundry_id')
+      .eq('id', mentorId)
+      .single()
+    
+    if (mentorProfile?.foundry_id) {
+      await supabase.from('notifications').insert({
+        user_id: mentorId,
+        foundry_id: mentorProfile.foundry_id,
+        type: 'otjt_approval_required',
+        title: 'OTJT Hours Pending Approval',
+        message: 'An apprentice has logged training hours that need your approval.',
+        metadata: { log_id: logId, enrollment_id: enrollmentId } as unknown as Json,
+        is_read: false
+      })
+    }
   } catch (error) {
     // Notifications table may not exist, silently fail
     console.log('Could not create notification:', error)
@@ -539,14 +550,24 @@ async function createRejectionNotification(
   const supabase = await createClient()
   
   try {
-    await supabase.from('notifications').insert({
-      user_id: apprenticeId,
-      type: 'otjt_rejected',
-      title: 'OTJT Log Rejected',
-      message: `Your OTJT log was rejected: ${reason}`,
-      data: { log_id: logId },
-      read: false
-    })
+    // Get apprentice's foundry_id
+    const { data: apprenticeProfile } = await supabase
+      .from('profiles')
+      .select('foundry_id')
+      .eq('id', apprenticeId)
+      .single()
+    
+    if (apprenticeProfile?.foundry_id) {
+      await supabase.from('notifications').insert({
+        user_id: apprenticeId,
+        foundry_id: apprenticeProfile.foundry_id,
+        type: 'otjt_rejected',
+        title: 'OTJT Log Rejected',
+        message: `Your OTJT log was rejected: ${reason}`,
+        metadata: { log_id: logId } as unknown as Json,
+        is_read: false
+      })
+    }
   } catch (error) {
     console.log('Could not create notification:', error)
   }

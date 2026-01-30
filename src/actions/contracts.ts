@@ -48,7 +48,7 @@ export async function getContractTemplates(templateType?: string) {
     
     const { data, error } = await query.order('name', { ascending: true })
     
-    return { templates: (data || []) as ContractTemplate[], error: error?.message || null }
+    return { templates: (data || []) as unknown as ContractTemplate[], error: error?.message || null }
 }
 
 // Get a specific template
@@ -61,7 +61,7 @@ export async function getContractTemplate(id: string) {
         .eq('id', id)
         .single()
     
-    return { template: data as ContractTemplate | null, error: error?.message || null }
+    return { template: data as unknown as ContractTemplate | null, error: error?.message || null }
 }
 
 // Generate contract from template

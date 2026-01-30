@@ -70,7 +70,7 @@ export default async function ProfilePage({ params }: { params: Promise<{ id: st
     return (
         <div className="space-y-8">
             {/* Header / Profile Card */}
-            <div className="bg-background border border rounded-xl p-8 shadow-sm flex items-start gap-8">
+            <div className="bg-background border border-slate-200 rounded-xl p-8 shadow-sm flex items-start gap-8">
                 <div className="h-32 w-32 bg-muted rounded-full flex items-center justify-center text-4xl border-4 border-slate-50 shadow-inner">
                     {profile.role === 'AI_Agent' ? '🤖' : '👤'}
                 </div>
@@ -138,7 +138,7 @@ export default async function ProfilePage({ params }: { params: Promise<{ id: st
                 return activeTasks.length > 0 ? (
                     <div>
                         <h2 className="text-xl font-bold text-foreground mb-4">Current Tasks</h2>
-                        <div className="bg-background border border rounded-lg overflow-hidden">
+                        <div className="bg-background border border-slate-200 rounded-lg overflow-hidden">
                             {activeTasks.map(task => (
                                 <div key={task.id} className="p-4 border-b border-slate-100 last:border-0 hover:bg-muted flex justify-between items-center">
                                     <div>
@@ -159,7 +159,7 @@ export default async function ProfilePage({ params }: { params: Promise<{ id: st
                 return (
                     <div>
                         <h2 className="text-xl font-bold text-foreground mb-4">Completed Tasks</h2>
-                        <div className="bg-background border border rounded-lg overflow-hidden">
+                        <div className="bg-background border border-slate-200 rounded-lg overflow-hidden">
                             {completedTasks.length === 0 ? (
                                 <div className="p-8 text-center text-muted-foreground">No completed tasks yet.</div>
                             ) : (

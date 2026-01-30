@@ -95,7 +95,7 @@ export default function MarketingPage() {
         {/* Content */}
         <div className="relative z-10 max-w-5xl mx-auto px-6 text-center pt-8 md:pt-0">
           {/* System Online Badge */}
-          <div className="inline-flex items-center gap-2 mb-6 md:mb-8 px-4 py-2 border border bg-background/80 backdrop-blur-sm">
+          <div className="inline-flex items-center gap-2 mb-6 md:mb-8 px-4 py-2 border border-slate-200 bg-background/80 backdrop-blur-sm">
             <span className="w-2 h-2 rounded-full bg-electric-blue" />
             <span className="text-electric-blue text-xs font-mono uppercase tracking-widest">
               System Online
@@ -137,8 +137,8 @@ export default function MarketingPage() {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-8">
             {/* Founders */}
-            <div className="border border bg-background p-4 sm:p-6 md:p-8 flex flex-col">
-              <div className="h-48 md:h-64 mb-4 md:mb-6 bg-muted border border relative overflow-hidden">
+            <div className="border border-slate-200 bg-background p-4 sm:p-6 md:p-8 flex flex-col">
+              <div className="h-48 md:h-64 mb-4 md:mb-6 bg-muted border border-slate-200 relative overflow-hidden">
                 <Image
                   src="/images/founder-hologram.png"
                   alt="Founders Decide"
@@ -171,8 +171,8 @@ export default function MarketingPage() {
             </div>
 
             {/* Executives */}
-            <div className="border border bg-background p-4 sm:p-6 md:p-8 flex flex-col">
-              <div className="h-48 md:h-64 mb-4 md:mb-6 bg-muted border border relative overflow-hidden">
+            <div className="border border-slate-200 bg-background p-4 sm:p-6 md:p-8 flex flex-col">
+              <div className="h-48 md:h-64 mb-4 md:mb-6 bg-muted border border-slate-200 relative overflow-hidden">
                 <Image
                   src="/images/executive-pilot.png"
                   alt="Executives Evaluate"
@@ -205,8 +205,8 @@ export default function MarketingPage() {
             </div>
 
             {/* Apprentices */}
-            <div className="border border bg-background p-4 sm:p-6 md:p-8 flex flex-col sm:col-span-2 lg:col-span-1">
-              <div className="h-48 md:h-64 mb-4 md:mb-6 bg-muted border border relative overflow-hidden">
+            <div className="border border-slate-200 bg-background p-4 sm:p-6 md:p-8 flex flex-col sm:col-span-2 lg:col-span-1">
+              <div className="h-48 md:h-64 mb-4 md:mb-6 bg-muted border border-slate-200 relative overflow-hidden">
                 <Image
                   src="/images/apprentice-engineer.png"
                   alt="Apprentices Do"
@@ -248,8 +248,8 @@ export default function MarketingPage() {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-8">
             {/* VCs */}
-            <div className="border border bg-background p-4 sm:p-6 md:p-8 flex flex-col">
-              <div className="h-48 md:h-64 mb-4 md:mb-6 bg-muted border border relative overflow-hidden">
+            <div className="border border-slate-200 bg-background p-4 sm:p-6 md:p-8 flex flex-col">
+              <div className="h-48 md:h-64 mb-4 md:mb-6 bg-muted border border-slate-200 relative overflow-hidden">
                 <Image
                   src="/images/vc-dashboard.png"
                   alt="VCs"
@@ -282,8 +282,8 @@ export default function MarketingPage() {
             </div>
 
             {/* Factories */}
-            <div className="border border bg-background p-4 sm:p-6 md:p-8 flex flex-col">
-              <div className="h-48 md:h-64 mb-4 md:mb-6 bg-muted border border relative overflow-hidden">
+            <div className="border border-slate-200 bg-background p-4 sm:p-6 md:p-8 flex flex-col">
+              <div className="h-48 md:h-64 mb-4 md:mb-6 bg-muted border border-slate-200 relative overflow-hidden">
                 <Image
                   src="/images/3d-printed-part.png"
                   alt="Factories"
@@ -316,8 +316,8 @@ export default function MarketingPage() {
             </div>
 
             {/* Universities */}
-            <div className="border border bg-background p-4 sm:p-6 md:p-8 flex flex-col sm:col-span-2 lg:col-span-1">
-              <div className="h-48 md:h-64 mb-4 md:mb-6 bg-muted border border relative overflow-hidden">
+            <div className="border border-slate-200 bg-background p-4 sm:p-6 md:p-8 flex flex-col sm:col-span-2 lg:col-span-1">
+              <div className="h-48 md:h-64 mb-4 md:mb-6 bg-muted border border-slate-200 relative overflow-hidden">
                 <Image
                   src="/images/university-lab.png"
                   alt="Universities"
@@ -359,8 +359,8 @@ export default function MarketingPage() {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-8">
             {/* The Entity */}
-            <div className="border border bg-background p-4 sm:p-6 md:p-8 flex flex-col">
-              <div className="h-48 md:h-64 mb-4 md:mb-6 bg-muted border border relative overflow-hidden">
+            <div className="border border-slate-200 bg-background p-4 sm:p-6 md:p-8 flex flex-col">
+              <div className="h-48 md:h-64 mb-4 md:mb-6 bg-muted border border-slate-200 relative overflow-hidden">
                 <Image
                   src="/images/hero-centaur-alt.png"
                   alt="The Entity"
@@ -378,8 +378,8 @@ export default function MarketingPage() {
             </div>
 
             {/* The System */}
-            <div className="border border bg-background p-4 sm:p-6 md:p-8 flex flex-col">
-              <div className="h-48 md:h-64 mb-4 md:mb-6 bg-muted border border relative overflow-hidden">
+            <div className="border border-slate-200 bg-background p-4 sm:p-6 md:p-8 flex flex-col">
+              <div className="h-48 md:h-64 mb-4 md:mb-6 bg-muted border border-slate-200 relative overflow-hidden">
                 <Image
                   src="/images/centaur-os-core.png"
                   alt="The System"
@@ -397,8 +397,8 @@ export default function MarketingPage() {
             </div>
 
             {/* The Community */}
-            <div className="border border bg-background p-4 sm:p-6 md:p-8 flex flex-col sm:col-span-2 lg:col-span-1">
-              <div className="h-48 md:h-64 mb-4 md:mb-6 bg-muted border border relative overflow-hidden">
+            <div className="border border-slate-200 bg-background p-4 sm:p-6 md:p-8 flex flex-col sm:col-span-2 lg:col-span-1">
+              <div className="h-48 md:h-64 mb-4 md:mb-6 bg-muted border border-slate-200 relative overflow-hidden">
                 <Image
                   src="/images/guild-workshop-new.png"
                   alt="The Community"

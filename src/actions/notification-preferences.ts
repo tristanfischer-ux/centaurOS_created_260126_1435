@@ -89,10 +89,10 @@ export async function getNotificationPreferences(): Promise<{
 
         // Get preferences from database
         // Note: notification_preferences table may not be in generated types yet
-        const { data: prefs, error } = await supabase
-            .from('notification_preferences' as 'profiles') // Type assertion for tables not in generated types
-            .select('*')
-            .eq('user_id', user.id) as unknown as { data: NotificationPreferenceRow[] | null; error: { message: string } | null }
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const baseQuery: any = supabase.from('notification_preferences')
+        const result = await baseQuery.select('*').eq('user_id', user.id)
+        const { data: prefs, error } = result as { data: NotificationPreferenceRow[] | null; error: { message: string } | null }
 
         if (error) {
             console.error('Error fetching notification preferences:', error)
@@ -406,8 +406,8 @@ export async function getNotificationHistory(options?: {
         const { limit = 20, offset = 0, unreadOnly = false } = options || {}
 
         // Note: notification_log table may not be in generated types yet
-        let query = supabase
-            .from('notification_log' as 'profiles')
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        let query: any = supabase.from('notification_log')
             .select('*', { count: 'exact' })
             .eq('user_id', user.id)
             .order('created_at', { ascending: false })
@@ -420,8 +420,8 @@ export async function getNotificationHistory(options?: {
             query = query.range(offset, offset + limit - 1)
         }
 
-        const result = await query as unknown as { data: NotificationLogRow[] | null; error: { message: string } | null; count: number | null }
-        const { data, error, count } = result
+        const result = await query
+        const { data, error, count } = result as { data: NotificationLogRow[] | null; error: { message: string } | null; count: number | null }
 
         if (error) {
             console.error('Error fetching notification history:', error)

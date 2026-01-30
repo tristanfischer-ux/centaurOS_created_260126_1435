@@ -187,7 +187,7 @@ export function GuildPageContent({ isManager, isApprentice }: GuildPageContentPr
                                     {pastAssignments.map((assignment) => (
                                         <div
                                             key={assignment.id}
-                                            className="p-4 border border rounded-lg opacity-70"
+                                            className="p-4 border border-slate-200 rounded-lg opacity-70"
                                         >
                                             <div className="flex items-start justify-between">
                                                 <div>

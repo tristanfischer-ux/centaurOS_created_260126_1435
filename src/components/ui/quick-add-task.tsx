@@ -76,7 +76,7 @@ export function QuickAddTask({ objectives, members, currentUserId, teams = [], o
                     <Plus className="w-3.5 h-3.5 text-muted-foreground group-hover:text-white transition-colors duration-200" aria-hidden="true" />
                 </div>
                 <span className="text-sm font-medium">Add a task...</span>
-                <kbd className="ml-auto px-2 py-0.5 text-[10px] font-mono bg-muted group-hover:bg-slate-200 text-muted-foreground group-hover:text-muted-foreground rounded border border transition-colors duration-200">N</kbd>
+                <kbd className="ml-auto px-2 py-0.5 text-[10px] font-mono bg-muted group-hover:bg-slate-200 text-muted-foreground group-hover:text-muted-foreground rounded border border-slate-200 transition-colors duration-200">N</kbd>
             </button>
         )
     }

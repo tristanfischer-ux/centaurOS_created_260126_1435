@@ -138,7 +138,7 @@ export async function getFoundryEnrollments(foundryId: string) {
     return { error: error.message }
   }
   
-  return { enrollments: enrollments as Enrollment[] }
+  return { enrollments: enrollments as unknown as Enrollment[] }
 }
 
 /**
@@ -420,7 +420,12 @@ async function createInductionObjective(
   }
   
   // Create induction tasks
-  const inductionTasks = [
+  const inductionTasks: Array<{
+    title: string
+    description: string
+    end_date: string
+    risk_level: 'Low' | 'Medium' | 'High'
+  }> = [
     {
       title: '📋 Sign Apprenticeship Agreement',
       description: 'Review and sign your formal apprenticeship employment contract. This is a legal requirement before you can start.',
@@ -626,7 +631,7 @@ export async function getPotentialMentors(foundryId: string) {
     .from('profiles')
     .select('id, full_name, email, avatar_url, role')
     .eq('foundry_id', foundryId)
-    .in('role', ['Executive', 'Founder', 'Operator'])
+    .in('role', ['Executive', 'Founder'])
     .order('full_name', { ascending: true })
   
   if (error) {

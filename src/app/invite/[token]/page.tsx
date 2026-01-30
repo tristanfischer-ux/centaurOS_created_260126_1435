@@ -83,10 +83,10 @@ export default function InvitePage({ params }: { params: Promise<{ token: string
   // Loading state
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-900 flex items-center justify-center">
+      <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
-          <Loader2 className="w-8 h-8 animate-spin text-blue-500 mx-auto mb-4" />
-          <p className="text-white/60">Loading invitation...</p>
+          <Loader2 className="w-8 h-8 animate-spin text-electric-blue mx-auto mb-4" />
+          <p className="text-muted-foreground">Loading invitation...</p>
         </div>
       </div>
     );
@@ -95,17 +95,17 @@ export default function InvitePage({ params }: { params: Promise<{ token: string
   // Error state - invalid or expired invitation
   if (!invitation) {
     return (
-      <div className="min-h-screen bg-slate-900 text-white flex flex-col items-center justify-center p-6">
+      <div className="min-h-screen bg-background text-foreground flex flex-col items-center justify-center p-6">
         <div className="max-w-md text-center">
-          <div className="w-16 h-16 rounded-full bg-red-500/20 flex items-center justify-center mx-auto mb-6">
-            <AlertCircle className="w-8 h-8 text-red-400" />
+          <div className="w-16 h-16 rounded-full bg-status-error-light flex items-center justify-center mx-auto mb-6">
+            <AlertCircle className="w-8 h-8 text-destructive" />
           </div>
           <h1 className="text-2xl font-bold mb-4">Invalid Invitation</h1>
-          <p className="text-white/60 mb-8">
+          <p className="text-muted-foreground mb-8">
             {error || "This invitation link is invalid, has expired, or has already been used."}
           </p>
           <Link href="/login">
-            <Button variant="secondary" className="text-white border-white/20 hover:bg-white/10">
+            <Button variant="secondary">
               Go to Login
             </Button>
           </Link>
@@ -117,16 +117,16 @@ export default function InvitePage({ params }: { params: Promise<{ token: string
   // Success state
   if (success) {
     return (
-      <div className="min-h-screen bg-slate-900 text-white flex flex-col items-center justify-center p-6">
+      <div className="min-h-screen bg-background text-foreground flex flex-col items-center justify-center p-6">
         <div className="max-w-md text-center">
-          <div className="w-16 h-16 rounded-full bg-green-500/20 flex items-center justify-center mx-auto mb-6">
-            <CheckCircle2 className="w-8 h-8 text-green-400" />
+          <div className="w-16 h-16 rounded-full bg-status-success-light flex items-center justify-center mx-auto mb-6">
+            <CheckCircle2 className="w-8 h-8 text-status-success" />
           </div>
           <h1 className="text-2xl font-bold mb-4">Welcome to {invitation.foundryName}!</h1>
-          <p className="text-white/60 mb-4">
+          <p className="text-muted-foreground mb-4">
             You've successfully joined as {invitation.role}.
           </p>
-          <p className="text-white/40 text-sm">Redirecting to dashboard...</p>
+          <p className="text-muted-foreground text-sm">Redirecting to dashboard...</p>
         </div>
       </div>
     );
@@ -137,11 +137,11 @@ export default function InvitePage({ params }: { params: Promise<{ token: string
     currentUserEmail.toLowerCase() !== invitation.email.toLowerCase();
 
   return (
-    <div className="min-h-screen bg-slate-900 text-white">
+    <div className="min-h-screen bg-background text-foreground">
       {/* Navigation */}
       <nav className="absolute top-0 left-0 right-0 z-50 px-4 sm:px-6 py-4 sm:py-6">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <Link href="/" className="text-white/80 hover:text-white text-sm font-mono uppercase tracking-widest flex items-center gap-2">
+          <Link href="/" className="text-muted-foreground hover:text-foreground text-sm font-mono uppercase tracking-widest flex items-center gap-2">
             <ArrowLeft className="w-4 h-4" />
             Back
           </Link>
@@ -157,9 +157,9 @@ export default function InvitePage({ params }: { params: Promise<{ token: string
             fill
             className="object-cover opacity-20"
           />
-          <div className="absolute inset-0 bg-gradient-to-r from-slate-900 via-slate-900/90 to-slate-900/70" />
+          <div className="absolute inset-0 bg-gradient-to-r from-background via-background/90 to-background/70" />
           <div className="relative z-10 p-6 sm:p-8 md:p-12 lg:p-16 flex flex-col justify-center min-h-[40vh] md:min-h-screen">
-            <span className="text-xs font-mono text-blue-400 tracking-widest mb-3 sm:mb-4 block uppercase">
+            <span className="text-xs font-mono text-electric-blue tracking-widest mb-3 sm:mb-4 block uppercase">
               Team Invitation
             </span>
             <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-4 sm:mb-6 leading-tight">
@@ -167,23 +167,23 @@ export default function InvitePage({ params }: { params: Promise<{ token: string
             </h1>
             
             {/* Company Card */}
-            <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-lg p-6 max-w-md">
+            <div className="bg-card/50 backdrop-blur-sm border border-muted rounded-lg p-6 max-w-md">
               <div className="flex items-center gap-4 mb-4">
-                <div className="w-12 h-12 rounded-lg bg-blue-500/20 flex items-center justify-center">
-                  <Building2 className="w-6 h-6 text-blue-400" />
+                <div className="w-12 h-12 rounded-lg bg-electric-blue/20 flex items-center justify-center">
+                  <Building2 className="w-6 h-6 text-electric-blue" />
                 </div>
                 <div>
                   <h2 className="text-xl font-bold">{invitation.foundryName}</h2>
-                  <p className="text-white/60 text-sm">as {invitation.role}</p>
+                  <p className="text-muted-foreground text-sm">as {invitation.role}</p>
                 </div>
               </div>
               
               <div className="space-y-2 text-sm">
-                <div className="flex items-center gap-2 text-white/60">
+                <div className="flex items-center gap-2 text-muted-foreground">
                   <Mail className="w-4 h-4" />
                   <span>Invited: {invitation.email}</span>
                 </div>
-                <div className="flex items-center gap-2 text-white/60">
+                <div className="flex items-center gap-2 text-muted-foreground">
                   <UserPlus className="w-4 h-4" />
                   <span>By: {invitation.invitedByName}</span>
                 </div>
@@ -196,9 +196,9 @@ export default function InvitePage({ params }: { params: Promise<{ token: string
         <div className="w-full md:w-1/2 bg-background text-foreground p-6 sm:p-8 md:p-12 lg:p-16 flex flex-col justify-center">
           <div className="w-full max-w-md mx-auto space-y-6 sm:space-y-8">
             {error && (
-              <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3">
-                <AlertCircle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
-                <p className="text-red-700 text-sm">{error}</p>
+              <div className="bg-status-error-light border border-destructive rounded-lg p-4 flex items-start gap-3">
+                <AlertCircle className="w-5 h-5 text-destructive shrink-0 mt-0.5" />
+                <p className="text-destructive text-sm">{error}</p>
               </div>
             )}
 
@@ -217,7 +217,7 @@ export default function InvitePage({ params }: { params: Promise<{ token: string
                     </p>
                     <div className="space-y-3">
                       <Link href={`/login?redirect=/invite/${token}`}>
-                        <Button className="w-full bg-slate-900 hover:bg-blue-600 text-white">
+                        <Button className="w-full">
                           Log in as {invitation.email}
                         </Button>
                       </Link>
@@ -248,7 +248,7 @@ export default function InvitePage({ params }: { params: Promise<{ token: string
                     <Button 
                       onClick={handleAcceptInvitation}
                       disabled={accepting}
-                      className="w-full bg-slate-900 hover:bg-blue-600 text-white font-bold tracking-widest uppercase py-5 sm:py-6 h-auto text-sm transition-colors"
+                      className="w-full font-bold tracking-widest uppercase py-5 sm:py-6 h-auto text-sm transition-colors"
                     >
                       {accepting ? (
                         <>
@@ -283,7 +283,7 @@ export default function InvitePage({ params }: { params: Promise<{ token: string
                       type="email"
                       value={invitation.email}
                       readOnly
-                      className="bg-muted border-slate-300 h-11 sm:h-12 text-muted-foreground"
+                      className="bg-muted border-muted h-11 sm:h-12 text-muted-foreground"
                     />
                     <p className="text-xs text-muted-foreground">This email was specified in your invitation</p>
                   </div>
@@ -294,7 +294,7 @@ export default function InvitePage({ params }: { params: Promise<{ token: string
                       id="name"
                       name="name"
                       placeholder="John Doe"
-                      className="bg-background border-slate-300 focus:border-blue-500 focus:ring-blue-500 h-11 sm:h-12"
+                      className="bg-background border-muted focus:border-electric-blue focus:ring-electric-blue h-11 sm:h-12"
                       required
                     />
                   </div>
@@ -306,7 +306,7 @@ export default function InvitePage({ params }: { params: Promise<{ token: string
                       name="password"
                       type="password"
                       placeholder="Create a strong password"
-                      className="bg-background border-slate-300 focus:border-blue-500 focus:ring-blue-500 h-11 sm:h-12"
+                      className="bg-background border-muted focus:border-electric-blue focus:ring-electric-blue h-11 sm:h-12"
                       required
                       minLength={8}
                     />
@@ -314,7 +314,7 @@ export default function InvitePage({ params }: { params: Promise<{ token: string
 
                   <Button 
                     type="submit"
-                    className="w-full bg-slate-900 hover:bg-blue-600 text-white font-bold tracking-widest uppercase py-5 sm:py-6 h-auto text-sm transition-colors"
+                    className="w-full font-bold tracking-widest uppercase py-5 sm:py-6 h-auto text-sm transition-colors"
                   >
                     Create Account & Join
                   </Button>
@@ -323,7 +323,7 @@ export default function InvitePage({ params }: { params: Promise<{ token: string
                 <div className="mt-6 text-center">
                   <p className="text-sm text-muted-foreground">
                     Already have an account?{" "}
-                    <Link href={`/login?redirect=/invite/${token}`} className="text-blue-600 hover:underline">
+                    <Link href={`/login?redirect=/invite/${token}`} className="text-electric-blue hover:underline">
                       Log in
                     </Link>
                   </p>

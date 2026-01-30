@@ -327,7 +327,7 @@ export function AvailabilityCalendar({
                         </span>
                     </div>
                     <div className="flex items-center gap-1.5">
-                        <div className="w-3 h-3 rounded bg-blue-100 border border" />
+                        <div className="w-3 h-3 rounded bg-blue-100 border border-blue-200" />
                         <span className="text-muted-foreground">
                             Booked: <strong>{stats.booked}</strong>
                         </span>

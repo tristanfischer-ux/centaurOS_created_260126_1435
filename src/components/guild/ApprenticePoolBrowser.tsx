@@ -154,7 +154,7 @@ export function ApprenticePoolBrowser() {
                     </div>
 
                     {/* Apprentice List */}
-                    <div className="divide-y divide-slate-100 border border rounded-lg overflow-hidden">
+                    <div className="divide-y divide-slate-100 border border-slate-200 rounded-lg overflow-hidden">
                         {filteredApprentices.map((apprentice) => (
                             <div
                                 key={apprentice.id}

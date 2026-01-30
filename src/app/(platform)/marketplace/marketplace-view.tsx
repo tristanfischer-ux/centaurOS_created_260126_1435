@@ -716,7 +716,7 @@ export function MarketplaceView({
 
                         {/* People Filters Panel */}
                         {activeTab === 'People' && showFilters && (
-                            <div className="bg-muted rounded border border p-4 space-y-4 hidden md:block">
+                            <div className="bg-muted rounded border border-slate-200 p-4 space-y-4 hidden md:block">
                                 <div className="flex items-center justify-between">
                                     <h3 className="font-medium text-sm">Filter People</h3>
                                     {hasActiveFilters && (
@@ -823,7 +823,7 @@ export function MarketplaceView({
 
                         {/* Products Filters Panel */}
                         {activeTab === 'Products' && showFilters && (
-                            <div className="bg-muted rounded border border p-4 space-y-4 hidden md:block">
+                            <div className="bg-muted rounded border border-slate-200 p-4 space-y-4 hidden md:block">
                                 <div className="flex items-center justify-between">
                                     <h3 className="font-medium text-sm">Filter Products & Manufacturers</h3>
                                     {hasActiveFilters && (

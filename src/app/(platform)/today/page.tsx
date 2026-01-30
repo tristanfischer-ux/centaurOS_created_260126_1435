@@ -248,7 +248,7 @@ export default async function TodayPage() {
     return (
         <div className="space-y-8">
             {/* Header - Morning Briefing */}
-            <div className="flex flex-col fold:flex-row fold:items-center fold:justify-between gap-3 xs:gap-4 pb-6 border-b border">
+            <div className="flex flex-col fold:flex-row fold:items-center fold:justify-between gap-3 xs:gap-4 pb-6 border-b border-slate-100">
                 <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-3 mb-2">
                         <div className="p-2 bg-gradient-to-br from-international-orange/10 to-electric-blue/10 rounded-xl">
@@ -307,7 +307,7 @@ export default async function TodayPage() {
                         </div>
                     )}
                     {mentions.length > 0 && (
-                        <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 border border rounded-full">
+                        <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 border border-blue-200 rounded-full">
                             <AtSign className="h-4 w-4 text-blue-600" />
                             <span className="text-sm font-medium text-blue-700">
                                 {mentions.length} mention{mentions.length !== 1 ? 's' : ''}
@@ -572,7 +572,7 @@ export default async function TodayPage() {
                                                     name={mention.author?.full_name} 
                                                     role={null}
                                                     size="md" 
-                                                    className="border border shrink-0"
+                                                    className="border border-slate-200 shrink-0"
                                                 />
                                                 <div className="flex-1 min-w-0">
                                                     <div className="flex items-center gap-2 mb-1">

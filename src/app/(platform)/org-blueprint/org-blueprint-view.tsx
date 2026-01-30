@@ -86,7 +86,7 @@ function FunctionCard({
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             className={cn(
-                "p-4 border border rounded-lg hover:shadow-md transition-all bg-background border-l-4",
+                "p-4 border border-slate-200 rounded-lg hover:shadow-md transition-all bg-background border-l-4",
                 borderColorClass
             )}
         >
@@ -299,7 +299,7 @@ export function OrgBlueprintView({ functions: initialFunctions, summary: initial
             </div>
 
             {/* How it Works Banner */}
-            <div className="bg-gradient-to-r from-slate-50 to-orange-50 border border rounded-lg p-5">
+            <div className="bg-gradient-to-r from-slate-50 to-orange-50 border border-slate-200 rounded-lg p-5">
                 <div className="flex items-start gap-4">
                     <div className="p-2 bg-orange-100 rounded-lg shrink-0">
                         <Building2 className="h-6 w-6 text-orange-600" />
