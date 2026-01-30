@@ -57,6 +57,7 @@ export interface MessageWithSender extends Message {
     full_name: string | null
     avatar_url: string | null
     email: string
+    role?: string | null
   }
 }
 
