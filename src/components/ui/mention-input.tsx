@@ -3,8 +3,9 @@
 import { useState, useRef, useEffect, KeyboardEvent } from 'react'
 import { createPortal } from 'react-dom'
 import { Textarea } from '@/components/ui/textarea'
+import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { getMentionAtCursor } from '@/lib/mentions'
-import { cn } from '@/lib/utils'
+import { cn, getInitials } from '@/lib/utils'
 
 interface Profile {
   id: string
@@ -70,7 +71,7 @@ export function MentionInput({
     }
   }
 
-  const insertMention = (profile: Profile) => {
+  const insertMention = (profile: Profile, keepOpen = false) => {
     if (!mentionInfo) return
     
     const firstName = profile.full_name.split(' ')[0]
@@ -79,7 +80,12 @@ export function MentionInput({
     const newValue = `${before}@${firstName} ${after}`
     
     onChange(newValue)
-    setShowSuggestions(false)
+    
+    // Keep dropdown open for multiple mentions if keepOpen is true
+    if (!keepOpen) {
+      setShowSuggestions(false)
+    }
+    
     textareaRef.current?.focus()
     
     // Set cursor position after the inserted mention
@@ -159,7 +165,7 @@ export function MentionInput({
         aria-label="Mention suggestions"
         aria-live="polite"
         aria-atomic="false"
-        className="fixed bg-popover border rounded-lg shadow-lg z-[100] overflow-hidden"
+        className="fixed bg-white border-2 border-slate-200 rounded-lg shadow-xl z-[100] overflow-hidden"
         style={{
           top: dropdownPosition.top - 4,
           left: dropdownPosition.left,
@@ -167,13 +173,13 @@ export function MentionInput({
           transform: 'translateY(-100%)'
         }}
       >
-        <div className="p-1 text-xs text-muted-foreground border-b" aria-hidden="true">
+        <div className="p-2 text-xs text-slate-500 border-b bg-slate-50" aria-hidden="true">
           Type to filter, ↑↓ to navigate, Enter to select
         </div>
         <div aria-live="polite" className="sr-only">
           {suggestions.length} suggestion{suggestions.length !== 1 ? 's' : ''} available
         </div>
-        <div className="max-h-[200px] overflow-y-auto">
+        <div className="max-h-[200px] overflow-y-auto bg-white">
           {suggestions.map((profile, index) => (
             <button
               key={profile.id}
@@ -181,18 +187,20 @@ export function MentionInput({
               role="option"
               aria-selected={index === selectedIndex}
               id={`mention-option-${profile.id}`}
-              onClick={() => insertMention(profile)}
+              onClick={() => insertMention(profile, false)}
               className={cn(
-                'w-full px-3 py-2 text-left text-sm flex items-center gap-2',
-                index === selectedIndex ? 'bg-accent' : 'hover:bg-muted'
+                'w-full px-3 py-2 text-left text-sm flex items-center gap-3 transition-colors',
+                index === selectedIndex ? 'bg-blue-50 text-blue-900' : 'hover:bg-slate-50'
               )}
             >
-              <div className="w-6 h-6 rounded-full bg-muted flex items-center justify-center text-xs" aria-hidden="true">
-                {profile.full_name[0]}
-              </div>
+              <Avatar className="h-8 w-8 border border-slate-200 shrink-0">
+                <AvatarFallback className="bg-slate-100 text-slate-700 text-xs font-medium">
+                  {getInitials(profile.full_name)}
+                </AvatarFallback>
+              </Avatar>
               <div className="flex-1 min-w-0">
-                <div className="font-medium truncate">{profile.full_name}</div>
-                <div className="text-xs text-muted-foreground truncate">{profile.email}</div>
+                <div className="font-medium truncate text-slate-900">{profile.full_name}</div>
+                <div className="text-xs text-slate-500 truncate">{profile.email}</div>
               </div>
             </button>
           ))}

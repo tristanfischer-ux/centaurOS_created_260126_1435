@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, memo } from "react"
+import { useState, memo, useEffect } from "react"
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -115,6 +115,13 @@ export const TaskCard = memo(function TaskCard(props: TaskCardProps) {
     const [rubberStampOpen, setRubberStampOpen] = useState(false)
     const [assigneePopoverOpen, setAssigneePopoverOpen] = useState(false)
     const [assigneePopoverOpen2, setAssigneePopoverOpen2] = useState(false)
+
+    // Auto-expand when any inline panel is opened
+    useEffect(() => {
+        if ((showThread || showHistory) && !expanded) {
+            onToggle()
+        }
+    }, [showThread, showHistory, expanded, onToggle])
 
 
     // Normalize assignees list (handle backward compatibility or fallback)
@@ -545,7 +552,7 @@ export const TaskCard = memo(function TaskCard(props: TaskCardProps) {
 
             {expanded && (
                 <>
-                    <CardContent className="bg-slate-50/50 pt-4 pb-4">
+                    <CardContent className="bg-slate-50/50 pt-4 pb-4 flex-1">
                         <div className="space-y-4">
                             {/* Full Description */}
                             <div className="space-y-1">
@@ -639,7 +646,7 @@ export const TaskCard = memo(function TaskCard(props: TaskCardProps) {
 
                     <Separator className="bg-slate-200" />
 
-                    <CardFooter className="bg-slate-50 p-4 flex flex-col gap-4">
+                    <CardFooter className="bg-slate-50 p-4 flex flex-col gap-4 mt-auto">
                         {/* Primary Workflow Actions - Only render section if actions are available */}
                         {(() => {
                             const showAcceptReject = task.status === 'Pending' && isAssignee
@@ -711,18 +718,18 @@ export const TaskCard = memo(function TaskCard(props: TaskCardProps) {
                         })()}
 
                         {/* Secondary & Meta Actions - Always show consistent layout */}
-                        <div className="flex items-center justify-between w-full">
+                        <div className="flex items-center justify-between w-full gap-2 flex-wrap">
                             {/* Tools Area - Always visible for consistent layout */}
-                            <div className="flex items-center gap-1">
+                            <div className="flex items-center gap-1 flex-wrap">
                                 <Button
                                     variant="ghost"
                                     size="sm"
                                     onClick={() => setEditOpen(true)}
                                     disabled={isLoading}
-                                    className="text-muted-foreground hover:text-blue-600 hover:bg-blue-50 active:text-blue-700 active:bg-blue-100 active:scale-[0.98] transition-all duration-200 px-2"
+                                    className="text-muted-foreground hover:text-blue-600 hover:bg-blue-50 active:text-blue-700 active:bg-blue-100 active:scale-[0.98] transition-all duration-200 px-2 shrink-0"
                                     title="Edit Details"
                                 >
-                                    <Pencil className="h-4 w-4" /> Edit
+                                    <Pencil className="h-4 w-4" /> <span className="hidden xs:inline">Edit</span>
                                 </Button>
 
                                 <Dialog open={forwardOpen} onOpenChange={setForwardOpen}>
@@ -731,10 +738,10 @@ export const TaskCard = memo(function TaskCard(props: TaskCardProps) {
                                             variant="ghost"
                                             size="sm"
                                             disabled={isLoading}
-                                            className="text-muted-foreground hover:text-amber-600 hover:bg-amber-50 active:text-amber-700 active:bg-amber-100 active:scale-[0.98] transition-all duration-200 px-2"
+                                            className="text-muted-foreground hover:text-amber-600 hover:bg-amber-50 active:text-amber-700 active:bg-amber-100 active:scale-[0.98] transition-all duration-200 px-2 shrink-0"
                                             title="Forward or Reassign"
                                         >
-                                            <ArrowRight className="h-4 w-4" /> Forward
+                                            <ArrowRight className="h-4 w-4" /> <span className="hidden xs:inline">Forward</span>
                                         </Button>
                                     </DialogTrigger>
                                     <DialogContent className="bg-white shadow-xl text-slate-900">
@@ -776,38 +783,38 @@ export const TaskCard = memo(function TaskCard(props: TaskCardProps) {
                                     size="sm"
                                     onClick={handleDuplicate}
                                     disabled={isLoading}
-                                    className="text-muted-foreground hover:text-indigo-600 hover:bg-indigo-50 active:text-indigo-700 active:bg-indigo-100 active:scale-[0.98] transition-all duration-200 px-2"
+                                    className="text-muted-foreground hover:text-indigo-600 hover:bg-indigo-50 active:text-indigo-700 active:bg-indigo-100 active:scale-[0.98] transition-all duration-200 px-2 shrink-0"
                                     title="Duplicate Task"
                                 >
-                                    <Copy className="h-4 w-4" /> Copy
+                                    <Copy className="h-4 w-4" /> <span className="hidden xs:inline">Copy</span>
                                 </Button>
                             </div>
 
                             {/* Meta Area - History & Notes */}
-                            <div className="flex items-center gap-1">
+                            <div className="flex items-center gap-1 flex-wrap">
                                 <Button
                                     variant="ghost"
                                     size="sm"
                                     className={cn(
-                                        "h-8 px-2 gap-1.5 text-xs transition-all duration-200",
+                                        "h-8 px-2 gap-1.5 text-xs transition-all duration-200 shrink-0",
                                         showHistory ? "text-blue-600 bg-blue-50" : "text-muted-foreground hover:text-foreground"
                                     )}
                                     onClick={() => { setShowHistory(!showHistory); setShowThread(false) }}
                                 >
                                     <HistoryIcon className="h-3.5 w-3.5" />
-                                    <span className="hidden sm:inline">Audit Log</span>
+                                    <span className="hidden xs:inline">Audit Log</span>
                                 </Button>
                                 <Button
                                     variant="ghost"
                                     size="sm"
                                     className={cn(
-                                        "h-8 px-2 gap-1.5 text-xs transition-all duration-200",
+                                        "h-8 px-2 gap-1.5 text-xs transition-all duration-200 shrink-0",
                                         showThread ? "text-blue-600 bg-blue-50" : "text-muted-foreground hover:text-foreground"
                                     )}
                                     onClick={() => { setShowThread(!showThread); setShowHistory(false) }}
                                 >
                                     <MessageSquare className="h-3.5 w-3.5" />
-                                    <span className="hidden sm:inline">Notes</span>
+                                    <span className="hidden xs:inline">Notes</span>
                                 </Button>
                             </div>
                         </div>

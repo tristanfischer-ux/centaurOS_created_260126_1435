@@ -287,25 +287,8 @@ export function OrgBlueprintView({ functions: initialFunctions, summary: initial
 
     return (
         <div className="space-y-6">
-            {/* Header */}
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-slate-100">
-                <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-3 mb-1">
-                        <div className="h-8 w-1 bg-orange-600 rounded-full shadow-[0_0_8px_rgba(234,88,12,0.6)]" />
-                        <h1 className="text-2xl sm:text-3xl font-display font-semibold text-foreground tracking-tight flex items-center gap-3">
-                            Org Blueprint
-                            {summary && (
-                                <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-orange-50 text-orange-700 text-sm font-medium rounded-full">
-                                    <span className="font-semibold">{summary.overallCoveragePercentage}%</span>
-                                    <span className="text-xs uppercase tracking-wider">coverage</span>
-                                </span>
-                            )}
-                        </h1>
-                    </div>
-                    <p className="text-muted-foreground mt-1 text-sm font-medium pl-4">
-                        Map your organizational capabilities and identify coverage gaps
-                    </p>
-                </div>
+            {/* Quick Assessment Button */}
+            <div className="flex justify-end">
                 <AssessmentModal functions={functions} onComplete={handleRefresh}>
                     <Button className="bg-slate-900 hover:bg-slate-800 text-white font-medium shadow-md">
                         <Sparkles className="h-4 w-4 mr-2" />

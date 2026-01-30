@@ -83,6 +83,7 @@ export default async function TodayPage() {
     // Get current time for greeting
     const hour = new Date().getHours()
     const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening'
+    const briefingTime = hour < 12 ? 'morning' : hour < 17 ? 'afternoon' : 'evening'
 
     // --- PARALLEL DATA FETCHING ---
 
@@ -229,7 +230,7 @@ export default async function TodayPage() {
                                 {greeting}, {userName}
                             </h1>
                             <p className="text-muted-foreground text-sm font-medium mt-0.5">
-                                Here's your morning briefing
+                                Here's your {briefingTime} briefing
                             </p>
                         </div>
                     </div>

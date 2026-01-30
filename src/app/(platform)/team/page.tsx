@@ -26,7 +26,7 @@ export default async function TeamPage() {
     // Fetch all tasks for task metrics
     const { data: tasks } = await supabase
         .from('tasks')
-        .select('assignee_id, status, title')
+        .select('assignee_id, status, title, end_date, created_at')
         .eq('foundry_id', foundry_id)
 
     // Fetch all profiles for the current foundry
@@ -76,6 +76,12 @@ export default async function TeamPage() {
     })) || []
 
     // Security: Removed email and phone_number from member metrics to prevent data exposure
+    interface TaskDetail {
+        title: string
+        end_date: string | null
+        created_at: string
+    }
+
     interface MemberMetrics {
         id: string
         full_name: string
@@ -94,11 +100,18 @@ export default async function TeamPage() {
             pending: string[]
             rejected: string[]
         }
+        taskDetails: {
+            active: TaskDetail[]
+            pending: TaskDetail[]
+        }
     }
 
     // Calculate metrics per member with defensive checks
     const membersWithMetrics: MemberMetrics[] = (profiles || [])?.map((profile) => {
         const memberTasks = (tasks || []).filter(t => t.assignee_id === profile.id)
+        const activeTasks = memberTasks.filter(t => t.status === 'Accepted')
+        const pendingTasks = memberTasks.filter(t => t.status === 'Pending')
+        
         return {
             id: profile.id,
             full_name: profile.full_name || 'Unknown',
@@ -112,15 +125,27 @@ export default async function TeamPage() {
                 role: profile.paired_ai.role,
                 avatar_url: profile.paired_ai.avatar_url
             }] : [],
-            activeTasks: memberTasks.filter(t => t.status === 'Accepted').length,
+            activeTasks: activeTasks.length,
             completedTasks: memberTasks.filter(t => t.status === 'Completed').length,
-            pendingTasks: memberTasks.filter(t => t.status === 'Pending').length,
+            pendingTasks: pendingTasks.length,
             rejectedTasks: memberTasks.filter(t => t.status === 'Rejected').length,
             taskTitles: {
-                active: memberTasks.filter(t => t.status === 'Accepted').map(t => t.title),
+                active: activeTasks.map(t => t.title),
                 completed: memberTasks.filter(t => t.status === 'Completed').map(t => t.title),
-                pending: memberTasks.filter(t => t.status === 'Pending').map(t => t.title),
+                pending: pendingTasks.map(t => t.title),
                 rejected: memberTasks.filter(t => t.status === 'Rejected').map(t => t.title),
+            },
+            taskDetails: {
+                active: activeTasks.map(t => ({
+                    title: t.title,
+                    end_date: t.end_date,
+                    created_at: t.created_at
+                })),
+                pending: pendingTasks.map(t => ({
+                    title: t.title,
+                    end_date: t.end_date,
+                    created_at: t.created_at
+                }))
             }
         }
     }) || []

@@ -36,8 +36,14 @@ export default async function OrgBlueprintPage() {
                 <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-3 mb-1">
                         <div className="h-8 w-1 bg-primary rounded-full shadow-[0_0_8px_rgba(234,88,12,0.6)]" />
-                        <h1 className="text-2xl sm:text-3xl font-display font-semibold text-foreground tracking-tight">
+                        <h1 className="text-2xl sm:text-3xl font-display font-semibold text-foreground tracking-tight flex items-center gap-3">
                             Org Blueprint
+                            {summary && (
+                                <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-orange-50 text-orange-700 text-sm font-medium rounded-full">
+                                    <span className="font-semibold">{summary.overallCoveragePercentage}%</span>
+                                    <span className="text-xs uppercase tracking-wider">coverage</span>
+                                </span>
+                            )}
                         </h1>
                     </div>
                     <p className="text-muted-foreground text-sm font-medium pl-4">Map your organizational capabilities and coverage</p>

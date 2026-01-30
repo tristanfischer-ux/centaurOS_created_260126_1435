@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react"
 import { useAutoRefresh } from "@/hooks/useAutoRefresh"
 import { RefreshButton } from "@/components/RefreshButton"
+import { formatDistanceToNow, isPast, parseISO } from "date-fns"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -11,7 +12,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "@/components/ui/table"
-import { Check, X, GitCompare, Users, MoreHorizontal, Pencil, Trash2, Loader2, AlertTriangle, Mail, Phone, LayoutGrid, List, ChevronUp, ChevronDown, User } from "lucide-react"
+import { Check, X, GitCompare, Users, MoreHorizontal, Pencil, Trash2, Loader2, AlertTriangle, Mail, Phone, LayoutGrid, List, ChevronUp, ChevronDown, User, Calendar, Clock, CheckCircle2 } from "lucide-react"
 import { createTeam, addTeamMember, deleteMember } from "@/actions/team"
 import { deleteTeam, updateTeamName } from "@/actions/teams"
 import Link from "next/link"
@@ -44,6 +45,12 @@ import { PresenceIndicator } from "@/components/PresenceIndicator"
 import { cn } from "@/lib/utils"
 
 
+interface TaskDetail {
+    title: string
+    end_date: string | null
+    created_at: string
+}
+
 interface Member {
     id: string
     full_name: string | null
@@ -62,6 +69,10 @@ interface Member {
         completed: string[]
         pending: string[]
         rejected: string[]
+    }
+    taskDetails?: {
+        active: TaskDetail[]
+        pending: TaskDetail[]
     }
 }
 
@@ -328,8 +339,8 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
         const pairedAI = member.pairedAI?.[0]
         const isCentaur = !!member.paired_ai_id && !!pairedAI
 
-        // Get member's current task titles from pre-computed data
-        const activeTaskTitles = [...(member.taskTitles?.active || []), ...(member.taskTitles?.pending || [])]
+        // Get member's current task details from pre-computed data
+        const activeTaskDetails = [...(member.taskDetails?.active || []), ...(member.taskDetails?.pending || [])]
 
         // Determine styles based on type
         let accentColor = 'bg-slate-400'
@@ -571,18 +582,52 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                         )}
 
                         {/* Current Tasks */}
-                        {activeTaskTitles.length > 0 && (
+                        {activeTaskDetails.length > 0 && (
                             <div className="space-y-2">
                                 <h4 className="text-xs font-semibold text-slate-700 uppercase tracking-wider">Current Tasks</h4>
-                                <div className="space-y-1">
-                                    {activeTaskTitles.slice(0, 3).map((title, idx) => (
-                                        <div key={idx} className="flex items-center text-xs bg-slate-50 p-2 rounded">
-                                            <span className="truncate text-slate-700">{title}</span>
-                                        </div>
-                                    ))}
-                                    {activeTaskTitles.length > 3 && (
-                                        <div className="text-xs text-slate-500 text-center">
-                                            +{activeTaskTitles.length - 3} more tasks
+                                <div className="space-y-2">
+                                    {activeTaskDetails.slice(0, 3).map((task, idx) => {
+                                        const isOverdue = task.end_date ? isPast(parseISO(task.end_date)) : false
+                                        const hasDeadline = !!task.end_date
+                                        
+                                        return (
+                                            <div key={idx} className={cn(
+                                                "flex flex-col gap-1 text-xs p-2 rounded border",
+                                                isOverdue ? "bg-red-50 border-red-200" : "bg-slate-50 border-slate-200"
+                                            )}>
+                                                <div className="flex items-start justify-between gap-2">
+                                                    <span className="truncate text-slate-900 font-medium flex-1">{task.title}</span>
+                                                    {hasDeadline && (
+                                                        <div className={cn(
+                                                            "flex items-center gap-1 shrink-0",
+                                                            isOverdue ? "text-red-600" : "text-green-600"
+                                                        )}>
+                                                            {isOverdue ? (
+                                                                <AlertTriangle className="h-3 w-3" />
+                                                            ) : (
+                                                                <CheckCircle2 className="h-3 w-3" />
+                                                            )}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                                {hasDeadline && (
+                                                    <div className={cn(
+                                                        "flex items-center gap-1 text-[10px]",
+                                                        isOverdue ? "text-red-600" : "text-slate-500"
+                                                    )}>
+                                                        <Calendar className="h-3 w-3" />
+                                                        <span>
+                                                            {isOverdue ? 'Overdue ' : 'Due '}
+                                                            {formatDistanceToNow(parseISO(task.end_date), { addSuffix: true })}
+                                                        </span>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )
+                                    })}
+                                    {activeTaskDetails.length > 3 && (
+                                        <div className="text-xs text-slate-500 text-center pt-1">
+                                            +{activeTaskDetails.length - 3} more tasks
                                         </div>
                                     )}
                                 </div>
@@ -899,7 +944,7 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                         Founders (Decide)
                     </h2>
                     {viewMode === 'grid' ? (
-                        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                             {founders.map(member => (
                                 <MemberCard key={member.id} member={member} type="founder" />
                             ))}
@@ -933,7 +978,7 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                     Executives (Evaluate)
                 </h2>
                 {viewMode === 'grid' ? (
-                    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                         {executives.map(member => (
                             <MemberCard key={member.id} member={member} type="executive" />
                         ))}
@@ -986,7 +1031,7 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                     Apprentices (Do)
                 </h2>
                 {viewMode === 'grid' ? (
-                    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                         {apprentices.map(member => (
                             <MemberCard key={member.id} member={member} type="apprentice" />
                         ))}
@@ -1052,7 +1097,7 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                             />
                         </div>
                     ) : (
-                        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                             {aiAgents.map(member => (
                                 <MemberCard key={member.id} member={member} type="ai_agent" />
                             ))}
