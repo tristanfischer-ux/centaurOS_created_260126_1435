@@ -197,7 +197,6 @@ export function ConversationThread({
             )}
             <UserAvatar
               name={otherParticipant.full_name || otherParticipant.email}
-              role={otherParticipant.role}
               avatarUrl={otherParticipant.avatar_url}
               size="md"
             />
