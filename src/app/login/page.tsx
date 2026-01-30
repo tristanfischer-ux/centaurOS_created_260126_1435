@@ -8,7 +8,6 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import Image from 'next/image'
-import Link from 'next/link'
 
 function SubmitButton() {
     const { pending } = useFormStatus()
@@ -44,17 +43,26 @@ function LoginForm() {
     return (
         <div className="w-full max-w-sm mx-auto space-y-8 relative z-10">
             <div className="space-y-2">
-                <a href={marketingDomain} className="inline-block mb-12 group">
+                <a href={marketingDomain} className="inline-block mb-8 group">
                     <span className="text-xs font-bold tracking-[0.3em] uppercase text-slate-400 group-hover:text-cyan-600 transition-colors">
                         ← Return to Site
                     </span>
                 </a>
-                <h1 className="text-4xl font-display font-semibold text-foreground tracking-tight">
-                    Welcome Back.
-                </h1>
-                <p className="text-muted-foreground text-sm leading-relaxed">
-                    Enter your credentials to access the Centaur Operating System.
-                </p>
+                
+                <div className="mb-8">
+                    <h2 className="text-sm font-bold tracking-[0.2em] uppercase text-cyan-600">
+                        Centaur Dynamics
+                    </h2>
+                </div>
+                
+                <div className="space-y-2">
+                    <h1 className="text-4xl font-display font-semibold text-foreground tracking-tight">
+                        Welcome Back.
+                    </h1>
+                    <p className="text-muted-foreground text-sm leading-relaxed">
+                        Enter your credentials to access <span className="font-semibold text-foreground">CentaurOS</span>.
+                    </p>
+                </div>
             </div>
 
             <form className="space-y-6">
@@ -107,8 +115,8 @@ export default function LoginPage() {
             {/* Left Side - Hero Image */}
             <div className="hidden lg:flex w-1/2 relative bg-slate-50 overflow-hidden">
                 <Image
-                    src="/images/login-portal-hero.png"
-                    alt="Centaur Dynamics Foundry Entrance"
+                    src="/images/digital-centaur-working.png"
+                    alt="Digital Centaur working in high-tech facility"
                     fill
                     className="object-cover"
                     priority
