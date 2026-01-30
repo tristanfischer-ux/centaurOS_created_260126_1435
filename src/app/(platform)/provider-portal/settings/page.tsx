@@ -122,7 +122,7 @@ export default function ProviderSettingsPage() {
             {/* Header */}
             <div className="flex items-center justify-between">
                 <div>
-                    <h1 className="text-2xl font-bold text-slate-900">Settings</h1>
+                    <h1 className="text-2xl font-bold text-foreground">Settings</h1>
                     <p className="text-muted-foreground mt-1">
                         Manage your capacity and availability preferences
                     </p>
@@ -183,7 +183,7 @@ export default function ProviderSettingsPage() {
                                             {profile.current_order_count} / {maxConcurrentOrders}
                                         </span>
                                     </div>
-                                    <div className="mt-2 h-2 bg-slate-100 rounded-full overflow-hidden">
+                                    <div className="mt-2 h-2 bg-muted rounded-full overflow-hidden">
                                         <div 
                                             className={cn(
                                                 "h-full transition-all rounded-full",

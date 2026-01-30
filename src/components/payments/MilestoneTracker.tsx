@@ -50,9 +50,9 @@ const STATUS_CONFIG: Record<
 > = {
   pending: {
     label: 'Pending',
-    color: 'text-slate-500',
+    color: 'text-muted-foreground',
     icon: <CircleDashed className="h-4 w-4" />,
-    bgColor: 'bg-slate-100',
+    bgColor: 'bg-muted',
   },
   submitted: {
     label: 'Submitted',
@@ -374,7 +374,7 @@ export function MilestoneTracker({
       <Card>
         <CardContent className="pt-6">
           <div className="text-center text-muted-foreground">
-            <Target className="h-8 w-8 mx-auto mb-2 text-slate-400" />
+            <Target className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
             <p>No milestones defined for this order</p>
             <p className="text-sm mt-1">
               Payment will be released in full upon completion

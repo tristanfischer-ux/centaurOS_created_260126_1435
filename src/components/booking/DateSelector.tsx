@@ -221,7 +221,7 @@ export function DateSelector({
                 <div className="flex items-center justify-between">
                     <div>
                         <CardTitle className="flex items-center gap-2">
-                            <Calendar className="h-5 w-5 text-slate-500" />
+                            <Calendar className="h-5 w-5 text-muted-foreground" />
                             Select Dates
                         </CardTitle>
                         <CardDescription>
@@ -289,7 +289,7 @@ export function DateSelector({
                     {WEEKDAYS.map(day => (
                         <div 
                             key={day}
-                            className="text-center text-sm font-medium text-slate-500 py-2"
+                            className="text-center text-sm font-medium text-muted-foreground py-2"
                         >
                             {day}
                         </div>
@@ -319,10 +319,10 @@ export function DateSelector({
                                 className={cn(
                                     "relative aspect-square p-1 rounded-lg border text-sm font-medium transition-all",
                                     // Base styles
-                                    !isCurrentMonth && "bg-slate-50 text-slate-300 cursor-default",
-                                    isCurrentMonth && isPast && "bg-slate-50 text-slate-400 cursor-not-allowed",
-                                    isCurrentMonth && !isPast && !isAvailable && "bg-slate-200 text-slate-500 cursor-not-allowed",
-                                    isCurrentMonth && !isPast && isAvailable && "bg-white text-slate-700 border-slate-200",
+                                    !isCurrentMonth && "bg-muted text-slate-300 cursor-default",
+                                    isCurrentMonth && isPast && "bg-muted text-muted-foreground cursor-not-allowed",
+                                    isCurrentMonth && !isPast && !isAvailable && "bg-slate-200 text-muted-foreground cursor-not-allowed",
+                                    isCurrentMonth && !isPast && isAvailable && "bg-background text-foreground border-slate-200",
                                     // Hover state
                                     isClickable && "hover:bg-emerald-50 hover:border-emerald-200 cursor-pointer",
                                     // Selection preview
@@ -344,9 +344,9 @@ export function DateSelector({
                 </div>
 
                 {/* Legend */}
-                <div className="mt-4 flex flex-wrap gap-4 text-xs text-slate-500">
+                <div className="mt-4 flex flex-wrap gap-4 text-xs text-muted-foreground">
                     <span className="flex items-center gap-1">
-                        <div className="w-3 h-3 rounded bg-white border border-slate-200" /> Available
+                        <div className="w-3 h-3 rounded bg-background border border-slate-200" /> Available
                     </span>
                     <span className="flex items-center gap-1">
                         <div className="w-3 h-3 rounded bg-emerald-100 border border-emerald-200" /> Selected
@@ -368,14 +368,14 @@ export function DateSelector({
 
                 {/* Estimated Cost */}
                 {estimatedCost !== null && selectedDates.isValid && (
-                    <div className="mt-4 p-4 rounded-lg bg-slate-50 border border-slate-200">
+                    <div className="mt-4 p-4 rounded-lg bg-muted border border-slate-200">
                         <div className="flex items-center justify-between">
-                            <span className="text-sm text-slate-600">Estimated cost</span>
-                            <span className="text-lg font-bold text-slate-900">
+                            <span className="text-sm text-muted-foreground">Estimated cost</span>
+                            <span className="text-lg font-bold text-foreground">
                                 {currency} {estimatedCost.toLocaleString()}
                             </span>
                         </div>
-                        <p className="text-xs text-slate-500 mt-1">
+                        <p className="text-xs text-muted-foreground mt-1">
                             {selectedDates.numberOfDays} day{selectedDates.numberOfDays !== 1 ? 's' : ''} × {currency} {dayRate?.toLocaleString()}/day
                         </p>
                     </div>

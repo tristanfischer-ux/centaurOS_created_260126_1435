@@ -76,7 +76,7 @@ async function SignupContent({ listingId }: { listingId?: string }) {
         <div className="max-w-3xl mx-auto">
             {/* Header */}
             <div className="mb-8">
-                <h1 className="text-3xl font-bold text-slate-900">
+                <h1 className="text-3xl font-bold text-foreground">
                     {listing ? 'Complete Your Provider Setup' : 'Become a Provider'}
                 </h1>
                 <p className="text-muted-foreground mt-2">
@@ -88,7 +88,7 @@ async function SignupContent({ listingId }: { listingId?: string }) {
             
             {/* Migration Banner */}
             {listing && (
-                <Card className="mb-6 border-blue-200 bg-blue-50/50">
+                <Card className="mb-6 border bg-blue-50/50">
                     <CardContent className="flex items-start gap-4 pt-6">
                         <div className="p-2 rounded-lg bg-blue-100">
                             <Store className="h-5 w-5 text-blue-600" />
@@ -210,8 +210,8 @@ async function SignupContent({ listingId }: { listingId?: string }) {
                 <Card>
                     <CardContent className="pt-6">
                         <div className="text-center space-y-4">
-                            <div className="p-4 rounded-full bg-slate-100 w-fit mx-auto">
-                                <User className="h-8 w-8 text-slate-600" />
+                            <div className="p-4 rounded-full bg-muted w-fit mx-auto">
+                                <User className="h-8 w-8 text-muted-foreground" />
                             </div>
                             <div>
                                 <h3 className="font-semibold">Sign in to continue</h3>
@@ -257,7 +257,7 @@ function StepItem({
                 flex items-center justify-center w-8 h-8 rounded-full flex-shrink-0
                 ${completed 
                     ? 'bg-green-100 text-green-600' 
-                    : 'bg-slate-100 text-slate-400'
+                    : 'bg-muted text-muted-foreground'
                 }
             `}>
                 {completed ? (

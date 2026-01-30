@@ -468,6 +468,6 @@ function getTierBadgeClass(tier: ProviderTier): string {
     case "standard":
       return "bg-blue-100 text-blue-800 border-blue-300"
     default:
-      return "bg-slate-100 text-slate-800"
+      return "bg-muted text-foreground"
   }
 }

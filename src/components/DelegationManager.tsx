@@ -129,7 +129,7 @@ export function DelegationManager({ members, currentUserId, userRole }: Delegati
         return (
             <Card>
                 <CardContent className="flex items-center justify-center py-8">
-                    <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
+                    <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
                 </CardContent>
             </Card>
         )
@@ -144,7 +144,7 @@ export function DelegationManager({ members, currentUserId, userRole }: Delegati
                         <div className="flex items-center justify-between">
                             <div>
                                 <CardTitle className="flex items-center gap-2">
-                                    <UserCheck className="h-5 w-5 text-slate-600" />
+                                    <UserCheck className="h-5 w-5 text-muted-foreground" />
                                     My Approval Delegations
                                 </CardTitle>
                                 <CardDescription>
@@ -159,10 +159,10 @@ export function DelegationManager({ members, currentUserId, userRole }: Delegati
                     </CardHeader>
                     <CardContent>
                         {myDelegations.length === 0 ? (
-                            <div className="text-center py-8 text-slate-500">
+                            <div className="text-center py-8 text-muted-foreground">
                                 <UserCheck className="h-12 w-12 mx-auto mb-2 opacity-30" />
                                 <p className="text-sm">No delegations set up</p>
-                                <p className="text-xs text-slate-400 mt-1">
+                                <p className="text-xs text-muted-foreground mt-1">
                                     Delegate approval authority when you'll be unavailable
                                 </p>
                             </div>
@@ -178,8 +178,8 @@ export function DelegationManager({ members, currentUserId, userRole }: Delegati
                                             className={cn(
                                                 'flex items-center justify-between p-3 rounded-lg border',
                                                 isExpired 
-                                                    ? 'bg-slate-50 border-slate-200 opacity-60'
-                                                    : 'bg-white border-slate-200'
+                                                    ? 'bg-muted border opacity-60'
+                                                    : 'bg-background border-slate-200'
                                             )}
                                         >
                                             <div className="flex items-center gap-3">
@@ -190,7 +190,7 @@ export function DelegationManager({ members, currentUserId, userRole }: Delegati
                                                 />
                                                 <div>
                                                     <div className="flex items-center gap-2">
-                                                        <span className="font-medium text-slate-900">
+                                                        <span className="font-medium text-foreground">
                                                             {delegate?.full_name || 'Unknown'}
                                                         </span>
                                                         <Badge variant="secondary" className="text-xs">
@@ -202,7 +202,7 @@ export function DelegationManager({ members, currentUserId, userRole }: Delegati
                                                             </Badge>
                                                         )}
                                                     </div>
-                                                    <div className="flex items-center gap-2 text-xs text-slate-500 mt-0.5">
+                                                    <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
                                                         <Calendar className="h-3 w-3" />
                                                         {delegation.end_date ? (
                                                             <span>
@@ -261,13 +261,13 @@ export function DelegationManager({ members, currentUserId, userRole }: Delegati
                                         />
                                         <div className="flex-1">
                                             <div className="flex items-center gap-2">
-                                                <span className="font-medium text-slate-900">
+                                                <span className="font-medium text-foreground">
                                                     {delegator?.full_name || 'Unknown'}
                                                 </span>
-                                                <ArrowRight className="h-3 w-3 text-slate-400" />
+                                                <ArrowRight className="h-3 w-3 text-muted-foreground" />
                                                 <span className="text-green-700 font-medium">You</span>
                                             </div>
-                                            <div className="flex items-center gap-2 text-xs text-slate-500 mt-0.5">
+                                            <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
                                                 <Clock className="h-3 w-3" />
                                                 {delegation.end_date ? (
                                                     <span>
@@ -293,7 +293,7 @@ export function DelegationManager({ members, currentUserId, userRole }: Delegati
             <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
                 <DialogContent className="sm:max-w-[425px] bg-white">
                     <DialogHeader>
-                        <DialogTitle className="text-slate-900">Create Delegation</DialogTitle>
+                        <DialogTitle className="text-foreground">Create Delegation</DialogTitle>
                         <DialogDescription>
                             Delegate your approval authority to another team member
                         </DialogDescription>
@@ -303,7 +303,7 @@ export function DelegationManager({ members, currentUserId, userRole }: Delegati
                         <div className="space-y-2">
                             <Label>Delegate To</Label>
                             <Select value={delegateId} onValueChange={setDelegateId}>
-                                <SelectTrigger className="bg-white">
+                                <SelectTrigger className="bg-background">
                                     <SelectValue placeholder="Select a team member..." />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -333,7 +333,7 @@ export function DelegationManager({ members, currentUserId, userRole }: Delegati
                                     type="date"
                                     value={startDate}
                                     onChange={(e) => setStartDate(e.target.value)}
-                                    className="bg-white"
+                                    className="bg-background"
                                 />
                             </div>
                             <div className="space-y-2">
@@ -342,7 +342,7 @@ export function DelegationManager({ members, currentUserId, userRole }: Delegati
                                     type="date"
                                     value={endDate}
                                     onChange={(e) => setEndDate(e.target.value)}
-                                    className="bg-white"
+                                    className="bg-background"
                                 />
                             </div>
                         </div>
@@ -353,7 +353,7 @@ export function DelegationManager({ members, currentUserId, userRole }: Delegati
                                 value={reason}
                                 onChange={(e) => setReason(e.target.value)}
                                 placeholder="e.g., On vacation, conference attendance..."
-                                className="bg-white"
+                                className="bg-background"
                             />
                         </div>
                     </div>

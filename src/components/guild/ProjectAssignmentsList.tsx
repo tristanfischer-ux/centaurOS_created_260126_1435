@@ -77,10 +77,10 @@ export function ProjectAssignmentsList() {
 
     if (loading) {
         return (
-            <Card className="border-slate-200">
+            <Card className="border">
                 <CardContent className="p-8 text-center">
                     <Loader2 className="h-8 w-8 animate-spin text-blue-500 mx-auto mb-4" />
-                    <p className="text-slate-500">Loading assignments...</p>
+                    <p className="text-muted-foreground">Loading assignments...</p>
                 </CardContent>
             </Card>
         )
@@ -88,11 +88,11 @@ export function ProjectAssignmentsList() {
 
     if (assignments.length === 0) {
         return (
-            <Card className="border-slate-200">
+            <Card className="border">
                 <CardContent className="p-8 text-center">
                     <Briefcase className="h-12 w-12 text-slate-300 mx-auto mb-4" />
-                    <h3 className="text-lg font-semibold text-slate-700 mb-2">No Project Assignments</h3>
-                    <p className="text-slate-500">
+                    <h3 className="text-lg font-semibold text-foreground mb-2">No Project Assignments</h3>
+                    <p className="text-muted-foreground">
                         Assign apprentices from the Guild pool to your projects.
                     </p>
                 </CardContent>
@@ -101,7 +101,7 @@ export function ProjectAssignmentsList() {
     }
 
     return (
-        <Card className="border-slate-200">
+        <Card className="border">
             <CardHeader className="pb-4">
                 <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-lg bg-green-100 flex items-center justify-center">
@@ -109,7 +109,7 @@ export function ProjectAssignmentsList() {
                     </div>
                     <div>
                         <CardTitle className="text-lg">Project Assignments</CardTitle>
-                        <p className="text-sm text-slate-500">
+                        <p className="text-sm text-muted-foreground">
                             {activeAssignments.length} active assignment{activeAssignments.length !== 1 ? 's' : ''}
                         </p>
                     </div>
@@ -119,12 +119,12 @@ export function ProjectAssignmentsList() {
                 {/* Active Assignments */}
                 {activeAssignments.length > 0 && (
                     <div className="space-y-2">
-                        <h4 className="text-sm font-medium text-slate-500 uppercase tracking-wider">Active</h4>
-                        <div className="divide-y divide-slate-100 border border-slate-200 rounded-lg overflow-hidden">
+                        <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Active</h4>
+                        <div className="divide-y divide-slate-100 border border rounded-lg overflow-hidden">
                             {activeAssignments.map((assignment) => (
                                 <div
                                     key={assignment.id}
-                                    className="flex items-center justify-between p-4 hover:bg-slate-50 transition-colors"
+                                    className="flex items-center justify-between p-4 hover:bg-muted transition-colors"
                                 >
                                     <div className="flex items-center gap-4">
                                         <UserAvatar
@@ -135,12 +135,12 @@ export function ProjectAssignmentsList() {
                                             className="border-green-200"
                                         />
                                         <div>
-                                            <h4 className="font-medium text-slate-900">{assignment.apprenticeName}</h4>
-                                            <div className="flex items-center gap-2 text-sm text-slate-500">
+                                            <h4 className="font-medium text-foreground">{assignment.apprenticeName}</h4>
+                                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
                                                 <Briefcase className="h-3 w-3" />
                                                 <span>{assignment.projectName}</span>
                                             </div>
-                                            <div className="flex items-center gap-2 text-xs text-slate-400 mt-1">
+                                            <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
                                                 <Clock className="h-3 w-3" />
                                                 <span>Started {formatDistanceToNow(new Date(assignment.startedAt), { addSuffix: true })}</span>
                                             </div>
@@ -187,8 +187,8 @@ export function ProjectAssignmentsList() {
                 {/* Completed/Cancelled Assignments */}
                 {completedAssignments.length > 0 && (
                     <div className="space-y-2">
-                        <h4 className="text-sm font-medium text-slate-500 uppercase tracking-wider">History</h4>
-                        <div className="divide-y divide-slate-100 border border-slate-200 rounded-lg overflow-hidden opacity-70">
+                        <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">History</h4>
+                        <div className="divide-y divide-slate-100 border border rounded-lg overflow-hidden opacity-70">
                             {completedAssignments.slice(0, 5).map((assignment) => (
                                 <div
                                     key={assignment.id}
@@ -200,18 +200,18 @@ export function ProjectAssignmentsList() {
                                             role="Apprentice"
                                             size="lg"
                                             showBorder
-                                            className="border-slate-200"
+                                            className="border"
                                         />
                                         <div>
-                                            <h4 className="font-medium text-slate-700">{assignment.apprenticeName}</h4>
-                                            <div className="text-sm text-slate-500">{assignment.projectName}</div>
+                                            <h4 className="font-medium text-foreground">{assignment.apprenticeName}</h4>
+                                            <div className="text-sm text-muted-foreground">{assignment.projectName}</div>
                                         </div>
                                     </div>
                                     <Badge 
                                         variant="outline" 
                                         className={
                                             assignment.status === 'completed'
-                                                ? 'bg-blue-50 text-blue-700 border-blue-200'
+                                                ? 'bg-blue-50 text-blue-700 border'
                                                 : 'bg-red-50 text-red-700 border-red-200'
                                         }
                                     >

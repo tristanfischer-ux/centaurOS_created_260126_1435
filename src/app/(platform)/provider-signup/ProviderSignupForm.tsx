@@ -131,7 +131,7 @@ export function ProviderSignupForm({ listingId, listing, migrationRecord }: Prov
                         </Alert>
                     )}
                     
-                    <div className="bg-slate-50 rounded-lg p-4 space-y-3">
+                    <div className="bg-muted rounded-lg p-4 space-y-3">
                         <h4 className="font-medium">Why connect Stripe?</h4>
                         <ul className="text-sm text-muted-foreground space-y-2">
                             <li className="flex items-start gap-2">

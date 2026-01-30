@@ -30,7 +30,7 @@ export function MarketingNavbar() {
                     <div className="w-8 h-8 bg-slate-900 rounded-full flex items-center justify-center group-hover:bg-international-orange transition-colors">
                         <span className="text-white text-xs font-mono font-bold">C</span>
                     </div>
-                    <span className="text-slate-900 text-sm font-bold tracking-[0.3em] uppercase group-hover:text-international-orange transition-colors">
+                    <span className="text-foreground text-sm font-bold tracking-[0.3em] uppercase group-hover:text-international-orange transition-colors">
                         CENTAUR DYNAMICS
                     </span>
                 </Link>
@@ -39,19 +39,19 @@ export function MarketingNavbar() {
                 <div className="hidden md:flex items-center gap-12">
                     <Link
                         href="#centaurs"
-                        className="text-slate-500 text-xs font-medium tracking-[0.2em] uppercase hover:text-slate-900 transition-colors"
+                        className="text-muted-foreground text-xs font-medium tracking-[0.2em] uppercase hover:text-foreground transition-colors"
                     >
                         THE CENTAURS
                     </Link>
                     <Link
                         href="#network"
-                        className="text-slate-500 text-xs font-medium tracking-[0.2em] uppercase hover:text-slate-900 transition-colors"
+                        className="text-muted-foreground text-xs font-medium tracking-[0.2em] uppercase hover:text-foreground transition-colors"
                     >
                         THE NETWORK
                     </Link>
                     <Link
                         href="#os"
-                        className="text-slate-500 text-xs font-medium tracking-[0.2em] uppercase hover:text-slate-900 transition-colors"
+                        className="text-muted-foreground text-xs font-medium tracking-[0.2em] uppercase hover:text-foreground transition-colors"
                     >
                         THE OS
                     </Link>

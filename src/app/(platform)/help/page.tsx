@@ -78,7 +78,7 @@ export default function HelpPage() {
       </div>
 
       {/* Keyboard Shortcuts Card */}
-      <Card className="bg-white border-slate-100 shadow-[0_2px_15px_rgba(0,0,0,0.03)]">
+      <Card className="bg-background border-slate-100 shadow-[0_2px_15px_rgba(0,0,0,0.03)]">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Keyboard className="h-5 w-5" />
@@ -89,7 +89,7 @@ export default function HelpPage() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {shortcuts.map(shortcut => (
               <div key={shortcut.key} className="flex items-center gap-3">
-                <kbd className="px-2 py-1 bg-slate-100 rounded text-sm font-mono">
+                <kbd className="px-2 py-1 bg-muted rounded text-sm font-mono">
                   {shortcut.key}
                 </kbd>
                 <span className="text-sm text-muted-foreground">
@@ -132,7 +132,7 @@ export default function HelpPage() {
       </div>
 
       {/* Tips */}
-      <Card className="bg-blue-50 border-blue-200">
+      <Card className="bg-blue-50 border">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-blue-900">
             <Mic className="h-5 w-5" />

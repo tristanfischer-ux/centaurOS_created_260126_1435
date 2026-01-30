@@ -24,7 +24,7 @@ export default async function SettingsPage() {
                 <p className="text-muted-foreground mt-1 text-sm font-medium pl-4">Configure your profile and preferences</p>
             </div>
 
-            <Card className="bg-white border-slate-100 shadow-[0_2px_15px_rgba(0,0,0,0.03)]">
+            <Card className="bg-background border-slate-100 shadow-[0_2px_15px_rgba(0,0,0,0.03)]">
                 <CardHeader>
                     <CardTitle>Profile Configuration</CardTitle>
                     <CardDescription>Manage your persona and foundry settings.</CardDescription>
@@ -33,19 +33,19 @@ export default async function SettingsPage() {
                     <div className="grid grid-cols-2 gap-4">
                         <div>
                             <Label>Full Name</Label>
-                            <div className="p-2 bg-slate-100 rounded border border-slate-200">{profile?.full_name}</div>
+                            <div className="p-2 bg-muted rounded border border-slate-200">{profile?.full_name}</div>
                         </div>
                         <div>
                             <Label>Email</Label>
-                            <div className="p-2 bg-slate-100 rounded border border-slate-200">{profile?.email}</div>
+                            <div className="p-2 bg-muted rounded border border-slate-200">{profile?.email}</div>
                         </div>
                         <div>
                             <Label>Role</Label>
-                            <div className="p-2 bg-slate-100 rounded border border-slate-200 font-mono text-amber-600">{profile?.role}</div>
+                            <div className="p-2 bg-muted rounded border border font-mono text-amber-600">{profile?.role}</div>
                         </div>
                         <div>
                             <Label>Foundry ID</Label>
-                            <div className="p-2 bg-slate-100 rounded border border-slate-200 text-xs font-mono">{profile?.foundry_id}</div>
+                            <div className="p-2 bg-muted rounded border border text-xs font-mono">{profile?.foundry_id}</div>
                         </div>
                     </div>
                 </CardContent>

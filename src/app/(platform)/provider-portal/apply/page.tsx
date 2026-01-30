@@ -184,7 +184,7 @@ export default function ProviderApplicationPage() {
                         {step === 3 && "Pricing & Availability"}
                     </span>
                 </div>
-                <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                <div className="h-2 bg-muted rounded-full overflow-hidden">
                     <div 
                         className="h-full bg-international-orange transition-all duration-300 rounded-full"
                         style={{ width: `${(step / 3) * 100}%` }}
@@ -223,10 +223,10 @@ export default function ProviderApplicationPage() {
                                             onClick={() => setCategory(cat.value)}
                                             className={cn(
                                                 "p-4 rounded-lg border-2 text-left transition-all",
-                                                "hover:border-international-orange/50 hover:bg-slate-50",
+                                                "hover:border-international-orange/50 hover:bg-muted",
                                                 category === cat.value 
                                                     ? "border-international-orange bg-international-orange/5" 
-                                                    : "border-slate-200"
+                                                    : "border"
                                             )}
                                         >
                                             <div className="flex items-start gap-3">
@@ -234,13 +234,13 @@ export default function ProviderApplicationPage() {
                                                     "p-2 rounded-lg",
                                                     category === cat.value 
                                                         ? "bg-international-orange/10" 
-                                                        : "bg-slate-100"
+                                                        : "bg-muted"
                                                 )}>
                                                     <Icon className={cn(
                                                         "h-5 w-5",
                                                         category === cat.value 
                                                             ? "text-international-orange" 
-                                                            : "text-slate-600"
+                                                            : "text-muted-foreground"
                                                     )} />
                                                 </div>
                                                 <div>

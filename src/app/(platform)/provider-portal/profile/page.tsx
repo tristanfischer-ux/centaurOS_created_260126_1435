@@ -153,7 +153,7 @@ export default function ProviderProfilePage() {
             {/* Header */}
             <div className="flex items-center justify-between">
                 <div>
-                    <h1 className="text-2xl font-bold text-slate-900">Profile Settings</h1>
+                    <h1 className="text-2xl font-bold text-foreground">Profile Settings</h1>
                     <p className="text-muted-foreground mt-1">
                         Manage how you appear in the marketplace
                     </p>
@@ -422,8 +422,8 @@ export default function ProviderProfilePage() {
                                     {/* Provider Card Preview */}
                                     <div className="p-4 rounded-lg border bg-white">
                                         <div className="flex items-start gap-4">
-                                            <div className="w-16 h-16 rounded-full bg-slate-100 flex items-center justify-center">
-                                                <User className="h-8 w-8 text-slate-400" />
+                                            <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center">
+                                                <User className="h-8 w-8 text-muted-foreground" />
                                             </div>
                                             <div className="flex-1">
                                                 <div className="flex items-center gap-2">

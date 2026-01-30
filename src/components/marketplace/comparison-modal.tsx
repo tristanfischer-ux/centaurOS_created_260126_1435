@@ -70,7 +70,7 @@ const LOWER_IS_BETTER = ['cost', 'latency', 'setup_time', 'lead_time', 'price']
 
 const categoryBadgeStyles: Record<string, string> = {
     'People': 'bg-stone-100 text-stone-700',
-    'Products': 'bg-slate-100 text-slate-700',
+    'Products': 'bg-muted text-foreground',
     'Services': 'bg-blue-50 text-blue-700',
     'AI': 'bg-violet-50 text-violet-700'
 }
@@ -184,7 +184,7 @@ export function ComparisonModal({ open, onOpenChange, items }: ComparisonModalPr
                                 </div>
 
                                 {/* Winner Section */}
-                                <div className="mb-4 p-3 bg-white dark:bg-violet-900/40 rounded-lg border border-violet-200 dark:border-violet-700">
+                                <div className="mb-4 p-3 bg-background dark:bg-violet-900/40 rounded-lg border border-violet-200 dark:border-violet-700">
                                     <div className="flex items-center gap-2 mb-2">
                                         <Trophy className="h-4 w-4 text-amber-500" />
                                         <span className="text-sm font-medium text-violet-900 dark:text-violet-100">Recommended</span>

@@ -248,7 +248,7 @@ export default async function TodayPage() {
     return (
         <div className="space-y-8">
             {/* Header - Morning Briefing */}
-            <div className="flex flex-col fold:flex-row fold:items-center fold:justify-between gap-3 xs:gap-4 pb-6 border-b border-foundry-200">
+            <div className="flex flex-col fold:flex-row fold:items-center fold:justify-between gap-3 xs:gap-4 pb-6 border-b border">
                 <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-3 mb-2">
                         <div className="p-2 bg-gradient-to-br from-international-orange/10 to-electric-blue/10 rounded-xl">
@@ -307,7 +307,7 @@ export default async function TodayPage() {
                         </div>
                     )}
                     {mentions.length > 0 && (
-                        <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 border border-blue-200 rounded-full">
+                        <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 border border rounded-full">
                             <AtSign className="h-4 w-4 text-blue-600" />
                             <span className="text-sm font-medium text-blue-700">
                                 {mentions.length} mention{mentions.length !== 1 ? 's' : ''}
@@ -363,7 +363,7 @@ export default async function TodayPage() {
                     <div className="lg:col-span-2 space-y-6">
                         {/* Decisions Pending */}
                         {isExecutiveOrFounder && pendingDecisions.length > 0 && (
-                            <Card className="bg-white border-foundry-200 border-l-4 border-l-amber-500">
+                            <Card className="bg-background border border-l-4 border-l-amber-500">
                                 <CardHeader className="pb-3">
                                     <div className="flex items-center justify-between">
                                         <div className="flex items-center gap-2">
@@ -409,7 +409,7 @@ export default async function TodayPage() {
                                                     "ml-2 capitalize text-xs",
                                                     task.risk_level === 'High' ? "bg-red-100 text-red-700 border-red-200" :
                                                     task.risk_level === 'Medium' ? "bg-amber-100 text-amber-700 border-amber-200" :
-                                                    "bg-foundry-100 text-foundry-600 border-foundry-200"
+                                                    "bg-foundry-100 text-foundry-600 border"
                                                 )}>
                                                     {task.risk_level || 'Low'} Risk
                                                 </Badge>
@@ -422,7 +422,7 @@ export default async function TodayPage() {
 
                         {/* Blockers Reported */}
                         {isExecutiveOrFounder && blockers.length > 0 && (
-                            <Card className="bg-white border-foundry-200 border-l-4 border-l-red-500">
+                            <Card className="bg-background border border-l-4 border-l-red-500">
                                 <CardHeader className="pb-3">
                                     <div className="flex items-center justify-between">
                                         <div className="flex items-center gap-2">
@@ -485,7 +485,7 @@ export default async function TodayPage() {
 
                         {/* Overdue Items */}
                         {overdueTasks.length > 0 && (
-                            <Card className="bg-white border-foundry-200 border-l-4 border-l-red-500">
+                            <Card className="bg-background border border-l-4 border-l-red-500">
                                 <CardHeader className="pb-3">
                                     <div className="flex items-center justify-between">
                                         <div className="flex items-center gap-2">
@@ -540,7 +540,7 @@ export default async function TodayPage() {
 
                         {/* Mentions - Someone @mentioned you */}
                         {mentions.length > 0 && (
-                            <Card className="bg-white border-foundry-200 border-l-4 border-l-blue-500">
+                            <Card className="bg-background border border-l-4 border-l-blue-500">
                                 <CardHeader className="pb-3">
                                     <div className="flex items-center justify-between">
                                         <div className="flex items-center gap-2">
@@ -550,7 +550,7 @@ export default async function TodayPage() {
                                             <CardTitle className="font-display text-lg text-foreground">
                                                 Mentions
                                             </CardTitle>
-                                            <Badge variant="secondary" className="bg-blue-100 text-blue-700 border-blue-200">
+                                            <Badge variant="secondary" className="bg-blue-100 text-blue-700 border">
                                                 {mentions.length}
                                             </Badge>
                                         </div>
@@ -572,7 +572,7 @@ export default async function TodayPage() {
                                                     name={mention.author?.full_name} 
                                                     role={null}
                                                     size="md" 
-                                                    className="border border-blue-200 shrink-0"
+                                                    className="border border shrink-0"
                                                 />
                                                 <div className="flex-1 min-w-0">
                                                     <div className="flex items-center gap-2 mb-1">
@@ -608,7 +608,7 @@ export default async function TodayPage() {
                         {!(isExecutiveOrFounder && pendingDecisions.length > 0) && 
                          !(isExecutiveOrFounder && blockers.length > 0) && 
                          overdueTasks.length === 0 && (
-                            <Card className="bg-gradient-to-br from-blue-50 to-cyan-50 border-blue-200">
+                            <Card className="bg-gradient-to-br from-blue-50 to-cyan-50 border">
                                 <CardContent className="py-12 text-center">
                                     <div className="inline-flex p-4 bg-white/80 rounded-full mb-4">
                                         <CheckCircle2 className="h-8 w-8 text-blue-500" />
@@ -644,7 +644,7 @@ export default async function TodayPage() {
                     {/* Right Column - Today's Focus (1/3) */}
                     <div className="space-y-6">
                         {/* Today's Focus - Prioritized Tasks */}
-                        <Card className="bg-white border-foundry-200 border-t-2 border-t-international-orange">
+                        <Card className="bg-background border border-t-2 border-t-international-orange">
                             <CardHeader>
                                 <div className="flex items-center gap-2">
                                     <div className="p-1.5 bg-international-orange/10 rounded-md">
@@ -692,7 +692,7 @@ export default async function TodayPage() {
                         </Card>
 
                         {/* Quick Links */}
-                        <Card className="bg-white border-foundry-200">
+                        <Card className="bg-background border">
                             <CardHeader className="pb-3">
                                 <CardTitle className="font-display text-lg text-foreground">Quick Links</CardTitle>
                             </CardHeader>

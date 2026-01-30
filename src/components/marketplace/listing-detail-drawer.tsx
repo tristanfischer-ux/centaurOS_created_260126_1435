@@ -40,7 +40,7 @@ interface ListingDetailDrawerProps {
 
 const categoryBadgeStyles = {
     'People': 'bg-stone-100 text-stone-700',
-    'Products': 'bg-slate-100 text-slate-700',
+    'Products': 'bg-muted text-foreground',
     'Services': 'bg-blue-50 text-blue-700',
     'AI': 'bg-violet-50 text-violet-700'
 }
@@ -217,7 +217,7 @@ function PeopleSection({ attrs }: { attrs: Record<string, any> }) {
                     {Array.isArray(attrs.previous_companies) ? (
                         <div className="flex flex-wrap gap-2">
                             {attrs.previous_companies.map((company: string, i: number) => (
-                                <span key={i} className="text-xs px-2.5 py-1 rounded-full bg-slate-100 text-slate-700">
+                                <span key={i} className="text-xs px-2.5 py-1 rounded-full bg-muted text-foreground">
                                     {company}
                                 </span>
                             ))}
@@ -386,7 +386,7 @@ function ProductsSection({ attrs }: { attrs: Record<string, any> }) {
                     {Array.isArray(attrs.capabilities) ? (
                         <div className="flex flex-wrap gap-2">
                             {attrs.capabilities.map((cap: string, i: number) => (
-                                <span key={i} className="text-xs px-2.5 py-1 rounded-full bg-slate-100 text-slate-700">
+                                <span key={i} className="text-xs px-2.5 py-1 rounded-full bg-muted text-foreground">
                                     {cap}
                                 </span>
                             ))}

@@ -79,9 +79,9 @@ export function InlineHistory({ taskId, isOpen, onClose }: InlineHistoryProps) {
     if (!isOpen) return null
 
     return (
-        <div className="border-t border-slate-200 bg-white">
+        <div className="border-t border bg-white">
             {/* Header */}
-            <div className="flex items-center justify-between px-4 py-2 bg-slate-50">
+            <div className="flex items-center justify-between px-4 py-2 bg-muted">
                 <div>
                     <h4 className="text-xs font-semibold text-foreground uppercase tracking-wider">
                         Audit Log
@@ -102,7 +102,7 @@ export function InlineHistory({ taskId, isOpen, onClose }: InlineHistoryProps) {
                 ) : history.length === 0 ? (
                     <p className="text-center text-muted-foreground py-4 text-xs">No history yet</p>
                 ) : (
-                    <div className="relative border-l border-slate-200 ml-1 space-y-3">
+                    <div className="relative border-l border ml-1 space-y-3">
                         {history.map((item) => (
                             <div key={item.id} className="relative pl-4">
                                 <div className="absolute -left-[3px] top-1 h-1.5 w-1.5 rounded-full bg-slate-300" />

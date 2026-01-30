@@ -193,7 +193,7 @@ export default function InvitePage({ params }: { params: Promise<{ token: string
         </div>
 
         {/* Right: Action Area */}
-        <div className="w-full md:w-1/2 bg-white text-slate-900 p-6 sm:p-8 md:p-12 lg:p-16 flex flex-col justify-center">
+        <div className="w-full md:w-1/2 bg-background text-foreground p-6 sm:p-8 md:p-12 lg:p-16 flex flex-col justify-center">
           <div className="w-full max-w-md mx-auto space-y-6 sm:space-y-8">
             {error && (
               <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3">
@@ -208,10 +208,10 @@ export default function InvitePage({ params }: { params: Promise<{ token: string
                 {emailMismatch ? (
                   // Email mismatch warning
                   <div>
-                    <h2 className="text-xl sm:text-2xl font-bold text-slate-900 mb-2">
+                    <h2 className="text-xl sm:text-2xl font-bold text-foreground mb-2">
                       Email Mismatch
                     </h2>
-                    <p className="text-slate-500 mb-6">
+                    <p className="text-muted-foreground mb-6">
                       You're logged in as <strong>{currentUserEmail}</strong>, but this invitation 
                       was sent to <strong>{invitation.email}</strong>.
                     </p>
@@ -239,10 +239,10 @@ export default function InvitePage({ params }: { params: Promise<{ token: string
                 ) : (
                   // Can accept invitation
                   <div>
-                    <h2 className="text-xl sm:text-2xl font-bold text-slate-900 mb-2">
+                    <h2 className="text-xl sm:text-2xl font-bold text-foreground mb-2">
                       Accept Invitation
                     </h2>
-                    <p className="text-slate-500 mb-6">
+                    <p className="text-muted-foreground mb-6">
                       Click below to join <strong>{invitation.foundryName}</strong> as {invitation.role}.
                     </p>
                     <Button 
@@ -265,10 +265,10 @@ export default function InvitePage({ params }: { params: Promise<{ token: string
             ) : (
               // Not logged in - show signup form
               <div>
-                <h2 className="text-xl sm:text-2xl font-bold text-slate-900 mb-2">
+                <h2 className="text-xl sm:text-2xl font-bold text-foreground mb-2">
                   Create your account
                 </h2>
-                <p className="text-slate-500 mb-6">
+                <p className="text-muted-foreground mb-6">
                   Set up your account to join <strong>{invitation.foundryName}</strong>.
                 </p>
 
@@ -276,37 +276,37 @@ export default function InvitePage({ params }: { params: Promise<{ token: string
                   <input type="hidden" name="token" value={token} />
                   
                   <div className="space-y-2">
-                    <Label htmlFor="email" className="text-sm font-medium text-slate-700">Email</Label>
+                    <Label htmlFor="email" className="text-sm font-medium text-foreground">Email</Label>
                     <Input
                       id="email"
                       name="email"
                       type="email"
                       value={invitation.email}
                       readOnly
-                      className="bg-slate-50 border-slate-300 h-11 sm:h-12 text-slate-500"
+                      className="bg-muted border-slate-300 h-11 sm:h-12 text-muted-foreground"
                     />
-                    <p className="text-xs text-slate-400">This email was specified in your invitation</p>
+                    <p className="text-xs text-muted-foreground">This email was specified in your invitation</p>
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="name" className="text-sm font-medium text-slate-700">Full Name</Label>
+                    <Label htmlFor="name" className="text-sm font-medium text-foreground">Full Name</Label>
                     <Input
                       id="name"
                       name="name"
                       placeholder="John Doe"
-                      className="bg-white border-slate-300 focus:border-blue-500 focus:ring-blue-500 h-11 sm:h-12"
+                      className="bg-background border-slate-300 focus:border-blue-500 focus:ring-blue-500 h-11 sm:h-12"
                       required
                     />
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="password" className="text-sm font-medium text-slate-700">Password</Label>
+                    <Label htmlFor="password" className="text-sm font-medium text-foreground">Password</Label>
                     <Input
                       id="password"
                       name="password"
                       type="password"
                       placeholder="Create a strong password"
-                      className="bg-white border-slate-300 focus:border-blue-500 focus:ring-blue-500 h-11 sm:h-12"
+                      className="bg-background border-slate-300 focus:border-blue-500 focus:ring-blue-500 h-11 sm:h-12"
                       required
                       minLength={8}
                     />
@@ -321,7 +321,7 @@ export default function InvitePage({ params }: { params: Promise<{ token: string
                 </form>
 
                 <div className="mt-6 text-center">
-                  <p className="text-sm text-slate-500">
+                  <p className="text-sm text-muted-foreground">
                     Already have an account?{" "}
                     <Link href={`/login?redirect=/invite/${token}`} className="text-blue-600 hover:underline">
                       Log in
@@ -331,11 +331,11 @@ export default function InvitePage({ params }: { params: Promise<{ token: string
               </div>
             )}
 
-            <p className="text-xs text-center text-slate-400">
+            <p className="text-xs text-center text-muted-foreground">
               By joining, you agree to our{" "}
-              <Link href="#" className="underline hover:text-slate-900">Terms of Service</Link>{" "}
+              <Link href="#" className="underline hover:text-foreground">Terms of Service</Link>{" "}
               and{" "}
-              <Link href="#" className="underline hover:text-slate-900">Privacy Policy</Link>.
+              <Link href="#" className="underline hover:text-foreground">Privacy Policy</Link>.
             </p>
           </div>
         </div>

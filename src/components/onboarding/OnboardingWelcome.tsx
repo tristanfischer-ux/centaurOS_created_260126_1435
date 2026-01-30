@@ -237,11 +237,11 @@ export function FeatureTip({
     return (
         <div className="relative">
             {children}
-            <div className={`absolute top-full ${alignmentClass} mt-2 z-50 w-72 p-4 bg-white border-2 border-international-orange rounded-lg shadow-xl animate-in fade-in-50 slide-in-from-top-2`}>
+            <div className={`absolute top-full ${alignmentClass} mt-2 z-50 w-72 p-4 bg-background border-2 border-international-orange rounded-lg shadow-xl animate-in fade-in-50 slide-in-from-top-2`}>
                 <div className="flex items-start justify-between gap-2">
                     <div>
-                        <p className="font-semibold text-sm text-slate-900">{title}</p>
-                        <p className="text-xs text-slate-600 mt-1.5 leading-relaxed">{description}</p>
+                        <p className="font-semibold text-sm text-foreground">{title}</p>
+                        <p className="text-xs text-muted-foreground mt-1.5 leading-relaxed">{description}</p>
                     </div>
                     <button 
                         onClick={handleDismiss}
@@ -250,7 +250,7 @@ export function FeatureTip({
                         Got it
                     </button>
                 </div>
-                <div className={`absolute -top-1.5 ${arrowAlignmentClass} w-3 h-3 bg-white border-l-2 border-t-2 border-international-orange rotate-45`} />
+                <div className={`absolute -top-1.5 ${arrowAlignmentClass} w-3 h-3 bg-background border-l-2 border-t-2 border-international-orange rotate-45`} />
             </div>
         </div>
     )

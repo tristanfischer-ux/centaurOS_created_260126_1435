@@ -8,6 +8,7 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { OfflineIndicator } from "@/components/OfflineIndicator";
 import { OnboardingModal } from "@/components/OnboardingModal";
 import { ExecutiveProfilePrompt, VerificationSuccessToast } from "@/components/onboarding";
+import { FloatingAdminBox } from "@/components/admin/FloatingAdminBox";
 import { Suspense } from "react";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { PresenceProvider } from "@/components/PresenceProvider";
@@ -43,6 +44,7 @@ export default async function PlatformLayout({
 
     let foundryName = "Centaur Foundry";
     let foundryId = "Unknown";
+    let hasAdminAccess = false;
 
     if (profile?.foundry_id) {
         foundryId = profile.foundry_id;
@@ -58,6 +60,20 @@ export default async function PlatformLayout({
 
         if (foundry) {
             foundryName = foundry.name;
+        }
+
+        // Check for admin permissions (non-Founders only)
+        // Note: foundry_admin_permissions table is new and may not be in generated types yet
+        if (profile.role !== "Founder") {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const { data: adminPerm } = await (supabase as any)
+                .from("foundry_admin_permissions")
+                .select("id")
+                .eq("foundry_id", profile.foundry_id)
+                .eq("profile_id", user.id)
+                .maybeSingle();
+            
+            hasAdminAccess = !!adminPerm;
         }
     }
 
@@ -86,6 +102,11 @@ export default async function PlatformLayout({
                         <Suspense fallback={null}>
                             <VerificationSuccessToast />
                         </Suspense>
+                        <FloatingAdminBox 
+                            foundryId={foundryId}
+                            isFounder={profile?.role === "Founder"}
+                            hasAdminAccess={hasAdminAccess}
+                        />
                     </div>
                 </ZoomProvider>
             </PresenceProvider>

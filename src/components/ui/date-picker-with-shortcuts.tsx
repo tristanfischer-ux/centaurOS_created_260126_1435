@@ -105,7 +105,7 @@ export function DatePickerWithShortcuts({
                         setOpen(false)
                     }}
                     initialFocus
-                    className="bg-white"
+                    className="bg-background"
                 />
             </PopoverContent>
         </Popover>

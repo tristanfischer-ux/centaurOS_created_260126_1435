@@ -170,7 +170,7 @@ export function InvoicePreview({
         )}
       </div>
       <div
-        className={`bg-white rounded-lg shadow-inner overflow-auto ${
+        className={`bg-background rounded-lg shadow-inner overflow-auto ${
           fullscreen ? "h-[90vh]" : "h-[600px]"
         }`}
       >

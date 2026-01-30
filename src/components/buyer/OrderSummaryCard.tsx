@@ -38,7 +38,7 @@ import type { OrderSummary, BookingStatus, PaymentStatus } from '@/types/booking
 function getStatusConfig(status: BookingStatus) {
     switch (status) {
         case 'draft':
-            return { label: 'Draft', color: 'bg-slate-100 text-slate-700', icon: Clock }
+            return { label: 'Draft', color: 'bg-muted text-foreground', icon: Clock }
         case 'pending_payment':
             return { label: 'Pending Payment', color: 'bg-amber-100 text-amber-700', icon: Clock }
         case 'confirmed':
@@ -48,11 +48,11 @@ function getStatusConfig(status: BookingStatus) {
         case 'completed':
             return { label: 'Completed', color: 'bg-emerald-100 text-emerald-700', icon: CheckCircle }
         case 'cancelled':
-            return { label: 'Cancelled', color: 'bg-slate-100 text-slate-500', icon: XCircle }
+            return { label: 'Cancelled', color: 'bg-muted text-muted-foreground', icon: XCircle }
         case 'disputed':
             return { label: 'Disputed', color: 'bg-red-100 text-red-700', icon: AlertCircle }
         default:
-            return { label: status, color: 'bg-slate-100 text-slate-700', icon: Clock }
+            return { label: status, color: 'bg-muted text-foreground', icon: Clock }
     }
 }
 
@@ -67,9 +67,9 @@ function getEscrowConfig(status: PaymentStatus) {
         case 'released':
             return { label: 'Payment Released', color: 'text-emerald-600' }
         case 'refunded':
-            return { label: 'Refunded', color: 'text-slate-500' }
+            return { label: 'Refunded', color: 'text-muted-foreground' }
         default:
-            return { label: status, color: 'text-slate-500' }
+            return { label: status, color: 'text-muted-foreground' }
     }
 }
 

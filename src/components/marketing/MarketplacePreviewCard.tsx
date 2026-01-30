@@ -41,7 +41,7 @@ function getAITypeIcon(subcategory: string) {
 export function MarketplacePreviewCard({ listing, onJoinClick }: MarketplacePreviewCardProps) {
     const categoryBadgeStyles: Record<string, string> = {
         'People': 'bg-stone-100 text-stone-700',
-        'Products': 'bg-slate-100 text-slate-700',
+        'Products': 'bg-muted text-foreground',
         'Services': 'bg-blue-50 text-blue-700',
         'AI': 'bg-violet-50 text-violet-700'
     }
@@ -62,7 +62,7 @@ export function MarketplacePreviewCard({ listing, onJoinClick }: MarketplacePrev
         <Card className="group relative flex flex-col shadow-sm hover:shadow-md transition-all duration-200 overflow-hidden border-slate-200">
             {/* Image */}
             {listing.image_url && (
-                <div className="relative w-full aspect-[4/3] bg-slate-100 overflow-hidden">
+                <div className="relative w-full aspect-[4/3] bg-muted overflow-hidden">
                     <Image 
                         src={listing.image_url} 
                         alt={listing.title}
@@ -158,7 +158,7 @@ export function MarketplacePreviewCard({ listing, onJoinClick }: MarketplacePrev
                                         key={i} 
                                         className={cn(
                                             "text-[10px] px-2 py-0.5 rounded-full",
-                                            isAI ? "bg-violet-50 text-violet-600" : "bg-slate-100 text-slate-600"
+                                            isAI ? "bg-violet-50 text-violet-600" : "bg-muted text-muted-foreground"
                                         )}
                                     >
                                         {item}

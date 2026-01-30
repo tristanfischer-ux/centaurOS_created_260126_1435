@@ -136,9 +136,9 @@ export function InlineThread({ taskId, isOpen, onClose, members }: InlineThreadP
     if (!isOpen) return null
 
     return (
-        <div className="border-t border-slate-200 bg-white">
+        <div className="border-t border bg-white">
             {/* Header */}
-            <div className="flex items-center justify-between px-4 py-2 bg-slate-50">
+            <div className="flex items-center justify-between px-4 py-2 bg-muted">
                 <div>
                     <h4 className="text-xs font-semibold text-foreground uppercase tracking-wider">
                         Notes
@@ -210,7 +210,7 @@ export function InlineThread({ taskId, isOpen, onClose, members }: InlineThreadP
                 <div
                     className={cn(
                         "border border-dashed rounded p-2 text-center transition-colors text-xs relative",
-                        isUploading ? "border-blue-300 bg-blue-50 cursor-wait" : isDragging ? "border-blue-500 bg-blue-50 cursor-pointer" : "border-slate-200 hover:border-slate-300 cursor-pointer",
+                        isUploading ? "border-blue-300 bg-blue-50 cursor-wait" : isDragging ? "border-blue-500 bg-blue-50 cursor-pointer" : "border hover:border-slate-300 cursor-pointer",
                         isUploading && "pointer-events-none"
                     )}
                     onClick={() => !isUploading && fileInputRef.current?.click()}

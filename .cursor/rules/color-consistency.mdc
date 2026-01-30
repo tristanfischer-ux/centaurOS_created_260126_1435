@@ -1,0 +1,278 @@
+---
+description: Use semantic color tokens - never hardcode color values
+alwaysApply: true
+---
+
+# Color Consistency Standards
+
+**CRITICAL:** CentaurOS has **1,108 hardcoded color classes** across 172 files. This rule enforces the migration to semantic tokens.
+
+## Core Principle
+
+**NEVER use hardcoded color values.** Always use semantic tokens from the design system.
+
+```tsx
+// ✅ CORRECT - Semantic tokens
+<div className="bg-background text-foreground">
+<p className="text-muted-foreground">
+<span className="text-destructive">
+
+// ❌ WRONG - Hardcoded colors
+<div className="bg-slate-100 text-slate-900">  // Wrong
+<p className="text-slate-600">  // Wrong
+<span className="text-red-500">  // Wrong
+```
+
+## 1. Text Colors
+
+| Use Case | Token | Example |
+|----------|-------|---------|
+| **Primary text** | `text-foreground` | Body text, headings |
+| **Secondary text** | `text-muted-foreground` | Descriptions, metadata |
+| **Brand accent** | `text-accent` or `text-international-orange` | CTAs, highlights |
+| **Links** | `text-primary` or `text-electric-blue` | Interactive links |
+| **Success** | `text-status-success` | Success messages |
+| **Warning** | `text-status-warning` | Warning messages |
+| **Error** | `text-destructive` | Error messages |
+| **Info** | `text-status-info` | Informational messages |
+
+```tsx
+// ✅ CORRECT
+<h1 className="text-foreground">Page Title</h1>
+<p className="text-muted-foreground">Subtitle text</p>
+<span className="text-destructive">Error message</span>
+
+// ❌ WRONG - Don't hardcode slate/gray colors
+<h1 className="text-slate-900">Page Title</h1>  // Wrong
+<p className="text-slate-600">Subtitle</p>  // Wrong
+<span className="text-red-600">Error</span>  // Wrong
+```
+
+## 2. Background Colors
+
+| Use Case | Token | Example |
+|----------|-------|---------|
+| **Page background** | `bg-background` | Main page wrapper |
+| **Card background** | `bg-card` | Card components |
+| **Secondary surface** | `bg-secondary` | Subtle backgrounds |
+| **Muted surface** | `bg-muted` | Inactive/disabled states |
+| **Brand accent** | `bg-accent` | Primary CTAs |
+| **Success** | `bg-status-success-light` | Success badges, alerts |
+| **Warning** | `bg-status-warning-light` | Warning badges, alerts |
+| **Error** | `bg-status-error-light` | Error badges, alerts |
+
+```tsx
+// ✅ CORRECT
+<div className="bg-background">
+<Card className="bg-card">
+<Badge className="bg-status-success-light text-status-success-dark">
+
+// ❌ WRONG - Don't hardcode backgrounds
+<div className="bg-white">  // Use bg-background
+<div className="bg-slate-50">  // Use bg-muted or bg-secondary
+<Badge className="bg-green-100 text-green-800">  // Use status tokens
+```
+
+## 3. Border Colors
+
+| Use Case | Token | Example |
+|----------|-------|---------|
+| **Default border** | `border` (no color class needed) | Cards, inputs |
+| **Input border** | `border-input` | Form inputs |
+| **Muted border** | `border-muted` | Subtle dividers |
+| **Accent border** | `border-accent` | Highlighted elements |
+| **Error border** | `border-destructive` | Invalid inputs |
+
+```tsx
+// ✅ CORRECT
+<Card className="border">  {/* Uses semantic border token */}
+<Input className={cn(hasError && "border-destructive")} />
+<div className="border-b border-slate-100" />  {/* Exception: light dividers */}
+
+// ❌ WRONG - Don't use colored borders without reason
+<Card className="border-blue-200" />  // Use border
+<Card className="border-foundry-200" />  // Use border
+<Input className="border-red-500" />  // Use border-destructive
+```
+
+**Exception:** Page header dividers can use `border-slate-100` for ultra-light dividers.
+
+## 4. Brand Colors
+
+Use brand colors for CTAs and highlights only:
+
+```tsx
+// ✅ CORRECT - Primary CTA
+<Button className="bg-accent">Get Started</Button>
+<Button className="bg-international-orange">Sign Up</Button>
+
+// ✅ CORRECT - Secondary brand accent
+<Link className="text-electric-blue hover:text-electric-blue-hover">
+  Learn More
+</Link>
+
+// ❌ WRONG - Don't overuse brand colors
+<div className="bg-international-orange">  {/* Too dominant */}
+<p className="text-international-orange">Body text</p>  {/* Use text-foreground */}
+```
+
+## 5. Status Colors
+
+**Always use semantic status tokens for status indicators:**
+
+```tsx
+import { StatusBadge } from '@/components/ui/status-badge'
+
+// ✅ CORRECT - Use StatusBadge with semantic status
+<StatusBadge status="success">Completed</StatusBadge>
+<StatusBadge status="warning">Pending</StatusBadge>
+<StatusBadge status="error">Failed</StatusBadge>
+<StatusBadge status="info">In Progress</StatusBadge>
+
+// ❌ WRONG - Don't use Badge with hardcoded colors
+<Badge className="bg-green-100 text-green-800">Completed</Badge>  // Wrong
+<span className="text-amber-600">Pending</span>  // Wrong
+```
+
+**For custom status implementations:**
+
+```tsx
+// Use semantic status tokens
+import { getStatusColor } from '@/lib/status-colors'
+
+const statusColor = getStatusColor(task.status)
+<div className={statusColor.bar} />  // Uses semantic tokens
+```
+
+## 6. Role Colors (User Avatars)
+
+**Use UserAvatar component - it handles role colors automatically:**
+
+```tsx
+import { UserAvatar } from '@/components/ui/user-avatar'
+
+// ✅ CORRECT - Automatic role-based colors
+<UserAvatar name="John Doe" role="Executive" />
+
+// ❌ WRONG - Don't manually color avatars
+<Avatar className="bg-blue-100 text-blue-700">  // Wrong
+  <AvatarFallback>JD</AvatarFallback>
+</Avatar>
+```
+
+See `avatar-standard.mdc` for full UserAvatar guidelines.
+
+## 7. Chart Colors
+
+Use semantic chart colors from design system:
+
+```tsx
+// ✅ CORRECT - Semantic chart colors
+<div className="bg-chart-1">  {/* International Orange */}
+<div className="bg-chart-2">  {/* Electric Blue */}
+<div className="bg-chart-3">  {/* Emerald */}
+<div className="bg-chart-4">  {/* Amber */}
+<div className="bg-chart-5">  {/* Purple */}
+<div className="bg-chart-6">  {/* Pink */}
+
+// For Recharts/charting libraries
+import { chartColors } from '@/lib/chart-colors'
+
+<Bar dataKey="value" fill={chartColors[0]} />
+```
+
+## 8. Dark Mode Compatibility
+
+**All semantic tokens support dark mode automatically:**
+
+```tsx
+// ✅ CORRECT - Automatically adapts to dark mode
+<div className="bg-background text-foreground">
+<Card className="bg-card border">
+<p className="text-muted-foreground">
+
+// ❌ WRONG - Hardcoded colors break dark mode
+<div className="bg-white text-slate-900">  // Won't invert in dark mode
+<div className="dark:bg-slate-900">  // Don't manually handle dark mode
+```
+
+## 9. Hover States
+
+Use semantic hover variants:
+
+```tsx
+// ✅ CORRECT
+<Button className="bg-accent hover:bg-accent/90">
+<Link className="text-primary hover:underline">
+
+// ❌ WRONG
+<Button className="bg-orange-600 hover:bg-orange-700">  // Use accent token
+<Link className="text-blue-600 hover:text-blue-800">  // Use primary token
+```
+
+## 10. Migration Strategy
+
+To fix hardcoded colors in existing code:
+
+**Text colors:**
+- `text-slate-900` → `text-foreground`
+- `text-slate-600` → `text-muted-foreground`
+- `text-slate-500` → `text-muted-foreground`
+- `text-slate-400` → `text-muted-foreground`
+
+**Background colors:**
+- `bg-white` → `bg-background`
+- `bg-slate-50` → `bg-muted` or `bg-secondary`
+- `bg-slate-100` → `bg-muted`
+
+**Status colors:**
+- `text-green-600`, `bg-green-100` → Use `StatusBadge` with `status="success"`
+- `text-red-600`, `bg-red-100` → Use `StatusBadge` with `status="error"`
+- `text-amber-600`, `bg-amber-100` → Use `StatusBadge` with `status="warning"`
+- `text-blue-600`, `bg-blue-100` → Use `StatusBadge` with `status="info"`
+
+## Available Semantic Tokens
+
+### Base Tokens (from Tailwind config)
+```
+background, foreground
+card, card-foreground
+primary, primary-foreground
+secondary, secondary-foreground
+muted, muted-foreground
+accent, accent-foreground
+destructive, destructive-foreground
+border, input, ring
+```
+
+### Brand Tokens
+```
+international-orange, international-orange-hover, international-orange-light
+electric-blue, electric-blue-hover, electric-blue-light
+```
+
+### Status Tokens
+```
+status-success, status-success-light, status-success-dark, status-success-foreground
+status-warning, status-warning-light, status-warning-dark, status-warning-foreground
+status-error, status-error-light, status-error-dark, status-error-foreground
+status-info, status-info-light, status-info-dark, status-info-foreground
+```
+
+### Chart Tokens
+```
+chart-1, chart-2, chart-3, chart-4, chart-5, chart-6
+```
+
+## Quick Checklist
+
+Before committing any component with colors:
+
+- [ ] No hardcoded text colors (`text-slate-*`, `text-gray-*`, etc.)
+- [ ] No hardcoded background colors (`bg-slate-*`, `bg-white`, etc.)
+- [ ] Status indicators use `StatusBadge` or semantic status tokens
+- [ ] User avatars use `UserAvatar` component
+- [ ] Cards use `border` without color class
+- [ ] Errors use `text-destructive` and `border-destructive`
+- [ ] Brand colors used sparingly (CTAs, highlights only)
+- [ ] Dark mode will work automatically (no manual dark: variants)

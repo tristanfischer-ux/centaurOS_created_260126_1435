@@ -478,8 +478,8 @@ export function TimelineListView({ tasks, members, currentUserId }: TimelineList
                                                 {/* Task Info */}
                                                 <div className="flex-1 min-w-0">
                                                     <div className="flex items-start justify-between gap-2">
-                                                        <h4 className="font-medium text-slate-900 truncate">
-                                                            <span className="text-slate-400 font-mono text-xs mr-2">#{task.task_number}</span>
+                                                        <h4 className="font-medium text-foreground truncate">
+                                                            <span className="text-muted-foreground font-mono text-xs mr-2">#{task.task_number}</span>
                                                             {task.title}
                                                         </h4>
                                                         <Badge className={`shrink-0 text-xs ${getStatusBadgeClass(task.status)}`}>
@@ -488,7 +488,7 @@ export function TimelineListView({ tasks, members, currentUserId }: TimelineList
                                                     </div>
 
                                                     {/* Compact info when collapsed */}
-                                                    <div className="flex items-center gap-4 mt-1 text-sm text-slate-500 flex-wrap">
+                                                    <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground flex-wrap">
                                                         {/* Interactive Date (End Date) - Stop Propagation */}
                                                         <div onClick={(e) => e.stopPropagation()}>
                                                             <Popover>

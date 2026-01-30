@@ -186,7 +186,7 @@ export default async function SuccessPage({
         {/* CTA */}
         <Link
           href={config.ctaLink}
-          className="inline-flex items-center gap-2 bg-white text-slate-900 px-6 sm:px-8 py-3 sm:py-4 font-bold tracking-widest uppercase hover:bg-blue-500 hover:text-white transition-colors text-sm"
+          className="inline-flex items-center gap-2 bg-background text-foreground px-6 sm:px-8 py-3 sm:py-4 font-bold tracking-widest uppercase hover:bg-blue-500 hover:text-white transition-colors text-sm"
         >
           {config.ctaText}
           <ArrowRight className="w-4 h-4" />

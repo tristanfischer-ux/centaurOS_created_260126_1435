@@ -67,9 +67,9 @@ export function CompareToDialog({ currentMember, allMembers }: CompareToDialogPr
             </Button>
 
             <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) resetState() }}>
-                <DialogContent className="max-w-2xl bg-white">
+                <DialogContent size="md">
                     <DialogHeader>
-                        <DialogTitle className="text-slate-900">
+                        <DialogTitle className="text-foreground">
                             {showComparison ? "Comparison Results" : "Compare To..."}
                         </DialogTitle>
                         <DialogDescription>
@@ -84,7 +84,7 @@ export function CompareToDialog({ currentMember, allMembers }: CompareToDialogPr
                         /* Member Selection Grid */
                         <div className="grid gap-2 max-h-80 overflow-y-auto py-2">
                             {otherMembers.length === 0 ? (
-                                <div className="text-center py-8 text-slate-500">
+                                <div className="text-center py-8 text-muted-foreground">
                                     No other team members to compare with.
                                 </div>
                             ) : (
@@ -92,18 +92,18 @@ export function CompareToDialog({ currentMember, allMembers }: CompareToDialogPr
                                     <button
                                         key={member.id}
                                         onClick={() => handleSelectMember(member)}
-                                        className="flex items-center gap-4 p-3 rounded-lg border border-slate-200 hover:border-blue-400 hover:bg-blue-50 transition-colors text-left"
+                                        className="flex items-center gap-4 p-3 rounded-lg border border hover:border-blue-400 hover:bg-blue-50 transition-colors text-left"
                                     >
                                         <Avatar className="h-10 w-10">
-                                            <AvatarFallback className="bg-slate-100 text-slate-600">
+                                            <AvatarFallback className="bg-muted text-muted-foreground">
                                                 {member.full_name?.substring(0, 2).toUpperCase() || "?"}
                                             </AvatarFallback>
                                         </Avatar>
                                         <div className="flex-1">
-                                            <div className="font-medium text-slate-900">{member.full_name}</div>
-                                            <div className="text-sm text-slate-500">{member.role}</div>
+                                            <div className="font-medium text-foreground">{member.full_name}</div>
+                                            <div className="text-sm text-muted-foreground">{member.role}</div>
                                         </div>
-                                        <div className="text-xs text-slate-400">
+                                        <div className="text-xs text-muted-foreground">
                                             {member.completedTasks} done • {member.activeTasks} active
                                         </div>
                                     </button>
@@ -116,16 +116,16 @@ export function CompareToDialog({ currentMember, allMembers }: CompareToDialogPr
                             <table className="w-full">
                                 <thead>
                                     <tr className="border-b border-slate-200">
-                                        <th className="py-4 px-4 text-left text-slate-500 font-medium w-32"></th>
+                                        <th className="py-4 px-4 text-left text-muted-foreground font-medium w-32"></th>
                                         {[currentMember, selectedMember!].map(member => (
                                             <th key={member.id} className="py-4 px-6 text-center">
                                                 <div className="flex flex-col items-center gap-2">
                                                     <Avatar className="h-14 w-14 border-2 border-slate-200">
-                                                        <AvatarFallback className="bg-slate-100 text-slate-600 font-bold">
+                                                        <AvatarFallback className="bg-muted text-muted-foreground font-bold">
                                                             {member.full_name?.substring(0, 2).toUpperCase()}
                                                         </AvatarFallback>
                                                     </Avatar>
-                                                    <span className="font-semibold text-slate-900">{member.full_name}</span>
+                                                    <span className="font-semibold text-foreground">{member.full_name}</span>
                                                 </div>
                                             </th>
                                         ))}
@@ -139,8 +139,8 @@ export function CompareToDialog({ currentMember, allMembers }: CompareToDialogPr
                                         const maxVal = Math.max(...numericValues)
 
                                         return (
-                                            <tr key={row.label} className={idx % 2 === 0 ? 'bg-slate-50' : 'bg-white'}>
-                                                <td className="py-3 px-4 text-slate-500 font-medium text-sm">{row.label}</td>
+                                            <tr key={row.label} className={idx % 2 === 0 ? 'bg-muted' : 'bg-white'}>
+                                                <td className="py-3 px-4 text-muted-foreground font-medium text-sm">{row.label}</td>
                                                 {members.map((member, i) => {
                                                     const value = values[i]
                                                     const isNumeric = typeof value === 'number'
@@ -153,7 +153,7 @@ export function CompareToDialog({ currentMember, allMembers }: CompareToDialogPr
                                                             className={`py-3 px-6 text-center font-medium
                                                                 ${isBest ? 'text-green-600 bg-green-50' : ''}
                                                                 ${isWorst ? 'text-red-600 bg-red-50' : ''}
-                                                                ${!isBest && !isWorst ? 'text-slate-900' : ''}
+                                                                ${!isBest && !isWorst ? 'text-foreground' : ''}
                                                             `}
                                                         >
                                                             {isBest && <Check className="inline h-4 w-4 mr-1" />}
@@ -167,7 +167,7 @@ export function CompareToDialog({ currentMember, allMembers }: CompareToDialogPr
                                 </tbody>
                             </table>
 
-                            <div className="mt-4 pt-4 border-t border-slate-200 flex justify-between">
+                            <div className="mt-4 pt-4 border-t border flex justify-between">
                                 <Button variant="secondary" onClick={resetState}>
                                     ← Compare with someone else
                                 </Button>

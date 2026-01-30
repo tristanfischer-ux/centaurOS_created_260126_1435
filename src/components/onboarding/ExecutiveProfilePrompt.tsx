@@ -161,7 +161,7 @@ export function ExecutiveProfilePrompt({
                   className={`px-3 py-1.5 text-xs font-medium rounded-full border transition-all ${
                     selectedExpertise.includes(area)
                       ? 'bg-orange-600 text-white border-orange-600'
-                      : 'bg-white text-slate-600 border-slate-200 hover:border-orange-500/50'
+                      : 'bg-background text-muted-foreground border hover:border-orange-500/50'
                   }`}
                 >
                   {selectedExpertise.includes(area) && (
@@ -205,7 +205,7 @@ export function ExecutiveProfilePrompt({
                   className={`flex-1 px-3 py-2 text-sm font-medium rounded border transition-all ${
                     availability === hours
                       ? 'bg-orange-600 text-white border-orange-600'
-                      : 'bg-white text-slate-600 border-slate-200 hover:border-orange-500/50'
+                      : 'bg-background text-muted-foreground border hover:border-orange-500/50'
                   }`}
                 >
                   {hours} hrs

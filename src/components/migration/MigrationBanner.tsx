@@ -106,7 +106,7 @@ function getBannerConfig(
                     Icon: AlertCircle,
                     title: 'Upgrade Your Listing',
                     description: 'Upgrade to accept bookings directly through the platform with secure payments.',
-                    containerClass: 'border-blue-200 bg-blue-50/50',
+                    containerClass: 'border bg-blue-50/50',
                     iconClass: 'bg-blue-100 text-blue-600',
                     titleClass: 'text-blue-900',
                     descriptionClass: 'text-blue-700',
@@ -137,10 +137,10 @@ function getBannerConfig(
                     Icon: AlertCircle,
                     title: 'Contact Only',
                     description: 'This provider isn\'t set up for online booking yet. Use their contact details.',
-                    containerClass: 'border-slate-200 bg-slate-50/50',
-                    iconClass: 'bg-slate-100 text-slate-600',
-                    titleClass: 'text-slate-900',
-                    descriptionClass: 'text-slate-600'
+                    containerClass: 'border bg-muted/50',
+                    iconClass: 'bg-muted text-muted-foreground',
+                    titleClass: 'text-foreground',
+                    descriptionClass: 'text-muted-foreground'
                 }
         }
     }
@@ -179,7 +179,7 @@ export function MigrationStatusIndicator({
         contact_only: {
             icon: AlertCircle,
             label: 'Contact Only',
-            className: 'text-slate-500'
+            className: 'text-muted-foreground'
         }
     }
     

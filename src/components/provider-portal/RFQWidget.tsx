@@ -122,12 +122,12 @@ export function RFQWidget({ className }: RFQWidgetProps) {
         {/* Stats Grid */}
         <div className="grid grid-cols-2 gap-3">
           {/* Active Matches */}
-          <div className="p-3 rounded-lg bg-white border border-slate-100">
+          <div className="p-3 rounded-lg bg-background border border-slate-100">
             <div className="flex items-center gap-2 mb-1">
               <FileSearch className="h-4 w-4 text-blue-600" />
               <span className="text-xs text-muted-foreground">Active Matches</span>
             </div>
-            <p className="text-2xl font-bold text-slate-900">
+            <p className="text-2xl font-bold text-foreground">
               {stats?.activeMatches || 0}
             </p>
           </div>
@@ -137,7 +137,7 @@ export function RFQWidget({ className }: RFQWidgetProps) {
             "p-3 rounded-lg border",
             hasUrgentRFQs 
               ? "bg-amber-50 border-amber-200" 
-              : "bg-white border-slate-100"
+              : "bg-background border-slate-100"
           )}>
             <div className="flex items-center gap-2 mb-1">
               <Zap className={cn(
@@ -148,30 +148,30 @@ export function RFQWidget({ className }: RFQWidgetProps) {
             </div>
             <p className={cn(
               "text-2xl font-bold",
-              hasUrgentRFQs ? "text-amber-700" : "text-slate-900"
+              hasUrgentRFQs ? "text-amber-700" : "text-foreground"
             )}>
               {stats?.urgentCount || 0}
             </p>
           </div>
 
           {/* Win Rate */}
-          <div className="p-3 rounded-lg bg-white border border-slate-100">
+          <div className="p-3 rounded-lg bg-background border border-slate-100">
             <div className="flex items-center gap-2 mb-1">
               <Trophy className="h-4 w-4 text-green-600" />
               <span className="text-xs text-muted-foreground">Win Rate</span>
             </div>
-            <p className="text-2xl font-bold text-slate-900">
+            <p className="text-2xl font-bold text-foreground">
               {stats?.winRate ? `${stats.winRate}%` : '-'}
             </p>
           </div>
 
           {/* Avg Response Time */}
-          <div className="p-3 rounded-lg bg-white border border-slate-100">
+          <div className="p-3 rounded-lg bg-background border border-slate-100">
             <div className="flex items-center gap-2 mb-1">
               <Clock className="h-4 w-4 text-purple-600" />
               <span className="text-xs text-muted-foreground">Avg Response</span>
             </div>
-            <p className="text-lg font-bold text-slate-900">
+            <p className="text-lg font-bold text-foreground">
               {stats?.avgResponseTime || '-'}
             </p>
           </div>
@@ -180,13 +180,13 @@ export function RFQWidget({ className }: RFQWidgetProps) {
         {/* Recent RFQs Preview */}
         {recentRFQs.length > 0 && (
           <div className="space-y-2">
-            <h4 className="text-sm font-medium text-slate-700">Recent Opportunities</h4>
+            <h4 className="text-sm font-medium text-foreground">Recent Opportunities</h4>
             <div className="space-y-2">
               {recentRFQs.slice(0, 3).map((rfq) => (
                 <button
                   key={rfq.id}
                   onClick={() => router.push(`/rfq/${rfq.id}`)}
-                  className="w-full flex items-center justify-between p-2 rounded-md border bg-white hover:bg-slate-50 transition-colors text-left"
+                  className="w-full flex items-center justify-between p-2 rounded-md border bg-background hover:bg-muted transition-colors text-left"
                 >
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium truncate">{rfq.title}</p>
@@ -207,9 +207,9 @@ export function RFQWidget({ className }: RFQWidgetProps) {
 
         {/* Empty State */}
         {recentRFQs.length === 0 && (
-          <div className="text-center py-6 px-4 rounded-lg bg-white border border-dashed">
+          <div className="text-center py-6 px-4 rounded-lg bg-background border border-dashed">
             <AlertCircle className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
-            <p className="text-sm font-medium text-slate-700">No RFQs available</p>
+            <p className="text-sm font-medium text-foreground">No RFQs available</p>
             <p className="text-xs text-muted-foreground mt-1">
               New opportunities will appear here
             </p>

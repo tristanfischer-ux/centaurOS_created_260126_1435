@@ -55,15 +55,15 @@ export default async function ProviderPortalLayout({ children }: ProviderPortalL
                     </CardHeader>
                     <CardContent className="space-y-6">
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
-                            <div className="p-4 rounded-lg bg-slate-50">
+                            <div className="p-4 rounded-lg bg-muted">
                                 <div className="text-2xl font-bold text-international-orange">1</div>
                                 <div className="text-sm text-muted-foreground mt-1">Apply to join</div>
                             </div>
-                            <div className="p-4 rounded-lg bg-slate-50">
+                            <div className="p-4 rounded-lg bg-muted">
                                 <div className="text-2xl font-bold text-international-orange">2</div>
                                 <div className="text-sm text-muted-foreground mt-1">Get verified</div>
                             </div>
-                            <div className="p-4 rounded-lg bg-slate-50">
+                            <div className="p-4 rounded-lg bg-muted">
                                 <div className="text-2xl font-bold text-international-orange">3</div>
                                 <div className="text-sm text-muted-foreground mt-1">Start earning</div>
                             </div>

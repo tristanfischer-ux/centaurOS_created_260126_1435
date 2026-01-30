@@ -351,7 +351,7 @@ export function CreateTaskDialog({ objectives, members, teams = [], currentUserI
                     </Button>
                 )}
             </DialogTrigger>
-            <DialogContent className="w-[calc(100vw-2rem)] sm:max-w-[600px] bg-white text-slate-900 border-slate-200 max-h-[90dvh] overflow-y-auto">
+            <DialogContent className="w-[calc(100vw-2rem)] sm:max-w-[600px] bg-background text-foreground border max-h-[90dvh] overflow-y-auto">
                 <form onSubmit={onSubmit}>
                     <DialogHeader>
                         <div className="flex items-start justify-between pr-8">
@@ -373,7 +373,7 @@ export function CreateTaskDialog({ objectives, members, teams = [], currentUserI
                                         </div>
                                     )}
                                 </div>
-                                <p className="text-xs text-slate-500 text-right max-w-[120px]">
+                                <p className="text-xs text-muted-foreground text-right max-w-[120px]">
                                     Speak to fill task details
                                 </p>
                             </div>
@@ -382,7 +382,9 @@ export function CreateTaskDialog({ objectives, members, teams = [], currentUserI
                     <div className="grid gap-4 py-4">
                         {/* Stage 1 - Required Fields (always visible) */}
                         <div className="grid gap-2">
-                            <Label htmlFor="title">Task Title <span className="text-red-500">*</span></Label>
+                            <Label htmlFor="title">
+                                Task Title <span className="text-destructive ml-1" aria-label="required">*</span>
+                            </Label>
                             <Input
                                 id="title"
                                 name="title"
@@ -393,12 +395,12 @@ export function CreateTaskDialog({ objectives, members, teams = [], currentUserI
                                 ref={titleObjRef}
                                 aria-describedby={titleError ? "title-error" : undefined}
                                 aria-invalid={!!titleError}
-                                className={titleError ? "border-red-500" : ""}
+                                className={cn(titleError && "border-destructive")}
                                 onChange={() => setTitleError(null)}
                                 autoFocus
                             />
                             {titleError && (
-                                <p id="title-error" className="text-sm text-red-600 mt-1" role="alert">
+                                <p id="title-error" className="text-sm text-destructive mt-1" role="alert">
                                     {titleError}
                                 </p>
                             )}
@@ -406,7 +408,9 @@ export function CreateTaskDialog({ objectives, members, teams = [], currentUserI
 
                         {/* Assignees - Multi-Select */}
                         <div className="grid gap-2">
-                            <Label>Assignees <span className="text-red-500">*</span></Label>
+                            <Label>
+                                Assignees <span className="text-destructive ml-1" aria-label="required">*</span>
+                            </Label>
                             <div aria-describedby={assigneeError ? "assignee-error" : undefined}>
                                 <MultiSelect
                                     options={memberOptions}
@@ -420,7 +424,7 @@ export function CreateTaskDialog({ objectives, members, teams = [], currentUserI
                                 />
                             </div>
                             {assigneeError && (
-                                <p id="assignee-error" className="text-sm text-red-600 mt-1" role="alert">
+                                <p id="assignee-error" className="text-sm text-destructive mt-1" role="alert">
                                     {assigneeError}
                                 </p>
                             )}
@@ -435,7 +439,7 @@ export function CreateTaskDialog({ objectives, members, teams = [], currentUserI
                                         variant="secondary"
                                         role="combobox"
                                         aria-expanded={objectiveOpen}
-                                        className="w-full justify-between bg-white border-slate-200"
+                                        className="w-full justify-between bg-background border-slate-200"
                                         id="objective"
                                     >
                                         {selectedObjective
@@ -488,7 +492,7 @@ export function CreateTaskDialog({ objectives, members, teams = [], currentUserI
                                 variant="ghost"
                                 size="sm"
                                 onClick={() => setShowAdvanced(!showAdvanced)}
-                                className="text-slate-500"
+                                className="text-muted-foreground"
                             >
                                 {showAdvanced ? (
                                     <>
@@ -508,7 +512,7 @@ export function CreateTaskDialog({ objectives, members, teams = [], currentUserI
                         {showAdvanced && (
                             <>
                                 <div className="grid gap-2">
-                                    <Label htmlFor="description">Description <span className="text-slate-500 font-normal">(Optional)</span></Label>
+                                    <Label htmlFor="description">Description <span className="text-muted-foreground font-normal">(Optional)</span></Label>
                                     <Textarea
                                         id="description"
                                         name="description"
@@ -520,7 +524,7 @@ export function CreateTaskDialog({ objectives, members, teams = [], currentUserI
                                         onChange={(e) => setDescription(e.target.value)}
                                         maxLength={500}
                                     />
-                                    <p className="text-xs text-slate-500 text-right">{description.length}/500</p>
+                                    <p className="text-xs text-muted-foreground text-right">{description.length}/500</p>
                                 </div>
 
                                 {/* Deadline */}
@@ -537,7 +541,7 @@ export function CreateTaskDialog({ objectives, members, teams = [], currentUserI
                                 <div className="grid gap-2">
                                     <Label htmlFor="file-upload">Attachments (Optional)</Label>
                                     <div
-                                        className="border-2 border-dashed border-slate-200 rounded-lg p-4 text-center cursor-pointer hover:border-slate-300 hover:bg-slate-50 transition-colors"
+                                        className="border-2 border-dashed border rounded-lg p-4 text-center cursor-pointer hover:border-slate-300 hover:bg-muted transition-colors"
                                         onClick={() => fileInputRef.current?.click()}
                                         role="button"
                                         tabIndex={0}
@@ -549,11 +553,11 @@ export function CreateTaskDialog({ objectives, members, teams = [], currentUserI
                                             }
                                         }}
                                     >
-                                        <Upload className="h-6 w-6 mx-auto text-slate-400 mb-2" />
-                                        <p className="text-sm text-slate-500">
+                                        <Upload className="h-6 w-6 mx-auto text-muted-foreground mb-2" />
+                                        <p className="text-sm text-muted-foreground">
                                             Click to upload or drag & drop
                                         </p>
-                                        <p className="text-xs text-slate-400 mt-1">
+                                        <p className="text-xs text-muted-foreground mt-1">
                                             Max {MAX_FILES} files, 10MB each
                                         </p>
                                     </div>
@@ -574,17 +578,17 @@ export function CreateTaskDialog({ objectives, members, teams = [], currentUserI
                                             {files.map((file, idx) => (
                                                 <div
                                                     key={idx}
-                                                    className="flex items-center gap-2 bg-slate-50 rounded-md px-3 py-2 text-sm"
+                                                    className="flex items-center gap-2 bg-muted rounded-md px-3 py-2 text-sm"
                                                 >
-                                                    <FileIcon className="h-4 w-4 text-slate-400 shrink-0" />
+                                                    <FileIcon className="h-4 w-4 text-muted-foreground shrink-0" />
                                                     <span className="truncate flex-1">{file.name}</span>
-                                                    <span className="text-xs text-slate-400 shrink-0">
+                                                    <span className="text-xs text-muted-foreground shrink-0">
                                                         {formatFileSize(file.size)}
                                                     </span>
                                                     <button
                                                         type="button"
                                                         onClick={() => removeFile(idx)}
-                                                        className="text-slate-400 hover:text-red-500"
+                                                        className="text-muted-foreground hover:text-destructive transition-colors"
                                                         aria-label={`Remove ${file.name}`}
                                                     >
                                                         <X className="h-4 w-4" />
@@ -598,7 +602,7 @@ export function CreateTaskDialog({ objectives, members, teams = [], currentUserI
                         )}
                         {submitError && (
                             <div className="col-span-full">
-                                <p className="text-sm text-red-600" role="alert">
+                                <p className="text-sm text-destructive" role="alert">
                                     {submitError}
                                 </p>
                             </div>

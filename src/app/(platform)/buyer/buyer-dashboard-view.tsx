@@ -399,7 +399,7 @@ function ProviderCard({ provider, onClick }: ProviderCardProps) {
                             Available
                         </Badge>
                     ) : (
-                        <Badge variant="secondary" className="text-slate-500">
+                        <Badge variant="secondary" className="text-muted-foreground">
                             Busy
                         </Badge>
                     )}

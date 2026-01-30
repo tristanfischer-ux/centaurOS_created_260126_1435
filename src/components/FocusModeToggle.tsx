@@ -77,7 +77,7 @@ export function FocusModeToggle({ compact = false, showLabel = true, className }
                     'relative p-2 rounded-full transition-colors',
                     isFocusMode 
                         ? 'bg-purple-100 text-purple-600 hover:bg-purple-200' 
-                        : 'hover:bg-slate-100 text-slate-600',
+                        : 'hover:bg-muted text-muted-foreground',
                     className
                 )}
                 title={isFocusMode ? 'Exit Focus Mode' : 'Enter Focus Mode'}
@@ -102,11 +102,11 @@ export function FocusModeToggle({ compact = false, showLabel = true, className }
                     <div className="flex items-center gap-2">
                         <Focus className={cn(
                             'h-4 w-4',
-                            isFocusMode ? 'text-purple-600' : 'text-slate-500'
+                            isFocusMode ? 'text-purple-600' : 'text-muted-foreground'
                         )} />
                         <span className={cn(
                             'text-sm font-medium',
-                            isFocusMode ? 'text-purple-600' : 'text-slate-700'
+                            isFocusMode ? 'text-purple-600' : 'text-foreground'
                         )}>
                             Focus Mode
                         </span>
@@ -123,7 +123,7 @@ export function FocusModeToggle({ compact = false, showLabel = true, className }
             <Dialog open={showDialog} onOpenChange={setShowDialog}>
                 <DialogContent className="sm:max-w-[400px] bg-white">
                     <DialogHeader>
-                        <DialogTitle className="flex items-center gap-2 text-slate-900">
+                        <DialogTitle className="flex items-center gap-2 text-foreground">
                             <Focus className="h-5 w-5 text-purple-600" />
                             Enter Focus Mode
                         </DialogTitle>
@@ -136,7 +136,7 @@ export function FocusModeToggle({ compact = false, showLabel = true, className }
                         <div className="space-y-2">
                             <Label>Duration</Label>
                             <Select value={duration} onValueChange={setDuration}>
-                                <SelectTrigger className="bg-white">
+                                <SelectTrigger className="bg-background">
                                     <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -157,7 +157,7 @@ export function FocusModeToggle({ compact = false, showLabel = true, className }
                                         max={480}
                                         className="w-24 bg-white"
                                     />
-                                    <span className="text-sm text-slate-500">minutes</span>
+                                    <span className="text-sm text-muted-foreground">minutes</span>
                                 </div>
                             )}
                         </div>
@@ -168,9 +168,9 @@ export function FocusModeToggle({ compact = false, showLabel = true, className }
                                 value={statusMessage}
                                 onChange={(e) => setStatusMessage(e.target.value)}
                                 placeholder="What are you working on?"
-                                className="bg-white"
+                                className="bg-background"
                             />
-                            <p className="text-xs text-slate-500">
+                            <p className="text-xs text-muted-foreground">
                                 Shown to team members who try to message you
                             </p>
                         </div>
@@ -282,7 +282,7 @@ export function UrgentOverrideButton({
             <Dialog open={showDialog} onOpenChange={setShowDialog}>
                 <DialogContent className="sm:max-w-[400px] bg-white">
                     <DialogHeader>
-                        <DialogTitle className="flex items-center gap-2 text-slate-900">
+                        <DialogTitle className="flex items-center gap-2 text-foreground">
                             <Zap className="h-5 w-5 text-amber-500" />
                             Send Urgent Message
                         </DialogTitle>

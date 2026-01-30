@@ -214,7 +214,7 @@ export const TaskCard = memo(function TaskCard(props: TaskCardProps) {
                 tooltip: "Requires peer review before completion. Important but manageable impact."
             },
             Low: {
-                badge: <Badge variant="secondary" className="gap-1 text-slate-500 bg-slate-50 border-slate-200 font-mono tracking-tighter cursor-help"><ShieldCheck className="w-3 h-3" /> LOW RISK</Badge>,
+                badge: <Badge variant="secondary" className="gap-1 text-muted-foreground bg-muted border font-mono tracking-tighter cursor-help"><ShieldCheck className="w-3 h-3" /> LOW RISK</Badge>,
                 tooltip: "Routine task. Can be completed without additional approvals."
             }
         }
@@ -364,7 +364,7 @@ export const TaskCard = memo(function TaskCard(props: TaskCardProps) {
     return (
         <Card
             className={cn(
-                "bg-white transition-all duration-300 flex flex-col h-full group/card relative border border-slate-200",
+                "bg-background transition-all duration-300 flex flex-col h-full group/card relative border border-slate-200",
                 isSelectionMode ? "cursor-pointer" : "hover:border-slate-400 hover:shadow-md hover:-translate-y-[2px] active:translate-y-0 active:shadow-sm",
                 isSelected && isSelectionMode ? "ring-2 ring-blue-500 bg-blue-50/10 border-blue-400" : ""
             )}
@@ -477,14 +477,14 @@ export const TaskCard = memo(function TaskCard(props: TaskCardProps) {
                                                     max={4}
                                                 />
                                             ) : (
-                                                <div className="h-8 w-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-400">
+                                                <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center text-muted-foreground">
                                                     <Plus className="w-4 h-4" />
                                                 </div>
                                             )}
                                         </div>
                                     </div>
                                 </PopoverTrigger>
-                                <PopoverContent className="z-[100] w-[calc(100vw-2rem)] max-w-[240px] sm:w-[240px] overflow-y-auto max-h-[60vh] p-0 bg-white border shadow-lg" align="end" sideOffset={8} collisionPadding={16} onClick={(e) => e.stopPropagation()} onOpenAutoFocus={(e) => e.preventDefault()}>
+                                <PopoverContent className="z-[100] w-[calc(100vw-2rem)] max-w-[240px] sm:w-[240px] overflow-y-auto max-h-[60vh] p-0 bg-background border shadow-lg" align="end" sideOffset={8} collisionPadding={16} onClick={(e) => e.stopPropagation()} onOpenAutoFocus={(e) => e.preventDefault()}>
                                     <Command>
                                         <CommandInput placeholder="Assign to member..." />
                                         <CommandList>
@@ -544,7 +544,7 @@ export const TaskCard = memo(function TaskCard(props: TaskCardProps) {
                         <PopoverTrigger asChild>
                             <div className="flex items-center gap-1 cursor-pointer hover:text-blue-600 active:text-blue-700 transition-colors duration-200 group/assignee touch-manipulation" onClick={(e) => e.stopPropagation()}>
                                 {currentAssignees.some(a => a.role === 'AI_Agent') ? <Bot className="w-3 h-3" /> : <div className="w-3" />}
-                                <span className="truncate max-w-[120px] border-b border-transparent group-hover/assignee:border-blue-200">
+                                <span className="truncate max-w-[120px] border-b border-transparent group-hover/assignee:border">
                                     {currentAssignees.length > 0 
                                         ? currentAssignees.length === 1 
                                             ? currentAssignees[0].full_name 
@@ -553,7 +553,7 @@ export const TaskCard = memo(function TaskCard(props: TaskCardProps) {
                                 </span>
                             </div>
                         </PopoverTrigger>
-                        <PopoverContent className="z-[100] w-[calc(100vw-2rem)] max-w-[240px] sm:w-[240px] overflow-y-auto max-h-[60vh] p-0 bg-white border shadow-lg" align="start" sideOffset={8} collisionPadding={16} onClick={(e) => e.stopPropagation()} onOpenAutoFocus={(e) => e.preventDefault()}>
+                        <PopoverContent className="z-[100] w-[calc(100vw-2rem)] max-w-[240px] sm:w-[240px] overflow-y-auto max-h-[60vh] p-0 bg-background border shadow-lg" align="start" sideOffset={8} collisionPadding={16} onClick={(e) => e.stopPropagation()} onOpenAutoFocus={(e) => e.preventDefault()}>
                             <Command>
                                 <CommandInput placeholder="Assign to member..." />
                                 <CommandList>
@@ -629,7 +629,7 @@ export const TaskCard = memo(function TaskCard(props: TaskCardProps) {
 
             {expanded && (
                 <>
-                    <CardContent className="bg-slate-50/50 pt-4 pb-4 flex-1">
+                    <CardContent className="bg-muted/50 pt-4 pb-4 flex-1">
                         <div className="space-y-4">
                             {/* Full Description */}
                             <div className="space-y-1">
@@ -649,7 +649,7 @@ export const TaskCard = memo(function TaskCard(props: TaskCardProps) {
                                 <Popover>
                                     <PopoverTrigger asChild>
                                         <div className={cn(
-                                            "bg-slate-50 p-2.5 rounded shadow-sm cursor-pointer hover:bg-slate-100 active:bg-slate-200 transition-colors duration-200 group",
+                                            "bg-muted p-2.5 rounded shadow-sm cursor-pointer hover:bg-muted active:bg-slate-200 transition-colors duration-200 group",
                                             !isAssignee && !isCreator && "pointer-events-none" // Only allow edits if assignee/creator
                                         )}>
                                             <span className="text-[10px] text-muted-foreground block mb-1 group-hover:text-amber-600 transition-colors duration-200">Start Date</span>
@@ -675,7 +675,7 @@ export const TaskCard = memo(function TaskCard(props: TaskCardProps) {
                                 <Popover>
                                     <PopoverTrigger asChild>
                                         <div className={cn(
-                                            "bg-slate-50 p-2.5 rounded shadow-sm cursor-pointer hover:bg-slate-100 active:bg-slate-200 transition-colors duration-200 group",
+                                            "bg-muted p-2.5 rounded shadow-sm cursor-pointer hover:bg-muted active:bg-slate-200 transition-colors duration-200 group",
                                             !isAssignee && !isCreator && "pointer-events-none"
                                         )}>
                                             <span className="text-[10px] text-muted-foreground block mb-1 group-hover:text-amber-600 transition-colors duration-200">Deadline</span>
@@ -723,7 +723,7 @@ export const TaskCard = memo(function TaskCard(props: TaskCardProps) {
 
                     <Separator className="bg-slate-200" />
 
-                    <CardFooter className="bg-slate-50 p-4 flex flex-col gap-4 mt-auto">
+                    <CardFooter className="bg-muted p-4 flex flex-col gap-4 mt-auto">
                         {/* Primary Workflow Actions - Only render section if actions are available */}
                         {(() => {
                             const showAcceptReject = task.status === 'Pending' && isAssignee
@@ -757,10 +757,10 @@ export const TaskCard = memo(function TaskCard(props: TaskCardProps) {
                                                             <X className="h-4 w-4" /> Reject
                                                         </Button>
                                                     </DialogTrigger>
-                                                    <DialogContent className="bg-white shadow-xl text-slate-900">
+                                                    <DialogContent className="bg-background shadow-xl text-foreground">
                                                         <DialogHeader><DialogTitle>Reject Task</DialogTitle></DialogHeader>
                                                         <form action={handleReject} className="space-y-4">
-                                                            <Textarea name="reason" placeholder="Reason for rejection..." required className="bg-slate-50" />
+                                                            <Textarea name="reason" placeholder="Reason for rejection..." required className="bg-muted" />
                                                             <Button type="submit" variant="destructive" className="w-full">Confirm Rejection</Button>
                                                         </form>
                                                     </DialogContent>
@@ -829,7 +829,7 @@ export const TaskCard = memo(function TaskCard(props: TaskCardProps) {
                                         </TooltipTrigger>
                                         <TooltipContent>Forward or reassign task</TooltipContent>
                                     </Tooltip>
-                                    <DialogContent className="bg-white shadow-xl text-slate-900 max-w-lg">
+                                    <DialogContent className="bg-background shadow-xl text-foreground max-w-lg">
                                         <DialogHeader>
                                             <DialogTitle>Forward Task</DialogTitle>
                                             <p className="text-sm text-muted-foreground mt-1">
@@ -840,10 +840,10 @@ export const TaskCard = memo(function TaskCard(props: TaskCardProps) {
                                             <div className="grid gap-2">
                                                 <label className="text-sm font-medium text-foreground">New Assignee</label>
                                                 <Select name="new_assignee_id" required>
-                                                    <SelectTrigger className="bg-white">
+                                                    <SelectTrigger className="bg-background">
                                                         <SelectValue placeholder="Select person..." />
                                                     </SelectTrigger>
-                                                    <SelectContent className="bg-white shadow-lg z-50">
+                                                    <SelectContent className="bg-background shadow-lg z-50">
                                                         {sortedMembers.map(member => (
                                                             <SelectItem key={member.id} value={member.id}>
                                                                 <div className="flex items-center gap-3">
@@ -872,7 +872,7 @@ export const TaskCard = memo(function TaskCard(props: TaskCardProps) {
                                                     name="reason" 
                                                     placeholder="e.g., 'Please review the attached documents and coordinate with the legal team. The deadline is urgent - client needs this by end of week.'"
                                                     required 
-                                                    className="bg-slate-50 min-h-[120px] resize-y" 
+                                                    className="bg-muted min-h-[120px] resize-y" 
                                                 />
                                             </div>
                                             
@@ -908,7 +908,7 @@ export const TaskCard = memo(function TaskCard(props: TaskCardProps) {
                                                         </Button>
                                                     </div>
                                                 </div>
-                                                <div className="bg-slate-50 rounded-lg p-3 max-h-[200px] overflow-y-auto">
+                                                <div className="bg-muted rounded-lg p-3 max-h-[200px] overflow-y-auto">
                                                     {forwardAttachmentsLoading ? (
                                                         <div className="flex items-center justify-center py-4 text-muted-foreground">
                                                             <Loader2 className="h-4 w-4 animate-spin mr-2" />
@@ -1010,7 +1010,7 @@ export const TaskCard = memo(function TaskCard(props: TaskCardProps) {
 
                         {/* Special Actions Block */}
                         {(isAITask || (!task.client_visible && task.status !== 'Completed')) && (
-                            <div className="flex flex-col gap-2 pt-2 mt-2 bg-slate-50/50 -mx-4 px-4 pb-2">
+                            <div className="flex flex-col gap-2 pt-2 mt-2 bg-muted/50 -mx-4 px-4 pb-2">
                                 {isAITask && (task.status === 'Pending' || task.status === 'Accepted') && (
                                     <Button
                                         onClick={handleRunAI}

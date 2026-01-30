@@ -140,7 +140,7 @@ export function DailyPrioritizer({ tasks, maxTasks = 5 }: DailyPrioritizerProps)
                         "p-3 rounded-lg border transition-all group hover:shadow-sm",
                         index === 0 
                             ? "bg-international-orange/5 border-international-orange/30 hover:border-international-orange/50" 
-                            : "bg-foundry-50/50 border-foundry-200 hover:border-foundry-300"
+                            : "bg-foundry-50/50 border hover:border-foundry-300"
                     )}>
                         {/* Priority rank indicator */}
                         <div className="flex items-start gap-3">
@@ -197,8 +197,8 @@ export function DailyPrioritizer({ tasks, maxTasks = 5 }: DailyPrioritizerProps)
                                                                     : isStale
                                                                         ? "bg-purple-100 text-purple-700 border-purple-200"
                                                                         : isApproval
-                                                                            ? "bg-blue-100 text-blue-700 border-blue-200"
-                                                                            : "bg-foundry-100 text-foundry-600 border-foundry-200"
+                                                                            ? "bg-blue-100 text-blue-700 border"
+                                                                            : "bg-foundry-100 text-foundry-600 border"
                                                     )}
                                                 >
                                                     {isOverdue && <AlertTriangle className="h-2.5 w-2.5 mr-0.5" />}

@@ -72,7 +72,7 @@ export function RFQFileUpload({
     if (type === 'application/pdf' || ext === 'pdf') {
       return <FileText className="w-5 h-5 text-red-500" />
     }
-    return <FileIcon className="w-5 h-5 text-slate-500" />
+    return <FileIcon className="w-5 h-5 text-muted-foreground" />
   }
 
   const validateFile = (file: File): string | null => {

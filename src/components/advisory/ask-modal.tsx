@@ -263,13 +263,13 @@ export function AskModal({ onSubmit, trigger }: AskModalProps) {
                                     "flex-1 p-3 rounded-lg border-2 transition-all text-left",
                                     visibility === "foundry"
                                         ? "border-violet-500 bg-violet-50"
-                                        : "border-slate-200 hover:border-slate-300"
+                                        : "border hover:border-slate-300"
                                 )}
                             >
                                 <div className="flex items-center gap-2 mb-1">
                                     <Building2 className={cn(
                                         "h-4 w-4",
-                                        visibility === "foundry" ? "text-violet-600" : "text-slate-400"
+                                        visibility === "foundry" ? "text-violet-600" : "text-muted-foreground"
                                     )} />
                                     <span className="font-medium text-sm">Private to Foundry</span>
                                 </div>
@@ -284,13 +284,13 @@ export function AskModal({ onSubmit, trigger }: AskModalProps) {
                                     "flex-1 p-3 rounded-lg border-2 transition-all text-left",
                                     visibility === "public"
                                         ? "border-blue-500 bg-blue-50"
-                                        : "border-slate-200 hover:border-slate-300"
+                                        : "border hover:border-slate-300"
                                 )}
                             >
                                 <div className="flex items-center gap-2 mb-1">
                                     <Globe className={cn(
                                         "h-4 w-4",
-                                        visibility === "public" ? "text-blue-600" : "text-slate-400"
+                                        visibility === "public" ? "text-blue-600" : "text-muted-foreground"
                                     )} />
                                     <span className="font-medium text-sm">Share with Network</span>
                                 </div>

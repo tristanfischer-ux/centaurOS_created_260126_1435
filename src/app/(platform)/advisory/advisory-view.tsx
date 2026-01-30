@@ -279,7 +279,7 @@ export function AdvisoryView({
                     <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-3 mb-1">
                             <div className="h-8 w-1 bg-orange-600 rounded-full shadow-[0_0_8px_rgba(234,88,12,0.6)]" />
-                            <h1 className="text-2xl sm:text-3xl font-display font-semibold text-slate-900 tracking-tight flex items-center gap-3">
+                            <h1 className="text-2xl sm:text-3xl font-display font-semibold text-foreground tracking-tight flex items-center gap-3">
                                 Advisory Forum
                                 <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-orange-50 text-orange-700 text-sm font-medium rounded-full">
                                     <span className="font-semibold">{questions.length}</span>
@@ -287,7 +287,7 @@ export function AdvisoryView({
                                 </span>
                             </h1>
                         </div>
-                        <p className="text-slate-500 mt-1 text-sm font-medium pl-4">
+                        <p className="text-muted-foreground mt-1 text-sm font-medium pl-4">
                             AI-powered insights verified by human experts through democratic workflow
                         </p>
                     </div>
@@ -332,7 +332,7 @@ export function AdvisoryView({
                         <Button 
                             variant="secondary" 
                             onClick={() => setShowFilters(!showFilters)}
-                            className={cn(showFilters && "bg-slate-100")}
+                            className={cn(showFilters && "bg-muted")}
                         >
                             <Filter className="h-4 w-4 mr-2" />
                             Filters
@@ -355,7 +355,7 @@ export function AdvisoryView({
                                     "px-3 py-1.5 rounded-full text-sm font-medium transition-all duration-200",
                                     activePreset === preset.id
                                         ? "bg-slate-900 text-white"
-                                        : "bg-slate-100 text-muted-foreground hover:bg-slate-200"
+                                        : "bg-muted text-muted-foreground hover:bg-slate-200"
                                 )}
                             >
                                 {preset.label}
@@ -372,7 +372,7 @@ export function AdvisoryView({
                                 exit={{ height: 0, opacity: 0 }}
                                 className="overflow-hidden"
                             >
-                                <div className="p-4 border rounded-lg bg-slate-50 space-y-4">
+                                <div className="p-4 border rounded-lg bg-muted space-y-4">
                                     <div className="flex items-center justify-between">
                                         <h3 className="font-medium text-sm">Filter Questions</h3>
                                         {hasActiveFilters && (
@@ -494,7 +494,7 @@ export function AdvisoryView({
 
             {/* Questions Grid/List */}
             {sortedQuestions.length === 0 ? (
-                <div className="border-2 border-dashed border-slate-200 rounded-lg bg-slate-50/50">
+                <div className="border-2 border-dashed border rounded-lg bg-muted/50">
                     <EmptyState
                         icon={<HelpCircle className="h-12 w-12" />}
                         title={hasActiveFilters ? "No questions match your filters" : activeTab === "my" ? "You haven't asked any questions yet" : "No questions yet"}
@@ -565,7 +565,7 @@ export function AdvisoryView({
             <div className="mt-12 pt-8 border-t border-slate-200">
                 <div className="flex items-center gap-2 mb-4">
                     <BookOpen className="h-5 w-5 text-orange-600" />
-                    <h2 className="text-lg font-semibold text-slate-900">Resources</h2>
+                    <h2 className="text-lg font-semibold text-foreground">Resources</h2>
                 </div>
                 <p className="text-sm text-muted-foreground mb-6">
                     Knowledge base and documentation to help you succeed.

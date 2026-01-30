@@ -60,7 +60,7 @@ export function SavedResourcesView({ savedResources: initialResources, error }: 
 
     const categoryStyles: Record<string, { bg: string; text: string; border: string }> = {
         'People': { bg: 'bg-stone-50', text: 'text-stone-700', border: 'border-stone-200' },
-        'Products': { bg: 'bg-slate-50', text: 'text-slate-700', border: 'border-slate-200' },
+        'Products': { bg: 'bg-muted', text: 'text-foreground', border: 'border-slate-200' },
         'AI_Tools': { bg: 'bg-violet-50', text: 'text-violet-700', border: 'border-violet-200' },
     }
 

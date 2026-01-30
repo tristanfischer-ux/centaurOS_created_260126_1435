@@ -62,7 +62,7 @@ async function MigrationContent() {
             {/* Header */}
             <div className="flex items-center justify-between">
                 <div>
-                    <h1 className="text-2xl font-bold text-slate-900">Listing Migration</h1>
+                    <h1 className="text-2xl font-bold text-foreground">Listing Migration</h1>
                     <p className="text-muted-foreground mt-1">
                         Transition existing marketplace listings to the transactional system
                     </p>
@@ -116,7 +116,7 @@ async function MigrationContent() {
                                 {stats.completedCount} of {stats.totalListings} listings
                             </span>
                         </div>
-                        <div className="h-3 bg-slate-100 rounded-full overflow-hidden">
+                        <div className="h-3 bg-muted rounded-full overflow-hidden">
                             <div className="h-full flex">
                                 <div 
                                     className="bg-green-500 transition-all"
@@ -158,7 +158,7 @@ async function MigrationContent() {
             
             {/* Candidates Summary */}
             {candidates && candidates.length > 0 && (
-                <Card className="border-blue-200 bg-blue-50/30">
+                <Card className="border bg-blue-50/30">
                     <CardContent className="flex items-center justify-between py-4">
                         <div className="flex items-center gap-3">
                             <div className="p-2 rounded-lg bg-blue-100">

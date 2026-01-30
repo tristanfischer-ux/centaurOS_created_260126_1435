@@ -19,7 +19,7 @@ export function TrustSafetySection() {
                     The 'Centaur Stamp' is our guarantee of quality.
                 </p>
 
-                <div className="grid md:grid-cols-3 gap-8 max-w-4xl mx-auto font-mono text-sm text-slate-400">
+                <div className="grid md:grid-cols-3 gap-8 max-w-4xl mx-auto font-mono text-sm text-muted-foreground">
                     <div className="border border-white/10 p-4 pt-12 relative text-left">
                         <span className="absolute top-4 left-4 text-international-orange">01</span>
                         Code Audited by Senior Staff Engineers

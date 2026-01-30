@@ -8,10 +8,10 @@ export function TalentSection() {
             <div className="container mx-auto px-6 grid md:grid-cols-2 gap-12 items-center">
                 <div>
                     <h2 className="text-gold font-mono text-international-orange uppercase tracking-widest text-sm mb-4">The Apprentice</h2>
-                    <h3 className="text-4xl md:text-5xl font-display text-slate-900 mb-8 leading-tight">
+                    <h3 className="text-4xl md:text-5xl font-display text-foreground mb-8 leading-tight">
                         THE NEW <br /> ACADEMICS.
                     </h3>
-                    <div className="prose prose-lg text-slate-600 font-sans font-light">
+                    <div className="prose prose-lg text-muted-foreground font-sans font-light">
                         <p>
                             A Centaur is not a junior. A Centaur is a pilot.
                             We recruit the brightest young minds—top 1% of engineering talent—and train them to command AI tools that replace entire departments.
@@ -23,11 +23,11 @@ export function TalentSection() {
                     </div>
 
                     <div className="mt-8 flex items-center space-x-4">
-                        <div className="p-3 bg-white rounded-full shadow-sm">
-                            <GraduationCap className="w-6 h-6 text-slate-900" />
+                        <div className="p-3 bg-background rounded-full shadow-sm">
+                            <GraduationCap className="w-6 h-6 text-foreground" />
                         </div>
-                        <div className="font-mono text-xs uppercase text-slate-500">
-                            <div className="text-slate-900 font-bold">Centaur Academy Verified</div>
+                        <div className="font-mono text-xs uppercase text-muted-foreground">
+                            <div className="text-foreground font-bold">Centaur Academy Verified</div>
                             <div>Acceptance Rate: 0.8%</div>
                         </div>
                     </div>

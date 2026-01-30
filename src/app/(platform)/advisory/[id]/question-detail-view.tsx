@@ -70,13 +70,13 @@ const categoryColors: Record<string, string> = {
     HR: "bg-pink-100 text-pink-800",
     Technology: "bg-cyan-100 text-cyan-800",
     Strategy: "bg-indigo-100 text-indigo-800",
-    General: "bg-slate-100 text-slate-800",
+    General: "bg-muted text-foreground",
 }
 
 const verificationConfig: Record<VerificationStatus, { label: string; color: string; icon: typeof CheckCircle2 }> = {
     unverified: {
         label: "Awaiting Review",
-        color: "bg-slate-100 text-slate-600",
+        color: "bg-muted text-muted-foreground",
         icon: Clock,
     },
     endorsed: {

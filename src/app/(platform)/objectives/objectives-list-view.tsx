@@ -349,7 +349,7 @@ export function ObjectivesListView({ objectives, objectivesForDialog, members, t
                                         )}
                                     </div>
                                     {objective.description && (
-                                        <div className="text-sm text-slate-500 truncate">
+                                        <div className="text-sm text-muted-foreground truncate">
                                             <Markdown content={objective.description} className="text-sm text-muted-foreground" />
                                         </div>
                                     )}

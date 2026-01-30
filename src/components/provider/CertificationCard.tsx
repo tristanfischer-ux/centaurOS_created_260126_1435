@@ -69,7 +69,7 @@ export const CertificationCard = memo(function CertificationCard({
                                     Verified
                                 </Badge>
                             ) : (
-                                <Badge variant="secondary" className="bg-slate-50 text-slate-600 border-slate-200 shrink-0">
+                                <Badge variant="secondary" className="bg-muted text-muted-foreground border shrink-0">
                                     <Clock className="w-3 h-3 mr-1" />
                                     Pending
                                 </Badge>
@@ -199,7 +199,7 @@ export const CertificationBadge = memo(function CertificationBadge({
             className={cn(
                 certification.is_verified 
                     ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                    : 'bg-slate-50 text-slate-600 border-slate-200',
+                    : 'bg-muted text-muted-foreground border-slate-200',
                 className
             )}
         >

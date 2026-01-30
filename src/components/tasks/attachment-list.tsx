@@ -130,7 +130,7 @@ export function AttachmentList({ taskId, attachments, canDelete = false, onDelet
 
     if (attachments.length === 0) {
         return (
-            <div className="text-xs text-slate-400 italic flex items-center gap-2 py-2">
+            <div className="text-xs text-muted-foreground italic flex items-center gap-2 py-2">
                 <Paperclip className="h-3 w-3" /> No attachments
             </div>
         )
@@ -144,10 +144,10 @@ export function AttachmentList({ taskId, attachments, canDelete = false, onDelet
                     const fileUrl = fileUrls[file.file_path]
                     
                     return (
-                        <div key={file.id} className="flex items-center justify-between p-2 bg-slate-50 border border-slate-100 rounded-md group hover:border-slate-200 transition-colors">
+                        <div key={file.id} className="flex items-center justify-between p-2 bg-muted border border-slate-100 rounded-md group hover:border transition-colors">
                             <div className="flex items-center gap-4 min-w-0 flex-1">
                                 {fileType === 'image' && fileUrl ? (
-                                    <div className="w-10 h-10 rounded overflow-hidden bg-slate-100 flex-shrink-0">
+                                    <div className="w-10 h-10 rounded overflow-hidden bg-muted flex-shrink-0">
                                         <img 
                                             src={fileUrl} 
                                             alt={file.file_name}
@@ -161,7 +161,7 @@ export function AttachmentList({ taskId, attachments, canDelete = false, onDelet
                                         />
                                     </div>
                                 ) : (
-                                    <div className="w-10 h-10 rounded bg-slate-100 flex items-center justify-center flex-shrink-0">
+                                    <div className="w-10 h-10 rounded bg-muted flex items-center justify-center flex-shrink-0">
                                         {fileType === 'pdf' ? (
                                             <FileText className="h-5 w-5 text-red-500" />
                                         ) : (
@@ -170,10 +170,10 @@ export function AttachmentList({ taskId, attachments, canDelete = false, onDelet
                                     </div>
                                 )}
                                 <div className="min-w-0 flex-1">
-                                    <p className="text-sm font-medium text-slate-700 truncate" title={file.file_name}>
+                                    <p className="text-sm font-medium text-foreground truncate" title={file.file_name}>
                                         {file.file_name}
                                     </p>
-                                    <p className="text-[10px] text-slate-400">
+                                    <p className="text-[10px] text-muted-foreground">
                                         {formatFileSize(file.file_size)}
                                         • {file.created_at ? new Date(file.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Unknown date'}
                                     </p>
@@ -187,7 +187,7 @@ export function AttachmentList({ taskId, attachments, canDelete = false, onDelet
                                             <Button
                                                 variant="ghost"
                                                 size="sm"
-                                                className="min-h-[44px] min-w-[44px] h-9 w-9 p-0 text-slate-400 hover:text-slate-600"
+                                                className="min-h-[44px] min-w-[44px] h-9 w-9 p-0 text-muted-foreground hover:text-muted-foreground"
                                                 onClick={() => setPreviewFile(file)}
                                             >
                                                 <Eye className="h-4 w-4" />
@@ -204,7 +204,7 @@ export function AttachmentList({ taskId, attachments, canDelete = false, onDelet
                                             <Button
                                                 variant="ghost"
                                                 size="sm"
-                                                className="min-h-[44px] min-w-[44px] h-9 w-9 p-0 text-slate-400 hover:text-slate-600"
+                                                className="min-h-[44px] min-w-[44px] h-9 w-9 p-0 text-muted-foreground hover:text-muted-foreground"
                                                 disabled={downloadingId === file.id}
                                                 onClick={() => handleDownload(file)}
                                             >
@@ -227,7 +227,7 @@ export function AttachmentList({ taskId, attachments, canDelete = false, onDelet
                                                 <Button
                                                     size="icon"
                                                     variant="ghost"
-                                                    className="min-h-[44px] min-w-[44px] h-9 w-9 text-slate-400 hover:text-red-600 hover:bg-red-50"
+                                                    className="min-h-[44px] min-w-[44px] h-9 w-9 text-muted-foreground hover:text-red-600 hover:bg-red-50"
                                                     disabled={deletingId === file.id}
                                                     onClick={() => handleDelete(file.id, file.file_path)}
                                                 >
@@ -252,16 +252,16 @@ export function AttachmentList({ taskId, attachments, canDelete = false, onDelet
 
             {/* Preview Modal */}
             <Dialog open={!!previewFile} onOpenChange={() => setPreviewFile(null)}>
-                <DialogContent className="max-w-4xl max-h-[90vh] p-0">
+                <DialogContent size="lg" className="max-h-[90vh] p-0">
                     {previewFile && (
                         <div className="p-4">
                             <DialogHeader className="mb-2">
                                 <div className="flex items-center justify-between">
                                     <div className="flex-1 min-w-0">
-                                        <DialogTitle className="text-sm font-medium text-slate-900 truncate">
+                                        <DialogTitle className="text-sm font-medium text-foreground truncate">
                                             {previewFile.file_name}
                                         </DialogTitle>
-                                        <p className="text-xs text-slate-400">{formatFileSize(previewFile.file_size)}</p>
+                                        <p className="text-xs text-muted-foreground">{formatFileSize(previewFile.file_size)}</p>
                                     </div>
                                     <Button
                                         variant="secondary"
@@ -301,7 +301,7 @@ export function AttachmentList({ taskId, attachments, canDelete = false, onDelet
                                 />
                             )}
                             {(getFileType(previewFile.file_name) === 'other' || !fileUrls[previewFile.file_path]) && (
-                                <div className="flex flex-col items-center justify-center h-[60vh] text-slate-400">
+                                <div className="flex flex-col items-center justify-center h-[60vh] text-muted-foreground">
                                     <FileIcon className="h-16 w-16 mb-4" />
                                     <p className="text-sm mb-2">Preview not available for this file type</p>
                                     <Button

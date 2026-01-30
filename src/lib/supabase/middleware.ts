@@ -13,6 +13,7 @@ const PUBLIC_ROUTES = [
     '/api/health',
     '/api/webhooks',
     '/api/marketplace/preview',
+    '/access-revoked',  // Access revoked page for deactivated users
 ]
 
 // Routes that require admin (Executive/Founder) role
@@ -82,24 +83,44 @@ export async function updateSession(request: NextRequest) {
         return NextResponse.redirect(loginUrl)
     }
 
-    // Security: Check admin routes require proper role
-    if (user && ADMIN_ROUTES.some(route => pathname.startsWith(route))) {
-        // Fetch user's role from profile
-        const { data: profile } = await supabase
+    // Security: Check if user is deactivated (is_active = false)
+    // This happens when a user is offboarded or their access is revoked
+    if (user && !isPublicRoute) {
+        const { data: profile, error: profileError } = await supabase
             .from('profiles')
-            .select('role')
+            .select('role, is_active')
             .eq('id', user.id)
             .single()
+        
+        // RED TEAM FIX: Handle case where profile doesn't exist yet (new user)
+        // This can happen during signup flow - allow them through
+        if (profileError && profileError.code !== 'PGRST116') {
+            // Real error, not just "no rows returned"
+            console.error(`[MIDDLEWARE] Failed to fetch profile for user ${user.id}:`, profileError)
+            // Allow through rather than blocking - RLS will handle data access
+        }
+        
+        // Check if user has been deactivated
+        if (profile && profile.is_active === false) {
+            // User has been deactivated - redirect to access revoked page
+            console.warn(`[SECURITY] Deactivated user ${user.id} attempted to access ${pathname}`)
+            const revokedUrl = request.nextUrl.clone()
+            revokedUrl.pathname = '/access-revoked'
+            return NextResponse.redirect(revokedUrl)
+        }
 
-        const isAdmin = profile?.role === 'Executive' || profile?.role === 'Founder'
+        // Security: Check admin routes require proper role
+        if (profile && ADMIN_ROUTES.some(route => pathname.startsWith(route))) {
+            const isAdmin = profile.role === 'Executive' || profile.role === 'Founder'
 
-        if (!isAdmin) {
-            // User doesn't have admin access - redirect to dashboard with error
-            console.warn(`[SECURITY] Non-admin user ${user.id} attempted to access ${pathname}`)
-            const redirectUrl = request.nextUrl.clone()
-            redirectUrl.pathname = '/dashboard'
-            redirectUrl.searchParams.set('error', 'Access denied')
-            return NextResponse.redirect(redirectUrl)
+            if (!isAdmin) {
+                // User doesn't have admin access - redirect to dashboard with error
+                console.warn(`[SECURITY] Non-admin user ${user.id} attempted to access ${pathname}`)
+                const redirectUrl = request.nextUrl.clone()
+                redirectUrl.pathname = '/dashboard'
+                redirectUrl.searchParams.set('error', 'Access denied')
+                return NextResponse.redirect(redirectUrl)
+            }
         }
     }
 

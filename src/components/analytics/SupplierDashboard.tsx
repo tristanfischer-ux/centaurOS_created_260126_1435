@@ -334,7 +334,7 @@ export function SupplierDashboard({
                 {analytics.topClients.map((client) => (
                   <div 
                     key={client.id}
-                    className="flex items-center justify-between p-3 rounded-lg bg-slate-50"
+                    className="flex items-center justify-between p-3 rounded-lg bg-muted"
                   >
                     <div className="flex items-center gap-3">
                       <Avatar className="h-10 w-10">

@@ -1,4 +1,3 @@
-// @ts-nocheck
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
@@ -25,6 +24,31 @@ export interface FoundryAdminPermission {
 }
 
 /**
+ * Log an admin action to the audit trail
+ */
+async function logAdminAction(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    supabase: any,
+    foundryId: string,
+    actorId: string,
+    action: string,
+    targetUserId?: string,
+    details?: Record<string, unknown>
+) {
+    try {
+        await supabase.from('foundry_admin_audit_log').insert({
+            foundry_id: foundryId,
+            actor_id: actorId,
+            action,
+            target_user_id: targetUserId || null,
+            details: details || {}
+        })
+    } catch (err) {
+        console.error('Failed to log admin action:', err)
+    }
+}
+
+/**
  * Check if the current user has foundry admin access
  * Founders always have admin access, others need explicit permission
  */
@@ -37,19 +61,25 @@ export async function hasFoundryAdminAccess(): Promise<boolean> {
     const foundry_id = await getFoundryIdCached()
     if (!foundry_id) return false
     
-    // Check if user is a Founder
+    // Check if user is a Founder and active
     const { data: profile } = await supabase
         .from('profiles')
-        .select('role')
+        .select('role, is_active')
         .eq('id', user.id)
         .single()
     
-    if (profile?.role === 'Founder') {
+    // RED TEAM FIX: Check is_active status
+    if (!profile?.is_active) {
+        return false
+    }
+    
+    if (profile.role === 'Founder') {
         return true
     }
     
     // Check for explicit admin permission
-    const { data: permission } = await supabase
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: permission } = await (supabase as any)
         .from('foundry_admin_permissions')
         .select('id')
         .eq('foundry_id', foundry_id)
@@ -72,26 +102,34 @@ export async function grantAdminPermission(profileId: string): Promise<{ success
     const foundry_id = await getFoundryIdCached()
     if (!foundry_id) return { error: 'User not in a foundry' }
     
-    // Verify current user is a Founder
+    // Verify current user is an active Founder
     const { data: currentProfile } = await supabase
         .from('profiles')
-        .select('role')
+        .select('role, is_active')
         .eq('id', user.id)
         .single()
     
-    if (currentProfile?.role !== 'Founder') {
+    if (!currentProfile?.is_active) {
+        return { error: 'Your account is not active' }
+    }
+    
+    if (currentProfile.role !== 'Founder') {
         return { error: 'Only Founders can grant admin permissions' }
     }
     
-    // Verify target user is in the same foundry
+    // Verify target user is in the same foundry and active
     const { data: targetProfile } = await supabase
         .from('profiles')
-        .select('foundry_id, role')
+        .select('foundry_id, role, is_active, full_name')
         .eq('id', profileId)
         .single()
     
     if (!targetProfile || targetProfile.foundry_id !== foundry_id) {
         return { error: 'User not found in your foundry' }
+    }
+    
+    if (!targetProfile.is_active) {
+        return { error: 'Cannot grant admin access to deactivated users' }
     }
     
     // Don't grant to Founders (they already have access)
@@ -100,7 +138,8 @@ export async function grantAdminPermission(profileId: string): Promise<{ success
     }
     
     // Check if permission already exists
-    const { data: existing } = await supabase
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: existing } = await (supabase as any)
         .from('foundry_admin_permissions')
         .select('id')
         .eq('foundry_id', foundry_id)
@@ -112,7 +151,8 @@ export async function grantAdminPermission(profileId: string): Promise<{ success
     }
     
     // Grant permission
-    const { error } = await supabase
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error } = await (supabase as any)
         .from('foundry_admin_permissions')
         .insert({
             foundry_id,
@@ -123,6 +163,11 @@ export async function grantAdminPermission(profileId: string): Promise<{ success
     if (error) {
         return { error: error.message }
     }
+    
+    // Log action
+    await logAdminAction(supabase, foundry_id, user.id, 'grant_admin_permission', profileId, {
+        target_user_name: targetProfile.full_name
+    })
     
     revalidatePath('/team')
     return { success: true }
@@ -141,19 +186,31 @@ export async function revokeAdminPermission(profileId: string): Promise<{ succes
     const foundry_id = await getFoundryIdCached()
     if (!foundry_id) return { error: 'User not in a foundry' }
     
-    // Verify current user is a Founder
+    // Verify current user is an active Founder
     const { data: currentProfile } = await supabase
         .from('profiles')
-        .select('role')
+        .select('role, is_active')
         .eq('id', user.id)
         .single()
     
-    if (currentProfile?.role !== 'Founder') {
+    if (!currentProfile?.is_active) {
+        return { error: 'Your account is not active' }
+    }
+    
+    if (currentProfile.role !== 'Founder') {
         return { error: 'Only Founders can revoke admin permissions' }
     }
     
+    // Get target user info for audit log
+    const { data: targetProfile } = await supabase
+        .from('profiles')
+        .select('full_name')
+        .eq('id', profileId)
+        .single()
+    
     // Revoke permission
-    const { error } = await supabase
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error } = await (supabase as any)
         .from('foundry_admin_permissions')
         .delete()
         .eq('foundry_id', foundry_id)
@@ -162,6 +219,11 @@ export async function revokeAdminPermission(profileId: string): Promise<{ succes
     if (error) {
         return { error: error.message }
     }
+    
+    // Log action
+    await logAdminAction(supabase, foundry_id, user.id, 'revoke_admin_permission', profileId, {
+        target_user_name: targetProfile?.full_name
+    })
     
     revalidatePath('/team')
     return { success: true }
@@ -183,15 +245,17 @@ export async function listAdminUsers(): Promise<{
     const foundry_id = await getFoundryIdCached()
     if (!foundry_id) return { users: [], founders: [], error: 'User not in a foundry' }
     
-    // Get Founders (always have admin access)
+    // Get active Founders
     const { data: founders } = await supabase
         .from('profiles')
         .select('id, full_name, email')
         .eq('foundry_id', foundry_id)
         .eq('role', 'Founder')
+        .eq('is_active', true)
     
     // Get explicitly granted permissions
-    const { data: permissions, error } = await supabase
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: permissions, error } = await (supabase as any)
         .from('foundry_admin_permissions')
         .select(`
             id,
@@ -230,7 +294,7 @@ export async function getNonAdminMembers(): Promise<{
     const foundry_id = await getFoundryIdCached()
     if (!foundry_id) return { members: [], error: 'User not in a foundry' }
     
-    // Get all foundry members
+    // Get all active foundry members
     const { data: allMembers } = await supabase
         .from('profiles')
         .select('id, full_name, email, role')
@@ -238,12 +302,13 @@ export async function getNonAdminMembers(): Promise<{
         .eq('is_active', true)
     
     // Get existing admin permissions
-    const { data: existingPermissions } = await supabase
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: existingPermissions } = await (supabase as any)
         .from('foundry_admin_permissions')
         .select('profile_id')
         .eq('foundry_id', foundry_id)
     
-    const adminIds = new Set(existingPermissions?.map(p => p.profile_id) || [])
+    const adminIds = new Set(existingPermissions?.map((p: { profile_id: string }) => p.profile_id) || [])
     
     // Filter out Founders and users who already have admin permission
     const nonAdminMembers = (allMembers || []).filter(

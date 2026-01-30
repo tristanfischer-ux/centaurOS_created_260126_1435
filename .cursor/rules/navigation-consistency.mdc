@@ -1,0 +1,322 @@
+---
+description: Consistent navigation patterns, active states, and menu styling
+alwaysApply: true
+---
+
+# Navigation Consistency Standards
+
+All navigation components must use consistent patterns for active states, typography, icons, and interactions.
+
+## 1. Active State Color
+
+**Use International Orange for all navigation active states:**
+
+```tsx
+// ✅ CORRECT - Consistent active state
+<Link
+  href="/tasks"
+  className={cn(
+    "transition-colors",
+    isActive
+      ? "text-international-orange font-semibold"
+      : "text-muted-foreground hover:text-foreground"
+  )}
+>
+  Tasks
+</Link>
+
+// ❌ WRONG - Don't use other colors for active state
+<Link className={isActive ? "text-cyan-600" : ""}>  // Wrong
+<Link className={isActive ? "bg-cyan-50" : ""}>  // Wrong
+```
+
+**Exception:** Tabs component uses `data-[state=active]:bg-background` which is acceptable for its design.
+
+## 2. Navigation Typography
+
+**Use consistent font sizes and weights:**
+
+```tsx
+// Desktop sidebar navigation
+<Link
+  className={cn(
+    "text-sm font-medium",  // Consistent size
+    isActive && "font-semibold"
+  )}
+>
+  Dashboard
+</Link>
+
+// Mobile bottom navigation
+<Link
+  className={cn(
+    "text-xs font-medium",  // Smaller for mobile
+    isActive && "font-semibold"
+  )}
+>
+  Tasks
+</Link>
+
+// Marketing navigation
+<Link className="text-xs font-medium tracking-[0.2em] uppercase">
+  Features
+</Link>
+
+// ❌ WRONG - Don't use inconsistent sizes
+<Link className="text-base">  // Too large
+<Link className="text-[10px]">  // Custom size
+```
+
+**Standards:**
+- Desktop sidebar: `text-sm font-medium`
+- Mobile bottom nav: `text-xs font-medium`
+- Marketing nav: `text-xs font-medium tracking-[0.2em] uppercase`
+- Dropdown items: `text-sm font-medium`
+
+## 3. Icon Sizing
+
+**Use consistent icon sizes across navigation:**
+
+```tsx
+// Desktop sidebar icons
+<Home className="h-4 w-4 mr-3" />
+
+// Mobile navigation icons
+<Home className="h-5 w-5" />
+
+// Dropdown menu icons
+<Settings className="h-4 w-4" />
+
+// ❌ WRONG - Don't use inconsistent icon sizes
+<Home className="h-6 w-6" />  // Too large for desktop nav
+<Home className="h-3 w-3" />  // Too small
+```
+
+**Standards:**
+- Desktop sidebar: `h-4 w-4` with `mr-3` margin
+- Mobile bottom nav main items: `h-5 w-5`
+- Dropdown menus: `h-4 w-4` with `gap-2`
+- Icon-only buttons: `h-4 w-4`
+
+## 4. Icon Color
+
+**Use consistent icon colors:**
+
+```tsx
+// ✅ CORRECT - Icon color matches text
+<Link
+  className={cn(
+    isActive ? "text-international-orange" : "text-muted-foreground"
+  )}
+>
+  <Home className="h-4 w-4" />  {/* Inherits color from parent */}
+  Dashboard
+</Link>
+
+// ❌ WRONG - Don't manually color icons
+<Home className="text-cyan-600" />  // Wrong
+<Home className="text-slate-400" />  // Should inherit
+```
+
+## 5. Hover States
+
+**Consistent hover transitions:**
+
+```tsx
+// ✅ CORRECT - Smooth hover transition
+<Link
+  className={cn(
+    "transition-colors duration-200",
+    isActive
+      ? "text-international-orange"
+      : "text-muted-foreground hover:text-foreground"
+  )}
+>
+  Tasks
+</Link>
+
+// For navigation items with backgrounds
+<Link
+  className={cn(
+    "transition-colors duration-200",
+    isActive
+      ? "bg-orange-50 text-international-orange"
+      : "text-muted-foreground hover:bg-muted"
+  )}
+>
+  Tasks
+</Link>
+```
+
+## 6. Desktop Sidebar Pattern
+
+**Standard desktop sidebar navigation item:**
+
+```tsx
+import { Home } from 'lucide-react'
+import Link from 'next/link'
+import { usePathname } from 'next/navigation'
+import { cn } from '@/lib/utils'
+
+const pathname = usePathname()
+const isActive = pathname === '/dashboard'
+
+<Link
+  href="/dashboard"
+  className={cn(
+    "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+    isActive
+      ? "bg-orange-50 text-international-orange font-semibold"
+      : "text-muted-foreground hover:bg-muted hover:text-foreground"
+  )}
+>
+  <Home className="h-4 w-4" />
+  Dashboard
+</Link>
+```
+
+## 7. Mobile Bottom Navigation Pattern
+
+**Standard mobile bottom nav item:**
+
+```tsx
+<Link
+  href="/tasks"
+  className={cn(
+    "flex flex-col items-center gap-1 min-h-[44px] min-w-[44px] justify-center",
+    "text-xs font-medium transition-colors",
+    isActive
+      ? "text-international-orange font-semibold"
+      : "text-muted-foreground"
+  )}
+>
+  <CheckSquare className="h-5 w-5" />
+  <span>Tasks</span>
+</Link>
+```
+
+## 8. Dropdown Menu Pattern
+
+**Standard dropdown menu item:**
+
+```tsx
+import { DropdownMenuItem } from '@/components/ui/dropdown-menu'
+
+<DropdownMenuItem
+  className={cn(
+    "gap-2 min-h-[44px]",
+    isActive && "text-international-orange font-semibold"
+  )}
+  onClick={handleClick}
+>
+  <Settings className="h-4 w-4" />
+  Settings
+</DropdownMenuItem>
+```
+
+## 9. Breadcrumb Pattern
+
+**Consistent breadcrumb styling:**
+
+```tsx
+import { ChevronRight } from 'lucide-react'
+
+<nav aria-label="Breadcrumb" className="flex items-center gap-2 text-sm">
+  <Link
+    href="/dashboard"
+    className="text-muted-foreground hover:text-foreground transition-colors"
+  >
+    Dashboard
+  </Link>
+  <ChevronRight className="h-4 w-4 text-muted-foreground" />
+  <Link
+    href="/tasks"
+    className="text-muted-foreground hover:text-foreground transition-colors"
+  >
+    Tasks
+  </Link>
+  <ChevronRight className="h-4 w-4 text-muted-foreground" />
+  <span className="text-foreground font-medium">Task Detail</span>
+</nav>
+```
+
+## 10. Tab Navigation Pattern
+
+**Use Tabs component for view switching:**
+
+```tsx
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+
+<Tabs value={activeTab} onValueChange={setActiveTab}>
+  <TabsList>
+    <TabsTrigger value="all">All Tasks</TabsTrigger>
+    <TabsTrigger value="active">Active</TabsTrigger>
+    <TabsTrigger value="completed">Completed</TabsTrigger>
+  </TabsList>
+</Tabs>
+```
+
+The Tabs component handles active state styling automatically with:
+- `data-[state=active]:bg-background`
+- `data-[state=active]:text-foreground`
+- `data-[state=active]:shadow-sm`
+
+## 11. Marketing Navigation
+
+**Marketing pages have distinct navigation style:**
+
+```tsx
+<nav className="flex items-center gap-6">
+  <Link
+    href="#features"
+    className={cn(
+      "text-xs font-medium tracking-[0.2em] uppercase",
+      "text-muted-foreground hover:text-foreground transition-colors"
+    )}
+  >
+    Features
+  </Link>
+</nav>
+```
+
+## 12. Navigation Sections
+
+**Group related navigation items with sections:**
+
+```tsx
+<nav className="space-y-6">
+  {/* Section 1 */}
+  <div className="space-y-1">
+    <p className="text-xs font-mono uppercase tracking-widest text-muted-foreground mb-2 px-3">
+      Main
+    </p>
+    <NavItem href="/dashboard" icon={Home}>Dashboard</NavItem>
+    <NavItem href="/tasks" icon={CheckSquare}>Tasks</NavItem>
+  </div>
+  
+  {/* Section 2 */}
+  <div className="space-y-1">
+    <p className="text-xs font-mono uppercase tracking-widest text-muted-foreground mb-2 px-3">
+      Settings
+    </p>
+    <NavItem href="/settings" icon={Settings}>Settings</NavItem>
+  </div>
+</nav>
+```
+
+## Quick Checklist
+
+Before committing any navigation:
+
+- [ ] Active state uses `text-international-orange` (not cyan)
+- [ ] Typography consistent: `text-sm font-medium` (desktop), `text-xs` (mobile)
+- [ ] Icons consistent: `h-4 w-4` (desktop sidebar), `h-5 w-5` (mobile)
+- [ ] Icon color inherits from parent (no manual coloring)
+- [ ] Hover states use `transition-colors`
+- [ ] Desktop nav uses `gap-3` and `mr-3` for icon spacing
+- [ ] Mobile nav items have `min-h-[44px] min-w-[44px]`
+- [ ] Dropdown items have `min-h-[44px]` and `gap-2`
+- [ ] Active items have `font-semibold`
+- [ ] Breadcrumbs use `ChevronRight` separator
+- [ ] Tabs use Tabs component (not custom)
+- [ ] Marketing nav uses uppercase tracking

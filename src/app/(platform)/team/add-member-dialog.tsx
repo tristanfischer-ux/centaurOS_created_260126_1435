@@ -74,7 +74,7 @@ export function AddMemberDialog() {
                     Add Member
                 </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[425px] bg-white text-slate-900 border-slate-200">
+            <DialogContent size="sm">
                 <DialogHeader>
                     <DialogTitle>Add Team Member</DialogTitle>
                     <DialogDescription>
@@ -93,7 +93,7 @@ export function AddMemberDialog() {
                                 placeholder="John Doe"
                                 autoComplete="name"
                                 enterKeyHint="next"
-                                className="bg-white border-slate-200"
+                                className="bg-background border-slate-200"
                                 autoFocus
                             />
                         </div>
@@ -109,7 +109,7 @@ export function AddMemberDialog() {
                                 required
                                 aria-required={true}
                                 placeholder="john@example.com"
-                                className="bg-white border-slate-200"
+                                className="bg-background border-slate-200"
                             />
                         </div>
                         <div className="grid gap-2">
@@ -117,12 +117,12 @@ export function AddMemberDialog() {
                             <Select name="role_type" defaultValue="Apprentice" required>
                                 <SelectTrigger 
                                     id="role_type"
-                                    className="bg-white border-slate-200"
+                                    className="bg-background border-slate-200"
                                     aria-required={true}
                                 >
                                     <SelectValue placeholder="Select a role" />
                                 </SelectTrigger>
-                                <SelectContent className="bg-white border-slate-200">
+                                <SelectContent className="bg-background border-slate-200">
                                     <SelectItem value="Apprentice">Apprentice</SelectItem>
                                     <SelectItem value="Executive">Executive</SelectItem>
                                 </SelectContent>

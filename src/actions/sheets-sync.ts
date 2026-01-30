@@ -1,4 +1,3 @@
-// @ts-nocheck
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
@@ -44,14 +43,21 @@ export async function getSheetsIntegration(): Promise<{
     // Check if user has admin access
     const { data: profile } = await supabase
         .from('profiles')
-        .select('role')
+        .select('role, is_active')
         .eq('id', user.id)
         .single()
     
     if (!profile) return { config: null, error: 'Profile not found' }
     
-    if (profile.role !== 'Founder') {
-        const { data: adminPerm } = await supabase
+    if (!profile.is_active) {
+        return { config: null, error: 'Your account is not active' }
+    }
+    
+    // Check permissions
+    const hasAccess = profile.role === 'Founder' || profile.role === 'Executive'
+    if (!hasAccess) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { data: adminPerm } = await (supabase as any)
             .from('foundry_admin_permissions')
             .select('id')
             .eq('foundry_id', foundry_id)
@@ -64,7 +70,8 @@ export async function getSheetsIntegration(): Promise<{
     }
     
     // Get integration config
-    const { data, error } = await supabase
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data, error } = await (supabase as any)
         .from('foundry_integrations')
         .select('*')
         .eq('foundry_id', foundry_id)
@@ -77,7 +84,6 @@ export async function getSheetsIntegration(): Promise<{
     }
     
     if (!data) {
-        // Return default config if none exists
         return {
             config: {
                 sheet_id: null,
@@ -123,14 +129,18 @@ export async function updateSheetsIntegration(updates: {
     // Check if user has admin access
     const { data: profile } = await supabase
         .from('profiles')
-        .select('role')
+        .select('role, is_active')
         .eq('id', user.id)
         .single()
     
-    if (!profile) return { error: 'Profile not found' }
+    if (!profile || !profile.is_active) {
+        return { error: 'Your account is not active' }
+    }
     
-    if (profile.role !== 'Founder') {
-        const { data: adminPerm } = await supabase
+    const hasAccess = profile.role === 'Founder' || profile.role === 'Executive'
+    if (!hasAccess) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { data: adminPerm } = await (supabase as any)
             .from('foundry_admin_permissions')
             .select('id')
             .eq('foundry_id', foundry_id)
@@ -143,7 +153,8 @@ export async function updateSheetsIntegration(updates: {
     }
     
     // Get existing config
-    const { data: existing } = await supabase
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: existing } = await (supabase as any)
         .from('foundry_integrations')
         .select('*')
         .eq('foundry_id', foundry_id)
@@ -152,15 +163,14 @@ export async function updateSheetsIntegration(updates: {
     
     const existingConfig = (existing as IntegrationRecord | null)?.config || {}
     
-    // Merge updates
     const newConfig = {
         ...existingConfig,
         ...updates,
         sync_errors: existingConfig.sync_errors || []
     }
     
-    // Upsert the integration
-    const { data, error } = await supabase
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data, error } = await (supabase as any)
         .from('foundry_integrations')
         .upsert({
             foundry_id,
@@ -192,7 +202,6 @@ export async function updateSheetsIntegration(updates: {
 
 /**
  * Trigger a manual sync to Google Sheets
- * This calls the edge function to perform the sync
  */
 export async function triggerManualSync(): Promise<{
     success?: boolean
@@ -206,7 +215,6 @@ export async function triggerManualSync(): Promise<{
     const foundry_id = await getFoundryIdCached()
     if (!foundry_id) return { error: 'User not in a foundry' }
     
-    // Get current config
     const configResult = await getSheetsIntegration()
     if (!configResult.config?.sync_enabled) {
         return { error: 'Google Sheets sync is not enabled' }
@@ -217,7 +225,6 @@ export async function triggerManualSync(): Promise<{
     }
     
     try {
-        // Call the edge function
         const { data, error } = await supabase.functions.invoke('sheets-sync', {
             body: {
                 foundry_id,
@@ -227,19 +234,18 @@ export async function triggerManualSync(): Promise<{
         })
         
         if (error) {
-            // Log the error and update config
             await addSyncError(supabase, foundry_id, error.message)
             return { error: `Sync failed: ${error.message}` }
         }
         
-        // Update last_sync_at on success
-        await supabase
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await (supabase as any)
             .from('foundry_integrations')
             .update({
                 config: {
                     ...configResult.config,
                     last_sync_at: new Date().toISOString(),
-                    sync_errors: [] // Clear errors on success
+                    sync_errors: []
                 }
             })
             .eq('foundry_id', foundry_id)
@@ -255,7 +261,6 @@ export async function triggerManualSync(): Promise<{
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function addSyncError(supabase: any, foundryId: string, error: string) {
-    // Get current config
     const { data } = await supabase
         .from('foundry_integrations')
         .select('config')
@@ -268,7 +273,6 @@ async function addSyncError(supabase: any, foundryId: string, error: string) {
         const errors = config.sync_errors || []
         errors.unshift(`${new Date().toISOString()}: ${error}`)
         
-        // Keep only last 10 errors
         const trimmedErrors = errors.slice(0, 10)
         
         await supabase

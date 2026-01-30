@@ -25,7 +25,7 @@ export function MigrationStatsCard({
 }: MigrationStatsCardProps) {
     const variantStyles = {
         default: {
-            icon: 'text-muted-foreground bg-slate-100',
+            icon: 'text-muted-foreground bg-muted',
             value: 'text-foreground'
         },
         success: {
@@ -84,7 +84,7 @@ export function MigrationStatsOverview({
     migrationRate
 }: MigrationStatsOverviewProps) {
     const statItems = [
-        { label: 'Total Listings', value: totalListings, color: 'bg-slate-500' },
+        { label: 'Total Listings', value: totalListings, color: 'bg-muted0' },
         { label: 'Pending', value: pendingCount, color: 'bg-slate-400' },
         { label: 'Invited', value: invitedCount, color: 'bg-amber-500' },
         { label: 'In Progress', value: inProgressCount, color: 'bg-blue-500' },
@@ -117,7 +117,7 @@ export function MigrationStatsOverview({
             
             {/* Progress bar */}
             <div className="pt-2">
-                <div className="h-2 bg-slate-100 rounded-full overflow-hidden flex">
+                <div className="h-2 bg-muted rounded-full overflow-hidden flex">
                     <div 
                         className="bg-green-500 transition-all"
                         style={{ width: `${(completedCount / Math.max(totalListings, 1)) * 100}%` }}

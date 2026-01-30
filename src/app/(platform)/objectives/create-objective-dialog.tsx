@@ -305,21 +305,21 @@ export function CreateObjectiveDialog({ children }: CreateObjectiveDialogProps) 
         <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
                 {children || (
-                    <Button size="sm" className="bg-white text-black hover:bg-gray-200 border border-transparent shadow-sm">
+                    <Button size="sm" className="bg-background text-black hover:bg-gray-200 border border-transparent shadow-sm">
                         <Plus className="h-4 w-4" /> New Objective
                     </Button>
                 )}
             </DialogTrigger>
-            <DialogContent className="w-[calc(100vw-2rem)] sm:max-w-[800px] max-h-[90dvh] flex flex-col p-0 gap-0 bg-white sm:rounded-xl overflow-hidden">
+            <DialogContent className="w-[calc(100vw-2rem)] sm:max-w-[800px] max-h-[90dvh] flex flex-col p-0 gap-0 bg-background sm:rounded-xl overflow-hidden">
                 {/* Header Section */}
-                <div className="p-6 pb-4 bg-slate-50/50">
+                <div className="p-6 pb-4 bg-muted/50">
                     <DialogHeader>
-                        <DialogTitle className="text-xl font-semibold tracking-tight text-slate-900">
+                        <DialogTitle className="text-xl font-semibold tracking-tight text-foreground">
                             {mode === 'manual' && "Define Strategic Objective"}
                             {mode === 'pack' && (selectedPack ? "Configure Objective Pack" : "Select Objective Pack")}
                             {mode === 'import' && "Import from Business Plan"}
                         </DialogTitle>
-                        <DialogDescription className="text-slate-500">
+                        <DialogDescription className="text-muted-foreground">
                             {mode === 'manual' && "Manually define your objective and success criteria."}
                             {mode === 'pack' && !selectedPack && "Choose a pre-configured template to jumpstart your strategy."}
                             {mode === 'pack' && selectedPack && `Review tasks included in the "${selectedPack.title}" pack.`}
@@ -356,7 +356,7 @@ export function CreateObjectiveDialog({ children }: CreateObjectiveDialogProps) 
                                         "flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-all duration-200",
                                         mode === m
                                             ? "bg-slate-900 text-white shadow-md"
-                                            : "bg-white text-slate-600 hover:bg-slate-100 shadow-sm",
+                                            : "bg-background text-muted-foreground hover:bg-muted shadow-sm",
                                         isDisabled && "opacity-50 cursor-not-allowed"
                                     )}
                                 >
@@ -376,7 +376,9 @@ export function CreateObjectiveDialog({ children }: CreateObjectiveDialogProps) 
                         {mode === 'manual' && (
                             <div className="space-y-6 max-w-2xl mx-auto pt-4">
                                 <div className="space-y-2">
-                                    <Label htmlFor="title" className="text-base font-semibold">Objective Title <span className="text-red-500">*</span></Label>
+                                    <Label htmlFor="title">
+                                        Objective Title <span className="text-destructive ml-1" aria-label="required">*</span>
+                                    </Label>
                                     <Input
                                         id="title"
                                         placeholder="e.g. Q1 Market Expansion"
@@ -385,18 +387,18 @@ export function CreateObjectiveDialog({ children }: CreateObjectiveDialogProps) 
                                             setTitle(e.target.value)
                                             setTitleError(null)
                                         }}
-                                        className={`h-12 text-lg ${titleError ? 'border-red-500' : ''}`}
+                                        className={cn(titleError && "border-destructive")}
                                         autoFocus
                                         aria-describedby={titleError ? "title-error" : undefined}
                                         aria-invalid={!!titleError}
                                     />
                                     {titleError && (
-                                        <p id="title-error" className="text-sm text-red-600 mt-1" role="alert">
+                                        <p id="title-error" className="text-sm text-destructive mt-1" role="alert">
                                             {titleError}
                                         </p>
                                     )}
                                     {!titleError && title && (
-                                        <p className="text-xs text-slate-400 text-right">
+                                        <p className="text-xs text-muted-foreground text-right">
                                             {title.length} / 200 characters
                                         </p>
                                     )}
@@ -409,7 +411,7 @@ export function CreateObjectiveDialog({ children }: CreateObjectiveDialogProps) 
                                         variant="ghost"
                                         size="sm"
                                         onClick={() => setShowAdvanced(!showAdvanced)}
-                                        className="text-slate-500"
+                                        className="text-muted-foreground"
                                     >
                                         {showAdvanced ? (
                                             <>
@@ -437,17 +439,17 @@ export function CreateObjectiveDialog({ children }: CreateObjectiveDialogProps) 
                                                 setDescription(e.target.value)
                                                 setDescriptionError(null)
                                             }}
-                                            className={`min-h-[200px] text-base resize-none p-4 ${descriptionError ? 'border-red-500' : ''}`}
+                                            className={cn("min-h-[200px] resize-none", descriptionError && "border-destructive")}
                                             aria-describedby={descriptionError ? "description-error" : undefined}
                                             aria-invalid={!!descriptionError}
                                         />
                                         {descriptionError && (
-                                            <p id="description-error" className="text-sm text-red-600 mt-1" role="alert">
+                                            <p id="description-error" className="text-sm text-destructive mt-1" role="alert">
                                                 {descriptionError}
                                             </p>
                                         )}
                                         {!descriptionError && (
-                                            <p className="text-xs text-slate-400 text-right">
+                                            <p className="text-xs text-muted-foreground text-right">
                                                 {description.length} / 10,000 characters {description.length > 0 && '(Markdown supported)'}
                                             </p>
                                         )}
@@ -477,7 +479,7 @@ export function CreateObjectiveDialog({ children }: CreateObjectiveDialogProps) 
                                                             onClick={() => setSelectedCategory(selectedCategory === cat ? null : cat)}
                                                             className={cn(
                                                                 "px-3 py-1 rounded-full text-sm",
-                                                                selectedCategory === cat ? "bg-slate-900 text-white" : "bg-slate-100"
+                                                                selectedCategory === cat ? "bg-slate-900 text-white" : "bg-muted"
                                                             )}
                                                         >
                                                             {cat}
@@ -493,15 +495,15 @@ export function CreateObjectiveDialog({ children }: CreateObjectiveDialogProps) 
                                                     <Loader2 className="w-8 h-8 animate-spin text-slate-300" />
                                                 </div>
                                             ) : packError ? (
-                                                <div className="col-span-full border-2 border-dashed border-red-200 rounded-lg">
+                                                <div className="col-span-full border-2 border-dashed border-destructive/20 rounded-lg">
                                                     <EmptyState
-                                                        icon={<Package className="h-12 w-12 text-red-500" />}
+                                                        icon={<Package className="h-12 w-12 text-destructive" />}
                                                         title="Failed to load packs"
                                                         description={packError}
                                                     />
                                                 </div>
                                             ) : packs.length === 0 ? (
-                                                <div className="col-span-full bg-slate-100/50 rounded-lg">
+                                                <div className="col-span-full bg-muted/50 rounded-lg">
                                                     <EmptyState
                                                         icon={<Package className="h-12 w-12" />}
                                                         title="No packs available"
@@ -519,8 +521,8 @@ export function CreateObjectiveDialog({ children }: CreateObjectiveDialogProps) 
                                                 
                                                 if (filteredPacks.length === 0) {
                                                     return (
-                                                        <div className="col-span-full bg-slate-100/50 rounded-lg py-8 text-center">
-                                                            <p className="text-slate-500">No packs match your search criteria.</p>
+                                                        <div className="col-span-full bg-muted/50 rounded-lg py-8 text-center">
+                                                            <p className="text-muted-foreground">No packs match your search criteria.</p>
                                                         </div>
                                                     )
                                                 }
@@ -539,16 +541,16 @@ export function CreateObjectiveDialog({ children }: CreateObjectiveDialogProps) 
                                                             }}
                                                         >
                                                             <CardHeader className="space-y-1">
-                                                                <div className="w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center mb-2 group-hover:bg-blue-50 group-hover:text-blue-600 transition-colors">
-                                                                    <Icon className="w-5 h-5 text-slate-500 group-hover:text-blue-600" />
+                                                                <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center mb-2 group-hover:bg-blue-50 group-hover:text-blue-600 transition-colors">
+                                                                    <Icon className="w-5 h-5 text-muted-foreground group-hover:text-blue-600" />
                                                                 </div>
                                                                 <CardTitle className="text-lg">{pack.title}</CardTitle>
                                                                 <CardDescription className="line-clamp-2">{pack.description}</CardDescription>
                                                             </CardHeader>
                                                             <CardContent>
                                                                 <div className="flex flex-wrap gap-2">
-                                                                    {pack.category && <Badge variant="secondary" className="text-xs font-normal text-slate-500">{pack.category}</Badge>}
-                                                                    <Badge variant="secondary" className="text-xs font-normal text-slate-500">{pack.items?.length || 0} Tasks</Badge>
+                                                                    {pack.category && <Badge variant="secondary" className="text-xs font-normal text-muted-foreground">{pack.category}</Badge>}
+                                                                    <Badge variant="secondary" className="text-xs font-normal text-muted-foreground">{pack.items?.length || 0} Tasks</Badge>
                                                                 </div>
                                                             </CardContent>
                                                         </Card>
@@ -560,18 +562,18 @@ export function CreateObjectiveDialog({ children }: CreateObjectiveDialogProps) 
                                 ) : (
                                     // Selected Pack Details
                                     <div className="space-y-6 max-w-3xl mx-auto">
-                                        <Button variant="ghost" size="sm" onClick={() => setSelectedPack(null)} className="mb-2 -ml-2 text-slate-500 hover:text-slate-900">
+                                        <Button variant="ghost" size="sm" onClick={() => setSelectedPack(null)} className="mb-2 -ml-2 text-muted-foreground hover:text-foreground">
                                             <ArrowLeft className="w-4 h-4 mr-1" /> Back to Packs
                                         </Button>
 
                                         <div className="space-y-4">
                                             <div>
-                                                <h3 className="text-2xl font-bold text-slate-900">{selectedPack.title}</h3>
-                                                <p className="text-slate-500 mt-1 text-lg">{selectedPack.description}</p>
+                                                <h3 className="text-2xl font-bold text-foreground">{selectedPack.title}</h3>
+                                                <p className="text-muted-foreground mt-1 text-lg">{selectedPack.description}</p>
                                             </div>
 
-                                            <div className="border rounded-xl overflow-hidden bg-slate-50">
-                                                <div className="px-4 py-3 border-b bg-white font-medium text-sm text-slate-500 flex justify-between items-center">
+                                            <div className="border rounded-xl overflow-hidden bg-muted">
+                                                <div className="px-4 py-3 border-b bg-background font-medium text-sm text-muted-foreground flex justify-between items-center">
                                                     <div className="flex items-center gap-2">
                                                         <Checkbox
                                                             checked={selectedTaskIds.length === (selectedPack.items?.length || 0) && (selectedPack.items?.length ?? 0) > 0}
@@ -589,7 +591,7 @@ export function CreateObjectiveDialog({ children }: CreateObjectiveDialogProps) 
                                                 </div>
                                                 <div className="divide-y divide-slate-100">
                                                     {selectedPack.items?.map((item) => (
-                                                        <div key={item.id} className="p-4 flex items-start gap-4 hover:bg-slate-50/50 transition-colors">
+                                                        <div key={item.id} className="p-4 flex items-start gap-4 hover:bg-muted/50 transition-colors">
                                                             <div className="mt-1">
                                                                 <Checkbox
                                                                     checked={selectedTaskIds.includes(item.id)}
@@ -603,8 +605,8 @@ export function CreateObjectiveDialog({ children }: CreateObjectiveDialogProps) 
                                                                 />
                                                             </div>
                                                             <div className="space-y-1">
-                                                                <p className="font-medium text-slate-900 text-sm">{item.title}</p>
-                                                                <p className="text-sm text-slate-500">{item.description}</p>
+                                                                <p className="font-medium text-foreground text-sm">{item.title}</p>
+                                                                <p className="text-sm text-muted-foreground">{item.description}</p>
                                                                 {/* Role removed for later assignment */}
                                                             </div>
                                                         </div>
@@ -623,7 +625,7 @@ export function CreateObjectiveDialog({ children }: CreateObjectiveDialogProps) 
                                 {!analyzedObjectives.length && !isAnalyzing ? (
                                     <div className="w-full">
                                         <div
-                                            className="bg-slate-100/50 rounded-xl p-12 flex flex-col items-center justify-center text-center space-y-4 hover:bg-blue-50/20 transition-all cursor-pointer group relative"
+                                            className="bg-muted/50 rounded-xl p-12 flex flex-col items-center justify-center text-center space-y-4 hover:bg-blue-50/20 transition-all cursor-pointer group relative"
                                         >
                                             <Input
                                                 type="file"
@@ -635,8 +637,8 @@ export function CreateObjectiveDialog({ children }: CreateObjectiveDialogProps) 
                                                 <Upload className="w-8 h-8 text-blue-600" />
                                             </div>
                                             <div className="space-y-2">
-                                                <h3 className="text-lg font-semibold text-slate-900">Upload Business Plan</h3>
-                                                <p className="text-slate-500 max-w-sm mx-auto">
+                                                <h3 className="text-lg font-semibold text-foreground">Upload Business Plan</h3>
+                                                <p className="text-muted-foreground max-w-sm mx-auto">
                                                     Drag and drop your PDF, TXT, or MD file to automatically extract strategic objectives.
                                                 </p>
                                             </div>
@@ -646,20 +648,20 @@ export function CreateObjectiveDialog({ children }: CreateObjectiveDialogProps) 
                                 ) : isAnalyzing ? (
                                     <div className="flex flex-col items-center justify-center py-20 space-y-6">
                                         <div className="relative">
-                                            <div className="w-16 h-16 rounded-full bg-slate-100 border-t-4 border-t-blue-600 animate-spin"></div>
+                                            <div className="w-16 h-16 rounded-full bg-muted border-t-4 border-t-blue-600 animate-spin"></div>
                                             <div className="absolute inset-0 flex items-center justify-center">
                                                 <img src="/icons/sparkles.svg" className="w-6 h-6 opacity-20" alt="" />
                                             </div>
                                         </div>
                                         <div className="text-center space-y-2">
-                                            <h3 className="text-lg font-medium text-slate-900">Analyzing Strategy...</h3>
-                                            <p className="text-slate-500">Extracting actionable objectives from {analysisFile?.name}</p>
+                                            <h3 className="text-lg font-medium text-foreground">Analyzing Strategy...</h3>
+                                            <p className="text-muted-foreground">Extracting actionable objectives from {analysisFile?.name}</p>
                                         </div>
                                     </div>
                                 ) : (
                                     <div className="w-full space-y-6">
                                         <div className="flex items-center justify-between">
-                                            <h3 className="text-lg font-semibold text-slate-900">Found {analyzedObjectives.length} Objectives</h3>
+                                            <h3 className="text-lg font-semibold text-foreground">Found {analyzedObjectives.length} Objectives</h3>
                                             <Button variant="ghost" size="sm" onClick={() => {
                                                 setAnalyzedObjectives([])
                                                 setAnalysisFile(null)
@@ -704,12 +706,12 @@ export function CreateObjectiveDialog({ children }: CreateObjectiveDialogProps) 
                                                     )}
                                                 >
                                                     <div className="flex justify-between items-start mb-2">
-                                                        <h4 className="font-semibold text-slate-900">{obj.title}</h4>
+                                                        <h4 className="font-semibold text-foreground">{obj.title}</h4>
                                                         {selectedAnalysisIndex === idx && <Check className="w-4 h-4 text-blue-600" />}
                                                     </div>
-                                                    <p className="text-sm text-slate-600 line-clamp-2">{obj.description}</p>
-                                                    <div className="mt-3 flex items-center gap-2 text-xs text-slate-500">
-                                                        <Badge variant="secondary" className="bg-slate-100 text-slate-600">
+                                                    <p className="text-sm text-muted-foreground line-clamp-2">{obj.description}</p>
+                                                    <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
+                                                        <Badge variant="secondary" className="bg-muted text-muted-foreground">
                                                             {obj.tasks.length} Tasks Generated
                                                         </Badge>
                                                     </div>
@@ -726,12 +728,12 @@ export function CreateObjectiveDialog({ children }: CreateObjectiveDialogProps) 
                                                         setTitle(e.target.value)
                                                         setTitleError(null)
                                                     }}
-                                                    className={`bg-white ${titleError ? 'border-red-500' : ''}`}
+                                                    className={cn("bg-background", titleError && "border-destructive")}
                                                     aria-describedby={titleError ? "title-error-import" : undefined}
                                                     aria-invalid={!!titleError}
                                                 />
                                                 {titleError && (
-                                                    <p id="title-error-import" className="text-sm text-red-600 mt-1" role="alert">
+                                                    <p id="title-error-import" className="text-sm text-destructive mt-1" role="alert">
                                                         {titleError}
                                                     </p>
                                                 )}
@@ -741,17 +743,17 @@ export function CreateObjectiveDialog({ children }: CreateObjectiveDialogProps) 
                                                         setDescription(e.target.value)
                                                         setDescriptionError(null)
                                                     }}
-                                                    className={`resize-none h-24 bg-white ${descriptionError ? 'border-red-500' : ''}`}
+                                                    className={cn("resize-none h-24 bg-white", descriptionError && "border-destructive")}
                                                     aria-describedby={descriptionError ? "description-error-import" : undefined}
                                                     aria-invalid={!!descriptionError}
                                                 />
                                                 {descriptionError && (
-                                                    <p id="description-error-import" className="text-sm text-red-600 mt-1" role="alert">
+                                                    <p id="description-error-import" className="text-sm text-destructive mt-1" role="alert">
                                                         {descriptionError}
                                                     </p>
                                                 )}
                                                 {!descriptionError && description && (
-                                                    <p className="text-xs text-slate-400 text-right">
+                                                    <p className="text-xs text-muted-foreground text-right">
                                                         {description.length} / 10,000 characters
                                                     </p>
                                                 )}
@@ -766,8 +768,8 @@ export function CreateObjectiveDialog({ children }: CreateObjectiveDialogProps) 
                 </ScrollArea>
 
                 {/* Footer Actions */}
-                <DialogFooter className="p-6 pt-4 bg-slate-50/50">
-                    <div className="flex-1 text-sm text-slate-500">
+                <DialogFooter className="p-6 pt-4 bg-muted/50">
+                    <div className="flex-1 text-sm text-muted-foreground">
                         {mode === 'pack' && selectedPack && "This will create 1 objective and multiple tasks."}
                         {mode === 'import' && selectedAnalysisIndex !== null && "AI generated tasks will be created."}
                     </div>

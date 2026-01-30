@@ -55,7 +55,7 @@ export function RubberStampModal({ taskId, isOpen, onClose }: RubberStampModalPr
 
     return (
         <Dialog open={isOpen} onOpenChange={() => !isSubmitting && onClose()}>
-            <DialogContent className="sm:max-w-md bg-white border-red-100 text-slate-900 overflow-hidden relative shadow-brand-lg">
+            <DialogContent className="sm:max-w-md bg-background border-red-100 text-foreground overflow-hidden relative shadow-brand-lg">
 
                 {/* STAMP ANIMATION OVERLAY */}
                 <AnimatePresence>
@@ -84,8 +84,8 @@ export function RubberStampModal({ taskId, isOpen, onClose }: RubberStampModalPr
                         <ShieldAlert className="w-6 h-6" />
                         <span className="text-sm font-mono uppercase tracking-widest font-bold">Executive Airlock</span>
                     </div>
-                    <DialogTitle className="text-2xl font-serif text-slate-900 font-bold">Certification Required</DialogTitle>
-                    <DialogDescription className="text-slate-500 font-medium">
+                    <DialogTitle className="text-2xl font-serif text-foreground font-bold">Certification Required</DialogTitle>
+                    <DialogDescription className="text-muted-foreground font-medium">
                         This is a High Risk operation. You must verify the following before releasing to client.
                     </DialogDescription>
                 </DialogHeader>

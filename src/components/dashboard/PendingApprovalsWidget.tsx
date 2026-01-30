@@ -91,13 +91,13 @@ export function PendingApprovalsWidget({ userRole }: PendingApprovalsWidgetProps
             <CardContent>
                 {isLoading ? (
                     <div className="flex items-center justify-center py-8">
-                        <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
+                        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
                     </div>
                 ) : tasks.length === 0 ? (
                     <div className="text-center py-6">
                         <Check className="h-10 w-10 mx-auto text-green-500 mb-2" />
-                        <p className="text-sm text-slate-600 font-medium">All caught up!</p>
-                        <p className="text-xs text-slate-400">No tasks pending approval</p>
+                        <p className="text-sm text-muted-foreground font-medium">All caught up!</p>
+                        <p className="text-xs text-muted-foreground">No tasks pending approval</p>
                     </div>
                 ) : (
                     <div className="space-y-2">
@@ -108,21 +108,21 @@ export function PendingApprovalsWidget({ userRole }: PendingApprovalsWidgetProps
                             return (
                                 <div 
                                     key={task.id} 
-                                    className="flex items-center justify-between p-3 rounded-lg border border-slate-200 hover:border-slate-300 bg-white transition-colors"
+                                    className="flex items-center justify-between p-3 rounded-lg border border hover:border-slate-300 bg-background transition-colors"
                                 >
                                     <div className="flex items-center gap-3 min-w-0 flex-1">
                                         {assignee && (
                                             <Avatar className="h-8 w-8 shrink-0">
-                                                <AvatarFallback className="text-xs bg-slate-100 text-slate-600">
+                                                <AvatarFallback className="text-xs bg-muted text-muted-foreground">
                                                     {getInitials(assignee.full_name)}
                                                 </AvatarFallback>
                                             </Avatar>
                                         )}
                                         <div className="min-w-0">
-                                            <p className="text-sm font-medium text-slate-900 truncate">
+                                            <p className="text-sm font-medium text-foreground truncate">
                                                 {task.title}
                                             </p>
-                                            <div className="flex items-center gap-2 text-xs text-slate-500">
+                                            <div className="flex items-center gap-2 text-xs text-muted-foreground">
                                                 {assignee?.full_name && (
                                                     <span>{assignee.full_name}</span>
                                                 )}
