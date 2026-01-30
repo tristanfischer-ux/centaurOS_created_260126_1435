@@ -18,20 +18,22 @@ For each model below, click **"Add Model"** and enter these EXACT details:
 #### Model 1: Qwen Coder (Fast & Good)
 - **Name:** `qwen2.5-coder:7b`
 - **Override OpenAI Base URL:** ✅ (Checked)
-- **Base URL:** `http://localhost:11434/v1`
+- **Base URL:** `https://poikiloblastic-nonemendable-roxann.ngrok-free.dev/v1`
 - **API Key:** `ollama`
 
 #### Model 2: Qwen 14B (Powerful)
 - **Name:** `qwen2.5:14b-instruct-q4_K_M`
 - **Override OpenAI Base URL:** ✅ (Checked)
-- **Base URL:** `http://localhost:11434/v1`
+- **Base URL:** `https://poikiloblastic-nonemendable-roxann.ngrok-free.dev/v1`
 - **API Key:** `ollama`
 
 #### Model 3: DeepSeek Coder
 - **Name:** `deepseek-coder:6.7b`
 - **Override OpenAI Base URL:** ✅ (Checked)
-- **Base URL:** `http://localhost:11434/v1`
+- **Base URL:** `https://poikiloblastic-nonemendable-roxann.ngrok-free.dev/v1`
 - **API Key:** `ollama`
+
+> **Note:** The ngrok URL tunnels to your local Ollama. If ngrok restarts, you'll get a new URL and need to update these settings.
 
 ---
 

@@ -13,8 +13,11 @@ FROM base AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-# Set environment variable to output standalone Next.js build
+# Set environment variables for build
 ENV NEXT_TELEMETRY_DISABLED=1
+# Dummy values for build-time only (actual values provided at runtime)
+ENV NEXT_PUBLIC_SUPABASE_URL=https://placeholder.supabase.co
+ENV NEXT_PUBLIC_SUPABASE_ANON_KEY=placeholder-key
 RUN npm run build
 
 # Production image, copy all the files and run next
