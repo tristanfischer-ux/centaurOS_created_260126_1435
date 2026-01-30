@@ -128,8 +128,8 @@
     --ring: 14 100% 50%;
     /* International Orange Ring */
 
-    --radius: 0px;
-    /* Sharp corners - industrial aesthetic */
+    --radius: 8px;
+    /* Soft corners - modern, friendly aesthetic */
   }
 
   .dark {

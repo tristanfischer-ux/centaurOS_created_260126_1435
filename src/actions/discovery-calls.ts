@@ -197,12 +197,30 @@ export async function removeDiscoveryCallSlot(slotId: string) {
 export async function getAvailableSlots(providerSlug: string, startDate: string, endDate: string) {
     const supabase = await createClient()
     
-    // Get provider by slug
-    const { data: provider } = await supabase
+    // Validate and sanitize slug
+    const sanitizedSlug = providerSlug.replace(/[^a-zA-Z0-9_-]/g, '')
+    if (!sanitizedSlug || sanitizedSlug.length === 0) {
+        return { slots: [], error: 'Invalid provider slug' }
+    }
+    
+    // Get provider by slug using separate queries instead of .or() with string interpolation
+    let provider = null
+    const { data: bySlug } = await supabase
         .from('provider_profiles')
         .select('id')
-        .or(`profile_slug.eq.${providerSlug},username.eq.${providerSlug}`)
+        .eq('profile_slug', sanitizedSlug)
         .single()
+    
+    if (bySlug) {
+        provider = bySlug
+    } else {
+        const { data: byUsername } = await supabase
+            .from('provider_profiles')
+            .select('id')
+            .eq('username', sanitizedSlug)
+            .single()
+        provider = byUsername
+    }
     
     if (!provider) return { slots: [], error: 'Provider not found' }
     
@@ -298,12 +316,30 @@ export async function bookDiscoveryCall(input: {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return { success: false, error: 'Not authenticated' }
     
-    // Get provider by slug
-    const { data: provider } = await supabase
+    // Validate and sanitize slug
+    const sanitizedSlug = input.providerSlug.replace(/[^a-zA-Z0-9_-]/g, '')
+    if (!sanitizedSlug || sanitizedSlug.length === 0) {
+        return { success: false, error: 'Invalid provider slug' }
+    }
+    
+    // Get provider by slug using separate queries instead of .or() with string interpolation
+    let provider = null
+    const { data: bySlug } = await supabase
         .from('provider_profiles')
         .select('id, user_id')
-        .or(`profile_slug.eq.${input.providerSlug},username.eq.${input.providerSlug}`)
+        .eq('profile_slug', sanitizedSlug)
         .single()
+    
+    if (bySlug) {
+        provider = bySlug
+    } else {
+        const { data: byUsername } = await supabase
+            .from('provider_profiles')
+            .select('id, user_id')
+            .eq('username', sanitizedSlug)
+            .single()
+        provider = byUsername
+    }
     
     if (!provider) return { success: false, error: 'Provider not found' }
     

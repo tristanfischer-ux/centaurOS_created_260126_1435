@@ -4,6 +4,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import type { EnrollmentInput, Enrollment } from '@/types/apprenticeship'
+import { isValidUUID } from '@/lib/security/sanitize'
 
 // NOTE: Types are in @/types/apprenticeship - import directly from there
 
@@ -149,16 +150,44 @@ export async function getMenteeEnrollments() {
   
   if (!user) return { error: 'Unauthorized' }
   
-  const { data: enrollments, error } = await supabase
-    .from('apprenticeship_enrollments')
-    .select(`
-      *,
-      apprentice:profiles!apprentice_id(id, full_name, email, avatar_url),
-      programme:apprenticeship_programmes(id, title, level, standard_code)
-    `)
-    .or(`senior_mentor_id.eq.${user.id},workplace_buddy_id.eq.${user.id}`)
-    .in('status', ['enrolled', 'active', 'on_break', 'gateway', 'epa'])
-    .order('start_date', { ascending: false })
+  // Validate user ID is a valid UUID before using in query
+  if (!isValidUUID(user.id)) {
+    return { error: 'Invalid user ID' }
+  }
+  
+  // Get enrollments using separate queries instead of .or() with string interpolation
+  const [mentorResult, buddyResult] = await Promise.all([
+    supabase
+      .from('apprenticeship_enrollments')
+      .select(`
+        *,
+        apprentice:profiles!apprentice_id(id, full_name, email, avatar_url),
+        programme:apprenticeship_programmes(id, title, level, standard_code)
+      `)
+      .eq('senior_mentor_id', user.id)
+      .in('status', ['enrolled', 'active', 'on_break', 'gateway', 'epa']),
+    supabase
+      .from('apprenticeship_enrollments')
+      .select(`
+        *,
+        apprentice:profiles!apprentice_id(id, full_name, email, avatar_url),
+        programme:apprenticeship_programmes(id, title, level, standard_code)
+      `)
+      .eq('workplace_buddy_id', user.id)
+      .in('status', ['enrolled', 'active', 'on_break', 'gateway', 'epa'])
+  ])
+  
+  // Combine and deduplicate results by ID
+  const enrollmentMap = new Map<string, typeof mentorResult.data[0]>()
+  for (const e of [...(mentorResult.data || []), ...(buddyResult.data || [])]) {
+    if (e && !enrollmentMap.has(e.id)) {
+      enrollmentMap.set(e.id, e)
+    }
+  }
+  const enrollments = Array.from(enrollmentMap.values())
+    .sort((a, b) => new Date(b.start_date).getTime() - new Date(a.start_date).getTime())
+  
+  const error = mentorResult.error || buddyResult.error
   
   if (error) {
     console.error('Error fetching mentee enrollments:', error)

@@ -194,13 +194,28 @@ export async function canUserApprove(taskId: string): Promise<{ canApprove: bool
     }
 
     // Check for active delegations to this user
-    const { data: delegations } = await supabase
+    // Using separate queries instead of .or() with string interpolation for security
+    const now = new Date().toISOString()
+    
+    // Get delegations with no end date (unlimited)
+    const { data: unlimitedDelegations } = await supabase
         .from('approval_delegations')
         .select('*')
         .eq('delegate_id', user.id)
         .eq('is_active', true)
-        .lte('start_date', new Date().toISOString())
-        .or(`end_date.is.null,end_date.gte.${new Date().toISOString()}`)
+        .lte('start_date', now)
+        .is('end_date', null)
+    
+    // Get delegations with end date in the future
+    const { data: timedDelegations } = await supabase
+        .from('approval_delegations')
+        .select('*')
+        .eq('delegate_id', user.id)
+        .eq('is_active', true)
+        .lte('start_date', now)
+        .gte('end_date', now)
+    
+    const delegations = [...(unlimitedDelegations || []), ...(timedDelegations || [])]
 
     if (delegations && delegations.length > 0) {
         return { canApprove: true, viaDelegation: true }

@@ -1,7 +1,7 @@
 // @ts-nocheck
 'use client'
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -56,20 +56,24 @@ interface AdminDashboardProps {
 export function AdminDashboard({ enrollments, foundryId, userRole }: AdminDashboardProps) {
   const [createDialogOpen, setCreateDialogOpen] = useState(false)
   
-  // Calculate statistics
-  const totalEnrollments = enrollments.length
-  const activeCount = enrollments.filter(e => e.status === 'active').length
-  const atRiskCount = enrollments.filter(e => {
-    const progress = (e.otjt_hours_logged / e.otjt_hours_target) * 100
-    const startDate = new Date(e.start_date).getTime()
-    const endDate = new Date(e.expected_end_date).getTime()
-    const expectedProgress = ((Date.now() - startDate) / (endDate - startDate)) * 100
-    return progress < expectedProgress * 0.8
-  }).length
-  
-  const avgProgress = totalEnrollments > 0
-    ? enrollments.reduce((sum, e) => sum + (e.otjt_hours_logged / e.otjt_hours_target) * 100, 0) / totalEnrollments
-    : 0
+  // Memoize expensive statistics calculations
+  const { totalEnrollments, activeCount, atRiskCount, avgProgress } = useMemo(() => {
+    const total = enrollments.length
+    const active = enrollments.filter(e => e.status === 'active').length
+    const atRisk = enrollments.filter(e => {
+      const progress = (e.otjt_hours_logged / e.otjt_hours_target) * 100
+      const startDate = new Date(e.start_date).getTime()
+      const endDate = new Date(e.expected_end_date).getTime()
+      const expectedProgress = ((Date.now() - startDate) / (endDate - startDate)) * 100
+      return progress < expectedProgress * 0.8
+    }).length
+    
+    const avg = total > 0
+      ? enrollments.reduce((sum, e) => sum + (e.otjt_hours_logged / e.otjt_hours_target) * 100, 0) / total
+      : 0
+    
+    return { totalEnrollments: total, activeCount: active, atRiskCount: atRisk, avgProgress: avg }
+  }, [enrollments])
 
   return (
     <div className="space-y-8">

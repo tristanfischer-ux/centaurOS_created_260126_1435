@@ -1,7 +1,7 @@
 // @ts-nocheck
 'use client'
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -54,14 +54,18 @@ interface MentorDashboardProps {
 export function MentorDashboard({ mentees }: MentorDashboardProps) {
   const [approvalPanelOpen, setApprovalPanelOpen] = useState(false)
   
-  const totalPendingApprovals = mentees.reduce((sum, m) => sum + m.pendingApprovals, 0)
-  const atRiskCount = mentees.filter(m => {
-    const progress = (m.otjt_hours_logged / m.otjt_hours_target) * 100
-    const startDate = new Date(m.start_date).getTime()
-    const endDate = new Date(m.expected_end_date).getTime()
-    const expectedProgress = ((Date.now() - startDate) / (endDate - startDate)) * 100
-    return progress < expectedProgress * 0.9
-  }).length
+  // Memoize expensive calculations
+  const { totalPendingApprovals, atRiskCount } = useMemo(() => {
+    const pending = mentees.reduce((sum, m) => sum + m.pendingApprovals, 0)
+    const atRisk = mentees.filter(m => {
+      const progress = (m.otjt_hours_logged / m.otjt_hours_target) * 100
+      const startDate = new Date(m.start_date).getTime()
+      const endDate = new Date(m.expected_end_date).getTime()
+      const expectedProgress = ((Date.now() - startDate) / (endDate - startDate)) * 100
+      return progress < expectedProgress * 0.9
+    }).length
+    return { totalPendingApprovals: pending, atRiskCount: atRisk }
+  }, [mentees])
   
   return (
     <>

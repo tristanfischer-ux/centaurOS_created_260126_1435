@@ -335,21 +335,21 @@ export function RFQCreator({
                     </TooltipContent>
                   </Tooltip>
                 </div>
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-3 gap-3">
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <button
                         type="button"
                         onClick={() => setRfqType('commodity')}
                         className={cn(
-                          'flex flex-col items-center gap-1 p-3 rounded-lg border-2 transition-colors text-xs',
+                          'flex flex-col items-center gap-1.5 p-4 rounded-xl border transition-all text-xs',
                           rfqType === 'commodity'
-                            ? 'border-primary bg-primary/5'
-                            : 'border-border hover:border-muted-foreground/50'
+                            ? 'border-primary bg-primary/5 shadow-sm ring-1 ring-primary/20'
+                            : 'border-transparent bg-muted/50 hover:bg-muted'
                         )}
                         disabled={isPending}
                       >
-                        <Zap className="w-4 h-4" />
+                        <Zap className="w-5 h-5" />
                         <span className="font-medium">Commodity</span>
                       </button>
                     </TooltipTrigger>
@@ -365,14 +365,14 @@ export function RFQCreator({
                         type="button"
                         onClick={() => setRfqType('custom')}
                         className={cn(
-                          'flex flex-col items-center gap-1 p-3 rounded-lg border-2 transition-colors text-xs',
+                          'flex flex-col items-center gap-1.5 p-4 rounded-xl border transition-all text-xs',
                           rfqType === 'custom'
-                            ? 'border-primary bg-primary/5'
-                            : 'border-border hover:border-muted-foreground/50'
+                            ? 'border-primary bg-primary/5 shadow-sm ring-1 ring-primary/20'
+                            : 'border-transparent bg-muted/50 hover:bg-muted'
                         )}
                         disabled={isPending}
                       >
-                        <Clock className="w-4 h-4" />
+                        <Clock className="w-5 h-5" />
                         <span className="font-medium">Custom</span>
                       </button>
                     </TooltipTrigger>
@@ -388,14 +388,14 @@ export function RFQCreator({
                         type="button"
                         onClick={() => setRfqType('service')}
                         className={cn(
-                          'flex flex-col items-center gap-1 p-3 rounded-lg border-2 transition-colors text-xs',
+                          'flex flex-col items-center gap-1.5 p-4 rounded-xl border transition-all text-xs',
                           rfqType === 'service'
-                            ? 'border-primary bg-primary/5'
-                            : 'border-border hover:border-muted-foreground/50'
+                            ? 'border-primary bg-primary/5 shadow-sm ring-1 ring-primary/20'
+                            : 'border-transparent bg-muted/50 hover:bg-muted'
                         )}
                         disabled={isPending}
                       >
-                        <Users className="w-4 h-4" />
+                        <Users className="w-5 h-5" />
                         <span className="font-medium">Service</span>
                       </button>
                     </TooltipTrigger>
@@ -525,10 +525,10 @@ export function RFQCreator({
                       type="button"
                       onClick={() => setUrgency('standard')}
                       className={cn(
-                        'flex items-center justify-center gap-2 p-3 rounded-lg border-2 transition-colors text-sm',
+                        'flex items-center justify-center gap-2 p-3.5 rounded-xl border transition-all text-sm font-medium',
                         urgency === 'standard'
-                          ? 'border-primary bg-primary/5'
-                          : 'border-border hover:border-muted-foreground/50'
+                          ? 'border-primary bg-primary/5 shadow-sm ring-1 ring-primary/20'
+                          : 'border-transparent bg-muted/50 hover:bg-muted'
                       )}
                       disabled={isPending}
                     >
@@ -539,10 +539,10 @@ export function RFQCreator({
                       type="button"
                       onClick={() => setUrgency('urgent')}
                       className={cn(
-                        'flex items-center justify-center gap-2 p-3 rounded-lg border-2 transition-colors text-sm',
+                        'flex items-center justify-center gap-2 p-3.5 rounded-xl border transition-all text-sm font-medium',
                         urgency === 'urgent'
-                          ? 'border-status-warning bg-status-warning-light text-status-warning-dark'
-                          : 'border-border hover:border-muted-foreground/50'
+                          ? 'border-status-warning bg-status-warning-light text-status-warning-dark shadow-sm ring-1 ring-status-warning/20'
+                          : 'border-transparent bg-muted/50 hover:bg-muted'
                       )}
                       disabled={isPending}
                     >

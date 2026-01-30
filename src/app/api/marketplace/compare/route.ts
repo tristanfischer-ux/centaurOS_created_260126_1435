@@ -3,8 +3,14 @@ import OpenAI from "openai";
 import { Json } from "@/types/database.types";
 import { createClient } from "@/lib/supabase/server";
 
+// Validate API key at runtime rather than using dummy fallback
+const apiKey = process.env.OPENAI_API_KEY;
+if (!apiKey && process.env.NODE_ENV === 'production') {
+    console.error('OPENAI_API_KEY is required in production');
+}
+
 const openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY || "dummy-key-for-build",
+    apiKey: apiKey || 'sk-placeholder-for-build-only',
 });
 
 // Types for the comparison request/response
@@ -37,6 +43,15 @@ export interface CompareResponse {
 
 export async function POST(req: NextRequest) {
     try {
+        // Validate API key is present
+        if (!process.env.OPENAI_API_KEY) {
+            console.error('OPENAI_API_KEY is not configured');
+            return NextResponse.json(
+                { error: "AI comparison service is not configured" },
+                { status: 503 }
+            );
+        }
+        
         // Authenticate user
         const supabase = await createClient()
         const { data: { user }, error: authError } = await supabase.auth.getUser()

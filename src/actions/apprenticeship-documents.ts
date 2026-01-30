@@ -9,6 +9,7 @@ import type {
   RequiredSignature, 
   ApprenticeshipDocument 
 } from '@/types/apprenticeship'
+import { isValidUUID } from '@/lib/security/sanitize'
 
 // =============================================
 // DOCUMENT RETRIEVAL
@@ -43,17 +44,29 @@ export async function getPendingSignatures() {
   
   if (!user) return { error: 'Unauthorized' }
   
-  // Get user's enrollments (as apprentice or mentor)
-  const { data: enrollments } = await supabase
-    .from('apprenticeship_enrollments')
-    .select('id')
-    .or(`apprentice_id.eq.${user.id},senior_mentor_id.eq.${user.id},workplace_buddy_id.eq.${user.id}`)
-  
-  if (!enrollments || enrollments.length === 0) {
-    return { documents: [] }
+  // Validate user ID is a valid UUID before using in query
+  if (!isValidUUID(user.id)) {
+    return { error: 'Invalid user ID' }
   }
   
-  const enrollmentIds = enrollments.map(e => e.id)
+  // Get user's enrollments using separate queries instead of .or() with string interpolation
+  const [apprenticeResult, mentorResult, buddyResult] = await Promise.all([
+    supabase.from('apprenticeship_enrollments').select('id').eq('apprentice_id', user.id),
+    supabase.from('apprenticeship_enrollments').select('id').eq('senior_mentor_id', user.id),
+    supabase.from('apprenticeship_enrollments').select('id').eq('workplace_buddy_id', user.id)
+  ])
+  
+  // Combine and deduplicate enrollment IDs
+  const allEnrollmentIds = [
+    ...(apprenticeResult.data || []).map(e => e.id),
+    ...(mentorResult.data || []).map(e => e.id),
+    ...(buddyResult.data || []).map(e => e.id)
+  ]
+  const enrollmentIds = [...new Set(allEnrollmentIds)]
+  
+  if (enrollmentIds.length === 0) {
+    return { documents: [] }
+  }
   
   const { data: documents, error } = await supabase
     .from('apprenticeship_documents')

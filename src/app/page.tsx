@@ -95,9 +95,9 @@ export default function MarketingPage() {
         {/* Content */}
         <div className="relative z-10 max-w-5xl mx-auto px-6 text-center pt-8 md:pt-0">
           {/* System Online Badge */}
-          <div className="inline-flex items-center gap-2 mb-6 md:mb-8 px-4 py-2 border border bg-white/80 backdrop-blur-sm">
-            <span className="w-2 h-2 rounded-full bg-blue-500" />
-            <span className="text-blue-600 text-xs font-mono uppercase tracking-widest">
+          <div className="inline-flex items-center gap-2 mb-6 md:mb-8 px-4 py-2 border border bg-background/80 backdrop-blur-sm">
+            <span className="w-2 h-2 rounded-full bg-electric-blue" />
+            <span className="text-electric-blue text-xs font-mono uppercase tracking-widest">
               System Online
             </span>
           </div>
@@ -105,7 +105,7 @@ export default function MarketingPage() {
           {/* Main Headline */}
           <h1 className="text-4xl sm:text-5xl md:text-7xl lg:text-8xl font-black leading-tight mb-6 md:mb-8">
             We build atoms at the{" "}
-            <span className="text-blue-500">speed of bits.</span>
+            <span className="text-electric-blue">speed of bits.</span>
           </h1>
 
           {/* Tagline */}
@@ -146,7 +146,7 @@ export default function MarketingPage() {
                   className="object-cover"
                 />
               </div>
-              <span className="text-xs text-blue-500 font-mono uppercase tracking-widest mb-2">
+              <span className="text-xs text-electric-blue font-mono uppercase tracking-widest mb-2">
                 Founders Decide
               </span>
               <h3 className="text-xl md:text-2xl font-bold mb-3 md:mb-4">RETAIN YOUR EQUITY.</h3>
@@ -154,16 +154,16 @@ export default function MarketingPage() {
                 &ldquo;Don&apos;t burn seed capital on a standing army. Launch with a fractional team. Validate fast, risk less, and retain maximum equity at Series A.&rdquo;
               </p>
               {/* Action Buttons */}
-              <div className="pt-4 md:pt-6 mt-4 border-t border-slate-100 flex gap-2 md:gap-3">
+              <div className="pt-4 md:pt-6 mt-4 border-t border-muted flex gap-2 md:gap-3">
                 <a
                   href={`${APP_DOMAIN}/login`}
-                  className="flex-1 bg-muted hover:bg-slate-200 text-foreground py-2.5 md:py-3 text-center text-xs font-mono font-bold tracking-widest uppercase transition-colors"
+                  className="flex-1 bg-muted hover:bg-secondary text-foreground py-2.5 md:py-3 text-center text-xs font-mono font-bold tracking-widest uppercase transition-colors"
                 >
                   Login
                 </a>
                 <Link
                   href="/join/founder"
-                  className="flex-1 bg-slate-900 hover:bg-slate-800 text-white py-2.5 md:py-3 text-center text-xs font-mono font-bold tracking-widest uppercase transition-colors"
+                  className="flex-1 bg-foreground hover:bg-foreground/90 text-background py-2.5 md:py-3 text-center text-xs font-mono font-bold tracking-widest uppercase transition-colors"
                 >
                   Begin Induction
                 </Link>
@@ -180,7 +180,7 @@ export default function MarketingPage() {
                   className="object-cover"
                 />
               </div>
-              <span className="text-xs text-blue-500 font-mono uppercase tracking-widest mb-2">
+              <span className="text-xs text-electric-blue font-mono uppercase tracking-widest mb-2">
                 Executives Evaluate
               </span>
               <h3 className="text-xl md:text-2xl font-bold mb-3 md:mb-4">TRY BEFORE YOU FLY.</h3>
@@ -188,16 +188,16 @@ export default function MarketingPage() {
                 &ldquo;Monetize elite expertise without the burnout. Join as a Fractional Executive to accelerate deep-tech startups. Then, invest in them or launch your own.&rdquo;
               </p>
               {/* Action Buttons */}
-              <div className="pt-4 md:pt-6 mt-4 border-t border-slate-100 flex gap-2 md:gap-3">
+              <div className="pt-4 md:pt-6 mt-4 border-t border-muted flex gap-2 md:gap-3">
                 <a
                   href={`${APP_DOMAIN}/login`}
-                  className="flex-1 bg-muted hover:bg-slate-200 text-foreground py-2.5 md:py-3 text-center text-xs font-mono font-bold tracking-widest uppercase transition-colors"
+                  className="flex-1 bg-muted hover:bg-secondary text-foreground py-2.5 md:py-3 text-center text-xs font-mono font-bold tracking-widest uppercase transition-colors"
                 >
                   Login
                 </a>
                 <Link
                   href="/join/executive"
-                  className="flex-1 bg-slate-900 hover:bg-slate-800 text-white py-2.5 md:py-3 text-center text-xs font-mono font-bold tracking-widest uppercase transition-colors"
+                  className="flex-1 bg-foreground hover:bg-foreground/90 text-background py-2.5 md:py-3 text-center text-xs font-mono font-bold tracking-widest uppercase transition-colors"
                 >
                   Join Cadre
                 </Link>
@@ -214,7 +214,7 @@ export default function MarketingPage() {
                   className="object-cover"
                 />
               </div>
-              <span className="text-xs text-blue-500 font-mono uppercase tracking-widest mb-2">
+              <span className="text-xs text-electric-blue font-mono uppercase tracking-widest mb-2">
                 Apprentices Do
               </span>
               <h3 className="text-xl md:text-2xl font-bold mb-3 md:mb-4">THE DIGITAL BODY.</h3>
@@ -222,16 +222,16 @@ export default function MarketingPage() {
                 &ldquo;We equip you with the Centaur OS—a &apos;Digital Body&apos; multiplying your output tenfold. You aren&apos;t a junior. You are a Founder-in-Training.&rdquo;
               </p>
               {/* Action Buttons */}
-              <div className="pt-4 md:pt-6 mt-4 border-t border-slate-100 flex gap-2 md:gap-3">
+              <div className="pt-4 md:pt-6 mt-4 border-t border-muted flex gap-2 md:gap-3">
                 <a
                   href={`${APP_DOMAIN}/login`}
-                  className="flex-1 bg-muted hover:bg-slate-200 text-foreground py-2.5 md:py-3 text-center text-xs font-mono font-bold tracking-widest uppercase transition-colors"
+                  className="flex-1 bg-muted hover:bg-secondary text-foreground py-2.5 md:py-3 text-center text-xs font-mono font-bold tracking-widest uppercase transition-colors"
                 >
                   Login
                 </a>
                 <Link
                   href="/join/apprentice"
-                  className="flex-1 bg-slate-900 hover:bg-slate-800 text-white py-2.5 md:py-3 text-center text-xs font-mono font-bold tracking-widest uppercase transition-colors"
+                  className="flex-1 bg-foreground hover:bg-foreground/90 text-background py-2.5 md:py-3 text-center text-xs font-mono font-bold tracking-widest uppercase transition-colors"
                 >
                   Enter Guild
                 </Link>
@@ -242,7 +242,7 @@ export default function MarketingPage() {
       </section>
 
       {/* THE NETWORK Section */}
-      <section id="network" className="py-12 md:py-24 bg-background border-t border-slate-100">
+      <section id="network" className="py-12 md:py-24 bg-background border-t border-muted">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
           <h2 className="text-3xl sm:text-4xl md:text-5xl font-black mb-8 md:mb-16">THE NETWORK.</h2>
 
@@ -257,7 +257,7 @@ export default function MarketingPage() {
                   className="object-cover"
                 />
               </div>
-              <span className="text-xs text-blue-500 font-mono uppercase tracking-widest mb-2">
+              <span className="text-xs text-electric-blue font-mono uppercase tracking-widest mb-2">
                 Venture Capital
               </span>
               <h3 className="text-xl md:text-2xl font-bold mb-3 md:mb-4">MORE BETS. SAME FUND.</h3>
@@ -265,16 +265,16 @@ export default function MarketingPage() {
                 &ldquo;Hardware usually kills returns with 12-month cycles. We shorten that to 12 weeks. Validate cheaper, kill failures faster, and place more winning bets.&rdquo;
               </p>
               {/* Action Buttons */}
-              <div className="pt-4 md:pt-6 mt-4 border-t border-slate-100 flex gap-2 md:gap-3">
+              <div className="pt-4 md:pt-6 mt-4 border-t border-muted flex gap-2 md:gap-3">
                 <a
                   href={`${APP_DOMAIN}/login`}
-                  className="flex-1 bg-muted hover:bg-slate-200 text-foreground py-2.5 md:py-3 text-center text-xs font-mono font-bold tracking-widest uppercase transition-colors"
+                  className="flex-1 bg-muted hover:bg-secondary text-foreground py-2.5 md:py-3 text-center text-xs font-mono font-bold tracking-widest uppercase transition-colors"
                 >
                   Login
                 </a>
                 <Link
                   href="/join/vc"
-                  className="flex-1 border-2 border-slate-900 hover:bg-slate-900 text-foreground hover:text-white py-2.5 md:py-3 text-center text-xs font-mono font-bold tracking-widest uppercase transition-colors"
+                  className="flex-1 border-2 border-foreground hover:bg-foreground text-foreground hover:text-background py-2.5 md:py-3 text-center text-xs font-mono font-bold tracking-widest uppercase transition-colors"
                 >
                   Apply
                 </Link>
@@ -291,7 +291,7 @@ export default function MarketingPage() {
                   className="object-cover"
                 />
               </div>
-              <span className="text-xs text-blue-500 font-mono uppercase tracking-widest mb-2">
+              <span className="text-xs text-electric-blue font-mono uppercase tracking-widest mb-2">
                 Manufacturing
               </span>
               <h3 className="text-xl md:text-2xl font-bold mb-3 md:mb-4">THE VIRTUAL FACTORY.</h3>
@@ -299,16 +299,16 @@ export default function MarketingPage() {
                 &ldquo;Monetize latent capacity. Connect your machines to Centaur OS. Receive pre-vetted, production-ready files: no sales friction, just print, ship, and bank.&rdquo;
               </p>
               {/* Action Buttons */}
-              <div className="pt-4 md:pt-6 mt-4 border-t border-slate-100 flex gap-2 md:gap-3">
+              <div className="pt-4 md:pt-6 mt-4 border-t border-muted flex gap-2 md:gap-3">
                 <a
                   href={`${APP_DOMAIN}/login`}
-                  className="flex-1 bg-muted hover:bg-slate-200 text-foreground py-2.5 md:py-3 text-center text-xs font-mono font-bold tracking-widest uppercase transition-colors"
+                  className="flex-1 bg-muted hover:bg-secondary text-foreground py-2.5 md:py-3 text-center text-xs font-mono font-bold tracking-widest uppercase transition-colors"
                 >
                   Login
                 </a>
                 <Link
                   href="/join/factory"
-                  className="flex-1 border-2 border-slate-900 hover:bg-slate-900 text-foreground hover:text-white py-2.5 md:py-3 text-center text-xs font-mono font-bold tracking-widest uppercase transition-colors"
+                  className="flex-1 border-2 border-foreground hover:bg-foreground text-foreground hover:text-background py-2.5 md:py-3 text-center text-xs font-mono font-bold tracking-widest uppercase transition-colors"
                 >
                   Connect
                 </Link>
@@ -325,7 +325,7 @@ export default function MarketingPage() {
                   className="object-cover"
                 />
               </div>
-              <span className="text-xs text-blue-500 font-mono uppercase tracking-widest mb-2">
+              <span className="text-xs text-electric-blue font-mono uppercase tracking-widest mb-2">
                 Academia
               </span>
               <h3 className="text-xl md:text-2xl font-bold mb-3 md:mb-4">THE FOUNDER PIPELINE.</h3>
@@ -333,16 +333,16 @@ export default function MarketingPage() {
                 &ldquo;Universities are IP-rich but execution-constrained. We provide the commercialization engine to transform research into venture-backed startups and students into Centaur Apprentices.&rdquo;
               </p>
               {/* Action Buttons */}
-              <div className="pt-4 md:pt-6 mt-4 border-t border-slate-100 flex gap-2 md:gap-3">
+              <div className="pt-4 md:pt-6 mt-4 border-t border-muted flex gap-2 md:gap-3">
                 <a
                   href={`${APP_DOMAIN}/login`}
-                  className="flex-1 bg-muted hover:bg-slate-200 text-foreground py-2.5 md:py-3 text-center text-xs font-mono font-bold tracking-widest uppercase transition-colors"
+                  className="flex-1 bg-muted hover:bg-secondary text-foreground py-2.5 md:py-3 text-center text-xs font-mono font-bold tracking-widest uppercase transition-colors"
                 >
                   Login
                 </a>
                 <Link
                   href="/join/university"
-                  className="flex-1 border-2 border-slate-900 hover:bg-slate-900 text-foreground hover:text-white py-2.5 md:py-3 text-center text-xs font-mono font-bold tracking-widest uppercase transition-colors"
+                  className="flex-1 border-2 border-foreground hover:bg-foreground text-foreground hover:text-background py-2.5 md:py-3 text-center text-xs font-mono font-bold tracking-widest uppercase transition-colors"
                 >
                   Partner
                 </Link>
@@ -353,7 +353,7 @@ export default function MarketingPage() {
       </section>
 
       {/* THE OPERATING SYSTEM Section */}
-      <section id="os" className="py-12 md:py-24 bg-background border-t border-slate-100">
+      <section id="os" className="py-12 md:py-24 bg-background border-t border-muted">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
           <h2 className="text-3xl sm:text-4xl md:text-5xl font-black mb-8 md:mb-16">THE OPERATING SYSTEM.</h2>
 
@@ -368,7 +368,7 @@ export default function MarketingPage() {
                   className="object-cover"
                 />
               </div>
-              <span className="text-xs text-blue-500 font-mono uppercase tracking-widest mb-2">
+              <span className="text-xs text-electric-blue font-mono uppercase tracking-widest mb-2">
                 The Entity
               </span>
               <h3 className="text-xl md:text-2xl font-bold mb-3 md:mb-4">THE FIRM.</h3>
@@ -387,7 +387,7 @@ export default function MarketingPage() {
                   className="object-cover"
                 />
               </div>
-              <span className="text-xs text-blue-500 font-mono uppercase tracking-widest mb-2">
+              <span className="text-xs text-electric-blue font-mono uppercase tracking-widest mb-2">
                 The System
               </span>
               <h3 className="text-xl md:text-2xl font-bold mb-3 md:mb-4">THE OPERATING SYSTEM.</h3>
@@ -406,7 +406,7 @@ export default function MarketingPage() {
                   className="object-cover"
                 />
               </div>
-              <span className="text-xs text-blue-500 font-mono uppercase tracking-widest mb-2">
+              <span className="text-xs text-electric-blue font-mono uppercase tracking-widest mb-2">
                 The Community
               </span>
               <h3 className="text-xl md:text-2xl font-bold mb-3 md:mb-4">THE GUILD.</h3>

@@ -9,6 +9,7 @@ import type {
   OTJTLog, 
   WeeklySummary 
 } from '@/types/apprenticeship'
+import { isValidUUID } from '@/lib/security/sanitize'
 
 // =============================================
 // LOGGING OTJT HOURS
@@ -228,6 +229,7 @@ export async function queryOTJTLog(logId: string, message: string) {
 
 /**
  * Bulk approve multiple OTJT logs
+ * Fixed: Uses Promise.all instead of sequential awaits (N+1 pattern)
  */
 export async function bulkApproveOTJTLogs(logIds: string[]) {
   const supabase = await createClient()
@@ -235,17 +237,19 @@ export async function bulkApproveOTJTLogs(logIds: string[]) {
   
   if (!user) return { error: 'Unauthorized' }
   
-  let approved = 0
-  let failed = 0
-  
-  for (const logId of logIds) {
-    const result = await approveOTJTLog(logId)
-    if (result.success) {
-      approved++
-    } else {
-      failed++
-    }
+  // Validate all log IDs are valid UUIDs
+  const validLogIds = logIds.filter(id => isValidUUID(id))
+  if (validLogIds.length === 0) {
+    return { error: 'No valid log IDs provided' }
   }
+  
+  // Execute all approvals in parallel (fixes N+1 pattern)
+  const results = await Promise.all(
+    validLogIds.map(logId => approveOTJTLog(logId))
+  )
+  
+  const approved = results.filter(r => r.success).length
+  const failed = results.filter(r => !r.success).length
   
   return { success: true, approved, failed }
 }
@@ -449,17 +453,33 @@ export async function getPendingOTJTApprovals() {
   
   if (!user) return { error: 'Unauthorized' }
   
-  // Get enrollments where user is mentor
-  const { data: enrollments } = await supabase
-    .from('apprenticeship_enrollments')
-    .select('id')
-    .or(`senior_mentor_id.eq.${user.id},workplace_buddy_id.eq.${user.id}`)
-  
-  if (!enrollments || enrollments.length === 0) {
-    return { logs: [] }
+  // Validate user ID is a valid UUID before using in query
+  if (!isValidUUID(user.id)) {
+    return { error: 'Invalid user ID' }
   }
   
-  const enrollmentIds = enrollments.map(e => e.id)
+  // Get enrollments where user is mentor
+  // Using separate queries instead of .or() with string interpolation for security
+  const { data: mentorEnrollments } = await supabase
+    .from('apprenticeship_enrollments')
+    .select('id')
+    .eq('senior_mentor_id', user.id)
+  
+  const { data: buddyEnrollments } = await supabase
+    .from('apprenticeship_enrollments')
+    .select('id')
+    .eq('workplace_buddy_id', user.id)
+  
+  // Combine results and deduplicate
+  const enrollmentIds = [
+    ...(mentorEnrollments || []).map(e => e.id),
+    ...(buddyEnrollments || []).map(e => e.id)
+  ]
+  const uniqueEnrollmentIds = [...new Set(enrollmentIds)]
+  
+  if (uniqueEnrollmentIds.length === 0) {
+    return { logs: [] }
+  }
   
   const { data: logs, error } = await supabase
     .from('otjt_time_logs')
@@ -472,7 +492,7 @@ export async function getPendingOTJTApprovals() {
       module:learning_modules(title),
       task:tasks(title)
     `)
-    .in('enrollment_id', enrollmentIds)
+    .in('enrollment_id', uniqueEnrollmentIds)
     .eq('status', 'pending')
     .order('created_at', { ascending: true })
   

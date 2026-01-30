@@ -272,12 +272,30 @@ export async function trackProfileView(providerSlug: string, source: 'marketplac
     
     const { data: { user } } = await supabase.auth.getUser()
     
-    // Get provider ID from slug
-    const { data: provider } = await supabase
+    // Validate and sanitize slug - only allow alphanumeric, hyphens, and underscores
+    const sanitizedSlug = providerSlug.replace(/[^a-zA-Z0-9_-]/g, '')
+    if (!sanitizedSlug || sanitizedSlug.length === 0) {
+        return
+    }
+    
+    // Get provider ID from slug using separate queries instead of .or() with string interpolation
+    let provider = null
+    const { data: bySlug } = await supabase
         .from('provider_profiles')
         .select('id, user_id')
-        .or(`profile_slug.eq.${providerSlug},username.eq.${providerSlug}`)
+        .eq('profile_slug', sanitizedSlug)
         .single()
+    
+    if (bySlug) {
+        provider = bySlug
+    } else {
+        const { data: byUsername } = await supabase
+            .from('provider_profiles')
+            .select('id, user_id')
+            .eq('username', sanitizedSlug)
+            .single()
+        provider = byUsername
+    }
     
     if (!provider) return
     

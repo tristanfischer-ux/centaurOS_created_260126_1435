@@ -46,7 +46,7 @@ export async function createProgressReview(input: ProgressReviewInput) {
     return { error: error.message }
   }
   
-  // Create follow-up tasks from action items
+  // Create follow-up tasks from action items (batch insert to fix N+1 pattern)
   if (input.actionItems && input.actionItems.length > 0) {
     const { data: enrollment } = await supabase
       .from('apprenticeship_enrollments')
@@ -55,18 +55,19 @@ export async function createProgressReview(input: ProgressReviewInput) {
       .single()
     
     if (enrollment) {
-      for (const item of input.actionItems) {
-        await supabase.from('tasks').insert({
-          title: item,
-          description: `Action item from ${input.reviewType} progress review`,
-          creator_id: user.id,
-          assignee_id: enrollment.apprentice_id,
-          foundry_id: enrollment.foundry_id,
-          status: 'Pending',
-          risk_level: 'Low',
-          end_date: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString() // Due in 2 weeks
-        })
-      }
+      // Batch insert all tasks at once instead of one-by-one
+      const tasksToInsert = input.actionItems.map(item => ({
+        title: item,
+        description: `Action item from ${input.reviewType} progress review`,
+        creator_id: user.id,
+        assignee_id: enrollment.apprentice_id,
+        foundry_id: enrollment.foundry_id,
+        status: 'Pending',
+        risk_level: 'Low',
+        end_date: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString() // Due in 2 weeks
+      }))
+      
+      await supabase.from('tasks').insert(tasksToInsert)
     }
   }
   
@@ -117,20 +118,20 @@ export async function completeProgressReview(
   
   if (error) return { error: error.message }
   
-  // Create follow-up tasks
+  // Create follow-up tasks (batch insert to fix N+1 pattern)
   if (input.actionItems && input.actionItems.length > 0 && review.enrollment) {
-    for (const item of input.actionItems) {
-      await supabase.from('tasks').insert({
-        title: item,
-        description: `Action item from progress review`,
-        creator_id: user.id,
-        assignee_id: review.enrollment.apprentice_id,
-        foundry_id: review.enrollment.foundry_id,
-        status: 'Pending',
-        risk_level: 'Low',
-        end_date: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString()
-      })
-    }
+    const tasksToInsert = input.actionItems.map(item => ({
+      title: item,
+      description: `Action item from progress review`,
+      creator_id: user.id,
+      assignee_id: review.enrollment.apprentice_id,
+      foundry_id: review.enrollment.foundry_id,
+      status: 'Pending',
+      risk_level: 'Low',
+      end_date: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString()
+    }))
+    
+    await supabase.from('tasks').insert(tasksToInsert)
   }
   
   revalidatePath('/apprenticeship')
