@@ -119,6 +119,7 @@ export function InlineThread({ taskId, isOpen, onClose, members }: InlineThreadP
                 .from('task_comments')
                 .select('*, user:user_id(full_name, role)')
                 .eq('task_id', taskId)
+                .eq('is_system_log', false)
                 .order('created_at', { ascending: false })
                 .limit(10)
             setComments((data || []) as Comment[])
@@ -140,9 +141,9 @@ export function InlineThread({ taskId, isOpen, onClose, members }: InlineThreadP
             <div className="flex items-center justify-between px-4 py-2 bg-slate-50">
                 <div>
                     <h4 className="text-xs font-semibold text-foreground uppercase tracking-wider">
-                        Notes & Comments
+                        Notes
                     </h4>
-                    <p className="text-[10px] text-muted-foreground">{comments.length} {comments.length === 1 ? 'entry' : 'entries'}</p>
+                    <p className="text-[10px] text-muted-foreground">{comments.length} {comments.length === 1 ? 'note' : 'notes'}</p>
                 </div>
                 <Button variant="ghost" size="sm" onClick={onClose} className="h-6 w-6 p-0">
                     <X className="h-4 w-4" />
@@ -169,25 +170,19 @@ export function InlineThread({ taskId, isOpen, onClose, members }: InlineThreadP
                             </div>
                         )}
                         
-                        {/* Comments Section */}
+                        {/* Notes Section */}
                         {comments.length === 0 && attachments.length === 0 ? (
-                            <p className="text-center text-muted-foreground py-4 text-xs">No activity yet</p>
+                            <p className="text-center text-muted-foreground py-4 text-xs">No notes yet</p>
                         ) : (
                             comments.map((comment) => (
-                                <div key={comment.id} className={cn(
-                                    "flex gap-2 text-xs",
-                                    comment.is_system_log && "opacity-60"
-                                )}>
-                                    <div className={cn(
-                                        "h-6 w-6 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0",
-                                        comment.is_system_log ? "bg-slate-100 text-slate-500" : "bg-blue-100 text-blue-700"
-                                    )}>
-                                        {comment.is_system_log ? 'S' : comment.user?.full_name?.substring(0, 2).toUpperCase()}
+                                <div key={comment.id} className="flex gap-2 text-xs">
+                                    <div className="h-6 w-6 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 bg-blue-100 text-blue-700">
+                                        {comment.user?.full_name?.substring(0, 2).toUpperCase()}
                                     </div>
                                     <div className="flex-1 min-w-0">
                                         <div className="flex items-center gap-2 mb-0.5">
                                             <span className="font-medium text-foreground truncate">
-                                                {comment.is_system_log ? 'System' : comment.user?.full_name}
+                                                {comment.user?.full_name}
                                             </span>
                                             <span className="text-muted-foreground whitespace-nowrap">
                                                 {formatDistanceToNow(new Date(comment.created_at), { addSuffix: true })}

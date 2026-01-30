@@ -4,7 +4,7 @@ import { memo } from "react"
 import Link from "next/link"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { UserAvatar } from "@/components/ui/user-avatar"
 import { Briefcase, Award } from "lucide-react"
 
 interface PersonCardProps {
@@ -27,24 +27,12 @@ export const PersonCard = memo(function PersonCard({
     compact = false
 }: PersonCardProps) {
     const isAI = role === 'AI_Agent'
-    // Get proper initials: first letter of first name + first letter of last name
-    const getInitials = (name: string | null) => {
-        if (!name) return '?'
-        const parts = name.trim().split(/\s+/)
-        if (parts.length === 1) return parts[0].charAt(0).toUpperCase()
-        return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase()
-    }
-    const initials = getInitials(full_name)
 
     if (compact) {
         return (
             <Link href={`/team/${id}`} className="block group">
                 <div className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted transition-colors">
-                    <Avatar className="h-8 w-8">
-                        <AvatarFallback className={`text-xs ${isAI ? 'bg-purple-100 text-purple-600' : 'bg-muted'}`}>
-                            {isAI ? '🤖' : initials}
-                        </AvatarFallback>
-                    </Avatar>
+                    <UserAvatar name={full_name} role={role} size="md" />
                     <div className="flex-1 min-w-0">
                         <div className="font-medium text-foreground truncate group-hover:text-primary">
                             {full_name}
@@ -61,11 +49,7 @@ export const PersonCard = memo(function PersonCard({
             <Card className="hover:border-primary hover:shadow-md transition-all">
                 <CardContent className="p-6">
                     <div className="flex items-start gap-4">
-                        <Avatar className="h-14 w-14">
-                            <AvatarFallback className={`text-xl ${isAI ? 'bg-purple-100 text-purple-600' : 'bg-muted'}`}>
-                                {isAI ? '🤖' : initials}
-                            </AvatarFallback>
-                        </Avatar>
+                        <UserAvatar name={full_name} role={role} size="xl" />
                         <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 mb-1">
                                 <h3 className="font-semibold text-foreground truncate group-hover:text-primary">

@@ -5,7 +5,7 @@ import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { UserAvatar, UserAvatarStack } from "@/components/ui/user-avatar"
 import { Markdown } from "@/components/ui/markdown"
 import {
     Dialog,
@@ -41,7 +41,7 @@ import {
 import { acceptTask, rejectTask, forwardTask, completeTask, triggerAIWorker, updateTaskDates, duplicateTask, updateTaskAssignees, getTaskAttachments } from "@/actions/tasks"
 import { uploadTaskAttachment } from "@/actions/attachments"
 import { AttachmentList } from "@/components/tasks/attachment-list"
-import { cn, getInitials } from "@/lib/utils"
+import { cn } from "@/lib/utils"
 import { Database } from "@/types/database.types"
 import { InlineThread } from "@/components/tasks/inline-thread"
 import { InlineHistory } from "@/components/tasks/inline-history"
@@ -124,12 +124,13 @@ export const TaskCard = memo(function TaskCard(props: TaskCardProps) {
     const [assigneePopoverOpen, setAssigneePopoverOpen] = useState(false)
     const [assigneePopoverOpen2, setAssigneePopoverOpen2] = useState(false)
 
-    // Auto-expand when any inline panel is opened
+    // Close inline panels when card collapses
     useEffect(() => {
-        if ((showThread || showHistory) && !expanded) {
-            onToggle()
+        if (!expanded) {
+            setShowThread(false)
+            setShowHistory(false)
         }
-    }, [showThread, showHistory, expanded, onToggle])
+    }, [expanded])
 
     // Load attachments when forward dialog opens
     useEffect(() => {
@@ -463,21 +464,16 @@ export const TaskCard = memo(function TaskCard(props: TaskCardProps) {
                                     >
                                         <div className="flex -space-x-2">
                                             {currentAssignees.length > 0 ? (
-                                                currentAssignees.map((assignee, i) => (
-                                                    <Avatar key={assignee.id} className="h-8 w-8 border-2 border-white ring-1 ring-slate-100 bg-white" style={{ zIndex: 10 - i }}>
-                                                        {assignee.role === "AI_Agent" ? (
-                                                            <AvatarImage src="/images/ai-agent-avatar.png" className="object-cover" />
-                                                        ) : assignee.avatar_url ? (
-                                                            <AvatarImage src={assignee.avatar_url} />
-                                                        ) : null}
-                                                        <AvatarFallback className={cn(
-                                                            "text-[10px] font-medium text-white",
-                                                            assignee.role === "AI_Agent" ? "bg-purple-600" : "bg-gradient-to-br from-slate-600 to-slate-800"
-                                                        )}>
-                                                            {assignee.role === "AI_Agent" ? <Bot className="w-3 h-3" /> : getInitials(assignee.full_name)}
-                                                        </AvatarFallback>
-                                                    </Avatar>
-                                                ))
+                                                <UserAvatarStack
+                                                    users={currentAssignees.map(a => ({
+                                                        id: a.id,
+                                                        name: a.full_name,
+                                                        role: a.role,
+                                                        avatarUrl: a.avatar_url,
+                                                    }))}
+                                                    size="md"
+                                                    max={4}
+                                                />
                                             ) : (
                                                 <div className="h-8 w-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-400">
                                                     <Plus className="w-4 h-4" />
@@ -511,11 +507,12 @@ export const TaskCard = memo(function TaskCard(props: TaskCardProps) {
                                                                 )}>
                                                                     {isSelected && <Check className="h-3 w-3 text-white" />}
                                                                 </div>
-                                                                <Avatar className="h-6 w-6 relative shadow-sm shrink-0">
-                                                                    <AvatarFallback className="text-[10px] bg-indigo-50 text-indigo-700 font-medium flex items-center justify-center">
-                                                                        {getInitials(member.full_name)}
-                                                                    </AvatarFallback>
-                                                                </Avatar>
+                                                                <UserAvatar 
+                                                                    name={member.full_name} 
+                                                                    role={member.role} 
+                                                                    size="sm" 
+                                                                    className="shadow-sm"
+                                                                />
                                                                 <span className="truncate flex-1">{member.full_name}</span>
                                                             </div>
                                                         </CommandItem>
@@ -579,11 +576,12 @@ export const TaskCard = memo(function TaskCard(props: TaskCardProps) {
                                                         )}>
                                                             {isSelected && <Check className="h-3 w-3 text-white" />}
                                                         </div>
-                                                        <Avatar className="h-6 w-6 relative shadow-sm shrink-0">
-                                                            <AvatarFallback className="text-[10px] bg-indigo-50 text-indigo-700 font-medium flex items-center justify-center">
-                                                                {getInitials(member.full_name)}
-                                                            </AvatarFallback>
-                                                        </Avatar>
+                                                        <UserAvatar 
+                                                            name={member.full_name} 
+                                                            role={member.role} 
+                                                            size="sm" 
+                                                            className="shadow-sm"
+                                                        />
                                                         <span className="truncate flex-1">{member.full_name}</span>
                                                     </div>
                                                 </CommandItem>
@@ -847,11 +845,12 @@ export const TaskCard = memo(function TaskCard(props: TaskCardProps) {
                                                         {sortedMembers.map(member => (
                                                             <SelectItem key={member.id} value={member.id}>
                                                                 <div className="flex items-center gap-3">
-                                                                    <Avatar className="h-8 w-8 shrink-0 border border-foundry-200">
-                                                                        <AvatarFallback className="text-xs bg-indigo-100 text-indigo-700 font-semibold">
-                                                                            {getInitials(member.full_name)}
-                                                                        </AvatarFallback>
-                                                                    </Avatar>
+                                                                    <UserAvatar 
+                                                                        name={member.full_name} 
+                                                                        role={member.role} 
+                                                                        size="md" 
+                                                                        showBorder
+                                                                    />
                                                                     <span>
                                                                         {member.full_name}
                                                                         {member.role === 'AI_Agent' && ' 🤖'}

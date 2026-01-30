@@ -6,7 +6,6 @@ import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { 
     CheckCircle2, 
@@ -35,6 +34,7 @@ import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { formatDistanceToNow } from 'date-fns'
 import { Markdown } from '@/components/ui/markdown'
+import { UserAvatar } from '@/components/ui/user-avatar'
 
 const moodOptions = [
     { value: 'great', icon: Smile, label: 'Great', color: 'text-green-500 bg-green-50 border-green-200' },
@@ -42,11 +42,6 @@ const moodOptions = [
     { value: 'okay', icon: Meh, label: 'Okay', color: 'text-yellow-500 bg-yellow-50 border-yellow-200' },
     { value: 'struggling', icon: Frown, label: 'Struggling', color: 'text-red-500 bg-red-50 border-red-200' }
 ] as const
-
-function getInitials(name: string | null) {
-    if (!name) return '??'
-    return name.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase()
-}
 
 interface StandupWidgetProps {
     userRole?: string

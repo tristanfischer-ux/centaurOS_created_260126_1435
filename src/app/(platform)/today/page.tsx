@@ -8,6 +8,7 @@ import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip
 import { CreateTaskDialog } from "../tasks/create-task-dialog"
 import { CreateObjectiveDialog } from "../objectives/create-objective-dialog"
 import { DailyPrioritizer } from "@/components/DailyPrioritizer"
+import { getMentionsForUser } from "@/actions/tasks"
 import Link from "next/link"
 import {
     Sun,
@@ -21,7 +22,9 @@ import {
     Inbox,
     AlertCircle,
     Users,
-    Sparkles
+    Sparkles,
+    AtSign,
+    MessageSquare
 } from "lucide-react"
 import { formatDistanceToNow } from "date-fns"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
@@ -60,6 +63,25 @@ interface BlockerStandup {
         full_name: string | null
         role: string | null
     }
+}
+
+interface Mention {
+    id: string
+    content: string
+    created_at: string
+    task_id: string
+    user_id: string
+    task: {
+        id: string
+        title: string
+        task_number: number
+        status: string
+    } | null
+    author: {
+        id: string
+        full_name: string | null
+        avatar_url: string | null
+    } | null
 }
 
 export default async function TodayPage() {

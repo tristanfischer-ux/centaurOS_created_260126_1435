@@ -1,17 +1,11 @@
 'use client'
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { Users, Activity, Focus } from 'lucide-react'
 import { usePresenceContext } from '@/components/PresenceProvider'
-import { PresenceIndicator, getPresenceColor, getPresenceLabel } from '@/components/PresenceIndicator'
-import { cn } from '@/lib/utils'
-
-function getInitials(name: string | null) {
-    if (!name) return '??'
-    return name.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase()
-}
+import { PresenceIndicator } from '@/components/PresenceIndicator'
+import { UserAvatar } from '@/components/ui/user-avatar'
 
 interface TeamPulseWidgetProps {
     members: {

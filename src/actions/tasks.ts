@@ -1396,6 +1396,43 @@ export async function getTaskHistory(taskId: string) {
     return { data }
 }
 
+/**
+ * Get recent mentions for the current user
+ * Returns comments where the user was @mentioned, for displaying in the Today page
+ */
+export async function getMentionsForUser(limit: number = 10) {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return { error: 'Unauthorized' }
+
+    const foundry_id = await getFoundryIdCached()
+    if (!foundry_id) return { error: 'User not in a foundry' }
+
+    // Query for comments that mention the current user
+    // Mentions are stored as @[userId] in the content
+    const mentionPattern = `@[${user.id}]`
+    
+    const { data, error } = await supabase
+        .from('task_comments')
+        .select(`
+            id,
+            content,
+            created_at,
+            task_id,
+            user_id,
+            task:tasks(id, title, task_number, status),
+            author:profiles!task_comments_user_id_fkey(id, full_name, avatar_url)
+        `)
+        .eq('foundry_id', foundry_id)
+        .eq('is_system_log', false)
+        .ilike('content', `%${mentionPattern}%`)
+        .order('created_at', { ascending: false })
+        .limit(limit)
+
+    if (error) return { error: error.message }
+    return { data }
+}
+
 export async function deleteTasks(taskIds: string[]) {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
