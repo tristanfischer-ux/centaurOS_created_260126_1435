@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Check, Mail, Clock, ArrowRight } from "lucide-react";
+import { Check, Mail, Clock, ArrowRight, Target, Users, Sparkles, Shield, Building, Bot } from "lucide-react";
 
 interface SuccessConfig {
   title: string;
@@ -8,6 +8,7 @@ interface SuccessConfig {
   nextStep: string;
   ctaText: string;
   ctaLink: string;
+  preparing?: { label: string; icon: typeof Check }[];
 }
 
 const signupSuccessConfig: Record<string, SuccessConfig> = {
@@ -19,6 +20,12 @@ const signupSuccessConfig: Record<string, SuccessConfig> = {
     nextStep: "Verify your email → Access your dashboard → Start building",
     ctaText: "Go to Login",
     ctaLink: "/login",
+    preparing: [
+      { label: "Creating your foundry workspace", icon: Building },
+      { label: "Setting up strategic objectives", icon: Target },
+      { label: "Preparing team management tools", icon: Users },
+      { label: "Connecting to the marketplace", icon: Sparkles },
+    ],
   },
   executive: {
     title: "Welcome to the Cadre.",
@@ -28,6 +35,12 @@ const signupSuccessConfig: Record<string, SuccessConfig> = {
     nextStep: "Verify your email → Complete your profile → Get matched",
     ctaText: "Go to Login",
     ctaLink: "/login",
+    preparing: [
+      { label: "Joining the Centaur Guild", icon: Users },
+      { label: "Setting up your executive profile", icon: Shield },
+      { label: "Preparing approval workflows", icon: Check },
+      { label: "Connecting to venture pipeline", icon: Target },
+    ],
   },
   apprentice: {
     title: "Welcome to the Guild.",
@@ -37,6 +50,12 @@ const signupSuccessConfig: Record<string, SuccessConfig> = {
     nextStep: "Verify your email → Enter the Guild → Begin training",
     ctaText: "Go to Login",
     ctaLink: "/login",
+    preparing: [
+      { label: "Joining the Centaur Guild", icon: Users },
+      { label: "Preparing your Digital Body toolkit", icon: Bot },
+      { label: "Assigning your first training tasks", icon: Target },
+      { label: "Connecting AI amplification tools", icon: Sparkles },
+    ],
   },
 };
 
@@ -122,9 +141,38 @@ export default async function SuccessPage({
         {/* Description */}
         <p className="text-white/50 mb-8 sm:mb-10 leading-relaxed text-sm sm:text-base">{config.description}</p>
 
+        {/* What's Being Prepared - Animated Progress */}
+        {config.preparing && config.preparing.length > 0 && (
+          <div className="mb-8 sm:mb-10 p-4 sm:p-6 bg-white/5 border border-white/10 text-left rounded-sm">
+            <h3 className="text-xs font-mono uppercase tracking-widest text-white/40 mb-4">
+              Preparing your workspace
+            </h3>
+            <div className="space-y-3">
+              {config.preparing.map((item, index) => {
+                const Icon = item.icon;
+                return (
+                  <div 
+                    key={item.label}
+                    className="flex items-center gap-3 text-white/70 text-sm animate-fade-in"
+                    style={{ animationDelay: `${index * 200}ms` }}
+                  >
+                    <div className="w-6 h-6 rounded-full bg-blue-500/20 flex items-center justify-center">
+                      <Icon className="w-3 h-3 text-blue-400" />
+                    </div>
+                    <span>{item.label}</span>
+                    <div className="ml-auto">
+                      <Check className="w-4 h-4 text-emerald-400 animate-scale-in" style={{ animationDelay: `${(index * 200) + 400}ms` }} />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {/* Next Steps */}
         {config.nextStep && (
-          <div className="mb-8 sm:mb-10 p-4 sm:p-6 bg-white/5 border border-white/10 text-left">
+          <div className="mb-8 sm:mb-10 p-4 sm:p-6 bg-white/5 border border-white/10 text-left rounded-sm">
             <h3 className="text-xs font-mono uppercase tracking-widest text-white/40 mb-3">
               What happens next
             </h3>

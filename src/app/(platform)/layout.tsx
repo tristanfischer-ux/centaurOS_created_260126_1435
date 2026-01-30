@@ -7,6 +7,8 @@ import { KeyboardShortcutsDialog } from "@/components/KeyboardShortcutsDialog";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { OfflineIndicator } from "@/components/OfflineIndicator";
 import { OnboardingModal } from "@/components/OnboardingModal";
+import { ExecutiveProfilePrompt, VerificationSuccessToast } from "@/components/onboarding";
+import { Suspense } from "react";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { PresenceProvider } from "@/components/PresenceProvider";
 import { ZoomProvider, MobileZoomControl, ZoomableContent } from "@/components/ZoomProvider";
@@ -79,7 +81,11 @@ export default async function PlatformLayout({
                         <PWARegister />
                         <DragDropPolyfill />
                         <OfflineIndicator />
-                        <OnboardingModal />
+                        <OnboardingModal userRole={profile?.role} />
+                        <ExecutiveProfilePrompt userRole={profile?.role} />
+                        <Suspense fallback={null}>
+                            <VerificationSuccessToast />
+                        </Suspense>
                     </div>
                 </ZoomProvider>
             </PresenceProvider>

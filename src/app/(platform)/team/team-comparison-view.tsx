@@ -18,6 +18,7 @@ import Link from "next/link"
 import { CreateTeamDialog } from "./create-team-dialog"
 import { InviteMemberDialog } from "./invite-member-dialog"
 import { PendingInvitations } from "./pending-invitations"
+import { FeatureTip } from "@/components/onboarding"
 import { pairCentaur, unpairCentaur } from "@/actions/team"
 import { Brain, Unplug, Zap } from "lucide-react"
 import { toast } from "sonner"
@@ -833,7 +834,13 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                 </div>
                 <div className="flex items-center gap-2">
                     <RefreshButton />
-                    <InviteMemberDialog />
+                    <FeatureTip
+                        id="team-invite"
+                        title="Build Your Team"
+                        description="Invite team members by email. Assign roles and they'll join your foundry automatically."
+                    >
+                        <InviteMemberDialog />
+                    </FeatureTip>
                     <CreateTeamDialog members={[...executives, ...apprentices]} />
 
                     {compareMode && selectedIds.size >= 2 && (

@@ -4,6 +4,7 @@ import { MarketplaceListing } from "@/actions/marketplace"
 import { ComparisonBar } from "@/components/marketplace/comparison-bar"
 import { ComparisonModal } from "@/components/marketplace/comparison-modal"
 import { MarketCard } from "@/components/marketplace/market-card"
+import { MarketplaceOnboardingModal } from "@/components/onboarding/MarketplaceOnboardingModal"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { EmptyState } from "@/components/ui/empty-state"
 import { Input } from "@/components/ui/input"
@@ -58,9 +59,19 @@ interface MarketplaceViewProps {
     initialListings: MarketplaceListing[]
     recommendations?: MarketplaceRecommendation[]
     teamMembers?: TeamMember[]
+    showOnboarding?: boolean
+    userRole?: 'Executive' | 'Apprentice' | 'Founder' | 'AI_Agent'
+    onboardingRecommendations?: MarketplaceListing[]
 }
 
-export function MarketplaceView({ initialListings, recommendations = [], teamMembers = [] }: MarketplaceViewProps) {
+export function MarketplaceView({ 
+    initialListings, 
+    recommendations = [], 
+    teamMembers = [],
+    showOnboarding = false,
+    userRole = 'Apprentice',
+    onboardingRecommendations = []
+}: MarketplaceViewProps) {
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
     const [isComparisonOpen, setIsComparisonOpen] = useState(false)
     const [activeTab, setActiveTab] = useState("People")
@@ -563,6 +574,17 @@ export function MarketplaceView({ initialListings, recommendations = [], teamMem
 
     return (
         <div className="space-y-6">
+            {/* Marketplace Onboarding Modal for first-time users */}
+            {showOnboarding && (
+                <MarketplaceOnboardingModal
+                    recommendations={onboardingRecommendations}
+                    userRole={userRole}
+                    onComplete={() => {
+                        console.log('Marketplace onboarding completed!')
+                    }}
+                />
+            )}
+
             <div className="flex flex-col gap-6">
 
                 {/* AI Recommendations Panel */}

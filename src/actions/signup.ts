@@ -113,6 +113,9 @@ export async function signup(formData: FormData) {
     return redirect(`/join/founder?error=Company name is required`);
   }
 
+  // Get the base URL for email redirect
+  const siteUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_SITE_URL || 'https://centauros.io'
+
   // 1. Create auth user
   const { data: authData, error: authError } = await supabase.auth.signUp({
     email,
@@ -122,6 +125,7 @@ export async function signup(formData: FormData) {
         full_name: fullName,
         role: capitalizeRole(role),
       },
+      emailRedirectTo: `${siteUrl}/auth/callback`,
     },
   });
 

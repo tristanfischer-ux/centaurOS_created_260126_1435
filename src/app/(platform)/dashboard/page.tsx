@@ -12,6 +12,8 @@ import { TeamPulseWidget } from "@/components/dashboard/TeamPulseWidget"
 import { PendingApprovalsWidget } from "@/components/dashboard/PendingApprovalsWidget"
 import { BlockersWidget } from "@/components/dashboard/BlockersWidget"
 import { StandupWidget } from "@/components/StandupWidget"
+import { BookingIntentBanner } from "@/components/onboarding/BookingIntentBanner"
+import { getUnfulfilledIntents } from "@/actions/onboarding-intent"
 import Link from "next/link"
 import {
     CheckSquare,
@@ -46,6 +48,9 @@ export default async function DashboardPage() {
         .single()
 
     const userName = profile?.full_name || user.user_metadata?.full_name || user.email || 'User'
+
+    // Fetch any unfulfilled booking intents from signup
+    const { intents: bookingIntents } = await getUnfulfilledIntents()
 
     interface DashboardTask {
         id: string
@@ -283,6 +288,11 @@ export default async function DashboardPage() {
                     <CreateObjectiveDialog />
                 </div>
             </div>
+
+            {/* Booking Intent Banner - shown if user had a booking intent during signup */}
+            {bookingIntents.length > 0 && (
+                <BookingIntentBanner intents={bookingIntents} />
+            )}
 
             {/* Remote Team Widgets - Executive/Founder View */}
             {(profile?.role === 'Executive' || profile?.role === 'Founder') && (

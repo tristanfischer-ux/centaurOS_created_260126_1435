@@ -40,7 +40,7 @@ export const viewport: Viewport = {
 
 export const metadata: Metadata = {
   title: "Centaur Dynamics",
-  description: "The Renaissance of Industry",
+  description: "We build atoms at the speed of bits.",
   manifest: "/manifest.json",
   icons: {
     icon: "/icons/icon-192x192.png",

@@ -54,6 +54,80 @@ export async function createSampleData() {
 }
 
 /**
+ * Create initial training tasks for new Apprentices
+ */
+export async function createApprenticeTrainingTasks() {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  
+  if (!user) return { error: 'Unauthorized' }
+  
+  // Get user's foundry (should be centaur-guild for apprentices)
+  const foundry_id = await getFoundryIdCached()
+  if (!foundry_id) return { error: 'User not in a foundry' }
+  
+  // Create training objective for the apprentice
+  const { data: objective, error: objError } = await supabase
+    .from('objectives')
+    .insert({
+      title: 'Week 1: Digital Body Setup',
+      description: 'Complete your initial training and set up your Digital Body - the AI-powered toolkit that amplifies your output 10x.',
+      creator_id: user.id,
+      foundry_id,
+      status: 'on_track'
+    })
+    .select()
+    .single()
+  
+  if (objError) {
+    console.error('Error creating training objective:', objError)
+    return { error: objError.message }
+  }
+  
+  // Create training tasks for apprentices
+  const trainingTasks = [
+    { 
+      title: 'Complete your profile', 
+      description: 'Add your bio, skills, and interests to help us match you with the right projects and mentors.',
+      end_date: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() // Due in 1 day
+    },
+    { 
+      title: 'Take the Digital Body tour', 
+      description: 'Explore the AI tools available in the marketplace. These tools will amplify your output and help you ship faster.',
+      end_date: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString() // Due in 2 days
+    },
+    { 
+      title: 'Review the Guild handbook', 
+      description: 'Understand how the Centaur Guild works, your path to becoming a founder, and how to get the most from your mentors.',
+      end_date: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString() // Due in 3 days
+    },
+    { 
+      title: 'Ship your first deliverable', 
+      description: 'Complete a small task assigned by your mentor. This is your first step to proving you can build atoms at the speed of bits.',
+      end_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() // Due in 7 days
+    }
+  ]
+  
+  for (const task of trainingTasks) {
+    await supabase.from('tasks').insert({
+      ...task,
+      objective_id: objective.id,
+      creator_id: user.id,
+      assignee_id: user.id,
+      foundry_id,
+      status: 'Pending',
+      risk_level: 'Low'
+    })
+  }
+  
+  revalidatePath('/objectives')
+  revalidatePath('/tasks')
+  revalidatePath('/dashboard')
+  
+  return { success: true }
+}
+
+/**
  * Marketplace Onboarding Functions
  */
 

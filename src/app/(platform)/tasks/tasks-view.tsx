@@ -14,6 +14,7 @@ import { deleteTasks, acceptTask, completeTask, updateTaskAssignees } from "@/ac
 import { toast } from "sonner"
 import { CreateTaskDialog } from "./create-task-dialog"
 import { QuickAddTask } from "@/components/ui/quick-add-task"
+import { FeatureTip } from "@/components/onboarding"
 import { Database } from "@/types/database.types"
 import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -436,12 +437,18 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                                     <List className="h-4 w-4" />
                                 </Button>
                             </div>
-                            <CreateTaskDialog
-                                objectives={objectives}
-                                members={members}
-                                teams={teams}
-                                currentUserId={currentUserId}
-                            />
+                            <FeatureTip
+                                id="tasks-create"
+                                title="Create Tasks"
+                                description="Break down objectives into actionable tasks. Assign them to team members or AI agents, set deadlines, and track completion."
+                            >
+                                <CreateTaskDialog
+                                    objectives={objectives}
+                                    members={members}
+                                    teams={teams}
+                                    currentUserId={currentUserId}
+                                />
+                            </FeatureTip>
                         </div>
                     </div>
 

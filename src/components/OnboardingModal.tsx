@@ -3,13 +3,97 @@
 import { useState, useEffect } from 'react'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
-import { CheckCircle2, Target, Zap, ArrowRight, LayoutDashboard } from 'lucide-react'
+import { CheckCircle2, Target, Zap, ArrowRight, LayoutDashboard, Users, Sparkles, GraduationCap } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { VisuallyHidden } from '@radix-ui/react-visually-hidden'
+import { createSampleData, createApprenticeTrainingTasks } from '@/actions/onboarding'
+import { toast } from 'sonner'
 
 const ONBOARDING_KEY = 'centauros_onboarding_completed'
 
-const steps = [
+// Role-specific step configurations
+const founderSteps = [
+  {
+    title: 'Welcome, Founder',
+    description: 'Your command center for building at software speed. We\'ve prepared your foundry and are ready to help you scale.',
+    icon: LayoutDashboard,
+    color: 'text-orange-600'
+  },
+  {
+    title: 'Define Your Strategy',
+    description: 'Set strategic Objectives that cascade into actionable tasks. Your team will align around your vision automatically.',
+    icon: Target,
+    color: 'text-orange-600'
+  },
+  {
+    title: 'Build Your Team',
+    description: 'Access fractional Executives and AI-amplified Apprentices from the Marketplace. Scale up or down on demand.',
+    icon: Users,
+    color: 'text-orange-600'
+  },
+  {
+    title: 'Your Foundry is Ready',
+    description: 'We\'ve created your first objective and sample tasks to get you started. Build atoms at the speed of bits.',
+    icon: CheckCircle2,
+    color: 'text-orange-600'
+  }
+]
+
+const executiveSteps = [
+  {
+    title: 'Welcome to the Cadre',
+    description: 'Deploy your expertise across multiple ventures. No politics, no bureaucracy—just high-impact work.',
+    icon: LayoutDashboard,
+    color: 'text-orange-600'
+  },
+  {
+    title: 'Your Portfolio Awaits',
+    description: 'Work with multiple startups simultaneously. Each engagement is tracked, and your impact is measured.',
+    icon: Target,
+    color: 'text-orange-600'
+  },
+  {
+    title: 'AI-Amplified Teams',
+    description: 'Lead teams of Apprentices with 10x output. The Marketplace connects you with the tools you need.',
+    icon: Sparkles,
+    color: 'text-orange-600'
+  },
+  {
+    title: 'Ready to Execute',
+    description: 'Your dashboard shows pending approvals and team status. Start building with the founders who need you.',
+    icon: CheckCircle2,
+    color: 'text-orange-600'
+  }
+]
+
+const apprenticeSteps = [
+  {
+    title: 'Welcome to the Guild',
+    description: 'You\'re not junior—you\'re a Founder-in-Training. Your Digital Body awaits.',
+    icon: GraduationCap,
+    color: 'text-orange-600'
+  },
+  {
+    title: 'Your Digital Body',
+    description: 'The Centaur OS gives you a 10x multiplier on your output. AI tools and workflows designed for builders.',
+    icon: Sparkles,
+    color: 'text-orange-600'
+  },
+  {
+    title: 'Learn by Doing',
+    description: 'Ship real work in your first month. Direct mentorship from Executives who\'ve built before.',
+    icon: Target,
+    color: 'text-orange-600'
+  },
+  {
+    title: 'Your Training Begins',
+    description: 'We\'ve assigned your first tasks. Complete them to progress on the Founder track.',
+    icon: CheckCircle2,
+    color: 'text-orange-600'
+  }
+]
+
+const defaultSteps = [
   {
     title: 'Welcome to the Foundry',
     description: 'Your central command for high-velocity creation. CentaurOS combines human ingenuity with AI precision.',
@@ -36,9 +120,20 @@ const steps = [
   }
 ]
 
-export function OnboardingModal() {
+interface OnboardingModalProps {
+  userRole?: 'Founder' | 'Executive' | 'Apprentice' | 'AI_Agent' | string
+}
+
+export function OnboardingModal({ userRole }: OnboardingModalProps) {
   const [open, setOpen] = useState(false)
   const [currentStep, setCurrentStep] = useState(0)
+  const [isCreatingSampleData, setIsCreatingSampleData] = useState(false)
+
+  // Select steps based on role
+  const steps = userRole === 'Founder' ? founderSteps 
+    : userRole === 'Executive' ? executiveSteps 
+    : userRole === 'Apprentice' ? apprenticeSteps 
+    : defaultSteps
 
   useEffect(() => {
     // Check if user has completed onboarding
@@ -49,7 +144,37 @@ export function OnboardingModal() {
     }
   }, [])
 
-  const handleComplete = () => {
+  const handleComplete = async () => {
+    // For Founders, create sample data to populate their dashboard
+    if (userRole === 'Founder') {
+      setIsCreatingSampleData(true)
+      try {
+        const result = await createSampleData()
+        if (result.success) {
+          toast.success('Your foundry is ready with sample objectives and tasks!')
+        }
+      } catch (error) {
+        console.error('Failed to create sample data:', error)
+      } finally {
+        setIsCreatingSampleData(false)
+      }
+    }
+    
+    // For Apprentices, create their training tasks
+    if (userRole === 'Apprentice') {
+      setIsCreatingSampleData(true)
+      try {
+        const result = await createApprenticeTrainingTasks()
+        if (result.success) {
+          toast.success('Your Digital Body is ready! Training tasks have been assigned.')
+        }
+      } catch (error) {
+        console.error('Failed to create training tasks:', error)
+      } finally {
+        setIsCreatingSampleData(false)
+      }
+    }
+    
     localStorage.setItem(ONBOARDING_KEY, 'true')
     setOpen(false)
   }

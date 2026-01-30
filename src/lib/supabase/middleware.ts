@@ -7,6 +7,7 @@ const PUBLIC_ROUTES = [
     '/',  // Marketing homepage
     '/login',
     '/auth',
+    '/auth/callback',  // Email verification callback
     '/join',
     '/invite',
     '/api/health',

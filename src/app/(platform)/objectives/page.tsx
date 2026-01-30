@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { CreateObjectiveDialog } from './create-objective-dialog'
 import { ObjectivesListView } from './objectives-list-view'
+import { FeatureTipWrapper } from './feature-tip-wrapper'
 
 // Revalidate every 60 seconds
 export const revalidate = 60
@@ -94,7 +95,9 @@ export default async function ObjectivesPage() {
                     </div>
                     <p className="text-muted-foreground mt-1 text-sm font-medium pl-4">High level goals for your company</p>
                 </div>
-                <CreateObjectiveDialog />
+                <FeatureTipWrapper>
+                    <CreateObjectiveDialog />
+                </FeatureTipWrapper>
             </div>
 
             <ObjectivesListView 

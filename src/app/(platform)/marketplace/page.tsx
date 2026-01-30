@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { getFoundryIdCached } from '@/lib/supabase/foundry-context'
 import { MarketplaceView } from './marketplace-view'
 import { CreateRFQDialog } from './create-rfq-dialog'
+import { getMarketplaceOnboardingStatus } from '@/actions/onboarding'
 
 // Force dynamic since we're fetching data that might change
 export const dynamic = 'force-dynamic'
@@ -21,9 +22,27 @@ export interface MarketplaceRecommendation {
 export default async function MarketplacePage() {
     const supabase = await createClient()
     const foundryId = await getFoundryIdCached()
+    const { data: { user } } = await supabase.auth.getUser()
 
     // Fetch marketplace listings
     const marketplaceListings = await getMarketplaceListings()
+
+    // Get user profile for role
+    let userRole: 'Executive' | 'Apprentice' | 'Founder' | 'AI_Agent' = 'Apprentice'
+    if (user) {
+        const { data: profile } = await supabase
+            .from('profiles')
+            .select('role')
+            .eq('id', user.id)
+            .single()
+        
+        if (profile?.role) {
+            userRole = profile.role as typeof userRole
+        }
+    }
+
+    // Check if user needs marketplace onboarding
+    const { needsOnboarding } = await getMarketplaceOnboardingStatus()
 
     // Fetch AI recommendations for this foundry
     let recommendations: MarketplaceRecommendation[] = []
@@ -56,6 +75,9 @@ export default async function MarketplacePage() {
         }
     }
 
+    // Get top 3 listings for onboarding recommendations
+    const onboardingRecommendations = marketplaceListings.slice(0, 3)
+
     return (
         <div className="space-y-8">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-6 border-b border-blue-200">
@@ -77,6 +99,9 @@ export default async function MarketplacePage() {
                 initialListings={marketplaceListings}
                 recommendations={recommendations}
                 teamMembers={teamMembers}
+                showOnboarding={needsOnboarding}
+                userRole={userRole}
+                onboardingRecommendations={onboardingRecommendations}
             />
         </div>
     )
