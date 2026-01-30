@@ -36,6 +36,7 @@ import {
 import { EmptyState } from "@/components/ui/empty-state"
 import { QuestionCard, Question, VerificationStatus } from "@/components/advisory/question-card"
 import { AskModal } from "@/components/advisory/ask-modal"
+import { StatusLegend } from "@/components/advisory/status-legend"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
 
@@ -292,6 +293,9 @@ export function AdvisoryView({
                     </div>
                     <AskModal onSubmit={handleAskQuestion} />
                 </div>
+
+                {/* Status Legend */}
+                <StatusLegend className="pt-4 pb-2" />
 
                 {/* Tabs */}
                 <Tabs value={activeTab} onValueChange={(val) => setActiveTab(val as typeof activeTab)} className="w-full">

@@ -769,7 +769,7 @@ export function GanttView({ tasks, objectives, profiles, members = [], currentUs
             ) : (
                 <div className="bg-card rounded-lg overflow-hidden shadow-md">
                     <Gantt
-                        key={`gantt-${sortBy}`} // Force re-render when sort changes
+                        key={`gantt-${sortBy}-${dateOffset.getTime()}`} // Force re-render when sort or date changes
                         tasks={ganttTasks}
                         viewMode={viewMode}
                         viewDate={dateOffset}

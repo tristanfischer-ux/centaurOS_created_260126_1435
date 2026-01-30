@@ -36,6 +36,7 @@ import {
 import { cn } from '@/lib/utils'
 import { CoverageRadar } from '@/components/org-blueprint/coverage-radar'
 import { AssessmentModal } from '@/components/org-blueprint/assessment-modal'
+import { CoverageLegend } from '@/components/org-blueprint/coverage-legend'
 
 type CoverageStatus = 'covered' | 'partial' | 'gap' | 'not_needed'
 type FunctionCategory = 'finance' | 'legal' | 'sales' | 'marketing' | 'product' | 'operations' | 'people' | 'customer' | 'strategy'
@@ -414,6 +415,9 @@ export function OrgBlueprintView({ functions: initialFunctions, summary: initial
                     </div>
                 </div>
             )}
+
+            {/* Coverage Legend */}
+            <CoverageLegend className="pb-2" />
 
             {/* Filters */}
             <div className="flex flex-col sm:flex-row gap-3">

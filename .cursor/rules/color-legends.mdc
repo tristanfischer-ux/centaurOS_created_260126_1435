@@ -1,0 +1,68 @@
+---
+description: Always include color legends when using colored UI elements (borders, badges, status indicators)
+alwaysApply: true
+---
+
+# Color Legends for Visual Indicators
+
+When using colored UI elements (borders, badges, status indicators), **always provide a legend** explaining what the colors mean. Users should never have to guess what a color represents.
+
+## When to Use Legends
+
+Add a legend when you have:
+- Cards with colored left borders (`border-l-4 border-l-green-500`)
+- Status badges with different colors
+- Color-coded categories or states
+- Any UI where color conveys meaning
+
+## Legend Pattern
+
+Use this consistent pattern across the app:
+
+```tsx
+interface StatusItem {
+    label: string
+    color: string  // Tailwind class like "bg-emerald-500"
+    icon: typeof LucideIcon
+}
+
+const STATUS_ITEMS: StatusItem[] = [
+    { label: "Verified", color: "bg-emerald-500", icon: CheckCircle2 },
+    { label: "Pending", color: "bg-slate-300", icon: Clock },
+]
+
+export function StatusLegend({ className }: { className?: string }) {
+    return (
+        <div className={cn("flex items-center gap-6 text-sm", className)}>
+            <span className="text-muted-foreground font-medium">Status:</span>
+            {STATUS_ITEMS.map((item) => {
+                const Icon = item.icon
+                return (
+                    <div key={item.label} className="flex items-center gap-2">
+                        <div className={cn("h-2 w-10 rounded-full", item.color)} />
+                        <Icon className="h-3.5 w-3.5 text-muted-foreground" />
+                        <span className="text-foreground font-medium">{item.label}</span>
+                    </div>
+                )
+            })}
+        </div>
+    )
+}
+```
+
+## Placement
+
+Place legends:
+- **Below page headers**, before main content
+- **Above filterable content** (before tabs/filters)
+- **Only when relevant content is visible** (conditional rendering)
+
+## Examples
+
+✅ **Advisory page**: Status legend shows Verified/Endorsed/Awaiting Review
+✅ **Today page**: Action items legend shows Decisions/Blockers/Mentions  
+✅ **Org Blueprint**: Coverage legend shows Covered/Partial/Gap
+
+❌ **Don't**: Use colored borders without explanation
+❌ **Don't**: Put legend at bottom or in tooltips only
+❌ **Don't**: Create inconsistent legend styles across pages

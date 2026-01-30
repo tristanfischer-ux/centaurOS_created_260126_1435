@@ -8,6 +8,7 @@ import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip
 import { CreateTaskDialog } from "../tasks/create-task-dialog"
 import { CreateObjectiveDialog } from "../objectives/create-objective-dialog"
 import { DailyPrioritizer } from "@/components/DailyPrioritizer"
+import { ActionItemsLegend } from "@/components/today/action-items-legend"
 import { getMentionsForUser } from "@/actions/tasks"
 import Link from "next/link"
 import {
@@ -314,6 +315,11 @@ export default async function TodayPage() {
                         </div>
                     )}
                 </div>
+            )}
+
+            {/* Action Items Legend */}
+            {totalActionItems > 0 && (
+                <ActionItemsLegend className="pt-2 pb-4" />
             )}
 
             {/* All Clear State */}
