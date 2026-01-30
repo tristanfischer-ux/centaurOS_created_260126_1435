@@ -225,10 +225,10 @@ export default async function TodayPage() {
                             <Sun className="h-6 w-6 text-international-orange" />
                         </div>
                         <div>
-                            <h1 className="text-2xl xs:text-3xl sm:text-4xl font-display font-semibold text-foundry-900 tracking-tight">
+                            <h1 className="text-2xl xs:text-3xl sm:text-4xl font-display font-semibold text-foreground tracking-tight">
                                 {greeting}, {userName}
                             </h1>
-                            <p className="text-foundry-500 text-sm font-medium mt-0.5">
+                            <p className="text-muted-foreground text-sm font-medium mt-0.5">
                                 Here's your morning briefing
                             </p>
                         </div>
@@ -327,7 +327,7 @@ export default async function TodayPage() {
                                             <div className="p-1.5 bg-amber-50 rounded-md">
                                                 <Inbox className="h-5 w-5 text-amber-600" />
                                             </div>
-                                            <CardTitle className="font-display text-lg text-foundry-900">
+                                            <CardTitle className="font-display text-lg text-foreground">
                                                 Decisions Pending
                                             </CardTitle>
                                             <Badge variant="secondary" className="bg-amber-100 text-amber-700 border-amber-200">
@@ -340,7 +340,7 @@ export default async function TodayPage() {
                                             </Button>
                                         </Link>
                                     </div>
-                                    <CardDescription className="text-foundry-500">
+                                    <CardDescription className="text-muted-foreground">
                                         Tasks awaiting your approval
                                     </CardDescription>
                                 </CardHeader>
@@ -349,10 +349,10 @@ export default async function TodayPage() {
                                         <Link key={task.id} href="/tasks" className="block">
                                             <div className="flex items-center justify-between p-3 rounded-lg border border-amber-100 bg-amber-50/30 hover:bg-amber-50 transition-colors group">
                                                 <div className="flex-1 min-w-0">
-                                                    <p className="text-sm font-medium text-foundry-900 truncate group-hover:text-amber-900">
+                                                    <p className="text-sm font-medium text-foreground truncate group-hover:text-amber-900">
                                                         {task.title}
                                                     </p>
-                                                    <div className="flex items-center gap-2 mt-1 text-xs text-foundry-500">
+                                                    <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
                                                         {task.objective?.title && (
                                                             <span className="flex items-center text-amber-700">
                                                                 <Target className="h-3 w-3 mr-1" />
@@ -386,7 +386,7 @@ export default async function TodayPage() {
                                             <div className="p-1.5 bg-red-50 rounded-md">
                                                 <AlertTriangle className="h-5 w-5 text-red-600" />
                                             </div>
-                                            <CardTitle className="font-display text-lg text-foundry-900">
+                                            <CardTitle className="font-display text-lg text-foreground">
                                                 Blockers Reported
                                             </CardTitle>
                                             <Badge variant="secondary" className="bg-red-100 text-red-700 border-red-200">
@@ -394,7 +394,7 @@ export default async function TodayPage() {
                                             </Badge>
                                         </div>
                                     </div>
-                                    <CardDescription className="text-foundry-500">
+                                    <CardDescription className="text-muted-foreground">
                                         Team members who need help today
                                     </CardDescription>
                                 </CardHeader>
@@ -409,7 +409,7 @@ export default async function TodayPage() {
                                                 </Avatar>
                                                 <div className="flex-1 min-w-0">
                                                     <div className="flex items-center gap-2">
-                                                        <span className="text-sm font-medium text-foundry-900">
+                                                        <span className="text-sm font-medium text-foreground">
                                                             {standup.user?.full_name || 'Team Member'}
                                                         </span>
                                                         {standup.needs_help && (
@@ -422,7 +422,7 @@ export default async function TodayPage() {
                                                                 "text-[10px] capitalize",
                                                                 standup.blocker_severity === 'critical' ? "border-red-400 text-red-600" :
                                                                 standup.blocker_severity === 'high' ? "border-orange-400 text-orange-600" :
-                                                                "border-foundry-300 text-foundry-500"
+                                                                "border-foundry-300 text-muted-foreground"
                                                             )}>
                                                                 {standup.blocker_severity}
                                                             </Badge>
@@ -448,7 +448,7 @@ export default async function TodayPage() {
                                             <div className="p-1.5 bg-red-50 rounded-md">
                                                 <AlertCircle className="h-5 w-5 text-red-600" />
                                             </div>
-                                            <CardTitle className="font-display text-lg text-foundry-900">
+                                            <CardTitle className="font-display text-lg text-foreground">
                                                 Overdue Items
                                             </CardTitle>
                                             <Badge variant="secondary" className="bg-red-100 text-red-700 border-red-200">
@@ -461,7 +461,7 @@ export default async function TodayPage() {
                                             </Button>
                                         </Link>
                                     </div>
-                                    <CardDescription className="text-foundry-500">
+                                    <CardDescription className="text-muted-foreground">
                                         Tasks past their deadline
                                     </CardDescription>
                                 </CardHeader>
@@ -470,7 +470,7 @@ export default async function TodayPage() {
                                         <Link key={task.id} href="/tasks" className="block">
                                             <div className="flex items-center justify-between p-3 rounded-lg border border-red-100 bg-red-50/30 hover:bg-red-50 transition-colors group">
                                                 <div className="flex-1 min-w-0">
-                                                    <p className="text-sm font-medium text-foundry-900 truncate group-hover:text-red-900">
+                                                    <p className="text-sm font-medium text-foreground truncate group-hover:text-red-900">
                                                         {task.title}
                                                     </p>
                                                     <div className="flex items-center gap-2 mt-1 text-xs">
@@ -478,7 +478,7 @@ export default async function TodayPage() {
                                                             Due {formatDistanceToNow(new Date(task.end_date!), { addSuffix: true })}
                                                         </span>
                                                         {task.assignee?.full_name && (
-                                                            <span className="text-foundry-500">
+                                                            <span className="text-muted-foreground">
                                                                 • {task.assignee.full_name}
                                                             </span>
                                                         )}
@@ -504,7 +504,7 @@ export default async function TodayPage() {
                                     <div className="p-1.5 bg-international-orange/10 rounded-md">
                                         <Target className="h-5 w-5 text-international-orange" />
                                     </div>
-                                    <CardTitle className="flex items-center gap-2 font-display text-lg text-foundry-900">
+                                    <CardTitle className="flex items-center gap-2 font-display text-lg text-foreground">
                                         Today's Focus
                                         <Tooltip>
                                             <TooltipTrigger>
@@ -516,7 +516,7 @@ export default async function TodayPage() {
                                         </Tooltip>
                                     </CardTitle>
                                 </div>
-                                <CardDescription className="text-foundry-500">
+                                <CardDescription className="text-muted-foreground">
                                     Your most important tasks right now
                                 </CardDescription>
                             </CardHeader>
@@ -548,23 +548,23 @@ export default async function TodayPage() {
                         {/* Quick Links */}
                         <Card className="bg-white border-foundry-200">
                             <CardHeader className="pb-3">
-                                <CardTitle className="font-display text-lg text-foundry-900">Quick Links</CardTitle>
+                                <CardTitle className="font-display text-lg text-foreground">Quick Links</CardTitle>
                             </CardHeader>
                             <CardContent className="space-y-2">
                                 <Link href="/tasks" className="block">
-                                    <Button variant="ghost" className="w-full justify-start text-foundry-700 hover:text-foundry-900 hover:bg-foundry-50">
+                                    <Button variant="ghost" className="w-full justify-start text-foundry-700 hover:text-foreground hover:bg-foundry-50">
                                         <CheckCircle2 className="h-4 w-4 mr-2" />
                                         All Tasks
                                     </Button>
                                 </Link>
                                 <Link href="/objectives" className="block">
-                                    <Button variant="ghost" className="w-full justify-start text-foundry-700 hover:text-foundry-900 hover:bg-foundry-50">
+                                    <Button variant="ghost" className="w-full justify-start text-foundry-700 hover:text-foreground hover:bg-foundry-50">
                                         <Target className="h-4 w-4 mr-2" />
                                         Objectives
                                     </Button>
                                 </Link>
                                 <Link href="/team" className="block">
-                                    <Button variant="ghost" className="w-full justify-start text-foundry-700 hover:text-foundry-900 hover:bg-foundry-50">
+                                    <Button variant="ghost" className="w-full justify-start text-foundry-700 hover:text-foreground hover:bg-foundry-50">
                                         <Users className="h-4 w-4 mr-2" />
                                         Team
                                     </Button>

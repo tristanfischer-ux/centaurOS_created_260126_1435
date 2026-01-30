@@ -441,6 +441,7 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                                 id="tasks-create"
                                 title="Create Tasks"
                                 description="Break down objectives into actionable tasks. Assign them to team members or AI agents, set deadlines, and track completion."
+                                align="right"
                             >
                                 <CreateTaskDialog
                                     objectives={objectives}

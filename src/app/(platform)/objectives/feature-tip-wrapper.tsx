@@ -12,6 +12,7 @@ export function FeatureTipWrapper({ children }: FeatureTipWrapperProps) {
             id="objectives-create"
             title="Set Strategic Objectives"
             description="Define high-level goals that align your team. Tasks cascade from objectives, making progress visible and measurable."
+            align="right"
         >
             {children}
         </FeatureTip>

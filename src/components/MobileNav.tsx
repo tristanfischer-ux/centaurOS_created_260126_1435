@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
-import { LayoutDashboard, Users, CheckSquare, Clock, Store, Settings, Target, HelpCircle, MoreHorizontal, Compass, Network, MessageCircleQuestion } from "lucide-react"
+import { LayoutDashboard, Users, CheckSquare, Clock, Store, Settings, Target, HelpCircle, MoreHorizontal, Compass, Network, MessageCircleQuestion, Sun } from "lucide-react"
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -25,7 +25,7 @@ function isRouteActive(pathname: string, href: string): boolean {
 // On ultra-narrow screens (Galaxy Fold outer), we show 4 items + More
 // On regular mobile, we show 5 items + More
 const mainNavigation = [
-    { name: "Dashboard", shortName: "Home", href: "/dashboard", icon: LayoutDashboard },
+    { name: "Today", shortName: "Today", href: "/today", icon: Sun },
     { name: "Objectives", shortName: "Goals", href: "/objectives", icon: Target },
     { name: "Tasks", shortName: "Tasks", href: "/tasks", icon: CheckSquare },
     { name: "Team", shortName: "Team", href: "/team", icon: Users },

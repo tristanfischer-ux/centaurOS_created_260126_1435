@@ -838,6 +838,7 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                         id="team-invite"
                         title="Build Your Team"
                         description="Invite team members by email. Assign roles and they'll join your foundry automatically."
+                        align="right"
                     >
                         <InviteMemberDialog />
                     </FeatureTip>

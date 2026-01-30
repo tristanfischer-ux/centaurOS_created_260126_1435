@@ -197,12 +197,14 @@ export function FeatureTip({
     id, 
     title, 
     description,
-    children 
+    children,
+    align = 'left'
 }: { 
     id: string
     title: string
     description: string
     children: React.ReactNode
+    align?: 'left' | 'right'
 }) {
     const [dismissed, setDismissed] = useState(true)
     const storageKey = `centauros:tip:${id}`
@@ -229,10 +231,13 @@ export function FeatureTip({
 
     if (dismissed) return <>{children}</>
 
+    const alignmentClass = align === 'right' ? 'right-0' : 'left-0'
+    const arrowAlignmentClass = align === 'right' ? 'right-4' : 'left-4'
+
     return (
         <div className="relative">
             {children}
-            <div className="absolute top-full left-0 mt-2 z-50 w-72 p-3 bg-primary text-primary-foreground rounded-lg shadow-lg animate-in fade-in-50 slide-in-from-top-2">
+            <div className={`absolute top-full ${alignmentClass} mt-2 z-50 w-72 p-3 bg-primary text-primary-foreground rounded-lg shadow-lg animate-in fade-in-50 slide-in-from-top-2`}>
                 <div className="flex items-start justify-between gap-2">
                     <div>
                         <p className="font-medium text-sm">{title}</p>
@@ -245,7 +250,7 @@ export function FeatureTip({
                         Got it
                     </button>
                 </div>
-                <div className="absolute -top-1.5 left-4 w-3 h-3 bg-primary rotate-45" />
+                <div className={`absolute -top-1.5 ${arrowAlignmentClass} w-3 h-3 bg-primary rotate-45`} />
             </div>
         </div>
     )

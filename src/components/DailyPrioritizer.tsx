@@ -127,7 +127,7 @@ export function DailyPrioritizer({ tasks, maxTasks = 5 }: DailyPrioritizerProps)
     if (prioritizedTasks.length === 0) {
         return (
             <div className="text-center py-6">
-                <p className="text-foundry-500 text-sm">No tasks to prioritize</p>
+                <p className="text-muted-foreground text-sm">No tasks to prioritize</p>
             </div>
         )
     }
@@ -159,14 +159,14 @@ export function DailyPrioritizer({ tasks, maxTasks = 5 }: DailyPrioritizerProps)
                                 {/* Task title */}
                                 <p className={cn(
                                     "text-sm font-medium line-clamp-2 group-hover:underline decoration-foundry-300 underline-offset-2",
-                                    index === 0 ? "text-international-orange-dark" : "text-foundry-900"
+                                    index === 0 ? "text-international-orange-dark" : "text-foreground"
                                 )}>
                                     {task.title}
                                 </p>
 
                                 {/* Objective */}
                                 {task.objective?.title && (
-                                    <p className="text-xs text-foundry-500 mt-1 flex items-center">
+                                    <p className="text-xs text-muted-foreground mt-1 flex items-center">
                                         <Target className="h-3 w-3 mr-1 text-foundry-400" />
                                         {task.objective.title}
                                     </p>

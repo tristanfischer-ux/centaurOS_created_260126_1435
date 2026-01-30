@@ -32,7 +32,6 @@ const APP_VERSION = "1.0.3"
 // Navigation groups with spacers between them
 const coreNavigation = [
     { name: "Today", href: "/today", icon: Sun, tooltip: "Your daily focus and morning briefing" },
-    { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
     { name: "Objectives", href: "/objectives", icon: Target },
     { name: "Tasks", href: "/tasks", icon: CheckSquare },
     { name: "Timeline", href: "/timeline", icon: Clock, tooltip: "Gantt chart view of all tasks" },
