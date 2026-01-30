@@ -5,7 +5,7 @@ import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { EmptyState } from "@/components/ui/empty-state"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { UserAvatar } from "@/components/ui/user-avatar"
 import { 
     MapPin, 
     Lock, 
@@ -37,13 +37,6 @@ interface GuildTabsProps {
 }
 
 export function GuildTabs({ events, members, isExecutive }: GuildTabsProps) {
-    const getInitials = (name: string | null) => {
-        if (!name) return '?'
-        const parts = name.trim().split(/\s+/)
-        if (parts.length === 1) return parts[0].charAt(0).toUpperCase()
-        return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase()
-    }
-
     const getRoleBadgeClass = (role: string | null) => {
         switch (role) {
             case 'Founder':
@@ -146,11 +139,11 @@ export function GuildTabs({ events, members, isExecutive }: GuildTabsProps) {
                         members.map(member => (
                             <Card key={member.id} className="p-4 bg-card">
                                 <div className="flex items-start gap-3">
-                                    <Avatar className="h-10 w-10">
-                                        <AvatarFallback className="bg-muted text-muted-foreground font-mono text-sm">
-                                            {getInitials(member.full_name)}
-                                        </AvatarFallback>
-                                    </Avatar>
+                                    <UserAvatar
+                                        name={member.full_name}
+                                        role={member.role}
+                                        size="lg"
+                                    />
                                     <div className="flex-1 min-w-0">
                                         <p className="font-medium text-foreground truncate">
                                             {member.full_name || "Unknown"}

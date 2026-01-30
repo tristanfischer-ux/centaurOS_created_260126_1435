@@ -19,21 +19,11 @@ import { addTaskComment, acceptTask, rejectTask, completeTask, forwardTask, trig
 import { uploadTaskAttachment } from "@/actions/attachments"
 import { toast } from "sonner"
 import { useRouter } from "next/navigation"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { UserAvatar } from "@/components/ui/user-avatar"
 import { EmptyState } from "@/components/ui/empty-state"
 import { MessageSquare } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { getStatusBadgeClass } from "@/lib/status-colors"
-
-function getInitials(name: string | null) {
-    if (!name) return '??'
-    return name
-        .split(' ')
-        .map(n => n[0])
-        .slice(0, 2)
-        .join('')
-        .toUpperCase()
-}
 
 interface Member {
     id: string
@@ -412,11 +402,12 @@ export function ThreadDrawer({
                                         .map(member => (
                                             <SelectItem key={member.id} value={member.id}>
                                                 <div className="flex items-center gap-2">
-                                                    <Avatar className="h-5 w-5 border border-border shrink-0">
-                                                        <AvatarFallback className="text-[9px] bg-muted text-muted-foreground font-medium flex items-center justify-center">
-                                                            {getInitials(member.full_name)}
-                                                        </AvatarFallback>
-                                                    </Avatar>
+                                                    <UserAvatar
+                                                        name={member.full_name}
+                                                        role={member.role}
+                                                        size="xs"
+                                                        className="border border-border shrink-0"
+                                                    />
                                                     <span>
                                                         {member.full_name || 'Unknown'}
                                                         {member.role === 'AI_Agent' && ' 🤖'}

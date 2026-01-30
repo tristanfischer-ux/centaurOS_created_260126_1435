@@ -93,11 +93,11 @@ export function TeamPulseWidget({ members }: TeamPulseWidgetProps) {
                                         className="flex items-center gap-2 p-2 rounded-lg bg-slate-50 hover:bg-slate-100 transition-colors"
                                     >
                                         <div className="relative">
-                                            <Avatar className="h-8 w-8">
-                                                <AvatarFallback className="text-xs bg-slate-200 text-slate-600">
-                                                    {getInitials(member.full_name)}
-                                                </AvatarFallback>
-                                            </Avatar>
+                                            <UserAvatar 
+                                                name={member.full_name} 
+                                                role={member.role} 
+                                                size="md" 
+                                            />
                                             <PresenceIndicator 
                                                 status={status} 
                                                 presence={presence}

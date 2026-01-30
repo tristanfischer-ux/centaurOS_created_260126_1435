@@ -4,7 +4,7 @@ import { memo } from 'react'
 import { cn } from '@/lib/utils'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { UserAvatar } from '@/components/ui/user-avatar'
 import { Star, CheckCircle2, User } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
 import type { ProviderRating } from '@/actions/ratings'
@@ -24,32 +24,23 @@ export const ReviewCard = memo(function ReviewCard({
         ? 'Anonymous' 
         : review.reviewer_name || 'Customer'
 
-    const initials = displayName
-        .split(' ')
-        .map(n => n[0])
-        .join('')
-        .toUpperCase()
-        .slice(0, 2)
-
     return (
         <Card className={cn('transition-colors', className)}>
             <CardContent className="p-4">
                 <div className="flex items-start gap-3">
                     {/* Avatar */}
-                    <Avatar className="w-10 h-10 shrink-0">
-                        {!review.is_anonymous && review.reviewer_avatar ? (
-                            <AvatarImage src={review.reviewer_avatar} alt={displayName} />
-                        ) : null}
-                        <AvatarFallback className={cn(
-                            review.is_anonymous && 'bg-slate-100 text-slate-500'
-                        )}>
-                            {review.is_anonymous ? (
-                                <User className="w-5 h-5" />
-                            ) : (
-                                initials
-                            )}
-                        </AvatarFallback>
-                    </Avatar>
+                    {review.is_anonymous ? (
+                        <div className="w-10 h-10 shrink-0 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center">
+                            <User className="w-5 h-5" />
+                        </div>
+                    ) : (
+                        <UserAvatar
+                            name={displayName}
+                            avatarUrl={review.reviewer_avatar}
+                            size="lg"
+                            className="shrink-0"
+                        />
+                    )}
 
                     <div className="flex-1 min-w-0">
                         {/* Header */}

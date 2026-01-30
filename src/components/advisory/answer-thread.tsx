@@ -15,7 +15,7 @@ import {
     Sparkles
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { UserAvatar } from "@/components/ui/user-avatar"
 import { Badge } from "@/components/ui/badge"
 import { Textarea } from "@/components/ui/textarea"
 import { VerifyButton } from "./verify-button"
@@ -188,23 +188,12 @@ export function AnswerThread({
             <div className="p-4 border-b border-slate-100">
                 <div className="flex items-start justify-between gap-3">
                     <div className="flex items-center gap-3">
-                        <Avatar className={cn(
-                            "h-10 w-10",
-                            answer.is_ai_generated && "ring-2 ring-violet-300 ring-offset-2"
-                        )}>
-                            <AvatarFallback className={cn(
-                                "text-sm font-medium",
-                                answer.is_ai_generated 
-                                    ? "bg-gradient-to-br from-violet-500 to-blue-500 text-white" 
-                                    : "bg-slate-100 text-slate-600"
-                            )}>
-                                {answer.is_ai_generated ? (
-                                    <Bot className="h-5 w-5" />
-                                ) : (
-                                    answer.author.full_name?.substring(0, 2).toUpperCase()
-                                )}
-                            </AvatarFallback>
-                        </Avatar>
+                        <UserAvatar
+                            name={answer.is_ai_generated ? "AI Assistant" : answer.author.full_name}
+                            role={answer.is_ai_generated ? "AI_Agent" : answer.author.role}
+                            size="lg"
+                            className={answer.is_ai_generated ? "ring-2 ring-violet-300 ring-offset-2" : undefined}
+                        />
                         <div>
                             <div className="flex items-center gap-2">
                                 <span className="font-semibold text-foreground">
@@ -332,11 +321,11 @@ export function AnswerThread({
                             ) : (
                                 localComments.map((comment) => (
                                     <div key={comment.id} className="flex gap-2">
-                                        <Avatar className="h-7 w-7 shrink-0">
-                                            <AvatarFallback className="text-[10px] font-medium bg-white text-slate-600">
-                                                {comment.user.full_name?.substring(0, 2).toUpperCase()}
-                                            </AvatarFallback>
-                                        </Avatar>
+                                        <UserAvatar
+                                            name={comment.user.full_name}
+                                            role={comment.user.role}
+                                            size="md"
+                                        />
                                         <div className="flex-1 min-w-0">
                                             <div className="flex items-center gap-2 mb-0.5">
                                                 <span className="text-xs font-medium text-foreground">

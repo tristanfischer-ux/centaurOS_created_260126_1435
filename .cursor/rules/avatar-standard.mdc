@@ -1,0 +1,99 @@
+# Avatar Standard: Use UserAvatar Component
+
+All user avatars in CentaurOS **must** use the standardized `UserAvatar` component to ensure consistent role-based color coding across the application.
+
+## Required Import
+
+```tsx
+import { UserAvatar, UserAvatarStack } from "@/components/ui/user-avatar"
+```
+
+## DO NOT use raw Avatar components for users
+
+```tsx
+// ❌ WRONG - Do not do this
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+<Avatar>
+  <AvatarFallback className="bg-slate-100">JD</AvatarFallback>
+</Avatar>
+
+// ✅ CORRECT - Use UserAvatar instead
+import { UserAvatar } from "@/components/ui/user-avatar"
+<UserAvatar name="John Doe" role="Executive" size="md" />
+```
+
+## Role-Based Color System
+
+The `UserAvatar` component automatically applies colors based on user role:
+
+| Role | Background | Text | Use Case |
+|------|------------|------|----------|
+| `Founder` | `bg-orange-100` | `text-orange-700` | Company founders |
+| `Executive` | `bg-blue-100` | `text-blue-700` | Executive team members |
+| `Apprentice` | `bg-green-100` | `text-green-700` | Apprentices/interns |
+| `AI_Agent` | `bg-purple-100` | `text-purple-600` | AI assistants |
+| Default | `bg-slate-100` | `text-slate-600` | Any other role |
+
+## Component Props
+
+```tsx
+interface UserAvatarProps {
+  name: string | null | undefined    // User's full name for initials
+  role?: string | null               // Role for color coding
+  avatarUrl?: string | null          // Optional profile image
+  size?: "xs" | "sm" | "md" | "lg" | "xl"  // Size variant
+  showBorder?: boolean               // Add border styling
+  className?: string                 // Additional classes
+}
+```
+
+## Size Reference
+
+| Size | Dimensions | Text Size | Use Case |
+|------|------------|-----------|----------|
+| `xs` | `h-4 w-4` | `text-[6px]` | Inline mentions, tiny indicators |
+| `sm` | `h-6 w-6` | `text-[10px]` | Compact lists, dropdowns |
+| `md` | `h-8 w-8` | `text-xs` | Default, cards, messages |
+| `lg` | `h-10 w-10` | `text-sm` | Profile headers, prominent display |
+| `xl` | `h-14 w-14` | `text-xl` | Large profile cards |
+
+## Examples
+
+### Single Avatar
+```tsx
+<UserAvatar name="Jane Smith" role="Founder" size="lg" />
+<UserAvatar name="AI Assistant" role="AI_Agent" size="md" />
+<UserAvatar name="John Doe" role="Executive" avatarUrl="/images/john.jpg" />
+```
+
+### Multiple Avatars (Stacked)
+```tsx
+<UserAvatarStack 
+  users={assignees.map(a => ({
+    id: a.id,
+    name: a.full_name,
+    role: a.role,
+    avatarUrl: a.avatar_url,
+  }))}
+  size="md"
+  max={4}
+/>
+```
+
+### In a List/Dropdown
+```tsx
+{members.map(member => (
+  <div className="flex items-center gap-2">
+    <UserAvatar name={member.full_name} role={member.role} size="sm" />
+    <span>{member.full_name}</span>
+  </div>
+))}
+```
+
+## When to Use Raw Avatar
+
+The base `Avatar` component from `@/components/ui/avatar` should **only** be used for:
+- Non-user avatars (e.g., organization logos, placeholder icons)
+- Custom avatar implementations that don't represent a person
+
+For any avatar representing a **user/person**, always use `UserAvatar`.

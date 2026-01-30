@@ -3,9 +3,9 @@
 import { useState, useRef, useEffect, KeyboardEvent } from 'react'
 import { createPortal } from 'react-dom'
 import { Textarea } from '@/components/ui/textarea'
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { UserAvatar } from '@/components/ui/user-avatar'
 import { getMentionAtCursor } from '@/lib/mentions'
-import { cn, getInitials } from '@/lib/utils'
+import { cn } from '@/lib/utils'
 
 interface Profile {
   id: string
@@ -193,11 +193,11 @@ export function MentionInput({
                 index === selectedIndex ? 'bg-blue-50 text-blue-900' : 'hover:bg-slate-50'
               )}
             >
-              <Avatar className="h-8 w-8 border border-slate-200 shrink-0">
-                <AvatarFallback className="bg-slate-100 text-slate-700 text-xs font-medium">
-                  {getInitials(profile.full_name)}
-                </AvatarFallback>
-              </Avatar>
+              <UserAvatar
+                name={profile.full_name}
+                size="sm"
+                className="border border-slate-200 shrink-0"
+              />
               <div className="flex-1 min-w-0">
                 <div className="font-medium truncate text-slate-900">{profile.full_name}</div>
                 <div className="text-xs text-slate-500 truncate">{profile.email}</div>

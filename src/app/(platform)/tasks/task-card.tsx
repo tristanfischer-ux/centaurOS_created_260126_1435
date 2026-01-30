@@ -23,7 +23,7 @@ import {
 } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { format } from "date-fns"
-import { Calendar as CalendarIcon, Check, X, ArrowRight, Bot, MessageSquare, ChevronDown, ChevronUp, Copy, Pencil, History as HistoryIcon, ShieldAlert, Eye, EyeOff, ShieldCheck, Paperclip, Plus, Upload, Loader2 } from "lucide-react"
+import { Calendar as CalendarIcon, Check, X, ArrowRight, Bot, MessageSquare, ChevronDown, ChevronUp, Copy, Pencil, History as HistoryIcon, ShieldAlert, Eye, EyeOff, ShieldCheck, Paperclip, Plus, Upload, Loader2, Maximize2 } from "lucide-react"
 import { Calendar } from "@/components/ui/calendar"
 import {
     Popover,
@@ -46,6 +46,7 @@ import { Database } from "@/types/database.types"
 import { InlineThread } from "@/components/tasks/inline-thread"
 import { InlineHistory } from "@/components/tasks/inline-history"
 import { EditTaskDialog } from "@/components/tasks/edit-task-dialog"
+import { FullTaskView } from "@/components/tasks/full-task-view"
 import { toast } from "sonner"
 import { RubberStampModal } from "@/components/smart-airlock/RubberStampModal"
 import { ClientNudgeButton } from "@/components/smart-airlock/ClientNudgeButton"
@@ -121,6 +122,7 @@ export const TaskCard = memo(function TaskCard(props: TaskCardProps) {
     const [editOpen, setEditOpen] = useState(false)
     const [showHistory, setShowHistory] = useState(false)
     const [rubberStampOpen, setRubberStampOpen] = useState(false)
+    const [fullViewOpen, setFullViewOpen] = useState(false)
     const [assigneePopoverOpen, setAssigneePopoverOpen] = useState(false)
     const [assigneePopoverOpen2, setAssigneePopoverOpen2] = useState(false)
 
@@ -989,6 +991,20 @@ export const TaskCard = memo(function TaskCard(props: TaskCardProps) {
                                     </TooltipTrigger>
                                     <TooltipContent>Add notes and attachments</TooltipContent>
                                 </Tooltip>
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            className="h-8 px-2 gap-1.5 text-xs transition-all duration-200 shrink-0 text-muted-foreground hover:text-international-orange hover:bg-orange-50"
+                                            onClick={() => setFullViewOpen(true)}
+                                        >
+                                            <Maximize2 className="h-3.5 w-3.5" />
+                                            <span className="hidden xs:inline">Expand</span>
+                                        </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>Open full view</TooltipContent>
+                                </Tooltip>
                             </div>
                         </div>
 
@@ -1042,6 +1058,13 @@ export const TaskCard = memo(function TaskCard(props: TaskCardProps) {
                         isOpen={rubberStampOpen}
                         onClose={() => setRubberStampOpen(false)}
                         taskId={task.id}
+                    />
+                    <FullTaskView
+                        open={fullViewOpen}
+                        onOpenChange={setFullViewOpen}
+                        task={task}
+                        members={members}
+                        currentUserId={currentUserId}
                     />
                 </>
             )}

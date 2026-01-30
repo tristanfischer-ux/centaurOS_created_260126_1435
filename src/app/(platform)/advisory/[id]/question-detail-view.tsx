@@ -21,7 +21,7 @@ import {
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { UserAvatar } from "@/components/ui/user-avatar"
 import { Textarea } from "@/components/ui/textarea"
 import { Card } from "@/components/ui/card"
 import { AnswerThread, Answer } from "@/components/advisory/answer-thread"
@@ -215,11 +215,11 @@ export function QuestionDetailView({
                     {/* Footer */}
                     <div className="flex items-center justify-between pt-4 border-t border-slate-100">
                         <div className="flex items-center gap-3">
-                            <Avatar className="h-10 w-10">
-                                <AvatarFallback className="text-sm font-medium bg-slate-100 text-slate-600">
-                                    {question.asker.full_name?.substring(0, 2).toUpperCase()}
-                                </AvatarFallback>
-                            </Avatar>
+                            <UserAvatar
+                                name={question.asker.full_name}
+                                role={question.asker.role}
+                                size="lg"
+                            />
                             <div>
                                 <div className="flex items-center gap-2">
                                     <span className="font-medium text-foreground">

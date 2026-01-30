@@ -27,8 +27,8 @@ import {
     MessageSquare
 } from "lucide-react"
 import { formatDistanceToNow } from "date-fns"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { getInitials, cn, formatStatus } from "@/lib/utils"
+import { UserAvatar } from "@/components/ui/user-avatar"
+import { cn, formatStatus } from "@/lib/utils"
 
 interface TodayTask {
     id: string
@@ -202,6 +202,9 @@ export default async function TodayPage() {
     const objectivesPromise = supabase.from('objectives').select('id, title')
     const membersPromise = supabase.from('profiles').select('id, full_name, role, email')
     const teamsPromise = supabase.from('teams').select('id, name')
+    
+    // 6. Mentions - where someone @mentioned this user in a note
+    const mentionsPromise = getMentionsForUser(10)
 
     // Execute all queries in parallel
     const [
@@ -211,7 +214,8 @@ export default async function TodayPage() {
         { data: myTasksData },
         { data: objectivesForDialog },
         { data: membersData },
-        { data: teamsData }
+        { data: teamsData },
+        mentionsResult
     ] = await Promise.all([
         pendingDecisionsPromise,
         blockersPromise,
@@ -219,13 +223,15 @@ export default async function TodayPage() {
         myTasksPromise,
         objectivesPromise,
         membersPromise,
-        teamsPromise
+        teamsPromise,
+        mentionsPromise
     ])
 
     const pendingDecisions = (pendingDecisionsData || []) as unknown as TodayTask[]
     const blockers = (blockersData || []) as unknown as BlockerStandup[]
     const overdueTasks = (overdueData || []) as unknown as TodayTask[]
     const myTasks = (myTasksData || []) as unknown as TodayTask[]
+    const mentions = (mentionsResult?.data || []) as unknown as Mention[]
     const members = (membersData || []).map(p => ({
         id: p.id,
         full_name: p.full_name || 'Unknown',
@@ -235,7 +241,7 @@ export default async function TodayPage() {
     const teams = teamsData || []
 
     // Calculate summary stats
-    const totalActionItems = pendingDecisions.length + blockers.length + overdueTasks.length
+    const totalActionItems = pendingDecisions.length + blockers.length + overdueTasks.length + mentions.length
     const hasNoItems = totalActionItems === 0 && myTasks.length === 0
 
     return (
@@ -296,6 +302,14 @@ export default async function TodayPage() {
                             <Clock className="h-4 w-4 text-red-600" />
                             <span className="text-sm font-medium text-red-700">
                                 {overdueTasks.length} overdue item{overdueTasks.length !== 1 ? 's' : ''}
+                            </span>
+                        </div>
+                    )}
+                    {mentions.length > 0 && (
+                        <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 border border-blue-200 rounded-full">
+                            <AtSign className="h-4 w-4 text-blue-600" />
+                            <span className="text-sm font-medium text-blue-700">
+                                {mentions.length} mention{mentions.length !== 1 ? 's' : ''}
                             </span>
                         </div>
                     )}
@@ -425,11 +439,12 @@ export default async function TodayPage() {
                                     {blockers.slice(0, 5).map((standup) => (
                                         <div key={standup.id} className="p-3 rounded-lg border border-red-100 bg-red-50/30">
                                             <div className="flex items-start gap-3">
-                                                <Avatar className="h-8 w-8 border border-red-200">
-                                                    <AvatarFallback className="text-xs bg-red-100 text-red-600 font-medium">
-                                                        {getInitials(standup.user?.full_name || 'U')}
-                                                    </AvatarFallback>
-                                                </Avatar>
+                                                <UserAvatar 
+                                                    name={standup.user?.full_name} 
+                                                    role={standup.user?.role} 
+                                                    size="md" 
+                                                    className="border border-red-200"
+                                                />
                                                 <div className="flex-1 min-w-0">
                                                     <div className="flex items-center gap-2">
                                                         <span className="text-sm font-medium text-foreground">
@@ -510,6 +525,72 @@ export default async function TodayPage() {
                                                 <Badge className="bg-red-100 text-red-700 border-red-200 capitalize text-xs">
                                                     {formatStatus(task.status)}
                                                 </Badge>
+                                            </div>
+                                        </Link>
+                                    ))}
+                                </CardContent>
+                            </Card>
+                        )}
+
+                        {/* Mentions - Someone @mentioned you */}
+                        {mentions.length > 0 && (
+                            <Card className="bg-white border-foundry-200 border-l-4 border-l-blue-500">
+                                <CardHeader className="pb-3">
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-2">
+                                            <div className="p-1.5 bg-blue-50 rounded-md">
+                                                <AtSign className="h-5 w-5 text-blue-600" />
+                                            </div>
+                                            <CardTitle className="font-display text-lg text-foreground">
+                                                Mentions
+                                            </CardTitle>
+                                            <Badge variant="secondary" className="bg-blue-100 text-blue-700 border-blue-200">
+                                                {mentions.length}
+                                            </Badge>
+                                        </div>
+                                        <Link href="/tasks">
+                                            <Button variant="ghost" size="sm" className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 font-medium group">
+                                                View Tasks <ArrowRight className="h-4 w-4 ml-1 group-hover:translate-x-0.5 transition-transform" />
+                                            </Button>
+                                        </Link>
+                                    </div>
+                                    <CardDescription className="text-muted-foreground">
+                                        Someone mentioned you in a note
+                                    </CardDescription>
+                                </CardHeader>
+                                <CardContent className="space-y-2">
+                                    {mentions.slice(0, 5).map((mention) => (
+                                        <Link key={mention.id} href="/tasks" className="block">
+                                            <div className="flex items-start gap-3 p-3 rounded-lg border border-blue-100 bg-blue-50/30 hover:bg-blue-50 transition-colors group">
+                                                <UserAvatar 
+                                                    name={mention.author?.full_name} 
+                                                    role={null}
+                                                    size="md" 
+                                                    className="border border-blue-200 shrink-0"
+                                                />
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="flex items-center gap-2 mb-1">
+                                                        <span className="text-sm font-medium text-foreground">
+                                                            {mention.author?.full_name || 'Someone'}
+                                                        </span>
+                                                        <span className="text-xs text-muted-foreground">
+                                                            {formatDistanceToNow(new Date(mention.created_at), { addSuffix: true })}
+                                                        </span>
+                                                    </div>
+                                                    {mention.task && (
+                                                        <div className="flex items-center gap-1 text-xs text-blue-700 mb-1">
+                                                            <MessageSquare className="h-3 w-3" />
+                                                            <span className="font-medium">#{mention.task.task_number}</span>
+                                                            <span className="truncate">{mention.task.title}</span>
+                                                        </div>
+                                                    )}
+                                                    <p className="text-sm text-foundry-600 line-clamp-2">
+                                                        {mention.content.replace(/@\[[^\]]+\]/g, (match) => {
+                                                            // Replace mention placeholders with readable text
+                                                            return '@someone'
+                                                        })}
+                                                    </p>
+                                                </div>
                                             </div>
                                         </Link>
                                     ))}

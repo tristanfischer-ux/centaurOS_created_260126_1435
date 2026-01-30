@@ -41,17 +41,7 @@ import { toast } from "sonner"
 import { addDays } from "date-fns"
 import { cn } from "@/lib/utils"
 import { DatePickerWithShortcuts } from "@/components/ui/date-picker-with-shortcuts"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-
-function getInitials(name: string | null) {
-    if (!name) return '??'
-    return name
-        .split(' ')
-        .map(n => n[0])
-        .slice(0, 2)
-        .join('')
-        .toUpperCase()
-}
+import { UserAvatar } from "@/components/ui/user-avatar"
 import { VoiceRecorder } from "@/components/tasks/voice-recorder"
 
 interface CreateTaskDialogProps {
@@ -273,11 +263,12 @@ export function CreateTaskDialog({ objectives, members, teams = [], currentUserI
             value: m.id,
             label: m.id === currentUserId ? 'Myself' : (m.full_name || 'Unknown'),
             icon: (
-                <Avatar className="h-4 w-4 border border-slate-200 shrink-0">
-                    <AvatarFallback className="text-[8px] bg-indigo-50 text-indigo-700 font-medium flex items-center justify-center">
-                        {getInitials(m.full_name)}
-                    </AvatarFallback>
-                </Avatar>
+                <UserAvatar
+                    name={m.full_name}
+                    role={m.role}
+                    size="xs"
+                    className="shrink-0"
+                />
             )
         }))
     ]

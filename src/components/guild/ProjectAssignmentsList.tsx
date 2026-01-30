@@ -4,7 +4,7 @@ import { useState, useEffect, useTransition } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { UserAvatar } from "@/components/ui/user-avatar"
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -72,12 +72,6 @@ export function ProjectAssignmentsList() {
         })
     }
 
-    const getInitials = (name: string) => {
-        const parts = name.trim().split(/\s+/)
-        if (parts.length === 1) return parts[0].charAt(0).toUpperCase()
-        return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase()
-    }
-
     const activeAssignments = assignments.filter(a => a.status === 'active')
     const completedAssignments = assignments.filter(a => a.status !== 'active')
 
@@ -133,11 +127,13 @@ export function ProjectAssignmentsList() {
                                     className="flex items-center justify-between p-4 hover:bg-slate-50 transition-colors"
                                 >
                                     <div className="flex items-center gap-4">
-                                        <Avatar className="h-10 w-10 border-2 border-green-200">
-                                            <AvatarFallback className="bg-green-100 text-green-700 font-bold">
-                                                {getInitials(assignment.apprenticeName)}
-                                            </AvatarFallback>
-                                        </Avatar>
+                                        <UserAvatar
+                                            name={assignment.apprenticeName}
+                                            role="Apprentice"
+                                            size="lg"
+                                            showBorder
+                                            className="border-green-200"
+                                        />
                                         <div>
                                             <h4 className="font-medium text-slate-900">{assignment.apprenticeName}</h4>
                                             <div className="flex items-center gap-2 text-sm text-slate-500">
@@ -199,11 +195,13 @@ export function ProjectAssignmentsList() {
                                     className="flex items-center justify-between p-4"
                                 >
                                     <div className="flex items-center gap-4">
-                                        <Avatar className="h-10 w-10 border border-slate-200">
-                                            <AvatarFallback className="bg-slate-100 text-slate-500">
-                                                {getInitials(assignment.apprenticeName)}
-                                            </AvatarFallback>
-                                        </Avatar>
+                                        <UserAvatar
+                                            name={assignment.apprenticeName}
+                                            role="Apprentice"
+                                            size="lg"
+                                            showBorder
+                                            className="border-slate-200"
+                                        />
                                         <div>
                                             <h4 className="font-medium text-slate-700">{assignment.apprenticeName}</h4>
                                             <div className="text-sm text-slate-500">{assignment.projectName}</div>

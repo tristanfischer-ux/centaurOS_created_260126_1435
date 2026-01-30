@@ -1,5 +1,15 @@
 "use client"
 
+/**
+ * Base Avatar primitives from Radix UI.
+ * 
+ * ⚠️ FOR USER AVATARS: Use `UserAvatar` from `@/components/ui/user-avatar` instead!
+ * It provides standardized role-based colors (Founder=orange, Executive=blue, 
+ * Apprentice=green, AI=purple) and consistent initials formatting.
+ * 
+ * Only use these base components for non-user avatars (logos, placeholders, etc.)
+ */
+
 import * as React from "react"
 import * as AvatarPrimitive from "@radix-ui/react-avatar"
 

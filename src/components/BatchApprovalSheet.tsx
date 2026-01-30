@@ -7,7 +7,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogTrigger } from '@/components/ui/dialog'
 import { Textarea } from '@/components/ui/textarea'
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { UserAvatar } from '@/components/ui/user-avatar'
 import { Check, AlertTriangle, Loader2, CheckCircle2, XCircle, ClipboardList } from 'lucide-react'
 import { getPendingApprovals, batchApproveTasks, batchRejectTasks, approveTask } from '@/actions/tasks'
 import { toast } from 'sonner'
@@ -28,15 +28,6 @@ interface Task {
     creator: { id: string; full_name: string | null } | null
 }
 
-function getInitials(name: string | null) {
-    if (!name) return '??'
-    return name
-        .split(' ')
-        .map(n => n[0])
-        .slice(0, 2)
-        .join('')
-        .toUpperCase()
-}
 
 interface BatchApprovalSheetProps {
     onApprovalComplete?: () => void
@@ -283,11 +274,11 @@ export function BatchApprovalSheet({ onApprovalComplete, trigger }: BatchApprova
                                                         <div className="flex items-center gap-2">
                                                             {assignee && (
                                                                 <div className="flex items-center gap-1.5">
-                                                                    <Avatar className="h-6 w-6">
-                                                                        <AvatarFallback className="text-[10px] bg-muted text-muted-foreground">
-                                                                            {getInitials(assignee.full_name)}
-                                                                        </AvatarFallback>
-                                                                    </Avatar>
+                                                                    <UserAvatar
+                                                                        name={assignee.full_name}
+                                                                        role={assignee.role}
+                                                                        size="sm"
+                                                                    />
                                                                     <span className="text-xs text-muted-foreground">
                                                                         {assignee.full_name}
                                                                     </span>

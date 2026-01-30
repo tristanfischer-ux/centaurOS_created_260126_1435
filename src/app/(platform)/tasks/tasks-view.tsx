@@ -8,8 +8,8 @@ import { RefreshButton } from "@/components/RefreshButton"
 import { TaskCard } from "./task-card"
 import { Button } from "@/components/ui/button"
 import { LayoutGrid, List, X, Trash2, CheckSquare, Loader2, Check, UserPlus, Filter, ChevronDown, Bot } from "lucide-react"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { getInitials } from "@/lib/utils"
+import { UserAvatar } from "@/components/ui/user-avatar"
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
 import { deleteTasks, acceptTask, completeTask, updateTaskAssignees } from "@/actions/tasks"
 import { toast } from "sonner"
 import { CreateTaskDialog } from "./create-task-dialog"
@@ -20,7 +20,7 @@ import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
 import { format, isThisWeek } from "date-fns"
 import { ThreadDrawer } from "./thread-drawer"
-import { cn } from "@/lib/utils"
+import { cn, getInitials } from "@/lib/utils"
 import {
     Select,
     SelectContent,
@@ -750,17 +750,12 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                                                     <div className="flex items-center gap-1 text-muted-foreground w-32">
                                                         {task.assignee ? (
                                                             <>
-                                                                <Avatar className="h-5 w-5 border border-white bg-slate-100">
-                                                                    {task.assignee.role === "AI_Agent" ? (
-                                                                        <AvatarImage src="/images/ai-agent-avatar.png" className="object-cover" />
-                                                                    ) : null}
-                                                                    <AvatarFallback className={cn(
-                                                                        "text-[8px] text-white",
-                                                                        task.assignee.role === "AI_Agent" ? "bg-purple-600" : "bg-slate-600"
-                                                                    )}>
-                                                                        {task.assignee.role === "AI_Agent" ? <Bot className="w-3 h-3" /> : getInitials(task.assignee.full_name)}
-                                                                    </AvatarFallback>
-                                                                </Avatar>
+                                                                <UserAvatar
+                                                                    name={task.assignee.full_name}
+                                                                    role={task.assignee.role}
+                                                                    size="xs"
+                                                                    className="border border-white"
+                                                                />
                                                                 <span className={cn("truncate", task.assignee.role === "AI_Agent" && "text-purple-700 font-medium")}>{task.assignee.full_name}</span>
                                                             </>
                                                         ) : (

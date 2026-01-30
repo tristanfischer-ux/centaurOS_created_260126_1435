@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/sheet"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { UserAvatar } from "@/components/ui/user-avatar"
 import { Badge } from "@/components/ui/badge"
 import { format } from "date-fns"
 import { useEffect, useState } from "react"
@@ -155,10 +155,13 @@ export function HistoryDrawer({ open, onOpenChange, taskId, taskTitle }: History
                                         </div>
 
                                         <div className="flex items-center gap-2 mt-1">
-                                            <Avatar className="h-5 w-5 border border-border">
-                                                <AvatarImage src={`https://avatar.vercel.sh/${item.user?.email || 'user'}`} />
-                                                <AvatarFallback className="text-[9px]">{item.user?.full_name?.substring(0, 2) || "??"}</AvatarFallback>
-                                            </Avatar>
+                                            <UserAvatar
+                                                name={item.user?.full_name || null}
+                                                role={item.user?.role || null}
+                                                avatarUrl={item.user?.avatar_url || null}
+                                                size="sm"
+                                                className="border border-border"
+                                            />
                                             <span className="text-sm font-medium text-foreground">
                                                 {item.user?.full_name || 'Unknown User'}
                                             </span>

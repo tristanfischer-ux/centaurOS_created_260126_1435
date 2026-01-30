@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { UserAvatar } from '@/components/ui/user-avatar'
 import { MessageBubble, DateSeparator } from './MessageBubble'
 import { useConversation } from '@/hooks/useConversation'
 import type { MessageWithSender } from '@/lib/messaging/service'
@@ -36,17 +36,6 @@ interface ConversationThreadProps {
   className?: string
 }
 
-function getInitials(name: string | null, email: string): string {
-  if (name) {
-    return name
-      .split(' ')
-      .map(n => n[0])
-      .join('')
-      .toUpperCase()
-      .slice(0, 2)
-  }
-  return email.slice(0, 2).toUpperCase()
-}
 
 // Group messages by date
 function groupMessagesByDate(messages: MessageWithSender[]): Map<string, MessageWithSender[]> {
@@ -206,15 +195,12 @@ export function ConversationThread({
                 <ArrowLeft className="w-5 h-5" />
               </Button>
             )}
-            <Avatar className="w-10 h-10">
-              <AvatarImage 
-                src={otherParticipant.avatar_url || undefined} 
-                alt={otherParticipant.full_name || otherParticipant.email} 
-              />
-              <AvatarFallback className="text-xs">
-                {getInitials(otherParticipant.full_name, otherParticipant.email)}
-              </AvatarFallback>
-            </Avatar>
+            <UserAvatar
+              name={otherParticipant.full_name || otherParticipant.email}
+              role={otherParticipant.role}
+              avatarUrl={otherParticipant.avatar_url}
+              size="md"
+            />
             <div>
               <h3 className="font-medium text-sm">
                 {otherParticipant.full_name || otherParticipant.email}

@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
 import { Textarea } from '@/components/ui/textarea'
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { UserAvatar } from '@/components/ui/user-avatar'
 import { Check, X, AlertTriangle, Loader2, CheckCircle2, XCircle, ChevronDown, ClipboardList } from 'lucide-react'
 import { getPendingApprovals, batchApproveTasks, batchRejectTasks, approveTask } from '@/actions/tasks'
 import { toast } from 'sonner'
@@ -27,10 +27,6 @@ interface Task {
     creator: { id: string; full_name: string | null } | null
 }
 
-function getInitials(name: string | null) {
-    if (!name) return '??'
-    return name.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase()
-}
 
 interface InlineBatchApprovalProps {
     onApprovalComplete?: () => void
@@ -254,11 +250,11 @@ export function InlineBatchApproval({ onApprovalComplete }: InlineBatchApprovalP
                                                         <div className="flex items-center gap-2 mt-1">
                                                             {task.assignee && (
                                                                 <div className="flex items-center gap-1">
-                                                                    <Avatar className="h-4 w-4">
-                                                                        <AvatarFallback className="text-[8px] bg-slate-100 text-slate-600">
-                                                                            {getInitials(task.assignee.full_name)}
-                                                                        </AvatarFallback>
-                                                                    </Avatar>
+                                                                    <UserAvatar
+                                                                        name={task.assignee.full_name}
+                                                                        role={task.assignee.role}
+                                                                        size="xs"
+                                                                    />
                                                                     <span className="text-[10px] text-muted-foreground truncate max-w-[80px]">
                                                                         {task.assignee.full_name}
                                                                     </span>

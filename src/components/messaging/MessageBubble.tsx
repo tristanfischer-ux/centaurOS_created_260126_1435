@@ -1,7 +1,7 @@
 'use client'
 
 import { cn } from '@/lib/utils'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { UserAvatar } from '@/components/ui/user-avatar'
 import { Check, CheckCheck, FileIcon, AlertCircle } from 'lucide-react'
 import type { MessageWithSender } from '@/lib/messaging/service'
 
@@ -87,12 +87,13 @@ export function MessageBubble({
     >
       {/* Avatar */}
       {showAvatar && !isOwn && (
-        <Avatar className="w-8 h-8 flex-shrink-0">
-          <AvatarImage src={sender.avatar_url || undefined} alt={sender.full_name || sender.email} />
-          <AvatarFallback className="text-xs bg-muted">
-            {getInitials(sender.full_name, sender.email)}
-          </AvatarFallback>
-        </Avatar>
+        <UserAvatar
+          name={sender.full_name || sender.email}
+          role={sender.role}
+          avatarUrl={sender.avatar_url}
+          size="sm"
+          className="flex-shrink-0"
+        />
       )}
 
       {/* Message content */}

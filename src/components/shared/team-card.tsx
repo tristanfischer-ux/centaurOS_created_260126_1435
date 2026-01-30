@@ -4,7 +4,7 @@ import { memo } from "react"
 import Link from "next/link"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { UserAvatar } from "@/components/ui/user-avatar"
 import { Users, Briefcase } from "lucide-react"
 
 interface TeamMember {
@@ -40,11 +40,14 @@ export const TeamCard = memo(function TeamCard({
                 <div className="flex items-center gap-4 p-2 rounded-lg hover:bg-muted transition-colors">
                     <div className="relative flex -space-x-2">
                         {displayMembers.slice(0, 3).map((member, i) => (
-                            <Avatar key={member.id} className="h-8 w-8 border-2 border-background" style={{ zIndex: 3 - i }}>
-                                <AvatarFallback className="text-xs bg-muted">
-                                    {member.full_name?.substring(0, 2).toUpperCase() || '?'}
-                                </AvatarFallback>
-                            </Avatar>
+                            <UserAvatar 
+                                key={member.id} 
+                                name={member.full_name} 
+                                role={member.role} 
+                                size="md" 
+                                showBorder
+                                style={{ zIndex: 3 - i }}
+                            />
                         ))}
                     </div>
                     <div className="flex-1 min-w-0">
@@ -90,15 +93,15 @@ export const TeamCard = memo(function TeamCard({
                     <div className="flex items-center gap-4 mb-4">
                         <div className="flex -space-x-3">
                             {displayMembers.map((member, i) => (
-                                <Avatar
+                                <UserAvatar
                                     key={member.id}
-                                    className="h-8 w-8 border-2 border-background shadow-sm"
+                                    name={member.full_name}
+                                    role={member.role}
+                                    size="md"
+                                    showBorder
+                                    className="shadow-sm"
                                     style={{ zIndex: displayMembers.length - i }}
-                                >
-                                    <AvatarFallback className={`text-xs ${member.role === 'AI_Agent' ? 'bg-purple-100 text-purple-600' : 'bg-muted'}`}>
-                                        {member.role === 'AI_Agent' ? '🤖' : member.full_name?.substring(0, 2).toUpperCase() || '?'}
-                                    </AvatarFallback>
-                                </Avatar>
+                                />
                             ))}
                             {remainingCount > 0 && (
                                 <div

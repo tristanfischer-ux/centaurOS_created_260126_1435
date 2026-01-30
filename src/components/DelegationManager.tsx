@@ -4,7 +4,7 @@ import { useState, useEffect, useTransition } from 'react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { UserAvatar } from '@/components/ui/user-avatar'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Input } from '@/components/ui/input'
@@ -31,10 +31,6 @@ import { toast } from 'sonner'
 import { formatDistanceToNow, format } from 'date-fns'
 import { cn } from '@/lib/utils'
 
-function getInitials(name: string | null) {
-    if (!name) return '??'
-    return name.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase()
-}
 
 interface DelegationManagerProps {
     members: { id: string; full_name: string | null; role: string }[]
@@ -187,11 +183,11 @@ export function DelegationManager({ members, currentUserId, userRole }: Delegati
                                             )}
                                         >
                                             <div className="flex items-center gap-3">
-                                                <Avatar className="h-10 w-10">
-                                                    <AvatarFallback className="bg-blue-100 text-blue-700">
-                                                        {getInitials(delegate?.full_name || null)}
-                                                    </AvatarFallback>
-                                                </Avatar>
+                                                <UserAvatar
+                                                    name={delegate?.full_name || null}
+                                                    role={delegate?.role}
+                                                    size="lg"
+                                                />
                                                 <div>
                                                     <div className="flex items-center gap-2">
                                                         <span className="font-medium text-slate-900">
@@ -258,11 +254,11 @@ export function DelegationManager({ members, currentUserId, userRole }: Delegati
                                         key={delegation.id}
                                         className="flex items-center gap-3 p-3 rounded-lg border border-green-200 bg-green-50"
                                     >
-                                        <Avatar className="h-10 w-10">
-                                            <AvatarFallback className="bg-green-200 text-green-700">
-                                                {getInitials(delegator?.full_name || null)}
-                                            </AvatarFallback>
-                                        </Avatar>
+                                        <UserAvatar
+                                            name={delegator?.full_name || null}
+                                            role={delegator?.role}
+                                            size="lg"
+                                        />
                                         <div className="flex-1">
                                             <div className="flex items-center gap-2">
                                                 <span className="font-medium text-slate-900">
@@ -314,11 +310,11 @@ export function DelegationManager({ members, currentUserId, userRole }: Delegati
                                     {availableDelegates.map((member) => (
                                         <SelectItem key={member.id} value={member.id}>
                                             <div className="flex items-center gap-2">
-                                                <Avatar className="h-5 w-5">
-                                                    <AvatarFallback className="text-[8px]">
-                                                        {getInitials(member.full_name)}
-                                                    </AvatarFallback>
-                                                </Avatar>
+                                                <UserAvatar
+                                                    name={member.full_name}
+                                                    role={member.role}
+                                                    size="xs"
+                                                />
                                                 <span>{member.full_name}</span>
                                                 <Badge variant="secondary" className="text-xs ml-1">
                                                     {member.role}

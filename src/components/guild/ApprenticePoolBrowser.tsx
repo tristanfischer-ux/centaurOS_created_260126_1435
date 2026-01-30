@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { UserAvatar } from "@/components/ui/user-avatar"
 import {
     Dialog,
     DialogContent,
@@ -92,12 +92,6 @@ export function ApprenticePoolBrowser() {
         setSuccess(false)
     }
 
-    const getInitials = (name: string) => {
-        const parts = name.trim().split(/\s+/)
-        if (parts.length === 1) return parts[0].charAt(0).toUpperCase()
-        return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase()
-    }
-
     const filteredApprentices = apprentices.filter(a => 
         a.fullName.toLowerCase().includes(searchQuery.toLowerCase()) ||
         a.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -167,11 +161,14 @@ export function ApprenticePoolBrowser() {
                                 className="flex items-center justify-between p-4 hover:bg-slate-50 transition-colors"
                             >
                                 <div className="flex items-center gap-4">
-                                    <Avatar className="h-12 w-12 border-2 border-blue-200">
-                                        <AvatarFallback className="bg-blue-100 text-blue-700 font-bold">
-                                            {getInitials(apprentice.fullName)}
-                                        </AvatarFallback>
-                                    </Avatar>
+                                    <UserAvatar
+                                        name={apprentice.fullName}
+                                        role="Apprentice"
+                                        avatarUrl={apprentice.avatarUrl}
+                                        size="xl"
+                                        showBorder
+                                        className="border-blue-200"
+                                    />
                                     <div>
                                         <h4 className="font-medium text-slate-900">{apprentice.fullName}</h4>
                                         <div className="flex items-center gap-2 text-sm text-slate-500">
@@ -235,11 +232,16 @@ export function ApprenticePoolBrowser() {
                                 </DialogTitle>
                             </DialogHeader>
                             <div className="py-6 text-center">
-                                <Avatar className="h-16 w-16 mx-auto border-2 border-green-200 mb-4">
-                                    <AvatarFallback className="bg-green-100 text-green-700 font-bold text-xl">
-                                        {selectedApprentice && getInitials(selectedApprentice.fullName)}
-                                    </AvatarFallback>
-                                </Avatar>
+                                <div className="mb-4 flex justify-center">
+                                    <UserAvatar
+                                        name={selectedApprentice?.fullName}
+                                        role="Apprentice"
+                                        avatarUrl={selectedApprentice?.avatarUrl}
+                                        size="xl"
+                                        showBorder
+                                        className="border-green-200"
+                                    />
+                                </div>
                                 <p className="text-slate-700">
                                     <strong>{selectedApprentice?.fullName}</strong> has been assigned to{" "}
                                     <strong>{projectName}</strong>
@@ -264,11 +266,14 @@ export function ApprenticePoolBrowser() {
                             
                             {selectedApprentice && (
                                 <div className="flex items-center gap-4 p-4 bg-slate-50 rounded-lg my-4">
-                                    <Avatar className="h-12 w-12 border-2 border-blue-200">
-                                        <AvatarFallback className="bg-blue-100 text-blue-700 font-bold">
-                                            {getInitials(selectedApprentice.fullName)}
-                                        </AvatarFallback>
-                                    </Avatar>
+                                    <UserAvatar
+                                        name={selectedApprentice.fullName}
+                                        role="Apprentice"
+                                        avatarUrl={selectedApprentice.avatarUrl}
+                                        size="xl"
+                                        showBorder
+                                        className="border-blue-200"
+                                    />
                                     <div>
                                         <h4 className="font-medium">{selectedApprentice.fullName}</h4>
                                         <p className="text-sm text-slate-500">{selectedApprentice.email}</p>

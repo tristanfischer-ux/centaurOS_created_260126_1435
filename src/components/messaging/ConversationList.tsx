@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { cn } from '@/lib/utils'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { UserAvatar } from '@/components/ui/user-avatar'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -45,17 +45,6 @@ function formatLastMessageTime(dateString: string): string {
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
 
-function getInitials(name: string | null, email: string): string {
-  if (name) {
-    return name
-      .split(' ')
-      .map(n => n[0])
-      .join('')
-      .toUpperCase()
-      .slice(0, 2)
-  }
-  return email.slice(0, 2).toUpperCase()
-}
 
 function getContextIcon(conversation: ConversationWithParticipants) {
   if (conversation.order_id) return <Package className="w-3 h-3" />
@@ -219,15 +208,12 @@ export function ConversationList({
                   )}
                 >
                   {/* Avatar */}
-                  <Avatar className="w-10 h-10 flex-shrink-0">
-                    <AvatarImage 
-                      src={otherParticipant.avatar_url || undefined} 
-                      alt={otherParticipant.full_name || otherParticipant.email} 
-                    />
-                    <AvatarFallback className="text-xs">
-                      {getInitials(otherParticipant.full_name, otherParticipant.email)}
-                    </AvatarFallback>
-                  </Avatar>
+                  <UserAvatar
+                    name={otherParticipant.full_name || otherParticipant.email}
+                    avatarUrl={otherParticipant.avatar_url}
+                    size="md"
+                    className="flex-shrink-0"
+                  />
 
                   {/* Content */}
                   <div className="flex-1 min-w-0">

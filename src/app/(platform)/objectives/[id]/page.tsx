@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { UserAvatar } from '@/components/ui/user-avatar'
 import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
 
@@ -74,11 +74,11 @@ export default async function ObjectiveDetailPage({ params }: { params: Promise<
                             </CardHeader>
                             <CardContent>
                                 <div className="flex items-center gap-2 mt-2">
-                                    <Avatar className="h-6 w-6">
-                                        <AvatarFallback className="text-[10px] bg-slate-100">
-                                            {task.assignee?.full_name?.substring(0, 2).toUpperCase()}
-                                        </AvatarFallback>
-                                    </Avatar>
+                                    <UserAvatar
+                                        name={task.assignee?.full_name}
+                                        role={task.assignee?.role}
+                                        size="sm"
+                                    />
                                     <span className="text-sm text-slate-600">
                                         {task.assignee?.full_name}
                                     </span>

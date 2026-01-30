@@ -469,11 +469,11 @@ export function StandupWidget({ userRole, compact = false }: StandupWidgetProps)
                                                 return (
                                                     <div key={standup.id} className="p-3 bg-white rounded-lg border border-slate-200">
                                                         <div className="flex items-center gap-2 mb-2">
-                                                            <Avatar className="h-6 w-6">
-                                                                <AvatarFallback className="text-xs bg-slate-100 text-slate-600">
-                                                                    {getInitials(user?.full_name || null)}
-                                                                </AvatarFallback>
-                                                            </Avatar>
+                                                            <UserAvatar 
+                                                                name={user?.full_name} 
+                                                                role={user?.role} 
+                                                                size="sm" 
+                                                            />
                                                             <span className="text-sm font-medium text-slate-900">
                                                                 {user?.full_name || 'Unknown'}
                                                             </span>

@@ -3,17 +3,13 @@
 import { useState, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { UserAvatar } from '@/components/ui/user-avatar'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { AlertTriangle, CheckCircle, Loader2, HelpCircle } from 'lucide-react'
 import { getStandupsWithBlockers, type Standup } from '@/actions/standups'
 import { formatDistanceToNow } from 'date-fns'
 import Link from 'next/link'
-import { cn } from '@/lib/utils'
-
-function getInitials(name: string | null) {
-    if (!name) return '??'
-    return name.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase()
-}
+import { cn, getInitials } from '@/lib/utils'
 
 interface BlockersWidgetProps {
     userRole: string

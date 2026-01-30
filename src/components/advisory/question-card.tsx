@@ -5,7 +5,7 @@ import { motion } from "framer-motion"
 import { MessageSquare, Eye, ThumbsUp, Bot, CheckCircle2, Shield, Clock } from "lucide-react"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { UserAvatar } from "@/components/ui/user-avatar"
 import { cn } from "@/lib/utils"
 import Link from "next/link"
 
@@ -125,11 +125,11 @@ export function QuestionCard({ question, className }: QuestionCardProps) {
                     {/* Footer */}
                     <div className="flex items-center justify-between pt-2 border-t border-slate-100">
                         <div className="flex items-center gap-2">
-                            <Avatar className="h-6 w-6">
-                                <AvatarFallback className="text-[10px] font-medium bg-slate-100 text-slate-600">
-                                    {question.asker.full_name?.substring(0, 2).toUpperCase()}
-                                </AvatarFallback>
-                            </Avatar>
+                            <UserAvatar
+                                name={question.asker.full_name}
+                                avatarUrl={question.asker.avatar_url}
+                                size="sm"
+                            />
                             <div className="flex flex-col">
                                 <span className="text-xs font-medium text-foreground truncate max-w-[120px]">
                                     {question.asker.full_name}
