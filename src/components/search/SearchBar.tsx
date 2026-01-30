@@ -186,7 +186,7 @@ export function SearchBar({
 
       {/* Suggestions Dropdown */}
       {showDropdown && (
-        <div className="absolute top-full left-0 right-0 mt-1 bg-background border rounded-lg shadow-lg z-50 max-h-96 overflow-y-auto">
+        <div className="absolute top-full left-0 right-0 mt-1 bg-card border rounded-lg shadow-lg backdrop-blur-sm z-50 max-h-96 overflow-y-auto">
           {/* Suggestions from search */}
           {suggestions.length > 0 && (
             <div className="p-2">

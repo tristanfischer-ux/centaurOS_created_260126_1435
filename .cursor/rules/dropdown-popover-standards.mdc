@@ -1,0 +1,264 @@
+# Dropdown & Popover Standards
+
+All dropdowns, popovers, modals, and overlay components MUST have opaque backgrounds. Users should NEVER be able to see through overlay components to content underneath.
+
+## Core Principle
+
+**Overlays must be solid and opaque** to ensure proper visual hierarchy and readability. Semi-transparent or "see-through" overlays are confusing and violate design standards.
+
+## 1. Background Color
+
+**Always use `bg-card` for overlay components** (dropdowns, popovers, tooltips, modals):
+
+```tsx
+// ✅ CORRECT - Opaque card background
+<div className="absolute top-full left-0 right-0 mt-1 bg-card border rounded-lg shadow-lg backdrop-blur-sm z-50">
+  <DropdownContent />
+</div>
+
+// ✅ CORRECT - Popover with card background
+<Popover>
+  <PopoverContent className="bg-card border shadow-lg">
+    Content here
+  </PopoverContent>
+</Popover>
+
+// ❌ WRONG - bg-background may be semi-transparent
+<div className="absolute bg-background border rounded-lg"> // Wrong
+```
+
+**Why `bg-card`?**
+- `bg-card` is specifically designed for elevated surfaces
+- It's guaranteed to be opaque in both light and dark modes
+- It provides proper contrast for readability
+
+## 2. Required Overlay Attributes
+
+Every dropdown/popover MUST have these classes:
+
+```tsx
+// ✅ CORRECT - Complete overlay styling
+<div className="absolute top-full left-0 right-0 mt-1 bg-card border rounded-lg shadow-lg backdrop-blur-sm z-50">
+  // Breakdown:
+  // - absolute: Position relative to parent
+  // - bg-card: Opaque background
+  // - border: Semantic border (uses border token)
+  // - rounded-lg: Consistent border radius
+  // - shadow-lg: Elevation shadow for depth
+  // - backdrop-blur-sm: Additional visual separation (optional but recommended)
+  // - z-50: Proper stacking order
+</div>
+```
+
+### Minimum Required Classes:
+1. ✅ `bg-card` - Opaque background
+2. ✅ `border` - Visual separation
+3. ✅ `shadow-lg` - Depth/elevation
+4. ✅ `z-50` (or higher) - Proper layering
+
+### Recommended Optional Classes:
+5. ✅ `backdrop-blur-sm` - Extra visual separation
+6. ✅ `rounded-lg` or `rounded-md` - Smooth corners
+
+## 3. Common Overlay Components
+
+### Dropdown Menus
+
+```tsx
+import { DropdownMenu, DropdownMenuContent } from '@/components/ui/dropdown-menu'
+
+// ✅ CORRECT - Uses shadcn DropdownMenu (already has proper styling)
+<DropdownMenu>
+  <DropdownMenuTrigger>Open</DropdownMenuTrigger>
+  <DropdownMenuContent>
+    {/* Automatically has bg-popover, border, shadow */}
+  </DropdownMenuContent>
+</DropdownMenu>
+
+// ✅ CORRECT - Custom dropdown
+<div className="relative">
+  <button>Trigger</button>
+  {isOpen && (
+    <div className="absolute top-full left-0 mt-1 bg-card border rounded-lg shadow-lg backdrop-blur-sm z-50">
+      <div className="p-2">Content</div>
+    </div>
+  )}
+</div>
+```
+
+### Popovers
+
+```tsx
+import { Popover, PopoverContent } from '@/components/ui/popover'
+
+// ✅ CORRECT - Uses shadcn Popover
+<Popover>
+  <PopoverTrigger>Open</PopoverTrigger>
+  <PopoverContent>
+    {/* Automatically has proper styling */}
+  </PopoverContent>
+</Popover>
+
+// ✅ CORRECT - Custom popover
+<div className="absolute bg-card border rounded-lg shadow-lg p-4 z-50 backdrop-blur-sm">
+  Popover content
+</div>
+```
+
+### Command Palettes / Search Dropdowns
+
+```tsx
+// ✅ CORRECT - Search suggestions dropdown
+<div className="relative">
+  <Input />
+  {showSuggestions && (
+    <div className="absolute top-full left-0 right-0 mt-1 bg-card border rounded-lg shadow-lg backdrop-blur-sm z-50 max-h-96 overflow-y-auto">
+      <div className="p-2">
+        <SuggestionList />
+      </div>
+    </div>
+  )}
+</div>
+```
+
+### Tooltips
+
+```tsx
+import { Tooltip, TooltipContent } from '@/components/ui/tooltip'
+
+// ✅ CORRECT - Uses shadcn Tooltip
+<Tooltip>
+  <TooltipTrigger>Hover me</TooltipTrigger>
+  <TooltipContent>
+    {/* Automatically has proper styling */}
+  </TooltipContent>
+</Tooltip>
+```
+
+### Modals / Dialogs
+
+```tsx
+import { Dialog, DialogContent } from '@/components/ui/dialog'
+
+// ✅ CORRECT - Uses shadcn Dialog
+<Dialog>
+  <DialogTrigger>Open</DialogTrigger>
+  <DialogContent>
+    {/* Automatically has proper styling + backdrop */}
+  </DialogContent>
+</Dialog>
+```
+
+## 4. Backdrop Blur (Optional Enhancement)
+
+For extra visual separation, add `backdrop-blur-sm`:
+
+```tsx
+// ✅ GOOD - Basic opaque overlay
+<div className="absolute bg-card border shadow-lg">
+
+// ✅ BETTER - With backdrop blur for extra clarity
+<div className="absolute bg-card border shadow-lg backdrop-blur-sm">
+```
+
+**When to use backdrop blur:**
+- Search dropdowns over complex content
+- Popovers over busy backgrounds
+- Command palettes
+- Any overlay where extra visual separation helps
+
+**When NOT needed:**
+- Simple tooltips
+- Short dropdown menus
+- Overlays with very few items
+
+## 5. Z-Index Standards
+
+Use consistent z-index values for layering:
+
+| Component | Z-Index | Usage |
+|----|----|----|
+| **Dropdowns** | `z-50` | Standard dropdowns, menus |
+| **Popovers** | `z-50` | Popover content |
+| **Modals** | `z-50` | Dialog content (shadcn default) |
+| **Tooltips** | `z-50` | Tooltip content |
+| **Toasts** | `z-[100]` | Toast notifications (top layer) |
+
+```tsx
+// ✅ CORRECT - Consistent z-index
+<div className="absolute bg-card border shadow-lg z-50">
+
+// ❌ WRONG - Custom z-index values
+<div className="absolute bg-card border shadow-lg z-[999]"> // Don't use arbitrary values
+```
+
+## 6. Shadow Standards
+
+Use semantic shadow utilities for depth:
+
+| Shadow | Usage |
+|----|----|
+| `shadow-sm` | Subtle elevation (tooltips) |
+| `shadow-md` | Medium elevation (dropdown items on hover) |
+| `shadow-lg` | High elevation (dropdowns, popovers) |
+| `shadow-xl` | Very high elevation (modals) |
+
+```tsx
+// ✅ CORRECT - Standard dropdown shadow
+<div className="absolute bg-card border shadow-lg">
+
+// ❌ WRONG - Custom shadow
+<div className="absolute bg-card border shadow-2xl"> // Too dramatic for dropdown
+```
+
+## 7. Border Styling
+
+Always use semantic border token:
+
+```tsx
+// ✅ CORRECT - Semantic border
+<div className="bg-card border rounded-lg shadow-lg">
+
+// ❌ WRONG - Colored borders
+<div className="bg-card border-slate-200 rounded-lg shadow-lg"> // Use semantic border
+<div className="bg-card border-blue-200 rounded-lg shadow-lg"> // Wrong
+```
+
+## 8. Testing Checklist
+
+Before committing any overlay component:
+
+- [ ] Background is opaque (`bg-card` or `bg-popover`)
+- [ ] Cannot see through overlay to content underneath
+- [ ] Border uses semantic `border` token (not colored)
+- [ ] Shadow provides visual depth (`shadow-lg`)
+- [ ] Z-index ensures proper layering (`z-50`)
+- [ ] Backdrop blur added if overlay is over complex content
+- [ ] Border radius is consistent (`rounded-lg` or `rounded-md`)
+- [ ] Works in both light and dark mode
+
+## Quick Reference
+
+**Standard dropdown/popover pattern:**
+
+```tsx
+<div className="absolute top-full left-0 right-0 mt-1 bg-card border rounded-lg shadow-lg backdrop-blur-sm z-50 max-h-96 overflow-y-auto">
+  <div className="p-2">
+    {/* Content */}
+  </div>
+</div>
+```
+
+**Do:**
+- ✅ Use `bg-card` for overlays
+- ✅ Use `border` without color
+- ✅ Use `shadow-lg` for depth
+- ✅ Use `z-50` for layering
+- ✅ Add `backdrop-blur-sm` for busy backgrounds
+
+**Don't:**
+- ❌ Use `bg-background` (may be semi-transparent)
+- ❌ Use colored borders (`border-slate-200`)
+- ❌ Forget shadows (overlays look flat)
+- ❌ Use arbitrary z-index values (`z-[999]`)
+- ❌ Create see-through overlays

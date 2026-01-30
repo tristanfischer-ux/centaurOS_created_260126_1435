@@ -1,6 +1,6 @@
 # Cursor Rules - CentaurOS Design System
 
-This directory contains **8 Cursor rules** that automatically enforce design consistency across the CentaurOS codebase.
+This directory contains **9 Cursor rules** that automatically enforce design consistency across the CentaurOS codebase.
 
 ## 📋 All Rules
 
@@ -42,14 +42,20 @@ This directory contains **8 Cursor rules** that automatically enforce design con
    - Touch-friendly targets
    - **Status:** Active
 
+7. **`dropdown-popover-standards.mdc`** 🆕
+   - Opaque overlay backgrounds
+   - No see-through dropdowns
+   - Proper elevation and shadows
+   - **Status:** Active
+
 ### Component-Specific Rules
 
-7. **`avatar-standard.mdc`** (Existing)
+8. **`avatar-standard.mdc`** (Existing)
    - UserAvatar component required
    - Role-based color coding
    - **Status:** Active
 
-8. **`task-completion-icons.mdc`** (Existing)
+9. **`task-completion-icons.mdc`** (Existing)
    - CheckCircle for completed only
    - Clock for active tasks
    - AlertTriangle for overdue
@@ -162,6 +168,22 @@ See `DESIGN_CONSISTENCY_AUDIT.md` in the root directory for:
 </Link>
 ```
 
+### Dropdowns & Popovers
+
+```tsx
+// ✅ CORRECT - Opaque overlay with proper styling
+<div className="absolute top-full left-0 right-0 mt-1 bg-card border rounded-lg shadow-lg backdrop-blur-sm z-50">
+  <div className="p-2">
+    <DropdownItems />
+  </div>
+</div>
+
+// ❌ WRONG - See-through background
+<div className="absolute top-full left-0 right-0 mt-1 bg-background border rounded-lg">
+  <DropdownItems />
+</div>
+```
+
 ---
 
 ## 🎯 Priority Levels
@@ -185,6 +207,7 @@ See `DESIGN_CONSISTENCY_AUDIT.md` in the root directory for:
 - ✅ **Layout:** Spacing scale and grid patterns
 - ✅ **Components:** Badge, Button, Card, Dialog, StatusBadge
 - ✅ **Navigation:** Active states, typography, icons
+- ✅ **Overlays:** Dropdowns, popovers, modals must be opaque
 - ✅ **Avatars:** UserAvatar with role colors
 - ✅ **Icons:** Task status icon patterns
 
@@ -255,5 +278,5 @@ See `DESIGN_CONSISTENCY_AUDIT.md` in the root directory for:
 ---
 
 **Last Updated:** 2026-01-30  
-**Total Rules:** 8 (5 new, 3 existing)  
+**Total Rules:** 9 (6 new, 3 existing)  
 **Estimated Compliance:** ~60% (improving)
