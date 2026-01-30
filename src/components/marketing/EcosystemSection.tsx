@@ -7,7 +7,7 @@ const osComponents = [
         label: "THE ENTITY",
         title: "THE FIRM.",
         description: "The real-world manifestation of the system. We are the Operating Company (OpCo) that holds the contracts, manages the liability, and provides the legal fortress for the work to happen.",
-        image: "/images/ecosystem-firm.png",
+        image: "/images/centaur-dynamics-hq.png",
     },
     {
         label: "THE SYSTEM",

@@ -1,0 +1,102 @@
+---
+description: CentaurOS design philosophy - bright, airy, and optimistic UI/UX
+alwaysApply: true
+---
+
+# Design Philosophy: Bright, Airy, and Optimistic
+
+CentaurOS is a platform for collaboration between humans and AI agents. The design should reflect **optimism, clarity, and openness** - not dark, dreary, or heavy interfaces.
+
+## Core Principles
+
+### 1. Light-First Design
+- **Default to light backgrounds** (foundry-50, foundry-100, white)
+- Use dark text on light backgrounds for primary content
+- Dark mode should be an **opt-in alternative**, not the default aesthetic
+- Avoid heavy grays (foundry-800, foundry-900) as primary backgrounds
+
+### 2. Bright Color Palette
+- **International Orange** (#ff4500): Primary brand color, use for CTAs and highlights
+- **Electric Blue** (#3b82f6): Secondary brand color, use for information and accents
+- **Light tones** (foundry-50 through foundry-200): Use for backgrounds and surfaces
+- **Vibrant status colors**: Use the bright variants (.light) for backgrounds, not dark variants
+
+### 3. Airy Spacing
+- Use generous whitespace - don't cram content
+- Prefer `space-y-6` or `space-y-8` over `space-y-2` or `space-y-4`
+- Card components should have ample padding (`p-6` or `p-8`)
+- Maintain visual breathing room between sections
+
+### 4. Optimistic Messaging
+- Use positive, empowering language in UI copy
+- Show progress and success states prominently
+- Error states should be helpful, not punishing
+- Empty states should be encouraging, offering clear next steps
+
+## What to Avoid
+
+❌ **DON'T:**
+- Use dark backgrounds (foundry-800, foundry-900) as default
+- Create heavy, dense layouts with minimal spacing
+- Use muted, desaturated colors as primary UI elements
+- Design dark, industrial, or dystopian aesthetics
+- Default to "professional gray" color schemes
+
+✅ **DO:**
+- Start with light backgrounds (foundry-50, white)
+- Use vibrant brand colors (international-orange, electric-blue)
+- Create spacious, easy-to-scan layouts
+- Embrace brightness and color
+- Design for optimism and human-AI collaboration
+
+## Example Patterns
+
+### Card Component (Good)
+```tsx
+<Card className="bg-white border-foundry-200 p-8 space-y-6">
+  <h2 className="text-2xl font-display text-foundry-900">
+    Welcome to CentaurOS
+  </h2>
+  <p className="text-foundry-600 text-lg leading-relaxed">
+    Collaborate with AI agents to accomplish amazing things.
+  </p>
+</Card>
+```
+
+### Card Component (Bad - Too Dark)
+```tsx
+{/* ❌ Don't do this */}
+<Card className="bg-foundry-800 border-foundry-700 p-4 space-y-2">
+  <h2 className="text-lg text-foundry-100">...</h2>
+</Card>
+```
+
+### Status Badge (Good - Bright)
+```tsx
+<Badge className="bg-status-success-light text-status-success-dark">
+  Active
+</Badge>
+```
+
+### Button Hierarchy (Good)
+```tsx
+{/* Primary: Vibrant brand color */}
+<Button className="bg-international-orange hover:bg-international-orange-hover">
+  Get Started
+</Button>
+
+{/* Secondary: Light with brand accent */}
+<Button variant="outline" className="border-electric-blue text-electric-blue">
+  Learn More
+</Button>
+```
+
+## Quick Reference
+
+When in doubt, ask yourself:
+- **Is this bright and welcoming?**
+- **Does this feel optimistic?**
+- **Is there enough whitespace?**
+- **Would this inspire collaboration?**
+
+If the answer to any is "no," lighten it up! 🌟

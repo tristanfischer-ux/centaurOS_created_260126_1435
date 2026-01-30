@@ -274,6 +274,17 @@ CentaurOS uses a custom design system based on shadcn/ui:
 - **Typography**: Use `src/lib/design-system/typography.ts`
 - **Animations**: Use `src/lib/design-system/animations.ts`
 
+### Design Philosophy
+
+**IMPORTANT:** CentaurOS design is **bright, airy, and optimistic** - NOT dark or dreary.
+
+- Default to **light backgrounds** (foundry-50, foundry-100, white)
+- Use **vibrant brand colors** (international-orange, electric-blue)
+- Create **spacious layouts** with generous whitespace
+- Design for **optimism and collaboration**
+
+See `.cursor/rules/design-philosophy.mdc` for full guidelines.
+
 Import UI components:
 ```typescript
 import { Button } from '@/components/ui/button';

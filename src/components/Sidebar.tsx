@@ -4,7 +4,7 @@ import React from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
-import { LayoutDashboard, Users, CheckSquare, Clock, Store, Target, Compass, LayoutGrid, MessageCircleQuestion, ShieldAlert, FileText } from "lucide-react"
+import { LayoutDashboard, Users, CheckSquare, Clock, Store, Target, Compass, LayoutGrid, MessageCircleQuestion, ShieldAlert, FileText, Sun } from "lucide-react"
 import { NotificationCenter } from "@/components/NotificationCenter"
 import { ThemeToggle } from "@/components/ThemeToggle"
 import { ZoomControl } from "@/components/ZoomControl"
@@ -31,6 +31,7 @@ const APP_VERSION = "1.0.3"
 
 // Navigation groups with spacers between them
 const coreNavigation = [
+    { name: "Today", href: "/today", icon: Sun, tooltip: "Your daily focus and morning briefing" },
     { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
     { name: "Objectives", href: "/objectives", icon: Target },
     { name: "Tasks", href: "/tasks", icon: CheckSquare },
