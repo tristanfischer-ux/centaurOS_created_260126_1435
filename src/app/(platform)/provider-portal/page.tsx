@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { Suspense } from "react"
 import { redirect } from "next/navigation"
 import Link from "next/link"
@@ -75,12 +74,12 @@ async function DashboardContent() {
     ]
 
     const statusColors = {
-        pending: 'bg-yellow-100 text-yellow-800',
-        confirmed: 'bg-blue-100 text-blue-800',
-        in_progress: 'bg-purple-100 text-purple-800',
-        completed: 'bg-green-100 text-green-800',
-        cancelled: 'bg-red-100 text-red-800',
-        disputed: 'bg-orange-100 text-orange-800'
+        pending: 'bg-status-warning-light text-status-warning-dark',
+        confirmed: 'bg-status-info-light text-status-info-dark',
+        in_progress: 'bg-status-info-light text-status-info-dark',
+        completed: 'bg-status-success-light text-status-success-dark',
+        cancelled: 'bg-status-error-light text-status-error-dark',
+        disputed: 'bg-status-warning-light text-status-warning-dark'
     }
 
     return (
@@ -97,7 +96,7 @@ async function DashboardContent() {
                     </p>
                 </div>
                 {profile.out_of_office && (
-                    <Badge variant="secondary" className="bg-amber-100 text-amber-800">
+                    <Badge variant="secondary" className="bg-status-warning-light text-status-warning-dark">
                         Out of Office
                     </Badge>
                 )}
@@ -108,8 +107,8 @@ async function DashboardContent() {
                 <Card>
                     <CardContent className="pt-6">
                         <div className="flex items-center gap-3">
-                            <div className="p-2 rounded-lg bg-green-50">
-                                <ShoppingCart className="h-5 w-5 text-green-600" />
+                            <div className="p-2 rounded-lg bg-status-success-light">
+                                <ShoppingCart className="h-5 w-5 text-status-success" />
                             </div>
                             <div>
                                 <p className="text-2xl font-bold">{stats?.activeOrdersCount || 0}</p>
@@ -121,8 +120,8 @@ async function DashboardContent() {
                 <Card>
                     <CardContent className="pt-6">
                         <div className="flex items-center gap-3">
-                            <div className="p-2 rounded-lg bg-blue-50">
-                                <Calendar className="h-5 w-5 text-blue-600" />
+                            <div className="p-2 rounded-lg bg-status-info-light">
+                                <Calendar className="h-5 w-5 text-status-info" />
                             </div>
                             <div>
                                 <p className="text-2xl font-bold">{stats?.upcomingBookingsCount || 0}</p>
@@ -134,8 +133,8 @@ async function DashboardContent() {
                 <Card>
                     <CardContent className="pt-6">
                         <div className="flex items-center gap-3">
-                            <div className="p-2 rounded-lg bg-amber-50">
-                                <Star className="h-5 w-5 text-amber-600" />
+                            <div className="p-2 rounded-lg bg-status-warning-light">
+                                <Star className="h-5 w-5 text-status-warning" />
                             </div>
                             <div>
                                 <p className="text-2xl font-bold">
@@ -151,8 +150,8 @@ async function DashboardContent() {
                 <Card>
                     <CardContent className="pt-6">
                         <div className="flex items-center gap-3">
-                            <div className="p-2 rounded-lg bg-purple-50">
-                                <Clock className="h-5 w-5 text-purple-600" />
+                            <div className="p-2 rounded-lg bg-status-info-light">
+                                <Clock className="h-5 w-5 text-status-info" />
                             </div>
                             <div>
                                 <p className="text-2xl font-bold">{profile.current_order_count}</p>
@@ -186,19 +185,19 @@ async function DashboardContent() {
             />
 
             {/* Analytics Link Card */}
-            <Card className="bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-100">
+            <Card className="bg-gradient-to-r from-status-info-light to-status-info-light/50 border-status-info-light">
                 <CardContent className="flex items-center justify-between py-4">
                     <div className="flex items-center gap-3">
-                        <div className="p-2 rounded-lg bg-blue-100">
-                            <BarChart3 className="h-5 w-5 text-blue-600" />
+                        <div className="p-2 rounded-lg bg-status-info-light">
+                            <BarChart3 className="h-5 w-5 text-status-info" />
                         </div>
                         <div>
-                            <p className="font-medium text-blue-900">Full Analytics Dashboard</p>
-                            <p className="text-sm text-blue-700">View detailed performance metrics, trends, and insights</p>
+                            <p className="font-medium text-status-info-dark">Full Analytics Dashboard</p>
+                            <p className="text-sm text-status-info">View detailed performance metrics, trends, and insights</p>
                         </div>
                     </div>
                     <Link href="/provider-portal/analytics">
-                        <Button variant="secondary" className="border hover:bg-blue-100">
+                        <Button variant="secondary" className="border hover:bg-status-info-light">
                             View Analytics
                             <ArrowRight className="ml-2 h-4 w-4" />
                         </Button>
@@ -280,7 +279,7 @@ async function DashboardContent() {
                 <Card>
                     <CardHeader className="pb-2">
                         <CardTitle className="text-lg flex items-center gap-2">
-                            <Activity className="h-5 w-5 text-blue-600" />
+                            <Activity className="h-5 w-5 text-status-info" />
                             Recent Activity
                         </CardTitle>
                         <CardDescription>Latest updates on your account</CardDescription>
@@ -300,10 +299,10 @@ async function DashboardContent() {
                                     >
                                         <div className={cn(
                                             "w-2 h-2 rounded-full mt-2 flex-shrink-0",
-                                            activity.type === 'order' && "bg-blue-500",
-                                            activity.type === 'review' && "bg-amber-500",
-                                            activity.type === 'booking' && "bg-green-500",
-                                            activity.type === 'payout' && "bg-purple-500"
+                                            activity.type === 'order' && "bg-status-info",
+                                            activity.type === 'review' && "bg-status-warning",
+                                            activity.type === 'booking' && "bg-status-success",
+                                            activity.type === 'payout' && "bg-status-info"
                                         )} />
                                         <div className="flex-1 min-w-0">
                                             <p className="text-sm font-medium">{activity.title}</p>

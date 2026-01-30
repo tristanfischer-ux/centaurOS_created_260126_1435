@@ -144,7 +144,7 @@ export function AttachmentList({ taskId, attachments, canDelete = false, onDelet
                     const fileUrl = fileUrls[file.file_path]
                     
                     return (
-                        <div key={file.id} className="flex items-center justify-between p-2 bg-muted border border-slate-100 rounded-md group hover:border transition-colors">
+                        <div key={file.id} className="flex items-center justify-between p-2 bg-muted border border-border rounded-md group hover:border transition-colors">
                             <div className="flex items-center gap-4 min-w-0 flex-1">
                                 {fileType === 'image' && fileUrl ? (
                                     <div className="w-10 h-10 rounded overflow-hidden bg-muted flex-shrink-0">
@@ -163,9 +163,9 @@ export function AttachmentList({ taskId, attachments, canDelete = false, onDelet
                                 ) : (
                                     <div className="w-10 h-10 rounded bg-muted flex items-center justify-center flex-shrink-0">
                                         {fileType === 'pdf' ? (
-                                            <FileText className="h-5 w-5 text-red-500" />
+                                            <FileText className="h-5 w-5 text-destructive" />
                                         ) : (
-                                            <FileIcon className="h-5 w-5 text-blue-500" />
+                                            <FileIcon className="h-5 w-5 text-electric-blue" />
                                         )}
                                     </div>
                                 )}
@@ -227,7 +227,7 @@ export function AttachmentList({ taskId, attachments, canDelete = false, onDelet
                                                 <Button
                                                     size="icon"
                                                     variant="ghost"
-                                                    className="min-h-[44px] min-w-[44px] h-9 w-9 text-muted-foreground hover:text-red-600 hover:bg-red-50"
+                                                    className="min-h-[44px] min-w-[44px] h-9 w-9 text-muted-foreground hover:text-destructive hover:bg-status-error-light"
                                                     disabled={deletingId === file.id}
                                                     onClick={() => handleDelete(file.id, file.file_path)}
                                                 >

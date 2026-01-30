@@ -78,15 +78,15 @@ export default async function ProviderPortalLayout({ children }: ProviderPortalL
 
                         <div className="space-y-3 text-sm text-muted-foreground">
                             <div className="flex items-center gap-2">
-                                <div className="w-1.5 h-1.5 rounded-full bg-green-500" />
+                                <div className="w-1.5 h-1.5 rounded-full bg-status-success" />
                                 Access to a network of innovative foundries
                             </div>
                             <div className="flex items-center gap-2">
-                                <div className="w-1.5 h-1.5 rounded-full bg-green-500" />
+                                <div className="w-1.5 h-1.5 rounded-full bg-status-success" />
                                 Secure payments through Stripe Connect
                             </div>
                             <div className="flex items-center gap-2">
-                                <div className="w-1.5 h-1.5 rounded-full bg-green-500" />
+                                <div className="w-1.5 h-1.5 rounded-full bg-status-success" />
                                 Tools to manage your orders and availability
                             </div>
                         </div>
@@ -146,7 +146,7 @@ export default async function ProviderPortalLayout({ children }: ProviderPortalL
                             <span className="text-muted-foreground">Status</span>
                             <span className={cn(
                                 "font-medium",
-                                profile.is_active ? "text-green-600" : "text-amber-600"
+                                profile.is_active ? "text-status-success" : "text-status-warning"
                             )}>
                                 {profile.is_active ? "Active" : "Paused"}
                             </span>
@@ -155,7 +155,7 @@ export default async function ProviderPortalLayout({ children }: ProviderPortalL
                             <span className="text-muted-foreground">Stripe</span>
                             <span className={cn(
                                 "font-medium",
-                                profile.stripe_onboarding_complete ? "text-green-600" : "text-amber-600"
+                                profile.stripe_onboarding_complete ? "text-status-success" : "text-status-warning"
                             )}>
                                 {profile.stripe_onboarding_complete ? "Connected" : "Setup needed"}
                             </span>
@@ -169,10 +169,10 @@ export default async function ProviderPortalLayout({ children }: ProviderPortalL
                     </div>
 
                     {/* Public profile link */}
-                    {(profile as any).profile_slug && (
+                    {profile.profile_slug && (
                         <div className="px-3 pt-4 border-t">
                             <Link 
-                                href={`/profile/${(profile as any).profile_slug}`}
+                                href={`/profile/${profile.profile_slug}`}
                                 target="_blank"
                                 className="text-xs text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
                             >

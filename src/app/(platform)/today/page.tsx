@@ -285,33 +285,33 @@ export default async function TodayPage() {
             {totalActionItems > 0 && (
                 <div className="flex flex-wrap gap-3">
                     {pendingDecisions.length > 0 && (
-                        <div className="flex items-center gap-2 px-3 py-1.5 bg-amber-50 border border-amber-200 rounded-full">
-                            <Inbox className="h-4 w-4 text-amber-600" />
-                            <span className="text-sm font-medium text-amber-700">
+                        <div className="flex items-center gap-2 px-3 py-1.5 bg-status-warning-light border border-amber-200 rounded-full">
+                            <Inbox className="h-4 w-4 text-status-warning" />
+                            <span className="text-sm font-medium text-status-warning-dark">
                                 {pendingDecisions.length} decision{pendingDecisions.length !== 1 ? 's' : ''} pending
                             </span>
                         </div>
                     )}
                     {blockers.length > 0 && (
-                        <div className="flex items-center gap-2 px-3 py-1.5 bg-red-50 border border-red-200 rounded-full">
-                            <AlertTriangle className="h-4 w-4 text-red-600" />
-                            <span className="text-sm font-medium text-red-700">
+                        <div className="flex items-center gap-2 px-3 py-1.5 bg-status-error-light border border-red-200 rounded-full">
+                            <AlertTriangle className="h-4 w-4 text-destructive" />
+                            <span className="text-sm font-medium text-destructive">
                                 {blockers.length} blocker{blockers.length !== 1 ? 's' : ''} reported
                             </span>
                         </div>
                     )}
                     {overdueTasks.length > 0 && (
-                        <div className="flex items-center gap-2 px-3 py-1.5 bg-red-50 border border-red-200 rounded-full">
-                            <Clock className="h-4 w-4 text-red-600" />
-                            <span className="text-sm font-medium text-red-700">
+                        <div className="flex items-center gap-2 px-3 py-1.5 bg-status-error-light border border-red-200 rounded-full">
+                            <Clock className="h-4 w-4 text-destructive" />
+                            <span className="text-sm font-medium text-destructive">
                                 {overdueTasks.length} overdue item{overdueTasks.length !== 1 ? 's' : ''}
                             </span>
                         </div>
                     )}
                     {mentions.length > 0 && (
-                        <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 border border-blue-200 rounded-full">
-                            <AtSign className="h-4 w-4 text-blue-600" />
-                            <span className="text-sm font-medium text-blue-700">
+                        <div className="flex items-center gap-2 px-3 py-1.5 bg-status-info-light border border-blue-200 rounded-full">
+                            <AtSign className="h-4 w-4 text-status-info" />
+                            <span className="text-sm font-medium text-status-info-dark">
                                 {mentions.length} mention{mentions.length !== 1 ? 's' : ''}
                             </span>
                         </div>
@@ -328,7 +328,7 @@ export default async function TodayPage() {
             {hasNoItems && (
                 <Card className="bg-gradient-to-br from-emerald-50 to-teal-50 border-emerald-200">
                     <CardContent className="py-12 text-center">
-                        <div className="inline-flex p-4 bg-white/80 rounded-full mb-4">
+                        <div className="inline-flex p-4 bg-background/80 rounded-full mb-4">
                             <Sparkles className="h-8 w-8 text-emerald-500" />
                         </div>
                         <h3 className="text-xl font-display font-semibold text-emerald-900 mb-2">
@@ -369,18 +369,18 @@ export default async function TodayPage() {
                                 <CardHeader className="pb-3">
                                     <div className="flex items-center justify-between">
                                         <div className="flex items-center gap-2">
-                                            <div className="p-1.5 bg-amber-50 rounded-md">
-                                                <Inbox className="h-5 w-5 text-amber-600" />
+                                            <div className="p-1.5 bg-status-warning-light rounded-md">
+                                                <Inbox className="h-5 w-5 text-status-warning" />
                                             </div>
                                             <CardTitle className="font-display text-lg text-foreground">
                                                 Decisions Pending
                                             </CardTitle>
-                                            <Badge variant="secondary" className="bg-amber-100 text-amber-700 border-amber-200">
+                                            <Badge variant="secondary" className="bg-amber-100 text-status-warning-dark border-amber-200">
                                                 {pendingDecisions.length}
                                             </Badge>
                                         </div>
                                         <Link href="/tasks?status=Pending_Executive_Approval">
-                                            <Button variant="ghost" size="sm" className="text-amber-600 hover:text-amber-700 hover:bg-amber-50 font-medium group">
+                                            <Button variant="ghost" size="sm" className="text-status-warning hover:text-status-warning-dark hover:bg-status-warning-light font-medium group">
                                                 Review All <ArrowRight className="h-4 w-4 ml-1 group-hover:translate-x-0.5 transition-transform" />
                                             </Button>
                                         </Link>
@@ -392,14 +392,14 @@ export default async function TodayPage() {
                                 <CardContent className="space-y-2">
                                     {pendingDecisions.slice(0, 5).map((task) => (
                                         <Link key={task.id} href="/tasks" className="block">
-                                            <div className="flex items-center justify-between p-3 rounded-lg border border-amber-100 bg-amber-50/30 hover:bg-amber-50 transition-colors group">
+                                            <div className="flex items-center justify-between p-3 rounded-lg border border-amber-100 bg-status-warning-light/30 hover:bg-status-warning-light transition-colors group">
                                                 <div className="flex-1 min-w-0">
                                                     <p className="text-sm font-medium text-foreground truncate group-hover:text-amber-900">
                                                         {task.title}
                                                     </p>
                                                     <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
                                                         {task.objective?.title && (
-                                                            <span className="flex items-center text-amber-700">
+                                                            <span className="flex items-center text-status-warning-dark">
                                                                 <Target className="h-3 w-3 mr-1" />
                                                                 {task.objective.title}
                                                             </span>
@@ -409,8 +409,8 @@ export default async function TodayPage() {
                                                 </div>
                                                 <Badge className={cn(
                                                     "ml-2 capitalize text-xs",
-                                                    task.risk_level === 'High' ? "bg-red-100 text-red-700 border-red-200" :
-                                                    task.risk_level === 'Medium' ? "bg-amber-100 text-amber-700 border-amber-200" :
+                                                    task.risk_level === 'High' ? "bg-red-100 text-destructive border-red-200" :
+                                                    task.risk_level === 'Medium' ? "bg-amber-100 text-status-warning-dark border-amber-200" :
                                                     "bg-foundry-100 text-foundry-600 border"
                                                 )}>
                                                     {task.risk_level || 'Low'} Risk
@@ -428,13 +428,13 @@ export default async function TodayPage() {
                                 <CardHeader className="pb-3">
                                     <div className="flex items-center justify-between">
                                         <div className="flex items-center gap-2">
-                                            <div className="p-1.5 bg-red-50 rounded-md">
-                                                <AlertTriangle className="h-5 w-5 text-red-600" />
+                                            <div className="p-1.5 bg-status-error-light rounded-md">
+                                                <AlertTriangle className="h-5 w-5 text-destructive" />
                                             </div>
                                             <CardTitle className="font-display text-lg text-foreground">
                                                 Blockers Reported
                                             </CardTitle>
-                                            <Badge variant="secondary" className="bg-red-100 text-red-700 border-red-200">
+                                            <Badge variant="secondary" className="bg-red-100 text-destructive border-red-200">
                                                 {blockers.length}
                                             </Badge>
                                         </div>
@@ -445,7 +445,7 @@ export default async function TodayPage() {
                                 </CardHeader>
                                 <CardContent className="space-y-3">
                                     {blockers.slice(0, 5).map((standup) => (
-                                        <div key={standup.id} className="p-3 rounded-lg border border-red-100 bg-red-50/30">
+                                        <div key={standup.id} className="p-3 rounded-lg border border-red-100 bg-status-error-light/30">
                                             <div className="flex items-start gap-3">
                                                 <UserAvatar 
                                                     name={standup.user?.full_name} 
@@ -459,14 +459,14 @@ export default async function TodayPage() {
                                                             {standup.user?.full_name || 'Team Member'}
                                                         </span>
                                                         {standup.needs_help && (
-                                                            <Badge className="bg-red-500 text-white text-[10px] px-1.5">
+                                                            <Badge className="bg-destructive text-destructive-foreground text-[10px] px-1.5">
                                                                 Needs Help
                                                             </Badge>
                                                         )}
                                                         {standup.blocker_severity && (
                                                             <Badge variant="outline" className={cn(
                                                                 "text-[10px] capitalize",
-                                                                standup.blocker_severity === 'critical' ? "border-red-400 text-red-600" :
+                                                                standup.blocker_severity === 'critical' ? "border-red-400 text-destructive" :
                                                                 standup.blocker_severity === 'high' ? "border-orange-400 text-orange-600" :
                                                                 "border-foundry-300 text-muted-foreground"
                                                             )}>
@@ -491,18 +491,18 @@ export default async function TodayPage() {
                                 <CardHeader className="pb-3">
                                     <div className="flex items-center justify-between">
                                         <div className="flex items-center gap-2">
-                                            <div className="p-1.5 bg-red-50 rounded-md">
-                                                <AlertCircle className="h-5 w-5 text-red-600" />
+                                            <div className="p-1.5 bg-status-error-light rounded-md">
+                                                <AlertCircle className="h-5 w-5 text-destructive" />
                                             </div>
                                             <CardTitle className="font-display text-lg text-foreground">
                                                 Overdue Items
                                             </CardTitle>
-                                            <Badge variant="secondary" className="bg-red-100 text-red-700 border-red-200">
+                                            <Badge variant="secondary" className="bg-red-100 text-destructive border-red-200">
                                                 {overdueTasks.length}
                                             </Badge>
                                         </div>
                                         <Link href="/tasks">
-                                            <Button variant="ghost" size="sm" className="text-red-600 hover:text-red-700 hover:bg-red-50 font-medium group">
+                                            <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive hover:bg-status-error-light font-medium group">
                                                 View All <ArrowRight className="h-4 w-4 ml-1 group-hover:translate-x-0.5 transition-transform" />
                                             </Button>
                                         </Link>
@@ -514,13 +514,13 @@ export default async function TodayPage() {
                                 <CardContent className="space-y-2">
                                     {overdueTasks.slice(0, 5).map((task) => (
                                         <Link key={task.id} href="/tasks" className="block">
-                                            <div className="flex items-center justify-between p-3 rounded-lg border border-red-100 bg-red-50/30 hover:bg-red-50 transition-colors group">
+                                            <div className="flex items-center justify-between p-3 rounded-lg border border-red-100 bg-status-error-light/30 hover:bg-status-error-light transition-colors group">
                                                 <div className="flex-1 min-w-0">
                                                     <p className="text-sm font-medium text-foreground truncate group-hover:text-red-900">
                                                         {task.title}
                                                     </p>
                                                     <div className="flex items-center gap-2 mt-1 text-xs">
-                                                        <span className="text-red-600 font-medium">
+                                                        <span className="text-destructive font-medium">
                                                             Due {formatDistanceToNow(new Date(task.end_date!), { addSuffix: true })}
                                                         </span>
                                                         {task.assignee?.full_name && (
@@ -530,7 +530,7 @@ export default async function TodayPage() {
                                                         )}
                                                     </div>
                                                 </div>
-                                                <Badge className="bg-red-100 text-red-700 border-red-200 capitalize text-xs">
+                                                <Badge className="bg-red-100 text-destructive border-red-200 capitalize text-xs">
                                                     {formatStatus(task.status)}
                                                 </Badge>
                                             </div>
@@ -546,18 +546,18 @@ export default async function TodayPage() {
                                 <CardHeader className="pb-3">
                                     <div className="flex items-center justify-between">
                                         <div className="flex items-center gap-2">
-                                            <div className="p-1.5 bg-blue-50 rounded-md">
-                                                <AtSign className="h-5 w-5 text-blue-600" />
+                                            <div className="p-1.5 bg-status-info-light rounded-md">
+                                                <AtSign className="h-5 w-5 text-status-info" />
                                             </div>
                                             <CardTitle className="font-display text-lg text-foreground">
                                                 Mentions
                                             </CardTitle>
-                                            <Badge variant="secondary" className="bg-blue-100 text-blue-700 border">
+                                            <Badge variant="secondary" className="bg-blue-100 text-status-info-dark border">
                                                 {mentions.length}
                                             </Badge>
                                         </div>
                                         <Link href="/tasks">
-                                            <Button variant="ghost" size="sm" className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 font-medium group">
+                                            <Button variant="ghost" size="sm" className="text-status-info hover:text-status-info-dark hover:bg-status-info-light font-medium group">
                                                 View Tasks <ArrowRight className="h-4 w-4 ml-1 group-hover:translate-x-0.5 transition-transform" />
                                             </Button>
                                         </Link>
@@ -569,7 +569,7 @@ export default async function TodayPage() {
                                 <CardContent className="space-y-2">
                                     {mentions.slice(0, 5).map((mention) => (
                                         <Link key={mention.id} href="/tasks" className="block">
-                                            <div className="flex items-start gap-3 p-3 rounded-lg border border-blue-100 bg-blue-50/30 hover:bg-blue-50 transition-colors group">
+                                            <div className="flex items-start gap-3 p-3 rounded-lg border border-blue-100 bg-status-info-light/30 hover:bg-status-info-light transition-colors group">
                                                 <UserAvatar 
                                                     name={mention.author?.full_name} 
                                                     role={null}
@@ -586,14 +586,14 @@ export default async function TodayPage() {
                                                         </span>
                                                     </div>
                                                     {mention.task && (
-                                                        <div className="flex items-center gap-1 text-xs text-blue-700 mb-1">
+                                                        <div className="flex items-center gap-1 text-xs text-status-info-dark mb-1">
                                                             <MessageSquare className="h-3 w-3" />
                                                             <span className="font-medium">#{mention.task.task_number}</span>
                                                             <span className="truncate">{mention.task.title}</span>
                                                         </div>
                                                     )}
                                                     <p className="text-sm text-foundry-600 line-clamp-2">
-                                                        {mention.content.replace(/@\[[^\]]+\]/g, (match) => {
+                                                        {mention.content.replace(/@\[[^\]]+\]/g, (_) => {
                                                             // Replace mention placeholders with readable text
                                                             return '@someone'
                                                         })}
@@ -612,28 +612,28 @@ export default async function TodayPage() {
                          overdueTasks.length === 0 && (
                             <Card className="bg-gradient-to-br from-blue-50 to-cyan-50 border">
                                 <CardContent className="py-12 text-center">
-                                    <div className="inline-flex p-4 bg-white/80 rounded-full mb-4">
+                                    <div className="inline-flex p-4 bg-background/80 rounded-full mb-4">
                                         <CheckCircle2 className="h-8 w-8 text-blue-500" />
                                     </div>
                                     <h3 className="text-xl font-display font-semibold text-blue-900 mb-2">
                                         All on track
                                     </h3>
-                                    <p className="text-blue-700 max-w-md mx-auto mb-6">
+                                    <p className="text-status-info-dark max-w-md mx-auto mb-6">
                                         No urgent items need your attention right now. Check your focus tasks on the right, or explore these quick actions.
                                     </p>
                                     <div className="flex flex-wrap justify-center gap-3">
                                         <Link href="/objectives">
-                                            <Button variant="secondary" className="border border-blue-300 text-blue-700 hover:bg-blue-100 bg-white/50">
+                                            <Button variant="secondary" className="border border-status-info text-status-info-dark hover:bg-status-info-light bg-background/50">
                                                 <Target className="h-4 w-4 mr-2" /> View Objectives
                                             </Button>
                                         </Link>
                                         <Link href="/tasks">
-                                            <Button variant="secondary" className="border border-blue-300 text-blue-700 hover:bg-blue-100 bg-white/50">
+                                            <Button variant="secondary" className="border border-status-info text-status-info-dark hover:bg-status-info-light bg-background/50">
                                                 <CheckCircle2 className="h-4 w-4 mr-2" /> All Tasks
                                             </Button>
                                         </Link>
                                         <Link href="/team">
-                                            <Button variant="secondary" className="border border-blue-300 text-blue-700 hover:bg-blue-100 bg-white/50">
+                                            <Button variant="secondary" className="border border-status-info text-status-info-dark hover:bg-status-info-light bg-background/50">
                                                 <Users className="h-4 w-4 mr-2" /> Team
                                             </Button>
                                         </Link>

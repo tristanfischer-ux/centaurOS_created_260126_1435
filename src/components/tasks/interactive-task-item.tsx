@@ -75,7 +75,7 @@ export function InteractiveTaskItem({ task, members, currentUserId, variant = "d
                             
                             <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
                                 {task.objective?.title && (
-                                    <span className="flex items-center text-blue-700 font-medium">
+                                    <span className="flex items-center text-status-info-dark font-medium">
                                         <Target className="h-3 w-3 mr-1" />
                                         {task.objective.title}
                                     </span>
@@ -93,7 +93,7 @@ export function InteractiveTaskItem({ task, members, currentUserId, variant = "d
                                 {task.end_date && (
                                     <span className={cn(
                                         "flex items-center gap-1",
-                                        isOverdue && "text-red-600 font-medium"
+                                        isOverdue && "text-destructive font-medium"
                                     )}>
                                         <Calendar className="h-3 w-3" />
                                         Due {format(new Date(task.end_date), "MMM d")}
@@ -151,7 +151,7 @@ export function InteractiveTaskItem({ task, members, currentUserId, variant = "d
                     <div className="flex items-start justify-between gap-4">
                         <div className="flex-1 min-w-0 space-y-2">
                             {task.objective && (
-                                <div className="flex items-center gap-1.5 text-xs text-blue-600 font-semibold uppercase tracking-wider">
+                                <div className="flex items-center gap-1.5 text-xs text-status-info font-semibold uppercase tracking-wider">
                                     <Target className="h-3.5 w-3.5" />
                                     {task.objective.title}
                                 </div>
@@ -215,9 +215,9 @@ export function InteractiveTaskItem({ task, members, currentUserId, variant = "d
                             </div>
                             <Badge className={cn(
                                 "text-xs px-3 py-1",
-                                task.risk_level === 'High' ? "bg-red-100 text-red-700 border-red-200" :
-                                task.risk_level === 'Medium' ? "bg-amber-100 text-amber-700 border-amber-200" :
-                                "bg-emerald-100 text-emerald-700 border-emerald-200"
+                                task.risk_level === 'High' ? "bg-status-error-light text-destructive border-destructive" :
+                                task.risk_level === 'Medium' ? "bg-status-warning-light text-status-warning-dark border-status-warning" :
+                                "bg-status-success-light text-status-success-dark border-status-success"
                             )}>
                                 {task.risk_level || 'Low'}
                             </Badge>
@@ -230,7 +230,7 @@ export function InteractiveTaskItem({ task, members, currentUserId, variant = "d
                                     Start Date
                                 </div>
                                 <div className="flex items-center gap-2 text-sm text-foreground font-medium">
-                                    <Calendar className="h-4 w-4 text-blue-500" />
+                                    <Calendar className="h-4 w-4 text-status-info" />
                                     {format(new Date(task.start_date), "MMM d, yyyy")}
                                 </div>
                             </div>
@@ -244,7 +244,7 @@ export function InteractiveTaskItem({ task, members, currentUserId, variant = "d
                                 </div>
                                 <div className={cn(
                                     "flex items-center gap-2 text-sm font-semibold",
-                                    isOverdue ? "text-red-600" : "text-foreground"
+                                    isOverdue ? "text-destructive" : "text-foreground"
                                 )}>
                                     <Calendar className="h-4 w-4" />
                                     {format(new Date(task.end_date), "MMM d, yyyy")}

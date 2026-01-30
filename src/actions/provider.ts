@@ -26,6 +26,7 @@ export interface ProviderProfile {
     auto_response_enabled: boolean
     auto_response_message: string | null
     auto_response_delay_minutes: number
+    profile_slug: string | null
     created_at: string
 }
 

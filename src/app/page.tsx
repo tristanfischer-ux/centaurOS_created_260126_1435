@@ -55,7 +55,7 @@ export default function MarketingPage() {
 
         {/* Mobile Menu */}
         {mobileMenuOpen && (
-          <div className="md:hidden border-t border bg-white">
+          <div className="md:hidden border-t border bg-background">
             <div className="px-6 py-4 flex flex-col gap-4">
               <a 
                 href="#centaurs" 
@@ -91,7 +91,7 @@ export default function MarketingPage() {
       </nav>
 
       {/* Hero Section */}
-      <section className="relative md:min-h-screen flex flex-col md:flex-row items-center justify-center overflow-hidden bg-white">
+      <section className="relative md:min-h-screen flex flex-col md:flex-row items-center justify-center overflow-hidden bg-background">
         {/* Content */}
         <div className="relative z-10 max-w-5xl mx-auto px-6 text-center pt-8 md:pt-0">
           {/* System Online Badge */}
@@ -125,13 +125,13 @@ export default function MarketingPage() {
             sizes="(max-width: 768px) 100vw, (max-width: 1200px) 100vw, 100vw"
           />
           {/* Gradient overlay to fade edges */}
-          <div className="absolute inset-0 pointer-events-none bg-gradient-to-t from-white via-transparent to-white/80" />
-          <div className="absolute inset-0 pointer-events-none bg-gradient-to-r from-white via-transparent to-white" />
+          <div className="absolute inset-0 pointer-events-none bg-gradient-to-t from-background via-transparent to-background/80" />
+          <div className="absolute inset-0 pointer-events-none bg-gradient-to-r from-background via-transparent to-background" />
         </div>
       </section>
 
       {/* THE CENTAURS Section */}
-      <section id="centaurs" className="py-12 md:py-24 bg-white">
+      <section id="centaurs" className="py-12 md:py-24 bg-background">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
           <h2 className="text-3xl sm:text-4xl md:text-5xl font-black mb-8 md:mb-16">THE CENTAURS.</h2>
 

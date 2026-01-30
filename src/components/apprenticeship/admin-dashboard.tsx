@@ -1,4 +1,3 @@
-// @ts-nocheck
 'use client'
 
 import { useState, useMemo } from 'react'
@@ -10,45 +9,19 @@ import { UserAvatar } from '@/components/ui/user-avatar'
 import { EnrollmentCreateDialog } from './enrollment-create-dialog'
 import { 
   Users, 
-  Plus,
-  GraduationCap,
-  Clock,
-  CheckCircle2,
-  AlertCircle,
-  TrendingUp,
-  Calendar,
-  FileText
+  Plus, 
+  GraduationCap, 
+  Clock, 
+  CheckCircle2, 
+  AlertCircle, 
+  TrendingUp, 
+  Calendar, 
+  FileText 
 } from 'lucide-react'
-
-interface EnrollmentSummary {
-  id: string
-  apprentice_id: string
-  status: string
-  start_date: string
-  expected_end_date: string
-  otjt_hours_logged: number
-  otjt_hours_target: number
-  apprentice: {
-    id: string
-    full_name: string
-    email: string
-    avatar_url: string | null
-  }
-  programme: {
-    id: string
-    title: string
-    level: number
-    standard_code: string
-  }
-  senior_mentor?: {
-    id: string
-    full_name: string
-    avatar_url: string | null
-  }
-}
+import { Enrollment } from '@/types/apprenticeship'
 
 interface AdminDashboardProps {
-  enrollments: EnrollmentSummary[]
+  enrollments: Enrollment[]
   foundryId: string
   userRole: 'Executive' | 'Founder' | 'Operator'
 }
@@ -78,7 +51,7 @@ export function AdminDashboard({ enrollments, foundryId, userRole }: AdminDashbo
   return (
     <div className="space-y-8">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-slate-100">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-border">
         <div>
           <div className="flex items-center gap-2 mb-2">
             <div className="h-1 w-8 bg-international-orange rounded-full" />
@@ -179,6 +152,8 @@ export function AdminDashboard({ enrollments, foundryId, userRole }: AdminDashbo
           ) : (
             <div className="space-y-4">
               {enrollments.map((enrollment) => {
+                if (!enrollment.apprentice || !enrollment.programme) return null
+
                 const progress = (enrollment.otjt_hours_logged / enrollment.otjt_hours_target) * 100
                 const startDate = new Date(enrollment.start_date).getTime()
                 const endDate = new Date(enrollment.expected_end_date).getTime()

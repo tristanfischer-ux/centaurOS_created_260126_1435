@@ -56,10 +56,10 @@ interface MarketplaceListingDetailProps {
 }
 
 const categoryBadgeStyles = {
-    'People': 'bg-stone-100 text-stone-700',
-    'Products': 'bg-muted text-foreground',
-    'Services': 'bg-blue-50 text-blue-700',
-    'AI': 'bg-violet-50 text-violet-700'
+    'People': 'bg-secondary text-secondary-foreground',
+    'Products': 'bg-muted text-muted-foreground',
+    'Services': 'bg-status-info-light text-status-info-dark',
+    'AI': 'bg-accent text-accent-foreground'
 }
 
 export function MarketplaceListingDetail({ listing, trustSignals, ratings }: MarketplaceListingDetailProps) {
@@ -264,7 +264,7 @@ function PeopleSection({ attrs }: { attrs: Record<string, any> }) {
                     </h2>
                     <div className="flex flex-wrap gap-2">
                         {(attrs.skills || attrs.expertise || []).map((skill: string, i: number) => (
-                            <Badge key={i} variant="secondary" className="bg-stone-100 text-stone-700">
+                            <Badge key={i} variant="secondary" className="bg-secondary text-secondary-foreground">
                                 {skill}
                             </Badge>
                         ))}
@@ -289,7 +289,7 @@ function AISection({ attrs }: { attrs: Record<string, any> }) {
                     {Array.isArray(attrs.integrations) ? (
                         <div className="flex flex-wrap gap-2">
                             {attrs.integrations.map((integration: string, i: number) => (
-                                <Badge key={i} variant="secondary" className="bg-violet-50 text-violet-700">
+                                <Badge key={i} variant="secondary" className="bg-accent text-accent-foreground">
                                     {integration}
                                 </Badge>
                             ))}
@@ -310,7 +310,7 @@ function AISection({ attrs }: { attrs: Record<string, any> }) {
                     {Array.isArray(attrs.use_cases) ? (
                         <div className="flex flex-wrap gap-2">
                             {attrs.use_cases.map((useCase: string, i: number) => (
-                                <Badge key={i} variant="secondary" className="bg-violet-50 text-violet-700">
+                                <Badge key={i} variant="secondary" className="bg-accent text-accent-foreground">
                                     {useCase}
                                 </Badge>
                             ))}
@@ -374,9 +374,9 @@ function AISection({ attrs }: { attrs: Record<string, any> }) {
                             </Card>
                         )}
                         {attrs.throughput && (
-                            <Card className="bg-violet-50 border-violet-200">
+                            <Card className="bg-accent/10 border-accent/20">
                                 <CardContent className="pt-6 text-center">
-                                    <p className="text-xl font-bold text-violet-700">{attrs.throughput}</p>
+                                    <p className="text-xl font-bold text-accent-foreground">{attrs.throughput}</p>
                                     <p className="text-xs text-muted-foreground mt-1">Throughput</p>
                                 </CardContent>
                             </Card>
@@ -451,7 +451,7 @@ function ServicesSection({ attrs }: { attrs: Record<string, any> }) {
                     {Array.isArray(attrs.specialty) ? (
                         <div className="flex flex-wrap gap-2">
                             {attrs.specialty.map((spec: string, i: number) => (
-                                <Badge key={i} variant="secondary" className="bg-blue-50 text-blue-700">
+                                <Badge key={i} variant="secondary" className="bg-status-info-light text-status-info-dark">
                                     {spec}
                                 </Badge>
                             ))}
@@ -472,7 +472,7 @@ function ServicesSection({ attrs }: { attrs: Record<string, any> }) {
                     {Array.isArray(attrs.focus_areas) ? (
                         <div className="flex flex-wrap gap-2">
                             {attrs.focus_areas.map((area: string, i: number) => (
-                                <Badge key={i} variant="secondary" className="bg-blue-50 text-blue-700">
+                                <Badge key={i} variant="secondary" className="bg-status-info-light text-status-info-dark">
                                     {area}
                                 </Badge>
                             ))}

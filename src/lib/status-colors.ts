@@ -51,18 +51,18 @@ export const STATUS_COLORS: Record<TaskStatus, {
     hex: '#f97316'
   },
   Pending_Executive_Approval: {
-    bg: 'bg-purple-100',
-    text: 'text-purple-700',
-    badge: 'bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-100',
-    bar: 'bg-purple-500',
-    hex: '#a855f7'
+    bg: 'bg-status-warning-light',
+    text: 'text-status-warning-dark',
+    badge: 'bg-status-warning-light text-status-warning-dark dark:bg-status-warning-dark dark:text-status-warning-light',
+    bar: 'bg-status-warning',
+    hex: '#f97316'
   },
   Pending_Peer_Review: {
-    bg: 'bg-cyan-100',
-    text: 'text-cyan-700',
-    badge: 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900 dark:text-cyan-100',
-    bar: 'bg-cyan-500',
-    hex: '#06b6d4'
+    bg: 'bg-status-info-light',
+    text: 'text-status-info-dark',
+    badge: 'bg-status-info-light text-status-info-dark dark:bg-status-info-dark dark:text-status-info-light',
+    bar: 'bg-status-info',
+    hex: '#3b82f6'
   }
 }
 

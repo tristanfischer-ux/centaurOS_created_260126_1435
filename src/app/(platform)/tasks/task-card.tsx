@@ -1,29 +1,14 @@
 "use client"
 
 import { useState, memo, useEffect } from "react"
-import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card"
+import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import { UserAvatar, UserAvatarStack } from "@/components/ui/user-avatar"
 import { Markdown } from "@/components/ui/markdown"
-import {
-    Dialog,
-    DialogContent,
-    DialogHeader,
-    DialogTitle,
-    DialogTrigger,
-} from "@/components/ui/dialog"
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from "@/components/ui/select"
-import { Textarea } from "@/components/ui/textarea"
 import { format } from "date-fns"
-import { Calendar as CalendarIcon, Check, X, ArrowRight, Bot, MessageSquare, ChevronDown, ChevronUp, Copy, Pencil, History as HistoryIcon, ShieldAlert, Eye, EyeOff, ShieldCheck, Paperclip, Plus, Upload, Loader2, Maximize2, CheckCircle2, XCircle } from "lucide-react"
+import { Calendar as CalendarIcon, Check, Bot, ChevronDown, ChevronUp, ShieldAlert, Eye, EyeOff, ShieldCheck, Paperclip, Plus, CheckCircle2, XCircle } from "lucide-react"
 import { Calendar } from "@/components/ui/calendar"
 import {
     Popover,
@@ -38,19 +23,14 @@ import {
     CommandItem,
     CommandList,
 } from "@/components/ui/command"
-import { acceptTask, rejectTask, forwardTask, completeTask, triggerAIWorker, updateTaskDates, duplicateTask, updateTaskAssignees } from "@/actions/tasks"
-import { AttachmentList } from "@/components/tasks/attachment-list"
 import { cn } from "@/lib/utils"
 import { Database } from "@/types/database.types"
 import { InlineThread } from "@/components/tasks/inline-thread"
 import { InlineHistory } from "@/components/tasks/inline-history"
 import { EditTaskDialog } from "@/components/tasks/edit-task-dialog"
 import { FullTaskView } from "@/components/tasks/full-task-view"
-import { ForwardTaskDialog } from "@/components/tasks/forward-task-dialog"
 import { TaskActionButtons } from "@/components/tasks/task-action-buttons"
-import { toast } from "sonner"
 import { RubberStampModal } from "@/components/smart-airlock/RubberStampModal"
-import { ClientNudgeButton } from "@/components/smart-airlock/ClientNudgeButton"
 import { Checkbox } from "@/components/ui/checkbox"
 import { getStatusColor } from "@/lib/status-colors"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"

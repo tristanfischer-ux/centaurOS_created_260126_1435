@@ -1,0 +1,98 @@
+# Design System Enforcement
+
+This rule enforces strict adherence to the CentaurOS design system tokens and prevents the introduction of hardcoded values.
+
+## 1. Color Tokens (Strict)
+
+**NEVER** use hardcoded color classes. You must use the semantic tokens.
+
+### Text Colors
+| ❌ Forbidden | ✅ Required Token | Description |
+|--------------|-------------------|-------------|
+| `text-slate-900` | `text-foreground` | Primary text |
+| `text-slate-600/500/400` | `text-muted-foreground` | Secondary/muted text |
+| `text-white` | `text-primary-foreground` | Text on primary background |
+| `text-red-600/500` | `text-destructive` | Error text |
+| `text-green-600/500` | `text-status-success` | Success text |
+| `text-amber-600/500` | `text-status-warning` | Warning text |
+| `text-blue-600/500` | `text-status-info` | Info text |
+| `text-cyan-*` | `text-international-orange` | Active state / Brand accent |
+
+### Background Colors
+| ❌ Forbidden | ✅ Required Token | Description |
+|--------------|-------------------|-------------|
+| `bg-white` | `bg-background` or `bg-card` | Page/Card background |
+| `bg-slate-50/100` | `bg-muted` or `bg-secondary` | Muted background |
+| `bg-red-50/100` | `bg-status-error-light` | Error background |
+| `bg-green-50/100` | `bg-status-success-light` | Success background |
+| `bg-amber-50/100` | `bg-status-warning-light` | Warning background |
+| `bg-blue-50/100` | `bg-status-info-light` | Info background |
+| `bg-cyan-*` | `bg-international-orange` | Active state / Brand accent |
+
+### Border Colors
+| ❌ Forbidden | ✅ Required Token | Description |
+|--------------|-------------------|-------------|
+| `border-slate-200/300` | `border` | Default border |
+| `border-red-200/300` | `border-destructive` | Error border |
+| `border-input` | `border-input` | Input border |
+
+## 2. Component Usage
+
+**NEVER** build custom components when a UI primitive exists.
+
+### Cards
+❌ **Forbidden:**
+```tsx
+<div className="rounded-lg border bg-white p-6 shadow-sm">
+  ...
+</div>
+```
+
+✅ **Required:**
+```tsx
+<Card>
+  <CardHeader>...</CardHeader>
+  <CardContent>...</CardContent>
+</Card>
+```
+
+### Badges
+❌ **Forbidden:**
+```tsx
+<span className="rounded-full bg-red-100 text-red-800 px-2 py-1">
+  Error
+</span>
+```
+
+✅ **Required:**
+```tsx
+<StatusBadge status="error">Error</StatusBadge>
+```
+
+## 3. Navigation Active States
+
+**NEVER** use Cyan/Blue for active states. CentaurOS uses **International Orange**.
+
+❌ **Forbidden:**
+```tsx
+className={cn(isActive ? "bg-cyan-50 text-cyan-600" : "...")}
+```
+
+✅ **Required:**
+```tsx
+className={cn(isActive ? "bg-orange-50 text-international-orange" : "...")}
+```
+
+## 4. Spacing
+
+Use the spacing constants from `@/lib/design-system` where possible, or standard Tailwind spacing classes (`space-y-6`, `gap-4`).
+
+## 5. Enforcement Checklist
+
+Before submitting code:
+- [ ] Grep for `text-slate-` and `bg-slate-` -> 0 matches expected
+- [ ] Grep for `bg-white` -> 0 matches expected
+- [ ] Grep for `text-red-` -> 0 matches expected (use `destructive`)
+- [ ] Grep for `bg-cyan-` -> 0 matches expected
+- [ ] Verify `Card` component is used for all containers
+- [ ] Verify `StatusBadge` is used for all status indicators

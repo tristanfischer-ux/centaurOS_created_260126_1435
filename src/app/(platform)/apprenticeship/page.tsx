@@ -1,4 +1,3 @@
-// @ts-nocheck - Apprenticeship types need alignment
 import { createClient } from '@/lib/supabase/server'
 import { getEnrollmentForUser, getMenteeEnrollments, getFoundryEnrollments } from '@/actions/apprenticeship-enrollment'
 import { getWeeklyOTJTSummary, getOTJTProgressSummary } from '@/actions/otjt-tracking'
