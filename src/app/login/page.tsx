@@ -115,7 +115,7 @@ export default function LoginPage() {
             {/* Left Side - Hero Image */}
             <div className="hidden lg:flex w-1/2 relative bg-slate-50 overflow-hidden">
                 <Image
-                    src="/images/digital-centaur-manufacturing.png"
+                    src="/images/digital-centaur-working.png"
                     alt="Digital Centaur converting bits to atoms, 3D printing a rocket engine"
                     fill
                     className="object-cover object-right"
