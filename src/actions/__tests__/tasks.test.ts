@@ -98,7 +98,7 @@ describe('Task Actions', () => {
             })
         })
 
-        it('should fail when task has no assignee', async () => {
+        it('should allow forwarding unassigned tasks', async () => {
             const mockTask = { id: 'task-123', assignee_id: null, forwarding_history: [] }
             
             mockSupabaseClient.from.mockReturnValue({
@@ -106,12 +106,21 @@ describe('Task Actions', () => {
                     eq: jest.fn().mockReturnValue({
                         single: jest.fn().mockResolvedValue({ data: mockTask })
                     })
-                })
+                }),
+                update: jest.fn().mockReturnValue({
+                    eq: jest.fn().mockResolvedValue({ error: null })
+                }),
+                delete: jest.fn().mockReturnValue({
+                    eq: jest.fn().mockResolvedValue({ error: null })
+                }),
+                insert: jest.fn().mockResolvedValue({ error: null })
             })
 
-            const result = await forwardTask('task-123', 'new-assignee', 'Delegating')
+            mockSupabaseClient.rpc.mockResolvedValue({ error: null })
 
-            expect(result).toEqual({ error: 'Task has no assignee to forward from' })
+            const result = await forwardTask('task-123', 'new-assignee', 'Assigning task')
+
+            expect(result).toEqual({ success: true })
         })
 
         it('should fail when RPC function fails', async () => {

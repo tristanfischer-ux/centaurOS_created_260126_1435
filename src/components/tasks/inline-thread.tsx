@@ -212,29 +212,41 @@ export function InlineThread({ taskId, isOpen, onClose, members }: InlineThreadP
             <div className="p-3 border-t border-slate-100 space-y-2 relative overflow-hidden">
                 <div
                     className={cn(
-                        "border border-dashed rounded p-2 text-center cursor-pointer transition-colors text-xs",
-                        isDragging ? "border-blue-500 bg-blue-50" : "border-slate-200 hover:border-slate-300"
+                        "border border-dashed rounded p-2 text-center transition-colors text-xs relative",
+                        isUploading ? "border-blue-300 bg-blue-50 cursor-wait" : isDragging ? "border-blue-500 bg-blue-50 cursor-pointer" : "border-slate-200 hover:border-slate-300 cursor-pointer",
+                        isUploading && "pointer-events-none"
                     )}
-                    onClick={() => fileInputRef.current?.click()}
-                    onDragOver={(e) => { e.preventDefault(); setIsDragging(true) }}
+                    onClick={() => !isUploading && fileInputRef.current?.click()}
+                    onDragOver={(e) => { e.preventDefault(); if (!isUploading) setIsDragging(true) }}
                     onDragLeave={(e) => { e.preventDefault(); setIsDragging(false) }}
                     onDrop={async (e) => {
                         e.preventDefault()
                         setIsDragging(false)
+                        if (isUploading) return
                         const files = Array.from(e.dataTransfer.files)
                         if (files.length > 0) await handleFileUpload(files[0])
                     }}
                 >
-                    <Upload className="h-3 w-3 mx-auto text-muted-foreground mb-1" />
-                    <span className="text-muted-foreground">Drop file or click</span>
+                    {isUploading ? (
+                        <>
+                            <Loader2 className="h-3 w-3 mx-auto text-blue-600 mb-1 animate-spin" />
+                            <span className="text-blue-600 font-medium">Uploading...</span>
+                        </>
+                    ) : (
+                        <>
+                            <Upload className="h-3 w-3 mx-auto text-muted-foreground mb-1" />
+                            <span className="text-muted-foreground">Drop file or click</span>
+                        </>
+                    )}
                 </div>
                 <input
                     type="file"
                     ref={fileInputRef}
                     onChange={async (e) => {
                         const file = e.target.files?.[0]
-                        if (file) await handleFileUpload(file)
+                        if (file && !isUploading) await handleFileUpload(file)
                     }}
+                    disabled={isUploading}
                     className="hidden"
                 />
                 <form onSubmit={handleSend} className="flex items-start gap-2 w-full relative overflow-hidden">

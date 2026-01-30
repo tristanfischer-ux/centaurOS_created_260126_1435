@@ -721,34 +721,47 @@ export const TaskCard = memo(function TaskCard(props: TaskCardProps) {
                         <div className="flex items-center justify-between w-full gap-2 flex-wrap">
                             {/* Tools Area - Always visible for consistent layout */}
                             <div className="flex items-center gap-1 flex-wrap">
-                                <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => setEditOpen(true)}
-                                    disabled={isLoading}
-                                    className="text-muted-foreground hover:text-blue-600 hover:bg-blue-50 active:text-blue-700 active:bg-blue-100 active:scale-[0.98] transition-all duration-200 px-2 shrink-0"
-                                    title="Edit Details"
-                                >
-                                    <Pencil className="h-4 w-4" /> <span className="hidden xs:inline">Edit</span>
-                                </Button>
-
-                                <Dialog open={forwardOpen} onOpenChange={setForwardOpen}>
-                                    <DialogTrigger asChild>
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
                                         <Button
                                             variant="ghost"
                                             size="sm"
+                                            onClick={() => setEditOpen(true)}
                                             disabled={isLoading}
-                                            className="text-muted-foreground hover:text-amber-600 hover:bg-amber-50 active:text-amber-700 active:bg-amber-100 active:scale-[0.98] transition-all duration-200 px-2 shrink-0"
-                                            title="Forward or Reassign"
+                                            className="text-muted-foreground hover:text-blue-600 hover:bg-blue-50 active:text-blue-700 active:bg-blue-100 active:scale-[0.98] transition-all duration-200 px-2 shrink-0"
                                         >
-                                            <ArrowRight className="h-4 w-4" /> <span className="hidden xs:inline">Forward</span>
+                                            <Pencil className="h-4 w-4" /> <span className="hidden xs:inline">Edit</span>
                                         </Button>
-                                    </DialogTrigger>
-                                    <DialogContent className="bg-white shadow-xl text-slate-900">
-                                        <DialogHeader><DialogTitle>Forward Task</DialogTitle></DialogHeader>
+                                    </TooltipTrigger>
+                                    <TooltipContent>Edit task details</TooltipContent>
+                                </Tooltip>
+
+                                <Dialog open={forwardOpen} onOpenChange={setForwardOpen}>
+                                    <Tooltip>
+                                        <TooltipTrigger asChild>
+                                            <DialogTrigger asChild>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    disabled={isLoading}
+                                                    className="text-muted-foreground hover:text-amber-600 hover:bg-amber-50 active:text-amber-700 active:bg-amber-100 active:scale-[0.98] transition-all duration-200 px-2 shrink-0"
+                                                >
+                                                    <ArrowRight className="h-4 w-4" /> <span className="hidden xs:inline">Forward</span>
+                                                </Button>
+                                            </DialogTrigger>
+                                        </TooltipTrigger>
+                                        <TooltipContent>Forward or reassign task</TooltipContent>
+                                    </Tooltip>
+                                    <DialogContent className="bg-white shadow-xl text-slate-900 max-w-lg">
+                                        <DialogHeader>
+                                            <DialogTitle>Forward Task</DialogTitle>
+                                            <p className="text-sm text-muted-foreground mt-1">
+                                                Reassign this task and provide context for the new assignee
+                                            </p>
+                                        </DialogHeader>
                                         <form action={handleForward} className="space-y-4">
                                             <div className="grid gap-2">
-                                                <label className="text-sm font-medium">New Assignee</label>
+                                                <label className="text-sm font-medium text-foreground">New Assignee</label>
                                                 <Select name="new_assignee_id" required>
                                                     <SelectTrigger className="bg-white">
                                                         <SelectValue placeholder="Select person..." />
@@ -772,50 +785,82 @@ export const TaskCard = memo(function TaskCard(props: TaskCardProps) {
                                                     </SelectContent>
                                                 </Select>
                                             </div>
-                                            <Textarea name="reason" placeholder="Handover notes..." required className="bg-slate-50" />
-                                            <Button type="submit" variant="warning" className="w-full">Forward Task</Button>
+                                            <div className="grid gap-2">
+                                                <label className="text-sm font-medium text-foreground">Handover Information</label>
+                                                <p className="text-xs text-muted-foreground">
+                                                    Provide context, instructions, or any important details for the new assignee
+                                                </p>
+                                                <Textarea 
+                                                    name="reason" 
+                                                    placeholder="e.g., 'Please review the attached documents and coordinate with the legal team. The deadline is urgent - client needs this by end of week.'"
+                                                    required 
+                                                    className="bg-slate-50 min-h-[120px] resize-y" 
+                                                />
+                                            </div>
+                                            <div className="flex gap-2 pt-2">
+                                                <Button type="button" variant="secondary" onClick={() => setForwardOpen(false)} className="flex-1">
+                                                    Cancel
+                                                </Button>
+                                                <Button type="submit" variant="default" className="flex-1 bg-amber-600 hover:bg-amber-700">
+                                                    Forward Task
+                                                </Button>
+                                            </div>
                                         </form>
                                     </DialogContent>
                                 </Dialog>
 
-                                <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={handleDuplicate}
-                                    disabled={isLoading}
-                                    className="text-muted-foreground hover:text-indigo-600 hover:bg-indigo-50 active:text-indigo-700 active:bg-indigo-100 active:scale-[0.98] transition-all duration-200 px-2 shrink-0"
-                                    title="Duplicate Task"
-                                >
-                                    <Copy className="h-4 w-4" /> <span className="hidden xs:inline">Copy</span>
-                                </Button>
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={handleDuplicate}
+                                            disabled={isLoading}
+                                            className="text-muted-foreground hover:text-indigo-600 hover:bg-indigo-50 active:text-indigo-700 active:bg-indigo-100 active:scale-[0.98] transition-all duration-200 px-2 shrink-0"
+                                        >
+                                            <Copy className="h-4 w-4" /> <span className="hidden xs:inline">Copy</span>
+                                        </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>Duplicate this task</TooltipContent>
+                                </Tooltip>
                             </div>
 
                             {/* Meta Area - History & Notes */}
                             <div className="flex items-center gap-1 flex-wrap">
-                                <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className={cn(
-                                        "h-8 px-2 gap-1.5 text-xs transition-all duration-200 shrink-0",
-                                        showHistory ? "text-blue-600 bg-blue-50" : "text-muted-foreground hover:text-foreground"
-                                    )}
-                                    onClick={() => { setShowHistory(!showHistory); setShowThread(false) }}
-                                >
-                                    <HistoryIcon className="h-3.5 w-3.5" />
-                                    <span className="hidden xs:inline">Audit Log</span>
-                                </Button>
-                                <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className={cn(
-                                        "h-8 px-2 gap-1.5 text-xs transition-all duration-200 shrink-0",
-                                        showThread ? "text-blue-600 bg-blue-50" : "text-muted-foreground hover:text-foreground"
-                                    )}
-                                    onClick={() => { setShowThread(!showThread); setShowHistory(false) }}
-                                >
-                                    <MessageSquare className="h-3.5 w-3.5" />
-                                    <span className="hidden xs:inline">Notes</span>
-                                </Button>
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            className={cn(
+                                                "h-8 px-2 gap-1.5 text-xs transition-all duration-200 shrink-0",
+                                                showHistory ? "text-blue-600 bg-blue-50" : "text-muted-foreground hover:text-foreground"
+                                            )}
+                                            onClick={() => { setShowHistory(!showHistory); setShowThread(false) }}
+                                        >
+                                            <HistoryIcon className="h-3.5 w-3.5" />
+                                            <span className="hidden xs:inline">Audit Log</span>
+                                        </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>View task history</TooltipContent>
+                                </Tooltip>
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            className={cn(
+                                                "h-8 px-2 gap-1.5 text-xs transition-all duration-200 shrink-0",
+                                                showThread ? "text-blue-600 bg-blue-50" : "text-muted-foreground hover:text-foreground"
+                                            )}
+                                            onClick={() => { setShowThread(!showThread); setShowHistory(false) }}
+                                        >
+                                            <MessageSquare className="h-3.5 w-3.5" />
+                                            <span className="hidden xs:inline">Notes</span>
+                                        </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>Add notes and attachments</TooltipContent>
+                                </Tooltip>
                             </div>
                         </div>
 

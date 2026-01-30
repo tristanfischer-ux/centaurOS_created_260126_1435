@@ -367,20 +367,15 @@ export async function forwardTask(taskId: string, newAssigneeId: string, reason:
     const { data: task } = await supabase.from('tasks').select('forwarding_history, assignee_id').eq('id', taskId).single()
     if (!task) return { error: 'Task not found' }
 
-    // Validate task has an assignee before forwarding
-    if (!task.assignee_id) {
-        return { error: 'Task has no assignee to forward from' }
-    }
-
-    // Verify user is the current assignee
-    if (task.assignee_id !== user.id) {
+    // If task has an assignee, verify user is the current assignee
+    if (task.assignee_id && task.assignee_id !== user.id) {
         return { error: 'Unauthorized: You are not the current assignee of this task' }
     }
 
     // Get old assignee name (optional, but good for log. Skipping for strict performance, just using IDs in history for now)
 
     interface ForwardingEvent {
-        from_id: string;
+        from_id: string | null;
         to_id: string;
         reason: string;
         date: string;
@@ -394,7 +389,7 @@ export async function forwardTask(taskId: string, newAssigneeId: string, reason:
     const newHistory: ForwardingEvent[] = [
         ...history,
         {
-            from_id: task.assignee_id,
+            from_id: task.assignee_id || null,
             to_id: newAssigneeId,
             reason: reason,
             date: new Date().toISOString()
