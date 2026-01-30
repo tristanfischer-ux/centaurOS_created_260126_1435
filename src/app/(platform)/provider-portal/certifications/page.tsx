@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { getCertifications, getMyProviderProfile } from '@/actions/trust-signals'

@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
-import { LayoutDashboard, Users, CheckSquare, Clock, Store, Settings, Target, HelpCircle, MoreHorizontal, Compass, Network, MessageCircleQuestion, Sun } from "lucide-react"
+import { LayoutDashboard, Users, CheckSquare, Clock, Store, Settings, Target, HelpCircle, MoreHorizontal, Compass, Network, MessageCircleQuestion, Sun, GraduationCap } from "lucide-react"
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -39,6 +39,7 @@ const moreNavigation = [
     { name: "Advisory", href: "/advisory", icon: MessageCircleQuestion },
     { name: "Marketplace", href: "/marketplace", icon: Store },
     { name: "Guild", href: "/guild", icon: Compass },
+    { name: "Apprenticeship", href: "/apprenticeship", icon: GraduationCap },
     { name: "Help", href: "/help", icon: HelpCircle },
     { name: "Settings", href: "/settings", icon: Settings },
 ]

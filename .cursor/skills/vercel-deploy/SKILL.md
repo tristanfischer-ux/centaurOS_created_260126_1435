@@ -35,6 +35,9 @@ npm run lint
 # Run type check
 npx tsc --noEmit
 
+# Run unit tests
+npm test
+
 # Check for any TODO/FIXME that might be blockers
 grep -r "TODO\|FIXME" src/ --include="*.ts" --include="*.tsx" | head -20
 ```
@@ -42,6 +45,7 @@ grep -r "TODO\|FIXME" src/ --include="*.ts" --include="*.tsx" | head -20
 **Stop deployment if:**
 - Linter errors exist
 - Type errors exist
+- Tests fail
 - Critical TODO items are unaddressed
 
 ## Step 2: Local Build Test
@@ -176,7 +180,7 @@ OPENAI_API_KEY=[openai-key]
 
 ```bash
 # Full deployment workflow (run in sequence)
-npm run lint && npm run build && git add . && git commit -m "deploy: updates" && git push
+npm run lint && npm test && npm run build && git add . && git commit -m "deploy: updates" && git push
 
 # Check if Vercel CLI is available
 which vercel || echo "Install with: npm i -g vercel"

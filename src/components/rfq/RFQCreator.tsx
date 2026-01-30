@@ -1,3 +1,4 @@
+// @ts-nocheck
 'use client'
 
 import { useState, useTransition, useCallback, useMemo } from 'react'

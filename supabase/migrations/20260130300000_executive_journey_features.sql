@@ -44,7 +44,7 @@ ADD COLUMN IF NOT EXISTS trial_rate_discount INTEGER DEFAULT 0;
 CREATE INDEX IF NOT EXISTS idx_provider_profiles_username ON public.provider_profiles(username) WHERE username IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_provider_profiles_slug ON public.provider_profiles(profile_slug) WHERE profile_slug IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_provider_profiles_public ON public.provider_profiles(is_public) WHERE is_public = TRUE;
-CREATE INDEX IF NOT EXISTS idx_provider_profiles_featured ON public.provider_profiles(featured_until) WHERE featured_until > NOW();
+CREATE INDEX IF NOT EXISTS idx_provider_profiles_featured ON public.provider_profiles(featured_until) WHERE featured_until IS NOT NULL;
 
 -- =============================================
 -- SECTION 2: CASE STUDIES TABLE

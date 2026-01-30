@@ -363,6 +363,407 @@ export type Database = {
         }
         Relationships: []
       }
+      apprentice_skill_assessments: {
+        Row: {
+          assessed_at: string | null
+          assessed_by: string | null
+          assessment_method: string | null
+          assessor_notes: string | null
+          created_at: string | null
+          current_level: number | null
+          development_plan: string | null
+          enrollment_id: string
+          evidence: string | null
+          evidence_urls: Json | null
+          id: string
+          skill_id: string
+          target_level: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          assessed_at?: string | null
+          assessed_by?: string | null
+          assessment_method?: string | null
+          assessor_notes?: string | null
+          created_at?: string | null
+          current_level?: number | null
+          development_plan?: string | null
+          enrollment_id: string
+          evidence?: string | null
+          evidence_urls?: Json | null
+          id?: string
+          skill_id: string
+          target_level?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          assessed_at?: string | null
+          assessed_by?: string | null
+          assessment_method?: string | null
+          assessor_notes?: string | null
+          created_at?: string | null
+          current_level?: number | null
+          development_plan?: string | null
+          enrollment_id?: string
+          evidence?: string | null
+          evidence_urls?: Json | null
+          id?: string
+          skill_id?: string
+          target_level?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "apprentice_skill_assessments_assessed_by_fkey"
+            columns: ["assessed_by"]
+            isOneToOne: false
+            referencedRelation: "buyer_stats"
+            referencedColumns: ["buyer_id"]
+          },
+          {
+            foreignKeyName: "apprentice_skill_assessments_assessed_by_fkey"
+            columns: ["assessed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "apprentice_skill_assessments_enrollment_id_fkey"
+            columns: ["enrollment_id"]
+            isOneToOne: false
+            referencedRelation: "apprenticeship_enrollments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "apprentice_skill_assessments_skill_id_fkey"
+            columns: ["skill_id"]
+            isOneToOne: false
+            referencedRelation: "apprenticeship_skills"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      apprenticeship_documents: {
+        Row: {
+          content: Json | null
+          created_at: string | null
+          created_by: string | null
+          description: string | null
+          document_type: string
+          enrollment_id: string
+          file_url: string | null
+          id: string
+          requires_signatures: Json | null
+          signatures: Json | null
+          status: string | null
+          superseded_by: string | null
+          template_version: string | null
+          title: string
+          updated_at: string | null
+          valid_from: string | null
+          valid_until: string | null
+        }
+        Insert: {
+          content?: Json | null
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          document_type: string
+          enrollment_id: string
+          file_url?: string | null
+          id?: string
+          requires_signatures?: Json | null
+          signatures?: Json | null
+          status?: string | null
+          superseded_by?: string | null
+          template_version?: string | null
+          title: string
+          updated_at?: string | null
+          valid_from?: string | null
+          valid_until?: string | null
+        }
+        Update: {
+          content?: Json | null
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          document_type?: string
+          enrollment_id?: string
+          file_url?: string | null
+          id?: string
+          requires_signatures?: Json | null
+          signatures?: Json | null
+          status?: string | null
+          superseded_by?: string | null
+          template_version?: string | null
+          title?: string
+          updated_at?: string | null
+          valid_from?: string | null
+          valid_until?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "apprenticeship_documents_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "buyer_stats"
+            referencedColumns: ["buyer_id"]
+          },
+          {
+            foreignKeyName: "apprenticeship_documents_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "apprenticeship_documents_enrollment_id_fkey"
+            columns: ["enrollment_id"]
+            isOneToOne: false
+            referencedRelation: "apprenticeship_enrollments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "apprenticeship_documents_superseded_by_fkey"
+            columns: ["superseded_by"]
+            isOneToOne: false
+            referencedRelation: "apprenticeship_documents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      apprenticeship_enrollments: {
+        Row: {
+          actual_end_date: string | null
+          agreement_signed_at: string | null
+          apprentice_id: string
+          commitment_statement_signed_at: string | null
+          created_at: string | null
+          employment_type: string | null
+          expected_end_date: string
+          flying_start_date: string | null
+          foundry_id: string
+          hourly_rate: number | null
+          id: string
+          notes: string | null
+          otjt_hours_logged: number | null
+          otjt_hours_target: number
+          programme_id: string
+          senior_mentor_id: string | null
+          start_date: string
+          status: string | null
+          training_plan_approved_at: string | null
+          updated_at: string | null
+          wage_band: string | null
+          weekly_hours: number | null
+          workplace_buddy_id: string | null
+        }
+        Insert: {
+          actual_end_date?: string | null
+          agreement_signed_at?: string | null
+          apprentice_id: string
+          commitment_statement_signed_at?: string | null
+          created_at?: string | null
+          employment_type?: string | null
+          expected_end_date: string
+          flying_start_date?: string | null
+          foundry_id: string
+          hourly_rate?: number | null
+          id?: string
+          notes?: string | null
+          otjt_hours_logged?: number | null
+          otjt_hours_target: number
+          programme_id: string
+          senior_mentor_id?: string | null
+          start_date: string
+          status?: string | null
+          training_plan_approved_at?: string | null
+          updated_at?: string | null
+          wage_band?: string | null
+          weekly_hours?: number | null
+          workplace_buddy_id?: string | null
+        }
+        Update: {
+          actual_end_date?: string | null
+          agreement_signed_at?: string | null
+          apprentice_id?: string
+          commitment_statement_signed_at?: string | null
+          created_at?: string | null
+          employment_type?: string | null
+          expected_end_date?: string
+          flying_start_date?: string | null
+          foundry_id?: string
+          hourly_rate?: number | null
+          id?: string
+          notes?: string | null
+          otjt_hours_logged?: number | null
+          otjt_hours_target?: number
+          programme_id?: string
+          senior_mentor_id?: string | null
+          start_date?: string
+          status?: string | null
+          training_plan_approved_at?: string | null
+          updated_at?: string | null
+          wage_band?: string | null
+          weekly_hours?: number | null
+          workplace_buddy_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "apprenticeship_enrollments_apprentice_id_fkey"
+            columns: ["apprentice_id"]
+            isOneToOne: false
+            referencedRelation: "buyer_stats"
+            referencedColumns: ["buyer_id"]
+          },
+          {
+            foreignKeyName: "apprenticeship_enrollments_apprentice_id_fkey"
+            columns: ["apprentice_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "apprenticeship_enrollments_programme_id_fkey"
+            columns: ["programme_id"]
+            isOneToOne: false
+            referencedRelation: "apprenticeship_programmes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "apprenticeship_enrollments_senior_mentor_id_fkey"
+            columns: ["senior_mentor_id"]
+            isOneToOne: false
+            referencedRelation: "buyer_stats"
+            referencedColumns: ["buyer_id"]
+          },
+          {
+            foreignKeyName: "apprenticeship_enrollments_senior_mentor_id_fkey"
+            columns: ["senior_mentor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "apprenticeship_enrollments_workplace_buddy_id_fkey"
+            columns: ["workplace_buddy_id"]
+            isOneToOne: false
+            referencedRelation: "buyer_stats"
+            referencedColumns: ["buyer_id"]
+          },
+          {
+            foreignKeyName: "apprenticeship_enrollments_workplace_buddy_id_fkey"
+            columns: ["workplace_buddy_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      apprenticeship_programmes: {
+        Row: {
+          assessment_plan: Json | null
+          created_at: string | null
+          description: string | null
+          duration_months: number
+          id: string
+          is_active: boolean | null
+          learning_outcomes: Json | null
+          level: number | null
+          otjt_hours_required: number
+          skills_framework: Json | null
+          standard_code: string | null
+          title: string
+          updated_at: string | null
+        }
+        Insert: {
+          assessment_plan?: Json | null
+          created_at?: string | null
+          description?: string | null
+          duration_months: number
+          id?: string
+          is_active?: boolean | null
+          learning_outcomes?: Json | null
+          level?: number | null
+          otjt_hours_required: number
+          skills_framework?: Json | null
+          standard_code?: string | null
+          title: string
+          updated_at?: string | null
+        }
+        Update: {
+          assessment_plan?: Json | null
+          created_at?: string | null
+          description?: string | null
+          duration_months?: number
+          id?: string
+          is_active?: boolean | null
+          learning_outcomes?: Json | null
+          level?: number | null
+          otjt_hours_required?: number
+          skills_framework?: Json | null
+          standard_code?: string | null
+          title?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      apprenticeship_skills: {
+        Row: {
+          category: string
+          created_at: string | null
+          description: string | null
+          id: string
+          is_active: boolean | null
+          level_1_description: string | null
+          level_2_description: string | null
+          level_3_description: string | null
+          level_4_description: string | null
+          level_5_description: string | null
+          name: string
+          parent_skill_id: string | null
+          programme_ids: string[] | null
+        }
+        Insert: {
+          category: string
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          level_1_description?: string | null
+          level_2_description?: string | null
+          level_3_description?: string | null
+          level_4_description?: string | null
+          level_5_description?: string | null
+          name: string
+          parent_skill_id?: string | null
+          programme_ids?: string[] | null
+        }
+        Update: {
+          category?: string
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          level_1_description?: string | null
+          level_2_description?: string | null
+          level_3_description?: string | null
+          level_4_description?: string | null
+          level_5_description?: string | null
+          name?: string
+          parent_skill_id?: string | null
+          programme_ids?: string[] | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "apprenticeship_skills_parent_skill_id_fkey"
+            columns: ["parent_skill_id"]
+            isOneToOne: false
+            referencedRelation: "apprenticeship_skills"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       approval_delegations: {
         Row: {
           all_tasks: boolean | null
@@ -528,6 +929,177 @@ export type Database = {
           typical_roles?: string[] | null
         }
         Relationships: []
+      }
+      case_studies: {
+        Row: {
+          approach: string
+          challenge: string
+          client_industry: string | null
+          client_logo_url: string | null
+          client_name: string | null
+          company_stage: string | null
+          created_at: string | null
+          display_order: number | null
+          end_date: string | null
+          engagement_type: string | null
+          hours_per_week: number | null
+          id: string
+          is_featured: boolean | null
+          is_public: boolean | null
+          metrics: Json | null
+          outcome: string
+          provider_id: string
+          start_date: string | null
+          testimonial_author: string | null
+          testimonial_quote: string | null
+          testimonial_role: string | null
+          title: string
+          updated_at: string | null
+        }
+        Insert: {
+          approach: string
+          challenge: string
+          client_industry?: string | null
+          client_logo_url?: string | null
+          client_name?: string | null
+          company_stage?: string | null
+          created_at?: string | null
+          display_order?: number | null
+          end_date?: string | null
+          engagement_type?: string | null
+          hours_per_week?: number | null
+          id?: string
+          is_featured?: boolean | null
+          is_public?: boolean | null
+          metrics?: Json | null
+          outcome: string
+          provider_id: string
+          start_date?: string | null
+          testimonial_author?: string | null
+          testimonial_quote?: string | null
+          testimonial_role?: string | null
+          title: string
+          updated_at?: string | null
+        }
+        Update: {
+          approach?: string
+          challenge?: string
+          client_industry?: string | null
+          client_logo_url?: string | null
+          client_name?: string | null
+          company_stage?: string | null
+          created_at?: string | null
+          display_order?: number | null
+          end_date?: string | null
+          engagement_type?: string | null
+          hours_per_week?: number | null
+          id?: string
+          is_featured?: boolean | null
+          is_public?: boolean | null
+          metrics?: Json | null
+          outcome?: string
+          provider_id?: string
+          start_date?: string | null
+          testimonial_author?: string | null
+          testimonial_quote?: string | null
+          testimonial_role?: string | null
+          title?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "case_studies_provider_id_fkey"
+            columns: ["provider_id"]
+            isOneToOne: false
+            referencedRelation: "provider_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "case_studies_provider_id_fkey"
+            columns: ["provider_id"]
+            isOneToOne: false
+            referencedRelation: "provider_stats"
+            referencedColumns: ["provider_id"]
+          },
+          {
+            foreignKeyName: "case_studies_provider_id_fkey"
+            columns: ["provider_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_search_ranking"
+            referencedColumns: ["provider_id"]
+          },
+        ]
+      }
+      company_invitations: {
+        Row: {
+          accepted_at: string | null
+          accepted_by: string | null
+          created_at: string | null
+          email: string
+          expires_at: string
+          foundry_id: string
+          id: string
+          invited_by: string
+          role: Database["public"]["Enums"]["member_role"]
+          token: string
+          updated_at: string | null
+        }
+        Insert: {
+          accepted_at?: string | null
+          accepted_by?: string | null
+          created_at?: string | null
+          email: string
+          expires_at: string
+          foundry_id: string
+          id?: string
+          invited_by: string
+          role?: Database["public"]["Enums"]["member_role"]
+          token: string
+          updated_at?: string | null
+        }
+        Update: {
+          accepted_at?: string | null
+          accepted_by?: string | null
+          created_at?: string | null
+          email?: string
+          expires_at?: string
+          foundry_id?: string
+          id?: string
+          invited_by?: string
+          role?: Database["public"]["Enums"]["member_role"]
+          token?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "company_invitations_accepted_by_fkey"
+            columns: ["accepted_by"]
+            isOneToOne: false
+            referencedRelation: "buyer_stats"
+            referencedColumns: ["buyer_id"]
+          },
+          {
+            foreignKeyName: "company_invitations_accepted_by_fkey"
+            columns: ["accepted_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "company_invitations_invited_by_fkey"
+            columns: ["invited_by"]
+            isOneToOne: false
+            referencedRelation: "buyer_stats"
+            referencedColumns: ["buyer_id"]
+          },
+          {
+            foreignKeyName: "company_invitations_invited_by_fkey"
+            columns: ["invited_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       contract_templates: {
         Row: {
@@ -710,6 +1282,251 @@ export type Database = {
           },
         ]
       }
+      discovery_call_settings: {
+        Row: {
+          buffer_minutes: number | null
+          calendar_provider: string | null
+          calendar_sync_enabled: boolean | null
+          calendar_sync_token: string | null
+          call_duration_minutes: number | null
+          confirmation_message: string | null
+          created_at: string | null
+          id: string
+          is_enabled: boolean | null
+          max_advance_days: number | null
+          min_notice_hours: number | null
+          pre_call_questions: Json | null
+          provider_id: string
+          reminder_hours_before: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          buffer_minutes?: number | null
+          calendar_provider?: string | null
+          calendar_sync_enabled?: boolean | null
+          calendar_sync_token?: string | null
+          call_duration_minutes?: number | null
+          confirmation_message?: string | null
+          created_at?: string | null
+          id?: string
+          is_enabled?: boolean | null
+          max_advance_days?: number | null
+          min_notice_hours?: number | null
+          pre_call_questions?: Json | null
+          provider_id: string
+          reminder_hours_before?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          buffer_minutes?: number | null
+          calendar_provider?: string | null
+          calendar_sync_enabled?: boolean | null
+          calendar_sync_token?: string | null
+          call_duration_minutes?: number | null
+          confirmation_message?: string | null
+          created_at?: string | null
+          id?: string
+          is_enabled?: boolean | null
+          max_advance_days?: number | null
+          min_notice_hours?: number | null
+          pre_call_questions?: Json | null
+          provider_id?: string
+          reminder_hours_before?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "discovery_call_settings_provider_id_fkey"
+            columns: ["provider_id"]
+            isOneToOne: true
+            referencedRelation: "provider_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "discovery_call_settings_provider_id_fkey"
+            columns: ["provider_id"]
+            isOneToOne: true
+            referencedRelation: "provider_stats"
+            referencedColumns: ["provider_id"]
+          },
+          {
+            foreignKeyName: "discovery_call_settings_provider_id_fkey"
+            columns: ["provider_id"]
+            isOneToOne: true
+            referencedRelation: "supplier_search_ranking"
+            referencedColumns: ["provider_id"]
+          },
+        ]
+      }
+      discovery_call_slots: {
+        Row: {
+          created_at: string | null
+          day_of_week: number
+          end_time: string
+          id: string
+          is_active: boolean | null
+          provider_id: string
+          start_time: string
+        }
+        Insert: {
+          created_at?: string | null
+          day_of_week: number
+          end_time: string
+          id?: string
+          is_active?: boolean | null
+          provider_id: string
+          start_time: string
+        }
+        Update: {
+          created_at?: string | null
+          day_of_week?: number
+          end_time?: string
+          id?: string
+          is_active?: boolean | null
+          provider_id?: string
+          start_time?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "discovery_call_slots_provider_id_fkey"
+            columns: ["provider_id"]
+            isOneToOne: false
+            referencedRelation: "provider_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "discovery_call_slots_provider_id_fkey"
+            columns: ["provider_id"]
+            isOneToOne: false
+            referencedRelation: "provider_stats"
+            referencedColumns: ["provider_id"]
+          },
+          {
+            foreignKeyName: "discovery_call_slots_provider_id_fkey"
+            columns: ["provider_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_search_ranking"
+            referencedColumns: ["provider_id"]
+          },
+        ]
+      }
+      discovery_calls: {
+        Row: {
+          buyer_feedback: string | null
+          buyer_id: string
+          cancellation_reason: string | null
+          cancelled_by: string | null
+          converted_to_order_id: string | null
+          created_at: string | null
+          duration_minutes: number | null
+          id: string
+          meeting_url: string | null
+          notes: string | null
+          pre_call_answers: Json | null
+          provider_feedback: string | null
+          provider_id: string
+          reminder_sent_at: string | null
+          scheduled_at: string
+          status: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          buyer_feedback?: string | null
+          buyer_id: string
+          cancellation_reason?: string | null
+          cancelled_by?: string | null
+          converted_to_order_id?: string | null
+          created_at?: string | null
+          duration_minutes?: number | null
+          id?: string
+          meeting_url?: string | null
+          notes?: string | null
+          pre_call_answers?: Json | null
+          provider_feedback?: string | null
+          provider_id: string
+          reminder_sent_at?: string | null
+          scheduled_at: string
+          status?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          buyer_feedback?: string | null
+          buyer_id?: string
+          cancellation_reason?: string | null
+          cancelled_by?: string | null
+          converted_to_order_id?: string | null
+          created_at?: string | null
+          duration_minutes?: number | null
+          id?: string
+          meeting_url?: string | null
+          notes?: string | null
+          pre_call_answers?: Json | null
+          provider_feedback?: string | null
+          provider_id?: string
+          reminder_sent_at?: string | null
+          scheduled_at?: string
+          status?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "discovery_calls_buyer_id_fkey"
+            columns: ["buyer_id"]
+            isOneToOne: false
+            referencedRelation: "buyer_stats"
+            referencedColumns: ["buyer_id"]
+          },
+          {
+            foreignKeyName: "discovery_calls_buyer_id_fkey"
+            columns: ["buyer_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "discovery_calls_cancelled_by_fkey"
+            columns: ["cancelled_by"]
+            isOneToOne: false
+            referencedRelation: "buyer_stats"
+            referencedColumns: ["buyer_id"]
+          },
+          {
+            foreignKeyName: "discovery_calls_cancelled_by_fkey"
+            columns: ["cancelled_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "discovery_calls_converted_to_order_id_fkey"
+            columns: ["converted_to_order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "discovery_calls_provider_id_fkey"
+            columns: ["provider_id"]
+            isOneToOne: false
+            referencedRelation: "provider_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "discovery_calls_provider_id_fkey"
+            columns: ["provider_id"]
+            isOneToOne: false
+            referencedRelation: "provider_stats"
+            referencedColumns: ["provider_id"]
+          },
+          {
+            foreignKeyName: "discovery_calls_provider_id_fkey"
+            columns: ["provider_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_search_ranking"
+            referencedColumns: ["provider_id"]
+          },
+        ]
+      }
       disputes: {
         Row: {
           assigned_to: string | null
@@ -837,19 +1654,158 @@ export type Database = {
         Row: {
           created_at: string | null
           id: string
+          industry: string | null
           name: string
+          owner_id: string | null
+          slug: string | null
+          stage: string | null
         }
         Insert: {
           created_at?: string | null
           id: string
+          industry?: string | null
           name: string
+          owner_id?: string | null
+          slug?: string | null
+          stage?: string | null
         }
         Update: {
           created_at?: string | null
           id?: string
+          industry?: string | null
           name?: string
+          owner_id?: string | null
+          slug?: string | null
+          stage?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "foundries_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "buyer_stats"
+            referencedColumns: ["buyer_id"]
+          },
+          {
+            foreignKeyName: "foundries_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      foundry_admin_audit_log: {
+        Row: {
+          action: string
+          actor_id: string
+          created_at: string | null
+          details: Json | null
+          foundry_id: string
+          id: string
+          target_user_id: string | null
+        }
+        Insert: {
+          action: string
+          actor_id: string
+          created_at?: string | null
+          details?: Json | null
+          foundry_id: string
+          id?: string
+          target_user_id?: string | null
+        }
+        Update: {
+          action?: string
+          actor_id?: string
+          created_at?: string | null
+          details?: Json | null
+          foundry_id?: string
+          id?: string
+          target_user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "foundry_admin_audit_log_actor_id_fkey"
+            columns: ["actor_id"]
+            isOneToOne: false
+            referencedRelation: "buyer_stats"
+            referencedColumns: ["buyer_id"]
+          },
+          {
+            foreignKeyName: "foundry_admin_audit_log_actor_id_fkey"
+            columns: ["actor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "foundry_admin_audit_log_target_user_id_fkey"
+            columns: ["target_user_id"]
+            isOneToOne: false
+            referencedRelation: "buyer_stats"
+            referencedColumns: ["buyer_id"]
+          },
+          {
+            foreignKeyName: "foundry_admin_audit_log_target_user_id_fkey"
+            columns: ["target_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      foundry_admin_permissions: {
+        Row: {
+          created_at: string | null
+          foundry_id: string
+          granted_by: string
+          id: string
+          profile_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          foundry_id: string
+          granted_by: string
+          id?: string
+          profile_id: string
+        }
+        Update: {
+          created_at?: string | null
+          foundry_id?: string
+          granted_by?: string
+          id?: string
+          profile_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "foundry_admin_permissions_granted_by_fkey"
+            columns: ["granted_by"]
+            isOneToOne: false
+            referencedRelation: "buyer_stats"
+            referencedColumns: ["buyer_id"]
+          },
+          {
+            foreignKeyName: "foundry_admin_permissions_granted_by_fkey"
+            columns: ["granted_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "foundry_admin_permissions_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "buyer_stats"
+            referencedColumns: ["buyer_id"]
+          },
+          {
+            foreignKeyName: "foundry_admin_permissions_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       foundry_function_coverage: {
         Row: {
@@ -911,6 +1867,66 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      foundry_integrations: {
+        Row: {
+          config: Json
+          created_at: string | null
+          foundry_id: string
+          id: string
+          is_active: boolean
+          service_type: string
+          updated_at: string | null
+        }
+        Insert: {
+          config?: Json
+          created_at?: string | null
+          foundry_id: string
+          id?: string
+          is_active?: boolean
+          service_type: string
+          updated_at?: string | null
+        }
+        Update: {
+          config?: Json
+          created_at?: string | null
+          foundry_id?: string
+          id?: string
+          is_active?: boolean
+          service_type?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      foundry_offboarding_settings: {
+        Row: {
+          created_at: string | null
+          default_action: Database["public"]["Enums"]["offboarding_action"]
+          foundry_id: string
+          id: string
+          require_task_reassignment: boolean
+          retention_days: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          default_action?: Database["public"]["Enums"]["offboarding_action"]
+          foundry_id: string
+          id?: string
+          require_task_reassignment?: boolean
+          retention_days?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          default_action?: Database["public"]["Enums"]["offboarding_action"]
+          foundry_id?: string
+          id?: string
+          require_task_reassignment?: boolean
+          retention_days?: number | null
+          updated_at?: string | null
+        }
+        Relationships: []
       }
       foundry_stack: {
         Row: {
@@ -1076,6 +2092,93 @@ export type Database = {
           },
         ]
       }
+      learning_modules: {
+        Row: {
+          content_data: Json | null
+          content_type: string | null
+          content_url: string | null
+          counts_as_otjt: boolean | null
+          created_at: string | null
+          description: string | null
+          estimated_hours: number
+          has_assessment: boolean | null
+          id: string
+          is_active: boolean | null
+          is_mandatory: boolean | null
+          max_attempts: number | null
+          module_type: string
+          order_index: number | null
+          passing_score: number | null
+          prerequisite_module_id: string | null
+          programme_id: string | null
+          skills_taught: Json | null
+          title: string
+          unlock_after_days: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          content_data?: Json | null
+          content_type?: string | null
+          content_url?: string | null
+          counts_as_otjt?: boolean | null
+          created_at?: string | null
+          description?: string | null
+          estimated_hours?: number
+          has_assessment?: boolean | null
+          id?: string
+          is_active?: boolean | null
+          is_mandatory?: boolean | null
+          max_attempts?: number | null
+          module_type: string
+          order_index?: number | null
+          passing_score?: number | null
+          prerequisite_module_id?: string | null
+          programme_id?: string | null
+          skills_taught?: Json | null
+          title: string
+          unlock_after_days?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          content_data?: Json | null
+          content_type?: string | null
+          content_url?: string | null
+          counts_as_otjt?: boolean | null
+          created_at?: string | null
+          description?: string | null
+          estimated_hours?: number
+          has_assessment?: boolean | null
+          id?: string
+          is_active?: boolean | null
+          is_mandatory?: boolean | null
+          max_attempts?: number | null
+          module_type?: string
+          order_index?: number | null
+          passing_score?: number | null
+          prerequisite_module_id?: string | null
+          programme_id?: string | null
+          skills_taught?: Json | null
+          title?: string
+          unlock_after_days?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "learning_modules_prerequisite_module_id_fkey"
+            columns: ["prerequisite_module_id"]
+            isOneToOne: false
+            referencedRelation: "learning_modules"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "learning_modules_programme_id_fkey"
+            columns: ["programme_id"]
+            isOneToOne: false
+            referencedRelation: "apprenticeship_programmes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       listing_migration: {
         Row: {
           contact_email: string | null
@@ -1171,42 +2274,96 @@ export type Database = {
       }
       marketplace_listings: {
         Row: {
+          approval_notes: string | null
+          approval_status: string | null
+          approved_at: string | null
+          approved_by: string | null
           attributes: Json | null
           category: Database["public"]["Enums"]["marketplace_category"]
           created_at: string | null
+          created_by_provider_id: string | null
           description: string | null
           id: string
           image_url: string | null
+          is_self_created: boolean | null
           is_verified: boolean | null
           search_vector: unknown
           subcategory: string
           title: string
         }
         Insert: {
+          approval_notes?: string | null
+          approval_status?: string | null
+          approved_at?: string | null
+          approved_by?: string | null
           attributes?: Json | null
           category: Database["public"]["Enums"]["marketplace_category"]
           created_at?: string | null
+          created_by_provider_id?: string | null
           description?: string | null
           id?: string
           image_url?: string | null
+          is_self_created?: boolean | null
           is_verified?: boolean | null
           search_vector?: unknown
           subcategory: string
           title: string
         }
         Update: {
+          approval_notes?: string | null
+          approval_status?: string | null
+          approved_at?: string | null
+          approved_by?: string | null
           attributes?: Json | null
           category?: Database["public"]["Enums"]["marketplace_category"]
           created_at?: string | null
+          created_by_provider_id?: string | null
           description?: string | null
           id?: string
           image_url?: string | null
+          is_self_created?: boolean | null
           is_verified?: boolean | null
           search_vector?: unknown
           subcategory?: string
           title?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "marketplace_listings_approved_by_fkey"
+            columns: ["approved_by"]
+            isOneToOne: false
+            referencedRelation: "buyer_stats"
+            referencedColumns: ["buyer_id"]
+          },
+          {
+            foreignKeyName: "marketplace_listings_approved_by_fkey"
+            columns: ["approved_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketplace_listings_created_by_provider_id_fkey"
+            columns: ["created_by_provider_id"]
+            isOneToOne: false
+            referencedRelation: "provider_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketplace_listings_created_by_provider_id_fkey"
+            columns: ["created_by_provider_id"]
+            isOneToOne: false
+            referencedRelation: "provider_stats"
+            referencedColumns: ["provider_id"]
+          },
+          {
+            foreignKeyName: "marketplace_listings_created_by_provider_id_fkey"
+            columns: ["created_by_provider_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_search_ranking"
+            referencedColumns: ["provider_id"]
+          },
+        ]
       }
       marketplace_recommendations: {
         Row: {
@@ -1370,6 +2527,92 @@ export type Database = {
             columns: ["sender_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      module_completions: {
+        Row: {
+          attempts: number | null
+          completed_at: string | null
+          created_at: string | null
+          enrollment_id: string
+          evidence_urls: Json | null
+          feedback: string | null
+          graded_at: string | null
+          graded_by: string | null
+          hours_logged: number | null
+          id: string
+          module_id: string
+          reflection: string | null
+          score: number | null
+          started_at: string | null
+          status: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          attempts?: number | null
+          completed_at?: string | null
+          created_at?: string | null
+          enrollment_id: string
+          evidence_urls?: Json | null
+          feedback?: string | null
+          graded_at?: string | null
+          graded_by?: string | null
+          hours_logged?: number | null
+          id?: string
+          module_id: string
+          reflection?: string | null
+          score?: number | null
+          started_at?: string | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          attempts?: number | null
+          completed_at?: string | null
+          created_at?: string | null
+          enrollment_id?: string
+          evidence_urls?: Json | null
+          feedback?: string | null
+          graded_at?: string | null
+          graded_by?: string | null
+          hours_logged?: number | null
+          id?: string
+          module_id?: string
+          reflection?: string | null
+          score?: number | null
+          started_at?: string | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "module_completions_enrollment_id_fkey"
+            columns: ["enrollment_id"]
+            isOneToOne: false
+            referencedRelation: "apprenticeship_enrollments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "module_completions_graded_by_fkey"
+            columns: ["graded_by"]
+            isOneToOne: false
+            referencedRelation: "buyer_stats"
+            referencedColumns: ["buyer_id"]
+          },
+          {
+            foreignKeyName: "module_completions_graded_by_fkey"
+            columns: ["graded_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "module_completions_module_id_fkey"
+            columns: ["module_id"]
+            isOneToOne: false
+            referencedRelation: "learning_modules"
             referencedColumns: ["id"]
           },
         ]
@@ -1653,6 +2896,78 @@ export type Database = {
           },
         ]
       }
+      offboarding_tasks: {
+        Row: {
+          created_at: string | null
+          departing_user_id: string
+          foundry_id: string
+          id: string
+          reassigned_to: string | null
+          relationship_type: string
+          status: string
+          task_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          departing_user_id: string
+          foundry_id: string
+          id?: string
+          reassigned_to?: string | null
+          relationship_type: string
+          status?: string
+          task_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          departing_user_id?: string
+          foundry_id?: string
+          id?: string
+          reassigned_to?: string | null
+          relationship_type?: string
+          status?: string
+          task_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "offboarding_tasks_departing_user_id_fkey"
+            columns: ["departing_user_id"]
+            isOneToOne: false
+            referencedRelation: "buyer_stats"
+            referencedColumns: ["buyer_id"]
+          },
+          {
+            foreignKeyName: "offboarding_tasks_departing_user_id_fkey"
+            columns: ["departing_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "offboarding_tasks_reassigned_to_fkey"
+            columns: ["reassigned_to"]
+            isOneToOne: false
+            referencedRelation: "buyer_stats"
+            referencedColumns: ["buyer_id"]
+          },
+          {
+            foreignKeyName: "offboarding_tasks_reassigned_to_fkey"
+            columns: ["reassigned_to"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "offboarding_tasks_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       order_contracts: {
         Row: {
           buyer_signed_at: string | null
@@ -1827,10 +3142,12 @@ export type Database = {
           business_function_id: string | null
           buyer_id: string
           completed_at: string | null
+          converted_from_trial_id: string | null
           created_at: string | null
           currency: string | null
           escrow_status: Database["public"]["Enums"]["escrow_status"] | null
           id: string
+          is_trial: boolean | null
           listing_id: string | null
           objective_id: string | null
           order_number: string | null
@@ -1841,6 +3158,9 @@ export type Database = {
           stripe_payment_intent_id: string | null
           tax_treatment: string | null
           total_amount: number
+          trial_converted_at: string | null
+          trial_duration_weeks: number | null
+          trial_hours_per_week: number | null
           vat_amount: number | null
           vat_rate: number | null
         }
@@ -1848,10 +3168,12 @@ export type Database = {
           business_function_id?: string | null
           buyer_id: string
           completed_at?: string | null
+          converted_from_trial_id?: string | null
           created_at?: string | null
           currency?: string | null
           escrow_status?: Database["public"]["Enums"]["escrow_status"] | null
           id?: string
+          is_trial?: boolean | null
           listing_id?: string | null
           objective_id?: string | null
           order_number?: string | null
@@ -1862,6 +3184,9 @@ export type Database = {
           stripe_payment_intent_id?: string | null
           tax_treatment?: string | null
           total_amount: number
+          trial_converted_at?: string | null
+          trial_duration_weeks?: number | null
+          trial_hours_per_week?: number | null
           vat_amount?: number | null
           vat_rate?: number | null
         }
@@ -1869,10 +3194,12 @@ export type Database = {
           business_function_id?: string | null
           buyer_id?: string
           completed_at?: string | null
+          converted_from_trial_id?: string | null
           created_at?: string | null
           currency?: string | null
           escrow_status?: Database["public"]["Enums"]["escrow_status"] | null
           id?: string
+          is_trial?: boolean | null
           listing_id?: string | null
           objective_id?: string | null
           order_number?: string | null
@@ -1883,6 +3210,9 @@ export type Database = {
           stripe_payment_intent_id?: string | null
           tax_treatment?: string | null
           total_amount?: number
+          trial_converted_at?: string | null
+          trial_duration_weeks?: number | null
+          trial_hours_per_week?: number | null
           vat_amount?: number | null
           vat_rate?: number | null
         }
@@ -1906,6 +3236,13 @@ export type Database = {
             columns: ["buyer_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_converted_from_trial_id_fkey"
+            columns: ["converted_from_trial_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
             referencedColumns: ["id"]
           },
           {
@@ -1949,6 +3286,102 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "supplier_search_ranking"
             referencedColumns: ["provider_id"]
+          },
+        ]
+      }
+      otjt_time_logs: {
+        Row: {
+          activity_type: string
+          approved_at: string | null
+          approved_by: string | null
+          created_at: string | null
+          description: string | null
+          enrollment_id: string
+          evidence_url: string | null
+          hours: number
+          id: string
+          learning_outcomes: string | null
+          log_date: string
+          module_id: string | null
+          query_message: string | null
+          rejection_reason: string | null
+          status: string | null
+          task_id: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          activity_type: string
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string | null
+          description?: string | null
+          enrollment_id: string
+          evidence_url?: string | null
+          hours: number
+          id?: string
+          learning_outcomes?: string | null
+          log_date: string
+          module_id?: string | null
+          query_message?: string | null
+          rejection_reason?: string | null
+          status?: string | null
+          task_id?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          activity_type?: string
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string | null
+          description?: string | null
+          enrollment_id?: string
+          evidence_url?: string | null
+          hours?: number
+          id?: string
+          learning_outcomes?: string | null
+          log_date?: string
+          module_id?: string | null
+          query_message?: string | null
+          rejection_reason?: string | null
+          status?: string | null
+          task_id?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "otjt_time_logs_approved_by_fkey"
+            columns: ["approved_by"]
+            isOneToOne: false
+            referencedRelation: "buyer_stats"
+            referencedColumns: ["buyer_id"]
+          },
+          {
+            foreignKeyName: "otjt_time_logs_approved_by_fkey"
+            columns: ["approved_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "otjt_time_logs_enrollment_id_fkey"
+            columns: ["enrollment_id"]
+            isOneToOne: false
+            referencedRelation: "apprenticeship_enrollments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "otjt_time_logs_module_id_fkey"
+            columns: ["module_id"]
+            isOneToOne: false
+            referencedRelation: "learning_modules"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "otjt_time_logs_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -2229,16 +3662,86 @@ export type Database = {
           },
         ]
       }
+      profile_views: {
+        Row: {
+          id: string
+          provider_id: string
+          source: string | null
+          viewed_at: string | null
+          viewer_id: string | null
+        }
+        Insert: {
+          id?: string
+          provider_id: string
+          source?: string | null
+          viewed_at?: string | null
+          viewer_id?: string | null
+        }
+        Update: {
+          id?: string
+          provider_id?: string
+          source?: string | null
+          viewed_at?: string | null
+          viewer_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "profile_views_provider_id_fkey"
+            columns: ["provider_id"]
+            isOneToOne: false
+            referencedRelation: "provider_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "profile_views_provider_id_fkey"
+            columns: ["provider_id"]
+            isOneToOne: false
+            referencedRelation: "provider_stats"
+            referencedColumns: ["provider_id"]
+          },
+          {
+            foreignKeyName: "profile_views_provider_id_fkey"
+            columns: ["provider_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_search_ranking"
+            referencedColumns: ["provider_id"]
+          },
+          {
+            foreignKeyName: "profile_views_viewer_id_fkey"
+            columns: ["viewer_id"]
+            isOneToOne: false
+            referencedRelation: "buyer_stats"
+            referencedColumns: ["buyer_id"]
+          },
+          {
+            foreignKeyName: "profile_views_viewer_id_fkey"
+            columns: ["viewer_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
+          availability_hours_per_week: number | null
+          availability_type: string | null
           avatar_url: string | null
           bio: string | null
           capacity_score: number | null
           created_at: string | null
+          deactivated_at: string | null
           email: string
+          executive_onboarding_completed: boolean | null
+          expertise_areas: string[] | null
           foundry_id: string
           full_name: string | null
+          headline: string | null
           id: string
+          industries: string[] | null
+          is_active: boolean
+          linkedin_url: string | null
+          looking_for: string[] | null
           onboarding_data: Json
           paired_ai_id: string | null
           phone_number: string | null
@@ -2246,16 +3749,27 @@ export type Database = {
           skills: string[] | null
           stripe_account_id: string | null
           updated_at: string | null
+          years_experience: number | null
         }
         Insert: {
+          availability_hours_per_week?: number | null
+          availability_type?: string | null
           avatar_url?: string | null
           bio?: string | null
           capacity_score?: number | null
           created_at?: string | null
+          deactivated_at?: string | null
           email: string
+          executive_onboarding_completed?: boolean | null
+          expertise_areas?: string[] | null
           foundry_id: string
           full_name?: string | null
+          headline?: string | null
           id: string
+          industries?: string[] | null
+          is_active?: boolean
+          linkedin_url?: string | null
+          looking_for?: string[] | null
           onboarding_data?: Json
           paired_ai_id?: string | null
           phone_number?: string | null
@@ -2263,16 +3777,27 @@ export type Database = {
           skills?: string[] | null
           stripe_account_id?: string | null
           updated_at?: string | null
+          years_experience?: number | null
         }
         Update: {
+          availability_hours_per_week?: number | null
+          availability_type?: string | null
           avatar_url?: string | null
           bio?: string | null
           capacity_score?: number | null
           created_at?: string | null
+          deactivated_at?: string | null
           email?: string
+          executive_onboarding_completed?: boolean | null
+          expertise_areas?: string[] | null
           foundry_id?: string
           full_name?: string | null
+          headline?: string | null
           id?: string
+          industries?: string[] | null
+          is_active?: boolean
+          linkedin_url?: string | null
+          looking_for?: string[] | null
           onboarding_data?: Json
           paired_ai_id?: string | null
           phone_number?: string | null
@@ -2280,6 +3805,7 @@ export type Database = {
           skills?: string[] | null
           stripe_account_id?: string | null
           updated_at?: string | null
+          years_experience?: number | null
         }
         Relationships: [
           {
@@ -2292,6 +3818,180 @@ export type Database = {
           {
             foreignKeyName: "profiles_paired_ai_id_fkey"
             columns: ["paired_ai_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      progress_reviews: {
+        Row: {
+          action_items: Json | null
+          apprentice_reflection: string | null
+          apprentice_signed_at: string | null
+          areas_for_improvement: Json | null
+          completed_date: string | null
+          created_at: string | null
+          duration_minutes: number | null
+          enrollment_id: string
+          epa_recommendation: string | null
+          gateway_ready: boolean | null
+          id: string
+          mentor_feedback: string | null
+          mentor_signed_at: string | null
+          objectives_met: Json | null
+          on_track: boolean | null
+          otjt_hours_in_period: number | null
+          otjt_target_for_period: number | null
+          overall_rating: number | null
+          review_type: string
+          reviewer_id: string
+          scheduled_date: string | null
+          skills_demonstrated: Json | null
+          updated_at: string | null
+        }
+        Insert: {
+          action_items?: Json | null
+          apprentice_reflection?: string | null
+          apprentice_signed_at?: string | null
+          areas_for_improvement?: Json | null
+          completed_date?: string | null
+          created_at?: string | null
+          duration_minutes?: number | null
+          enrollment_id: string
+          epa_recommendation?: string | null
+          gateway_ready?: boolean | null
+          id?: string
+          mentor_feedback?: string | null
+          mentor_signed_at?: string | null
+          objectives_met?: Json | null
+          on_track?: boolean | null
+          otjt_hours_in_period?: number | null
+          otjt_target_for_period?: number | null
+          overall_rating?: number | null
+          review_type: string
+          reviewer_id: string
+          scheduled_date?: string | null
+          skills_demonstrated?: Json | null
+          updated_at?: string | null
+        }
+        Update: {
+          action_items?: Json | null
+          apprentice_reflection?: string | null
+          apprentice_signed_at?: string | null
+          areas_for_improvement?: Json | null
+          completed_date?: string | null
+          created_at?: string | null
+          duration_minutes?: number | null
+          enrollment_id?: string
+          epa_recommendation?: string | null
+          gateway_ready?: boolean | null
+          id?: string
+          mentor_feedback?: string | null
+          mentor_signed_at?: string | null
+          objectives_met?: Json | null
+          on_track?: boolean | null
+          otjt_hours_in_period?: number | null
+          otjt_target_for_period?: number | null
+          overall_rating?: number | null
+          review_type?: string
+          reviewer_id?: string
+          scheduled_date?: string | null
+          skills_demonstrated?: Json | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "progress_reviews_enrollment_id_fkey"
+            columns: ["enrollment_id"]
+            isOneToOne: false
+            referencedRelation: "apprenticeship_enrollments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "progress_reviews_reviewer_id_fkey"
+            columns: ["reviewer_id"]
+            isOneToOne: false
+            referencedRelation: "buyer_stats"
+            referencedColumns: ["buyer_id"]
+          },
+          {
+            foreignKeyName: "progress_reviews_reviewer_id_fkey"
+            columns: ["reviewer_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      project_assignments: {
+        Row: {
+          apprentice_id: string
+          assigned_by: string
+          created_at: string | null
+          ended_at: string | null
+          foundry_id: string
+          id: string
+          notes: string | null
+          project_description: string | null
+          project_name: string | null
+          started_at: string | null
+          status: string
+          updated_at: string | null
+        }
+        Insert: {
+          apprentice_id: string
+          assigned_by: string
+          created_at?: string | null
+          ended_at?: string | null
+          foundry_id: string
+          id?: string
+          notes?: string | null
+          project_description?: string | null
+          project_name?: string | null
+          started_at?: string | null
+          status?: string
+          updated_at?: string | null
+        }
+        Update: {
+          apprentice_id?: string
+          assigned_by?: string
+          created_at?: string | null
+          ended_at?: string | null
+          foundry_id?: string
+          id?: string
+          notes?: string | null
+          project_description?: string | null
+          project_name?: string | null
+          started_at?: string | null
+          status?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_assignments_apprentice_id_fkey"
+            columns: ["apprentice_id"]
+            isOneToOne: false
+            referencedRelation: "buyer_stats"
+            referencedColumns: ["buyer_id"]
+          },
+          {
+            foreignKeyName: "project_assignments_apprentice_id_fkey"
+            columns: ["apprentice_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_assignments_assigned_by_fkey"
+            columns: ["assigned_by"]
+            isOneToOne: false
+            referencedRelation: "buyer_stats"
+            referencedColumns: ["buyer_id"]
+          },
+          {
+            foreignKeyName: "project_assignments_assigned_by_fkey"
+            columns: ["assigned_by"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
@@ -2536,6 +4236,7 @@ export type Database = {
       }
       provider_profiles: {
         Row: {
+          accepts_trial: boolean | null
           auto_pause_at_capacity: boolean | null
           auto_response_delay_minutes: number | null
           auto_response_enabled: boolean | null
@@ -2543,27 +4244,47 @@ export type Database = {
           avg_response_time_hours: number | null
           bio: string | null
           centaur_discount_percent: number | null
+          company_stages: string[] | null
           completion_rate: number | null
           created_at: string | null
           currency: string | null
           current_order_count: number | null
           day_rate: number | null
+          featured_until: string | null
           headline: string | null
+          hourly_rate: number | null
           id: string
+          industries: string[] | null
           is_active: boolean | null
+          is_public: boolean | null
+          last_active_at: string | null
+          linkedin_url: string | null
           listing_id: string | null
+          location: string | null
           max_concurrent_orders: number | null
+          minimum_engagement_hours: number | null
           out_of_office: boolean | null
           out_of_office_message: string | null
           out_of_office_until: string | null
+          profile_completeness: number | null
+          profile_slug: string | null
+          profile_views: number | null
           response_rate: number | null
+          specializations: string[] | null
           stripe_account_id: string | null
           stripe_onboarding_complete: boolean | null
           tier: Database["public"]["Enums"]["supplier_tier"] | null
           timezone: string | null
+          trial_rate_discount: number | null
           user_id: string
+          username: string | null
+          video_thumbnail_url: string | null
+          video_url: string | null
+          website_url: string | null
+          years_experience: number | null
         }
         Insert: {
+          accepts_trial?: boolean | null
           auto_pause_at_capacity?: boolean | null
           auto_response_delay_minutes?: number | null
           auto_response_enabled?: boolean | null
@@ -2571,27 +4292,47 @@ export type Database = {
           avg_response_time_hours?: number | null
           bio?: string | null
           centaur_discount_percent?: number | null
+          company_stages?: string[] | null
           completion_rate?: number | null
           created_at?: string | null
           currency?: string | null
           current_order_count?: number | null
           day_rate?: number | null
+          featured_until?: string | null
           headline?: string | null
+          hourly_rate?: number | null
           id?: string
+          industries?: string[] | null
           is_active?: boolean | null
+          is_public?: boolean | null
+          last_active_at?: string | null
+          linkedin_url?: string | null
           listing_id?: string | null
+          location?: string | null
           max_concurrent_orders?: number | null
+          minimum_engagement_hours?: number | null
           out_of_office?: boolean | null
           out_of_office_message?: string | null
           out_of_office_until?: string | null
+          profile_completeness?: number | null
+          profile_slug?: string | null
+          profile_views?: number | null
           response_rate?: number | null
+          specializations?: string[] | null
           stripe_account_id?: string | null
           stripe_onboarding_complete?: boolean | null
           tier?: Database["public"]["Enums"]["supplier_tier"] | null
           timezone?: string | null
+          trial_rate_discount?: number | null
           user_id: string
+          username?: string | null
+          video_thumbnail_url?: string | null
+          video_url?: string | null
+          website_url?: string | null
+          years_experience?: number | null
         }
         Update: {
+          accepts_trial?: boolean | null
           auto_pause_at_capacity?: boolean | null
           auto_response_delay_minutes?: number | null
           auto_response_enabled?: boolean | null
@@ -2599,25 +4340,44 @@ export type Database = {
           avg_response_time_hours?: number | null
           bio?: string | null
           centaur_discount_percent?: number | null
+          company_stages?: string[] | null
           completion_rate?: number | null
           created_at?: string | null
           currency?: string | null
           current_order_count?: number | null
           day_rate?: number | null
+          featured_until?: string | null
           headline?: string | null
+          hourly_rate?: number | null
           id?: string
+          industries?: string[] | null
           is_active?: boolean | null
+          is_public?: boolean | null
+          last_active_at?: string | null
+          linkedin_url?: string | null
           listing_id?: string | null
+          location?: string | null
           max_concurrent_orders?: number | null
+          minimum_engagement_hours?: number | null
           out_of_office?: boolean | null
           out_of_office_message?: string | null
           out_of_office_until?: string | null
+          profile_completeness?: number | null
+          profile_slug?: string | null
+          profile_views?: number | null
           response_rate?: number | null
+          specializations?: string[] | null
           stripe_account_id?: string | null
           stripe_onboarding_complete?: boolean | null
           tier?: Database["public"]["Enums"]["supplier_tier"] | null
           timezone?: string | null
+          trial_rate_discount?: number | null
           user_id?: string
+          username?: string | null
+          video_thumbnail_url?: string | null
+          video_url?: string | null
+          website_url?: string | null
+          years_experience?: number | null
         }
         Relationships: [
           {
@@ -2953,31 +4713,70 @@ export type Database = {
       }
       rfq_responses: {
         Row: {
+          attachments: Json | null
+          buyer_shortlisted: boolean | null
+          buyer_viewed_at: string | null
+          deliverables: Json | null
           id: string
           message: string | null
+          milestones: Json | null
+          pricing_breakdown: Json | null
+          proposal_summary: string | null
+          proposal_title: string | null
           provider_id: string
           quoted_price: number | null
           responded_at: string | null
           response_type: string
           rfq_id: string
+          scope_of_work: string | null
+          terms_and_conditions: string | null
+          timeline_weeks: number | null
+          updated_at: string | null
+          valid_until: string | null
         }
         Insert: {
+          attachments?: Json | null
+          buyer_shortlisted?: boolean | null
+          buyer_viewed_at?: string | null
+          deliverables?: Json | null
           id?: string
           message?: string | null
+          milestones?: Json | null
+          pricing_breakdown?: Json | null
+          proposal_summary?: string | null
+          proposal_title?: string | null
           provider_id: string
           quoted_price?: number | null
           responded_at?: string | null
           response_type: string
           rfq_id: string
+          scope_of_work?: string | null
+          terms_and_conditions?: string | null
+          timeline_weeks?: number | null
+          updated_at?: string | null
+          valid_until?: string | null
         }
         Update: {
+          attachments?: Json | null
+          buyer_shortlisted?: boolean | null
+          buyer_viewed_at?: string | null
+          deliverables?: Json | null
           id?: string
           message?: string | null
+          milestones?: Json | null
+          pricing_breakdown?: Json | null
+          proposal_summary?: string | null
+          proposal_title?: string | null
           provider_id?: string
           quoted_price?: number | null
           responded_at?: string | null
           response_type?: string
           rfq_id?: string
+          scope_of_work?: string | null
+          terms_and_conditions?: string | null
+          timeline_weeks?: number | null
+          updated_at?: string | null
+          valid_until?: string | null
         }
         Relationships: [
           {
@@ -3393,6 +5192,75 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: []
+      }
+      success_checkins: {
+        Row: {
+          action_items: Json | null
+          buyer_feedback: string | null
+          buyer_rating: number | null
+          checkin_type: string
+          completed_at: string | null
+          continuation_confirmed: boolean | null
+          created_at: string | null
+          id: string
+          issues_raised: string | null
+          order_id: string
+          retainer_id: string | null
+          scheduled_for: string
+          scope_changes: string | null
+          seller_feedback: string | null
+          seller_rating: number | null
+        }
+        Insert: {
+          action_items?: Json | null
+          buyer_feedback?: string | null
+          buyer_rating?: number | null
+          checkin_type: string
+          completed_at?: string | null
+          continuation_confirmed?: boolean | null
+          created_at?: string | null
+          id?: string
+          issues_raised?: string | null
+          order_id: string
+          retainer_id?: string | null
+          scheduled_for: string
+          scope_changes?: string | null
+          seller_feedback?: string | null
+          seller_rating?: number | null
+        }
+        Update: {
+          action_items?: Json | null
+          buyer_feedback?: string | null
+          buyer_rating?: number | null
+          checkin_type?: string
+          completed_at?: string | null
+          continuation_confirmed?: boolean | null
+          created_at?: string | null
+          id?: string
+          issues_raised?: string | null
+          order_id?: string
+          retainer_id?: string | null
+          scheduled_for?: string
+          scope_changes?: string | null
+          seller_feedback?: string | null
+          seller_rating?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "success_checkins_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "success_checkins_retainer_id_fkey"
+            columns: ["retainer_id"]
+            isOneToOne: false
+            referencedRelation: "retainers"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       task_assignees: {
         Row: {
@@ -4104,10 +5972,22 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      calculate_otjt_progress: {
+        Args: { enrollment_id: string }
+        Returns: number
+      }
+      calculate_profile_completeness: {
+        Args: { provider_id_input: string }
+        Returns: number
+      }
       calculate_workload_score: { Args: { p_user_id: string }; Returns: number }
       can_user_approve: {
         Args: { p_task_id: string; p_user_id: string }
         Returns: boolean
+      }
+      count_active_founders: {
+        Args: { target_foundry_id: string }
+        Returns: number
       }
       create_notification: {
         Args: {
@@ -4158,12 +6038,24 @@ export type Database = {
         Args: { p_foundry_id: string }
         Returns: number
       }
+      generate_profile_slug: {
+        Args: { full_name: string; user_id: string }
+        Returns: string
+      }
       get_buyer_spend: {
         Args: { p_buyer_id: string; p_end_date: string; p_start_date: string }
         Returns: {
           date: string
           order_count: number
           spend: number
+        }[]
+      }
+      get_escrow_balance_atomic: {
+        Args: { p_order_id: string }
+        Returns: {
+          available_balance: number
+          total_held: number
+          total_released: number
         }[]
       }
       get_foundry_coverage_summary: {
@@ -4219,6 +6111,16 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      get_offboarding_tasks: {
+        Args: { target_user_id: string }
+        Returns: {
+          current_assignee_name: string
+          relationship_type: string
+          task_id: string
+          task_status: string
+          task_title: string
+        }[]
+      }
       get_provider_earnings: {
         Args: {
           p_end_date: string
@@ -4241,6 +6143,18 @@ export type Database = {
           task_title: string
         }[]
       }
+      get_weekly_otjt_target: {
+        Args: { enrollment_id: string }
+        Returns: number
+      }
+      has_foundry_admin_access: {
+        Args: { target_foundry_id: string; user_id: string }
+        Returns: boolean
+      }
+      increment_profile_views: {
+        Args: { provider_id_input: string }
+        Returns: undefined
+      }
       increment_question_views: {
         Args: { p_question_id: string }
         Returns: undefined
@@ -4249,7 +6163,9 @@ export type Database = {
         Args: { search_query: string }
         Returns: undefined
       }
+      is_active_user: { Args: never; Returns: boolean }
       is_admin: { Args: never; Returns: boolean }
+      is_otjt_on_track: { Args: { enrollment_id: string }; Returns: boolean }
       refresh_all_analytics: { Args: never; Returns: undefined }
       refresh_buyer_stats: { Args: never; Returns: undefined }
       refresh_platform_stats: { Args: never; Returns: undefined }
@@ -4385,6 +6301,7 @@ export type Database = {
       member_role: "Executive" | "Apprentice" | "AI_Agent" | "Founder"
       notification_channel: "push" | "email" | "sms" | "in_app"
       notification_priority: "critical" | "high" | "medium" | "low"
+      offboarding_action: "reassign_delete" | "soft_delete" | "anonymize"
       order_status:
         | "pending"
         | "accepted"
@@ -4392,7 +6309,7 @@ export type Database = {
         | "completed"
         | "disputed"
         | "cancelled"
-      order_type: "people_booking" | "product_rfq" | "service"
+      order_type: "people_booking" | "product_rfq" | "service" | "trial"
       presence_status: "online" | "away" | "focus" | "offline"
       provider_type:
         | "Legal"
@@ -4574,6 +6491,7 @@ export const Constants = {
       member_role: ["Executive", "Apprentice", "AI_Agent", "Founder"],
       notification_channel: ["push", "email", "sms", "in_app"],
       notification_priority: ["critical", "high", "medium", "low"],
+      offboarding_action: ["reassign_delete", "soft_delete", "anonymize"],
       order_status: [
         "pending",
         "accepted",
@@ -4582,7 +6500,7 @@ export const Constants = {
         "disputed",
         "cancelled",
       ],
-      order_type: ["people_booking", "product_rfq", "service"],
+      order_type: ["people_booking", "product_rfq", "service", "trial"],
       presence_status: ["online", "away", "focus", "offline"],
       provider_type: [
         "Legal",
