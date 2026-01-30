@@ -34,18 +34,19 @@ export async function addToStack(id: string, type: 'provider' | 'tool' = 'provid
 
     if (error) {
         if (error.code === '23505') { // Unique violation
-            return { error: "Already in stack" }
+            return { error: "Already saved" }
         }
-        return { error: "Failed to add to stack" }
+        return { error: "Failed to save resource" }
     }
 
     revalidatePath("/marketplace")
+    revalidatePath("/saved-resources")
     return { success: true }
 }
 
 export async function removeFromStack(id: string, type: 'provider' | 'tool' = 'provider') {
     if (type === 'tool') {
-        return { error: "AI Agents cannot be removed from stack yet" }
+        return { error: "AI Agents cannot be removed yet" }
     }
 
     const providerId = id
@@ -63,10 +64,83 @@ export async function removeFromStack(id: string, type: 'provider' | 'tool' = 'p
         .eq("foundry_id", foundry_id)
         .eq("provider_id", providerId)
 
-    if (error) return { error: "Failed to remove from stack" }
+    if (error) return { error: "Failed to remove saved resource" }
 
     revalidatePath("/marketplace")
+    revalidatePath("/saved-resources")
     return { success: true }
+}
+
+export async function getSavedResources() {
+    const supabase = await createClient()
+
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return { error: "Not authenticated", data: [] }
+
+    const foundry_id = await getFoundryIdCached()
+    if (!foundry_id) return { error: "User not in a foundry", data: [] }
+
+    // First get the stack items
+    const { data: stackData, error: stackError } = await supabase
+        .from("foundry_stack")
+        .select("id, provider_id, status, created_at")
+        .eq("foundry_id", foundry_id)
+        .order("created_at", { ascending: false })
+
+    if (stackError) {
+        console.error("Error fetching stack:", stackError)
+        return { error: "Failed to fetch saved resources", data: [] }
+    }
+
+    if (!stackData || stackData.length === 0) {
+        return { data: [], error: null }
+    }
+
+    // Then get the marketplace listings for those IDs
+    const providerIds = stackData.map(s => s.provider_id)
+    const { data: listings, error: listingsError } = await supabase
+        .from("marketplace_listings")
+        .select(`
+            id,
+            title,
+            description,
+            category,
+            subcategory,
+            attributes,
+            image_url
+        `)
+        .in("id", providerIds)
+
+    if (listingsError) {
+        console.error("Error fetching listings:", listingsError)
+        return { error: "Failed to fetch saved resources", data: [] }
+    }
+
+    // Combine the data
+    const data = stackData.map(stack => {
+        const listing = listings?.find(l => l.id === stack.provider_id)
+        return {
+            ...stack,
+            marketplace_listings: listing ? {
+                id: listing.id,
+                name: listing.title,
+                headline: listing.description || '',
+                category: listing.category,
+                subcategory: listing.subcategory || '',
+                tags: (listing.attributes as any)?.tags || [],
+                hourly_rate_min: (listing.attributes as any)?.hourly_rate_min || null,
+                hourly_rate_max: (listing.attributes as any)?.hourly_rate_max || null,
+                delivery_time_days: (listing.attributes as any)?.delivery_time_days || null,
+                certification_level: (listing.attributes as any)?.certification_level || null,
+                rating_average: (listing.attributes as any)?.rating_average || null,
+                total_reviews: (listing.attributes as any)?.total_reviews || null,
+                total_bookings: (listing.attributes as any)?.total_bookings || null,
+                response_time_hours: (listing.attributes as any)?.response_time_hours || null,
+            } : null
+        }
+    })
+
+    return { data, error: null }
 }
 
 export async function submitRFQ(formData: {

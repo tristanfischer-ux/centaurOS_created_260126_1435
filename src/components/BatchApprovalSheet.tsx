@@ -158,8 +158,8 @@ export function BatchApprovalSheet({ onApprovalComplete, trigger }: BatchApprova
                         </Button>
                     )}
                 </DialogTrigger>
-                <DialogContent className="sm:max-w-[600px] max-h-[85vh] flex flex-col p-0">
-                    <DialogHeader className="px-6 pt-6 pb-4">
+                <DialogContent className="sm:max-w-[600px] max-h-[85vh] flex flex-col p-0 overflow-hidden">
+                    <DialogHeader className="px-6 pt-6 pb-4 flex-shrink-0">
                         <DialogTitle className="flex items-center gap-2 text-foreground">
                             <AlertTriangle className="h-5 w-5 text-international-orange" />
                             Pending Approvals
@@ -171,7 +171,7 @@ export function BatchApprovalSheet({ onApprovalComplete, trigger }: BatchApprova
 
                     {/* Batch Actions Bar */}
                     {tasks.length > 0 && (
-                        <div className="flex items-center justify-between px-6 py-3 border-y border-border bg-muted/30">
+                        <div className="flex items-center justify-between px-6 py-3 border-y border-border bg-muted/30 flex-shrink-0">
                             <div className="flex items-center gap-2">
                                 <Checkbox
                                     id="select-all"

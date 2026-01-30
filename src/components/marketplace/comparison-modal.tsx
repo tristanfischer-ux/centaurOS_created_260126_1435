@@ -137,8 +137,8 @@ export function ComparisonModal({ open, onOpenChange, items }: ComparisonModalPr
 
     return (
         <Dialog open={open} onOpenChange={handleOpenChange}>
-            <DialogContent className="max-w-4xl max-h-[80vh] flex flex-col p-0 gap-0">
-                <DialogHeader className="p-6 pb-4 border-b border-border">
+            <DialogContent className="max-w-4xl max-h-[80vh] flex flex-col p-0 gap-0 overflow-hidden">
+                <DialogHeader className="p-6 pb-4 border-b border-border flex-shrink-0">
                     <div className="flex items-center justify-between">
                         <DialogTitle className="text-xl font-semibold">Compare Listings</DialogTitle>
                         <Button
@@ -163,7 +163,7 @@ export function ComparisonModal({ open, onOpenChange, items }: ComparisonModalPr
                     </div>
                 </DialogHeader>
 
-                <ScrollArea className="flex-1">
+                <ScrollArea className="flex-1 overflow-auto">
                     <div className="p-6 pt-4">
                         {/* AI Analysis Results */}
                         {aiAnalysis && (

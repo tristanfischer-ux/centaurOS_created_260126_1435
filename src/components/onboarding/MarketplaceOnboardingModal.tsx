@@ -37,13 +37,13 @@ const ONBOARDING_STEPS: OnboardingStep[] = [
     {
         id: 'recommendations',
         title: 'Recommended for You',
-        description: 'Based on your role and foundry, here are some listings that might help you get started.',
+        description: 'Based on your role, here are some listings that might help you get started.',
         icon: Sparkles,
     },
     {
         id: 'action',
         title: 'Take Your First Action',
-        description: 'Add a listing to your stack, create an RFQ, or use AI search to find exactly what you need.',
+        description: 'Save a listing for later, create an RFQ, or use AI search to find exactly what you need.',
         icon: Rocket,
     },
 ]
@@ -135,7 +135,7 @@ export function MarketplaceOnboardingModal({
     const getRoleSpecificCopy = () => {
         switch (userRole) {
             case 'Executive':
-                return 'As an Executive, you can approve purchases, book talent, and build your stack. Find the resources to execute your vision.'
+                return 'As an Executive, you can approve purchases, book talent, and find the resources to execute your vision.'
             case 'Founder':
                 return 'As a Founder, you have the power to rapidly scale your team with the best people, products, and AI agents in the world.'
             case 'Apprentice':
@@ -153,13 +153,41 @@ export function MarketplaceOnboardingModal({
                         <Badge variant="secondary" className="text-xs">
                             Step {currentStep + 1} of {ONBOARDING_STEPS.length}
                         </Badge>
-                        {!isLastStep && (
-                            <Button variant="ghost" size="sm" onClick={handleSkip} className="text-xs">
-                                Skip tour
-                            </Button>
-                        )}
+                        <Button variant="ghost" size="sm" onClick={handleSkip} className="text-xs">
+                            Skip tour
+                        </Button>
                     </div>
                     <Progress value={progress} className="h-1 mb-4" />
+                    
+                    {/* Navigation buttons at top */}
+                    <div className="flex items-center justify-between gap-2 mb-4">
+                        <Button
+                            variant="secondary"
+                            onClick={handlePrev}
+                            disabled={currentStep === 0}
+                            size="sm"
+                        >
+                            <ArrowLeft className="h-4 w-4 mr-1" />
+                            Back
+                        </Button>
+                        <Button 
+                            onClick={handleNext} 
+                            size="sm"
+                            disabled={isCompleting}
+                        >
+                            {isLastStep ? (
+                                <>
+                                    Start Building
+                                    <Rocket className="h-4 w-4 ml-1" />
+                                </>
+                            ) : (
+                                <>
+                                    Next
+                                    <ArrowRight className="h-4 w-4 ml-1" />
+                                </>
+                            )}
+                        </Button>
+                    </div>
                     <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-4">
                         <StepIcon className="h-6 w-6 text-primary" />
                     </div>
@@ -175,35 +203,6 @@ export function MarketplaceOnboardingModal({
                     {currentStep === 1 && <RecommendationsContent recommendations={recommendations} />}
                     {currentStep === 2 && <ActionContent />}
                 </div>
-
-                <DialogFooter className="flex-row justify-between sm:justify-between gap-2 mt-4">
-                    <Button
-                        variant="secondary"
-                        onClick={handlePrev}
-                        disabled={currentStep === 0}
-                        className="flex-1 sm:flex-initial"
-                    >
-                        <ArrowLeft className="h-4 w-4 mr-1" />
-                        Previous
-                    </Button>
-                    <Button 
-                        onClick={handleNext} 
-                        className="flex-1 sm:flex-initial"
-                        disabled={isCompleting}
-                    >
-                        {isLastStep ? (
-                            <>
-                                Start Building
-                                <Rocket className="h-4 w-4 ml-1" />
-                            </>
-                        ) : (
-                            <>
-                                Next
-                                <ArrowRight className="h-4 w-4 ml-1" />
-                            </>
-                        )}
-                    </Button>
-                </DialogFooter>
             </DialogContent>
         </Dialog>
     )
@@ -295,7 +294,7 @@ function RecommendationsContent({ recommendations }: { recommendations: Marketpl
     return (
         <div className="space-y-3">
             <p className="text-sm text-muted-foreground mb-4">
-                These listings match your foundry's needs. Click "More" to see details or "Compare" to add them to comparison.
+                These listings match your needs. Click "More" to see details or "Compare" to add them to comparison.
             </p>
             {recommendations.slice(0, 3).map(listing => (
                 <MarketCard
@@ -326,9 +325,9 @@ function ActionContent() {
                             <ShoppingCart className="h-5 w-5 text-primary" />
                         </div>
                         <div>
-                            <h4 className="font-semibold text-sm mb-1">Add to Stack</h4>
+                            <h4 className="font-semibold text-sm mb-1">Save Resources</h4>
                             <p className="text-xs text-muted-foreground">
-                                Add providers and tools to your foundry's stack for quick access. Your team will see them in their workspace.
+                                Save providers and tools for quick access later. View them anytime in "Saved Resources".
                             </p>
                         </div>
                     </div>
@@ -369,7 +368,7 @@ function ActionContent() {
                     <div>
                         <p className="text-sm font-medium mb-1">You're All Set!</p>
                         <p className="text-xs text-muted-foreground">
-                            Click "Start Building" to explore the full marketplace and start adding resources to your foundry.
+                            Click "Start Building" to explore the full marketplace and start adding resources to your team.
                         </p>
                     </div>
                 </div>

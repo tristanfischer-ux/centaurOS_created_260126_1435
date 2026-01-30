@@ -3,7 +3,8 @@
 import { useState, useMemo, useEffect } from "react"
 import { Database } from "@/types/database.types"
 import { Badge } from "@/components/ui/badge"
-import { Calendar, Clock, ChevronRight, ChevronDown, Target, Check, Plus, Calendar as CalendarIcon } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { Calendar, Clock, ChevronRight, ChevronDown, Target, Check, Plus, Calendar as CalendarIcon, Maximize2 } from "lucide-react"
 import Link from "next/link"
 import {
     Popover,
@@ -19,6 +20,7 @@ import {
     CommandList,
 } from "@/components/ui/command"
 import { Calendar as CalendarComponent } from "@/components/ui/calendar"
+import { FullTaskView } from "@/components/tasks/full-task-view"
 import { updateTaskAssignees, updateTaskDates } from "@/actions/tasks"
 import { toast } from "sonner"
 import { format } from "date-fns"
@@ -35,7 +37,7 @@ type JoinedTask = Database["public"]["Tables"]["tasks"]["Row"] & {
 
 interface TimelineListViewProps {
     tasks: JoinedTask[]
-    members: { id: string, full_name: string, role: string }[]
+    members: { id: string, full_name: string, role: string, email?: string }[]
     currentUserId: string
 }
 
@@ -200,6 +202,9 @@ function MiniTimelineBar({ task, windowStart, windowEnd, stableNow }: {
 export function TimelineListView({ tasks, members, currentUserId }: TimelineListViewProps) {
     const [expandedDate, setExpandedDate] = useState<string | null>(null)
     const [collapsedTasks, setCollapsedTasks] = useState<Set<string>>(new Set())
+    const [selectedTask, setSelectedTask] = useState<JoinedTask | null>(null)
+    const [taskModalOpen, setTaskModalOpen] = useState(false)
+    
     // Use stable timestamp to avoid hydration mismatch - starts as noon today for SSR consistency
     const [stableNow, setStableNow] = useState<number>(() => {
         const d = new Date()
@@ -231,6 +236,13 @@ export function TimelineListView({ tasks, members, currentUserId }: TimelineList
             }
             return newSet
         })
+    }
+    
+    // Open task modal
+    const openTaskModal = (task: JoinedTask, e: React.MouseEvent) => {
+        e.stopPropagation()
+        setSelectedTask(task)
+        setTaskModalOpen(true)
     }
 
     const groupedTasks = useMemo(() => groupTasksByDueDate(tasks), [tasks])
@@ -552,14 +564,16 @@ export function TimelineListView({ tasks, members, currentUserId }: TimelineList
                                                         />
                                                     </div>
 
-                                                    {/* View Details Link */}
-                                                    <Link
-                                                        href={`/tasks?highlight=${task.id}`}
-                                                        className="ml-11 mt-3 inline-flex items-center text-xs font-semibold text-amber-600 hover:text-amber-700 bg-amber-50 px-2 py-1 rounded-md"
-                                                        onClick={(e) => e.stopPropagation()}
+                                                    {/* View Details Button */}
+                                                    <Button
+                                                        onClick={(e) => openTaskModal(task, e)}
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        className="ml-11 mt-3 text-xs font-semibold text-international-orange hover:text-international-orange-hover hover:bg-orange-50 gap-1"
                                                     >
-                                                        View Full Details <ChevronRight className="h-3 w-3 ml-1" />
-                                                    </Link>
+                                                        <Maximize2 className="h-3 w-3" />
+                                                        Open Full Task
+                                                    </Button>
                                                 </div>
                                             )}
                                         </div>
@@ -570,6 +584,41 @@ export function TimelineListView({ tasks, members, currentUserId }: TimelineList
                     </div>
                 )
             })}
+            
+            {/* Task Modal */}
+            {selectedTask && (
+                <FullTaskView
+                    open={taskModalOpen}
+                    onOpenChange={setTaskModalOpen}
+                    task={{
+                        id: selectedTask.id,
+                        title: selectedTask.title || '',
+                        description: selectedTask.description,
+                        status: selectedTask.status || 'Pending',
+                        risk_level: selectedTask.risk_level,
+                        start_date: selectedTask.start_date,
+                        end_date: selectedTask.end_date,
+                        task_number: selectedTask.task_number,
+                        assignee: selectedTask.profiles ? {
+                            id: selectedTask.profiles.id,
+                            full_name: selectedTask.profiles.full_name,
+                            role: selectedTask.profiles.role || 'Unknown',
+                            email: selectedTask.profiles.email || '',
+                            avatar_url: selectedTask.profiles.avatar_url
+                        } : null,
+                        assignees: selectedTask.assignees,
+                        objective: selectedTask.objectives ? {
+                            id: selectedTask.objectives.id,
+                            title: selectedTask.objectives.title || 'Untitled'
+                        } : null
+                    }}
+                    members={members.map(m => ({
+                        ...m,
+                        email: m.email || ''
+                    }))}
+                    currentUserId={currentUserId}
+                />
+            )}
         </div>
     )
 }

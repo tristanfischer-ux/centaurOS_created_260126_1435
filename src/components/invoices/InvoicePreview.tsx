@@ -187,12 +187,14 @@ export function InvoicePreview({
   if (fullscreen) {
     return (
       <Dialog open={fullscreen} onOpenChange={setFullscreen}>
-        <DialogContent className="max-w-4xl h-[95vh]">
-          <DialogHeader className="sr-only">
+        <DialogContent className="max-w-4xl h-[95vh] flex flex-col overflow-hidden">
+          <DialogHeader className="sr-only flex-shrink-0">
             <DialogTitle>Invoice Preview</DialogTitle>
             <DialogDescription>Full screen invoice preview</DialogDescription>
           </DialogHeader>
-          <PreviewContent />
+          <div className="flex-1 overflow-auto">
+            <PreviewContent />
+          </div>
         </DialogContent>
       </Dialog>
     )
@@ -246,14 +248,14 @@ export function InvoicePreviewModal({
           </Button>
         )}
       </DialogTrigger>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden">
-        <DialogHeader>
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+        <DialogHeader className="flex-shrink-0">
           <DialogTitle>Invoice Preview</DialogTitle>
           <DialogDescription>
             Preview the invoice before it&apos;s generated
           </DialogDescription>
         </DialogHeader>
-        <div className="overflow-auto">
+        <div className="overflow-auto flex-1">
           <InvoicePreview
             orderId={orderId}
             documentType={documentType}

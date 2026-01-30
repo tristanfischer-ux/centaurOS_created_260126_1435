@@ -36,11 +36,12 @@ export default async function TimelinePage() {
         return <div className="text-red-500">Error loading timeline data</div>
     }
 
-    // Format members for CreateTaskDialog
+    // Format members for CreateTaskDialog and TimelineListView
     const members = (profiles || []).map(p => ({
         id: p.id,
         full_name: p.full_name || 'Unnamed',
-        role: p.role || 'Apprentice'
+        role: p.role || 'Apprentice',
+        email: p.email || ''
     }))
 
     // Format objectives for CreateTaskDialog

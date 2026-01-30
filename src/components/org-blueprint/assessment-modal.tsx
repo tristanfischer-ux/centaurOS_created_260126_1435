@@ -201,7 +201,7 @@ export function AssessmentModal({ functions, onComplete, children }: AssessmentM
         <Dialog open={isOpen} onOpenChange={handleOpenChange}>
             <DialogTrigger asChild>{children}</DialogTrigger>
             <DialogContent size="lg" className="max-h-[90vh] overflow-hidden flex flex-col">
-                <DialogHeader>
+                <DialogHeader className="flex-shrink-0">
                     <div className="flex items-center justify-between">
                         <div>
                             <DialogTitle className="flex items-center gap-2">
@@ -219,7 +219,7 @@ export function AssessmentModal({ functions, onComplete, children }: AssessmentM
                 </DialogHeader>
 
                 {/* Progress bar */}
-                <div className="space-y-2">
+                <div className="space-y-2 flex-shrink-0">
                     <Progress value={progress} className="h-2" />
                     <div className="flex justify-between">
                         {categoriesWithFunctions.map((cat, index) => (
@@ -242,7 +242,7 @@ export function AssessmentModal({ functions, onComplete, children }: AssessmentM
                 </div>
 
                 {/* Category Header */}
-                <div className="flex items-center gap-3 py-3 border-b">
+                <div className="flex items-center gap-3 py-3 border-b flex-shrink-0">
                     <div
                         className="w-4 h-4 rounded-full"
                         style={{ backgroundColor: CATEGORY_COLORS[currentCategory] }}
@@ -349,7 +349,7 @@ export function AssessmentModal({ functions, onComplete, children }: AssessmentM
                     </AnimatePresence>
                 </div>
 
-                <DialogFooter className="border-t pt-4">
+                <DialogFooter className="border-t pt-4 flex-shrink-0">
                     <div className="flex items-center justify-between w-full">
                         <Button
                             variant="secondary"

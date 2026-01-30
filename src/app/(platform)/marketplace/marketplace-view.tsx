@@ -593,7 +593,7 @@ export function MarketplaceView({
                         <div className="p-4">
                             <div className="flex items-center gap-2 mb-3">
                                 <Sparkles className="h-5 w-5 text-amber-600" />
-                                <h3 className="font-semibold text-amber-900">Recommended for Your Foundry</h3>
+                                <h3 className="font-semibold text-amber-900">Recommended for You</h3>
                             </div>
                             <div className="flex flex-wrap gap-2">
                                 {recommendations.map((rec) => (

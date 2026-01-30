@@ -64,6 +64,28 @@ Updated task lists in the following sections to use the interactive component:
 - More information at a glance
 - Better space utilization
 
+### 4. Enhanced Timeline Page (`src/components/timeline/TimelineListView.tsx`)
+
+**Before:**
+- Tasks expanded inline showing mini timeline bar
+- Link to navigate to tasks page
+- Limited interaction
+
+**After:**
+- **"Open Full Task" button** - Click to open complete task modal
+- All inline features still work (expand/collapse, date pickers, assignee management)
+- Direct access to full task capabilities without leaving timeline view
+- Modal shows complete task details, discussion, attachments, and actions
+
+**Desktop Gantt View:**
+- Already includes full task interaction via TaskCard component
+- Click any task in the Gantt chart to see full details in sidebar
+- Sidebar has "Expand" button to open full modal
+
+**Mobile List View:**
+- Now includes "Open Full Task" button on each task
+- Consistent experience across devices
+
 ## User Experience Improvements
 
 ### Before
@@ -80,6 +102,26 @@ Updated task lists in the following sections to use the interactive component:
 - ✅ **Overdue indicators** - Red highlights for past-due tasks
 - ✅ **Team visibility** - Avatar stacks show multiple assignees
 - ✅ **Quick actions** - Full task modal provides complete interaction capabilities
+
+## Where Tasks Are Now Interactive
+
+Tasks can now be clicked to open the full modal from:
+
+✅ **Team Profile Pages** (`/team/[id]`)
+- Current Tasks section
+- Completed Tasks section
+
+✅ **Today Page** (`/today`)
+- Decisions Pending
+- Overdue Items  
+- Mentions section
+
+✅ **Timeline Page** (`/timeline`)
+- Mobile List View - "Open Full Task" button
+- Desktop Gantt View - Click task → sidebar → "Expand" button
+
+✅ **Tasks Page** (`/tasks`)
+- Already had full interaction via TaskCard component
 
 ## Task Modal Features
 When clicking a task, users can:
