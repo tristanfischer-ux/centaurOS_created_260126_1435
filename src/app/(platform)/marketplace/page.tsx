@@ -2,7 +2,7 @@ import { getMarketplaceListings } from '@/actions/marketplace'
 import { createClient } from '@/lib/supabase/server'
 import { getFoundryIdCached } from '@/lib/supabase/foundry-context'
 import { MarketplaceView } from './marketplace-view'
-import { CreateRFQDialog } from './create-rfq-dialog'
+import { CreateRFQSheet } from './create-rfq-sheet'
 import { getMarketplaceOnboardingStatus } from '@/actions/onboarding'
 
 // Force dynamic since we're fetching data that might change
@@ -91,7 +91,7 @@ export default async function MarketplacePage() {
                     <p className="text-muted-foreground text-sm font-medium pl-4">Discover people, products, services, and AI</p>
                 </div>
                 <div className="flex gap-2 flex-wrap shrink-0">
-                    <CreateRFQDialog />
+                    <CreateRFQSheet />
                 </div>
             </div>
 

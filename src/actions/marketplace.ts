@@ -143,6 +143,11 @@ export async function getSavedResources() {
     return { data, error: null }
 }
 
+/**
+ * @deprecated This function is deprecated. Use createNewRFQ from @/actions/rfq instead.
+ * This function stores RFQs in the manufacturing_rfqs table which is being deprecated
+ * in favor of the unified rfqs table with full race mechanics.
+ */
 export async function submitRFQ(formData: {
     title: string;
     specifications: string;

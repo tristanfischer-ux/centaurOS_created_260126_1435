@@ -1,5 +1,11 @@
 "use client"
 
+/**
+ * @deprecated This component is deprecated. Use CreateRFQSheet instead.
+ * The new component uses the unified RFQCreator with side-by-side preview.
+ * This file is kept temporarily for reference and will be removed in a future update.
+ */
+
 import { useState, useRef, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import {
