@@ -1,0 +1,149 @@
+# Git Workflow: No Branches
+
+CentaurOS uses a **trunk-based development** workflow. Work directly on `main` with no feature branches.
+
+## Core Principle
+
+**All work happens on `main`**. No branches. No worktrees. Simple.
+
+## Why No Branches?
+
+1. **Continuous Integration** - Changes integrate immediately
+2. **No Branch Management** - No orphaned branches or merge conflicts
+3. **Always Deployable** - Main is always production-ready
+4. **Faster Iteration** - No waiting for PR reviews or merges
+5. **Cleaner History** - Linear git history
+
+## Workflow
+
+### Making Changes
+
+```bash
+# Always work on main
+git checkout main
+
+# Make your changes
+# ... edit files ...
+
+# Commit frequently with descriptive messages
+git add .
+git commit -m "feat: add feature X"
+
+# Push to trigger deployment
+git push origin main
+```
+
+### Before Committing
+
+Run these checks:
+```bash
+# Lint
+npm run lint
+
+# Type check
+npx tsc --noEmit
+
+# Build locally
+npm run build
+```
+
+### Commit Message Format
+
+Use conventional commit format:
+```
+feat: add new feature
+fix: resolve bug in X
+docs: update README
+style: format code
+refactor: restructure component
+test: add tests for Y
+chore: update dependencies
+```
+
+### If Something Breaks
+
+Use git revert instead of branches:
+```bash
+# Revert a bad commit
+git revert HEAD
+
+# Or revert specific commit
+git revert abc123
+
+# Push revert
+git push origin main
+```
+
+### For Experimental Work
+
+Use feature flags instead of branches:
+```typescript
+// In code
+if (process.env.NEXT_PUBLIC_ENABLE_EXPERIMENT === 'true') {
+  // Experimental feature
+}
+
+// In .env.local (not committed)
+NEXT_PUBLIC_ENABLE_EXPERIMENT=true
+```
+
+## Cursor Settings
+
+The following settings are configured to prevent automatic branching:
+
+```json
+{
+  "composer.autoBranch": false,
+  "composer.worktrees": false,
+  "git.enableSmartCommit": true,
+  "git.postCommitCommand": "push",
+  "git.confirmSync": false
+}
+```
+
+## What This Means for AI
+
+When AI works on code:
+- ✅ Work directly on `main`
+- ✅ Commit changes with clear messages
+- ✅ Push immediately after successful build
+- ❌ Don't create branches
+- ❌ Don't create worktrees
+- ❌ Don't wait for manual merge
+
+## Emergency: Rolling Back
+
+If a deployment breaks:
+```bash
+# See recent commits
+git log --oneline -10
+
+# Revert to working commit
+git revert HEAD  # or git revert <commit-hash>
+git push origin main
+
+# This triggers automatic redeployment
+```
+
+## Benefits
+
+- **Speed**: No PR overhead, changes go live fast
+- **Simplicity**: One branch to track
+- **Quality**: Forced to keep main stable
+- **Clarity**: Linear git history
+- **No Cleanup**: No stale branches to delete
+
+## Trade-offs
+
+- **Requires Discipline**: Must ensure code is tested before pushing
+- **No PR Reviews**: Code review happens through pair programming or post-commit
+- **Shared Responsibility**: Everyone owns main's stability
+
+## When to Use a Branch
+
+**Never.** If you need isolation:
+1. Use feature flags
+2. Use separate staging environment
+3. Use local .env overrides
+
+But don't create git branches.
