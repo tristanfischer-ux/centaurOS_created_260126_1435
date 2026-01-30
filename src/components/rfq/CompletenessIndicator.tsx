@@ -42,15 +42,15 @@ export function CompletenessIndicator({ checks, className }: CompletenessIndicat
 
   // Determine color based on score
   const getScoreColor = () => {
-    if (totalScore >= 80) return 'text-emerald-600'
-    if (totalScore >= 50) return 'text-amber-600'
-    return 'text-red-600'
+    if (totalScore >= 80) return 'text-status-success'
+    if (totalScore >= 50) return 'text-status-warning'
+    return 'text-status-error'
   }
 
   const getProgressColor = () => {
-    if (totalScore >= 80) return '[&>div]:bg-emerald-500'
-    if (totalScore >= 50) return '[&>div]:bg-amber-500'
-    return '[&>div]:bg-red-500'
+    if (totalScore >= 80) return '[&>div]:bg-status-success'
+    if (totalScore >= 50) return '[&>div]:bg-status-warning'
+    return '[&>div]:bg-status-error'
   }
 
   return (
@@ -72,9 +72,9 @@ export function CompletenessIndicator({ checks, className }: CompletenessIndicat
         {/* Show missing required items first */}
         {incompleteRequired.map((check) => (
           <div key={check.key} className="flex items-start gap-2 text-sm">
-            <AlertCircle className="w-4 h-4 text-red-500 mt-0.5 shrink-0" />
+            <AlertCircle className="w-4 h-4 text-status-error mt-0.5 shrink-0" />
             <div>
-              <span className="text-red-600 font-medium">{check.label}</span>
+              <span className="text-status-error font-medium">{check.label}</span>
               {check.hint && (
                 <span className="text-muted-foreground ml-1">— {check.hint}</span>
               )}
@@ -85,9 +85,9 @@ export function CompletenessIndicator({ checks, className }: CompletenessIndicat
         {/* Show missing optional items */}
         {incompleteOptional.slice(0, 3).map((check) => (
           <div key={check.key} className="flex items-start gap-2 text-sm">
-            <AlertCircle className="w-4 h-4 text-amber-500 mt-0.5 shrink-0" />
+            <AlertCircle className="w-4 h-4 text-status-warning mt-0.5 shrink-0" />
             <div>
-              <span className="text-amber-600">{check.label}</span>
+              <span className="text-status-warning">{check.label}</span>
               {check.hint && (
                 <span className="text-muted-foreground ml-1">— {check.hint}</span>
               )}
@@ -98,7 +98,7 @@ export function CompletenessIndicator({ checks, className }: CompletenessIndicat
         {/* Show completed items (collapsed if many) */}
         {completedChecks.slice(0, 3).map((check) => (
           <div key={check.key} className="flex items-center gap-2 text-sm">
-            <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+            <CheckCircle2 className="w-4 h-4 text-status-success shrink-0" />
             <span className="text-muted-foreground">{check.label}</span>
           </div>
         ))}

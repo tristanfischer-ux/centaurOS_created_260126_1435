@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { StatusBadge } from '@/components/ui/status-badge'
 import { Button } from '@/components/ui/button'
 import {
   Clock,
@@ -25,13 +26,13 @@ interface RFQCardProps {
   className?: string
 }
 
-const statusConfig: Record<RFQStatus, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline'; color: string }> = {
-  'Open': { label: 'Open', variant: 'secondary', color: 'bg-blue-50 text-blue-700 border' },
-  'Bidding': { label: 'Bidding', variant: 'default', color: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
-  'priority_hold': { label: 'Priority Hold', variant: 'secondary', color: 'bg-amber-50 text-amber-700 border-amber-200' },
-  'Awarded': { label: 'Awarded', variant: 'default', color: 'bg-violet-50 text-violet-700 border-violet-200' },
-  'Closed': { label: 'Closed', variant: 'secondary', color: 'bg-gray-50 text-gray-700 border-gray-200' },
-  'cancelled': { label: 'Cancelled', variant: 'destructive', color: 'bg-red-50 text-red-700 border-red-200' },
+const statusConfig: Record<RFQStatus, { label: string; status: 'info' | 'success' | 'warning' | 'error' | 'default' }> = {
+  'Open': { label: 'Open', status: 'info' },
+  'Bidding': { label: 'Bidding', status: 'success' },
+  'priority_hold': { label: 'Priority Hold', status: 'warning' },
+  'Awarded': { label: 'Awarded', status: 'success' },
+  'Closed': { label: 'Closed', status: 'default' },
+  'cancelled': { label: 'Cancelled', status: 'error' },
 }
 
 const typeConfig: Record<RFQType, { label: string; icon: typeof Zap }> = {
@@ -77,18 +78,18 @@ export const RFQCard = memo(function RFQCard({
               {rfq.title}
             </Link>
             <div className="flex items-center gap-2 flex-wrap">
-              <Badge variant="secondary" className={cn('text-xs', status.color)}>
+              <StatusBadge status={status.status} size="sm">
                 {status.label}
-              </Badge>
+              </StatusBadge>
               <Badge variant="secondary" className="text-xs">
                 <TypeIcon className="w-3 h-3 mr-1" />
                 {type.label}
               </Badge>
               {rfq.urgency === 'urgent' && (
-                <Badge variant="secondary" className="text-xs bg-amber-50 text-amber-700 border-amber-200">
+                <StatusBadge status="warning" size="sm">
                   <Zap className="w-3 h-3 mr-1" />
                   Urgent
-                </Badge>
+                </StatusBadge>
               )}
             </div>
           </div>
@@ -148,7 +149,7 @@ export const RFQCard = memo(function RFQCard({
               <ChevronRight className="w-4 h-4 ml-2" />
             </Button>
           ) : rfq.status === 'Awarded' ? (
-            <div className="flex items-center gap-2 text-violet-600">
+            <div className="flex items-center gap-2 text-status-success">
               <Award className="w-4 h-4" />
               <span className="text-sm font-medium">Awarded</span>
             </div>
@@ -196,9 +197,9 @@ export const RFQCardMinimal = memo(function RFQCardMinimal({
           <span>{rfq.response_count} responses</span>
         </div>
       </div>
-      <Badge variant="secondary" className={cn('text-xs ml-2', status.color)}>
+      <StatusBadge status={status.status} size="sm" className="ml-2">
         {status.label}
-      </Badge>
+      </StatusBadge>
     </Link>
   )
 })

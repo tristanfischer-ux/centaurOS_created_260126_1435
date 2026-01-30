@@ -1168,7 +1168,6 @@ export function MarketplaceView({
                                 const attrs = item.attributes || {}
                                 const primaryMetric = attrs.rate || attrs.cost || attrs.price || null
                                 return (
-<<<<<<< HEAD
                                     <Card key={item.id} className="group relative p-4 border-slate-200 hover:border-orange-300 hover:shadow-md transition-all">
                                         {/* Compare button - hover */}
                                         <button
@@ -1184,9 +1183,6 @@ export function MarketplaceView({
                                             <Users className="w-4 h-4" />
                                         </button>
                                         
-=======
-                                    <Card key={item.id} className="p-4 border hover:border-orange-200 hover:shadow-sm transition-all">
->>>>>>> feat/design-consistency
                                         <div className="flex items-start gap-4">
                                             {/* Main content */}
                                             <div className="flex-1 min-w-0">

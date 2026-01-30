@@ -1,6 +1,7 @@
 'use client'
 
 import { Badge } from '@/components/ui/badge'
+import { StatusBadge } from '@/components/ui/status-badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import {
@@ -147,10 +148,10 @@ export function SupplierPreviewPanel({
                 </Badge>
               )}
               {formData.urgency === 'urgent' && (
-                <Badge className="text-xs bg-amber-100 text-amber-700 hover:bg-amber-100">
+                <StatusBadge status="warning" size="sm">
                   <Zap className="w-3 h-3 mr-1" />
                   Urgent
-                </Badge>
+                </StatusBadge>
               )}
             </div>
           </CardHeader>
@@ -237,7 +238,8 @@ export function SupplierPreviewPanel({
               <div className="flex gap-2">
                 <Button
                   size="sm"
-                  className="flex-1 bg-emerald-600 hover:bg-emerald-600 cursor-default"
+                  variant="success"
+                  className="flex-1 cursor-default"
                   disabled
                 >
                   <CheckCircle2 className="w-3.5 h-3.5 mr-1.5" />

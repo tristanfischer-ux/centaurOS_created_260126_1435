@@ -2,6 +2,7 @@ import { Suspense } from 'react'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
+import { typography } from '@/lib/design-system'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Card, CardContent } from '@/components/ui/card'
@@ -39,15 +40,17 @@ export default async function RFQPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-slate-100">
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-3 mb-1">
-            <div className="h-8 w-1 bg-orange-600 rounded-full shadow-[0_0_8px_rgba(234,88,12,0.6)]" />
-            <h1 className="text-2xl sm:text-3xl font-display font-semibold text-foreground tracking-tight">RFQ Race</h1>
+          <div className={typography.pageHeader}>
+            <div className={typography.pageHeaderAccent} />
+            <h1 className={typography.h1}>
+              RFQ Race
+            </h1>
           </div>
-          <p className="text-muted-foreground mt-1 text-sm font-medium pl-4">
+          <p className={typography.pageSubtitle}>
             Create requests and compete for opportunities
           </p>
         </div>
-        <Button asChild className="bg-slate-900 hover:bg-slate-800 text-white font-medium shadow-md">
+        <Button asChild variant="default">
           <Link href="/rfq/create">
             <Plus className="w-4 h-4 mr-2" />
             Create RFQ
@@ -65,7 +68,7 @@ export default async function RFQPage() {
                   <p className="text-sm text-muted-foreground">Open</p>
                   <p className="text-2xl font-bold">{counts.data.open}</p>
                 </div>
-                <FileText className="w-8 h-8 text-blue-600" />
+                <FileText className="w-8 h-8 text-status-info" />
               </div>
             </CardContent>
           </Card>
@@ -77,7 +80,7 @@ export default async function RFQPage() {
                   <p className="text-sm text-muted-foreground">Bidding</p>
                   <p className="text-2xl font-bold">{counts.data.bidding}</p>
                 </div>
-                <Send className="w-8 h-8 text-emerald-600" />
+                <Send className="w-8 h-8 text-status-success" />
               </div>
             </CardContent>
           </Card>
@@ -89,7 +92,7 @@ export default async function RFQPage() {
                   <p className="text-sm text-muted-foreground">Awarded</p>
                   <p className="text-2xl font-bold">{counts.data.awarded}</p>
                 </div>
-                <Award className="w-8 h-8 text-violet-600" />
+                <Award className="w-8 h-8 text-international-orange" />
               </div>
             </CardContent>
           </Card>

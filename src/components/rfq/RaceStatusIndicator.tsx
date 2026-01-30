@@ -2,7 +2,7 @@
 
 import { useState, useEffect, memo } from 'react'
 import { cn } from '@/lib/utils'
-import { Badge } from '@/components/ui/badge'
+import { StatusBadge as StatusBadgeComponent } from '@/components/ui/status-badge'
 import { Progress } from '@/components/ui/progress'
 import {
   Clock,
@@ -83,7 +83,7 @@ export const RaceStatusIndicator = memo(function RaceStatusIndicator({
           </span>
         )}
         {holdTimeLeft && status === 'priority_hold' && (
-          <span className="text-xs text-amber-600">
+          <span className="text-xs text-status-warning">
             {holdTimeLeft} left
           </span>
         )}
@@ -98,8 +98,8 @@ export const RaceStatusIndicator = memo(function RaceStatusIndicator({
       {status === 'Open' && timeUntilOpen && (
         <div className="space-y-3">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
-              <Clock className="w-5 h-5 text-blue-600" />
+            <div className="w-10 h-10 rounded-full bg-status-info-light flex items-center justify-center">
+              <Clock className="w-5 h-5 text-status-info" />
             </div>
             <div>
               <div className="font-semibold">Race Scheduled</div>
@@ -118,11 +118,11 @@ export const RaceStatusIndicator = memo(function RaceStatusIndicator({
       {status === 'Open' && !timeUntilOpen && (
         <div className="space-y-3">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center animate-pulse">
-              <Zap className="w-5 h-5 text-emerald-600" />
+            <div className="w-10 h-10 rounded-full bg-status-success-light flex items-center justify-center animate-pulse">
+              <Zap className="w-5 h-5 text-status-success" />
             </div>
             <div>
-              <div className="font-semibold text-emerald-700">Race Open</div>
+              <div className="font-semibold text-status-success">Race Open</div>
               <div className="text-sm text-muted-foreground">
                 Suppliers can now respond
               </div>
@@ -135,11 +135,11 @@ export const RaceStatusIndicator = memo(function RaceStatusIndicator({
       {status === 'Bidding' && (
         <div className="space-y-3">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center">
-              <Zap className="w-5 h-5 text-emerald-600" />
+            <div className="w-10 h-10 rounded-full bg-status-success-light flex items-center justify-center">
+              <Zap className="w-5 h-5 text-status-success" />
             </div>
             <div>
-              <div className="font-semibold text-emerald-700">Race Active</div>
+              <div className="font-semibold text-status-success">Race Active</div>
               <div className="text-sm text-muted-foreground">
                 {responseCount} {responseCount === 1 ? 'response' : 'responses'} received
               </div>
@@ -152,11 +152,11 @@ export const RaceStatusIndicator = memo(function RaceStatusIndicator({
       {status === 'priority_hold' && (
         <div className="space-y-3">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center">
-              <Lock className="w-5 h-5 text-amber-600" />
+            <div className="w-10 h-10 rounded-full bg-status-warning-light flex items-center justify-center">
+              <Lock className="w-5 h-5 text-status-warning" />
             </div>
             <div className="flex-1">
-              <div className="font-semibold text-amber-700">Priority Hold</div>
+              <div className="font-semibold text-status-warning">Priority Hold</div>
               <div className="text-sm text-muted-foreground">
                 {priorityHolderName || 'A supplier'} has first right of refusal
               </div>
@@ -167,9 +167,9 @@ export const RaceStatusIndicator = memo(function RaceStatusIndicator({
             <div className="space-y-2">
               <div className="flex items-center justify-between text-sm">
                 <span className="text-muted-foreground">Time remaining</span>
-                <span className="font-medium text-amber-700">{holdTimeLeft}</span>
+                <span className="font-medium text-status-warning">{holdTimeLeft}</span>
               </div>
-              <Progress value={holdProgress} className="h-2" />
+              <Progress value={holdProgress} className="h-2 [&>div]:bg-status-warning" />
             </div>
           )}
 
@@ -183,11 +183,11 @@ export const RaceStatusIndicator = memo(function RaceStatusIndicator({
       {status === 'Awarded' && (
         <div className="space-y-3">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-violet-100 flex items-center justify-center">
-              <Award className="w-5 h-5 text-violet-600" />
+            <div className="w-10 h-10 rounded-full bg-status-success-light flex items-center justify-center">
+              <Award className="w-5 h-5 text-status-success" />
             </div>
             <div>
-              <div className="font-semibold text-violet-700">Awarded</div>
+              <div className="font-semibold text-status-success">Awarded</div>
               <div className="text-sm text-muted-foreground">
                 {winnerName ? `Awarded to ${winnerName}` : 'This RFQ has been awarded'}
               </div>
@@ -200,11 +200,11 @@ export const RaceStatusIndicator = memo(function RaceStatusIndicator({
       {status === 'Closed' && (
         <div className="space-y-3">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center">
-              <CheckCircle2 className="w-5 h-5 text-gray-600" />
+            <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center">
+              <CheckCircle2 className="w-5 h-5 text-muted-foreground" />
             </div>
             <div>
-              <div className="font-semibold text-gray-700">Closed</div>
+              <div className="font-semibold text-muted-foreground">Closed</div>
               <div className="text-sm text-muted-foreground">
                 No longer accepting responses
               </div>
@@ -217,11 +217,11 @@ export const RaceStatusIndicator = memo(function RaceStatusIndicator({
       {status === 'cancelled' && (
         <div className="space-y-3">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
-              <Ban className="w-5 h-5 text-red-600" />
+            <div className="w-10 h-10 rounded-full bg-status-error-light flex items-center justify-center">
+              <Ban className="w-5 h-5 text-status-error" />
             </div>
             <div>
-              <div className="font-semibold text-red-700">Cancelled</div>
+              <div className="font-semibold text-status-error">Cancelled</div>
               <div className="text-sm text-muted-foreground">
                 This RFQ has been cancelled
               </div>
@@ -240,22 +240,22 @@ interface StatusBadgeProps {
 }
 
 function StatusBadge({ status, className }: StatusBadgeProps) {
-  const config: Record<RFQStatus, { label: string; color: string; Icon: typeof Clock }> = {
-    'Open': { label: 'Open', color: 'bg-blue-50 text-blue-700 border', Icon: Clock },
-    'Bidding': { label: 'Bidding', color: 'bg-emerald-50 text-emerald-700 border-emerald-200', Icon: Zap },
-    'priority_hold': { label: 'Priority Hold', color: 'bg-amber-50 text-amber-700 border-amber-200', Icon: Lock },
-    'Awarded': { label: 'Awarded', color: 'bg-violet-50 text-violet-700 border-violet-200', Icon: Award },
-    'Closed': { label: 'Closed', color: 'bg-gray-50 text-gray-700 border-gray-200', Icon: CheckCircle2 },
-    'cancelled': { label: 'Cancelled', color: 'bg-red-50 text-red-700 border-red-200', Icon: Ban },
+  const config: Record<RFQStatus, { label: string; status: 'info' | 'success' | 'warning' | 'error' | 'default'; Icon: typeof Clock }> = {
+    'Open': { label: 'Open', status: 'info', Icon: Clock },
+    'Bidding': { label: 'Bidding', status: 'success', Icon: Zap },
+    'priority_hold': { label: 'Priority Hold', status: 'warning', Icon: Lock },
+    'Awarded': { label: 'Awarded', status: 'success', Icon: Award },
+    'Closed': { label: 'Closed', status: 'default', Icon: CheckCircle2 },
+    'cancelled': { label: 'Cancelled', status: 'error', Icon: Ban },
   }
 
-  const { label, color, Icon } = config[status] || config['Open']
+  const { label, status: badgeStatus, Icon } = config[status] || config['Open']
 
   return (
-    <Badge variant="secondary" className={cn('text-xs', color, className)}>
+    <StatusBadgeComponent status={badgeStatus} size="sm" className={className}>
       <Icon className="w-3 h-3 mr-1" />
       {label}
-    </Badge>
+    </StatusBadgeComponent>
   )
 }
 
@@ -281,7 +281,7 @@ export function RaceCountdown({ raceOpensAt, className }: RaceCountdownProps) {
 
   if (!countdown) {
     return (
-      <div className={cn('flex items-center gap-2 text-emerald-600', className)}>
+      <div className={cn('flex items-center gap-2 text-status-success', className)}>
         <Zap className="w-4 h-4" />
         <span className="font-medium">Race is open!</span>
       </div>

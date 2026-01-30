@@ -431,7 +431,7 @@ export function RFQCreateForm({
                     className={cn(
                       'flex items-center justify-center gap-2 p-3 rounded-lg border-2 transition-colors',
                       urgency === 'urgent'
-                        ? 'border-amber-500 bg-amber-50 text-amber-700'
+                        ? 'border-status-warning bg-status-warning-light text-status-warning-dark'
                         : 'border-border hover:border-muted-foreground/50'
                     )}
                     disabled={isPending}

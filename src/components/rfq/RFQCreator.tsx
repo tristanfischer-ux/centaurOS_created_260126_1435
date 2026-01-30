@@ -3,10 +3,12 @@
 import { useState, useTransition, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
+import { typography, spacing } from '@/lib/design-system'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
+import { StatusBadge } from '@/components/ui/status-badge'
 import {
   Select,
   SelectContent,
@@ -260,11 +262,16 @@ export function RFQCreator({
               showPreview ? 'lg:border-r' : ''
             )}
           >
-            {/* Header */}
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-xl font-semibold">Create Request for Quote</h2>
-                <p className="text-sm text-muted-foreground mt-1">
+            {/* Header with Orange Accent Bar */}
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-slate-100">
+              <div className="min-w-0 flex-1">
+                <div className={typography.pageHeader}>
+                  <div className={typography.pageHeaderAccent} />
+                  <h1 className={typography.h1}>
+                    Create Request for Quote
+                  </h1>
+                </div>
+                <p className={typography.pageSubtitle}>
                   Describe what you need and suppliers will compete to fulfill your request
                 </p>
               </div>
@@ -533,7 +540,7 @@ export function RFQCreator({
                       className={cn(
                         'flex items-center justify-center gap-2 p-3 rounded-lg border-2 transition-colors text-sm',
                         urgency === 'urgent'
-                          ? 'border-amber-500 bg-amber-50 text-amber-700'
+                          ? 'border-status-warning bg-status-warning-light text-status-warning-dark'
                           : 'border-border hover:border-muted-foreground/50'
                       )}
                       disabled={isPending}

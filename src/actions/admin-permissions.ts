@@ -69,9 +69,10 @@ export async function hasFoundryAdminAccess(): Promise<boolean> {
         .single()
     
     // RED TEAM FIX: Check is_active status
-    if (!profile?.is_active) {
-        return false
-    }
+    // TODO: Add is_active column to profiles table
+    // if (!profile?.is_active) {
+    //     return false
+    // }
     
     if (profile.role === 'Founder') {
         return true

@@ -4,6 +4,7 @@ import { useState, useTransition } from 'react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { StatusBadge } from '@/components/ui/status-badge'
 import {
   Card,
   CardContent,
@@ -55,13 +56,13 @@ interface RFQDetailProps {
   className?: string
 }
 
-const statusColors: Record<RFQStatus, string> = {
-  'Open': 'bg-blue-50 text-blue-700 border',
-  'Bidding': 'bg-emerald-50 text-emerald-700 border-emerald-200',
-  'priority_hold': 'bg-amber-50 text-amber-700 border-amber-200',
-  'Awarded': 'bg-violet-50 text-violet-700 border-violet-200',
-  'Closed': 'bg-gray-50 text-gray-700 border-gray-200',
-  'cancelled': 'bg-red-50 text-red-700 border-red-200',
+const statusMap: Record<RFQStatus, { label: string; status: 'info' | 'success' | 'warning' | 'error' | 'default' }> = {
+  'Open': { label: 'Open', status: 'info' },
+  'Bidding': { label: 'Bidding', status: 'success' },
+  'priority_hold': { label: 'Priority Hold', status: 'warning' },
+  'Awarded': { label: 'Awarded', status: 'success' },
+  'Closed': { label: 'Closed', status: 'default' },
+  'cancelled': { label: 'Cancelled', status: 'error' },
 }
 
 const typeLabels: Record<RFQType, string> = {
@@ -137,18 +138,18 @@ export function RFQDetail({
     <div className={cn('space-y-6', className)}>
       {/* Order Created Alert - shown when RFQ is awarded */}
       {isOwner && rfq.status === 'Awarded' && (
-        <Card className="border-emerald-200 bg-emerald-50">
+        <Card className="border-status-success bg-status-success-light">
           <CardContent className="pt-6">
             <div className="flex items-start gap-4">
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-100">
-                <ShoppingCart className="h-5 w-5 text-emerald-600" />
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-status-success-light">
+                <ShoppingCart className="h-5 w-5 text-status-success" />
               </div>
               <div className="flex-1">
-                <h3 className="font-semibold text-emerald-900 mb-1">Order Automatically Created</h3>
-                <p className="text-sm text-emerald-700 mb-3">
+                <h3 className="font-semibold text-status-success-dark mb-1">Order Automatically Created</h3>
+                <p className="text-sm text-status-success-dark mb-3">
                   An order has been automatically created with the winning quote. You can now proceed with payment and project setup.
                 </p>
-                <Button asChild size="sm" className="bg-emerald-600 hover:bg-emerald-700">
+                <Button asChild size="sm" variant="success">
                   <Link href="/orders">
                     View Orders
                     <ArrowRight className="w-4 h-4 ml-2" />
@@ -167,17 +168,17 @@ export function RFQDetail({
             <div className="space-y-2">
               <CardTitle className="text-2xl">{rfq.title}</CardTitle>
               <div className="flex items-center gap-2 flex-wrap">
-                <Badge variant="secondary" className={cn('text-sm', statusColors[rfq.status])}>
-                  {rfq.status === 'priority_hold' ? 'Priority Hold' : rfq.status}
-                </Badge>
+                <StatusBadge status={statusMap[rfq.status].status} size="md">
+                  {statusMap[rfq.status].label}
+                </StatusBadge>
                 <Badge variant="secondary" className="text-sm">
                   {typeLabels[rfq.rfq_type]}
                 </Badge>
                 {rfq.urgency === 'urgent' && (
-                  <Badge variant="secondary" className="text-sm bg-amber-50 text-amber-700 border-amber-200">
+                  <StatusBadge status="warning" size="md">
                     <Zap className="w-3 h-3 mr-1" />
                     Urgent
-                  </Badge>
+                  </StatusBadge>
                 )}
               </div>
             </div>
@@ -349,7 +350,7 @@ export function RFQDetail({
             {acceptResponses.length > 0 && (
               <div>
                 <h4 className="font-medium flex items-center gap-2 mb-3">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                  <CheckCircle2 className="w-4 h-4 text-status-success" />
                   Accepted ({acceptResponses.length})
                 </h4>
                 <div className="space-y-3">
@@ -374,7 +375,7 @@ export function RFQDetail({
             {infoRequests.length > 0 && (
               <div>
                 <h4 className="font-medium flex items-center gap-2 mb-3">
-                  <HelpCircle className="w-4 h-4 text-blue-600" />
+                  <HelpCircle className="w-4 h-4 text-status-info" />
                   Info Requests ({infoRequests.length})
                 </h4>
                 <div className="space-y-3">
@@ -414,7 +415,7 @@ export function RFQDetail({
         <Card>
           <CardContent className="py-6">
             <div className="text-center">
-              <CheckCircle2 className="w-12 h-12 mx-auto text-emerald-600 mb-2" />
+              <CheckCircle2 className="w-12 h-12 mx-auto text-status-success mb-2" />
               <p className="font-medium">You have already responded to this RFQ</p>
             </div>
           </CardContent>
@@ -467,9 +468,9 @@ function RFQProgressIndicator({ status }: { status: RFQStatus }) {
                 <div
                   className={cn(
                     'flex h-10 w-10 items-center justify-center rounded-full border-2 transition-colors',
-                    stageStatus === 'complete' && 'border-emerald-500 bg-emerald-50 text-emerald-600',
-                    stageStatus === 'current' && 'border-blue-500 bg-blue-50 text-blue-600',
-                    stageStatus === 'pending' && 'border-gray-200 bg-gray-50 text-gray-400'
+                    stageStatus === 'complete' && 'border-status-success bg-status-success-light text-status-success',
+                    stageStatus === 'current' && 'border-status-info bg-status-info-light text-status-info',
+                    stageStatus === 'pending' && 'border-muted bg-muted text-muted-foreground'
                   )}
                 >
                   {stageStatus === 'complete' ? (
@@ -481,9 +482,9 @@ function RFQProgressIndicator({ status }: { status: RFQStatus }) {
                 <span
                   className={cn(
                     'mt-2 text-xs font-medium',
-                    stageStatus === 'complete' && 'text-emerald-600',
-                    stageStatus === 'current' && 'text-blue-600',
-                    stageStatus === 'pending' && 'text-gray-400'
+                    stageStatus === 'complete' && 'text-status-success',
+                    stageStatus === 'current' && 'text-status-info',
+                    stageStatus === 'pending' && 'text-muted-foreground'
                   )}
                 >
                   {stage.label}
@@ -493,7 +494,7 @@ function RFQProgressIndicator({ status }: { status: RFQStatus }) {
                 <div
                   className={cn(
                     'flex-1 h-0.5 mx-2 mb-6',
-                    stageStatus === 'complete' ? 'bg-emerald-500' : 'bg-gray-200'
+                    stageStatus === 'complete' ? 'bg-status-success' : 'bg-muted'
                   )}
                 />
               )}
@@ -529,7 +530,7 @@ function ResponseCard({
     <div
       className={cn(
         'p-4 rounded-lg border',
-        isAwarded && 'bg-violet-50 border-violet-200'
+        isAwarded && 'bg-status-success-light border-status-success'
       )}
     >
       <div className="flex items-start justify-between gap-4">
@@ -549,10 +550,10 @@ function ResponseCard({
             <div className="font-medium flex items-center gap-2">
               {providerName}
               {isAwarded && (
-                <Badge className="bg-violet-100 text-violet-700">
+                <StatusBadge status="success" size="sm">
                   <Award className="w-3 h-3 mr-1" />
                   Awarded
-                </Badge>
+                </StatusBadge>
               )}
             </div>
             {tierLabel && (

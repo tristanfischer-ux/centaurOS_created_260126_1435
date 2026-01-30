@@ -67,10 +67,10 @@ export function RFQFileUpload({
   const getFileIcon = (type: string, name: string) => {
     const ext = name.split('.').pop()?.toLowerCase()
     if (type.startsWith('image/') || ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext || '')) {
-      return <Image className="w-5 h-5 text-blue-500" />
+      return <Image className="w-5 h-5 text-status-info" />
     }
     if (type === 'application/pdf' || ext === 'pdf') {
-      return <FileText className="w-5 h-5 text-red-500" />
+      return <FileText className="w-5 h-5 text-status-error" />
     }
     return <FileIcon className="w-5 h-5 text-muted-foreground" />
   }
