@@ -117,7 +117,7 @@ export function InviteMemberDialog() {
                     Invite Member
                 </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[425px]">
+            <DialogContent size="sm">
                 {success ? (
                     // Success state
                     <>
@@ -182,7 +182,7 @@ export function InviteMemberDialog() {
                         <form onSubmit={handleSubmit} className="space-y-4 py-4">
                             <div className="space-y-2">
                                 <Label htmlFor="email">
-                                    Email Address <span className="text-red-500" aria-label="required">*</span>
+                                    Email Address <span className="text-destructive ml-1" aria-label="required">*</span>
                                 </Label>
                                 <Input
                                     id="email"
@@ -202,14 +202,14 @@ export function InviteMemberDialog() {
                                     className={emailError ? 'border-destructive' : ''}
                                 />
                                 {emailError && (
-                                    <p id="email-error" className="text-sm text-red-600 mt-1" role="alert">
+                                    <p id="email-error" className="text-sm text-destructive mt-1" role="alert">
                                         {emailError}
                                     </p>
                                 )}
                             </div>
                             <div className="space-y-2">
                                 <Label htmlFor="role_type">
-                                    Role <span className="text-red-500" aria-label="required">*</span>
+                                    Role <span className="text-destructive ml-1" aria-label="required">*</span>
                                 </Label>
                                 <Select 
                                     value={role} 

@@ -45,7 +45,7 @@ export function TeamPulseWidget({ members }: TeamPulseWidgetProps) {
                 <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
                         <CardTitle className="text-base flex items-center gap-2">
-                            <Activity className="h-4 w-4 shrink-0 text-slate-600" />
+                            <Activity className="h-4 w-4 shrink-0 text-muted-foreground" />
                             <span className="truncate">Team Pulse</span>
                         </CardTitle>
                         <CardDescription className="truncate">Real-time team availability</CardDescription>
@@ -60,26 +60,26 @@ export function TeamPulseWidget({ members }: TeamPulseWidgetProps) {
                 <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs">
                     <div className="flex items-center gap-1.5">
                         <span className="h-2 w-2 shrink-0 rounded-full bg-green-500" />
-                        <span className="text-slate-600">{onlineCount} online</span>
+                        <span className="text-muted-foreground">{onlineCount} online</span>
                     </div>
                     <div className="flex items-center gap-1.5">
                         <span className="h-2 w-2 shrink-0 rounded-full bg-purple-500" />
-                        <span className="text-slate-600">{focusCount} focus</span>
+                        <span className="text-muted-foreground">{focusCount} focus</span>
                     </div>
                     <div className="flex items-center gap-1.5">
                         <span className="h-2 w-2 shrink-0 rounded-full bg-yellow-500" />
-                        <span className="text-slate-600">{awayCount} away</span>
+                        <span className="text-muted-foreground">{awayCount} away</span>
                     </div>
                     <div className="flex items-center gap-1.5">
                         <span className="h-2 w-2 shrink-0 rounded-full bg-gray-400" />
-                        <span className="text-slate-600">{offlineCount} offline</span>
+                        <span className="text-muted-foreground">{offlineCount} offline</span>
                     </div>
                 </div>
 
                 {/* Active members (online + focus) */}
                 {(onlineMembers.length > 0 || focusMembers.length > 0) && (
                     <div className="space-y-2">
-                        <h4 className="text-xs font-medium text-slate-500 uppercase tracking-wide">
+                        <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
                             Active Now
                         </h4>
                         <div className="flex flex-wrap gap-2">
@@ -90,7 +90,7 @@ export function TeamPulseWidget({ members }: TeamPulseWidgetProps) {
                                 return (
                                     <div 
                                         key={member.id} 
-                                        className="flex items-center gap-2 p-2 rounded-lg bg-slate-50 hover:bg-slate-100 transition-colors"
+                                        className="flex items-center gap-2 p-2 rounded-lg bg-muted hover:bg-muted transition-colors"
                                     >
                                         <div className="relative">
                                             <UserAvatar 
@@ -105,7 +105,7 @@ export function TeamPulseWidget({ members }: TeamPulseWidgetProps) {
                                             />
                                         </div>
                                         <div className="min-w-0">
-                                            <span className="text-xs font-medium text-slate-700 truncate block">
+                                            <span className="text-xs font-medium text-foreground truncate block">
                                                 {member.full_name?.split(' ')[0]}
                                             </span>
                                             {status === 'focus' && (
@@ -120,7 +120,7 @@ export function TeamPulseWidget({ members }: TeamPulseWidgetProps) {
                             })}
                         </div>
                         {(onlineMembers.length + focusMembers.length) > 8 && (
-                            <p className="text-xs text-slate-400">
+                            <p className="text-xs text-muted-foreground">
                                 +{(onlineMembers.length + focusMembers.length) - 8} more
                             </p>
                         )}
@@ -131,7 +131,7 @@ export function TeamPulseWidget({ members }: TeamPulseWidgetProps) {
                 {onlineMembers.length === 0 && focusMembers.length === 0 && (
                     <div className="text-center py-4">
                         <Users className="h-8 w-8 mx-auto text-slate-300 mb-2" />
-                        <p className="text-sm text-slate-500">No team members active right now</p>
+                        <p className="text-sm text-muted-foreground">No team members active right now</p>
                     </div>
                 )}
             </CardContent>

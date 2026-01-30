@@ -47,7 +47,7 @@ export const MarketCard = memo(function MarketCard({
 
     const categoryBadgeStyles: Record<string, string> = {
         'People': 'bg-stone-100 text-stone-700',
-        'Products': 'bg-slate-100 text-slate-700',
+        'Products': 'bg-muted text-foreground',
         'Services': 'bg-blue-50 text-blue-700',
         'AI': 'bg-violet-50 text-violet-700'
     }
@@ -64,7 +64,7 @@ export const MarketCard = memo(function MarketCard({
 
     return (
         <Card className={cn(
-            "group relative flex flex-col border-blue-200 hover:border-orange-200 hover:shadow-sm transition-all duration-200 overflow-hidden bg-white",
+            "group relative flex flex-col border hover:border-orange-200 hover:shadow-sm transition-all duration-200 overflow-hidden bg-white",
             isSelected && "ring-2 ring-orange-500 border-orange-500",
             isExpanded && "shadow-md border-orange-200"
         )}>
@@ -115,18 +115,18 @@ export const MarketCard = memo(function MarketCard({
 
             {/* Expanded Content - Details only - NO flex-grow, only shows when expanded */}
             {isExpanded && (
-                <div className="border-t border-blue-200 bg-slate-50 p-4">
+                <div className="border-t border bg-muted p-4">
                     <ExpandedDetails listing={listing} attrs={attrs} />
                 </div>
             )}
 
             {/* Action buttons - shown when expanded */}
             {isExpanded && (
-                <div className="flex gap-2 px-4 pb-3 pt-2 border-t border-blue-200 bg-white">
+                <div className="flex gap-2 px-4 pb-3 pt-2 border-t border bg-white">
                     <Button 
                         variant="secondary" 
                         size="sm"
-                        className="flex-1 text-xs border-slate-200 hover:border-orange-500/50 hover:bg-orange-50/50 hover:text-orange-700"
+                        className="flex-1 text-xs border hover:border-orange-500/50 hover:bg-orange-50/50 hover:text-orange-700"
                         onClick={(e) => {
                             e.stopPropagation()
                             onToggleSelect(listing.id)
@@ -150,7 +150,7 @@ export const MarketCard = memo(function MarketCard({
                 </div>
             )}
 
-            <CardFooter className="relative z-10 flex items-center justify-between pt-3 pb-3 px-4 bg-slate-50 border-t border-blue-200">
+            <CardFooter className="relative z-10 flex items-center justify-between pt-3 pb-3 px-4 bg-muted border-t border">
                 <div className="flex items-center gap-2">
                     <Checkbox
                         id={`compare-${listing.id}`}
@@ -172,7 +172,7 @@ export const MarketCard = memo(function MarketCard({
                         <Button 
                             size="sm" 
                             variant="secondary"
-                            className="text-xs gap-1 border-slate-200 hover:border-orange-500/50 hover:bg-orange-50/50 hover:text-orange-700"
+                            className="text-xs gap-1 border hover:border-orange-500/50 hover:bg-orange-50/50 hover:text-orange-700"
                             asChild
                         >
                             <Link href="/rfq/create">
@@ -184,7 +184,7 @@ export const MarketCard = memo(function MarketCard({
                     <Button 
                         size="sm" 
                         variant="ghost" 
-                        className="text-xs gap-1 hover:bg-slate-100"
+                        className="text-xs gap-1 hover:bg-muted"
                         onClick={handleToggleExpand}
                     >
                         {isExpanded ? 'Less' : 'More'}
@@ -359,12 +359,12 @@ function SummaryMetrics({ listing, attrs }: { listing: MarketplaceListing; attrs
                 {(attrs.skills || attrs.expertise) && (
                     <div className="flex flex-wrap gap-1">
                         {(attrs.skills || attrs.expertise || []).slice(0, 3).map((skill: string, i: number) => (
-                            <span key={i} className="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">
+                            <span key={i} className="text-[10px] px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
                                 {skill}
                             </span>
                         ))}
                         {(attrs.skills || attrs.expertise || []).length > 3 && (
-                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-500">
+                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
                                 +{(attrs.skills || attrs.expertise).length - 3}
                             </span>
                         )}
@@ -441,7 +441,7 @@ function PeopleExpanded({ attrs }: { attrs: Record<string, any> }) {
                     </h4>
                     <div className="flex flex-wrap gap-1">
                         {attrs.previous_companies.map((company: string, i: number) => (
-                            <span key={i} className="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-700">
+                            <span key={i} className="text-[10px] px-2 py-0.5 rounded-full bg-muted text-foreground">
                                 {company}
                             </span>
                         ))}
@@ -502,7 +502,7 @@ function AIExpanded({ attrs }: { attrs: Record<string, any> }) {
                     <h4 className="text-xs font-semibold text-muted-foreground mb-1">Data Inputs</h4>
                     <div className="flex flex-wrap gap-1">
                         {attrs.data_inputs.map((input: string, i: number) => (
-                            <span key={i} className="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">
+                            <span key={i} className="text-[10px] px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
                                 {input}
                             </span>
                         ))}
@@ -514,7 +514,7 @@ function AIExpanded({ attrs }: { attrs: Record<string, any> }) {
                     <h4 className="text-xs font-semibold text-muted-foreground mb-1">Outputs</h4>
                     <div className="flex flex-wrap gap-1">
                         {attrs.outputs.map((output: string, i: number) => (
-                            <span key={i} className="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">
+                            <span key={i} className="text-[10px] px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
                                 {output}
                             </span>
                         ))}
@@ -547,7 +547,7 @@ function ProductsExpanded({ attrs }: { attrs: Record<string, any> }) {
                     <h4 className="text-xs font-semibold text-muted-foreground mb-1">Capabilities</h4>
                     <div className="flex flex-wrap gap-1">
                         {attrs.capabilities.map((cap: string, i: number) => (
-                            <span key={i} className="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-700">
+                            <span key={i} className="text-[10px] px-2 py-0.5 rounded-full bg-muted text-foreground">
                                 {cap}
                             </span>
                         ))}
@@ -571,7 +571,7 @@ function ProductsExpanded({ attrs }: { attrs: Record<string, any> }) {
                     <h4 className="text-xs font-semibold text-muted-foreground mb-1">Materials</h4>
                     <div className="flex flex-wrap gap-1">
                         {attrs.materials.map((mat: string, i: number) => (
-                            <span key={i} className="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">
+                            <span key={i} className="text-[10px] px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
                                 {mat}
                             </span>
                         ))}
@@ -602,7 +602,7 @@ function ServicesExpanded({ attrs }: { attrs: Record<string, any> }) {
                     <h4 className="text-xs font-semibold text-muted-foreground mb-1">Jurisdictions</h4>
                     <div className="flex flex-wrap gap-1">
                         {attrs.jurisdictions.map((j: string, i: number) => (
-                            <span key={i} className="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">
+                            <span key={i} className="text-[10px] px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
                                 {j}
                             </span>
                         ))}

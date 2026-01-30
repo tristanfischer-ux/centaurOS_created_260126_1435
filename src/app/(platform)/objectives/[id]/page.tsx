@@ -31,12 +31,12 @@ export default async function ObjectiveDetailPage({ params }: { params: Promise<
         <div className="space-y-8 max-w-5xl mx-auto">
             {/* Header / Back Link */}
             <div>
-                <Link href="/objectives" className="text-sm text-slate-400 hover:text-slate-600 flex items-center mb-4 transition-colors">
+                <Link href="/objectives" className="text-sm text-muted-foreground hover:text-muted-foreground flex items-center mb-4 transition-colors">
                     <ArrowLeft className="h-4 w-4 mr-1" /> Back to Objectives
                 </Link>
-                <h1 className="text-3xl font-bold tracking-tight text-slate-900 mb-2">{objective.title}</h1>
-                <p className="text-lg text-slate-600 leading-relaxed max-w-3xl">{objective.description}</p>
-                <div className="flex items-center gap-4 mt-4 text-sm text-slate-400">
+                <h1 className="text-3xl font-bold tracking-tight text-foreground mb-2">{objective.title}</h1>
+                <p className="text-lg text-muted-foreground leading-relaxed max-w-3xl">{objective.description}</p>
+                <div className="flex items-center gap-4 mt-4 text-sm text-muted-foreground">
                     <span>ID: {objective.id}</span>
                     <span>•</span>
                     <span>Created: {new Date(objective.created_at!).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
@@ -45,14 +45,14 @@ export default async function ObjectiveDetailPage({ params }: { params: Promise<
 
             {/* Tasks Section */}
             <div className="pt-8 mt-4">
-                <h2 className="text-xl font-semibold text-slate-800 mb-6 flex items-center">
+                <h2 className="text-xl font-semibold text-foreground mb-6 flex items-center">
                     Associated Tasks
                     <Badge variant="secondary" className="ml-3 rounded-full">{tasks?.length || 0}</Badge>
                 </h2>
 
                 <div className="grid gap-4 md:grid-cols-2">
                     {tasks?.map((task) => (
-                        <Card key={task.id} className="bg-white hover:shadow-lg transition-all">
+                        <Card key={task.id} className="bg-background hover:shadow-lg transition-all">
                             <CardHeader className="pb-2">
                                 <div className="flex justify-between items-start">
                                     <Badge variant={
@@ -68,7 +68,7 @@ export default async function ObjectiveDetailPage({ params }: { params: Promise<
                                         </Badge>
                                     )}
                                 </div>
-                                <CardTitle className="text-lg text-slate-900 leading-tight">
+                                <CardTitle className="text-lg text-foreground leading-tight">
                                     {task.title}
                                 </CardTitle>
                             </CardHeader>
@@ -79,7 +79,7 @@ export default async function ObjectiveDetailPage({ params }: { params: Promise<
                                         role={task.assignee?.role}
                                         size="sm"
                                     />
-                                    <span className="text-sm text-slate-600">
+                                    <span className="text-sm text-muted-foreground">
                                         {task.assignee?.full_name}
                                     </span>
                                 </div>
@@ -87,7 +87,7 @@ export default async function ObjectiveDetailPage({ params }: { params: Promise<
                         </Card>
                     ))}
                     {(!tasks || tasks.length === 0) && (
-                        <div className="col-span-full py-12 text-center text-slate-400 bg-slate-100/50 rounded-lg">
+                        <div className="col-span-full py-12 text-center text-muted-foreground bg-muted/50 rounded-lg">
                             No tasks linked to this objective yet.
                         </div>
                     )}

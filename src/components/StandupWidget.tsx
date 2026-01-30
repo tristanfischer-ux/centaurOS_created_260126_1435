@@ -38,7 +38,7 @@ import { UserAvatar } from '@/components/ui/user-avatar'
 
 const moodOptions = [
     { value: 'great', icon: Smile, label: 'Great', color: 'text-green-500 bg-green-50 border-green-200' },
-    { value: 'good', icon: Smile, label: 'Good', color: 'text-blue-500 bg-blue-50 border-blue-200' },
+    { value: 'good', icon: Smile, label: 'Good', color: 'text-blue-500 bg-blue-50 border' },
     { value: 'okay', icon: Meh, label: 'Okay', color: 'text-yellow-500 bg-yellow-50 border-yellow-200' },
     { value: 'struggling', icon: Frown, label: 'Struggling', color: 'text-red-500 bg-red-50 border-red-200' }
 ] as const
@@ -156,7 +156,7 @@ export function StandupWidget({ userRole, compact = false }: StandupWidgetProps)
         return (
             <Card>
                 <CardContent className="flex items-center justify-center py-8">
-                    <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
+                    <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
                 </CardContent>
             </Card>
         )
@@ -171,7 +171,7 @@ export function StandupWidget({ userRole, compact = false }: StandupWidgetProps)
                 <CardHeader className="pb-2">
                     <div className="flex items-center justify-between">
                         <CardTitle className="text-base flex items-center gap-2">
-                            <Target className="h-4 w-4 text-slate-600" />
+                            <Target className="h-4 w-4 text-muted-foreground" />
                             Daily Standup
                         </CardTitle>
                         {hasSubmitted ? (
@@ -188,7 +188,7 @@ export function StandupWidget({ userRole, compact = false }: StandupWidgetProps)
                 </CardHeader>
                 <CardContent>
                     {hasSubmitted ? (
-                        <div className="text-sm text-slate-600">
+                        <div className="text-sm text-muted-foreground">
                             <p className="line-clamp-2">{myStandup?.planned || 'No plans shared'}</p>
                             <Button 
                                 variant="link" 
@@ -211,7 +211,7 @@ export function StandupWidget({ userRole, compact = false }: StandupWidgetProps)
                     
                     {stats && (
                         <div className="mt-3 pt-3 border-t border-slate-100">
-                            <div className="flex items-center justify-between text-xs text-slate-500">
+                            <div className="flex items-center justify-between text-xs text-muted-foreground">
                                 <span>{stats.submittedToday}/{stats.totalMembers} submitted</span>
                                 <span>{stats.participationRate}%</span>
                             </div>
@@ -229,7 +229,7 @@ export function StandupWidget({ userRole, compact = false }: StandupWidgetProps)
                 <div className="flex items-center justify-between">
                     <div>
                         <CardTitle className="flex items-center gap-2">
-                            <Target className="h-5 w-5 text-slate-600" />
+                            <Target className="h-5 w-5 text-muted-foreground" />
                             Daily Standup
                         </CardTitle>
                         <CardDescription>
@@ -249,7 +249,7 @@ export function StandupWidget({ userRole, compact = false }: StandupWidgetProps)
                 {(showForm || !hasSubmitted) && (
                     <div className="space-y-4">
                         <div className="space-y-2">
-                            <label htmlFor="standup-yesterday" className="text-sm font-medium text-slate-700 flex items-center gap-2">
+                            <label htmlFor="standup-yesterday" className="text-sm font-medium text-foreground flex items-center gap-2">
                                 <CheckCircle2 className="h-4 w-4 text-green-500" />
                                 What did you accomplish?
                             </label>
@@ -258,12 +258,12 @@ export function StandupWidget({ userRole, compact = false }: StandupWidgetProps)
                                 value={completed}
                                 onChange={(e) => setCompleted(e.target.value)}
                                 placeholder="Yesterday I completed..."
-                                className="min-h-[80px] bg-white border-slate-200"
+                                className="min-h-[80px] bg-background border-slate-200"
                             />
                         </div>
                         
                         <div className="space-y-2">
-                            <label htmlFor="standup-today" className="text-sm font-medium text-slate-700 flex items-center gap-2">
+                            <label htmlFor="standup-today" className="text-sm font-medium text-foreground flex items-center gap-2">
                                 <Target className="h-4 w-4 text-blue-500" />
                                 What will you work on today?
                             </label>
@@ -272,12 +272,12 @@ export function StandupWidget({ userRole, compact = false }: StandupWidgetProps)
                                 value={planned}
                                 onChange={(e) => setPlanned(e.target.value)}
                                 placeholder="Today I plan to..."
-                                className="min-h-[80px] bg-white border-slate-200"
+                                className="min-h-[80px] bg-background border-slate-200"
                             />
                         </div>
                         
                         <div className="space-y-2">
-                            <label htmlFor="standup-blockers" className="text-sm font-medium text-slate-700 flex items-center gap-2">
+                            <label htmlFor="standup-blockers" className="text-sm font-medium text-foreground flex items-center gap-2">
                                 <AlertTriangle className="h-4 w-4 text-amber-500" />
                                 Any blockers or issues?
                             </label>
@@ -286,7 +286,7 @@ export function StandupWidget({ userRole, compact = false }: StandupWidgetProps)
                                 value={blockers}
                                 onChange={(e) => setBlockers(e.target.value)}
                                 placeholder="I'm blocked by... (or leave empty)"
-                                className="min-h-[60px] bg-white border-slate-200"
+                                className="min-h-[60px] bg-background border-slate-200"
                             />
                             {blockers && (
                                 <label className="flex items-center gap-2 text-sm">
@@ -296,13 +296,13 @@ export function StandupWidget({ userRole, compact = false }: StandupWidgetProps)
                                         onChange={(e) => setNeedsHelp(e.target.checked)}
                                         className="rounded border-slate-300"
                                     />
-                                    <span className="text-slate-600">I need help unblocking this</span>
+                                    <span className="text-muted-foreground">I need help unblocking this</span>
                                 </label>
                             )}
                         </div>
                         
                         <div className="space-y-2">
-                            <label className="text-sm font-medium text-slate-700">How are you feeling?</label>
+                            <label className="text-sm font-medium text-foreground">How are you feeling?</label>
                             <div className="flex gap-2">
                                 {moodOptions.map((option) => {
                                     const Icon = option.icon
@@ -315,16 +315,16 @@ export function StandupWidget({ userRole, compact = false }: StandupWidgetProps)
                                                 'flex-1 py-2 px-3 rounded-lg border transition-all',
                                                 mood === option.value
                                                     ? option.color + ' border-2'
-                                                    : 'border-slate-200 hover:border-slate-300 bg-white'
+                                                    : 'border hover:border-slate-300 bg-white'
                                             )}
                                         >
                                             <Icon className={cn(
                                                 'h-5 w-5 mx-auto',
-                                                mood === option.value ? '' : 'text-slate-400'
+                                                mood === option.value ? '' : 'text-muted-foreground'
                                             )} />
                                             <span className={cn(
                                                 'text-xs block mt-1',
-                                                mood === option.value ? '' : 'text-slate-500'
+                                                mood === option.value ? '' : 'text-muted-foreground'
                                             )}>
                                                 {option.label}
                                             </span>
@@ -357,29 +357,29 @@ export function StandupWidget({ userRole, compact = false }: StandupWidgetProps)
                     <div className="space-y-3">
                         {myStandup?.completed && (
                             <div className="text-sm">
-                                <div className="flex items-center gap-2 text-slate-500 mb-1">
+                                <div className="flex items-center gap-2 text-muted-foreground mb-1">
                                     <CheckCircle2 className="h-4 w-4 text-green-500" />
                                     Completed
                                 </div>
-                                <p className="text-slate-700 pl-6">{myStandup.completed}</p>
+                                <p className="text-foreground pl-6">{myStandup.completed}</p>
                             </div>
                         )}
                         {myStandup?.planned && (
                             <div className="text-sm">
-                                <div className="flex items-center gap-2 text-slate-500 mb-1">
+                                <div className="flex items-center gap-2 text-muted-foreground mb-1">
                                     <Target className="h-4 w-4 text-blue-500" />
                                     Planned
                                 </div>
-                                <p className="text-slate-700 pl-6">{myStandup.planned}</p>
+                                <p className="text-foreground pl-6">{myStandup.planned}</p>
                             </div>
                         )}
                         {myStandup?.blockers && (
                             <div className="text-sm">
-                                <div className="flex items-center gap-2 text-slate-500 mb-1">
+                                <div className="flex items-center gap-2 text-muted-foreground mb-1">
                                     <AlertTriangle className="h-4 w-4 text-amber-500" />
                                     Blockers
                                 </div>
-                                <p className="text-slate-700 pl-6">{myStandup.blockers}</p>
+                                <p className="text-foreground pl-6">{myStandup.blockers}</p>
                             </div>
                         )}
                         <Button variant="secondary" size="sm" onClick={() => setShowForm(true)}>
@@ -391,27 +391,27 @@ export function StandupWidget({ userRole, compact = false }: StandupWidgetProps)
                 {/* Team Stats & Summary (for executives) */}
                 {isExecutive && stats && (
                     <Collapsible open={isExpanded} onOpenChange={setIsExpanded}>
-                        <div className="border-t border-slate-200 pt-4 mt-4">
+                        <div className="border-t border pt-4 mt-4">
                             <CollapsibleTrigger asChild>
                                 <button className="flex items-center justify-between w-full text-left">
                                     <div className="flex items-center gap-2">
-                                        <Users className="h-4 w-4 text-slate-500" />
-                                        <span className="text-sm font-medium text-slate-700">Team Overview</span>
+                                        <Users className="h-4 w-4 text-muted-foreground" />
+                                        <span className="text-sm font-medium text-foreground">Team Overview</span>
                                         <Badge variant="secondary" className="text-xs">
                                             {stats.submittedToday}/{stats.totalMembers}
                                         </Badge>
                                     </div>
                                     {isExpanded ? (
-                                        <ChevronUp className="h-4 w-4 text-slate-400" />
+                                        <ChevronUp className="h-4 w-4 text-muted-foreground" />
                                     ) : (
-                                        <ChevronDown className="h-4 w-4 text-slate-400" />
+                                        <ChevronDown className="h-4 w-4 text-muted-foreground" />
                                     )}
                                 </button>
                             </CollapsibleTrigger>
                             
                             <div className="mt-2">
                                 <Progress value={stats.participationRate} className="h-2" />
-                                <p className="text-xs text-slate-500 mt-1">
+                                <p className="text-xs text-muted-foreground mt-1">
                                     {stats.participationRate}% participation
                                     {stats.membersWithBlockers > 0 && (
                                         <span className="text-amber-600 ml-2">
@@ -423,9 +423,9 @@ export function StandupWidget({ userRole, compact = false }: StandupWidgetProps)
 
                             <CollapsibleContent className="space-y-4 mt-4">
                                 {/* AI Summary */}
-                                <div className="bg-slate-50 rounded-lg p-4">
+                                <div className="bg-muted rounded-lg p-4">
                                     <div className="flex items-center justify-between mb-3">
-                                        <h4 className="text-sm font-medium text-slate-700 flex items-center gap-2">
+                                        <h4 className="text-sm font-medium text-foreground flex items-center gap-2">
                                             <Sparkles className="h-4 w-4 text-purple-500" />
                                             AI Summary
                                         </h4>
@@ -446,12 +446,12 @@ export function StandupWidget({ userRole, compact = false }: StandupWidgetProps)
                                     {summary ? (
                                         <div className="prose prose-sm max-w-none">
                                             <Markdown content={summary.summary_text} />
-                                            <p className="text-xs text-slate-400 mt-2">
+                                            <p className="text-xs text-muted-foreground mt-2">
                                                 Generated {formatDistanceToNow(new Date(summary.generated_at), { addSuffix: true })}
                                             </p>
                                         </div>
                                     ) : (
-                                        <p className="text-sm text-slate-500">
+                                        <p className="text-sm text-muted-foreground">
                                             Click generate to create an AI summary of today's standups.
                                         </p>
                                     )}
@@ -459,22 +459,22 @@ export function StandupWidget({ userRole, compact = false }: StandupWidgetProps)
 
                                 {/* Team Standups List */}
                                 <div className="space-y-2">
-                                    <h4 className="text-sm font-medium text-slate-700">Individual Standups</h4>
+                                    <h4 className="text-sm font-medium text-foreground">Individual Standups</h4>
                                     {teamStandups.length === 0 ? (
-                                        <p className="text-sm text-slate-500">No standups submitted yet today.</p>
+                                        <p className="text-sm text-muted-foreground">No standups submitted yet today.</p>
                                     ) : (
                                         <div className="space-y-2 max-h-[300px] overflow-y-auto">
                                             {teamStandups.map((standup) => {
                                                 const user = standup.user as { full_name: string | null; role: string | null } | undefined
                                                 return (
-                                                    <div key={standup.id} className="p-3 bg-white rounded-lg border border-slate-200">
+                                                    <div key={standup.id} className="p-3 bg-background rounded-lg border border-slate-200">
                                                         <div className="flex items-center gap-2 mb-2">
                                                             <UserAvatar 
                                                                 name={user?.full_name} 
                                                                 role={user?.role} 
                                                                 size="sm" 
                                                             />
-                                                            <span className="text-sm font-medium text-slate-900">
+                                                            <span className="text-sm font-medium text-foreground">
                                                                 {user?.full_name || 'Unknown'}
                                                             </span>
                                                             {standup.mood && (
@@ -489,8 +489,8 @@ export function StandupWidget({ userRole, compact = false }: StandupWidgetProps)
                                                             )}
                                                         </div>
                                                         {standup.planned && (
-                                                            <p className="text-sm text-slate-600 line-clamp-2">
-                                                                <span className="text-slate-400">Today:</span> {standup.planned}
+                                                            <p className="text-sm text-muted-foreground line-clamp-2">
+                                                                <span className="text-muted-foreground">Today:</span> {standup.planned}
                                                             </p>
                                                         )}
                                                         {standup.blockers && (

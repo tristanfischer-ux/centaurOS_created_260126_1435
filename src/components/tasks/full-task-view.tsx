@@ -219,7 +219,7 @@ export function FullTaskView({ open, onOpenChange, task, members, currentUserId 
             )
         }
         return (
-            <Badge variant="secondary" className="gap-1 text-slate-500 bg-slate-50 border-slate-200 font-mono tracking-tighter">
+            <Badge variant="secondary" className="gap-1 text-muted-foreground bg-muted border font-mono tracking-tighter">
                 <ShieldCheck className="w-3 h-3" /> LOW RISK
             </Badge>
         )
@@ -250,7 +250,7 @@ export function FullTaskView({ open, onOpenChange, task, members, currentUserId 
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="max-w-[calc(100vw-300px)] w-full h-[90vh] p-0 gap-0 flex flex-col overflow-hidden">
                 {/* Header */}
-                <DialogHeader className="p-6 pb-4 border-b border-slate-200 shrink-0">
+                <DialogHeader className="p-6 pb-4 border-b border shrink-0">
                     <div className="flex items-start justify-between gap-4">
                         <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 mb-2 flex-wrap">
@@ -287,7 +287,7 @@ export function FullTaskView({ open, onOpenChange, task, members, currentUserId 
                                 <h3 className="text-sm font-semibold text-foreground uppercase tracking-wider flex items-center gap-2">
                                     <MessageSquare className="h-4 w-4" /> Description
                                 </h3>
-                                <div className="bg-slate-50 rounded-lg p-4 min-h-[100px]">
+                                <div className="bg-muted rounded-lg p-4 min-h-[100px]">
                                     {task.description ? (
                                         <Markdown content={task.description} className="text-sm text-foreground leading-relaxed" />
                                     ) : (
@@ -299,7 +299,7 @@ export function FullTaskView({ open, onOpenChange, task, members, currentUserId 
                             {/* Details */}
                             <div className="space-y-4">
                                 <h3 className="text-sm font-semibold text-foreground uppercase tracking-wider">Details</h3>
-                                <div className="bg-slate-50 rounded-lg p-4 space-y-3">
+                                <div className="bg-muted rounded-lg p-4 space-y-3">
                                     <div className="flex items-center gap-2 text-sm">
                                         <Calendar className="h-4 w-4 text-muted-foreground" />
                                         <span className="text-muted-foreground">Start:</span>
@@ -363,7 +363,7 @@ export function FullTaskView({ open, onOpenChange, task, members, currentUserId 
                             <div
                                 className={cn(
                                     "border-2 border-dashed rounded-lg p-4 text-center transition-colors cursor-pointer",
-                                    isUploading ? "border-blue-300 bg-blue-50 cursor-wait" : isDragging ? "border-blue-500 bg-blue-50" : "border-slate-200 hover:border-slate-300",
+                                    isUploading ? "border-blue-300 bg-blue-50 cursor-wait" : isDragging ? "border-blue-500 bg-blue-50" : "border hover:border-slate-300",
                                     isUploading && "pointer-events-none"
                                 )}
                                 onClick={() => !isUploading && fileInputRef.current?.click()}
@@ -402,7 +402,7 @@ export function FullTaskView({ open, onOpenChange, task, members, currentUserId 
 
                             {/* Attachments List */}
                             {attachments.length > 0 && (
-                                <div className="bg-slate-50 rounded-lg p-4">
+                                <div className="bg-muted rounded-lg p-4">
                                     <AttachmentList
                                         taskId={task.id}
                                         attachments={attachments}
@@ -456,14 +456,14 @@ export function FullTaskView({ open, onOpenChange, task, members, currentUserId 
                                     <Loader2 className="h-5 w-5 animate-spin mr-2" /> Loading...
                                 </div>
                             ) : humanNotes.length === 0 ? (
-                                <div className="bg-slate-50 rounded-lg p-8 text-center">
+                                <div className="bg-muted rounded-lg p-8 text-center">
                                     <MessageSquare className="h-8 w-8 text-slate-300 mx-auto mb-2" />
                                     <p className="text-muted-foreground">No notes yet. Be the first to add one!</p>
                                 </div>
                             ) : (
                                 <div className="space-y-3">
                                     {humanNotes.map((comment) => (
-                                        <div key={comment.id} className="bg-white border border-slate-200 rounded-lg p-4">
+                                        <div key={comment.id} className="bg-background border border rounded-lg p-4">
                                             <div className="flex items-start gap-3">
                                                 <Avatar className="h-8 w-8 shrink-0">
                                                     <AvatarFallback className="text-xs bg-blue-100 text-blue-700 font-medium">
@@ -508,13 +508,13 @@ export function FullTaskView({ open, onOpenChange, task, members, currentUserId 
                                     <Loader2 className="h-5 w-5 animate-spin mr-2" /> Loading...
                                 </div>
                             ) : (history.length === 0 && systemLogs.length === 0) ? (
-                                <div className="bg-slate-50 rounded-lg p-8 text-center">
+                                <div className="bg-muted rounded-lg p-8 text-center">
                                     <History className="h-8 w-8 text-slate-300 mx-auto mb-2" />
                                     <p className="text-muted-foreground">No activity logged yet.</p>
                                 </div>
                             ) : (
-                                <div className="bg-slate-50 rounded-lg p-4">
-                                    <div className="relative border-l-2 border-slate-200 ml-2 space-y-3">
+                                <div className="bg-muted rounded-lg p-4">
+                                    <div className="relative border-l-2 border ml-2 space-y-3">
                                         {/* Combine and sort history and system logs by date */}
                                         {[
                                             ...history.map(h => ({ type: 'history' as const, item: h, date: new Date(h.created_at || 0) })),
@@ -544,7 +544,7 @@ export function FullTaskView({ open, onOpenChange, task, members, currentUserId 
                                                                 <span className="text-xs font-mono text-muted-foreground">
                                                                     {format(entry.date, 'MMM d, HH:mm')}
                                                                 </span>
-                                                                <Badge variant="secondary" className="text-[10px] bg-slate-100">System</Badge>
+                                                                <Badge variant="secondary" className="text-[10px] bg-muted">System</Badge>
                                                             </div>
                                                             <p className="text-xs text-muted-foreground">
                                                                 {(entry.item as Comment).content}

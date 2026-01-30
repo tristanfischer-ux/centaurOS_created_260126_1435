@@ -85,7 +85,7 @@ function getStatusConfig(status: ListingTransactionStatus) {
             return {
                 Icon: Clock,
                 label: 'Setting Up',
-                className: 'bg-blue-100 text-blue-800 hover:bg-blue-100 border-blue-200',
+                className: 'bg-blue-100 text-blue-800 hover:bg-blue-100 border',
                 description: 'Provider is completing their profile'
             }
         case 'contact_only':
@@ -93,7 +93,7 @@ function getStatusConfig(status: ListingTransactionStatus) {
             return {
                 Icon: AlertCircle,
                 label: 'Contact',
-                className: 'bg-slate-100 text-slate-600 hover:bg-slate-100 border-slate-200',
+                className: 'bg-muted text-muted-foreground hover:bg-muted border-slate-200',
                 description: 'Contact this provider directly'
             }
     }
@@ -157,7 +157,7 @@ export function StatusDisplay({
                 status === 'transactional' && 'bg-green-100 text-green-600',
                 status === 'invite_sent' && 'bg-amber-100 text-amber-600',
                 status === 'pending_signup' && 'bg-blue-100 text-blue-600',
-                status === 'contact_only' && 'bg-slate-100 text-slate-500'
+                status === 'contact_only' && 'bg-muted text-muted-foreground'
             )}>
                 <config.Icon className="h-4 w-4" />
             </div>
@@ -167,7 +167,7 @@ export function StatusDisplay({
                     status === 'transactional' && 'text-green-800',
                     status === 'invite_sent' && 'text-amber-800',
                     status === 'pending_signup' && 'text-blue-800',
-                    status === 'contact_only' && 'text-slate-600'
+                    status === 'contact_only' && 'text-muted-foreground'
                 )}>
                     {config.label}
                 </p>

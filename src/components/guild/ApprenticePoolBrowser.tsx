@@ -100,10 +100,10 @@ export function ApprenticePoolBrowser() {
 
     if (loading) {
         return (
-            <Card className="border-slate-200">
+            <Card className="border">
                 <CardContent className="p-8 text-center">
                     <Loader2 className="h-8 w-8 animate-spin text-blue-500 mx-auto mb-4" />
-                    <p className="text-slate-500">Loading Guild apprentices...</p>
+                    <p className="text-muted-foreground">Loading Guild apprentices...</p>
                 </CardContent>
             </Card>
         )
@@ -111,11 +111,11 @@ export function ApprenticePoolBrowser() {
 
     if (apprentices.length === 0) {
         return (
-            <Card className="border-slate-200">
+            <Card className="border">
                 <CardContent className="p-8 text-center">
                     <GraduationCap className="h-12 w-12 text-slate-300 mx-auto mb-4" />
-                    <h3 className="text-lg font-semibold text-slate-700 mb-2">No Apprentices Available</h3>
-                    <p className="text-slate-500">
+                    <h3 className="text-lg font-semibold text-foreground mb-2">No Apprentices Available</h3>
+                    <p className="text-muted-foreground">
                         There are currently no apprentices in the Guild pool.
                     </p>
                 </CardContent>
@@ -125,7 +125,7 @@ export function ApprenticePoolBrowser() {
 
     return (
         <>
-            <Card className="border-slate-200">
+            <Card className="border">
                 <CardHeader className="pb-4">
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
@@ -134,7 +134,7 @@ export function ApprenticePoolBrowser() {
                             </div>
                             <div>
                                 <CardTitle className="text-lg">Guild Apprentice Pool</CardTitle>
-                                <p className="text-sm text-slate-500">
+                                <p className="text-sm text-muted-foreground">
                                     {apprentices.length} apprentice{apprentices.length !== 1 ? 's' : ''} available
                                 </p>
                             </div>
@@ -144,7 +144,7 @@ export function ApprenticePoolBrowser() {
                 <CardContent className="space-y-4">
                     {/* Search */}
                     <div className="relative">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                         <Input
                             placeholder="Search by name, email, or skills..."
                             value={searchQuery}
@@ -154,11 +154,11 @@ export function ApprenticePoolBrowser() {
                     </div>
 
                     {/* Apprentice List */}
-                    <div className="divide-y divide-slate-100 border border-slate-200 rounded-lg overflow-hidden">
+                    <div className="divide-y divide-slate-100 border border rounded-lg overflow-hidden">
                         {filteredApprentices.map((apprentice) => (
                             <div
                                 key={apprentice.id}
-                                className="flex items-center justify-between p-4 hover:bg-slate-50 transition-colors"
+                                className="flex items-center justify-between p-4 hover:bg-muted transition-colors"
                             >
                                 <div className="flex items-center gap-4">
                                     <UserAvatar
@@ -167,23 +167,23 @@ export function ApprenticePoolBrowser() {
                                         avatarUrl={apprentice.avatarUrl}
                                         size="xl"
                                         showBorder
-                                        className="border-blue-200"
+                                        className="border"
                                     />
                                     <div>
-                                        <h4 className="font-medium text-slate-900">{apprentice.fullName}</h4>
-                                        <div className="flex items-center gap-2 text-sm text-slate-500">
+                                        <h4 className="font-medium text-foreground">{apprentice.fullName}</h4>
+                                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
                                             <Mail className="h-3 w-3" />
                                             <span>{apprentice.email}</span>
                                         </div>
                                         {apprentice.skills.length > 0 && (
                                             <div className="flex gap-1 mt-1 flex-wrap">
                                                 {apprentice.skills.slice(0, 3).map((skill, idx) => (
-                                                    <Badge key={idx} variant="secondary" className="text-xs bg-slate-100">
+                                                    <Badge key={idx} variant="secondary" className="text-xs bg-muted">
                                                         {skill}
                                                     </Badge>
                                                 ))}
                                                 {apprentice.skills.length > 3 && (
-                                                    <Badge variant="secondary" className="text-xs bg-slate-100">
+                                                    <Badge variant="secondary" className="text-xs bg-muted">
                                                         +{apprentice.skills.length - 3}
                                                     </Badge>
                                                 )}
@@ -212,7 +212,7 @@ export function ApprenticePoolBrowser() {
 
                         {filteredApprentices.length === 0 && (
                             <div className="p-8 text-center">
-                                <p className="text-slate-500">No apprentices match your search.</p>
+                                <p className="text-muted-foreground">No apprentices match your search.</p>
                             </div>
                         )}
                     </div>
@@ -242,11 +242,11 @@ export function ApprenticePoolBrowser() {
                                         className="border-green-200"
                                     />
                                 </div>
-                                <p className="text-slate-700">
+                                <p className="text-foreground">
                                     <strong>{selectedApprentice?.fullName}</strong> has been assigned to{" "}
                                     <strong>{projectName}</strong>
                                 </p>
-                                <p className="text-sm text-slate-500 mt-2">
+                                <p className="text-sm text-muted-foreground mt-2">
                                     They can now work on tasks for your company while remaining in the Guild.
                                 </p>
                             </div>
@@ -265,18 +265,18 @@ export function ApprenticePoolBrowser() {
                             </DialogHeader>
                             
                             {selectedApprentice && (
-                                <div className="flex items-center gap-4 p-4 bg-slate-50 rounded-lg my-4">
+                                <div className="flex items-center gap-4 p-4 bg-muted rounded-lg my-4">
                                     <UserAvatar
                                         name={selectedApprentice.fullName}
                                         role="Apprentice"
                                         avatarUrl={selectedApprentice.avatarUrl}
                                         size="xl"
                                         showBorder
-                                        className="border-blue-200"
+                                        className="border"
                                     />
                                     <div>
                                         <h4 className="font-medium">{selectedApprentice.fullName}</h4>
-                                        <p className="text-sm text-slate-500">{selectedApprentice.email}</p>
+                                        <p className="text-sm text-muted-foreground">{selectedApprentice.email}</p>
                                     </div>
                                 </div>
                             )}
@@ -295,7 +295,7 @@ export function ApprenticePoolBrowser() {
                                 </div>
                                 <div className="space-y-2">
                                     <Label htmlFor="projectDescription">
-                                        Description <span className="text-slate-400 text-xs">(optional)</span>
+                                        Description <span className="text-muted-foreground text-xs">(optional)</span>
                                     </Label>
                                     <Textarea
                                         id="projectDescription"

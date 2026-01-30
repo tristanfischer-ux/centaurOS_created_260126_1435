@@ -44,11 +44,11 @@ export function GuildTabs({ events, members, isExecutive }: GuildTabsProps) {
             case 'Executive':
                 return 'bg-amber-100 text-amber-700 border-amber-200'
             case 'Apprentice':
-                return 'bg-blue-100 text-blue-700 border-blue-200'
+                return 'bg-blue-100 text-blue-700 border'
             case 'AI_Agent':
                 return 'bg-indigo-100 text-indigo-700 border-indigo-200'
             default:
-                return 'bg-slate-100 text-slate-600 border-slate-200'
+                return 'bg-muted text-muted-foreground border-slate-200'
         }
     }
 

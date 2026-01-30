@@ -70,15 +70,15 @@ export default async function ProfilePage({ params }: { params: Promise<{ id: st
     return (
         <div className="space-y-8">
             {/* Header / Profile Card */}
-            <div className="bg-white border border-slate-200 rounded-xl p-8 shadow-sm flex items-start gap-8">
-                <div className="h-32 w-32 bg-slate-100 rounded-full flex items-center justify-center text-4xl border-4 border-slate-50 shadow-inner">
+            <div className="bg-background border border rounded-xl p-8 shadow-sm flex items-start gap-8">
+                <div className="h-32 w-32 bg-muted rounded-full flex items-center justify-center text-4xl border-4 border-slate-50 shadow-inner">
                     {profile.role === 'AI_Agent' ? '🤖' : '👤'}
                 </div>
                 <div className="flex-1">
                     <div className="flex justify-between items-start">
                         <div>
-                            <h1 className="text-3xl font-bold text-slate-900">{profile.full_name}</h1>
-                            <div className="flex items-center gap-2 mt-2 text-slate-500">
+                            <h1 className="text-3xl font-bold text-foreground">{profile.full_name}</h1>
+                            <div className="flex items-center gap-2 mt-2 text-muted-foreground">
                                 <Mail className="w-4 h-4" />
                                 <span>{profile.email}</span>
                             </div>
@@ -88,7 +88,7 @@ export default async function ProfilePage({ params }: { params: Promise<{ id: st
                                 currentMember={currentMemberMetrics}
                                 allMembers={allMembersWithMetrics}
                             />
-                            <Badge variant="secondary" className="text-lg px-4 py-1 bg-slate-50">
+                            <Badge variant="secondary" className="text-lg px-4 py-1 bg-muted">
                                 {profile.role}
                             </Badge>
                         </div>
@@ -104,8 +104,8 @@ export default async function ProfilePage({ params }: { params: Promise<{ id: st
                                         <Briefcase className="w-5 h-5" />
                                     </div>
                                     <div>
-                                        <div className="text-sm text-slate-500">Active Tasks</div>
-                                        <div className="font-semibold text-slate-900">{activeTasks.length}</div>
+                                        <div className="text-sm text-muted-foreground">Active Tasks</div>
+                                        <div className="font-semibold text-foreground">{activeTasks.length}</div>
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-3">
@@ -113,8 +113,8 @@ export default async function ProfilePage({ params }: { params: Promise<{ id: st
                                         <Shield className="w-5 h-5" />
                                     </div>
                                     <div>
-                                        <div className="text-sm text-slate-500">Completed</div>
-                                        <div className="font-semibold text-slate-900">{completedTasks.length}</div>
+                                        <div className="text-sm text-muted-foreground">Completed</div>
+                                        <div className="font-semibold text-foreground">{completedTasks.length}</div>
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-3">
@@ -122,8 +122,8 @@ export default async function ProfilePage({ params }: { params: Promise<{ id: st
                                         <Award className="w-5 h-5" />
                                     </div>
                                     <div>
-                                        <div className="text-sm text-slate-500">Reputation</div>
-                                        <div className="font-semibold text-slate-900">Good</div>
+                                        <div className="text-sm text-muted-foreground">Reputation</div>
+                                        <div className="font-semibold text-foreground">Good</div>
                                     </div>
                                 </div>
                             </div>
@@ -137,13 +137,13 @@ export default async function ProfilePage({ params }: { params: Promise<{ id: st
                 const activeTasks = tasks?.filter(t => t.status === 'Pending' || t.status === 'Accepted') || []
                 return activeTasks.length > 0 ? (
                     <div>
-                        <h2 className="text-xl font-bold text-slate-900 mb-4">Current Tasks</h2>
-                        <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
+                        <h2 className="text-xl font-bold text-foreground mb-4">Current Tasks</h2>
+                        <div className="bg-background border border rounded-lg overflow-hidden">
                             {activeTasks.map(task => (
-                                <div key={task.id} className="p-4 border-b border-slate-100 last:border-0 hover:bg-slate-50 flex justify-between items-center">
+                                <div key={task.id} className="p-4 border-b border-slate-100 last:border-0 hover:bg-muted flex justify-between items-center">
                                     <div>
-                                        <div className="font-medium text-slate-900">{task.title}</div>
-                                        <div className="text-sm text-slate-500 truncate max-w-md">{task.description}</div>
+                                        <div className="font-medium text-foreground">{task.title}</div>
+                                        <div className="text-sm text-muted-foreground truncate max-w-md">{task.description}</div>
                                     </div>
                                     <Badge variant={task.status === 'Accepted' ? 'default' : 'secondary'}>{task.status}</Badge>
                                 </div>
@@ -158,16 +158,16 @@ export default async function ProfilePage({ params }: { params: Promise<{ id: st
                 const completedTasks = tasks?.filter(t => t.status === 'Completed') || []
                 return (
                     <div>
-                        <h2 className="text-xl font-bold text-slate-900 mb-4">Completed Tasks</h2>
-                        <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
+                        <h2 className="text-xl font-bold text-foreground mb-4">Completed Tasks</h2>
+                        <div className="bg-background border border rounded-lg overflow-hidden">
                             {completedTasks.length === 0 ? (
-                                <div className="p-8 text-center text-slate-500">No completed tasks yet.</div>
+                                <div className="p-8 text-center text-muted-foreground">No completed tasks yet.</div>
                             ) : (
                                 completedTasks.map(task => (
-                                    <div key={task.id} className="p-4 border-b border-slate-100 last:border-0 hover:bg-slate-50 flex justify-between items-center">
+                                    <div key={task.id} className="p-4 border-b border-slate-100 last:border-0 hover:bg-muted flex justify-between items-center">
                                         <div>
-                                            <div className="font-medium text-slate-900">{task.title}</div>
-                                            <div className="text-sm text-slate-500 truncate max-w-md">{task.description}</div>
+                                            <div className="font-medium text-foreground">{task.title}</div>
+                                            <div className="text-sm text-muted-foreground truncate max-w-md">{task.description}</div>
                                         </div>
                                         <Badge variant="secondary" className="bg-green-50 text-green-700 border-green-200">Completed</Badge>
                                     </div>

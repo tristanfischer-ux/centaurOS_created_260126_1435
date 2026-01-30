@@ -200,7 +200,7 @@ export function OnboardingModal({ userRole }: OnboardingModalProps) {
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="sm:max-w-[480px] p-0 overflow-hidden bg-white border-none shadow-brand-lg">
+      <DialogContent className="sm:max-w-[480px] p-0 overflow-hidden bg-background border-none shadow-brand-lg">
         {/* Accessibility: Hidden title for screen readers */}
         <VisuallyHidden>
           <DialogTitle>{step.title}</DialogTitle>
@@ -213,7 +213,7 @@ export function OnboardingModal({ userRole }: OnboardingModalProps) {
           />
 
           {/* Progress Indicator - Line Style */}
-          <div className="absolute top-0 left-0 right-0 h-1 bg-slate-100">
+          <div className="absolute top-0 left-0 right-0 h-1 bg-muted">
             <div
               className="h-full bg-orange-600 transition-all duration-500 ease-in-out"
               style={{ width: `${((currentStep + 1) / steps.length) * 100}%` }}
@@ -223,16 +223,16 @@ export function OnboardingModal({ userRole }: OnboardingModalProps) {
           {/* Content */}
           <div className="pt-16 pb-10 px-10 text-center relative z-10 font-sans">
             <div className={cn(
-              'w-20 h-20 rounded-full mx-auto mb-8 flex items-center justify-center bg-slate-50 border border-slate-100 shadow-sm',
+              'w-20 h-20 rounded-full mx-auto mb-8 flex items-center justify-center bg-muted border border-slate-100 shadow-sm',
               step.color
             )}>
               <Icon className="w-8 h-8" strokeWidth={1.5} />
             </div>
 
-            <h2 className="text-3xl font-display font-medium text-slate-900 mb-4 tracking-tight">
+            <h2 className="text-3xl font-display font-medium text-foreground mb-4 tracking-tight">
               {step.title}
             </h2>
-            <p className="text-slate-500 mb-10 max-w-sm mx-auto leading-relaxed text-sm">
+            <p className="text-muted-foreground mb-10 max-w-sm mx-auto leading-relaxed text-sm">
               {step.description}
             </p>
 
@@ -241,7 +241,7 @@ export function OnboardingModal({ userRole }: OnboardingModalProps) {
                 <Button
                   variant="ghost"
                   onClick={() => setCurrentStep(currentStep - 1)}
-                  className="text-slate-400 hover:text-slate-600 hover:bg-transparent px-6"
+                  className="text-muted-foreground hover:text-muted-foreground hover:bg-transparent px-6"
                 >
                   Back
                 </Button>
@@ -264,7 +264,7 @@ export function OnboardingModal({ userRole }: OnboardingModalProps) {
                   key={index}
                   className={cn(
                     "w-1.5 h-1.5 rounded-full transition-colors duration-300",
-                    index === currentStep ? "bg-slate-300" : "bg-slate-100"
+                    index === currentStep ? "bg-slate-300" : "bg-muted"
                   )}
                 />
               ))}

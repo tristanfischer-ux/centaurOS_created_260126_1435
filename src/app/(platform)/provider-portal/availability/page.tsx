@@ -68,7 +68,7 @@ export default async function AvailabilityPage() {
     if (!profile) {
         return (
             <div className="space-y-6">
-                <h1 className="text-3xl font-bold tracking-tight text-slate-900">Availability Calendar</h1>
+                <h1 className="text-3xl font-bold tracking-tight text-foreground">Availability Calendar</h1>
                 
                 <Card className="border-amber-100 bg-amber-50/50">
                     <CardHeader>
@@ -98,10 +98,10 @@ export default async function AvailabilityPage() {
             {/* Header */}
             <div className="flex items-center justify-between">
                 <div>
-                    <h1 className="text-3xl font-bold tracking-tight text-slate-900">
+                    <h1 className="text-3xl font-bold tracking-tight text-foreground">
                         Availability Calendar
                     </h1>
-                    <p className="text-slate-500 mt-1">
+                    <p className="text-muted-foreground mt-1">
                         Manage when you&apos;re available for bookings
                     </p>
                 </div>
@@ -122,11 +122,11 @@ export default async function AvailabilityPage() {
                                 <Check className="h-6 w-6 text-emerald-600" />
                             </div>
                             <div>
-                                <p className="text-2xl font-bold text-slate-900">
+                                <p className="text-2xl font-bold text-foreground">
                                     {availableThisMonth}
                                 </p>
-                                <p className="text-sm text-slate-500">Days Available</p>
-                                <p className="text-xs text-slate-400">This month</p>
+                                <p className="text-sm text-muted-foreground">Days Available</p>
+                                <p className="text-xs text-muted-foreground">This month</p>
                             </div>
                         </div>
                     </CardContent>
@@ -139,11 +139,11 @@ export default async function AvailabilityPage() {
                                 <Calendar className="h-6 w-6 text-blue-600" />
                             </div>
                             <div>
-                                <p className="text-2xl font-bold text-slate-900">
+                                <p className="text-2xl font-bold text-foreground">
                                     {bookedThisMonth}
                                 </p>
-                                <p className="text-sm text-slate-500">Days Booked</p>
-                                <p className="text-xs text-slate-400">This month</p>
+                                <p className="text-sm text-muted-foreground">Days Booked</p>
+                                <p className="text-xs text-muted-foreground">This month</p>
                             </div>
                         </div>
                     </CardContent>
@@ -156,11 +156,11 @@ export default async function AvailabilityPage() {
                                 <Clock className="h-6 w-6 text-purple-600" />
                             </div>
                             <div>
-                                <p className="text-2xl font-bold text-slate-900">
+                                <p className="text-2xl font-bold text-foreground">
                                     {upcomingBookings || 0}
                                 </p>
-                                <p className="text-sm text-slate-500">Upcoming</p>
-                                <p className="text-xs text-slate-400">Bookings</p>
+                                <p className="text-sm text-muted-foreground">Upcoming</p>
+                                <p className="text-xs text-muted-foreground">Bookings</p>
                             </div>
                         </div>
                     </CardContent>
@@ -176,7 +176,7 @@ export default async function AvailabilityPage() {
                                 <Badge variant={profile.is_active ? "default" : "secondary"}>
                                     {profile.is_active ? 'Active' : 'Paused'}
                                 </Badge>
-                                <span className="text-xs text-slate-400">{profile.timezone || 'No timezone'}</span>
+                                <span className="text-xs text-muted-foreground">{profile.timezone || 'No timezone'}</span>
                             </div>
                         </div>
                     </CardContent>
@@ -218,7 +218,7 @@ export default async function AvailabilityPage() {
             <Card>
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2">
-                        <CalendarSync className="h-5 w-5 text-slate-500" />
+                        <CalendarSync className="h-5 w-5 text-muted-foreground" />
                         Calendar Sync
                     </CardTitle>
                     <CardDescription>
@@ -228,14 +228,14 @@ export default async function AvailabilityPage() {
                 <CardContent>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         {/* Export iCal */}
-                        <div className="p-4 border rounded-lg bg-slate-50/50">
+                        <div className="p-4 border rounded-lg bg-muted/50">
                             <div className="flex items-start gap-3">
-                                <div className="p-2 rounded-lg bg-white border">
-                                    <Download className="h-5 w-5 text-slate-500" />
+                                <div className="p-2 rounded-lg bg-background border">
+                                    <Download className="h-5 w-5 text-muted-foreground" />
                                 </div>
                                 <div className="flex-1">
-                                    <h4 className="font-medium text-slate-900">Export iCal</h4>
-                                    <p className="text-xs text-slate-500 mt-0.5">
+                                    <h4 className="font-medium text-foreground">Export iCal</h4>
+                                    <p className="text-xs text-muted-foreground mt-0.5">
                                         Download your availability as an iCal file
                                     </p>
                                     <Button 
@@ -251,14 +251,14 @@ export default async function AvailabilityPage() {
                         </div>
 
                         {/* Google Calendar */}
-                        <div className="p-4 border rounded-lg bg-slate-50/50">
+                        <div className="p-4 border rounded-lg bg-muted/50">
                             <div className="flex items-start gap-3">
-                                <div className="p-2 rounded-lg bg-white border">
+                                <div className="p-2 rounded-lg bg-background border">
                                     <Calendar className="h-5 w-5 text-blue-500" />
                                 </div>
                                 <div className="flex-1">
-                                    <h4 className="font-medium text-slate-900">Google Calendar</h4>
-                                    <p className="text-xs text-slate-500 mt-0.5">
+                                    <h4 className="font-medium text-foreground">Google Calendar</h4>
+                                    <p className="text-xs text-muted-foreground mt-0.5">
                                         Two-way sync with Google Calendar
                                     </p>
                                     <Button 
@@ -274,14 +274,14 @@ export default async function AvailabilityPage() {
                         </div>
 
                         {/* Outlook */}
-                        <div className="p-4 border rounded-lg bg-slate-50/50">
+                        <div className="p-4 border rounded-lg bg-muted/50">
                             <div className="flex items-start gap-3">
-                                <div className="p-2 rounded-lg bg-white border">
+                                <div className="p-2 rounded-lg bg-background border">
                                     <ExternalLink className="h-5 w-5 text-blue-600" />
                                 </div>
                                 <div className="flex-1">
-                                    <h4 className="font-medium text-slate-900">Outlook</h4>
-                                    <p className="text-xs text-slate-500 mt-0.5">
+                                    <h4 className="font-medium text-foreground">Outlook</h4>
+                                    <p className="text-xs text-muted-foreground mt-0.5">
                                         Sync with Microsoft Outlook
                                     </p>
                                     <Button 
@@ -314,17 +314,17 @@ export default async function AvailabilityPage() {
                 <CardHeader>
                     <CardTitle className="text-lg">How it works</CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-3 text-sm text-slate-600">
+                <CardContent className="space-y-3 text-sm text-muted-foreground">
                     <p>
-                        <strong className="text-slate-900">Green days</strong> are available for booking. 
+                        <strong className="text-foreground">Green days</strong> are available for booking. 
                         Clients can see these when browsing your profile in the marketplace.
                     </p>
                     <p>
-                        <strong className="text-slate-900">Gray days</strong> are blocked. 
+                        <strong className="text-foreground">Gray days</strong> are blocked. 
                         Block days when you&apos;re unavailable or need time off.
                     </p>
                     <p>
-                        <strong className="text-slate-900">Blue days</strong> are booked. 
+                        <strong className="text-foreground">Blue days</strong> are booked. 
                         These have confirmed orders and cannot be modified.
                     </p>
                     <p>

@@ -42,19 +42,19 @@ const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 
 function getStatusColor(status: AvailabilityStatus | null, isCurrentMonth: boolean): string {
     if (!isCurrentMonth) {
-        return 'bg-slate-50 text-slate-300'
+        return 'bg-muted text-slate-300'
     }
     
     switch (status) {
         case 'available':
             return 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200 border-emerald-200'
         case 'booked':
-            return 'bg-blue-100 text-blue-800 border-blue-200 cursor-not-allowed'
+            return 'bg-blue-100 text-blue-800 border cursor-not-allowed'
         case 'blocked':
-            return 'bg-slate-200 text-slate-600 hover:bg-slate-300 border-slate-300'
+            return 'bg-slate-200 text-muted-foreground hover:bg-slate-300 border-slate-300'
         default:
             // Default: treat as available (no slot = available)
-            return 'bg-white text-slate-700 hover:bg-emerald-50 border-slate-200'
+            return 'bg-background text-foreground hover:bg-emerald-50 border-slate-200'
     }
 }
 
@@ -189,7 +189,7 @@ export function AvailabilityCalendar({
                 <div className="flex items-center justify-between">
                     <div>
                         <CardTitle className="flex items-center gap-2">
-                            <CalendarIcon className="h-5 w-5 text-slate-500" />
+                            <CalendarIcon className="h-5 w-5 text-muted-foreground" />
                             Availability Calendar
                         </CardTitle>
                         {showTimezone && profile?.timezone && (
@@ -265,7 +265,7 @@ export function AvailabilityCalendar({
                                             variant="secondary" 
                                             size="sm"
                                             disabled={isLoading || isPending}
-                                            className="text-slate-600 hover:text-slate-700"
+                                            className="text-muted-foreground hover:text-foreground"
                                         >
                                             <Ban className="h-4 w-4 mr-1.5" />
                                             Block Dates
@@ -307,7 +307,7 @@ export function AvailabilityCalendar({
                                     size="sm"
                                     onClick={handleBulkBlock}
                                     disabled={isLoading || isPending}
-                                    className="text-slate-600 hover:text-slate-700"
+                                    className="text-muted-foreground hover:text-foreground"
                                 >
                                     Block Entire Month
                                 </Button>
@@ -322,19 +322,19 @@ export function AvailabilityCalendar({
                 <div className="flex gap-4 mb-4 text-sm">
                     <div className="flex items-center gap-1.5">
                         <div className="w-3 h-3 rounded bg-emerald-100 border border-emerald-200" />
-                        <span className="text-slate-600">
+                        <span className="text-muted-foreground">
                             Available: <strong>{stats.available}</strong>
                         </span>
                     </div>
                     <div className="flex items-center gap-1.5">
-                        <div className="w-3 h-3 rounded bg-blue-100 border border-blue-200" />
-                        <span className="text-slate-600">
+                        <div className="w-3 h-3 rounded bg-blue-100 border border" />
+                        <span className="text-muted-foreground">
                             Booked: <strong>{stats.booked}</strong>
                         </span>
                     </div>
                     <div className="flex items-center gap-1.5">
                         <div className="w-3 h-3 rounded bg-slate-200 border border-slate-300" />
-                        <span className="text-slate-600">
+                        <span className="text-muted-foreground">
                             Blocked: <strong>{stats.blocked}</strong>
                         </span>
                     </div>
@@ -353,7 +353,7 @@ export function AvailabilityCalendar({
                         {WEEKDAYS.map(day => (
                             <div 
                                 key={day}
-                                className="text-center text-sm font-medium text-slate-500 py-2"
+                                className="text-center text-sm font-medium text-muted-foreground py-2"
                             >
                                 {day}
                             </div>
@@ -402,7 +402,7 @@ export function AvailabilityCalendar({
                 {/* Legend */}
                 {showLegend && (
                     <div className="mt-6 pt-4 border-t border-slate-100">
-                        <p className="text-xs text-slate-500">
+                        <p className="text-xs text-muted-foreground">
                             <strong>Click</strong> on a day to toggle availability. 
                             <span className="inline-flex items-center gap-1 ml-2">
                                 <Lock className="h-3 w-3" /> = Booked (cannot change)
@@ -443,7 +443,7 @@ export function AvailabilityPreview({ providerId, className }: AvailabilityPrevi
         <Card className={cn("", className)}>
             <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium flex items-center gap-2">
-                    <CalendarIcon className="h-4 w-4 text-slate-500" />
+                    <CalendarIcon className="h-4 w-4 text-muted-foreground" />
                     Availability
                 </CardTitle>
             </CardHeader>
@@ -452,7 +452,7 @@ export function AvailabilityPreview({ providerId, className }: AvailabilityPrevi
                     <span className="text-2xl font-bold text-emerald-600">
                         {available}
                     </span>
-                    <span className="text-sm text-slate-500">
+                    <span className="text-sm text-muted-foreground">
                         days available in {format(currentMonth, 'MMM')}
                     </span>
                 </div>
@@ -474,7 +474,7 @@ export function AvailabilityPreview({ providerId, className }: AvailabilityPrevi
                     ))}
                 </div>
 
-                <div className="mt-3 flex gap-3 text-xs text-slate-500">
+                <div className="mt-3 flex gap-3 text-xs text-muted-foreground">
                     <span className="flex items-center gap-1">
                         <div className="w-2 h-2 rounded-sm bg-emerald-200" /> Available
                     </span>

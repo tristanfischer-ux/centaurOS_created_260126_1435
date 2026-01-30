@@ -59,7 +59,7 @@ export function KeyboardShortcutsDialog() {
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogContent className="max-w-2xl bg-white">
         <DialogHeader>
-          <DialogTitle className="text-slate-900">Keyboard Shortcuts</DialogTitle>
+          <DialogTitle className="text-foreground">Keyboard Shortcuts</DialogTitle>
           <DialogDescription>
             Quick actions to boost your productivity
           </DialogDescription>
@@ -67,16 +67,16 @@ export function KeyboardShortcutsDialog() {
         <div className="space-y-6 py-4">
           {shortcuts.map((section) => (
             <div key={section.category}>
-              <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-3">
+              <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">
                 {section.category}
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {section.items.map((shortcut) => (
                   <div key={shortcut.keys} className="flex items-center justify-between gap-4 py-1">
-                    <span className="text-sm text-slate-700">{shortcut.description}</span>
+                    <span className="text-sm text-foreground">{shortcut.description}</span>
                     <kbd className={cn(
-                      "px-2.5 py-1 bg-slate-100 rounded-md text-xs font-mono",
-                      "border border-slate-200 shadow-sm text-slate-600 whitespace-nowrap"
+                      "px-2.5 py-1 bg-muted rounded-md text-xs font-mono",
+                      "border border shadow-sm text-muted-foreground whitespace-nowrap"
                     )}>
                       {shortcut.keys}
                     </kbd>
@@ -86,8 +86,8 @@ export function KeyboardShortcutsDialog() {
             </div>
           ))}
         </div>
-        <div className="text-xs text-slate-400 text-center pt-2 border-t border-slate-100">
-          Press <kbd className="px-1.5 py-0.5 bg-slate-100 rounded text-xs font-mono border border-slate-200">Esc</kbd> to close
+        <div className="text-xs text-muted-foreground text-center pt-2 border-t border-slate-100">
+          Press <kbd className="px-1.5 py-0.5 bg-muted rounded text-xs font-mono border border-slate-200">Esc</kbd> to close
         </div>
       </DialogContent>
     </Dialog>

@@ -75,7 +75,7 @@ async function PaymentsContent() {
         <div className="space-y-6">
             {/* Header */}
             <div>
-                <h1 className="text-2xl font-bold text-slate-900">Payments</h1>
+                <h1 className="text-2xl font-bold text-foreground">Payments</h1>
                 <p className="text-muted-foreground mt-1">
                     Manage your payment settings and view your earnings
                 </p>
@@ -170,14 +170,14 @@ async function PaymentsContent() {
                     </CardHeader>
                     <CardContent className="space-y-4">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div className="p-4 rounded-lg bg-slate-50">
+                            <div className="p-4 rounded-lg bg-muted">
                                 <p className="text-sm font-medium">Payout Frequency</p>
                                 <p className="text-sm text-muted-foreground mt-1">
                                     Payouts are processed automatically through Stripe based on your account settings.
                                     Typically, this is daily or weekly depending on your Stripe configuration.
                                 </p>
                             </div>
-                            <div className="p-4 rounded-lg bg-slate-50">
+                            <div className="p-4 rounded-lg bg-muted">
                                 <p className="text-sm font-medium">Processing Time</p>
                                 <p className="text-sm text-muted-foreground mt-1">
                                     Once a payout is initiated, it typically takes 2-5 business days to arrive
@@ -223,7 +223,7 @@ async function PaymentsContent() {
                                 </p>
                             </div>
                             <div className="p-4 rounded-lg border">
-                                <p className="text-lg font-bold text-slate-600">2.9% + 20p</p>
+                                <p className="text-lg font-bold text-muted-foreground">2.9% + 20p</p>
                                 <p className="text-sm font-medium mt-1">Payment Processing</p>
                                 <p className="text-xs text-muted-foreground mt-1">
                                     Stripe&apos;s standard processing fee

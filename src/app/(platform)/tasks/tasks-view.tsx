@@ -384,7 +384,7 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
         <>
             <div className="space-y-8">
                 <div className="flex flex-col gap-4">
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-blue-200">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border">
                         <div className="min-w-0 flex-1">
                             <div className="flex items-center gap-3 mb-1">
                                 <div className="h-8 w-1 bg-orange-600 rounded-full shadow-[0_0_8px_rgba(234,88,12,0.6)]" />
@@ -437,7 +437,7 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                                     {allExpanded ? 'Collapse All' : 'Expand All'}
                                 </Button>
                             )}
-                            <div className="bg-slate-100 p-1 rounded-lg flex items-center mr-2">
+                            <div className="bg-muted p-1 rounded-lg flex items-center mr-2">
                                 <Button
                                     variant={viewMode === 'grid' ? 'default' : 'ghost'}
                                     size="sm"
@@ -481,7 +481,7 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                                     "px-3 py-1.5 rounded-full text-sm font-medium transition-all duration-200",
                                     activePreset === preset.id
                                         ? "bg-slate-900 text-white"
-                                        : "bg-slate-100 text-muted-foreground hover:bg-slate-200"
+                                        : "bg-muted text-muted-foreground hover:bg-slate-200"
                                 )}
                             >
                                 {preset.label}
@@ -509,7 +509,7 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                                     </Button>
 
                                     {filtersOpen && (
-                                        <div className="p-4 border rounded-lg bg-slate-50 space-y-4">
+                                        <div className="p-4 border rounded-lg bg-muted space-y-4">
                                             <div className="flex flex-wrap items-center gap-3">
                                                 <div className="flex items-center gap-2 pr-4 border-r border-slate-200">
                                                     <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Status:</span>
@@ -521,7 +521,7 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                                                                 "cursor-pointer hover:opacity-80 active:opacity-70 transition-all duration-200",
                                                                 statusFilter.includes(status)
                                                                     ? getStatusBadgeClass(status)
-                                                                    : "text-muted-foreground bg-white hover:bg-slate-50 active:bg-slate-100"
+                                                                    : "text-muted-foreground bg-background hover:bg-muted active:bg-muted"
                                                             )}
                                                             onClick={() => toggleStatusFilter(status)}
                                                         >
@@ -535,7 +535,7 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                                                         value={assigneeFilter}
                                                         onValueChange={(val) => setAssigneeFilter(val as string)}
                                                     >
-                                                        <SelectTrigger className="h-8 w-[180px] text-xs bg-white border-slate-200">
+                                                        <SelectTrigger className="h-8 w-[180px] text-xs bg-background border-slate-200">
                                                             <SelectValue placeholder="All Assignees" />
                                                         </SelectTrigger>
                                                         <SelectContent>
@@ -551,7 +551,7 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                                                         value={sortBy}
                                                         onValueChange={(val) => setSortBy(val as 'due_date_asc' | 'due_date_desc' | 'created_desc')}
                                                     >
-                                                        <SelectTrigger className="h-8 w-[160px] text-xs bg-white border-slate-200">
+                                                        <SelectTrigger className="h-8 w-[160px] text-xs bg-background border-slate-200">
                                                             <SelectValue placeholder="Sort by" />
                                                         </SelectTrigger>
                                                         <SelectContent>
@@ -602,7 +602,7 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                 </div>
 
                 {viewMode === 'grid' ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-7">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         {sortedTasks.map((task) => (
                             <div key={task.id} className="h-full">
                                 <TaskCard
@@ -636,7 +636,7 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                                             />
                                         </div>
                                         <h3 className="text-2xl font-display font-medium text-slate-100 mb-3 relative z-10 tracking-tight">System Idle</h3>
-                                        <p className="text-slate-400 max-w-sm mb-8 relative z-10 font-mono text-xs tracking-wide leading-relaxed">
+                                        <p className="text-muted-foreground max-w-sm mb-8 relative z-10 font-mono text-xs tracking-wide leading-relaxed">
                                             NO PROCESSING TASKS IN QUEUE.<br />
                                             INITIALIZE NEW DIRECTIVES TO BEGIN OPERATIONS.
                                         </p>
@@ -645,7 +645,7 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                                         </div>
                                     </div>
                                 ) : (
-                                    <div className="col-span-full border-2 border-dashed border-blue-200 rounded-lg bg-slate-50/50">
+                                    <div className="col-span-full border-2 border-dashed border rounded-lg bg-muted/50">
                                         <EmptyState
                                             icon={<Inbox className="h-8 w-8" />}
                                             title="No tasks match your filters"
@@ -676,8 +676,8 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                             if (objectiveTasks.length === 0) return null
 
                             return (
-                                <div key={objective.id} className="border border-blue-200 rounded-lg overflow-hidden bg-white">
-                                    <div className="bg-slate-50 px-4 py-3 border-b border-blue-200 flex justify-between items-center">
+                                <div key={objective.id} className="border border rounded-lg overflow-hidden bg-white">
+                                    <div className="bg-muted px-4 py-3 border-b border flex justify-between items-center">
                                         <h3 className="font-semibold text-foreground flex items-center gap-2">
                                             {isSelectionMode && (
                                                 <Checkbox
@@ -696,7 +696,7 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                                             )}
                                             <div className="bg-blue-600 w-2 h-2 rounded-full" />
                                             {objective.title}
-                                            <Badge variant="secondary" className="ml-2 bg-white text-slate-600 font-normal">
+                                            <Badge variant="secondary" className="ml-2 bg-background text-muted-foreground font-normal">
                                                 {objectiveTasks.length} Tasks
                                             </Badge>
                                         </h3>
@@ -706,7 +706,7 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                                             <div
                                                 key={task.id}
                                                 className={cn(
-                                                    "pl-5 pr-7 py-4 border-b border-slate-100 last:border-0 hover:bg-slate-50 active:bg-slate-100 flex items-center justify-between group gap-4 relative cursor-pointer transition-colors duration-200",
+                                                    "pl-5 pr-7 py-4 border-b border-slate-100 last:border-0 hover:bg-muted active:bg-muted flex items-center justify-between group gap-4 relative cursor-pointer transition-colors duration-200",
                                                     isSelectionMode && selectedTaskIds.has(task.id) && "bg-blue-50 hover:bg-blue-100"
                                                 )}
                                                 onClick={() => {
@@ -774,8 +774,8 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                         })}
 
                         {orphanedTasks.length > 0 && (
-                            <div className="border border-blue-200 rounded-lg overflow-hidden bg-white">
-                                <div className="bg-slate-50 px-4 py-3 border-b border-blue-200">
+                            <div className="border border rounded-lg overflow-hidden bg-white">
+                                <div className="bg-muted px-4 py-3 border-b border">
                                     <h3 className="font-semibold text-muted-foreground flex items-center gap-2">
                                         {isSelectionMode && (
                                             <Checkbox
@@ -801,7 +801,7 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                                         <div
                                             key={task.id}
                                             className={cn(
-                                                "px-5 py-4 border-b border-slate-100 last:border-0 hover:bg-slate-50 active:bg-slate-100 flex items-center justify-between group gap-4 cursor-pointer transition-colors duration-200",
+                                                "px-5 py-4 border-b border-slate-100 last:border-0 hover:bg-muted active:bg-muted flex items-center justify-between group gap-4 cursor-pointer transition-colors duration-200",
                                                 isSelectionMode && selectedTaskIds.has(task.id) && "bg-blue-50 hover:bg-blue-100"
                                             )}
                                             onClick={() => {
@@ -841,7 +841,7 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                                                 <div className="flex items-center gap-1 text-muted-foreground w-32">
                                                     {task.assignee ? (
                                                         <>
-                                                            <Avatar className="h-5 w-5 border border-white bg-slate-100">
+                                                            <Avatar className="h-5 w-5 border border-white bg-muted">
                                                                 {task.assignee.role === "AI_Agent" ? (
                                                                     <AvatarImage src="/images/ai-agent-avatar.png" className="object-cover" />
                                                                 ) : null}
@@ -881,7 +881,7 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                             variant="secondary"
                             onClick={handleBulkAccept}
                             disabled={isBulkOperating}
-                            className="bg-white text-slate-900 hover:bg-slate-100"
+                            className="bg-background text-foreground hover:bg-muted"
                         >
                             <Check className="w-4 h-4 mr-1" />
                             Accept
@@ -891,7 +891,7 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                             variant="secondary"
                             onClick={handleBulkComplete}
                             disabled={isBulkOperating}
-                            className="bg-white text-slate-900 hover:bg-slate-100"
+                            className="bg-background text-foreground hover:bg-muted"
                         >
                             <CheckSquare className="w-4 h-4 mr-1" />
                             Complete
@@ -902,7 +902,7 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                                     size="sm"
                                     variant="secondary"
                                     disabled={isBulkOperating}
-                                    className="bg-white text-slate-900 hover:bg-slate-100"
+                                    className="bg-background text-foreground hover:bg-muted"
                                 >
                                     <UserPlus className="w-4 h-4 mr-1" />
                                     Assign

@@ -93,10 +93,10 @@ export default function PricingPage() {
         return (
             <div className="space-y-6">
                 <div>
-                    <h1 className="text-3xl font-bold tracking-tight text-slate-900">
+                    <h1 className="text-3xl font-bold tracking-tight text-foreground">
                         Pricing & Capacity
                     </h1>
-                    <p className="text-slate-500 mt-1">
+                    <p className="text-muted-foreground mt-1">
                         Set your rates and manage your workload
                     </p>
                 </div>
@@ -146,10 +146,10 @@ export default function PricingPage() {
             {/* Header */}
             <div className="flex items-center justify-between">
                 <div>
-                    <h1 className="text-3xl font-bold tracking-tight text-slate-900">
+                    <h1 className="text-3xl font-bold tracking-tight text-foreground">
                         Pricing & Capacity
                     </h1>
-                    <p className="text-slate-500 mt-1">
+                    <p className="text-muted-foreground mt-1">
                         Set your rates and manage your workload
                     </p>
                 </div>
@@ -206,7 +206,7 @@ export default function PricingPage() {
                     <Card>
                         <CardHeader>
                             <CardTitle className="flex items-center gap-2">
-                                <TrendingUp className="h-5 w-5 text-slate-500" />
+                                <TrendingUp className="h-5 w-5 text-muted-foreground" />
                                 Capacity Settings
                             </CardTitle>
                             <CardDescription>
@@ -218,7 +218,7 @@ export default function PricingPage() {
                                 <div className="space-y-2">
                                     <label 
                                         htmlFor="maxOrders" 
-                                        className="text-sm font-medium text-slate-700"
+                                        className="text-sm font-medium text-foreground"
                                     >
                                         Maximum Concurrent Orders
                                     </label>
@@ -229,22 +229,22 @@ export default function PricingPage() {
                                         max="50"
                                         value={maxConcurrentOrders}
                                         onChange={(e) => setMaxConcurrentOrders(e.target.value)}
-                                        className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm ring-offset-white file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-950 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                        className="flex h-10 w-full rounded-md border border bg-background px-3 py-2 text-sm ring-offset-white file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-950 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                                     />
-                                    <p className="text-xs text-slate-500">
+                                    <p className="text-xs text-muted-foreground">
                                         How many active orders you can work on simultaneously
                                     </p>
                                 </div>
 
-                                <div className="flex items-center justify-between p-4 bg-slate-50 rounded-lg">
+                                <div className="flex items-center justify-between p-4 bg-muted rounded-lg">
                                     <div className="space-y-0.5">
                                         <label 
                                             htmlFor="autoPause" 
-                                            className="text-sm font-medium text-slate-700 cursor-pointer"
+                                            className="text-sm font-medium text-foreground cursor-pointer"
                                         >
                                             Auto-pause at capacity
                                         </label>
-                                        <p className="text-xs text-slate-500">
+                                        <p className="text-xs text-muted-foreground">
                                             Automatically pause new bookings when at max capacity
                                         </p>
                                     </div>
@@ -258,7 +258,7 @@ export default function PricingPage() {
                                         }`}
                                     >
                                         <span
-                                            className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 transition-transform ${
+                                            className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-background shadow-lg ring-0 transition-transform ${
                                                 autoPauseAtCapacity ? 'translate-x-5' : 'translate-x-0'
                                             }`}
                                         />
@@ -266,9 +266,9 @@ export default function PricingPage() {
                                 </div>
 
                                 {/* Current Capacity Display */}
-                                <div className="p-4 bg-slate-50 rounded-lg">
+                                <div className="p-4 bg-muted rounded-lg">
                                     <div className="flex items-center justify-between">
-                                        <p className="text-sm text-slate-500">Current Workload</p>
+                                        <p className="text-sm text-muted-foreground">Current Workload</p>
                                         <Badge variant={isAtCapacity ? "destructive" : "default"}>
                                             {profile?.current_order_count || 0} / {profile?.max_concurrent_orders || 5}
                                         </Badge>
@@ -309,36 +309,36 @@ export default function PricingPage() {
                     <Card>
                         <CardHeader>
                             <CardTitle className="flex items-center gap-2">
-                                <Settings className="h-5 w-5 text-slate-500" />
+                                <Settings className="h-5 w-5 text-muted-foreground" />
                                 Profile Status
                             </CardTitle>
                         </CardHeader>
                         <CardContent>
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                                <div className="p-4 bg-slate-50 rounded-lg">
-                                    <p className="text-xs text-slate-500 uppercase tracking-wide">Status</p>
+                                <div className="p-4 bg-muted rounded-lg">
+                                    <p className="text-xs text-muted-foreground uppercase tracking-wide">Status</p>
                                     <div className="mt-1">
                                         <Badge variant={profile?.is_active ? "default" : "secondary"}>
                                             {profile?.is_active ? 'Active' : 'Paused'}
                                         </Badge>
                                     </div>
                                 </div>
-                                <div className="p-4 bg-slate-50 rounded-lg">
-                                    <p className="text-xs text-slate-500 uppercase tracking-wide">Timezone</p>
-                                    <p className="mt-1 font-medium text-slate-900 text-sm truncate">
+                                <div className="p-4 bg-muted rounded-lg">
+                                    <p className="text-xs text-muted-foreground uppercase tracking-wide">Timezone</p>
+                                    <p className="mt-1 font-medium text-foreground text-sm truncate">
                                         {profile?.timezone || 'Not set'}
                                     </p>
                                 </div>
-                                <div className="p-4 bg-slate-50 rounded-lg">
-                                    <p className="text-xs text-slate-500 uppercase tracking-wide">Stripe</p>
+                                <div className="p-4 bg-muted rounded-lg">
+                                    <p className="text-xs text-muted-foreground uppercase tracking-wide">Stripe</p>
                                     <div className="mt-1">
                                         <Badge variant={profileData?.stripe_onboarding_complete ? "default" : "secondary"}>
                                             {profileData?.stripe_onboarding_complete ? 'Connected' : 'Not Connected'}
                                         </Badge>
                                     </div>
                                 </div>
-                                <div className="p-4 bg-slate-50 rounded-lg">
-                                    <p className="text-xs text-slate-500 uppercase tracking-wide">Out of Office</p>
+                                <div className="p-4 bg-muted rounded-lg">
+                                    <p className="text-xs text-muted-foreground uppercase tracking-wide">Out of Office</p>
                                     <div className="mt-1">
                                         <Badge variant={profileData?.out_of_office ? "destructive" : "secondary"}>
                                             {profileData?.out_of_office ? 'Away' : 'Available'}
@@ -356,25 +356,25 @@ export default function PricingPage() {
                 <CardHeader>
                     <CardTitle className="text-lg">Understanding Your Settings</CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-3 text-sm text-slate-600">
+                <CardContent className="space-y-3 text-sm text-muted-foreground">
                     <p>
-                        <strong className="text-slate-900">Day Rate:</strong> This is your standard rate 
+                        <strong className="text-foreground">Day Rate:</strong> This is your standard rate 
                         per day of work. Clients will see this when browsing your profile.
                     </p>
                     <p>
-                        <strong className="text-slate-900">Minimum Engagement:</strong> Set a minimum 
+                        <strong className="text-foreground">Minimum Engagement:</strong> Set a minimum 
                         number of days for bookings. This ensures engagements are worth your time.
                     </p>
                     <p>
-                        <strong className="text-slate-900">Retainer Pricing:</strong> Offer a discounted 
+                        <strong className="text-foreground">Retainer Pricing:</strong> Offer a discounted 
                         hourly rate for clients who commit to ongoing weekly hours.
                     </p>
                     <p>
-                        <strong className="text-slate-900">Max Concurrent Orders:</strong> Limits how 
+                        <strong className="text-foreground">Max Concurrent Orders:</strong> Limits how 
                         many active engagements you can have at once. This helps prevent overcommitment.
                     </p>
                     <p>
-                        <strong className="text-slate-900">Auto-pause:</strong> When enabled, your 
+                        <strong className="text-foreground">Auto-pause:</strong> When enabled, your 
                         profile will automatically stop accepting new orders when you reach capacity. 
                         It resumes when orders are completed.
                     </p>

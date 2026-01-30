@@ -159,7 +159,7 @@ function InitialsAvatar({
 function CustomTaskListHeader({ headerHeight }: { headerHeight: number }) {
     return (
         <div
-            className="flex items-center bg-slate-100 text-xs font-medium text-slate-600"
+            className="flex items-center bg-muted text-xs font-medium text-muted-foreground"
             style={{ height: headerHeight }}
         >
             <div className="w-10 px-2 text-center">#</div>
@@ -191,7 +191,7 @@ function AssigneeAvatarStack({ assignees, maxDisplay = 3 }: { assignees: Assigne
                 </div>
             ))}
             {remainingCount > 0 && (
-                <div className="h-5 w-5 bg-slate-300 rounded-full flex items-center justify-center text-[8px] font-semibold text-slate-600 ring-1 ring-white">
+                <div className="h-5 w-5 bg-slate-300 rounded-full flex items-center justify-center text-[8px] font-semibold text-muted-foreground ring-1 ring-white">
                     +{remainingCount}
                 </div>
             )}
@@ -222,11 +222,11 @@ function CustomTaskListTable({
                 return (
                     <div
                         key={task.id}
-                        className="flex items-center hover:bg-slate-100 text-sm cursor-pointer"
+                        className="flex items-center hover:bg-muted text-sm cursor-pointer"
                         style={{ height: rowHeight }}
                         onClick={() => onExpanderClick(task)}
                     >
-                        <div className="w-10 px-2 text-center text-slate-400 text-xs font-mono">{taskNum}</div>
+                        <div className="w-10 px-2 text-center text-muted-foreground text-xs font-mono">{taskNum}</div>
                         <div className="flex-1 px-2 min-w-[120px] flex items-center gap-2">
                             {/* Show multiple assignees if available, otherwise fall back to single */}
                             {task.assignees && task.assignees.length > 0 ? (
@@ -238,7 +238,7 @@ function CustomTaskListTable({
                                     isAI={task.assigneeRole === 'AI_Agent'}
                                 />
                             )}
-                            <span className="text-slate-900 truncate">{displayName}</span>
+                            <span className="text-foreground truncate">{displayName}</span>
                             {/* Progress percentage badge */}
                             {progressPct > 0 && progressPct < 100 && (
                                 <span className="ml-auto shrink-0 text-[10px] font-medium text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">
@@ -251,10 +251,10 @@ function CustomTaskListTable({
                                 </span>
                             )}
                         </div>
-                        <div className="w-20 px-2 text-center text-slate-500 text-xs">
+                        <div className="w-20 px-2 text-center text-muted-foreground text-xs">
                             {format(task.start, 'd MMM')}
                         </div>
-                        <div className="w-20 px-2 text-center text-slate-500 text-xs">
+                        <div className="w-20 px-2 text-center text-muted-foreground text-xs">
                             {format(task.end, 'd MMM')}
                         </div>
                     </div>
@@ -291,7 +291,7 @@ const CustomTooltip = ({ task }: { task: GanttTask, fontSize: string, fontFamily
             color: '#0f172a' // slate-900
         }}>
             <div className="font-bold mb-1">{task.name}</div>
-            <div className="text-slate-500 mb-1">
+            <div className="text-muted-foreground mb-1">
                 {format(startDate, 'MMM d')} - {format(endDate, 'MMM d, yyyy')}
             </div>
             <div className="flex items-center gap-3 mt-2">
@@ -303,7 +303,7 @@ const CustomTooltip = ({ task }: { task: GanttTask, fontSize: string, fontFamily
                 </div>
             </div>
             {extendedTask.assignees && extendedTask.assignees.length > 0 && (
-                <div className="text-slate-500 text-xs mt-1.5 border-t border-slate-100 pt-1.5">
+                <div className="text-muted-foreground text-xs mt-1.5 border-t border-slate-100 pt-1.5">
                     Assigned: {extendedTask.assignees.map(a => a.full_name || 'Unknown').join(', ')}
                 </div>
             )}
@@ -611,33 +611,33 @@ export function GanttView({ tasks, objectives, profiles, members = [], currentUs
             {/* Color Legend */}
             <div className="flex flex-wrap items-center justify-between gap-4 px-1">
                 <div className="flex flex-wrap items-center gap-3 text-xs">
-                    <span className="text-slate-500 font-medium">Status:</span>
+                    <span className="text-muted-foreground font-medium">Status:</span>
                     <span className="flex items-center gap-1.5">
                         <span className="w-3 h-3 rounded-sm" style={{ backgroundColor: '#9ca3af' }}></span>
-                        <span className="text-slate-600">Pending</span>
+                        <span className="text-muted-foreground">Pending</span>
                     </span>
                     <span className="flex items-center gap-1.5">
                         <span className="w-3 h-3 rounded-sm" style={{ backgroundColor: '#3b82f6' }}></span>
-                        <span className="text-slate-600">Accepted</span>
+                        <span className="text-muted-foreground">Accepted</span>
                     </span>
                     <span className="flex items-center gap-1.5">
                         <span className="w-3 h-3 rounded-sm" style={{ backgroundColor: '#22c55e' }}></span>
-                        <span className="text-slate-600">Completed</span>
+                        <span className="text-muted-foreground">Completed</span>
                     </span>
                     <span className="flex items-center gap-1.5">
                         <span className="w-3 h-3 rounded-sm" style={{ backgroundColor: '#f59e0b' }}></span>
-                        <span className="text-slate-600">Due Soon</span>
+                        <span className="text-muted-foreground">Due Soon</span>
                     </span>
                     <span className="flex items-center gap-1.5">
                         <span className="w-3 h-3 rounded-sm" style={{ backgroundColor: '#ef4444' }}></span>
-                        <span className="text-slate-600">Overdue</span>
+                        <span className="text-muted-foreground">Overdue</span>
                     </span>
                     <span className="flex items-center gap-1.5">
                         <span className="w-3 h-3 rounded-sm" style={{ backgroundColor: '#a855f7' }}></span>
-                        <span className="text-slate-600">Pending Approval</span>
+                        <span className="text-muted-foreground">Pending Approval</span>
                     </span>
                 </div>
-                <div className="text-xs text-slate-500 flex gap-4">
+                <div className="text-xs text-muted-foreground flex gap-4">
                     <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-slate-400"></span> Drag bar to reschedule</span>
                     <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-slate-400"></span> Drag edges to resize duration</span>
                 </div>
@@ -792,7 +792,7 @@ export function GanttView({ tasks, objectives, profiles, members = [], currentUs
                     <Button
                         variant="ghost"
                         size="icon"
-                        className="absolute right-2 top-2 z-50 h-8 w-8 rounded-full bg-white/90 hover:bg-white shadow-md"
+                        className="absolute right-2 top-2 z-50 h-8 w-8 rounded-full bg-white/90 hover:bg-background shadow-md"
                         onClick={() => setSelectedTaskId(null)}
                     >
                         <X className="h-4 w-4" />

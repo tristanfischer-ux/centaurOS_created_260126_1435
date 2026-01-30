@@ -16,7 +16,8 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { submitRFQ } from "@/actions/marketplace"
 import { Loader2, ChevronDown, ChevronUp, Mic, Square } from "lucide-react"
-import { toast } from "sonner" // Assuming sonner is used, or I'll use a basic alert if not available
+import { toast } from "sonner"
+import { cn } from "@/lib/utils"
 
 export function CreateRFQDialog() {
     const [open, setOpen] = useState(false)
@@ -225,7 +226,7 @@ export function CreateRFQDialog() {
             <DialogTrigger asChild>
                 <Button size="sm" variant="default" className="shadow-md">Create RFQ</Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[425px] bg-white text-slate-900 border-slate-200">
+            <DialogContent className="sm:max-w-[425px] bg-background text-foreground border-slate-200">
                 <DialogHeader>
                     <DialogTitle>Create Manufacturing RFQ</DialogTitle>
                     <DialogDescription>
@@ -235,9 +236,10 @@ export function CreateRFQDialog() {
                 <form onSubmit={handleSubmit} className="grid gap-4 py-4">
                     {/* Voice recording status */}
                     {(isRecording || isTranscribing) && (
-                        <div className={`flex items-center justify-center gap-2 py-2 px-3 rounded-md text-sm font-medium ${
-                            isRecording ? 'bg-red-50 text-red-600 animate-pulse' : 'bg-amber-50 text-amber-600'
-                        }`}>
+                        <div className={cn(
+                            "flex items-center justify-center gap-2 py-2 px-3 rounded-md text-sm font-medium",
+                            isRecording ? 'bg-destructive/10 text-destructive animate-pulse' : 'bg-status-warning-light text-status-warning-dark'
+                        )}>
                             {isRecording ? (
                                 <>
                                     <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
@@ -266,7 +268,7 @@ export function CreateRFQDialog() {
                                 placeholder="e.g. Aluminum Enclosure Prototype"
                                 required
                                 enterKeyHint="next"
-                                className={`flex-1 ${titleError ? 'border-red-500' : ''}`}
+                                className={cn("flex-1", titleError && "border-destructive")}
                                 aria-describedby={titleError ? "title-error" : undefined}
                                 aria-invalid={!!titleError}
                             />
@@ -289,7 +291,7 @@ export function CreateRFQDialog() {
                             </Button>
                         </div>
                         {titleError && (
-                            <p id="title-error" className="text-sm text-red-600 mt-1" role="alert">
+                            <p id="title-error" className="text-sm text-destructive mt-1" role="alert">
                                 {titleError}
                             </p>
                         )}
@@ -302,7 +304,7 @@ export function CreateRFQDialog() {
                             variant="ghost"
                             size="sm"
                             onClick={() => setShowAdvanced(!showAdvanced)}
-                            className="text-slate-500"
+                            className="text-muted-foreground"
                         >
                             {showAdvanced ? (
                                 <>
@@ -332,17 +334,17 @@ export function CreateRFQDialog() {
                                     }}
                                     placeholder="e.g. $500 - $1,000"
                                     enterKeyHint="next"
-                                    className={budgetError ? 'border-red-500' : ''}
+                                    className={cn(budgetError && "border-destructive")}
                                     aria-describedby={budgetError ? "budget-error" : undefined}
                                     aria-invalid={!!budgetError}
                                 />
                                 {budgetError && (
-                                    <p id="budget-error" className="text-sm text-red-600 mt-1" role="alert">
+                                    <p id="budget-error" className="text-sm text-destructive mt-1" role="alert">
                                         {budgetError}
                                     </p>
                                 )}
                                 {!budgetError && (
-                                    <p className="text-xs text-slate-500">Format: $500 - $1,000 or $500-$1000</p>
+                                    <p className="text-xs text-muted-foreground">Format: $500 - $1,000 or $500-$1000</p>
                                 )}
                             </div>
                             <div className="grid gap-2">
@@ -355,18 +357,18 @@ export function CreateRFQDialog() {
                                         setSpecsError(null)
                                     }}
                                     placeholder="Detailed requirements, materials, tolerances..."
-                                    className={`h-32 ${specsError ? 'border-red-500' : ''}`}
+                                    className={cn("h-32", specsError && "border-destructive")}
                                     enterKeyHint="done"
                                     aria-describedby={specsError ? "specs-error" : undefined}
                                     aria-invalid={!!specsError}
                                 />
                                 {specsError && (
-                                    <p id="specs-error" className="text-sm text-red-600 mt-1" role="alert">
+                                    <p id="specs-error" className="text-sm text-destructive mt-1" role="alert">
                                         {specsError}
                                     </p>
                                 )}
                                 {!specsError && formData.specifications && (
-                                    <p className="text-xs text-slate-500 text-right">
+                                    <p className="text-xs text-muted-foreground text-right">
                                         {formData.specifications.length} / 5,000 characters
                                     </p>
                                 )}

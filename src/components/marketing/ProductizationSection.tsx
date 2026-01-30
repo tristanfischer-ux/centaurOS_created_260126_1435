@@ -23,7 +23,7 @@ const network = [
 
 export function ProductizationSection() {
     return (
-        <section id="network" className="py-32 bg-slate-100">
+        <section id="network" className="py-32 bg-muted">
             <div className="max-w-7xl mx-auto px-6">
                 {/* Section Title */}
                 <h2 className="text-4xl md:text-5xl font-light text-black tracking-tight mb-20">
@@ -35,7 +35,7 @@ export function ProductizationSection() {
                     {network.map((item, index) => (
                         <div 
                             key={item.title}
-                            className="group relative bg-white rounded-lg overflow-hidden hover:shadow-xl transition-all duration-500"
+                            className="group relative bg-background rounded-lg overflow-hidden hover:shadow-xl transition-all duration-500"
                         >
                             {/* Image Placeholder with Gradient */}
                             <div className={`h-64 bg-gradient-to-b ${item.gradient} bg-slate-200 relative`}>
@@ -44,13 +44,13 @@ export function ProductizationSection() {
                             
                             {/* Content */}
                             <div className="p-8 -mt-16 relative">
-                                <span className="text-xs font-medium tracking-[0.2em] text-slate-500 uppercase block mb-3">
+                                <span className="text-xs font-medium tracking-[0.2em] text-muted-foreground uppercase block mb-3">
                                     {item.label}
                                 </span>
                                 <h3 className="text-2xl font-semibold text-black tracking-tight mb-4">
                                     {item.title}
                                 </h3>
-                                <p className="text-slate-600 leading-relaxed">
+                                <p className="text-muted-foreground leading-relaxed">
                                     &ldquo;{item.description}&rdquo;
                                 </p>
                             </div>

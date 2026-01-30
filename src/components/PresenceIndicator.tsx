@@ -193,7 +193,7 @@ export function PresenceList({ presences, onUserClick }: PresenceListProps) {
             <button
               key={presence.user_id}
               onClick={() => onUserClick?.(presence.user_id)}
-              className="flex items-center gap-2 text-sm hover:bg-slate-50 rounded px-2 py-1 w-full text-left transition-colors"
+              className="flex items-center gap-2 text-sm hover:bg-muted rounded px-2 py-1 w-full text-left transition-colors"
             >
               <span className="font-medium truncate">
                 {presence.full_name || 'Unknown'}

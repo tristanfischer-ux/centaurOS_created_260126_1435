@@ -385,7 +385,7 @@ export function BuyerOnboardingBanner({
     if (isDismissed) return null
 
     return (
-        <Card className={cn("border-blue-200 bg-blue-50", className)}>
+        <Card className={cn("border bg-blue-50", className)}>
             <CardContent className="py-4">
                 <div className="flex items-center justify-between gap-4">
                     <div className="flex items-center gap-3">
@@ -407,7 +407,7 @@ export function BuyerOnboardingBanner({
                                 localStorage.setItem(ONBOARDING_STORAGE_KEY, 'true')
                                 setIsDismissed(true)
                             }}
-                            className="border-blue-200 text-blue-700 hover:bg-blue-100"
+                            className="border text-blue-700 hover:bg-blue-100"
                         >
                             Dismiss
                         </Button>

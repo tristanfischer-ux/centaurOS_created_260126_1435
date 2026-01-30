@@ -1,0 +1,298 @@
+---
+description: Consistent page layouts, containers, spacing, and grid patterns
+alwaysApply: true
+---
+
+# Layout & Spacing Standards
+
+All pages and components must follow these layout and spacing patterns for visual consistency.
+
+## 1. Page Container Pattern
+
+**Platform pages inherit padding from layout** - do NOT add additional containers unless needed:
+
+```tsx
+// ✅ CORRECT - Let platform layout handle padding
+export default function TasksPage() {
+  return (
+    <div>
+      <PageHeader />
+      <TaskList />
+    </div>
+  )
+}
+
+// ❌ WRONG - Don't duplicate padding
+export default function TasksPage() {
+  return (
+    <div className="p-6">  {/* Layout already has padding! */}
+      <PageHeader />
+    </div>
+  )
+}
+```
+
+**Platform layout provides:** `p-4 sm:p-6 lg:p-8`
+
+## 2. Max-Width Patterns
+
+Use consistent max-widths based on page type:
+
+| Page Type | Max Width | Usage |
+|-----------|-----------|-------|
+| **List/Grid views** | No max-width | Full width for task lists, team grids, marketplace |
+| **Detail pages** | `max-w-5xl mx-auto` | Individual task, objective, profile detail |
+| **Forms** | `max-w-3xl mx-auto` | Onboarding, settings, create dialogs |
+| **Settings** | `max-w-4xl mx-auto` | Settings pages, preferences |
+| **Marketing** | `max-w-7xl mx-auto` | Landing pages, wide marketing content |
+
+```tsx
+// ✅ CORRECT - Detail page with centered content
+export default function TaskDetailPage() {
+  return (
+    <div className="max-w-5xl mx-auto">
+      <TaskDetail />
+    </div>
+  )
+}
+
+// ✅ CORRECT - List view without max-width
+export default function TasksPage() {
+  return (
+    <div>
+      <TaskGrid />  {/* Full width */}
+    </div>
+  )
+}
+```
+
+## 3. Spacing Scale
+
+**Use design system spacing utilities:**
+
+```tsx
+import { spacing } from '@/lib/design-system'
+
+// Page sections
+<div className={spacing.section}>     {/* space-y-8 */}
+  
+  // Card content groups
+  <div className={spacing.card}>      {/* space-y-6 */}
+    
+    // Standard lists/stacks
+    <div className={spacing.stack}>   {/* space-y-4 */}
+      
+      // Tight groupings
+      <div className={spacing.stackTight}>  {/* space-y-2 */}
+```
+
+**Direct values when needed:**
+
+| Use Case | Value | When to Use |
+|----------|-------|-------------|
+| **Page sections** | `space-y-8` | Between major page sections (header, content, footer) |
+| **Card groups** | `space-y-6` | Between cards or content blocks |
+| **List items** | `space-y-4` | Standard lists, form fields |
+| **Tight content** | `space-y-2` | Label-to-input, related metadata |
+| **Wide sections** | `space-y-12` | Marketing sections, hero spacing |
+
+## 4. Grid Patterns
+
+**Use consistent grid breakpoints and gaps:**
+
+```tsx
+// ✅ CORRECT - Standard 3-column grid
+<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+  <Card />
+  <Card />
+  <Card />
+</div>
+
+// ✅ CORRECT - Responsive 2-column to 4-column
+<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+  <Item />
+</div>
+```
+
+**Grid gap standards:**
+
+| Use Case | Gap Value |
+|----------|-----------|
+| **Default grids** | `gap-6` |
+| **Dense grids** | `gap-4` |
+| **Wide grids** | `gap-8` |
+
+**Breakpoint preference:**
+- Use `md:` and `lg:` for most layouts (not `sm:`)
+- Use `sm:` only for small adjustments (typography, padding)
+- Use `xl:` for 4+ column grids
+
+```tsx
+// ❌ WRONG - Don't use inconsistent gaps
+<div className="grid gap-7">  {/* Use gap-6 or gap-8 */}
+<div className="grid gap-5">  {/* Use gap-4 or gap-6 */}
+```
+
+## 5. Card Layout Pattern
+
+**Use Card component consistently:**
+
+```tsx
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
+
+// ✅ CORRECT - Standard card
+<Card>
+  <CardHeader>
+    <CardTitle>Card Title</CardTitle>
+  </CardHeader>
+  <CardContent>
+    <p>Card content</p>
+  </CardContent>
+</Card>
+
+// ❌ WRONG - Don't override card padding
+<Card className="p-8">  {/* CardHeader/Content handle padding */}
+  <h2>Title</h2>
+</Card>
+
+// ❌ WRONG - Don't use custom card divs
+<div className="rounded-lg border p-6">  {/* Use Card component */}
+  <h2>Title</h2>
+</div>
+```
+
+**Card component provides:**
+- `CardHeader`: `p-4 sm:p-6` with `space-y-1.5`
+- `CardContent`: `p-6 pt-2`
+- `CardFooter`: `p-6 pt-2`
+
+## 6. Page Header Pattern
+
+**All platform pages must use the standardized header with orange accent bar:**
+
+```tsx
+import { typography } from '@/lib/design-system'
+
+<div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-slate-100">
+  <div className="min-w-0 flex-1">
+    <div className={typography.pageHeader}>
+      <div className={typography.pageHeaderAccent} />
+      <h1 className={typography.h1}>
+        Page Title
+      </h1>
+    </div>
+    <p className={typography.pageSubtitle}>
+      Subtitle or description
+    </p>
+  </div>
+  
+  <div className="flex items-center gap-2">
+    <Button>Action</Button>
+  </div>
+</div>
+```
+
+**Header standards:**
+- ✅ Orange accent bar on all platform pages
+- ✅ Responsive flex layout (column on mobile, row on desktop)
+- ✅ Border: `border-slate-100` (not blue or foundry variants)
+- ✅ Bottom padding: `pb-4`
+- ✅ Typography from design system
+
+## 7. Flex Patterns
+
+**Consistent flex layouts:**
+
+```tsx
+// Header with actions
+<div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+  <div className="min-w-0 flex-1">
+    <h1>Title</h1>
+  </div>
+  <div className="flex items-center gap-2">
+    <Button>Action 1</Button>
+    <Button>Action 2</Button>
+  </div>
+</div>
+
+// Horizontal list with consistent gaps
+<div className="flex items-center gap-2">
+  <Icon />
+  <Text />
+</div>
+
+// Vertical stack
+<div className="flex flex-col gap-4">
+  <Item />
+  <Item />
+</div>
+```
+
+## 8. Responsive Padding
+
+**Use responsive padding consistently:**
+
+```tsx
+// Card padding - more on desktop
+<Card>
+  <CardHeader className="p-4 sm:p-6">  {/* Default */}
+    <CardTitle />
+  </CardHeader>
+</Card>
+
+// Page containers
+<div className="p-4 sm:p-6 lg:p-8">  {/* Platform standard */}
+
+// Section padding
+<section className="py-8 sm:py-12 lg:py-16">  {/* Marketing sections */}
+```
+
+## 9. Content Centering
+
+When centering content, use consistent patterns:
+
+```tsx
+// ✅ CORRECT - Centered container
+<div className="max-w-5xl mx-auto">
+  <Content />
+</div>
+
+// ✅ CORRECT - Flex center for single item
+<div className="flex items-center justify-center min-h-[200px]">
+  <EmptyState />
+</div>
+
+// ❌ WRONG - Don't mix patterns
+<div className="container mx-auto px-4 max-w-6xl">  {/* Redundant */}
+```
+
+## 10. Section Dividers
+
+Use consistent dividers between sections:
+
+```tsx
+// Border divider
+<div className="border-b border-slate-100 pb-4 mb-8" />
+
+// Spacer divider (no visual line)
+<div className="h-8" />  // Use sparingly
+
+// Separator component (for within-card dividers)
+import { Separator } from '@/components/ui/separator'
+<Separator className="my-4" />
+```
+
+## Quick Checklist
+
+Before committing any layout:
+
+- [ ] Platform pages rely on layout padding (no duplicate `p-6`)
+- [ ] Max-width follows standards (detail pages: `max-w-5xl`, forms: `max-w-3xl`)
+- [ ] Page sections use `space-y-8`, card content uses `space-y-6`
+- [ ] Grids use standard gaps (`gap-6` default, `gap-4` dense)
+- [ ] Breakpoints use `md:` and `lg:` consistently
+- [ ] Cards use Card component (not custom divs)
+- [ ] Page headers have orange accent bar
+- [ ] Header border uses `border-slate-100`
+- [ ] No custom gap values (gap-5, gap-7)
+- [ ] Responsive padding follows platform standards

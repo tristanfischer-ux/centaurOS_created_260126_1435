@@ -1,0 +1,376 @@
+---
+description: Consistent usage of UI components (badges, dialogs, buttons, cards)
+alwaysApply: true
+---
+
+# Component Usage Patterns
+
+All components must follow these standardized patterns for consistency.
+
+## 1. Badge Component
+
+**Add size variants when using Badge:**
+
+```tsx
+import { Badge } from '@/components/ui/badge'
+
+// ✅ CORRECT - Use variants, not custom classes
+<Badge variant="success">Active</Badge>
+<Badge variant="warning">Pending</Badge>
+<Badge variant="destructive">Error</Badge>
+<Badge variant="info">Info</Badge>
+
+// ❌ WRONG - Don't override with custom sizes
+<Badge className="text-[10px]">  // Wrong
+<Badge className="text-lg px-4 py-1">  // Wrong
+```
+
+**For status indicators, use StatusBadge instead:**
+
+```tsx
+import { StatusBadge } from '@/components/ui/status-badge'
+
+// ✅ CORRECT - StatusBadge for statuses
+<StatusBadge status="success" size="md">Completed</StatusBadge>
+<StatusBadge status="warning" size="sm" dot>Pending</StatusBadge>
+<StatusBadge status="error" animated>Failed</StatusBadge>
+
+// ❌ WRONG - Don't use Badge for statuses
+<Badge variant="success">Completed</Badge>  // Use StatusBadge
+```
+
+**Badge variants:**
+- `default` - Primary brand color
+- `secondary` - Muted gray
+- `destructive` - Red for errors
+- `warning` - Orange for warnings
+- `success` - Green for success
+- `info` - Blue for information
+- `outline` - Outlined text
+- `system` - Monospace system badge
+- `brand` - Brand accent
+
+## 2. Button Component
+
+**Use semantic button variants:**
+
+```tsx
+import { Button } from '@/components/ui/button'
+
+// ✅ CORRECT - Semantic variants
+<Button variant="default">Primary Action</Button>
+<Button variant="secondary">Secondary Action</Button>
+<Button variant="ghost">Subtle Action</Button>
+<Button variant="destructive">Delete</Button>
+<Button variant="success">Approve</Button>
+<Button variant="warning">Review</Button>
+
+// ❌ WRONG - Don't create custom button styles
+<Button className="bg-blue-500 hover:bg-blue-600">  // Wrong
+```
+
+**Button hierarchy per page:**
+- **One** `default` (primary) button
+- Multiple `secondary` or `ghost` buttons as needed
+- One `destructive` button if delete/remove action exists
+
+**Loading states:**
+
+```tsx
+// ✅ CORRECT - Consistent loading pattern
+<Button disabled={isLoading}>
+  {isLoading ? (
+    <>
+      <Loader2 className="animate-spin" />
+      Loading...
+    </>
+  ) : (
+    'Submit'
+  )}
+</Button>
+
+// ❌ WRONG - Don't create custom loading states
+<Button className={isLoading ? 'opacity-50' : ''}>  // Wrong
+```
+
+**Icon buttons:**
+
+```tsx
+// ✅ CORRECT - Icon-only button
+<Button variant="ghost" size="icon" aria-label="Close">
+  <X className="h-4 w-4" />
+</Button>
+
+// ❌ WRONG - Missing accessible name
+<Button variant="ghost" size="icon">
+  <X className="h-4 w-4" />
+</Button>
+```
+
+## 3. Card Component
+
+**Always use Card component, not custom divs:**
+
+```tsx
+import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card'
+
+// ✅ CORRECT - Standard card structure
+<Card>
+  <CardHeader>
+    <CardTitle>Card Title</CardTitle>
+  </CardHeader>
+  <CardContent>
+    <p>Card content goes here</p>
+  </CardContent>
+  <CardFooter>
+    <Button>Action</Button>
+  </CardFooter>
+</Card>
+
+// ❌ WRONG - Don't create custom card divs
+<div className="rounded-lg border bg-white p-6">  // Use Card
+  <h3>Title</h3>
+  <p>Content</p>
+</div>
+
+// ❌ WRONG - Don't override card padding
+<Card className="p-8">  {/* CardHeader/Content handle padding */}
+```
+
+**Card without header/footer:**
+
+```tsx
+// ✅ CORRECT - Content-only card
+<Card>
+  <CardContent className="pt-6">
+    <p>Simple card content</p>
+  </CardContent>
+</Card>
+```
+
+**Card borders:**
+
+```tsx
+// ✅ CORRECT - Use semantic border
+<Card className="border">  {/* Uses semantic border token */}
+
+// ❌ WRONG - Don't customize border colors
+<Card className="border-blue-200">  // Wrong
+<Card className="border-foundry-200">  // Wrong
+<Card className="border-slate-200">  // Wrong
+```
+
+## 4. Dialog Component
+
+**Use size prop, not custom widths:**
+
+```tsx
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
+
+// ✅ CORRECT - Use size prop
+<Dialog>
+  <DialogContent size="md">
+    <DialogHeader>
+      <DialogTitle>Dialog Title</DialogTitle>
+    </DialogHeader>
+    <div>Content</div>
+    <DialogFooter>
+      <Button variant="secondary" onClick={onClose}>Cancel</Button>
+      <Button onClick={onSubmit}>Submit</Button>
+    </DialogFooter>
+  </DialogContent>
+</Dialog>
+
+// ❌ WRONG - Don't use custom widths
+<DialogContent className="sm:max-w-[600px]">  // Use size="md"
+<DialogContent className="max-w-3xl">  // Use size="lg"
+```
+
+**Dialog sizes:**
+- `sm` - 425px (confirmations, small forms)
+- `md` - 600px (standard forms, most dialogs)
+- `lg` - 800px (complex forms, galleries)
+- `default` - 512px (if size not specified)
+
+**Dialog footer pattern:**
+
+```tsx
+// ✅ CORRECT - Cancel on left, primary on right
+<DialogFooter>
+  <Button variant="secondary" onClick={onCancel}>
+    Cancel
+  </Button>
+  <Button onClick={onSubmit}>
+    Submit
+  </Button>
+</DialogFooter>
+
+// ❌ WRONG - Don't reverse button order
+<DialogFooter>
+  <Button onClick={onSubmit}>Submit</Button>
+  <Button variant="secondary">Cancel</Button>
+</DialogFooter>
+```
+
+## 5. Sheet Component (Side Panels)
+
+**Use Sheet for side panels, Dialog for centered modals:**
+
+```tsx
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
+
+// ✅ CORRECT - Sheet for detail views
+<Sheet>
+  <SheetContent side="right" className="w-[480px]">
+    <SheetHeader>
+      <SheetTitle>Detail View</SheetTitle>
+    </SheetHeader>
+    <div>Content</div>
+  </SheetContent>
+</Sheet>
+
+// When to use Sheet vs Dialog:
+// Sheet: Detail views, sidebars, history panels
+// Dialog: Forms, confirmations, focused actions
+```
+
+## 6. EmptyState Component
+
+**Use EmptyState for zero-data views:**
+
+```tsx
+import { EmptyState } from '@/components/ui/empty-state'
+
+// ✅ CORRECT - Standard empty state
+<EmptyState
+  title="No tasks yet"
+  description="Get started by creating your first task"
+  action={
+    <Button onClick={onCreate}>
+      <Plus className="h-4 w-4 mr-2" />
+      Create Task
+    </Button>
+  }
+/>
+
+// ❌ WRONG - Don't create custom empty states
+<div className="flex flex-col items-center justify-center p-8">
+  <p className="text-slate-500">No tasks found</p>
+</div>
+```
+
+## 7. StatusBadge Component
+
+**Use StatusBadge for all status indicators:**
+
+```tsx
+import { StatusBadge } from '@/components/ui/status-badge'
+
+// ✅ CORRECT - Semantic status
+<StatusBadge status="success">Active</StatusBadge>
+<StatusBadge status="warning" dot>Pending</StatusBadge>
+<StatusBadge status="error" animated>Failed</StatusBadge>
+<StatusBadge status="info" size="sm">Info</StatusBadge>
+
+// ❌ WRONG - Don't use Badge for statuses
+<Badge className="bg-green-100 text-green-800">Active</Badge>
+```
+
+## 8. Tabs Component
+
+**Use Tabs for view switching:**
+
+```tsx
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
+
+// ✅ CORRECT - Standard tabs
+<Tabs defaultValue="all">
+  <TabsList>
+    <TabsTrigger value="all">All</TabsTrigger>
+    <TabsTrigger value="active">Active</TabsTrigger>
+    <TabsTrigger value="completed">Completed</TabsTrigger>
+  </TabsList>
+  <TabsContent value="all">
+    <TaskList />
+  </TabsContent>
+</Tabs>
+```
+
+## 9. Skeleton Component
+
+**Use Skeleton for loading states:**
+
+```tsx
+import { Skeleton } from '@/components/ui/skeleton'
+
+// ✅ CORRECT - Loading skeleton
+{isLoading ? (
+  <div className="space-y-4">
+    <Skeleton className="h-12 w-full" />
+    <Skeleton className="h-12 w-full" />
+    <Skeleton className="h-12 w-full" />
+  </div>
+) : (
+  <TaskList tasks={tasks} />
+)}
+
+// ❌ WRONG - Don't create custom loading states
+<div className="animate-pulse bg-slate-200 h-12" />  // Use Skeleton
+```
+
+## 10. Alert Component
+
+**Use Alert for informational messages:**
+
+```tsx
+import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert'
+
+// ✅ CORRECT - Semantic alerts
+<Alert variant="destructive">
+  <AlertCircle className="h-4 w-4" />
+  <AlertTitle>Error</AlertTitle>
+  <AlertDescription>
+    Something went wrong. Please try again.
+  </AlertDescription>
+</Alert>
+
+<Alert variant="default">
+  <Info className="h-4 w-4" />
+  <AlertTitle>Note</AlertTitle>
+  <AlertDescription>
+    This action cannot be undone.
+  </AlertDescription>
+</Alert>
+```
+
+## Component Naming Convention
+
+When creating custom components that wrap or extend base components:
+
+```tsx
+// ✅ CORRECT - Descriptive, purpose-based names
+TaskStatusBadge.tsx  // Specific to task statuses
+OrderCard.tsx        // Specific to orders
+CreateTaskDialog.tsx // Specific action + component type
+
+// ❌ WRONG - Generic or unclear names
+MyBadge.tsx          // Too vague
+CustomCard.tsx       // Doesn't describe purpose
+Dialog2.tsx          // Version numbers indicate poor planning
+```
+
+## Quick Checklist
+
+Before committing any component usage:
+
+- [ ] Badges use semantic variants (not custom colors)
+- [ ] StatusBadge used for all status indicators
+- [ ] Buttons use semantic variants and include loading states
+- [ ] Icon-only buttons have `aria-label`
+- [ ] Cards use Card component (not custom divs)
+- [ ] Card padding not overridden
+- [ ] Dialogs use `size` prop (not custom widths)
+- [ ] Dialog footers: Cancel left, Submit right
+- [ ] EmptyState used for zero-data views
+- [ ] Skeleton used for loading states
+- [ ] Sheet used for side panels, Dialog for centered modals

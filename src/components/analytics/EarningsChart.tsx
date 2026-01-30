@@ -55,7 +55,7 @@ export function EarningsChart({
   }) => {
     if (active && payload && payload.length) {
       return (
-        <div className="bg-white dark:bg-slate-800 p-3 border rounded-lg shadow-lg">
+        <div className="bg-background dark:bg-slate-800 p-3 border rounded-lg shadow-lg">
           <p className="text-sm font-medium text-muted-foreground">{label}</p>
           {payload.map((entry, index) => (
             <p key={index} className="text-sm font-semibold" style={{ color: entry.color }}>

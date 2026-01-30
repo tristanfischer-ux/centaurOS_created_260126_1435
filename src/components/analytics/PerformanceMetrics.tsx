@@ -83,9 +83,9 @@ function MetricCard({ metric, showComparison }: MetricCardProps) {
   
   const variantStyles = {
     default: {
-      bg: 'bg-slate-50 border-slate-100',
-      icon: 'text-slate-600',
-      value: 'text-slate-900',
+      bg: 'bg-muted border-slate-100',
+      icon: 'text-muted-foreground',
+      value: 'text-foreground',
     },
     success: {
       bg: 'bg-green-50 border-green-100',
@@ -122,7 +122,7 @@ function MetricCard({ metric, showComparison }: MetricCardProps) {
       ? 'text-green-600'
       : metric.trend?.direction === 'down'
         ? 'text-red-600'
-        : 'text-slate-500'
+        : 'text-muted-foreground'
 
   return (
     <div className={cn("p-4 rounded-lg border", styles.bg)}>

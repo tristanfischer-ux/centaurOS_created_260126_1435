@@ -146,7 +146,7 @@ export function EditTaskDialog({ open, onOpenChange, task, members }: EditTaskDi
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-xl max-h-[90vh] flex flex-col overflow-hidden">
+            <DialogContent size="md" className="max-h-[90vh] flex flex-col overflow-hidden">
                 <DialogHeader className="flex-shrink-0">
                     <DialogTitle className="flex items-baseline gap-2">
                         Edit Task

@@ -55,15 +55,15 @@ export function Sidebar({ foundryName, foundryId, userName, userRole, isAdmin }:
     const { setZoom } = useZoomContext()
 
     return (
-        <div className="hidden md:flex h-screen w-64 flex-col bg-white border-r border-slate-100 text-slate-900">
+        <div className="hidden md:flex h-screen w-64 flex-col bg-background border-r border-slate-100 text-foreground">
             {/* App Header - Centaur Dynamics Branding */}
             <div className="px-5 pt-8 pb-6">
                 <div className="flex items-center justify-between">
                     <Link href="/dashboard" className="group flex items-center gap-2">
-                        <span className="font-display text-xl font-bold tracking-[0.05em] text-cyan-950 group-hover:text-cyan-700 transition-colors">
+                        <span className="font-display text-xl font-bold tracking-[0.05em] text-foreground group-hover:text-international-orange transition-colors">
                             CentaurOS
                         </span>
-                        <span className="w-1.5 h-1.5 rounded-full bg-cyan-500 animate-pulse shadow-[0_0_8px_rgba(6,182,212,0.8)]"></span>
+                        <span className="w-1.5 h-1.5 rounded-full bg-international-orange animate-pulse shadow-[0_0_8px_rgba(255,69,0,0.6)]"></span>
                     </Link>
                     <div className="flex items-center gap-0.5">
                         <ThemeToggle />
@@ -100,14 +100,14 @@ export function Sidebar({ foundryName, foundryId, userName, userRole, isAdmin }:
                                 href={item.href}
                                 className={cn(
                                     isActive
-                                        ? "bg-cyan-50 text-cyan-900 font-semibold"
-                                        : "text-slate-500 hover:bg-slate-50 hover:text-slate-900",
+                                        ? "bg-orange-50 text-international-orange font-semibold"
+                                        : "text-muted-foreground hover:bg-muted hover:text-foreground",
                                     "group flex items-center px-3 py-2.5 text-sm transition-all duration-200 rounded-md"
                                 )}
                             >
                                 <item.icon
                                     className={cn(
-                                        isActive ? "text-cyan-600" : "text-slate-400 group-hover:text-slate-600",
+                                        isActive ? "text-international-orange" : "text-muted-foreground group-hover:text-foreground",
                                         "mr-3 h-4 w-4 flex-shrink-0 transition-colors"
                                     )}
                                     aria-hidden="true"
@@ -160,14 +160,14 @@ export function Sidebar({ foundryName, foundryId, userName, userRole, isAdmin }:
                             href="/admin"
                             className={cn(
                                 isRouteActive(pathname, "/admin")
-                                    ? "bg-cyan-50 text-cyan-900 font-semibold"
-                                    : "text-slate-500 hover:bg-slate-50 hover:text-slate-900",
+                                    ? "bg-orange-50 text-international-orange font-semibold"
+                                    : "text-muted-foreground hover:bg-muted hover:text-foreground",
                                 "group flex items-center px-3 py-2.5 text-sm transition-all duration-200 rounded-md"
                             )}
                         >
                             <ShieldAlert
                                 className={cn(
-                                    isRouteActive(pathname, "/admin") ? "text-cyan-600" : "text-slate-400 group-hover:text-slate-600",
+                                    isRouteActive(pathname, "/admin") ? "text-international-orange" : "text-muted-foreground group-hover:text-foreground",
                                     "mr-3 h-4 w-4 flex-shrink-0 transition-colors"
                                 )}
                                 aria-hidden="true"

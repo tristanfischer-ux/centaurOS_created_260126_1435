@@ -106,8 +106,8 @@ export function HistoryDrawer({ open, onOpenChange, taskId, taskTitle }: History
                     if (key === 'initial_status' || key === 'source') return null
                     // Skip some fields if too verbose
                     return (
-                        <div key={key} className="text-xs text-slate-500 flex flex-wrap items-center gap-1">
-                            <span className="font-medium text-slate-700 capitalize">{key.replace(/_/g, ' ')}:</span>
+                        <div key={key} className="text-xs text-muted-foreground flex flex-wrap items-center gap-1">
+                            <span className="font-medium text-foreground capitalize">{key.replace(/_/g, ' ')}:</span>
                             {typeof value === 'object' && value !== null ? (
                                 // Handle nested objects like dates
                                 <span>{JSON.stringify(value)}</span>

@@ -33,17 +33,17 @@ export function Markdown({ content, className }: MarkdownProps) {
           </a>
         ),
         code: ({ children }) => (
-          <code className="bg-slate-100 px-1 py-0.5 rounded text-sm text-slate-800 font-mono">
+          <code className="bg-muted px-1 py-0.5 rounded text-sm text-foreground font-mono">
             {children}
           </code>
         ),
         pre: ({ children }) => (
-          <pre className="bg-slate-100 p-3 rounded overflow-x-auto my-2">
+          <pre className="bg-muted p-3 rounded overflow-x-auto my-2">
             {children}
           </pre>
         ),
         blockquote: ({ children }) => (
-          <blockquote className="border-l-4 border-slate-300 pl-4 my-2 italic text-slate-600">
+          <blockquote className="border-l-4 border-slate-300 pl-4 my-2 italic text-muted-foreground">
             {children}
           </blockquote>
         ),

@@ -223,9 +223,9 @@ function WelcomeContent({ userRole }: { userRole: string }) {
                     </p>
                 </div>
 
-                <div className="p-4 border rounded-lg bg-slate-50 border-slate-200">
-                    <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center mb-2">
-                        <ShoppingCart className="h-4 w-4 text-slate-700" />
+                <div className="p-4 border rounded-lg bg-muted border-slate-200">
+                    <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center mb-2">
+                        <ShoppingCart className="h-4 w-4 text-foreground" />
                     </div>
                     <h4 className="font-semibold text-sm mb-1">Products</h4>
                     <p className="text-xs text-muted-foreground">

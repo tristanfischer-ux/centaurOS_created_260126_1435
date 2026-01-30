@@ -18,7 +18,7 @@ export const ROLE_COLORS = {
   Executive: {
     bg: "bg-blue-100",
     text: "text-blue-700",
-    border: "border-blue-200",
+    border: "border",
   },
   Apprentice: {
     bg: "bg-green-100",
@@ -32,9 +32,9 @@ export const ROLE_COLORS = {
   },
   // Default for any other roles
   default: {
-    bg: "bg-slate-100",
-    text: "text-slate-600",
-    border: "border-slate-200",
+    bg: "bg-muted",
+    text: "text-muted-foreground",
+    border: "border",
   },
 } as const
 
@@ -215,7 +215,7 @@ export function UserAvatarStack({
         <div
           className={cn(
             sizeClasses[size],
-            "rounded-full bg-slate-200 text-slate-600 flex items-center justify-center border-2 border-white",
+            "rounded-full bg-slate-200 text-muted-foreground flex items-center justify-center border-2 border-white",
             textSizeClasses[size],
             "font-medium"
           )}

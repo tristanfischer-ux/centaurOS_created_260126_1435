@@ -139,11 +139,11 @@ export function InlineBatchApproval({ onApprovalComplete }: InlineBatchApprovalP
     }
 
     return (
-        <div className="rounded-lg shadow-sm bg-white overflow-hidden">
+        <div className="rounded-lg shadow-sm bg-background overflow-hidden">
             {/* Header - clickable to expand/collapse */}
             <button
                 onClick={() => setIsExpanded(!isExpanded)}
-                className="w-full flex items-center justify-between p-4 hover:bg-slate-50 transition-colors"
+                className="w-full flex items-center justify-between p-4 hover:bg-muted transition-colors"
             >
                 <div className="flex items-center gap-3">
                     <div className="p-2 rounded-full bg-amber-50">
@@ -171,7 +171,7 @@ export function InlineBatchApproval({ onApprovalComplete }: InlineBatchApprovalP
                     <div className="border-t border-slate-100">
                         {/* Batch Actions Bar */}
                         {tasks.length > 0 && (
-                            <div className="flex items-center justify-between px-4 py-2 bg-slate-50">
+                            <div className="flex items-center justify-between px-4 py-2 bg-muted">
                                 <div className="flex items-center gap-2">
                                     <Checkbox
                                         id="select-all-inline"
@@ -223,7 +223,7 @@ export function InlineBatchApproval({ onApprovalComplete }: InlineBatchApprovalP
                                                 key={task.id}
                                                 className={cn(
                                                     'p-3 transition-colors',
-                                                    isSelected ? 'bg-blue-50/50' : 'hover:bg-slate-50'
+                                                    isSelected ? 'bg-blue-50/50' : 'hover:bg-muted'
                                                 )}
                                             >
                                                 <div className="flex items-start gap-2">
@@ -287,7 +287,7 @@ export function InlineBatchApproval({ onApprovalComplete }: InlineBatchApprovalP
             <Dialog open={rejectDialogOpen} onOpenChange={setRejectDialogOpen}>
                 <DialogContent className="sm:max-w-[425px] bg-white">
                     <DialogHeader>
-                        <DialogTitle className="text-slate-900">Reject Tasks</DialogTitle>
+                        <DialogTitle className="text-foreground">Reject Tasks</DialogTitle>
                         <DialogDescription>
                             Provide a reason for rejecting {selectedIds.size} task{selectedIds.size !== 1 ? 's' : ''}.
                         </DialogDescription>
@@ -296,7 +296,7 @@ export function InlineBatchApproval({ onApprovalComplete }: InlineBatchApprovalP
                         value={rejectReason}
                         onChange={(e) => setRejectReason(e.target.value)}
                         placeholder="Enter rejection reason..."
-                        className="min-h-[100px] bg-white border-slate-200"
+                        className="min-h-[100px] bg-background border-slate-200"
                     />
                     <DialogFooter>
                         <Button variant="secondary" onClick={() => setRejectDialogOpen(false)}>Cancel</Button>

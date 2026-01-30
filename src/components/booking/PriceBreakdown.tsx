@@ -31,11 +31,11 @@ function formatCurrency(amount: number, currency: string): string {
 function ItemIcon({ type }: { type: PriceBreakdownItem['type'] }) {
     switch (type) {
         case 'subtotal':
-            return <Receipt className="h-4 w-4 text-slate-500" />
+            return <Receipt className="h-4 w-4 text-muted-foreground" />
         case 'fee':
             return <ShieldCheck className="h-4 w-4 text-blue-500" />
         case 'tax':
-            return <Building2 className="h-4 w-4 text-slate-500" />
+            return <Building2 className="h-4 w-4 text-muted-foreground" />
         case 'discount':
             return <Tag className="h-4 w-4 text-emerald-500" />
         default:
@@ -87,7 +87,7 @@ export function PriceBreakdown({
         <Card className={className}>
             <CardHeader className="pb-4">
                 <CardTitle className="flex items-center gap-2 text-lg">
-                    <Receipt className="h-5 w-5 text-slate-500" />
+                    <Receipt className="h-5 w-5 text-muted-foreground" />
                     Price Breakdown
                 </CardTitle>
                 <CardDescription>

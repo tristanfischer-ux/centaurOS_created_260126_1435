@@ -197,7 +197,7 @@ async function DashboardContent() {
                         </div>
                     </div>
                     <Link href="/provider-portal/analytics">
-                        <Button variant="secondary" className="border-blue-200 hover:bg-blue-100">
+                        <Button variant="secondary" className="border hover:bg-blue-100">
                             View Analytics
                             <ArrowRight className="ml-2 h-4 w-4" />
                         </Button>
@@ -244,7 +244,7 @@ async function DashboardContent() {
                                 {recentOrders.map((order) => (
                                     <div 
                                         key={order.id}
-                                        className="flex items-center justify-between p-3 rounded-lg bg-slate-50"
+                                        className="flex items-center justify-between p-3 rounded-lg bg-muted"
                                     >
                                         <div className="flex-1 min-w-0">
                                             <p className="text-sm font-medium truncate">
@@ -259,7 +259,7 @@ async function DashboardContent() {
                                                 variant="secondary"
                                                 className={cn(
                                                     "text-xs",
-                                                    statusColors[order.status as keyof typeof statusColors] || 'bg-slate-100'
+                                                    statusColors[order.status as keyof typeof statusColors] || 'bg-muted'
                                                 )}
                                             >
                                                 {order.status.replace('_', ' ')}
@@ -295,7 +295,7 @@ async function DashboardContent() {
                                 {activities.map((activity) => (
                                     <div 
                                         key={activity.id}
-                                        className="flex items-start gap-3 p-3 rounded-lg bg-slate-50"
+                                        className="flex items-start gap-3 p-3 rounded-lg bg-muted"
                                     >
                                         <div className={cn(
                                             "w-2 h-2 rounded-full mt-2 flex-shrink-0",

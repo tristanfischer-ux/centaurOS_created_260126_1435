@@ -182,7 +182,7 @@ export function PricingForm({
             <Card>
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2">
-                        <DollarSign className="h-5 w-5 text-slate-500" />
+                        <DollarSign className="h-5 w-5 text-muted-foreground" />
                         Day Rate Pricing
                     </CardTitle>
                     <CardDescription>
@@ -196,7 +196,7 @@ export function PricingForm({
                             <Label htmlFor="dayRate">Day Rate</Label>
                             <div className="flex gap-2">
                                 <div className="relative flex-1">
-                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500">
+                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
                                         {getCurrencySymbol(currency)}
                                     </span>
                                     <Input
@@ -246,7 +246,7 @@ export function PricingForm({
                                     ))}
                                 </SelectContent>
                             </Select>
-                            <p className="text-xs text-slate-500">
+                            <p className="text-xs text-muted-foreground">
                                 Clients must book at least this many days
                             </p>
                         </div>
@@ -270,7 +270,7 @@ export function PricingForm({
                     <div className="flex items-center justify-between">
                         <div>
                             <CardTitle className="flex items-center gap-2">
-                                <Repeat className="h-5 w-5 text-slate-500" />
+                                <Repeat className="h-5 w-5 text-muted-foreground" />
                                 Retainer Pricing
                             </CardTitle>
                             <CardDescription>
@@ -291,7 +291,7 @@ export function PricingForm({
                             <div className="space-y-2">
                                 <Label htmlFor="retainerRate">Retainer Hourly Rate</Label>
                                 <div className="relative">
-                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500">
+                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
                                         {getCurrencySymbol(currency)}
                                     </span>
                                     <Input
@@ -350,7 +350,7 @@ export function PricingForm({
                                 onChange={(e) => setRetainerDiscountPercent(parseInt(e.target.value))}
                                 className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer"
                             />
-                            <div className="flex justify-between text-xs text-slate-500">
+                            <div className="flex justify-between text-xs text-muted-foreground">
                                 <span>0%</span>
                                 <span>15%</span>
                                 <span>30%</span>
@@ -387,17 +387,17 @@ export function PricingForm({
                 <Card className="border-dashed">
                     <CardHeader className="pb-3">
                         <CardTitle className="text-base flex items-center gap-2">
-                            <Eye className="h-4 w-4 text-slate-500" />
+                            <Eye className="h-4 w-4 text-muted-foreground" />
                             How Buyers See Your Pricing
                         </CardTitle>
                     </CardHeader>
                     <CardContent>
-                        <div className="p-4 bg-white border rounded-lg">
+                        <div className="p-4 bg-background border rounded-lg">
                             <div className="flex items-baseline gap-2 mb-2">
-                                <span className="text-3xl font-bold text-slate-900">
+                                <span className="text-3xl font-bold text-foreground">
                                     {parsedDayRate ? formatPrice(parsedDayRate, currency) : '—'}
                                 </span>
-                                <span className="text-slate-500">/day</span>
+                                <span className="text-muted-foreground">/day</span>
                             </div>
                             
                             {minimumDays > 1 && (
@@ -411,7 +411,7 @@ export function PricingForm({
                                     <Separator className="my-3" />
                                     <div className="flex items-center gap-2">
                                         <Users className="h-4 w-4 text-blue-600" />
-                                        <span className="text-sm text-slate-600">
+                                        <span className="text-sm text-muted-foreground">
                                             Retainer available at{' '}
                                             <span className="font-semibold text-blue-600">
                                                 {formatPrice(parsedRetainerRate, currency)}/hr

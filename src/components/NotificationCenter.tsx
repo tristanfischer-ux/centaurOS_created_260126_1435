@@ -130,8 +130,8 @@ export function NotificationCenter() {
   return (
     <Popover open={isOpen} onOpenChange={setIsOpen}>
       <PopoverTrigger asChild>
-        <button className="relative p-2 rounded-full hover:bg-slate-100 transition-colors">
-          <Bell className="h-5 w-5 text-slate-600" />
+        <button className="relative p-2 rounded-full hover:bg-muted transition-colors">
+          <Bell className="h-5 w-5 text-muted-foreground" />
           {unreadCount > 0 && (
             <span className="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-xs font-medium rounded-full h-5 w-5 flex items-center justify-center">
               {unreadCount > 9 ? '9+' : unreadCount}
@@ -161,7 +161,7 @@ export function NotificationCenter() {
                 <div
                   key={notification.id}
                   className={cn(
-                    'p-3 hover:bg-slate-50 cursor-pointer transition-colors',
+                    'p-3 hover:bg-muted cursor-pointer transition-colors',
                     !notification.is_read && 'bg-blue-50/50'
                   )}
                   onClick={() => markAsRead(notification.id)}

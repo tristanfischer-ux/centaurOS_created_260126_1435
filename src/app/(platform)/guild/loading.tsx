@@ -18,7 +18,7 @@ export default function GuildLoading() {
                 {[1, 2, 3].map((i) => (
                     <Card key={i} className="flex flex-col md:flex-row overflow-hidden">
                         {/* Date Section */}
-                        <div className="bg-slate-50 p-6 flex flex-col items-center justify-center min-w-[150px] border-r border-slate-200">
+                        <div className="bg-muted p-6 flex flex-col items-center justify-center min-w-[150px] border-r border-slate-200">
                             <Skeleton className="h-8 w-8 mb-1" />
                             <Skeleton className="h-4 w-10" />
                         </div>

@@ -1,0 +1,236 @@
+---
+description: Consistent form component patterns, validation, and accessibility
+alwaysApply: true
+---
+
+# Form Consistency Standards
+
+All forms in CentaurOS must follow these patterns for validation, error handling, accessibility, and styling.
+
+## 1. Form Field Pattern
+
+Every form field MUST use this structure:
+
+```tsx
+<div className="space-y-2">
+  <Label htmlFor="field-id" className="text-sm font-medium">
+    Field Label
+    {isRequired && (
+      <span className="text-destructive ml-1" aria-label="required">*</span>
+    )}
+  </Label>
+  <Input
+    id="field-id"
+    name="fieldName"
+    value={value}
+    onChange={handleChange}
+    aria-required={isRequired}
+    aria-invalid={hasError}
+    aria-describedby={hasError ? "field-id-error" : undefined}
+    className={cn(hasError && "border-destructive")}
+  />
+  {hasError && (
+    <p id="field-id-error" role="alert" className="text-sm text-destructive">
+      {errorMessage}
+    </p>
+  )}
+</div>
+```
+
+### Required Elements:
+- ✅ `Label` with `htmlFor` matching `Input` `id`
+- ✅ `aria-required` on required fields
+- ✅ `aria-invalid` when field has error
+- ✅ `aria-describedby` linking to error message
+- ✅ `aria-label="required"` on asterisk
+- ✅ Error message with `role="alert"` and matching `id`
+
+## 2. Input Height Standards
+
+**DO NOT override input heights.** Use the default from the design system:
+
+```tsx
+// ✅ CORRECT - Use default height
+<Input placeholder="Enter name" />
+
+// ❌ WRONG - Don't override height
+<Input className="h-11" />  // Wrong
+<Input className="h-12" />  // Wrong
+```
+
+**Default heights:**
+- Input/Select: `h-10` (40px)
+- Button default: `h-11` with `min-h-[44px]`
+- Button sm: `h-9` with `min-h-[44px]` on mobile
+
+## 3. Error State Styling
+
+**Use semantic destructive token, not hardcoded red:**
+
+```tsx
+// ✅ CORRECT
+<Input
+  aria-invalid={hasError}
+  className={cn(hasError && "border-destructive")}
+/>
+<p className="text-sm text-destructive">{error}</p>
+
+// ❌ WRONG - Don't use hardcoded colors
+<Input className="border-red-500" />  // Wrong
+<p className="text-red-600">{error}</p>  // Wrong
+```
+
+## 4. Validation Patterns
+
+**Use inline validation with debounced checks:**
+
+```tsx
+const [errors, setErrors] = useState<Record<string, string>>({})
+
+// Clear error on change
+const handleChange = (field: string, value: string) => {
+  setFormData(prev => ({ ...prev, [field]: value }))
+  if (errors[field]) {
+    setErrors(prev => ({ ...prev, [field]: '' }))
+  }
+}
+
+// Validate on blur
+const handleBlur = (field: string) => {
+  const error = validateField(field, formData[field])
+  if (error) {
+    setErrors(prev => ({ ...prev, [field]: error }))
+  }
+}
+
+// Validate all on submit
+const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault()
+  const newErrors = validateForm(formData)
+  if (Object.keys(newErrors).length > 0) {
+    setErrors(newErrors)
+    // Focus first error field
+    const firstErrorField = Object.keys(newErrors)[0]
+    document.getElementById(firstErrorField)?.focus()
+    return
+  }
+  // Submit form
+}
+```
+
+## 5. Focus Management
+
+**Always focus the first error field after validation fails:**
+
+```tsx
+if (Object.keys(newErrors).length > 0) {
+  setErrors(newErrors)
+  const firstErrorId = Object.keys(newErrors)[0]
+  requestAnimationFrame(() => {
+    document.getElementById(firstErrorId)?.focus()
+  })
+  return
+}
+```
+
+## 6. Label Styling
+
+**Use consistent label styling from design system:**
+
+```tsx
+// ✅ CORRECT - Default label styling
+<Label htmlFor="field-id">Field Name</Label>
+
+// ❌ WRONG - Don't override label styles
+<Label className="text-xs uppercase">Field Name</Label>  // Wrong
+<Label className="text-lg font-bold">Field Name</Label>  // Wrong
+```
+
+**Exception:** Section labels can use `typography.label`:
+
+```tsx
+import { typography } from '@/lib/design-system'
+
+<p className={typography.label}>Section Header</p>
+```
+
+## 7. Form Spacing
+
+Use consistent spacing for form sections:
+
+```tsx
+import { spacing } from '@/lib/design-system'
+
+// Form container
+<form className={spacing.section}>  {/* space-y-8 */}
+  
+  {/* Form section */}
+  <div className={spacing.card}>  {/* space-y-6 */}
+    
+    {/* Individual fields */}
+    <div className={spacing.stack}>  {/* space-y-4 */}
+      <FormField />
+      <FormField />
+    </div>
+  </div>
+</form>
+```
+
+## 8. Disabled State
+
+Use semantic disabled styling:
+
+```tsx
+<Input
+  disabled={isLoading}
+  aria-disabled={isLoading}
+  // Design system handles disabled styling automatically
+/>
+```
+
+## 9. Helper Text
+
+Use muted-foreground for helper text:
+
+```tsx
+<div className="space-y-2">
+  <Label htmlFor="email">Email Address</Label>
+  <Input id="email" type="email" />
+  <p className="text-sm text-muted-foreground">
+    We'll never share your email with anyone else.
+  </p>
+</div>
+```
+
+## 10. Multi-Field Validation
+
+For forms with dependent fields, validate together:
+
+```tsx
+const validatePasswordFields = (password: string, confirm: string) => {
+  const errors: Record<string, string> = {}
+  
+  if (password.length < 8) {
+    errors.password = 'Password must be at least 8 characters'
+  }
+  
+  if (password !== confirm) {
+    errors.confirmPassword = 'Passwords do not match'
+  }
+  
+  return errors
+}
+```
+
+## Quick Checklist
+
+Before committing any form:
+
+- [ ] All Labels have `htmlFor` matching Input `id`
+- [ ] Required fields have `aria-required` and asterisk with `aria-label="required"`
+- [ ] Error states use `aria-invalid`, `aria-describedby`, and `role="alert"`
+- [ ] Error styling uses `border-destructive` and `text-destructive`
+- [ ] No hardcoded heights (`h-11`, `h-12`) on inputs
+- [ ] No hardcoded colors (`text-red-500`, `border-red-600`)
+- [ ] Focus moves to first error field on validation failure
+- [ ] Form spacing uses design system utilities

@@ -104,8 +104,8 @@ export function StripeAccountStatus({
     const statusConfig = {
         not_connected: {
             icon: XCircle,
-            color: 'text-slate-400',
-            bgColor: 'bg-slate-50',
+            color: 'text-muted-foreground',
+            bgColor: 'bg-muted',
             badge: 'Not Connected',
             badgeVariant: 'secondary' as const,
             description: 'Connect your Stripe account to receive payments'
@@ -162,28 +162,28 @@ export function StripeAccountStatus({
                 {/* Status indicators for connected accounts */}
                 {hasAccount && (
                     <div className="grid grid-cols-3 gap-4">
-                        <div className="text-center p-3 rounded-lg bg-slate-50">
+                        <div className="text-center p-3 rounded-lg bg-muted">
                             <div className={cn(
                                 "text-sm font-medium",
-                                chargesEnabled ? "text-green-600" : "text-slate-400"
+                                chargesEnabled ? "text-green-600" : "text-muted-foreground"
                             )}>
                                 {chargesEnabled ? "Enabled" : "Disabled"}
                             </div>
                             <div className="text-xs text-muted-foreground mt-1">Charges</div>
                         </div>
-                        <div className="text-center p-3 rounded-lg bg-slate-50">
+                        <div className="text-center p-3 rounded-lg bg-muted">
                             <div className={cn(
                                 "text-sm font-medium",
-                                payoutsEnabled ? "text-green-600" : "text-slate-400"
+                                payoutsEnabled ? "text-green-600" : "text-muted-foreground"
                             )}>
                                 {payoutsEnabled ? "Enabled" : "Disabled"}
                             </div>
                             <div className="text-xs text-muted-foreground mt-1">Payouts</div>
                         </div>
-                        <div className="text-center p-3 rounded-lg bg-slate-50">
+                        <div className="text-center p-3 rounded-lg bg-muted">
                             <div className={cn(
                                 "text-sm font-medium",
-                                detailsSubmitted ? "text-green-600" : "text-slate-400"
+                                detailsSubmitted ? "text-green-600" : "text-muted-foreground"
                             )}>
                                 {detailsSubmitted ? "Complete" : "Incomplete"}
                             </div>

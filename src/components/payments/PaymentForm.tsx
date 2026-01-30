@@ -93,7 +93,7 @@ function PaymentFormInner({ amount, currency, onSuccess, onError }: PaymentFormI
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
       {/* Amount Display */}
-      <div className="p-4 rounded-lg bg-slate-50 dark:bg-slate-900">
+      <div className="p-4 rounded-lg bg-muted dark:bg-slate-900">
         <div className="flex justify-between items-center mb-2">
           <span className="text-sm text-muted-foreground">Subtotal</span>
           <span className="text-sm">{formatCurrency(feeBreakdown.subtotal, currency)}</span>

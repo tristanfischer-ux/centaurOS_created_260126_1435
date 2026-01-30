@@ -605,19 +605,19 @@ export function MarketplaceView({
                                                 setSearchQuery(rec.search_term)
                                             }
                                         }}
-                                        className="flex items-center gap-2 px-3 py-2 bg-white rounded border border-amber-200 hover:border-amber-400 hover:shadow-sm transition-all text-left"
+                                        className="flex items-center gap-2 px-3 py-2 bg-background rounded border border-amber-200 hover:border-amber-400 hover:shadow-sm transition-all text-left"
                                     >
                                         <div>
                                             <div className="flex items-center gap-1.5">
                                                 <Badge variant="secondary" className="text-[10px] bg-amber-100 text-amber-700 border-amber-300">
                                                     {rec.source_type === 'coverage_gap' ? 'Gap' : rec.source_type === 'advisory' ? 'Q&A' : 'AI'}
                                                 </Badge>
-                                                <span className="text-sm font-medium text-slate-900">
+                                                <span className="text-sm font-medium text-foreground">
                                                     {rec.search_term || rec.subcategory || rec.category}
                                                 </span>
                                             </div>
                                             {rec.reasoning && (
-                                                <p className="text-xs text-slate-500 mt-0.5 line-clamp-1 max-w-[200px]">
+                                                <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1 max-w-[200px]">
                                                     {rec.reasoning}
                                                 </p>
                                             )}
@@ -703,7 +703,7 @@ export function MarketplaceView({
                                         variant="secondary" 
                                         size="default"
                                         onClick={() => setShowFilters(!showFilters)}
-                                        className={showFilters ? 'bg-slate-100' : ''}
+                                        className={showFilters ? 'bg-muted' : ''}
                                     >
                                         <SlidersHorizontal className="h-4 w-4 mr-2" />
                                         Filters
@@ -741,7 +741,7 @@ export function MarketplaceView({
 
                         {/* People Filters Panel */}
                         {activeTab === 'People' && showFilters && (
-                            <div className="bg-slate-50 rounded border border-blue-200 p-4 space-y-4 hidden md:block">
+                            <div className="bg-muted rounded border border p-4 space-y-4 hidden md:block">
                                 <div className="flex items-center justify-between">
                                     <h3 className="font-medium text-sm">Filter People</h3>
                                     {hasActiveFilters && (
@@ -848,7 +848,7 @@ export function MarketplaceView({
 
                         {/* Products Filters Panel */}
                         {activeTab === 'Products' && showFilters && (
-                            <div className="bg-slate-50 rounded border border-blue-200 p-4 space-y-4 hidden md:block">
+                            <div className="bg-muted rounded border border p-4 space-y-4 hidden md:block">
                                 <div className="flex items-center justify-between">
                                     <h3 className="font-medium text-sm">Filter Products & Manufacturers</h3>
                                     {hasActiveFilters && (
@@ -1005,7 +1005,7 @@ export function MarketplaceView({
                                     className={`px-3 py-1.5 text-xs font-medium rounded border transition-all ${
                                         selectedSubcategories.has(sub)
                                             ? 'bg-orange-600 text-white border-orange-600 shadow-sm'
-                                            : 'bg-white text-slate-600 border-slate-200 hover:border-orange-500/50 hover:bg-orange-50/50 hover:text-orange-700'
+                                            : 'bg-background text-muted-foreground border hover:border-orange-500/50 hover:bg-orange-50/50 hover:text-orange-700'
                                     }`}
                                 >
                                     {sub}
@@ -1014,7 +1014,7 @@ export function MarketplaceView({
                             {selectedSubcategories.size > 0 && (
                                 <button
                                     onClick={() => setSelectedSubcategories(new Set())}
-                                    className="px-2 py-1.5 text-xs text-muted-foreground hover:text-orange-600 flex items-center gap-1 rounded border border-transparent hover:border-slate-200 transition-all"
+                                    className="px-2 py-1.5 text-xs text-muted-foreground hover:text-orange-600 flex items-center gap-1 rounded border border-transparent hover:border transition-all"
                                 >
                                     <X className="h-3 w-3" />
                                     Clear
@@ -1048,7 +1048,7 @@ export function MarketplaceView({
                                                 <label className="text-xs font-medium text-violet-700 mb-1.5 block">Team Member</label>
                                                 {teamMembers.length > 0 ? (
                                                     <Select value={selectedMemberId} onValueChange={setSelectedMemberId}>
-                                                        <SelectTrigger className="bg-white">
+                                                        <SelectTrigger className="bg-background">
                                                             <SelectValue placeholder="Select a team member" />
                                                         </SelectTrigger>
                                                         <SelectContent>
@@ -1064,7 +1064,7 @@ export function MarketplaceView({
                                                         placeholder="Enter member ID"
                                                         value={selectedMemberId}
                                                         onChange={(e) => setSelectedMemberId(e.target.value)}
-                                                        className="bg-white"
+                                                        className="bg-background"
                                                     />
                                                 )}
                                             </div>
@@ -1094,21 +1094,21 @@ export function MarketplaceView({
                                                 {centaurSuggestions.map((suggestion, idx) => {
                                                     const listing = initialListings.find(l => l.id === suggestion.listingId)
                                                     return (
-                                                        <div key={suggestion.listingId} className="bg-white rounded-lg p-3 border border-violet-100">
+                                                        <div key={suggestion.listingId} className="bg-background rounded-lg p-3 border border-violet-100">
                                                             <div className="flex items-start justify-between gap-3">
                                                                 <div className="flex-1">
                                                                     <div className="flex items-center gap-2">
                                                                         <span className="text-xs font-bold text-violet-600">#{idx + 1}</span>
-                                                                        <h5 className="font-medium text-slate-900">{suggestion.title}</h5>
+                                                                        <h5 className="font-medium text-foreground">{suggestion.title}</h5>
                                                                         <Badge className="bg-violet-100 text-violet-700 text-xs">
                                                                             {suggestion.compatibilityScore}/10
                                                                         </Badge>
                                                                     </div>
-                                                                    <p className="text-sm text-slate-600 mt-1">{suggestion.reasoning}</p>
+                                                                    <p className="text-sm text-muted-foreground mt-1">{suggestion.reasoning}</p>
                                                                     {suggestion.useCases.length > 0 && (
                                                                         <div className="flex flex-wrap gap-1 mt-2">
                                                                             {suggestion.useCases.slice(0, 3).map((useCase, i) => (
-                                                                                <span key={i} className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded">
+                                                                                <span key={i} className="text-xs bg-muted text-muted-foreground px-2 py-0.5 rounded">
                                                                                     {useCase}
                                                                                 </span>
                                                                             ))}
@@ -1197,7 +1197,7 @@ export function MarketplaceView({
                             {filteredItems.map(item => {
                                 const attrs = item.attributes || {}
                                 return (
-                                    <Card key={item.id} className="p-4 border-blue-200 hover:border-orange-200 hover:shadow-sm transition-all">
+                                    <Card key={item.id} className="p-4 border hover:border-orange-200 hover:shadow-sm transition-all">
                                         <div className="flex items-start gap-4">
                                             {/* Checkbox */}
                                             <Checkbox
@@ -1290,7 +1290,7 @@ export function MarketplaceView({
                                 title={hasActiveFilters ? "No items match your filters" : "No listings found in this category yet"}
                                 description={hasActiveFilters ? "Try adjusting your filters or search terms." : "Check back later or browse other categories."}
                                 action={hasActiveFilters ? (
-                                    <Button variant="secondary" onClick={clearFilters} className="border-slate-200 hover:border-orange-500 hover:text-orange-700">Clear filters</Button>
+                                    <Button variant="secondary" onClick={clearFilters} className="border hover:border-orange-500 hover:text-orange-700">Clear filters</Button>
                                 ) : undefined}
                             />
                         </div>

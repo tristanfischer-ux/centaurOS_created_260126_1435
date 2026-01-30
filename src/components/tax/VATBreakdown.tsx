@@ -145,7 +145,7 @@ export function VATBreakdown({
 
       {/* Zero-Rated Notice */}
       {breakdown.taxTreatment === "zero_rated" && (
-        <div className="flex items-start gap-2 p-2 rounded bg-blue-50 border border-blue-200 text-sm">
+        <div className="flex items-start gap-2 p-2 rounded bg-blue-50 border border text-sm">
           <Info className="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0" />
           <p className="text-blue-800">
             Zero-rated export: No VAT is charged on this transaction.

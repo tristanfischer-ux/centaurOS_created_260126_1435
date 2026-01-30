@@ -108,7 +108,7 @@ const TRANSACTION_CONFIG: Record<
   fee_deduction: {
     label: 'Platform Fee',
     icon: <Minus className="h-3 w-3" />,
-    color: 'text-slate-500',
+    color: 'text-muted-foreground',
   },
 }
 
@@ -138,7 +138,7 @@ function TransactionItem({
     <div className="flex items-start gap-3 pb-4 last:pb-0">
       <div
         className={cn(
-          'flex h-6 w-6 items-center justify-center rounded-full bg-slate-100',
+          'flex h-6 w-6 items-center justify-center rounded-full bg-muted',
           config.color
         )}
       >
@@ -237,7 +237,7 @@ export function EscrowStatus({
       <Card>
         <CardContent className="pt-6">
           <div className="text-center text-muted-foreground">
-            <AlertCircle className="h-8 w-8 mx-auto mb-2 text-slate-400" />
+            <AlertCircle className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
             <p>Unable to load escrow status</p>
           </div>
         </CardContent>
@@ -270,14 +270,14 @@ export function EscrowStatus({
       <CardContent className="space-y-6">
         {/* Balance Overview */}
         <div className="grid grid-cols-2 gap-4">
-          <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-900">
+          <div className="p-3 rounded-lg bg-muted dark:bg-slate-900">
             <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
               <Wallet className="h-4 w-4" />
               Held in Escrow
             </div>
             <p className="text-lg font-bold">{formatCurrency(pendingRelease, currency)}</p>
           </div>
-          <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-900">
+          <div className="p-3 rounded-lg bg-muted dark:bg-slate-900">
             <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
               <Building2 className="h-4 w-4" />
               Released

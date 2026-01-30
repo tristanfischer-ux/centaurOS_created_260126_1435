@@ -105,7 +105,7 @@ export function PendingInvitations() {
                 onClick={() => setExpanded(!expanded)}
             >
                 <div className="flex items-center gap-3">
-                    <h2 className="text-lg font-semibold text-slate-700 flex items-center gap-2">
+                    <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
                         <Mail className="h-5 w-5 text-blue-500" />
                         Pending Invitations
                     </h2>
@@ -120,19 +120,19 @@ export function PendingInvitations() {
                         </Badge>
                     )}
                 </div>
-                <Button variant="ghost" size="sm" className="text-slate-400 group-hover:text-slate-600">
+                <Button variant="ghost" size="sm" className="text-muted-foreground group-hover:text-muted-foreground">
                     {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                 </Button>
             </div>
 
             {expanded && (
-                <Card className="border-slate-200">
+                <Card className="border">
                     <CardContent className="p-0">
                         <div className="divide-y divide-slate-100">
                             {pendingInvitations.map((invitation) => (
                                 <div 
                                     key={invitation.id}
-                                    className="flex items-center justify-between p-4 hover:bg-slate-50 transition-colors"
+                                    className="flex items-center justify-between p-4 hover:bg-muted transition-colors"
                                 >
                                     <div className="flex items-center gap-4">
                                         <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
@@ -140,12 +140,12 @@ export function PendingInvitations() {
                                         </div>
                                         <div>
                                             <div className="flex items-center gap-2">
-                                                <span className="font-medium text-slate-900">{invitation.email}</span>
+                                                <span className="font-medium text-foreground">{invitation.email}</span>
                                                 <Badge variant="outline" className="text-xs">
                                                     {invitation.role}
                                                 </Badge>
                                             </div>
-                                            <div className="flex items-center gap-2 text-xs text-slate-500 mt-1">
+                                            <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
                                                 <Clock className="h-3 w-3" />
                                                 <span>
                                                     Expires {formatDistanceToNow(new Date(invitation.expiresAt), { addSuffix: true })}
@@ -177,7 +177,7 @@ export function PendingInvitations() {
                                             size="sm"
                                             onClick={() => handleCancel(invitation.id)}
                                             disabled={isPending && actionId === invitation.id}
-                                            className="text-slate-400 hover:text-red-600 hover:bg-red-50"
+                                            className="text-muted-foreground hover:text-red-600 hover:bg-red-50"
                                         >
                                             <X className="h-4 w-4" />
                                         </Button>
@@ -188,7 +188,7 @@ export function PendingInvitations() {
                             {/* Expired/Accepted invitations */}
                             {otherInvitations.length > 0 && (
                                 <>
-                                    <div className="px-4 py-2 bg-slate-50 text-xs font-medium text-slate-500 uppercase tracking-wider">
+                                    <div className="px-4 py-2 bg-muted text-xs font-medium text-muted-foreground uppercase tracking-wider">
                                         History
                                     </div>
                                     {otherInvitations.slice(0, 5).map((invitation) => (
@@ -210,7 +210,7 @@ export function PendingInvitations() {
                                                 </div>
                                                 <div>
                                                     <div className="flex items-center gap-2">
-                                                        <span className="font-medium text-slate-700">{invitation.email}</span>
+                                                        <span className="font-medium text-foreground">{invitation.email}</span>
                                                         <Badge 
                                                             variant="outline" 
                                                             className={`text-xs ${
@@ -222,7 +222,7 @@ export function PendingInvitations() {
                                                             {invitation.status}
                                                         </Badge>
                                                     </div>
-                                                    <div className="text-xs text-slate-400 mt-1">
+                                                    <div className="text-xs text-muted-foreground mt-1">
                                                         {invitation.role} - {formatDistanceToNow(new Date(invitation.createdAt), { addSuffix: true })}
                                                     </div>
                                                 </div>

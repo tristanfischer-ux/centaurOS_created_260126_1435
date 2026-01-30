@@ -88,9 +88,9 @@ export function BookingIntentBanner({ intents }: BookingIntentBannerProps) {
                             {intent.listing.subcategory || intent.listing.category}
                           </Badge>
                         </div>
-                        <p className="font-medium text-slate-900">{intent.listing.title}</p>
+                        <p className="font-medium text-foreground">{intent.listing.title}</p>
                         {intent.listing.description && (
-                          <p className="text-sm text-slate-600 mt-1 line-clamp-1">
+                          <p className="text-sm text-muted-foreground mt-1 line-clamp-1">
                             {intent.listing.description}
                           </p>
                         )}

@@ -192,7 +192,7 @@ export function AdminDashboard({
       {/* Key Metrics */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Total GMV */}
-        <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200">
+        <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border">
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>

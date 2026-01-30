@@ -30,7 +30,7 @@ export const ReviewCard = memo(function ReviewCard({
                 <div className="flex items-start gap-3">
                     {/* Avatar */}
                     {review.is_anonymous ? (
-                        <div className="w-10 h-10 shrink-0 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center">
+                        <div className="w-10 h-10 shrink-0 rounded-full bg-muted text-muted-foreground flex items-center justify-center">
                             <User className="w-5 h-5" />
                         </div>
                     ) : (

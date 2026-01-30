@@ -41,7 +41,7 @@ export class ErrorBoundary extends Component<Props, State> {
           <div className="w-16 h-16 rounded-full bg-red-100 flex items-center justify-center mb-4">
             <AlertCircle className="h-8 w-8 text-red-600" />
           </div>
-          <h2 className="text-xl font-semibold text-slate-900 mb-2">Something went wrong</h2>
+          <h2 className="text-xl font-semibold text-foreground mb-2">Something went wrong</h2>
           <p className="text-muted-foreground mb-6 max-w-md">
             We encountered an unexpected error. Your work has been saved. Please try refreshing the page.
           </p>
@@ -55,7 +55,7 @@ export class ErrorBoundary extends Component<Props, State> {
             </Button>
           </div>
           {process.env.NODE_ENV === 'development' && this.state.error && (
-            <pre className="mt-6 p-4 bg-slate-100 rounded text-left text-xs overflow-auto max-w-full">
+            <pre className="mt-6 p-4 bg-muted rounded text-left text-xs overflow-auto max-w-full">
               {this.state.error.message}
             </pre>
           )}

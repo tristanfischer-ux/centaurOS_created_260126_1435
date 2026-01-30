@@ -44,7 +44,7 @@ function LoginForm() {
         <div className="w-full max-w-sm mx-auto space-y-8 relative z-10">
             <div className="space-y-2">
                 <a href={marketingDomain} className="inline-block mb-8 group">
-                    <span className="text-xs font-bold tracking-[0.3em] uppercase text-slate-400 group-hover:text-cyan-600 transition-colors">
+                    <span className="text-xs font-bold tracking-[0.3em] uppercase text-muted-foreground group-hover:text-cyan-600 transition-colors">
                         ← Return to Site
                     </span>
                 </a>
@@ -72,7 +72,7 @@ function LoginForm() {
 
                 <div className="space-y-4">
                     <div className="space-y-2">
-                        <Label htmlFor="email" className="text-xs uppercase tracking-wider text-slate-500 font-medium">Email Address</Label>
+                        <Label htmlFor="email" className="text-xs uppercase tracking-wider text-muted-foreground font-medium">Email Address</Label>
                         <Input
                             id="email"
                             name="email"
@@ -81,18 +81,18 @@ function LoginForm() {
                             autoFocus
                             autoComplete="off"
                             required
-                            className="h-11 bg-white border-slate-200 focus:border-cyan-500 focus:ring-cyan-500/20 transition-all font-medium"
+                            className="h-11 bg-background border focus:border-cyan-500 focus:ring-cyan-500/20 transition-all font-medium"
                         />
                     </div>
                     <div className="space-y-2">
-                        <Label htmlFor="password" className="text-xs uppercase tracking-wider text-slate-500 font-medium">Password</Label>
+                        <Label htmlFor="password" className="text-xs uppercase tracking-wider text-muted-foreground font-medium">Password</Label>
                         <Input
                             id="password"
                             name="password"
                             type="password"
                             autoComplete="current-password"
                             required
-                            className="h-11 bg-white border-slate-200 focus:border-cyan-500 focus:ring-cyan-500/20 transition-all font-medium font-mono tracking-widest"
+                            className="h-11 bg-background border focus:border-cyan-500 focus:ring-cyan-500/20 transition-all font-medium font-mono tracking-widest"
                         />
                     </div>
                 </div>
@@ -100,7 +100,7 @@ function LoginForm() {
                 <SubmitButton />
 
                 <div className="text-center pt-4">
-                    <span className="text-xs text-slate-400">
+                    <span className="text-xs text-muted-foreground">
                         Protected by Centaur Security Layer v4.3
                     </span>
                 </div>
@@ -113,7 +113,7 @@ export default function LoginPage() {
     return (
         <div className="min-h-screen flex w-full bg-white">
             {/* Left Side - Hero Image */}
-            <div className="hidden lg:flex w-1/2 relative bg-slate-50 overflow-hidden">
+            <div className="hidden lg:flex w-1/2 relative bg-muted overflow-hidden">
                 <Image
                     src="/images/digital-centaur-working.png"
                     alt="Digital Centaur converting bits to atoms, 3D printing a rocket engine"
@@ -126,7 +126,7 @@ export default function LoginPage() {
                 {/* Subtle Gradient for Text Readability */}
                 <div className="absolute inset-0 z-10 bg-gradient-to-t from-white/90 via-white/20 to-transparent" />
 
-                <div className="relative z-20 flex flex-col justify-end p-12 h-full text-slate-900 pb-20">
+                <div className="relative z-20 flex flex-col justify-end p-12 h-full text-foreground pb-20">
                     <div className="h-1 w-20 bg-cyan-500 mb-6 shadow-[0_0_15px_rgba(6,182,212,0.6)]" />
                     <h3 className="text-sm font-bold tracking-[0.2em] uppercase text-cyan-700 mb-2">
                         Centaur Dynamics
@@ -136,7 +136,7 @@ export default function LoginPage() {
                         <br />
                         <span className="text-cyan-600">speed of bits.</span>
                     </h2>
-                    <div className="flex items-center gap-4 text-sm font-mono text-slate-600 tracking-wider uppercase font-semibold">
+                    <div className="flex items-center gap-4 text-sm font-mono text-muted-foreground tracking-wider uppercase font-semibold">
                         <span>System Status: Optimal</span>
                         <span className="h-2 w-2 rounded-full bg-cyan-500 animate-pulse shadow-[0_0_10px_rgba(6,182,212,0.8)]" />
                         <span>Latency: 12ms</span>

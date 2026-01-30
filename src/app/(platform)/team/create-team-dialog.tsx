@@ -79,7 +79,7 @@ export function CreateTeamDialog({ members }: { members: Member[] }) {
                     New Team
                 </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[425px]">
+            <DialogContent size="sm">
                 <DialogHeader>
                     <DialogTitle>Create New Team</DialogTitle>
                     <DialogDescription>

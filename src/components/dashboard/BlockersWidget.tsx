@@ -55,7 +55,7 @@ export function BlockersWidget({ userRole }: BlockersWidgetProps) {
                         <CardTitle className="text-base flex items-center gap-2">
                             <AlertTriangle className={cn(
                                 "h-4 w-4",
-                                criticalBlockers.length > 0 ? "text-amber-500" : "text-slate-600"
+                                criticalBlockers.length > 0 ? "text-amber-500" : "text-muted-foreground"
                             )} />
                             Team Blockers
                         </CardTitle>
@@ -67,7 +67,7 @@ export function BlockersWidget({ userRole }: BlockersWidgetProps) {
                             className={cn(
                                 criticalBlockers.length > 0 
                                     ? "bg-amber-100 text-amber-700" 
-                                    : "bg-slate-100 text-slate-600"
+                                    : "bg-muted text-muted-foreground"
                             )}
                         >
                             {standups.length}
@@ -78,13 +78,13 @@ export function BlockersWidget({ userRole }: BlockersWidgetProps) {
             <CardContent>
                 {isLoading ? (
                     <div className="flex items-center justify-center py-8">
-                        <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
+                        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
                     </div>
                 ) : standups.length === 0 ? (
                     <div className="text-center py-6">
                         <CheckCircle className="h-10 w-10 mx-auto text-green-500 mb-2" />
-                        <p className="text-sm text-slate-600 font-medium">No blockers reported</p>
-                        <p className="text-xs text-slate-400">Team is running smoothly</p>
+                        <p className="text-sm text-muted-foreground font-medium">No blockers reported</p>
+                        <p className="text-xs text-muted-foreground">Team is running smoothly</p>
                     </div>
                 ) : (
                     <div className="space-y-3">
@@ -99,18 +99,18 @@ export function BlockersWidget({ userRole }: BlockersWidgetProps) {
                                         'p-3 rounded-lg border transition-colors',
                                         isCritical 
                                             ? 'border-amber-200 bg-amber-50' 
-                                            : 'border-slate-200 bg-white'
+                                            : 'border bg-white'
                                     )}
                                 >
                                     <div className="flex items-start gap-3">
                                         <Avatar className="h-8 w-8 shrink-0">
-                                            <AvatarFallback className="text-xs bg-slate-100 text-slate-600">
+                                            <AvatarFallback className="text-xs bg-muted text-muted-foreground">
                                                 {getInitials(user?.full_name || null)}
                                             </AvatarFallback>
                                         </Avatar>
                                         <div className="flex-1 min-w-0">
                                             <div className="flex items-center gap-2 mb-1">
-                                                <span className="text-sm font-medium text-slate-900">
+                                                <span className="text-sm font-medium text-foreground">
                                                     {user?.full_name || 'Unknown'}
                                                 </span>
                                                 {standup.needs_help && (
@@ -125,10 +125,10 @@ export function BlockersWidget({ userRole }: BlockersWidgetProps) {
                                                     </Badge>
                                                 )}
                                             </div>
-                                            <p className="text-sm text-slate-600 line-clamp-2">
+                                            <p className="text-sm text-muted-foreground line-clamp-2">
                                                 {standup.blockers}
                                             </p>
-                                            <p className="text-xs text-slate-400 mt-1">
+                                            <p className="text-xs text-muted-foreground mt-1">
                                                 {formatDistanceToNow(new Date(standup.standup_date), { addSuffix: true })}
                                             </p>
                                         </div>
@@ -138,7 +138,7 @@ export function BlockersWidget({ userRole }: BlockersWidgetProps) {
                         })}
                         
                         {standups.length > 4 && (
-                            <p className="text-xs text-center text-slate-500 pt-2">
+                            <p className="text-xs text-center text-muted-foreground pt-2">
                                 +{standups.length - 4} more blockers reported
                             </p>
                         )}

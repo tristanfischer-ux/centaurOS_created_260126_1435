@@ -85,7 +85,7 @@ function FunctionCard({
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             className={cn(
-                "p-4 border border-slate-200 rounded-lg hover:shadow-md transition-all bg-white border-l-4",
+                "p-4 border border rounded-lg hover:shadow-md transition-all bg-background border-l-4",
                 borderColorClass
             )}
         >
@@ -298,32 +298,32 @@ export function OrgBlueprintView({ functions: initialFunctions, summary: initial
             </div>
 
             {/* How it Works Banner */}
-            <div className="bg-gradient-to-r from-slate-50 to-orange-50 border border-slate-200 rounded-lg p-5">
+            <div className="bg-gradient-to-r from-slate-50 to-orange-50 border border rounded-lg p-5">
                 <div className="flex items-start gap-4">
                     <div className="p-2 bg-orange-100 rounded-lg shrink-0">
                         <Building2 className="h-6 w-6 text-orange-600" />
                     </div>
                     <div className="flex-1 min-w-0">
-                        <h3 className="font-semibold text-slate-900 mb-1">What is Org Blueprint?</h3>
-                        <p className="text-sm text-slate-600 mb-3">
+                        <h3 className="font-semibold text-foreground mb-1">What is Org Blueprint?</h3>
+                        <p className="text-sm text-muted-foreground mb-3">
                             Org Blueprint maps all the key business functions your company needs — from finance and legal to marketing and operations. 
                             It helps you see where you have coverage (internal team or external providers) and where you have gaps that need to be filled.
                         </p>
                         <div className="flex flex-wrap gap-4 text-xs">
                             <div className="flex items-center gap-2">
                                 <div className="w-3 h-3 rounded-full bg-green-500"></div>
-                                <span className="text-slate-600"><strong>Covered:</strong> Handled by your team</span>
+                                <span className="text-muted-foreground"><strong>Covered:</strong> Handled by your team</span>
                             </div>
                             <div className="flex items-center gap-2">
                                 <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
-                                <span className="text-slate-600"><strong>Partial:</strong> External provider</span>
+                                <span className="text-muted-foreground"><strong>Partial:</strong> External provider</span>
                             </div>
                             <div className="flex items-center gap-2">
                                 <div className="w-3 h-3 rounded-full bg-slate-300"></div>
-                                <span className="text-slate-600"><strong>Gap:</strong> Needs coverage</span>
+                                <span className="text-muted-foreground"><strong>Gap:</strong> Needs coverage</span>
                             </div>
                         </div>
-                        <p className="text-xs text-slate-500 mt-3">
+                        <p className="text-xs text-muted-foreground mt-3">
                             <strong>Tip:</strong> Click "Quick Assessment" to walk through each function and mark your coverage status. 
                             You can then browse the Marketplace to find providers for any gaps.
                         </p>

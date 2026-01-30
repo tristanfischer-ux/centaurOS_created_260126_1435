@@ -95,7 +95,7 @@ export function ExpandableCard({
             >
                 <div className="overflow-hidden">
                     <div className={cn(
-                        "border-t border-slate-100 bg-slate-50/50",
+                        "border-t border-slate-100 bg-muted/50",
                         expandedClassName
                     )}>
                         {/* Close button */}

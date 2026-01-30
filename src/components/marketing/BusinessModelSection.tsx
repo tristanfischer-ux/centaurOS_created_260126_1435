@@ -26,17 +26,17 @@ const roles = [
 
 export function BusinessModelSection() {
     return (
-        <section className="py-32 bg-slate-50">
+        <section className="py-32 bg-muted">
             <div className="max-w-7xl mx-auto px-6">
                 {/* Section Header */}
                 <div className="mb-20 max-w-2xl">
                     <span className="text-xs font-bold tracking-[0.3em] text-international-orange uppercase block mb-6">
                         The Hierarchy
                     </span>
-                    <h2 className="text-4xl md:text-5xl font-display font-medium text-slate-900 leading-tight mb-6">
+                    <h2 className="text-4xl md:text-5xl font-display font-medium text-foreground leading-tight mb-6">
                         Roles in the machine.
                     </h2>
-                    <p className="text-lg text-slate-600 leading-relaxed font-light">
+                    <p className="text-lg text-muted-foreground leading-relaxed font-light">
                         The Centaur OS is designed for three distinct operators. Each plays a critical role in the atom-building process.
                     </p>
                 </div>

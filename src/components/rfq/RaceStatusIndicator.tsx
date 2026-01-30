@@ -241,7 +241,7 @@ interface StatusBadgeProps {
 
 function StatusBadge({ status, className }: StatusBadgeProps) {
   const config: Record<RFQStatus, { label: string; color: string; Icon: typeof Clock }> = {
-    'Open': { label: 'Open', color: 'bg-blue-50 text-blue-700 border-blue-200', Icon: Clock },
+    'Open': { label: 'Open', color: 'bg-blue-50 text-blue-700 border', Icon: Clock },
     'Bidding': { label: 'Bidding', color: 'bg-emerald-50 text-emerald-700 border-emerald-200', Icon: Zap },
     'priority_hold': { label: 'Priority Hold', color: 'bg-amber-50 text-amber-700 border-amber-200', Icon: Lock },
     'Awarded': { label: 'Awarded', color: 'bg-violet-50 text-violet-700 border-violet-200', Icon: Award },

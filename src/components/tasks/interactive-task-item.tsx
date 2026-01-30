@@ -67,7 +67,7 @@ export function InteractiveTaskItem({ task, members, currentUserId, variant = "d
                     onClick={() => setModalOpen(true)}
                     className="w-full text-left transition-all group hover:shadow-md active:shadow-sm"
                 >
-                    <div className="flex items-center justify-between p-4 rounded-lg border border-foundry-200 bg-white hover:bg-foundry-50/30 hover:border-foundry-300 transition-colors">
+                    <div className="flex items-center justify-between p-4 rounded-lg border border bg-background hover:bg-foundry-50/30 hover:border-foundry-300 transition-colors">
                         <div className="flex-1 min-w-0 space-y-2">
                             <p className="text-sm font-medium text-foreground truncate group-hover:text-international-orange transition-colors">
                                 {task.title}
@@ -120,7 +120,7 @@ export function InteractiveTaskItem({ task, members, currentUserId, variant = "d
                                 "capitalize text-xs shrink-0",
                                 task.risk_level === 'High' ? "bg-red-100 text-red-700 border-red-200" :
                                 task.risk_level === 'Medium' ? "bg-amber-100 text-amber-700 border-amber-200" :
-                                "bg-foundry-100 text-foundry-600 border-foundry-200"
+                                "bg-foundry-100 text-foundry-600 border"
                             )}>
                                 {task.risk_level || 'Low'}
                             </Badge>
@@ -146,7 +146,7 @@ export function InteractiveTaskItem({ task, members, currentUserId, variant = "d
                 onClick={() => setModalOpen(true)}
                 className="w-full text-left transition-all group cursor-pointer"
             >
-                <div className="bg-white border-2 border-foundry-200 rounded-xl p-6 hover:border-international-orange hover:shadow-xl hover:-translate-y-1 active:translate-y-0 active:shadow-lg transition-all duration-200 space-y-5">
+                <div className="bg-background border-2 border rounded-xl p-6 hover:border-international-orange hover:shadow-xl hover:-translate-y-1 active:translate-y-0 active:shadow-lg transition-all duration-200 space-y-5">
                     {/* Header */}
                     <div className="flex items-start justify-between gap-4">
                         <div className="flex-1 min-w-0 space-y-2">

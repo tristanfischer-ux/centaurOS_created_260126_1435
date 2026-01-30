@@ -32,10 +32,10 @@ export function EcosystemSection() {
                     <span className="text-xs font-bold tracking-[0.3em] text-international-orange uppercase block mb-6">
                         The Infrastructure
                     </span>
-                    <h2 className="text-4xl md:text-5xl font-display font-medium text-slate-900 leading-tight mb-6">
+                    <h2 className="text-4xl md:text-5xl font-display font-medium text-foreground leading-tight mb-6">
                         THE OPERATING SYSTEM.
                     </h2>
-                    <p className="text-lg text-slate-600 leading-relaxed font-light">
+                    <p className="text-lg text-muted-foreground leading-relaxed font-light">
                         A unified stack for physical creation. From legal entities to neural networks.
                     </p>
                 </div>
@@ -72,7 +72,7 @@ export function EcosystemSection() {
 
                                 <div className="h-[1px] w-full bg-slate-700 mt-6 mb-6 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-700 origin-left" />
 
-                                <div className="flex items-center gap-2 text-xs font-mono text-slate-500 uppercase tracking-widest">
+                                <div className="flex items-center gap-2 text-xs font-mono text-muted-foreground uppercase tracking-widest">
                                     <span className="w-2 h-2 bg-international-orange rounded-full" />
                                     System Online
                                 </div>

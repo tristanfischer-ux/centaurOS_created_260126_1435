@@ -247,7 +247,7 @@ export default function JoinPage({ params }: { params: Promise<{ role: string }>
                         {/* CTA Button */}
                         <button
                             onClick={() => setStage("form")}
-                            className="group bg-white text-slate-900 px-8 sm:px-12 py-4 sm:py-5 text-sm sm:text-base font-bold tracking-widest uppercase hover:bg-blue-500 hover:text-white transition-all duration-300 flex items-center gap-3 mb-8 sm:mb-10"
+                            className="group bg-background text-foreground px-8 sm:px-12 py-4 sm:py-5 text-sm sm:text-base font-bold tracking-widest uppercase hover:bg-blue-500 hover:text-white transition-all duration-300 flex items-center gap-3 mb-8 sm:mb-10"
                         >
                             {config.ctaText}
                             <ArrowRight className="w-4 sm:w-5 h-4 sm:h-5 group-hover:translate-x-1 transition-transform" />
@@ -312,13 +312,13 @@ export default function JoinPage({ params }: { params: Promise<{ role: string }>
                     </div>
 
                     {/* Right: Form */}
-                    <div className="w-full md:w-1/2 bg-white text-slate-900 p-6 sm:p-8 md:p-12 lg:p-16 flex flex-col justify-center">
+                    <div className="w-full md:w-1/2 bg-background text-foreground p-6 sm:p-8 md:p-12 lg:p-16 flex flex-col justify-center">
                         <div className="w-full max-w-md mx-auto space-y-6 sm:space-y-8">
                             <div>
-                                <h2 className="text-xl sm:text-2xl font-bold text-slate-900">
+                                <h2 className="text-xl sm:text-2xl font-bold text-foreground">
                                     {config.isApplication ? "Apply for consideration" : "Create your account"}
                                 </h2>
-                                <p className="text-slate-500 mt-2 text-sm">
+                                <p className="text-muted-foreground mt-2 text-sm">
                                     {config.isApplication 
                                         ? "We review every application personally." 
                                         : "Enter your details to begin the induction."}
@@ -337,24 +337,24 @@ export default function JoinPage({ params }: { params: Promise<{ role: string }>
                                 )}
                                 
                                 <div className="space-y-2">
-                                    <Label htmlFor="name" className="text-sm font-medium text-slate-700">Full Name</Label>
+                                    <Label htmlFor="name" className="text-sm font-medium text-foreground">Full Name</Label>
                                     <Input
                                         id="name"
                                         name="name"
                                         placeholder="John Doe"
-                                        className="bg-white border-slate-300 focus:border-blue-500 focus:ring-blue-500 h-11 sm:h-12"
+                                        className="bg-background border-slate-300 focus:border-blue-500 focus:ring-blue-500 h-11 sm:h-12"
                                         required
                                     />
                                 </div>
 
                                 <div className="space-y-2">
-                                    <Label htmlFor="email" className="text-sm font-medium text-slate-700">Email</Label>
+                                    <Label htmlFor="email" className="text-sm font-medium text-foreground">Email</Label>
                                     <Input
                                         id="email"
                                         name="email"
                                         type="email"
                                         placeholder="you@example.com"
-                                        className="bg-white border-slate-300 focus:border-blue-500 focus:ring-blue-500 h-11 sm:h-12"
+                                        className="bg-background border-slate-300 focus:border-blue-500 focus:ring-blue-500 h-11 sm:h-12"
                                         required
                                     />
                                 </div>
@@ -362,7 +362,7 @@ export default function JoinPage({ params }: { params: Promise<{ role: string }>
                                 {/* Additional fields for applications and founder details */}
                                 {config.additionalFields?.map((field) => (
                                     <div key={field.id} className="space-y-2">
-                                        <Label htmlFor={field.id} className="text-sm font-medium text-slate-700">
+                                        <Label htmlFor={field.id} className="text-sm font-medium text-foreground">
                                             {field.label}
                                             {field.required && <span className="text-red-500 ml-1">*</span>}
                                         </Label>
@@ -371,7 +371,7 @@ export default function JoinPage({ params }: { params: Promise<{ role: string }>
                                             name={field.id}
                                             type={field.type || "text"}
                                             placeholder={field.placeholder}
-                                            className="bg-white border-slate-300 focus:border-blue-500 focus:ring-blue-500 h-11 sm:h-12"
+                                            className="bg-background border-slate-300 focus:border-blue-500 focus:ring-blue-500 h-11 sm:h-12"
                                             required={field.required}
                                         />
                                     </div>
@@ -379,13 +379,13 @@ export default function JoinPage({ params }: { params: Promise<{ role: string }>
 
                                 {!config.isApplication && (
                                     <div className="space-y-2">
-                                        <Label htmlFor="password" className="text-sm font-medium text-slate-700">Password</Label>
+                                        <Label htmlFor="password" className="text-sm font-medium text-foreground">Password</Label>
                                         <Input
                                             id="password"
                                             name="password"
                                             type="password"
                                             placeholder="Create a strong password"
-                                            className="bg-white border-slate-300 focus:border-blue-500 focus:ring-blue-500 h-11 sm:h-12"
+                                            className="bg-background border-slate-300 focus:border-blue-500 focus:ring-blue-500 h-11 sm:h-12"
                                             required
                                         />
                                     </div>
@@ -399,11 +399,11 @@ export default function JoinPage({ params }: { params: Promise<{ role: string }>
                                 </Button>
                             </form>
 
-                            <p className="text-xs text-center text-slate-400">
+                            <p className="text-xs text-center text-muted-foreground">
                                 By {config.isApplication ? "applying" : "joining"}, you agree to our{" "}
-                                <Link href="#" className="underline hover:text-slate-900">Terms of Service</Link>{" "}
+                                <Link href="#" className="underline hover:text-foreground">Terms of Service</Link>{" "}
                                 and{" "}
-                                <Link href="#" className="underline hover:text-slate-900">Privacy Policy</Link>.
+                                <Link href="#" className="underline hover:text-foreground">Privacy Policy</Link>.
                             </p>
                         </div>
                     </div>

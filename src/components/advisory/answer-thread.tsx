@@ -181,7 +181,7 @@ export function AnswerThread({
                 "border rounded-lg overflow-hidden",
                 answer.is_ai_generated 
                     ? "bg-gradient-to-br from-violet-50/50 to-blue-50/50 border-violet-200" 
-                    : "bg-white border-slate-200"
+                    : "bg-background border-slate-200"
             )}
         >
             {/* Answer Header */}
@@ -313,7 +313,7 @@ export function AnswerThread({
                         transition={{ duration: 0.2 }}
                         className="border-t border-slate-100 overflow-hidden"
                     >
-                        <div className="p-4 bg-slate-50/50 space-y-3">
+                        <div className="p-4 bg-muted/50 space-y-3">
                             {localComments.length === 0 ? (
                                 <p className="text-sm text-muted-foreground text-center py-2">
                                     No comments yet. Be the first to comment!
