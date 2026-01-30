@@ -412,6 +412,7 @@ export async function listInvitations(): Promise<{
       id: inv.id,
       email: inv.email,
       role: inv.role as MemberRole,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       invitedByName: (inv.profiles as any)?.full_name || 'Unknown',
       createdAt: inv.created_at,
       expiresAt: inv.expires_at,

@@ -94,6 +94,7 @@ export async function completeMarketplaceOnboarding(skipped: boolean = false) {
   const { error } = await supabase
     .from('profiles')
     .update({ 
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       onboarding_data: updatedData as any,
       updated_at: new Date().toISOString()
     })
@@ -170,6 +171,7 @@ export async function recordMarketplaceAction(
   const { error } = await supabase
     .from('profiles')
     .update({ 
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       onboarding_data: updatedData as any,
       updated_at: new Date().toISOString()
     })

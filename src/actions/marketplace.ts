@@ -132,6 +132,7 @@ export interface MarketplaceListing {
     subcategory: string
     title: string
     description: string
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     attributes: Record<string, any>
     image_url: string | null
     is_verified: boolean

@@ -126,6 +126,7 @@ export async function notifyBookingRequest(
         // Get booking details - this assumes a marketplace_orders table exists
         // Note: marketplace_orders table may not be in generated types yet
         const { data: booking, error: bookingError } = await supabase
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             .from('orders' as any)
             .select(`
                 id,
@@ -222,6 +223,7 @@ export async function notifyPaymentReceived(
         // Get order details
         // Note: marketplace_orders table may not be in generated types yet
         const { data: order, error: orderError } = await supabase
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             .from('orders' as any)
             .select(`
                 id,
@@ -318,6 +320,7 @@ export async function notifyOrderStatusChange(
         // Get order details
         // Note: marketplace_orders table may not be in generated types yet
         const { data: order, error: orderError } = await supabase
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             .from('orders' as any)
             .select(`
                 id,

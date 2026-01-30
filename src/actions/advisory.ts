@@ -120,6 +120,7 @@ export async function createAdvisoryQuestion(data: {
             const aiResult = await generateAdvisoryAnswer({
                 question_title: data.title,
                 question_body: data.body,
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 category: data.category as any
             })
 
