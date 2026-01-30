@@ -286,7 +286,8 @@ export function usePresence(options: UsePresenceOptions = {}) {
         window.removeEventListener(event, recordActivity)
       })
     }
-  }, []) // Only run on mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []) // Only run on mount - deps intentionally omitted to prevent reconnection loops
 
   // Handle visibility change (tab switching)
   useEffect(() => {

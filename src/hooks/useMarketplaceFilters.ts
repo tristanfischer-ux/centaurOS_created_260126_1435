@@ -56,7 +56,7 @@ export function useMarketplaceFilters() {
         return () => clearTimeout(timer)
     }, [searchQuery])
 
-    // Sync with URL params on mount
+    // Sync with URL params on mount (intentionally run once)
     useEffect(() => {
         if (urlSearchParams) {
             const query = urlSearchParams.get('q')
@@ -71,6 +71,7 @@ export function useMarketplaceFilters() {
             if (location) setLocationFilter(location)
             if (sort) setSortBy(sort)
         }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
 
     // Toggle subcategory in multi-select

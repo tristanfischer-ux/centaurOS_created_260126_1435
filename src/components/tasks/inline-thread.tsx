@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef, useMemo } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { formatDistanceToNow } from "date-fns"
-import { Loader2, Send, Upload, ChevronDown, X } from "lucide-react"
+import { Loader2, Send, Upload, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { MentionInput } from "@/components/ui/mention-input"
 import { MentionText } from "@/components/ui/mention-text"

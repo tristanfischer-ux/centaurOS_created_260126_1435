@@ -1,7 +1,7 @@
 "use client"
 
-import { useState, useMemo, useEffect } from "react"
-import { FileIcon, X, Loader2, Paperclip, FileText, Image, Eye, Download } from "lucide-react"
+import { useState, useMemo, useEffect, useCallback } from "react"
+import { FileIcon, X, Loader2, Paperclip, FileText, Eye, Download } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
@@ -48,7 +48,7 @@ export function AttachmentList({ taskId, attachments, canDelete = false, onDelet
     }
 
     // Get signed URL for file (valid for 1 hour)
-    const getFileUrl = async (filePath: string) => {
+    const getFileUrl = useCallback(async (filePath: string) => {
         // Check if we already have a URL cached
         if (fileUrls[filePath]) {
             return fileUrls[filePath]
@@ -71,7 +71,7 @@ export function AttachmentList({ taskId, attachments, canDelete = false, onDelet
             console.error('Exception creating signed URL:', err)
             return null
         }
-    }
+    }, [fileUrls, supabase.storage])
 
     // Download file
     const handleDownload = async (file: Attachment) => {
@@ -111,7 +111,7 @@ export function AttachmentList({ taskId, attachments, canDelete = false, onDelet
         attachments.forEach(file => {
             getFileUrl(file.file_path)
         })
-    }, [attachments])
+    }, [attachments, getFileUrl])
 
     const handleDelete = async (fileId: string, filePath: string) => {
         if (!confirm("Are you sure you want to delete this attachment?")) return

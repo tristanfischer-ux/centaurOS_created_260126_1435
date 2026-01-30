@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge"
 import { UserAvatarStack } from "@/components/ui/user-avatar"
 import { FullTaskView } from "@/components/tasks/full-task-view"
 import { format } from "date-fns"
-import { Calendar, Target, User, Loader2 } from "lucide-react"
+import { Calendar, Target, User } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 interface InteractiveTaskItemProps {

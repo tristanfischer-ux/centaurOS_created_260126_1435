@@ -93,7 +93,7 @@ interface FullTaskViewProps {
     currentUserId: string
 }
 
-export function FullTaskView({ open, onOpenChange, task, members, currentUserId }: FullTaskViewProps) {
+export function FullTaskView({ open, onOpenChange, task, members }: FullTaskViewProps) {
     const [comments, setComments] = useState<Comment[]>([])
     const [history, setHistory] = useState<TaskHistoryItem[]>([])
     const [attachments, setAttachments] = useState<any[]>([])
@@ -112,40 +112,40 @@ export function FullTaskView({ open, onOpenChange, task, members, currentUserId 
 
     // Fetch data when dialog opens
     useEffect(() => {
+        const fetchAllData = async () => {
+            setIsLoading(true)
+            
+            // Fetch comments (all, including system logs for full history view)
+            const { data: commentsData } = await supabase
+                .from('task_comments')
+                .select('*, user:user_id(full_name, role)')
+                .eq('task_id', task.id)
+                .order('created_at', { ascending: false })
+                .limit(50)
+
+            if (commentsData) {
+                setComments(commentsData as Comment[])
+            }
+
+            // Fetch attachments
+            const attachmentsRes = await getTaskAttachments(task.id)
+            if (attachmentsRes.data) {
+                setAttachments(attachmentsRes.data)
+            }
+
+            // Fetch history
+            const historyRes = await getTaskHistory(task.id)
+            if (historyRes.data && Array.isArray(historyRes.data)) {
+                setHistory(historyRes.data as TaskHistoryItem[])
+            }
+
+            setIsLoading(false)
+        }
+
         if (open && task.id) {
             fetchAllData()
         }
-    }, [open, task.id])
-
-    const fetchAllData = async () => {
-        setIsLoading(true)
-        
-        // Fetch comments (all, including system logs for full history view)
-        const { data: commentsData } = await supabase
-            .from('task_comments')
-            .select('*, user:user_id(full_name, role)')
-            .eq('task_id', task.id)
-            .order('created_at', { ascending: false })
-            .limit(50)
-
-        if (commentsData) {
-            setComments(commentsData as Comment[])
-        }
-
-        // Fetch attachments
-        const attachmentsRes = await getTaskAttachments(task.id)
-        if (attachmentsRes.data) {
-            setAttachments(attachmentsRes.data)
-        }
-
-        // Fetch history
-        const historyRes = await getTaskHistory(task.id)
-        if (historyRes.data && Array.isArray(historyRes.data)) {
-            setHistory(historyRes.data as TaskHistoryItem[])
-        }
-
-        setIsLoading(false)
-    }
+    }, [open, task.id, supabase])
 
     const handleSend = async (e: React.FormEvent) => {
         e.preventDefault()

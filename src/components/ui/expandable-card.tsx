@@ -169,24 +169,27 @@ export function ExpandableProvider({ children }: { children: React.ReactNode }) 
 export function useExpandable(id: string) {
     const context = React.useContext(ExpandableContext)
     
-    if (!context) {
-        // Not within provider, use local state
-        const [isExpanded, setIsExpanded] = React.useState(false)
+    // Always call useState unconditionally to follow Rules of Hooks
+    const [localExpanded, setLocalExpanded] = React.useState(false)
+    
+    // Use context if available, otherwise use local state
+    if (context) {
+        const { expandedId, setExpandedId } = context
+        const isExpanded = expandedId === id
+        
         return {
             isExpanded,
-            toggle: () => setIsExpanded(prev => !prev),
-            expand: () => setIsExpanded(true),
-            collapse: () => setIsExpanded(false),
+            toggle: () => setExpandedId(isExpanded ? null : id),
+            expand: () => setExpandedId(id),
+            collapse: () => setExpandedId(null),
         }
     }
     
-    const { expandedId, setExpandedId } = context
-    const isExpanded = expandedId === id
-    
+    // Not within provider, use local state
     return {
-        isExpanded,
-        toggle: () => setExpandedId(isExpanded ? null : id),
-        expand: () => setExpandedId(id),
-        collapse: () => setExpandedId(null),
+        isExpanded: localExpanded,
+        toggle: () => setLocalExpanded(prev => !prev),
+        expand: () => setLocalExpanded(true),
+        collapse: () => setLocalExpanded(false),
     }
 }

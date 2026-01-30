@@ -5,7 +5,6 @@ import { Database } from "@/types/database.types"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Calendar, Clock, ChevronRight, ChevronDown, Target, Check, Plus, Calendar as CalendarIcon, Maximize2 } from "lucide-react"
-import Link from "next/link"
 import {
     Popover,
     PopoverContent,
@@ -403,9 +402,6 @@ export function TimelineListView({ tasks, members, currentUserId }: TimelineList
                                     const currentAssignees = task.assignees && task.assignees.length > 0
                                         ? task.assignees
                                         : (task.assignee ? [task.assignee] : [])
-
-                                    const isAssignee = currentAssignees.some(a => a.id === currentUserId)
-                                    const isCreator = task.creator_id === currentUserId
 
                                     return (
                                         <div

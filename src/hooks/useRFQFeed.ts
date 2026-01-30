@@ -171,17 +171,20 @@ export function useRFQFeed(options: UseRFQFeedOptions = {}): UseRFQFeedReturn {
 
     setupChannel()
 
+    // Capture current ref value for cleanup
+    const currentChannel = channelRef.current
+    const currentRfqChannels = rfqChannelsRef.current
+
     return () => {
-      if (channelRef.current) {
-        supabase.removeChannel(channelRef.current)
+      if (currentChannel) {
+        supabase.removeChannel(currentChannel)
         channelRef.current = null
       }
       // Clean up any specific RFQ subscriptions
-      const channelsToClean = rfqChannelsRef.current
-      channelsToClean.forEach((channel) => {
+      currentRfqChannels.forEach((channel) => {
         supabase.removeChannel(channel)
       })
-      channelsToClean.clear()
+      currentRfqChannels.clear()
     }
   }, [enabled, onNewRFQ])
 
