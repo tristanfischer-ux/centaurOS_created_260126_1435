@@ -600,12 +600,12 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                                                     {hasDeadline && (
                                                         <div className={cn(
                                                             "flex items-center gap-1 shrink-0",
-                                                            isOverdue ? "text-red-600" : "text-green-600"
+                                                            isOverdue ? "text-red-600" : "text-slate-400"
                                                         )}>
                                                             {isOverdue ? (
                                                                 <AlertTriangle className="h-3 w-3" />
                                                             ) : (
-                                                                <CheckCircle2 className="h-3 w-3" />
+                                                                <Clock className="h-3 w-3" />
                                                             )}
                                                         </div>
                                                     )}

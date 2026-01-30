@@ -1,0 +1,88 @@
+# Task Completion Icons: Design Standard
+
+## Problem
+
+Users reported confusion when green checkmark circles (`CheckCircle2`) appeared next to **active** tasks, making them look completed when they were actually still in progress.
+
+## Solution: Clear Visual States
+
+### ✅ Use CheckCircle (Green) ONLY for:
+- **Actually completed tasks** (status === 'Completed')
+- Success messages after an action completes
+- Verified items or approved applications
+- Items that are genuinely "done"
+
+### ⏱️ Use Clock Icon for:
+- Tasks with upcoming deadlines (not overdue, not complete)
+- Tasks that are "in progress" or "active"
+- Time-based indicators
+
+### ⚠️ Use AlertTriangle for:
+- Overdue tasks
+- Tasks requiring attention
+- Error or warning states
+
+### ⭕ Use Circle (outline) for:
+- Incomplete tasks
+- Pending items
+- Items awaiting action
+
+## Code Examples
+
+### ❌ DON'T DO THIS
+```tsx
+{/* This makes active tasks look completed! */}
+{!isOverdue && (
+  <CheckCircle2 className="h-3 w-3 text-green-600" />
+)}
+```
+
+### ✅ DO THIS INSTEAD
+```tsx
+{/* Clear visual distinction between states */}
+{task.status === 'Completed' ? (
+  <CheckCircle2 className="h-3 w-3 text-green-600" />
+) : isOverdue ? (
+  <AlertTriangle className="h-3 w-3 text-red-600" />
+) : (
+  <Clock className="h-3 w-3 text-slate-400" />
+)}
+```
+
+## Task Status Color Coding
+
+| State | Icon | Color | Meaning |
+|-------|------|-------|---------|
+| **Completed** | `CheckCircle2` | Green (`text-green-600`) | Task is done ✓ |
+| **Active/In Progress** | `Clock` | Blue or Gray (`text-blue-500`, `text-slate-400`) | Task is ongoing |
+| **Pending** | `Circle` | Gray (`text-slate-400`) | Task is waiting to start |
+| **Overdue** | `AlertTriangle` | Red (`text-red-600`) | Task needs urgent attention |
+
+## Interactive Completion Buttons
+
+When providing a button to mark tasks as complete:
+- Always use clear **text labels** like "Mark Complete" or "Complete Task"
+- Icon + text is better than icon alone
+- Use button styling, not just a clickable icon
+
+### ✅ Good Example
+```tsx
+<Button onClick={handleComplete}>
+  <Check className="h-4 w-4 mr-2" />
+  Mark Complete
+</Button>
+```
+
+### ❌ Bad Example  
+```tsx
+{/* Ambiguous - is it a status indicator or a button? */}
+<CheckCircle2 
+  className="h-5 w-5 text-green-500 cursor-pointer" 
+  onClick={handleComplete} 
+/>
+```
+
+## Summary
+
+**Green checkmarks = completed only.**  
+For everything else, use Clock, Circle, or AlertTriangle to show the actual state.

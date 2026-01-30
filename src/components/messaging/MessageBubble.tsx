@@ -89,7 +89,6 @@ export function MessageBubble({
       {showAvatar && !isOwn && (
         <UserAvatar
           name={sender.full_name || sender.email}
-          role={sender.role}
           avatarUrl={sender.avatar_url}
           size="sm"
           className="flex-shrink-0"
