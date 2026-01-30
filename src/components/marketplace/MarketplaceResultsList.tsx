@@ -4,19 +4,17 @@ import { memo } from 'react'
 import { MarketplaceListing } from '@/actions/marketplace'
 import { MarketCard } from './market-card'
 import { Card } from '@/components/ui/card'
-import { Checkbox } from '@/components/ui/checkbox'
 import { Badge } from '@/components/ui/badge'
-import { EmptyState } from '@/components/ui/empty-state'
 import { Button } from '@/components/ui/button'
-import { Store, ShieldCheck, Briefcase, MapPin, Clock } from 'lucide-react'
+import { EmptyState } from '@/components/ui/empty-state'
+import { cn } from '@/lib/utils'
+import { Store, ShieldCheck, Briefcase, MapPin, Clock, GitCompareArrows } from 'lucide-react'
 
 interface MarketplaceResultsListProps {
     items: MarketplaceListing[]
     viewMode: 'grid' | 'list'
-    allExpanded: boolean
     selectedIds: Set<string>
     onToggleSelect: (id: string) => void
-    onToggleExpandAll: () => void
     hasActiveFilters: boolean
     onClearFilters: () => void
     getResultsLabel: () => string
@@ -29,10 +27,8 @@ interface MarketplaceResultsListProps {
 export const MarketplaceResultsList = memo(function MarketplaceResultsList({
     items,
     viewMode,
-    allExpanded,
     selectedIds,
     onToggleSelect,
-    onToggleExpandAll,
     hasActiveFilters,
     onClearFilters,
     getResultsLabel,
@@ -61,8 +57,6 @@ export const MarketplaceResultsList = memo(function MarketplaceResultsList({
                         listing={item}
                         isSelected={selectedIds.has(item.id)}
                         onToggleSelect={onToggleSelect}
-                        isExpanded={allExpanded}
-                        onToggleExpandAll={onToggleExpandAll}
                     />
                 ))}
             </div>
@@ -74,17 +68,24 @@ export const MarketplaceResultsList = memo(function MarketplaceResultsList({
         <div className="space-y-3 animate-in fade-in duration-500">
             {items.map(item => {
                 const attrs = item.attributes || {}
+                const primaryMetric = attrs.rate || attrs.cost || attrs.price || null
                 return (
-                    <Card key={item.id} className="p-4 hover:shadow-md transition-shadow">
+                    <Card key={item.id} className="group relative p-4 border-slate-200 hover:border-orange-300 hover:shadow-md transition-all">
+                        {/* Compare button - hover */}
+                        <button
+                            onClick={() => onToggleSelect(item.id)}
+                            className={cn(
+                                "absolute top-4 right-4 z-10 w-8 h-8 rounded-full flex items-center justify-center transition-all duration-200",
+                                selectedIds.has(item.id)
+                                    ? "bg-orange-500 text-white shadow-md"
+                                    : "bg-white/90 text-slate-600 shadow-md border border-slate-200 opacity-0 group-hover:opacity-100"
+                            )}
+                            title={selectedIds.has(item.id) ? "Remove from comparison" : "Add to comparison"}
+                        >
+                            <GitCompareArrows className="w-4 h-4" />
+                        </button>
+                        
                         <div className="flex items-start gap-4">
-                            {/* Checkbox */}
-                            <Checkbox
-                                checked={selectedIds.has(item.id)}
-                                onCheckedChange={() => onToggleSelect(item.id)}
-                                className="mt-1"
-                                aria-label={`Select ${item.title} for comparison`}
-                            />
-                            
                             {/* Main content */}
                             <div className="flex-1 min-w-0">
                                 <div className="flex items-start justify-between gap-4">
@@ -103,14 +104,14 @@ export const MarketplaceResultsList = memo(function MarketplaceResultsList({
                                         )}
                                     </div>
                                     
-                                    {/* Key metrics */}
-                                    <div className="text-right shrink-0">
-                                        {attrs.rate && (
-                                            <p className="font-semibold text-foreground">{attrs.rate}</p>
+                                    {/* Price + CTA */}
+                                    <div className="text-right shrink-0 flex items-center gap-3">
+                                        {primaryMetric && (
+                                            <p className="font-bold text-foreground">{primaryMetric}</p>
                                         )}
-                                        {attrs.cost && (
-                                            <p className="font-semibold text-foreground">{attrs.cost}</p>
-                                        )}
+                                        <Button size="sm" variant="default" asChild>
+                                            <a href={`/marketplace/${item.id}`}>View</a>
+                                        </Button>
                                     </div>
                                 </div>
                                 
@@ -142,12 +143,12 @@ export const MarketplaceResultsList = memo(function MarketplaceResultsList({
                                     {(attrs.skills || attrs.expertise) && (
                                         <div className="flex gap-1 flex-wrap">
                                             {(attrs.skills || attrs.expertise || []).slice(0, 3).map((skill: string, i: number) => (
-                                                <span key={i} className="px-2 py-0.5 bg-muted text-muted-foreground rounded">
+                                                <span key={i} className="px-2 py-0.5 bg-slate-100 text-slate-600 rounded-full">
                                                     {skill}
                                                 </span>
                                             ))}
                                             {(attrs.skills || attrs.expertise || []).length > 3 && (
-                                                <span className="px-2 py-0.5 bg-muted text-muted-foreground rounded">
+                                                <span className="px-2 py-0.5 bg-slate-100 text-slate-500 rounded-full">
                                                     +{(attrs.skills || attrs.expertise).length - 3}
                                                 </span>
                                             )}

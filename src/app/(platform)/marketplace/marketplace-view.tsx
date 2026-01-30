@@ -13,10 +13,10 @@ import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { CreateRFQDialog } from "./create-rfq-dialog"
 import { useState, useMemo, useEffect, useCallback } from "react"
-import { Loader2, Store, Search, X, SlidersHorizontal, MapPin, Briefcase, GraduationCap, Bot, Factory, Zap, Shield, LayoutGrid, List, ShieldCheck, Clock, Sparkles, Users, ArrowRight, Bookmark, Star, TrendingUp } from "lucide-react"
+import { Loader2, Store, Search, X, SlidersHorizontal, MapPin, Briefcase, GraduationCap, Bot, Factory, Zap, Shield, LayoutGrid, List, ShieldCheck, Clock, Sparkles, Users, ArrowRight, Bookmark, Star } from "lucide-react"
 import { toast } from "sonner"
 import { Card } from "@/components/ui/card"
-import { Checkbox } from "@/components/ui/checkbox"
+import { cn } from "@/lib/utils"
 import { useSearchParams, useRouter, usePathname } from "next/navigation"
 import { SearchBar, ActiveFilterBadges } from "@/components/search"
 import { SaveSearchDialog } from "@/components/search/SavedSearches"
@@ -79,9 +79,6 @@ export function MarketplaceView({
     const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('')
     const [showFilters, setShowFilters] = useState(false)
     const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
-    
-    // Global expansion state - all cards expand/collapse together
-    const [allExpanded, setAllExpanded] = useState(false)
     
     // Universal filters - subcategory is multi-select
     const [selectedSubcategories, setSelectedSubcategories] = useState<Set<string>>(new Set())
@@ -717,27 +714,6 @@ export function MarketplaceView({
                             </div>
                         </div>
                         
-                        {/* Trending searches - show when search is empty */}
-                        {!searchQuery && popularSearches.length > 0 && (
-                            <div className="flex flex-wrap items-center gap-2">
-                                <span className="text-xs text-muted-foreground flex items-center gap-1">
-                                    <TrendingUp className="h-3 w-3" />
-                                    Trending:
-                                </span>
-                                {popularSearches.slice(0, 5).map((popular, idx) => (
-                                    <button
-                                        key={`${popular.query}-${idx}`}
-                                        onClick={() => {
-                                            setSearchQuery(popular.query)
-                                            if (popular.category) setActiveTab(popular.category)
-                                        }}
-                                        className="px-2 py-1 text-xs rounded-full border hover:bg-muted transition-colors"
-                                    >
-                                        {popular.query}
-                                    </button>
-                                ))}
-                            </div>
-                        )}
 
                         {/* People Filters Panel */}
                         {activeTab === 'People' && showFilters && (
@@ -978,18 +954,25 @@ export function MarketplaceView({
                             </div>
                         )}
 
-                        {selectedIds.size === 0 && (
-                            <p className="text-sm text-muted-foreground flex items-center gap-1">
-                                Select up to 3 items to compare
-                            </p>
-                        )}
-                        {/* Tabs - scrollable on ultra-narrow, grid on wider */}
+                        {/* Tabs with counts - scrollable on ultra-narrow, grid on wider */}
                         <div className="overflow-x-auto -mx-2 xs:mx-0 px-2 xs:px-0 pb-1">
-                            <TabsList className="inline-flex xs:grid w-auto xs:w-full max-w-md xs:grid-cols-4 min-w-max xs:min-w-0">
-                                <TabsTrigger value="People" className="px-3 xs:px-4">People</TabsTrigger>
-                                <TabsTrigger value="Products" className="px-3 xs:px-4">Products</TabsTrigger>
-                                <TabsTrigger value="Services" className="px-3 xs:px-4">Services</TabsTrigger>
-                                <TabsTrigger value="AI" className="px-3 xs:px-4">AI</TabsTrigger>
+                            <TabsList className="inline-flex xs:grid w-auto xs:w-full max-w-lg xs:grid-cols-4 min-w-max xs:min-w-0">
+                                <TabsTrigger value="People" className="px-3 xs:px-4 gap-1.5">
+                                    People
+                                    <span className="text-[10px] opacity-60">({initialListings.filter(l => l.category === 'People').length})</span>
+                                </TabsTrigger>
+                                <TabsTrigger value="Products" className="px-3 xs:px-4 gap-1.5">
+                                    Products
+                                    <span className="text-[10px] opacity-60">({initialListings.filter(l => l.category === 'Products').length})</span>
+                                </TabsTrigger>
+                                <TabsTrigger value="Services" className="px-3 xs:px-4 gap-1.5">
+                                    Services
+                                    <span className="text-[10px] opacity-60">({initialListings.filter(l => l.category === 'Services').length})</span>
+                                </TabsTrigger>
+                                <TabsTrigger value="AI" className="px-3 xs:px-4 gap-1.5">
+                                    AI
+                                    <span className="text-[10px] opacity-60">({initialListings.filter(l => l.category === 'AI').length})</span>
+                                </TabsTrigger>
                             </TabsList>
                         </div>
                     </div>
@@ -1137,24 +1120,14 @@ export function MarketplaceView({
                         </div>
                     )}
 
-                    {/* Results count, view toggle, and expand all */}
+                    {/* Results count and view toggle */}
                     <div className="flex items-center justify-between mb-4">
                         <p className="text-sm text-muted-foreground">
                             Showing {getResultsLabel()}
                             {hasActiveFilters && ' (filtered)'}
                         </p>
                         <div className="flex items-center gap-2">
-                            {viewMode === 'grid' && filteredItems.length > 0 && (
-                                <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => setAllExpanded(!allExpanded)}
-                                    className="text-xs text-muted-foreground hover:text-foreground"
-                                >
-                                    {allExpanded ? 'Collapse All' : 'Expand All'}
-                                </Button>
-                            )}
-                            <div className="bg-muted p-1 flex items-center">
+                            <div className="bg-muted p-1 rounded-md flex items-center">
                                 <Button
                                     variant={viewMode === 'grid' ? 'default' : 'ghost'}
                                     size="sm"
@@ -1187,8 +1160,6 @@ export function MarketplaceView({
                                     listing={item}
                                     isSelected={selectedIds.has(item.id)}
                                     onToggleSelect={toggleSelect}
-                                    isExpanded={allExpanded}
-                                    onToggleExpandAll={() => setAllExpanded(!allExpanded)}
                                 />
                             ))}
                         </div>
@@ -1196,16 +1167,24 @@ export function MarketplaceView({
                         <div className="space-y-3 animate-fade-in">
                             {filteredItems.map(item => {
                                 const attrs = item.attributes || {}
+                                const primaryMetric = attrs.rate || attrs.cost || attrs.price || null
                                 return (
-                                    <Card key={item.id} className="p-4 border-blue-200 hover:border-orange-200 hover:shadow-sm transition-all">
+                                    <Card key={item.id} className="group relative p-4 border-slate-200 hover:border-orange-300 hover:shadow-md transition-all">
+                                        {/* Compare button - hover */}
+                                        <button
+                                            onClick={() => toggleSelect(item.id)}
+                                            className={cn(
+                                                "absolute top-4 right-4 z-10 w-8 h-8 rounded-full flex items-center justify-center transition-all duration-200",
+                                                selectedIds.has(item.id)
+                                                    ? "bg-orange-500 text-white shadow-md"
+                                                    : "bg-white/90 text-slate-600 shadow-md border border-slate-200 opacity-0 group-hover:opacity-100"
+                                            )}
+                                            title={selectedIds.has(item.id) ? "Remove from comparison" : "Add to comparison"}
+                                        >
+                                            <Users className="w-4 h-4" />
+                                        </button>
+                                        
                                         <div className="flex items-start gap-4">
-                                            {/* Checkbox */}
-                                            <Checkbox
-                                                checked={selectedIds.has(item.id)}
-                                                onCheckedChange={() => toggleSelect(item.id)}
-                                                className="mt-1"
-                                            />
-                                            
                                             {/* Main content */}
                                             <div className="flex-1 min-w-0">
                                                 <div className="flex items-start justify-between gap-4">
@@ -1224,14 +1203,14 @@ export function MarketplaceView({
                                                         )}
                                                     </div>
                                                     
-                                                    {/* Key metrics */}
-                                                    <div className="text-right shrink-0">
-                                                        {attrs.rate && (
-                                                            <p className="font-semibold text-foreground">{attrs.rate}</p>
+                                                    {/* Price + CTA */}
+                                                    <div className="text-right shrink-0 flex items-center gap-3">
+                                                        {primaryMetric && (
+                                                            <p className="font-bold text-foreground">{primaryMetric}</p>
                                                         )}
-                                                        {attrs.cost && (
-                                                            <p className="font-semibold text-foreground">{attrs.cost}</p>
-                                                        )}
+                                                        <Button size="sm" variant="default" asChild>
+                                                            <a href={`/marketplace/${item.id}`}>View</a>
+                                                        </Button>
                                                     </div>
                                                 </div>
                                                 
@@ -1263,12 +1242,12 @@ export function MarketplaceView({
                                                     {(attrs.skills || attrs.expertise) && (
                                                         <div className="flex gap-1">
                                                             {(attrs.skills || attrs.expertise || []).slice(0, 3).map((skill: string, i: number) => (
-                                                                <span key={i} className="px-2 py-0.5 bg-muted text-muted-foreground">
+                                                                <span key={i} className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">
                                                                     {skill}
                                                                 </span>
                                                             ))}
                                                             {(attrs.skills || attrs.expertise || []).length > 3 && (
-                                                                <span className="px-2 py-0.5 bg-muted text-muted-foreground">
+                                                                <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-500">
                                                                     +{(attrs.skills || attrs.expertise).length - 3}
                                                                 </span>
                                                             )}

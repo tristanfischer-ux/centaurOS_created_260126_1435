@@ -262,7 +262,6 @@ function WelcomeContent({ userRole }: { userRole: string }) {
 // Step 2: Recommendations Content
 function RecommendationsContent({ recommendations }: { recommendations: MarketplaceListing[] }) {
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
-    const [expandedId, setExpandedId] = useState<string | null>(null)
 
     const handleToggleSelect = (id: string) => {
         setSelectedIds(prev => {
@@ -274,10 +273,6 @@ function RecommendationsContent({ recommendations }: { recommendations: Marketpl
             }
             return next
         })
-    }
-
-    const handleToggleExpand = (id: string) => {
-        setExpandedId(prev => prev === id ? null : id)
     }
 
     if (!recommendations || recommendations.length === 0) {
@@ -294,7 +289,7 @@ function RecommendationsContent({ recommendations }: { recommendations: Marketpl
     return (
         <div className="space-y-3">
             <p className="text-sm text-muted-foreground mb-4">
-                These listings match your needs. Click "More" to see details or "Compare" to add them to comparison.
+                These listings match your needs. Hover to compare or click "View" for details.
             </p>
             {recommendations.slice(0, 3).map(listing => (
                 <MarketCard
@@ -302,8 +297,6 @@ function RecommendationsContent({ recommendations }: { recommendations: Marketpl
                     listing={listing}
                     isSelected={selectedIds.has(listing.id)}
                     onToggleSelect={handleToggleSelect}
-                    isExpanded={expandedId === listing.id}
-                    onToggleExpandAll={() => handleToggleExpand(listing.id)}
                 />
             ))}
         </div>
