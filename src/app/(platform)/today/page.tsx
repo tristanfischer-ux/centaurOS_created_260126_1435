@@ -493,6 +493,42 @@ export default async function TodayPage() {
                                 </CardContent>
                             </Card>
                         )}
+
+                        {/* No Action Items State - Show when left column would be empty */}
+                        {!(isExecutiveOrFounder && pendingDecisions.length > 0) && 
+                         !(isExecutiveOrFounder && blockers.length > 0) && 
+                         overdueTasks.length === 0 && (
+                            <Card className="bg-gradient-to-br from-blue-50 to-cyan-50 border-blue-200">
+                                <CardContent className="py-12 text-center">
+                                    <div className="inline-flex p-4 bg-white/80 rounded-full mb-4">
+                                        <CheckCircle2 className="h-8 w-8 text-blue-500" />
+                                    </div>
+                                    <h3 className="text-xl font-display font-semibold text-blue-900 mb-2">
+                                        All on track
+                                    </h3>
+                                    <p className="text-blue-700 max-w-md mx-auto mb-6">
+                                        No urgent items need your attention right now. Check your focus tasks on the right, or explore these quick actions.
+                                    </p>
+                                    <div className="flex flex-wrap justify-center gap-3">
+                                        <Link href="/objectives">
+                                            <Button variant="secondary" className="border border-blue-300 text-blue-700 hover:bg-blue-100 bg-white/50">
+                                                <Target className="h-4 w-4 mr-2" /> View Objectives
+                                            </Button>
+                                        </Link>
+                                        <Link href="/tasks">
+                                            <Button variant="secondary" className="border border-blue-300 text-blue-700 hover:bg-blue-100 bg-white/50">
+                                                <CheckCircle2 className="h-4 w-4 mr-2" /> All Tasks
+                                            </Button>
+                                        </Link>
+                                        <Link href="/team">
+                                            <Button variant="secondary" className="border border-blue-300 text-blue-700 hover:bg-blue-100 bg-white/50">
+                                                <Users className="h-4 w-4 mr-2" /> Team
+                                            </Button>
+                                        </Link>
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        )}
                     </div>
 
                     {/* Right Column - Today's Focus (1/3) */}

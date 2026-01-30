@@ -209,7 +209,7 @@ export function InlineThread({ taskId, isOpen, onClose, members }: InlineThreadP
             </div>
 
             {/* Input area */}
-            <div className="p-3 border-t border-slate-100 space-y-2 relative overflow-visible">
+            <div className="p-3 border-t border-slate-100 space-y-2 relative overflow-hidden">
                 <div
                     className={cn(
                         "border border-dashed rounded p-2 text-center cursor-pointer transition-colors text-xs",
@@ -237,7 +237,7 @@ export function InlineThread({ taskId, isOpen, onClose, members }: InlineThreadP
                     }}
                     className="hidden"
                 />
-                <form onSubmit={handleSend} className="flex items-start gap-2 w-full relative">
+                <form onSubmit={handleSend} className="flex items-start gap-2 w-full relative overflow-hidden">
                     <MentionInput
                         value={newComment}
                         onChange={setNewComment}
