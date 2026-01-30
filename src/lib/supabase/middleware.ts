@@ -4,6 +4,7 @@ import { Database } from '@/types/database.types'
 
 // Public routes that don't require authentication
 const PUBLIC_ROUTES = [
+    '/',  // Marketing homepage
     '/login',
     '/auth',
     '/join',
