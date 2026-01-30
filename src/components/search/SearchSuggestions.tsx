@@ -193,15 +193,15 @@ function getSuggestionIcon(type: string): React.ReactNode {
     case "listing":
       return <Search className="h-4 w-4 text-muted-foreground" />
     case "category":
-      return <Tag className="h-4 w-4 text-blue-500" />
+      return <Tag className="h-4 w-4 text-chart-2" />
     case "provider":
-      return <User className="h-4 w-4 text-green-500" />
+      return <User className="h-4 w-4 text-chart-3" />
     case "recent":
       return <History className="h-4 w-4 text-muted-foreground" />
     case "popular":
-      return <TrendingUp className="h-4 w-4 text-orange-500" />
+      return <TrendingUp className="h-4 w-4 text-international-orange" />
     default:
-      return <Sparkles className="h-4 w-4 text-violet-500" />
+      return <Sparkles className="h-4 w-4 text-chart-5" />
   }
 }
 
@@ -217,7 +217,7 @@ function highlightMatch(text: string, query: string): React.ReactNode {
   return (
     <>
       {text.slice(0, index)}
-      <mark className="bg-yellow-100 text-yellow-900 rounded px-0.5">
+      <mark className="bg-accent/20 text-accent-foreground rounded px-0.5">
         {text.slice(index, index + query.length)}
       </mark>
       {text.slice(index + query.length)}
@@ -320,7 +320,7 @@ export function QuickSuggestionsRow({
           className={cn(
             "px-2 py-1 text-xs rounded-full border transition-colors",
             "hover:bg-muted hover:border-muted-foreground/50",
-            suggestion.trending && "border-orange-300 text-orange-700"
+            suggestion.trending && "border-international-orange/50 text-international-orange"
           )}
         >
           {suggestion.trending && (

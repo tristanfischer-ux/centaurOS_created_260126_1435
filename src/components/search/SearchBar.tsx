@@ -129,7 +129,7 @@ export function SearchBar({
             placeholder={aiSearchEnabled ? "Describe what you're looking for..." : placeholder}
             className={cn(
               "pl-9 pr-10",
-              aiSearchEnabled && "border-violet-300 focus-visible:ring-violet-500"
+              aiSearchEnabled && "border-primary focus-visible:ring-primary"
             )}
           />
           {value && (
@@ -137,6 +137,7 @@ export function SearchBar({
               type="button"
               onClick={handleClear}
               className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              aria-label="Clear search"
             >
               <X className="h-4 w-4" />
             </button>
@@ -157,7 +158,7 @@ export function SearchBar({
               }
             }}
             className={cn(
-              aiSearchEnabled && "bg-violet-600 hover:bg-violet-700"
+              aiSearchEnabled && "bg-primary hover:bg-primary/90"
             )}
             title={aiSearchEnabled ? "Search with AI" : "Enable AI Search"}
           >

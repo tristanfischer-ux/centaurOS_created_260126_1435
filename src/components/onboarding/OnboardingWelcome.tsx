@@ -135,7 +135,7 @@ export function OnboardingWelcome({ forceShow = false, onComplete }: OnboardingW
 
     return (
         <Dialog open={isOpen} onOpenChange={setIsOpen}>
-            <DialogContent className="sm:max-w-md">
+            <DialogContent size="md">
                 <DialogHeader>
                     <div className="flex items-center justify-between mb-2">
                         <Badge variant="secondary" className="text-xs">
@@ -159,7 +159,7 @@ export function OnboardingWelcome({ forceShow = false, onComplete }: OnboardingW
 
                 {step.tip && (
                     <div className="flex items-start gap-2 p-3 bg-muted rounded-lg">
-                        <Lightbulb className="h-4 w-4 text-amber-500 mt-0.5 shrink-0" />
+                        <Lightbulb className="h-4 w-4 text-status-warning mt-0.5 shrink-0" />
                         <p className="text-sm text-muted-foreground">{step.tip}</p>
                     </div>
                 )}
