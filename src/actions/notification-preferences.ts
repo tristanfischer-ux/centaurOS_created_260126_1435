@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-// @ts-nocheck
+
 // TODO: Fix Supabase type instantiation issues - using ts-nocheck until types are regenerated
 'use server'
 

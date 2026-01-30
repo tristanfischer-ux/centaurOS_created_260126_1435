@@ -1,5 +1,4 @@
 'use server'
-// @ts-nocheck - Database types out of sync
 
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'

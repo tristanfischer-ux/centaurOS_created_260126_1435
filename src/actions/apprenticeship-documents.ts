@@ -1,5 +1,5 @@
 'use server'
-// @ts-nocheck - Database types out of sync
+
 
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
@@ -32,7 +32,7 @@ export async function getEnrollmentDocuments(enrollmentId: string) {
     return { error: error.message }
   }
   
-  return { documents: documents as ApprenticeshipDocument[] }
+  return { documents: documents as unknown as ApprenticeshipDocument[] }
 }
 
 /**
@@ -88,8 +88,8 @@ export async function getPendingSignatures() {
   
   // Filter to only documents where this user needs to sign
   const pendingForUser = (documents || []).filter(doc => {
-    const signatures = doc.signatures || []
-    const required = doc.requires_signatures || []
+    const signatures = (doc.signatures || []) as unknown as Signature[]
+    const required = (doc.requires_signatures || []) as unknown as RequiredSignature[]
     
     // Check if user is in required list and hasn't signed yet
     const userRequired = required.find((r: RequiredSignature) => r.user_id === user.id)
@@ -126,7 +126,7 @@ export async function getDocument(documentId: string) {
     return { error: error.message }
   }
   
-  return { document: document as ApprenticeshipDocument & { enrollment: unknown } }
+  return { document: document as unknown as ApprenticeshipDocument & { enrollment: unknown } }
 }
 
 // =============================================
