@@ -122,12 +122,12 @@ export function RFQResponseForm({
           <button
             onClick={() => setMode('accept')}
             className={cn(
-              'w-full flex items-center gap-4 p-4 rounded-lg border-2 transition-colors hover:border-emerald-500 hover:bg-emerald-50'
+              'w-full flex items-center gap-4 p-4 rounded-lg border-2 transition-colors hover:border-status-success hover:bg-status-success-light'
             )}
             disabled={isPending}
           >
-            <div className="w-12 h-12 rounded-full bg-emerald-100 flex items-center justify-center">
-              <CheckCircle2 className="w-6 h-6 text-emerald-600" />
+            <div className="w-12 h-12 rounded-full bg-status-success-light flex items-center justify-center">
+              <CheckCircle2 className="w-6 h-6 text-status-success" />
             </div>
             <div className="text-left">
               <div className="font-semibold">Accept</div>
@@ -140,12 +140,12 @@ export function RFQResponseForm({
           <button
             onClick={() => setMode('info_request')}
             className={cn(
-              'w-full flex items-center gap-4 p-4 rounded-lg border-2 transition-colors hover:border-blue-500 hover:bg-blue-50'
+              'w-full flex items-center gap-4 p-4 rounded-lg border-2 transition-colors hover:border-status-info hover:bg-status-info-light'
             )}
             disabled={isPending}
           >
-            <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center">
-              <HelpCircle className="w-6 h-6 text-blue-600" />
+            <div className="w-12 h-12 rounded-full bg-status-info-light flex items-center justify-center">
+              <HelpCircle className="w-6 h-6 text-status-info" />
             </div>
             <div className="text-left">
               <div className="font-semibold">Request More Info</div>
@@ -158,12 +158,12 @@ export function RFQResponseForm({
           <button
             onClick={() => setMode('decline')}
             className={cn(
-              'w-full flex items-center gap-4 p-4 rounded-lg border-2 transition-colors hover:border-red-500 hover:bg-red-50'
+              'w-full flex items-center gap-4 p-4 rounded-lg border-2 transition-colors hover:border-destructive hover:bg-status-error-light'
             )}
             disabled={isPending}
           >
-            <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center">
-              <XCircle className="w-6 h-6 text-red-600" />
+            <div className="w-12 h-12 rounded-full bg-status-error-light flex items-center justify-center">
+              <XCircle className="w-6 h-6 text-destructive" />
             </div>
             <div className="text-left">
               <div className="font-semibold">Decline</div>
@@ -190,8 +190,8 @@ export function RFQResponseForm({
       <Card className={className}>
         <CardHeader>
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center">
-              <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+            <div className="w-10 h-10 rounded-full bg-status-success-light flex items-center justify-center">
+              <CheckCircle2 className="w-5 h-5 text-status-success" />
             </div>
             <div>
               <CardTitle>Accept RFQ</CardTitle>
@@ -250,7 +250,8 @@ export function RFQResponseForm({
           <Button
             onClick={() => handleSubmit('accept')}
             disabled={isPending}
-            className="flex-1 bg-emerald-600 hover:bg-emerald-700"
+            variant="success"
+            className="flex-1"
           >
             {isPending ? (
               <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -270,8 +271,8 @@ export function RFQResponseForm({
       <Card className={className}>
         <CardHeader>
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
-              <HelpCircle className="w-5 h-5 text-blue-600" />
+            <div className="w-10 h-10 rounded-full bg-status-info-light flex items-center justify-center">
+              <HelpCircle className="w-5 h-5 text-status-info" />
             </div>
             <div>
               <CardTitle>Request More Info</CardTitle>
@@ -331,8 +332,8 @@ export function RFQResponseForm({
       <Card className={className}>
         <CardHeader>
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
-              <XCircle className="w-5 h-5 text-red-600" />
+            <div className="w-10 h-10 rounded-full bg-status-error-light flex items-center justify-center">
+              <XCircle className="w-5 h-5 text-destructive" />
             </div>
             <div>
               <CardTitle>Decline RFQ</CardTitle>
@@ -396,17 +397,17 @@ export function RFQResponseForm({
             <DialogTitle className="flex items-center gap-2">
               {responseResult.awarded ? (
                 <>
-                  <Award className="w-5 h-5 text-violet-600" />
+                  <Award className="w-5 h-5 text-primary" />
                   Congratulations!
                 </>
               ) : responseResult.priority_hold ? (
                 <>
-                  <Clock className="w-5 h-5 text-amber-600" />
+                  <Clock className="w-5 h-5 text-status-warning" />
                   Priority Hold Granted
                 </>
               ) : (
                 <>
-                  <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+                  <CheckCircle2 className="w-5 h-5 text-status-success" />
                   Response Submitted
                 </>
               )}

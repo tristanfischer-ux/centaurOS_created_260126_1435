@@ -20,6 +20,6 @@ export const typography = {
   
   // Page header pattern (platform)
   pageHeader: 'flex items-center gap-3 mb-1',
-  pageHeaderAccent: 'h-8 w-1 bg-primary rounded-full shadow-[0_0_8px_rgba(234,88,12,0.6)]',
+  pageHeaderAccent: 'h-8 w-1.5 bg-international-orange rounded-full shadow-[0_0_10px_rgba(255,69,0,0.5)]',
   pageSubtitle: 'text-muted-foreground text-sm font-medium pl-4',
 }

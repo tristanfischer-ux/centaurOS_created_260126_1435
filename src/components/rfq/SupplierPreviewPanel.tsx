@@ -125,7 +125,7 @@ export function SupplierPreviewPanel({
 
       {/* Preview Card */}
       <div className="flex-1 overflow-y-auto space-y-4 pr-1">
-        <Card className="border-2">
+        <Card className="border shadow-sm">
           <CardHeader className="pb-3">
             {/* Title */}
             <h4 className="font-semibold text-lg leading-tight">

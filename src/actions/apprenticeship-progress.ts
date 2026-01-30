@@ -496,7 +496,7 @@ export async function completeModule(
     .eq('id', completionId)
     .single()
   
-  const module = completion?.module as { id: string; title: string; estimated_hours: number; counts_as_otjt: boolean } | null
+  const learningModule = completion?.module as { id: string; title: string; estimated_hours: number; counts_as_otjt: boolean } | null
   
   const { error } = await supabase
     .from('module_completions')
@@ -506,15 +506,15 @@ export async function completeModule(
       score: options?.score,
       reflection: options?.reflection,
       evidence_urls: options?.evidenceUrls || [],
-      hours_logged: module?.estimated_hours || 0,
+      hours_logged: learningModule?.estimated_hours || 0,
       updated_at: new Date().toISOString()
     })
     .eq('id', completionId)
   
   if (error) return { error: error.message }
   
-  // Auto-log OTJT hours if module counts as OTJT
-  if (module?.counts_as_otjt && module.estimated_hours > 0) {
+  // Auto-log OTJT hours if learningModule counts as OTJT
+  if (learningModule?.counts_as_otjt && learningModule.estimated_hours > 0) {
     await supabase.from('otjt_time_logs').insert({
       enrollment_id: enrollmentId,
       log_date: new Date().toISOString().split('T')[0],
@@ -583,12 +583,12 @@ async function unlockDependentModules(enrollmentId: string, completedModuleId?: 
   if (!dependentModules || dependentModules.length === 0) return
   
   // Update their completion status to available
-  for (const module of dependentModules) {
+  for (const depModule of dependentModules) {
     await supabase
       .from('module_completions')
       .update({ status: 'available', updated_at: new Date().toISOString() })
       .eq('enrollment_id', enrollmentId)
-      .eq('module_id', module.id)
+      .eq('module_id', depModule.id)
       .eq('status', 'locked')
   }
 }

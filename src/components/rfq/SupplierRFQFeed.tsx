@@ -206,9 +206,9 @@ export const SupplierRFQFeed = memo(function SupplierRFQFeed({
       {urgentRFQs.length > 0 && (
         <div className="space-y-4">
           <div className="flex items-center gap-2">
-            <Zap className="w-5 h-5 text-amber-600" />
-            <h3 className="font-semibold text-amber-700">Urgent RFQs</h3>
-            <Badge variant="secondary" className="bg-amber-50 text-amber-700 border-amber-200">
+            <Zap className="w-5 h-5 text-status-warning" />
+            <h3 className="font-semibold text-status-warning-dark">Urgent RFQs</h3>
+            <Badge variant="warning">
               {urgentRFQs.length}
             </Badge>
           </div>
@@ -325,7 +325,7 @@ export function SupplierRFQFeedMinimal({
               </div>
             </div>
             {rfq.urgency === 'urgent' && (
-              <Badge variant="secondary" className="ml-2 bg-amber-50 text-amber-700 border-amber-200">
+              <Badge variant="warning" className="ml-2">
                 <Zap className="w-3 h-3" />
               </Badge>
             )}
