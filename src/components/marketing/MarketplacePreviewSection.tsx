@@ -1,5 +1,6 @@
 'use client';
 
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -129,10 +130,10 @@ export function MarketplacePreviewSection({ listings, onBookClick }: Marketplace
                         className="text-white/60 hover:text-white text-sm font-mono uppercase tracking-widest"
                         asChild
                     >
-                        <a href="/marketplace">
+                        <Link href="/marketplace">
                             View Full Marketplace
                             <ArrowRight className="w-4 h-4 ml-2" />
-                        </a>
+                        </Link>
                     </Button>
                 </div>
             )}

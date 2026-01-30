@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, memo, useEffect, useRef } from "react"
+import { useState, memo, useEffect } from "react"
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -38,8 +38,7 @@ import {
     CommandItem,
     CommandList,
 } from "@/components/ui/command"
-import { acceptTask, rejectTask, forwardTask, completeTask, triggerAIWorker, updateTaskDates, duplicateTask, updateTaskAssignees, getTaskAttachments } from "@/actions/tasks"
-import { uploadTaskAttachment } from "@/actions/attachments"
+import { acceptTask, rejectTask, forwardTask, completeTask, triggerAIWorker, updateTaskDates, duplicateTask, updateTaskAssignees } from "@/actions/tasks"
 import { AttachmentList } from "@/components/tasks/attachment-list"
 import { cn } from "@/lib/utils"
 import { Database } from "@/types/database.types"
@@ -53,6 +52,8 @@ import { ClientNudgeButton } from "@/components/smart-airlock/ClientNudgeButton"
 import { Checkbox } from "@/components/ui/checkbox"
 import { getStatusColor } from "@/lib/status-colors"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
+import { useTaskCardState } from "@/hooks/useTaskCardState"
+import { useTaskActions } from "@/hooks/useTaskActions"
 
 type Task = Database["public"]["Tables"]["tasks"]["Row"] & {
     assignee?: { id: string, full_name: string | null, role: string, email: string, avatar_url?: string | null } | null
@@ -105,77 +106,37 @@ export const TaskCard = memo(function TaskCard(props: TaskCardProps) {
         onToggleSelection
     } = props
 
-    const [isLoading, setIsLoading] = useState(false)
-    const [aiRunning, setAiRunning] = useState(false)
-
-    // Dialog States
-    const [rejectOpen, setRejectOpen] = useState(false)
-    const [forwardOpen, setForwardOpen] = useState(false)
-    
-    // Forward dialog attachment states
-    const [forwardAttachments, setForwardAttachments] = useState<any[]>([])
-    const [forwardAttachmentsLoading, setForwardAttachmentsLoading] = useState(false)
-    const [forwardUploading, setForwardUploading] = useState(false)
-    const forwardFileInputRef = useRef<HTMLInputElement>(null)
-
-    const [showThread, setShowThread] = useState(false)
-    const [editOpen, setEditOpen] = useState(false)
-    const [showHistory, setShowHistory] = useState(false)
-    const [rubberStampOpen, setRubberStampOpen] = useState(false)
-    const [fullViewOpen, setFullViewOpen] = useState(false)
-    const [assigneePopoverOpen, setAssigneePopoverOpen] = useState(false)
-    const [assigneePopoverOpen2, setAssigneePopoverOpen2] = useState(false)
-
-    // Close inline panels when card collapses
-    useEffect(() => {
-        if (!expanded) {
-            setShowThread(false)
-            setShowHistory(false)
-        }
-    }, [expanded])
-
-    // Load attachments when forward dialog opens
-    useEffect(() => {
-        if (forwardOpen) {
-            setForwardAttachmentsLoading(true)
-            getTaskAttachments(task.id).then(res => {
-                if (res.data) {
-                    setForwardAttachments(res.data)
-                }
-                setForwardAttachmentsLoading(false)
-            })
-        }
-    }, [forwardOpen, task.id])
-
-    // Handle file upload in forward dialog
-    const handleForwardFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0]
-        if (!file) return
-
-        setForwardUploading(true)
-        try {
-            const formData = new FormData()
-            formData.append('file', file)
-            const result = await uploadTaskAttachment(task.id, formData)
-            if (result.error) {
-                toast.error(result.error)
-            } else {
-                toast.success('Attachment uploaded')
-                // Refresh attachments
-                const res = await getTaskAttachments(task.id)
-                if (res.data) {
-                    setForwardAttachments(res.data)
-                }
-            }
-        } catch {
-            toast.error('Failed to upload attachment')
-        } finally {
-            setForwardUploading(false)
-            if (forwardFileInputRef.current) {
-                forwardFileInputRef.current.value = ''
-            }
-        }
-    }
+    // Use custom hook for state management
+    const {
+        isLoading,
+        setIsLoading,
+        aiRunning,
+        setAiRunning,
+        rejectOpen,
+        setRejectOpen,
+        forwardOpen,
+        setForwardOpen,
+        showThread,
+        setShowThread,
+        editOpen,
+        setEditOpen,
+        showHistory,
+        setShowHistory,
+        rubberStampOpen,
+        setRubberStampOpen,
+        fullViewOpen,
+        setFullViewOpen,
+        assigneePopoverOpen,
+        setAssigneePopoverOpen,
+        assigneePopoverOpen2,
+        setAssigneePopoverOpen2,
+        forwardAttachments,
+        forwardAttachmentsLoading,
+        forwardUploading,
+        forwardFileInputRef,
+        handleForwardFileUpload,
+        handleRemoveAttachment,
+    } = useTaskCardState({ taskId: task.id, expanded })
 
 
     // Normalize assignees list (handle backward compatibility or fallback)
@@ -195,6 +156,29 @@ export const TaskCard = memo(function TaskCard(props: TaskCardProps) {
     }, [task.assignees, task.assignee])
     
     const currentAssignees = optimisticAssignees
+
+    // Use custom hook for action handlers
+    const {
+        handleAccept,
+        handleReject,
+        handleForward,
+        handleComplete,
+        handleDuplicate,
+        handleRunAI,
+        handleDateUpdate,
+        handleAssigneeToggle,
+    } = useTaskActions({
+        taskId: task.id,
+        taskStartDate: task.start_date,
+        taskEndDate: task.end_date,
+        currentAssignees,
+        members,
+        setIsLoading,
+        setAiRunning,
+        setRejectOpen,
+        setForwardOpen,
+        setOptimisticAssignees,
+    })
 
     // Helper Functions
     const formatFullDate = (dateStr: string | null) => {
@@ -234,122 +218,7 @@ export const TaskCard = memo(function TaskCard(props: TaskCardProps) {
         )
     }
 
-    // Handlers (keep existing ones...)
-    const handleAccept = async () => {
-        setIsLoading(true)
-        const res = await acceptTask(task.id)
-        setIsLoading(false)
-        if (res.error) toast.error(res.error)
-        else toast.success("Task accepted")
-    }
-
-    const handleReject = async (formData: FormData) => {
-        setIsLoading(true)
-        const reason = formData.get('reason') as string
-        const res = await rejectTask(task.id, reason)
-        setIsLoading(false)
-        setRejectOpen(false)
-        if (res.error) toast.error(res.error)
-        else toast.success("Task rejected")
-    }
-
-    const handleForward = async (formData: FormData) => {
-        setIsLoading(true)
-        const newAssigneeId = formData.get('new_assignee_id') as string
-        const reason = formData.get('reason') as string
-        const res = await forwardTask(task.id, newAssigneeId, reason)
-        setIsLoading(false)
-        setForwardOpen(false)
-        if (res.error) toast.error(res.error)
-        else toast.success("Task forwarded")
-    }
-
-
-
-    const handleComplete = async () => {
-        setIsLoading(true)
-        const res = await completeTask(task.id)
-        setIsLoading(false)
-        if (res.error) toast.error(res.error)
-        else {
-            if (res.newStatus === 'Completed') {
-                toast.success("Task completed")
-            } else {
-                toast.info(`Task moved to ${res.newStatus?.replace(/_/g, ' ')}`)
-            }
-        }
-    }
-
-    const handleDuplicate = async () => {
-        setIsLoading(true)
-        const res = await duplicateTask(task.id)
-        setIsLoading(false)
-        if (res.error) toast.error(res.error)
-        else toast.success("Task duplicated")
-    }
-
-    const handleRunAI = async () => {
-        setAiRunning(true)
-        const res = await triggerAIWorker(task.id)
-        setAiRunning(false)
-        if (res.error) toast.error(res.error)
-        else toast.success("AI Agent triggered")
-    }
-
-    // Date Update Handler
-    const handleDateUpdate = async (type: 'start' | 'end', date: Date | undefined) => {
-        if (!date) return
-        const newDateStr = date.toISOString()
-        const currentStart = task.start_date || new Date().toISOString()
-        const currentEnd = task.end_date || new Date().toISOString()
-        setIsLoading(true)
-        if (type === 'start') {
-            await updateTaskDates(task.id, newDateStr, currentEnd)
-        } else {
-            await updateTaskDates(task.id, currentStart, newDateStr)
-        }
-        setIsLoading(false)
-        toast.success("Date updated")
-    }
-
     const sortedMembers = [...members].sort((a, b) => a.full_name.localeCompare(b.full_name))
-
-    const handleAssigneeToggle = async (memberId: string) => {
-        const currentIds = currentAssignees.map(a => a.id)
-        const previousAssignees = [...currentAssignees]
-        let newAssignees: typeof currentAssignees
-
-        if (currentIds.includes(memberId)) {
-            // Remove
-            if (currentAssignees.length <= 1) {
-                toast.error("Task must have at least one assignee")
-                return
-            }
-            newAssignees = currentAssignees.filter(a => a.id !== memberId)
-        } else {
-            // Add - find the member from the members list
-            const memberToAdd = members.find(m => m.id === memberId)
-            if (memberToAdd) {
-                newAssignees = [...currentAssignees, { ...memberToAdd, email: '', avatar_url: null }]
-            } else {
-                return
-            }
-        }
-
-        // Optimistic update - immediately update UI
-        setOptimisticAssignees(newAssignees)
-
-        // Server update in background
-        const newIds = newAssignees.map(a => a.id)
-        const result = await updateTaskAssignees(task.id, newIds)
-        
-        if (result.error) {
-            // Revert on error
-            setOptimisticAssignees(previousAssignees)
-            toast.error(result.error)
-        }
-        // No toast on success - the instant UI update is feedback enough
-    }
 
     const handleCardClick = (e: React.MouseEvent) => {
         if (isSelectionMode && onToggleSelection) {
@@ -919,9 +788,7 @@ export const TaskCard = memo(function TaskCard(props: TaskCardProps) {
                                                             taskId={task.id} 
                                                             attachments={forwardAttachments}
                                                             canDelete={true}
-                                                            onDelete={(fileId) => {
-                                                                setForwardAttachments(prev => prev.filter(a => a.id !== fileId))
-                                                            }}
+                                                            onDelete={handleRemoveAttachment}
                                                         />
                                                     )}
                                                 </div>

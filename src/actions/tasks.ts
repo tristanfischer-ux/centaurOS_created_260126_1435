@@ -8,7 +8,7 @@ import { logTaskHistory } from '@/lib/audit'
 import { createTaskSchema, updateTaskDatesSchema, addCommentSchema, validate } from '@/lib/validations'
 import { getFoundryIdCached } from '@/lib/supabase/foundry-context'
 import { withRetry } from '@/lib/retry'
-import { sanitizeFileName } from '@/lib/security/sanitize'
+import { sanitizeFileName, sanitizeErrorMessage } from '@/lib/security/sanitize'
 
 // Nudge cooldown duration (1 hour)
 const NUDGE_COOLDOWN_MS = 60 * 60 * 1000

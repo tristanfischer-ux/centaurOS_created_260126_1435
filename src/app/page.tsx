@@ -163,7 +163,7 @@ export default function MarketingPage() {
                 </a>
                 <Link
                   href="/join/founder"
-                  className="flex-1 bg-foreground hover:bg-foreground/90 text-background py-2.5 md:py-3 text-center text-xs font-mono font-bold tracking-widest uppercase transition-colors"
+                  className="flex-1 bg-foreground hover:bg-international-orange text-background py-2.5 md:py-3 text-center text-xs font-mono font-bold tracking-widest uppercase transition-colors"
                 >
                   Begin Induction
                 </Link>
@@ -197,7 +197,7 @@ export default function MarketingPage() {
                 </a>
                 <Link
                   href="/join/executive"
-                  className="flex-1 bg-foreground hover:bg-foreground/90 text-background py-2.5 md:py-3 text-center text-xs font-mono font-bold tracking-widest uppercase transition-colors"
+                  className="flex-1 bg-foreground hover:bg-international-orange text-background py-2.5 md:py-3 text-center text-xs font-mono font-bold tracking-widest uppercase transition-colors"
                 >
                   Join Cadre
                 </Link>
@@ -231,7 +231,7 @@ export default function MarketingPage() {
                 </a>
                 <Link
                   href="/join/apprentice"
-                  className="flex-1 bg-foreground hover:bg-foreground/90 text-background py-2.5 md:py-3 text-center text-xs font-mono font-bold tracking-widest uppercase transition-colors"
+                  className="flex-1 bg-foreground hover:bg-international-orange text-background py-2.5 md:py-3 text-center text-xs font-mono font-bold tracking-widest uppercase transition-colors"
                 >
                   Enter Guild
                 </Link>
@@ -274,7 +274,7 @@ export default function MarketingPage() {
                 </a>
                 <Link
                   href="/join/vc"
-                  className="flex-1 border-2 border-foreground hover:bg-foreground text-foreground hover:text-background py-2.5 md:py-3 text-center text-xs font-mono font-bold tracking-widest uppercase transition-colors"
+                  className="flex-1 bg-foreground hover:bg-international-orange text-background py-2.5 md:py-3 text-center text-xs font-mono font-bold tracking-widest uppercase transition-colors"
                 >
                   Apply
                 </Link>
@@ -308,7 +308,7 @@ export default function MarketingPage() {
                 </a>
                 <Link
                   href="/join/factory"
-                  className="flex-1 border-2 border-foreground hover:bg-foreground text-foreground hover:text-background py-2.5 md:py-3 text-center text-xs font-mono font-bold tracking-widest uppercase transition-colors"
+                  className="flex-1 bg-foreground hover:bg-international-orange text-background py-2.5 md:py-3 text-center text-xs font-mono font-bold tracking-widest uppercase transition-colors"
                 >
                   Connect
                 </Link>
@@ -342,7 +342,7 @@ export default function MarketingPage() {
                 </a>
                 <Link
                   href="/join/university"
-                  className="flex-1 border-2 border-foreground hover:bg-foreground text-foreground hover:text-background py-2.5 md:py-3 text-center text-xs font-mono font-bold tracking-widest uppercase transition-colors"
+                  className="flex-1 bg-foreground hover:bg-international-orange text-background py-2.5 md:py-3 text-center text-xs font-mono font-bold tracking-widest uppercase transition-colors"
                 >
                   Partner
                 </Link>

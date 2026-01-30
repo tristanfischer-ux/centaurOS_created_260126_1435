@@ -9,7 +9,7 @@ import type {
   OTJTLog, 
   WeeklySummary 
 } from '@/types/apprenticeship'
-import { isValidUUID } from '@/lib/security/sanitize'
+import { isValidUUID, sanitizeErrorMessage } from '@/lib/security/sanitize'
 import type { Json } from '@/types/database.types'
 
 // =============================================

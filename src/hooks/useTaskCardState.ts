@@ -89,6 +89,11 @@ export function useTaskCardState({ taskId, expanded }: UseTaskCardStateProps) {
     }
   }, [taskId])
 
+  // Handle attachment deletion
+  const handleRemoveAttachment = useCallback((fileId: string) => {
+    setForwardAttachments(prev => prev.filter(a => a.id !== fileId))
+  }, [])
+
   return {
     // Loading states
     isLoading,
@@ -122,5 +127,6 @@ export function useTaskCardState({ taskId, expanded }: UseTaskCardStateProps) {
     forwardUploading,
     forwardFileInputRef,
     handleForwardFileUpload,
+    handleRemoveAttachment,
   }
 }

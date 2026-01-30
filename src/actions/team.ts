@@ -687,14 +687,14 @@ export async function assignToTask(taskId: string, profileIds: string[]) {
         .from('task_assignees')
         .insert(assigneeInserts)
 
-    if (error) return { error: error.message }
+    if (error) return { error: sanitizeErrorMessage(error) }
 
-    await supabase
+    const { error: updateError } = await supabase
         .from('tasks')
         .update({ assignee_id: profileIds[0] })
         .eq('id', taskId)
 
-    if (error) return { error: sanitizeErrorMessage(error) }
+    if (updateError) return { error: sanitizeErrorMessage(updateError) }
 
     revalidatePath('/tasks')
     revalidatePath('/team')

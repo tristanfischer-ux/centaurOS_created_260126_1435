@@ -95,8 +95,8 @@ export function ModuleProgressList({ modules, enrollmentId }: ModuleProgressList
   return (
     <div className="space-y-3">
       {modules.map((completion) => {
-        const module = completion.module
-        const typeConfig = MODULE_TYPE_CONFIG[module.module_type] || MODULE_TYPE_CONFIG.core
+        const moduleData = completion.module
+        const typeConfig = MODULE_TYPE_CONFIG[moduleData.module_type] || MODULE_TYPE_CONFIG.core
         const statusConfig = STATUS_CONFIG[completion.status]
         const Icon = typeConfig.icon
         const isLocked = completion.status === 'locked'
@@ -123,7 +123,7 @@ export function ModuleProgressList({ modules, enrollmentId }: ModuleProgressList
             {/* Content */}
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-1">
-                <h4 className="font-medium text-sm truncate">{module.title}</h4>
+                <h4 className="font-medium text-sm truncate">{moduleData.title}</h4>
                 <Badge variant="outline" className="text-xs shrink-0">
                   {typeConfig.label}
                 </Badge>
@@ -131,7 +131,7 @@ export function ModuleProgressList({ modules, enrollmentId }: ModuleProgressList
               <div className="flex items-center gap-3 text-xs text-muted-foreground">
                 <span className="flex items-center gap-1">
                   <Clock className="h-3 w-3" />
-                  {module.estimated_hours}h
+                  {moduleData.estimated_hours}h
                 </span>
                 <Badge 
                   variant={statusConfig.color as 'secondary' | 'info' | 'warning' | 'success' | 'destructive'}
@@ -145,7 +145,7 @@ export function ModuleProgressList({ modules, enrollmentId }: ModuleProgressList
               {completion.status === 'in_progress' && completion.hours_logged !== undefined && (
                 <div className="mt-2">
                   <Progress 
-                    value={(completion.hours_logged / module.estimated_hours) * 100} 
+                    value={(completion.hours_logged / moduleData.estimated_hours) * 100} 
                     className="h-1"
                   />
                 </div>
