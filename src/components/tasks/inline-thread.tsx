@@ -51,11 +51,12 @@ export function InlineThread({ taskId, isOpen, onClose, members }: InlineThreadP
         const fetchData = async () => {
             setIsLoading(true)
             
-            // Fetch comments
+            // Fetch comments (only human notes, not system logs)
             const { data, error } = await supabase
                 .from('task_comments')
                 .select('*, user:user_id(full_name, role)')
                 .eq('task_id', taskId)
+                .eq('is_system_log', false)
                 .order('created_at', { ascending: false })
                 .limit(10)
 
@@ -92,6 +93,7 @@ export function InlineThread({ taskId, isOpen, onClose, members }: InlineThreadP
                     .from('task_comments')
                     .select('*, user:user_id(full_name, role)')
                     .eq('task_id', taskId)
+                    .eq('is_system_log', false)
                     .order('created_at', { ascending: false })
                     .limit(10)
                 if (data) setComments(data as Comment[])

@@ -228,12 +228,30 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
         )
     }
 
-    // Global expansion state - all cards expand/collapse together
-    const [allExpanded, setAllExpanded] = useState(false)
+    // Individual card expansion state - each card expands/collapses independently
+    const [expandedCardIds, setExpandedCardIds] = useState<Set<string>>(new Set())
+
+    const toggleCardExpanded = useCallback((taskId: string) => {
+        setExpandedCardIds(prev => {
+            const next = new Set(prev)
+            if (next.has(taskId)) next.delete(taskId)
+            else next.add(taskId)
+            return next
+        })
+    }, [])
 
     const toggleAllExpanded = () => {
-        setAllExpanded(prev => !prev)
+        setExpandedCardIds(prev => {
+            // If any cards are expanded, collapse all. Otherwise expand all.
+            if (prev.size > 0) {
+                return new Set()
+            } else {
+                return new Set(sortedTasks.map(t => t.id))
+            }
+        })
     }
+
+    const allExpanded = expandedCardIds.size === sortedTasks.length && sortedTasks.length > 0
 
     // Selection Handlers
     const toggleSelectionMode = () => {
@@ -592,8 +610,8 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                                     currentUserId={currentUserId}
                                     userRole={currentUserRole}
                                     members={members}
-                                    expanded={allExpanded}
-                                    onToggle={toggleAllExpanded}
+                                    expanded={expandedCardIds.has(task.id)}
+                                    onToggle={() => toggleCardExpanded(task.id)}
                                     isSelectionMode={isSelectionMode}
                                     isSelected={selectedTaskIds.has(task.id)}
                                     onToggleSelection={() => toggleTaskSelection(task.id)}

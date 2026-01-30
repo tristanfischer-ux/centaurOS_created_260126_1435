@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, memo, useEffect } from "react"
+import { useState, memo, useEffect, useRef } from "react"
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -23,7 +23,7 @@ import {
 } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { format } from "date-fns"
-import { Calendar as CalendarIcon, Check, X, ArrowRight, Bot, MessageSquare, ChevronDown, ChevronUp, Copy, Pencil, History as HistoryIcon, ShieldAlert, Eye, EyeOff, ShieldCheck, Paperclip, Plus } from "lucide-react"
+import { Calendar as CalendarIcon, Check, X, ArrowRight, Bot, MessageSquare, ChevronDown, ChevronUp, Copy, Pencil, History as HistoryIcon, ShieldAlert, Eye, EyeOff, ShieldCheck, Paperclip, Plus, Upload, Loader2 } from "lucide-react"
 import { Calendar } from "@/components/ui/calendar"
 import {
     Popover,
@@ -38,7 +38,9 @@ import {
     CommandItem,
     CommandList,
 } from "@/components/ui/command"
-import { acceptTask, rejectTask, forwardTask, completeTask, triggerAIWorker, updateTaskDates, duplicateTask, updateTaskAssignees } from "@/actions/tasks"
+import { acceptTask, rejectTask, forwardTask, completeTask, triggerAIWorker, updateTaskDates, duplicateTask, updateTaskAssignees, getTaskAttachments } from "@/actions/tasks"
+import { uploadTaskAttachment } from "@/actions/attachments"
+import { AttachmentList } from "@/components/tasks/attachment-list"
 import { cn, getInitials } from "@/lib/utils"
 import { Database } from "@/types/database.types"
 import { InlineThread } from "@/components/tasks/inline-thread"
@@ -108,6 +110,12 @@ export const TaskCard = memo(function TaskCard(props: TaskCardProps) {
     // Dialog States
     const [rejectOpen, setRejectOpen] = useState(false)
     const [forwardOpen, setForwardOpen] = useState(false)
+    
+    // Forward dialog attachment states
+    const [forwardAttachments, setForwardAttachments] = useState<any[]>([])
+    const [forwardAttachmentsLoading, setForwardAttachmentsLoading] = useState(false)
+    const [forwardUploading, setForwardUploading] = useState(false)
+    const forwardFileInputRef = useRef<HTMLInputElement>(null)
 
     const [showThread, setShowThread] = useState(false)
     const [editOpen, setEditOpen] = useState(false)
@@ -123,11 +131,67 @@ export const TaskCard = memo(function TaskCard(props: TaskCardProps) {
         }
     }, [showThread, showHistory, expanded, onToggle])
 
+    // Load attachments when forward dialog opens
+    useEffect(() => {
+        if (forwardOpen) {
+            setForwardAttachmentsLoading(true)
+            getTaskAttachments(task.id).then(res => {
+                if (res.data) {
+                    setForwardAttachments(res.data)
+                }
+                setForwardAttachmentsLoading(false)
+            })
+        }
+    }, [forwardOpen, task.id])
+
+    // Handle file upload in forward dialog
+    const handleForwardFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0]
+        if (!file) return
+
+        setForwardUploading(true)
+        try {
+            const formData = new FormData()
+            formData.append('file', file)
+            const result = await uploadTaskAttachment(task.id, formData)
+            if (result.error) {
+                toast.error(result.error)
+            } else {
+                toast.success('Attachment uploaded')
+                // Refresh attachments
+                const res = await getTaskAttachments(task.id)
+                if (res.data) {
+                    setForwardAttachments(res.data)
+                }
+            }
+        } catch {
+            toast.error('Failed to upload attachment')
+        } finally {
+            setForwardUploading(false)
+            if (forwardFileInputRef.current) {
+                forwardFileInputRef.current.value = ''
+            }
+        }
+    }
+
 
     // Normalize assignees list (handle backward compatibility or fallback)
-    const currentAssignees = task.assignees && task.assignees.length > 0
+    const initialAssignees = task.assignees && task.assignees.length > 0
         ? task.assignees
         : (task.assignee ? [task.assignee] : [])
+    
+    // Local state for optimistic updates
+    const [optimisticAssignees, setOptimisticAssignees] = useState(initialAssignees)
+    
+    // Sync with props when task changes
+    useEffect(() => {
+        const newAssignees = task.assignees && task.assignees.length > 0
+            ? task.assignees
+            : (task.assignee ? [task.assignee] : [])
+        setOptimisticAssignees(newAssignees)
+    }, [task.assignees, task.assignee])
+    
+    const currentAssignees = optimisticAssignees
 
     // Helper Functions
     const formatFullDate = (dateStr: string | null) => {
@@ -249,26 +313,39 @@ export const TaskCard = memo(function TaskCard(props: TaskCardProps) {
 
     const handleAssigneeToggle = async (memberId: string) => {
         const currentIds = currentAssignees.map(a => a.id)
-        let newIds: string[]
+        const previousAssignees = [...currentAssignees]
+        let newAssignees: typeof currentAssignees
 
         if (currentIds.includes(memberId)) {
             // Remove
-            newIds = currentIds.filter(id => id !== memberId)
-            if (newIds.length === 0) {
+            if (currentAssignees.length <= 1) {
                 toast.error("Task must have at least one assignee")
                 return
             }
+            newAssignees = currentAssignees.filter(a => a.id !== memberId)
         } else {
-            // Add
-            newIds = [...currentIds, memberId]
+            // Add - find the member from the members list
+            const memberToAdd = members.find(m => m.id === memberId)
+            if (memberToAdd) {
+                newAssignees = [...currentAssignees, { ...memberToAdd, email: '', avatar_url: null }]
+            } else {
+                return
+            }
         }
 
+        // Optimistic update - immediately update UI
+        setOptimisticAssignees(newAssignees)
+
+        // Server update in background
+        const newIds = newAssignees.map(a => a.id)
         const result = await updateTaskAssignees(task.id, newIds)
+        
         if (result.error) {
+            // Revert on error
+            setOptimisticAssignees(previousAssignees)
             toast.error(result.error)
-        } else {
-            toast.success("Assignees updated")
         }
+        // No toast on success - the instant UI update is feedback enough
     }
 
     const handleCardClick = (e: React.MouseEvent) => {
@@ -769,9 +846,9 @@ export const TaskCard = memo(function TaskCard(props: TaskCardProps) {
                                                     <SelectContent className="bg-white shadow-lg z-50">
                                                         {sortedMembers.map(member => (
                                                             <SelectItem key={member.id} value={member.id}>
-                                                                <div className="flex items-center gap-2">
-                                                                    <Avatar className="h-5 w-5 shadow-sm shrink-0">
-                                                                        <AvatarFallback className="text-[9px] bg-indigo-50 text-indigo-700 font-medium flex items-center justify-center">
+                                                                <div className="flex items-center gap-3">
+                                                                    <Avatar className="h-8 w-8 shrink-0 border border-foundry-200">
+                                                                        <AvatarFallback className="text-xs bg-indigo-100 text-indigo-700 font-semibold">
                                                                             {getInitials(member.full_name)}
                                                                         </AvatarFallback>
                                                                     </Avatar>
@@ -797,6 +874,58 @@ export const TaskCard = memo(function TaskCard(props: TaskCardProps) {
                                                     className="bg-slate-50 min-h-[120px] resize-y" 
                                                 />
                                             </div>
+                                            
+                                            {/* Attachments Section */}
+                                            <div className="grid gap-2">
+                                                <div className="flex items-center justify-between">
+                                                    <label className="text-sm font-medium text-foreground flex items-center gap-2">
+                                                        <Paperclip className="h-4 w-4" />
+                                                        Attachments
+                                                    </label>
+                                                    <div>
+                                                        <input
+                                                            type="file"
+                                                            ref={forwardFileInputRef}
+                                                            onChange={handleForwardFileUpload}
+                                                            className="hidden"
+                                                            accept="*/*"
+                                                        />
+                                                        <Button
+                                                            type="button"
+                                                            variant="secondary"
+                                                            size="sm"
+                                                            onClick={() => forwardFileInputRef.current?.click()}
+                                                            disabled={forwardUploading}
+                                                            className="gap-2"
+                                                        >
+                                                            {forwardUploading ? (
+                                                                <Loader2 className="h-4 w-4 animate-spin" />
+                                                            ) : (
+                                                                <Upload className="h-4 w-4" />
+                                                            )}
+                                                            Add File
+                                                        </Button>
+                                                    </div>
+                                                </div>
+                                                <div className="bg-slate-50 rounded-lg p-3 max-h-[200px] overflow-y-auto">
+                                                    {forwardAttachmentsLoading ? (
+                                                        <div className="flex items-center justify-center py-4 text-muted-foreground">
+                                                            <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                                                            Loading attachments...
+                                                        </div>
+                                                    ) : (
+                                                        <AttachmentList 
+                                                            taskId={task.id} 
+                                                            attachments={forwardAttachments}
+                                                            canDelete={true}
+                                                            onDelete={(fileId) => {
+                                                                setForwardAttachments(prev => prev.filter(a => a.id !== fileId))
+                                                            }}
+                                                        />
+                                                    )}
+                                                </div>
+                                            </div>
+                                            
                                             <div className="flex gap-2 pt-2">
                                                 <Button type="button" variant="secondary" onClick={() => setForwardOpen(false)} className="flex-1">
                                                     Cancel
