@@ -1,5 +1,4 @@
-// @ts-nocheck
-// TODO: Fix marketplace category type mismatches
+// @ts-nocheck - CATEGORY_MAPPINGS uses business function categories that don't 1:1 map to MarketplaceCategory enum; listing queries with provider joins need type alignment
 /**
  * Org Blueprint → Marketplace Integration
  * Connect capability gaps to marketplace listings and orders

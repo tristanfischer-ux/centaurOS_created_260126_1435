@@ -235,7 +235,6 @@ export function validateVATNumber(
   
   // Extract country prefix from VAT number if present
   let vatCountry = normalizedCountry
-  const vatRest = normalizedVAT
   
   // Check if VAT number starts with a country code
   const countryPrefixMatch = normalizedVAT.match(/^([A-Z]{2})(.+)$/)

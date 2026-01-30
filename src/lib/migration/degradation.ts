@@ -1,5 +1,4 @@
-// @ts-nocheck
-// TODO: Fix type mismatches with unknown properties
+// @ts-nocheck - provider_profiles.listing_id and listing_migration table not in generated types; run `supabase gen types` after migration schema applied
 // Graceful degradation for non-migrated marketplace listings
 import { createClient } from "@/lib/supabase/server"
 import { ListingActions, ListingTransactionStatus, MigrationStatus } from "@/types/migration"

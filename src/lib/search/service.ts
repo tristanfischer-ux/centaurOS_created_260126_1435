@@ -1,5 +1,4 @@
-// @ts-nocheck
-// TODO: Fix type mismatches
+// @ts-nocheck - marketplace_listings query with nested provider_profiles join returns type not matching SearchResult interface; regenerate types after schema stabilizes
 /**
  * Marketplace Search Service
  * Main entry point for all search functionality

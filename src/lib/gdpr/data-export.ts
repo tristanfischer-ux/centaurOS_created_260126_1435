@@ -1,5 +1,4 @@
-// @ts-nocheck
-// TODO: Fix Supabase nested relationship type mismatches
+// @ts-nocheck - Data export queries multiple tables (orders, messages, reviews, payments) with nested joins; types need UntypedClient workaround until all tables in schema
 /**
  * Data Export Service
  * Handles collection and export of user data for GDPR compliance

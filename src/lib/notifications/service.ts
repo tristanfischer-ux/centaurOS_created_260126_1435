@@ -1,5 +1,4 @@
-// @ts-nocheck
-// TODO: Fix Supabase type instantiation issues
+// @ts-nocheck - notification_preferences table not in generated types; run `supabase gen types` after adding table to schema
 /**
  * Multi-Channel Notification Service
  * 

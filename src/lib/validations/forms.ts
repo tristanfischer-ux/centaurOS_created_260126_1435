@@ -1,5 +1,4 @@
-// @ts-nocheck
-// TODO: Fix Zod v4 API changes
+// @ts-nocheck - Zod v4 changed .refine() return type and error handling; update to use .superRefine() or upgrade validation patterns
 import { z } from 'zod'
 
 /**

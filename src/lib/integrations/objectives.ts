@@ -1,5 +1,4 @@
-// @ts-nocheck
-// TODO: Fix Supabase nested relationship type mismatches
+// @ts-nocheck - objectives table with nested orders/listings joins returns complex type not matching ObjectiveWithOrders interface
 /**
  * Objective Linking Integration
  * Link orders to objectives and track spend/progress

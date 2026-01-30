@@ -136,7 +136,7 @@ export function InlineThread({ taskId, isOpen, onClose, members }: InlineThreadP
     if (!isOpen) return null
 
     return (
-        <div className="border-t border bg-white">
+        <div className="border-t border bg-background">
             {/* Header */}
             <div className="flex items-center justify-between px-4 py-2 bg-muted">
                 <div>
@@ -176,7 +176,7 @@ export function InlineThread({ taskId, isOpen, onClose, members }: InlineThreadP
                         ) : (
                             comments.map((comment) => (
                                 <div key={comment.id} className="flex gap-2 text-xs">
-                                    <div className="h-6 w-6 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 bg-blue-100 text-blue-700">
+                                                <div className="h-6 w-6 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 bg-electric-blue-light text-electric-blue">
                                         {comment.user?.full_name?.substring(0, 2).toUpperCase()}
                                     </div>
                                     <div className="flex-1 min-w-0">
@@ -210,7 +210,7 @@ export function InlineThread({ taskId, isOpen, onClose, members }: InlineThreadP
                 <div
                     className={cn(
                         "border border-dashed rounded p-2 text-center transition-colors text-xs relative",
-                        isUploading ? "border-blue-300 bg-blue-50 cursor-wait" : isDragging ? "border-blue-500 bg-blue-50 cursor-pointer" : "border hover:border-slate-300 cursor-pointer",
+                        isUploading ? "border-electric-blue bg-electric-blue-light cursor-wait" : isDragging ? "border-electric-blue bg-electric-blue-light cursor-pointer" : "border hover:border-muted-foreground/50 cursor-pointer",
                         isUploading && "pointer-events-none"
                     )}
                     onClick={() => !isUploading && fileInputRef.current?.click()}
@@ -226,8 +226,8 @@ export function InlineThread({ taskId, isOpen, onClose, members }: InlineThreadP
                 >
                     {isUploading ? (
                         <>
-                            <Loader2 className="h-3 w-3 mx-auto text-blue-600 mb-1 animate-spin" />
-                            <span className="text-blue-600 font-medium">Uploading...</span>
+                            <Loader2 className="h-3 w-3 mx-auto text-electric-blue mb-1 animate-spin" />
+                            <span className="text-electric-blue font-medium">Uploading...</span>
                         </>
                     ) : (
                         <>

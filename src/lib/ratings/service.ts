@@ -1,5 +1,4 @@
-// @ts-nocheck
-// TODO: Fix Supabase type mismatches
+// @ts-nocheck - reviews table with nested reviewer/order joins doesn't match ReviewWithDetails interface; provider_ratings table not in generated types
 /**
  * Rating System Service
  * Handles reviews, ratings, and statistical calculations

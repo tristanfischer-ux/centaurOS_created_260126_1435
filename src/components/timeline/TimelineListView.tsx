@@ -459,7 +459,7 @@ export function TimelineListView({ tasks, members, currentUserId }: TimelineList
                                                                                     <div className="flex items-center gap-2 w-full">
                                                                                         <InitialsAvatar name={member.full_name} size="sm" isAI={member.role === 'AI_Agent'} />
                                                                                         <span className="truncate flex-1">{member.full_name}</span>
-                                                                                        {isSelected && <Check className="ml-auto h-4 w-4 text-blue-600" />}
+                                                                                        {isSelected && <Check className="ml-auto h-4 w-4 text-international-orange" />}
                                                                                     </div>
                                                                                 </CommandItem>
                                                                             )

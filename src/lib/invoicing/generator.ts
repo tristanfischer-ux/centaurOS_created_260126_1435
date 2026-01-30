@@ -1,5 +1,4 @@
-// @ts-nocheck
-// TODO: Fix Supabase nested relationship type mismatches
+// @ts-nocheck - invoices table with nested buyer/seller profile joins returns complex type not matching Invoice interface; regenerate types after schema stabilizes
 /**
  * Invoice Generator Service
  * Handles generation of invoices, self-bills, and platform fee invoices

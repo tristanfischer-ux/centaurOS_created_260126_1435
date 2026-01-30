@@ -1,5 +1,4 @@
-// @ts-nocheck
-// TODO: Fix Supabase type instantiation issues
+// @ts-nocheck - provider_profiles table uses `as 'profiles'` cast workaround; stripe_account_id column not in generated types
 import { Suspense } from "react"
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"

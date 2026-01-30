@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-// TODO: Fix Supabase type instantiation issues - using ts-nocheck until types are regenerated
+// notification_preferences and notification_log tables not in generated types; using inline interface definitions as workaround
 'use server'
 
 /**

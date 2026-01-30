@@ -78,7 +78,7 @@ export function InlineHistory({ taskId, isOpen, onClose }: InlineHistoryProps) {
     if (!isOpen) return null
 
     return (
-        <div className="border-t border bg-white">
+        <div className="border-t border bg-background">
             {/* Header */}
             <div className="flex items-center justify-between px-4 py-2 bg-muted">
                 <div>

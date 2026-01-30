@@ -1,5 +1,4 @@
 // Order types for the marketplace order lifecycle system
-import { Database } from "@/types/database.types"
 
 // Base order status from the database enum
 export type OrderStatus = 'pending' | 'accepted' | 'in_progress' | 'completed' | 'disputed' | 'cancelled'

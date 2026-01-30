@@ -1,5 +1,4 @@
-// @ts-nocheck
-// TODO: Fix type mismatches
+// @ts-nocheck - RFQ types (RFQWithDetails, RFQSummary) use camelCase but DB returns snake_case; regenerate types with `supabase gen types` after schema stabilizes
 /**
  * RFQ Service
  * Core business logic for RFQ management

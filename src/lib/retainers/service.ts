@@ -1,5 +1,4 @@
-// @ts-nocheck
-// TODO: Fix type mismatches
+// @ts-nocheck - retainers table not in generated types; run `supabase gen types` after applying retainers migration
 /**
  * Retainer Service
  * Core business logic for retainer management

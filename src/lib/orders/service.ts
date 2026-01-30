@@ -1,5 +1,4 @@
-// @ts-nocheck
-// TODO: Fix Supabase type mismatches
+// @ts-nocheck - Schema mismatches: marketplace_listings.price, provider_profiles.display_name columns changed
 /**
  * Order Service
  * Core business logic for order management

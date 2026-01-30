@@ -1,5 +1,4 @@
-// @ts-nocheck
-// TODO: Fix type mismatches
+// @ts-nocheck - escrow_transactions and payment_intents tables not in generated types; Payment/EscrowTransaction types use camelCase vs DB snake_case
 /**
  * Payment Flow Service
  * Manages the complete payment lifecycle for marketplace orders

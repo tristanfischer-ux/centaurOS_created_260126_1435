@@ -1,5 +1,4 @@
-// @ts-nocheck
-// TODO: Fix type mismatches
+// @ts-nocheck - timesheets table not in generated types; TimesheetWithDetails uses camelCase vs DB snake_case
 /**
  * Timesheet Service
  * Core business logic for timesheet management and weekly billing

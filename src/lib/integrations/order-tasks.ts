@@ -1,5 +1,4 @@
-// @ts-nocheck
-// TODO: Fix task status type mismatches
+// @ts-nocheck - TaskStatus enum from DB doesn't include all statuses used here (onboarding, check_in, milestone_review); align enums or add missing values to schema
 /**
  * Order → Task Integration
  * Auto-create and manage tasks when orders are created/updated

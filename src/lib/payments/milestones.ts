@@ -1,5 +1,4 @@
-// @ts-nocheck
-// TODO: Fix sendNotification parameter type mismatches
+// @ts-nocheck - sendNotification() expects NotificationParams but called with partial object; Milestone type uses camelCase vs DB snake_case
 /**
  * Milestone Service
  * Manages milestone-based payment releases for marketplace orders

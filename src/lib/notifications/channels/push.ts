@@ -1,5 +1,4 @@
-// @ts-nocheck
-// TODO: Fix Supabase type instantiation issues
+// @ts-nocheck - notification_preferences table not in generated types; using type cast workaround `as 'profiles'` until table added to schema
 /**
  * Push Notification Channel
  * 
