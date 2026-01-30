@@ -1,5 +1,11 @@
 import { uploadTaskAttachment, getTaskAttachments } from '../attachments'
 
+// Valid UUID test constants
+const VALID_TASK_ID = '550e8400-e29b-41d4-a716-446655440000'
+const VALID_USER_ID = '550e8400-e29b-41d4-a716-446655440001'
+const VALID_FOUNDRY_ID = '550e8400-e29b-41d4-a716-446655440002'
+const VALID_OTHER_FOUNDRY_ID = '550e8400-e29b-41d4-a716-446655440003'
+
 // Mock Supabase
 const mockSupabaseClient = {
     auth: {
@@ -25,7 +31,7 @@ describe('Attachment Actions', () => {
         
         // Default mock setup
         mockSupabaseClient.auth.getUser.mockResolvedValue({
-            data: { user: { id: 'user-123', app_metadata: { foundry_id: 'foundry-123' } } }
+            data: { user: { id: VALID_USER_ID, app_metadata: { foundry_id: VALID_FOUNDRY_ID } } }
         })
     })
 
@@ -35,8 +41,8 @@ describe('Attachment Actions', () => {
         mockFormData.append('file', mockFile)
 
         it('should successfully upload file and create task_files record', async () => {
-            const mockProfile = { foundry_id: 'foundry-123' }
-            const mockTask = { foundry_id: 'foundry-123' }
+            const mockProfile = { foundry_id: VALID_FOUNDRY_ID }
+            const mockTask = { foundry_id: VALID_FOUNDRY_ID }
             const mockStorage = {
                 upload: jest.fn().mockResolvedValue({ error: null }),
                 getPublicUrl: jest.fn().mockReturnValue({ data: { publicUrl: 'https://example.com/file.pdf' } })
@@ -78,16 +84,16 @@ describe('Attachment Actions', () => {
 
             mockSupabaseClient.storage.from.mockReturnValue(mockStorage)
 
-            const result = await uploadTaskAttachment('task-123', mockFormData)
+            const result = await uploadTaskAttachment(VALID_TASK_ID, mockFormData)
 
             expect(result).toEqual({ success: true, url: 'https://example.com/file.pdf' })
             expect(mockTaskFilesInsert).toHaveBeenCalledWith(
                 expect.objectContaining({
-                    task_id: 'task-123',
+                    task_id: VALID_TASK_ID,
                     file_name: 'test.pdf',
                     file_size: mockFile.size,
                     mime_type: 'application/pdf',
-                    uploaded_by: 'user-123'
+                    uploaded_by: VALID_USER_ID
                 })
             )
         })
@@ -97,7 +103,7 @@ describe('Attachment Actions', () => {
                 data: { user: null }
             })
 
-            const result = await uploadTaskAttachment('task-123', mockFormData)
+            const result = await uploadTaskAttachment(VALID_TASK_ID, mockFormData)
 
             expect(result).toEqual({ error: 'Unauthorized' })
         })
@@ -105,14 +111,14 @@ describe('Attachment Actions', () => {
         it('should return error when no file is provided', async () => {
             const emptyFormData = new FormData()
 
-            const result = await uploadTaskAttachment('task-123', emptyFormData)
+            const result = await uploadTaskAttachment(VALID_TASK_ID, emptyFormData)
 
             expect(result).toEqual({ error: 'No file provided' })
         })
 
         it('should prevent cross-foundry uploads', async () => {
-            const mockProfile = { foundry_id: 'foundry-123' }
-            const mockTask = { foundry_id: 'foundry-456' } // Different foundry
+            const mockProfile = { foundry_id: VALID_FOUNDRY_ID }
+            const mockTask = { foundry_id: VALID_OTHER_FOUNDRY_ID } // Different foundry
 
             mockSupabaseClient.from.mockImplementation((table: string) => {
                 if (table === 'profiles') {
@@ -136,14 +142,14 @@ describe('Attachment Actions', () => {
                 return {}
             })
 
-            const result = await uploadTaskAttachment('task-123', mockFormData)
+            const result = await uploadTaskAttachment(VALID_TASK_ID, mockFormData)
 
             expect(result).toEqual({ error: 'Unauthorized: Task belongs to a different foundry' })
         })
 
         it('should handle upload errors', async () => {
-            const mockProfile = { foundry_id: 'foundry-123' }
-            const mockTask = { foundry_id: 'foundry-123' }
+            const mockProfile = { foundry_id: VALID_FOUNDRY_ID }
+            const mockTask = { foundry_id: VALID_FOUNDRY_ID }
             const mockStorage = {
                 upload: jest.fn().mockResolvedValue({ error: { message: 'Storage quota exceeded' } })
             }
@@ -172,13 +178,13 @@ describe('Attachment Actions', () => {
 
             mockSupabaseClient.storage.from.mockReturnValue(mockStorage)
 
-            const result = await uploadTaskAttachment('task-123', mockFormData)
+            const result = await uploadTaskAttachment(VALID_TASK_ID, mockFormData)
 
             expect(result).toEqual({ error: 'Storage quota exceeded' })
         })
 
         it('should handle task not found error', async () => {
-            const mockProfile = { foundry_id: 'foundry-123' }
+            const mockProfile = { foundry_id: VALID_FOUNDRY_ID }
 
             mockSupabaseClient.from.mockImplementation((table: string) => {
                 if (table === 'profiles') {
@@ -202,14 +208,14 @@ describe('Attachment Actions', () => {
                 return {}
             })
 
-            const result = await uploadTaskAttachment('task-123', mockFormData)
+            const result = await uploadTaskAttachment(VALID_TASK_ID, mockFormData)
 
             expect(result).toEqual({ error: 'Task not found' })
         })
 
         it('should handle file record insertion failure', async () => {
-            const mockProfile = { foundry_id: 'foundry-123' }
-            const mockTask = { foundry_id: 'foundry-123' }
+            const mockProfile = { foundry_id: VALID_FOUNDRY_ID }
+            const mockTask = { foundry_id: VALID_FOUNDRY_ID }
             const mockStorage = {
                 upload: jest.fn().mockResolvedValue({ error: null }),
                 getPublicUrl: jest.fn().mockReturnValue({ data: { publicUrl: 'https://example.com/file.pdf' } })
@@ -249,7 +255,7 @@ describe('Attachment Actions', () => {
 
             mockSupabaseClient.storage.from.mockReturnValue(mockStorage)
 
-            const result = await uploadTaskAttachment('task-123', mockFormData)
+            const result = await uploadTaskAttachment(VALID_TASK_ID, mockFormData)
 
             expect(result).toEqual({ error: 'File uploaded but failed to record in database' })
         })
@@ -263,7 +269,7 @@ describe('Attachment Actions', () => {
 
             mockSupabaseClient.storage.from.mockReturnValue(mockStorage)
 
-            const result = await getTaskAttachments('task-123')
+            const result = await getTaskAttachments(VALID_TASK_ID)
 
             expect(result).toEqual([])
         })
@@ -282,11 +288,11 @@ describe('Attachment Actions', () => {
 
             mockSupabaseClient.storage.from.mockReturnValue(mockStorage)
 
-            const result = await getTaskAttachments('task-123')
+            const result = await getTaskAttachments(VALID_TASK_ID)
 
             expect(result).toEqual([
-                { name: 'file1.pdf', url: 'https://example.com/task-123/file1.pdf', size: 1024 },
-                { name: 'file2.jpg', url: 'https://example.com/task-123/file2.jpg', size: 2048 }
+                { name: 'file1.pdf', url: `https://example.com/${VALID_TASK_ID}/file1.pdf`, size: 1024 },
+                { name: 'file2.jpg', url: `https://example.com/${VALID_TASK_ID}/file2.jpg`, size: 2048 }
             ])
         })
     })

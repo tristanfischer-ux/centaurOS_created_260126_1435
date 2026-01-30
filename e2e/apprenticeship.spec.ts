@@ -75,7 +75,7 @@ test.describe('Apprenticeship', () => {
       await page.click('button:has-text("OTJT logs pending")')
       
       // Click approve on first pending log
-      await page.click('[aria-label="Approve"]').first()
+      await page.locator('[aria-label="Approve"]').first().click()
       
       // Verify success
       await expect(page.locator('text=approved')).toBeVisible()
@@ -99,11 +99,11 @@ test.describe('Apprenticeship', () => {
       
       // Select apprentice
       await page.click('button:has-text("Choose an apprentice")')
-      await page.click('[role="option"]').first()
+      await page.locator('[role="option"]').first().click()
       
       // Select programme
       await page.click('button:has-text("Choose a programme")')
-      await page.click('[role="option"]').first()
+      await page.locator('[role="option"]').first().click()
       
       // Submit
       await page.click('button:has-text("Create Enrollment")')

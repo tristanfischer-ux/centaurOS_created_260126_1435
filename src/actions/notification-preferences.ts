@@ -89,7 +89,7 @@ export async function getNotificationPreferences(): Promise<{
 
         // Get preferences from database
         // Note: notification_preferences table may not be in generated types yet
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+         
         const baseQuery: any = supabase.from('notification_preferences')
         const result = await baseQuery.select('*').eq('user_id', user.id)
         const { data: prefs, error } = result as { data: NotificationPreferenceRow[] | null; error: { message: string } | null }
@@ -175,7 +175,7 @@ export async function updateNotificationPreferences(
 
         // Upsert preference
         // Note: notification_preferences table may not be in generated types yet
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+         
         const { error } = await (supabase as any)
             .from('notification_preferences')
             .upsert({
@@ -332,7 +332,7 @@ export async function updateSMSPhoneNumber(
 
         // Upsert SMS preference with phone number
         // Note: notification_preferences table may not be in generated types yet
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+         
         const { error } = await (supabase as any)
             .from('notification_preferences')
             .upsert({
@@ -406,7 +406,7 @@ export async function getNotificationHistory(options?: {
         const { limit = 20, offset = 0, unreadOnly = false } = options || {}
 
         // Note: notification_log table may not be in generated types yet
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+         
         let query: any = supabase.from('notification_log')
             .select('*', { count: 'exact' })
             .eq('user_id', user.id)

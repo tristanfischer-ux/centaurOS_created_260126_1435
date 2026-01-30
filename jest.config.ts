@@ -14,6 +14,16 @@ const config: Config = {
     moduleNameMapper: {
         '^@/(.*)$': '<rootDir>/src/$1',
     },
+    // Exclude e2e tests and test utilities - they run with Playwright, not Jest
+    testPathIgnorePatterns: [
+        '<rootDir>/node_modules/',
+        '<rootDir>/e2e/',
+    ],
+    // Only match test files with .test. or .spec. patterns
+    testMatch: [
+        '**/__tests__/**/*.test.[jt]s?(x)',
+        '**/?(*.)+(spec|test).[jt]s?(x)',
+    ],
 }
 
 // createJestConfig is exported this way to ensure that next/jest can load the Next.js config which is async

@@ -89,7 +89,7 @@ export async function exportFoundryData(
     }
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+ 
 async function fetchTableData(
     supabase: any,
     table: ExportableTable,

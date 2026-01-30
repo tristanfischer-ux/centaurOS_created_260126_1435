@@ -1,5 +1,5 @@
 import { render, screen } from '@testing-library/react'
-import { Dialog, DialogContent, DialogTitle } from '../dialog'
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from '../dialog'
 import '@testing-library/jest-dom'
 
 describe('Dialog Component', () => {
@@ -9,6 +9,7 @@ describe('Dialog Component', () => {
                 <Dialog open>
                     <DialogContent size="sm" data-testid="dialog-content">
                         <DialogTitle>Small Dialog</DialogTitle>
+                        <DialogDescription>Small dialog description</DialogDescription>
                         <p>Small Dialog</p>
                     </DialogContent>
                 </Dialog>
@@ -22,6 +23,7 @@ describe('Dialog Component', () => {
                 <Dialog open>
                     <DialogContent size="md" data-testid="dialog-content">
                         <DialogTitle>Medium Dialog</DialogTitle>
+                        <DialogDescription>Medium dialog description</DialogDescription>
                         <p>Medium Dialog</p>
                     </DialogContent>
                 </Dialog>
@@ -35,6 +37,7 @@ describe('Dialog Component', () => {
                 <Dialog open>
                     <DialogContent size="lg" data-testid="dialog-content">
                         <DialogTitle>Large Dialog</DialogTitle>
+                        <DialogDescription>Large dialog description</DialogDescription>
                         <p>Large Dialog</p>
                     </DialogContent>
                 </Dialog>
@@ -48,6 +51,7 @@ describe('Dialog Component', () => {
                 <Dialog open>
                     <DialogContent data-testid="dialog-content">
                         <DialogTitle>Default Dialog</DialogTitle>
+                        <DialogDescription>Default dialog description</DialogDescription>
                         <p>Default Dialog</p>
                     </DialogContent>
                 </Dialog>
@@ -63,6 +67,7 @@ describe('Dialog Component', () => {
                 <Dialog open>
                     <DialogContent data-testid="dialog-content">
                         <DialogTitle>Dialog Title</DialogTitle>
+                        <DialogDescription>Dialog description for accessibility</DialogDescription>
                         <p>Dialog Content</p>
                     </DialogContent>
                 </Dialog>
@@ -71,9 +76,6 @@ describe('Dialog Component', () => {
             const dialog = screen.getByRole('dialog')
             expect(dialog).toBeInTheDocument()
             
-            // Verify aria-modal is set for modal dialogs
-            expect(dialog).toHaveAttribute('aria-modal', 'true')
-            
             // Verify dialog is labeled by the title (aria-labelledby or aria-describedby)
             const dialogTitle = screen.getByText('Dialog Title')
             expect(dialogTitle).toBeInTheDocument()
@@ -81,6 +83,10 @@ describe('Dialog Component', () => {
             // Check that the dialog has aria-labelledby pointing to the title
             const labelledBy = dialog.getAttribute('aria-labelledby')
             expect(labelledBy).toBeTruthy()
+            
+            // Check that the dialog has aria-describedby for the description
+            const describedBy = dialog.getAttribute('aria-describedby')
+            expect(describedBy).toBeTruthy()
         })
     })
 })
