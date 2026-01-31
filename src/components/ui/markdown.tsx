@@ -8,6 +8,20 @@ interface MarkdownProps {
   className?: string
 }
 
+/**
+ * SECURITY: Validate URL protocols to prevent XSS via javascript: or data: URLs
+ */
+function isValidUrl(url: string | undefined): boolean {
+  if (!url) return false
+  try {
+    const parsed = new URL(url, window.location.origin)
+    // Only allow safe protocols
+    return ['http:', 'https:', 'mailto:', 'tel:'].includes(parsed.protocol)
+  } catch {
+    return false
+  }
+}
+
 export function Markdown({ content, className }: MarkdownProps) {
   if (!content) return null
 
@@ -22,16 +36,20 @@ export function Markdown({ content, className }: MarkdownProps) {
         ul: ({ children }) => <ul className="my-1 ml-4 list-disc">{children}</ul>,
         ol: ({ children }) => <ol className="my-1 ml-4 list-decimal">{children}</ol>,
         li: ({ children }) => <li className="my-0.5">{children}</li>,
-        a: ({ href, children }) => (
-          <a 
-            href={href} 
-            target="_blank" 
-            rel="noopener noreferrer"
-            className="text-blue-600 hover:underline"
-          >
-            {children}
-          </a>
-        ),
+        // SECURITY: Validate URLs to prevent XSS via javascript: or data: URLs
+        a: ({ href, children }) => {
+          const safeHref = isValidUrl(href) ? href : '#'
+          return (
+            <a 
+              href={safeHref} 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="text-blue-600 hover:underline"
+            >
+              {children}
+            </a>
+          )
+        },
         code: ({ children }) => (
           <code className="bg-muted px-1 py-0.5 rounded text-sm text-foreground font-mono">
             {children}

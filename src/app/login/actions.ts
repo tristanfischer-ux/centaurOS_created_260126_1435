@@ -30,9 +30,19 @@ export async function login(formData: FormData) {
         redirect('/login?error=Invalid email address')
     }
 
-    // Security: Basic password validation
-    if (!password || password.length < 1) {
+    // Security: Password validation with strength requirements
+    if (!password) {
         redirect('/login?error=Password is required')
+    }
+    
+    // Check password length (min 8 characters for security)
+    if (password.length < 8) {
+        redirect('/login?error=Password must be at least 8 characters')
+    }
+    
+    // Check password max length (prevent DoS with extremely long passwords)
+    if (password.length > 128) {
+        redirect('/login?error=Password is too long')
     }
 
     const { error } = await supabase.auth.signInWithPassword({

@@ -7,6 +7,7 @@
 
 import { createClient } from "@/lib/supabase/server"
 import { revalidatePath } from "next/cache"
+import { requireAdmin } from "@/lib/admin/access"
 import {
   detectFraudSignals,
   flagSuspiciousActivity,
@@ -166,24 +167,13 @@ export async function getFraudSignals(
   error: string | null
   total: number
 }> {
-  const supabase = await createClient()
-
-  // Verify admin access
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) {
-    return { data: [], error: "Not authenticated", total: 0 }
-  }
-
-  const { data: adminUser } = await supabase
-    .from("admin_users")
-    .select("id")
-    .eq("user_id", user.id)
-    .single()
-
-  if (!adminUser) {
-    return { data: [], error: "Admin access required", total: 0 }
+  // SECURITY: Use standardized admin authorization check
+  let supabase
+  try {
+    const adminContext = await requireAdmin()
+    supabase = adminContext.supabase
+  } catch (err) {
+    return { data: [], error: err instanceof Error ? err.message : "Admin access required", total: 0 }
   }
 
   // Build query
@@ -232,24 +222,15 @@ export async function clearFraudFlag(
   signalId: string,
   reason: string
 ): Promise<{ success: boolean; error: string | null }> {
-  const supabase = await createClient()
-
-  // Verify admin access
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) {
-    return { success: false, error: "Not authenticated" }
-  }
-
-  const { data: adminUser } = await supabase
-    .from("admin_users")
-    .select("id")
-    .eq("user_id", user.id)
-    .single()
-
-  if (!adminUser) {
-    return { success: false, error: "Admin access required" }
+  // SECURITY: Use standardized admin authorization check
+  let supabase
+  let userId: string
+  try {
+    const adminContext = await requireAdmin()
+    supabase = adminContext.supabase
+    userId = adminContext.userId
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : "Admin access required" }
   }
 
   // Update fraud signal
@@ -257,7 +238,7 @@ export async function clearFraudFlag(
     .from("fraud_signals")
     .update({
       action_taken: `Cleared: ${reason}`,
-      reviewed_by: adminUser.id,
+      reviewed_by: userId,
     })
     .eq("id", signalId)
 
@@ -281,24 +262,13 @@ export async function updateTransactionLimits(
     monthly?: number
   }
 ): Promise<{ success: boolean; error: string | null }> {
-  const supabase = await createClient()
-
-  // Verify admin access
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) {
-    return { success: false, error: "Not authenticated" }
-  }
-
-  const { data: adminUser } = await supabase
-    .from("admin_users")
-    .select("id")
-    .eq("user_id", user.id)
-    .single()
-
-  if (!adminUser) {
-    return { success: false, error: "Admin access required" }
+  // SECURITY: Use standardized admin authorization check
+  let supabase
+  try {
+    const adminContext = await requireAdmin()
+    supabase = adminContext.supabase
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : "Admin access required" }
   }
 
   // Update each provided limit

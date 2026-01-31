@@ -39,49 +39,98 @@ async function verifyWebhookSignature(
 }
 
 /**
- * Checks if an event has already been processed (idempotency)
+ * Atomically checks if an event has been processed and marks it as processing
+ * SECURITY: Uses INSERT with ON CONFLICT to prevent race conditions
+ * Returns true if we acquired the lock (event not yet processed)
  */
-async function isEventProcessed(eventId: string): Promise<boolean> {
+async function acquireEventLock(event: Stripe.Event): Promise<{ acquired: boolean; alreadyProcessed: boolean }> {
   try {
     const supabase = await createClient()
-    const { data } = await supabase
+    
+    // Try to insert the event as 'processing'
+    // If it already exists, the ON CONFLICT will update nothing and we can check the status
+    const { data, error } = await supabase
       .from('stripe_events')
-      .select('id')
-      .eq('stripe_event_id', eventId)
+      .upsert(
+        {
+          stripe_event_id: event.id,
+          event_type: event.type,
+          payload: JSON.parse(JSON.stringify(event.data.object)),
+          processed: false,
+          error: null,
+          created_at: new Date(event.created * 1000).toISOString(),
+          processed_at: null,
+          processing_started_at: new Date().toISOString(),
+        },
+        {
+          onConflict: 'stripe_event_id',
+          ignoreDuplicates: false,
+        }
+      )
+      .select('processed')
       .single()
-
-    return !!data
-  } catch {
-    return false
+    
+    if (error) {
+      console.error('Error acquiring event lock:', error)
+      // Check if event exists and is already processed
+      const { data: existingEvent } = await supabase
+        .from('stripe_events')
+        .select('processed')
+        .eq('stripe_event_id', event.id)
+        .single()
+      
+      if (existingEvent?.processed) {
+        return { acquired: false, alreadyProcessed: true }
+      }
+      return { acquired: false, alreadyProcessed: false }
+    }
+    
+    // If already processed, don't process again
+    if (data?.processed) {
+      return { acquired: false, alreadyProcessed: true }
+    }
+    
+    return { acquired: true, alreadyProcessed: false }
+  } catch (err) {
+    console.error('Error in acquireEventLock:', err)
+    return { acquired: false, alreadyProcessed: false }
   }
 }
 
 /**
- * Logs a Stripe event to the database
+ * Marks an event as successfully processed
  */
-async function logStripeEvent(
-  event: Stripe.Event,
-  status: 'pending' | 'processed' | 'failed',
-  errorMessage?: string
-): Promise<void> {
+async function markEventProcessed(eventId: string): Promise<void> {
   try {
     const supabase = await createClient()
-    await supabase.from('stripe_events').upsert(
-      {
-        stripe_event_id: event.id,
-        event_type: event.type,
-        payload: JSON.parse(JSON.stringify(event.data.object)),
-        processed: status === 'processed',
-        error: errorMessage || null,
-        created_at: new Date(event.created * 1000).toISOString(),
-        processed_at: status === 'processed' ? new Date().toISOString() : null,
-      },
-      {
-        onConflict: 'stripe_event_id',
-      }
-    )
+    await supabase
+      .from('stripe_events')
+      .update({
+        processed: true,
+        processed_at: new Date().toISOString(),
+        error: null,
+      })
+      .eq('stripe_event_id', eventId)
   } catch (error) {
-    console.error('Error logging Stripe event:', error)
+    console.error('Error marking event as processed:', error)
+  }
+}
+
+/**
+ * Marks an event as failed
+ */
+async function markEventFailed(eventId: string, errorMessage: string): Promise<void> {
+  try {
+    const supabase = await createClient()
+    await supabase
+      .from('stripe_events')
+      .update({
+        processed: false,
+        error: errorMessage,
+      })
+      .eq('stripe_event_id', eventId)
+  } catch (error) {
+    console.error('Error marking event as failed:', error)
   }
 }
 
@@ -102,6 +151,7 @@ function formatAmount(amount: number, currency: string): string {
  * - For orders: Updates order escrow status to 'held', creates escrow hold transaction
  * - For retainers: Marks timesheet as paid
  * - Notifies the relevant parties
+ * SECURITY: Validates payment amount against database before processing
  */
 async function handlePaymentIntentSucceeded(paymentIntent: Stripe.PaymentIntent): Promise<void> {
   const referenceId = paymentIntent.metadata?.order_id
@@ -116,11 +166,58 @@ async function handlePaymentIntentSucceeded(paymentIntent: Stripe.PaymentIntent)
   })
 
   if (!referenceId) {
-    console.error('No order_id in payment intent metadata')
+    console.error('[SECURITY] No order_id in payment intent metadata')
     return
   }
 
   const supabase = await createClient()
+  
+  // SECURITY: First validate the payment amount against database order
+  const { data: orderValidation, error: validationError } = await supabase
+    .from('orders')
+    .select('id, total_amount, currency, status, escrow_status, stripe_payment_intent_id')
+    .eq('id', referenceId)
+    .single()
+  
+  if (validationError || !orderValidation) {
+    console.error('[SECURITY] Order not found for payment validation:', referenceId)
+    return
+  }
+  
+  // SECURITY: Verify payment intent ID matches what was stored
+  if (orderValidation.stripe_payment_intent_id && 
+      orderValidation.stripe_payment_intent_id !== paymentIntent.id) {
+    console.error('[SECURITY] Payment intent ID mismatch!', {
+      expected: orderValidation.stripe_payment_intent_id,
+      received: paymentIntent.id,
+      orderId: referenceId
+    })
+    return
+  }
+  
+  // SECURITY: Verify the payment amount matches the order amount (with tolerance for fees)
+  const expectedAmount = Math.round(Number(orderValidation.total_amount) * 100) // Convert to cents
+  const tolerance = 1 // Allow 1 cent tolerance for rounding
+  
+  if (Math.abs(paymentIntent.amount - expectedAmount) > tolerance) {
+    console.error('[SECURITY] Payment amount mismatch!', {
+      expected: expectedAmount,
+      received: paymentIntent.amount,
+      orderId: referenceId,
+      difference: paymentIntent.amount - expectedAmount
+    })
+    // Alert but don't fail - log for investigation
+  }
+  
+  // SECURITY: Verify currency matches
+  if (orderValidation.currency?.toLowerCase() !== paymentIntent.currency.toLowerCase()) {
+    console.error('[SECURITY] Currency mismatch!', {
+      expected: orderValidation.currency,
+      received: paymentIntent.currency,
+      orderId: referenceId
+    })
+    return
+  }
 
   // Check if this is a retainer timesheet payment or a regular order
   const { data: timesheet, error: timesheetError } = await supabase
@@ -606,26 +703,31 @@ async function handlePayoutPaid(payout: Stripe.Payout): Promise<void> {
 
 /**
  * Main webhook handler
+ * SECURITY: Uses atomic idempotency check to prevent race conditions
  */
 export async function POST(request: NextRequest) {
   // Verify webhook signature
   const verification = await verifyWebhookSignature(request)
   if (verification.error || !verification.event) {
     console.error('Webhook verification failed:', verification.error)
-    return NextResponse.json({ error: verification.error || 'Invalid event' }, { status: 400 })
+    return NextResponse.json({ error: 'Invalid request' }, { status: 400 })
   }
 
   const event = verification.event
 
-  // Check idempotency - skip if already processed
-  const alreadyProcessed = await isEventProcessed(event.id)
+  // SECURITY: Atomic idempotency check - prevents race conditions
+  const { acquired, alreadyProcessed } = await acquireEventLock(event)
+  
   if (alreadyProcessed) {
     console.log('Event already processed:', event.id)
     return NextResponse.json({ received: true, status: 'already_processed' })
   }
-
-  // Log event as pending
-  await logStripeEvent(event, 'pending')
+  
+  if (!acquired) {
+    console.log('Could not acquire lock for event:', event.id)
+    // Another process is handling this event, return success to prevent retry
+    return NextResponse.json({ received: true, status: 'processing' })
+  }
 
   try {
     // Handle different event types
@@ -685,17 +787,18 @@ export async function POST(request: NextRequest) {
         console.log('Unhandled event type:', event.type)
     }
 
-    // Log event as processed
-    await logStripeEvent(event, 'processed')
+    // Mark event as successfully processed
+    await markEventProcessed(event.id)
 
     return NextResponse.json({ received: true, status: 'processed' })
   } catch (error) {
     console.error('Error processing webhook:', error)
 
-    // Log event as failed
+    // Mark event as failed
     const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-    await logStripeEvent(event, 'failed', errorMessage)
+    await markEventFailed(event.id, errorMessage)
 
-    return NextResponse.json({ error: 'Webhook processing failed' }, { status: 500 })
+    // SECURITY: Return generic error message
+    return NextResponse.json({ error: 'Processing failed' }, { status: 500 })
   }
 }

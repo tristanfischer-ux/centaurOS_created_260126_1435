@@ -2,17 +2,20 @@
  * Rate Limiting Module
  * 
  * Provides rate limiting for API endpoints and server actions.
- * Uses in-memory storage by default, can be upgraded to Redis/Upstash for production.
+ * Uses Supabase for distributed storage (works across serverless instances).
+ * Falls back to in-memory for development if Supabase unavailable.
  * 
  * Usage:
  *   const result = await rateLimit('login', ip, { limit: 5, window: 15 * 60 * 1000 })
  *   if (!result.success) return { error: 'Too many attempts, please try again later' }
  */
 
-// In-memory store for rate limiting (use Redis in production)
+import { createClient } from '@supabase/supabase-js'
+
+// In-memory fallback store (development only)
 const rateLimitStore = new Map<string, { count: number; resetTime: number }>()
 
-// Clean up expired entries periodically
+// Clean up expired entries periodically (for in-memory fallback)
 let cleanupInterval: ReturnType<typeof setInterval> | null = null
 
 function startCleanup() {
@@ -27,10 +30,27 @@ function startCleanup() {
     }, 60 * 1000) // Clean up every minute
 }
 
-// Start cleanup on module load
+// Start cleanup on module load (for fallback)
 if (typeof window === 'undefined') {
     startCleanup()
 }
+
+// Create a Supabase client for rate limiting (uses service role for atomic operations)
+function getRateLimitClient() {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+    
+    if (!url || !serviceKey) {
+        return null // Fall back to in-memory
+    }
+    
+    return createClient(url, serviceKey, {
+        auth: { autoRefreshToken: false, persistSession: false }
+    })
+}
+
+// Check if we should use distributed rate limiting
+const useDistributed = process.env.NODE_ENV === 'production'
 
 export interface RateLimitConfig {
     /** Maximum number of requests allowed in the window */
@@ -76,21 +96,73 @@ export const RATE_LIMIT_CONFIGS = {
 export type RateLimitAction = keyof typeof RATE_LIMIT_CONFIGS
 
 /**
- * Check and update rate limit for an action
- * 
- * @param action - The type of action being rate limited
- * @param identifier - Unique identifier (usually IP address or user ID)
- * @param config - Optional custom configuration (uses defaults if not provided)
- * @returns Rate limit result with success status and remaining count
+ * Check and update rate limit for an action (distributed version)
+ * Uses Supabase for atomic rate limiting across serverless instances
  */
-export async function rateLimit(
-    action: RateLimitAction | string,
+async function distributedRateLimit(
+    action: string,
     identifier: string,
-    config?: Partial<RateLimitConfig>
+    limit: number,
+    windowMs: number
 ): Promise<RateLimitResult> {
-    const defaultConfig = RATE_LIMIT_CONFIGS[action as RateLimitAction] || RATE_LIMIT_CONFIGS.api
-    const { limit, window } = { ...defaultConfig, ...config }
+    const supabase = getRateLimitClient()
+    if (!supabase) {
+        // Fall back to in-memory if no Supabase client
+        return inMemoryRateLimit(action, identifier, limit, windowMs)
+    }
     
+    const key = `${action}:${identifier}`
+    const now = new Date()
+    const windowStart = new Date(now.getTime() - windowMs)
+    
+    try {
+        // Use a database function for atomic rate limiting
+        // First, clean up old entries and count recent ones
+        const { data, error } = await supabase.rpc('check_rate_limit', {
+            p_key: key,
+            p_limit: limit,
+            p_window_start: windowStart.toISOString(),
+            p_now: now.toISOString()
+        })
+        
+        if (error) {
+            console.warn('[RATE_LIMIT] Supabase error, falling back to in-memory:', error.message)
+            return inMemoryRateLimit(action, identifier, limit, windowMs)
+        }
+        
+        const result = data as { allowed: boolean; count: number; reset_at: string }
+        
+        if (!result.allowed) {
+            const resetTime = new Date(result.reset_at).getTime()
+            const secondsUntilReset = Math.ceil((resetTime - now.getTime()) / 1000)
+            return {
+                success: false,
+                remaining: 0,
+                resetTime,
+                error: `Rate limit exceeded. Try again in ${secondsUntilReset} seconds.`
+            }
+        }
+        
+        return {
+            success: true,
+            remaining: limit - result.count,
+            resetTime: now.getTime() + windowMs
+        }
+    } catch (err) {
+        console.warn('[RATE_LIMIT] Error, falling back to in-memory:', err)
+        return inMemoryRateLimit(action, identifier, limit, windowMs)
+    }
+}
+
+/**
+ * In-memory rate limiting (fallback for development)
+ */
+function inMemoryRateLimit(
+    action: string,
+    identifier: string,
+    limit: number,
+    windowMs: number
+): RateLimitResult {
     const key = `ratelimit:${action}:${identifier}`
     const now = Date.now()
     
@@ -99,7 +171,7 @@ export async function rateLimit(
     
     if (!entry || now > entry.resetTime) {
         // Create new entry or reset expired entry
-        entry = { count: 0, resetTime: now + window }
+        entry = { count: 0, resetTime: now + windowMs }
         rateLimitStore.set(key, entry)
     }
     
@@ -121,6 +193,31 @@ export async function rateLimit(
         remaining: limit - entry.count,
         resetTime: entry.resetTime
     }
+}
+
+/**
+ * Check and update rate limit for an action
+ * 
+ * @param action - The type of action being rate limited
+ * @param identifier - Unique identifier (usually IP address or user ID)
+ * @param config - Optional custom configuration (uses defaults if not provided)
+ * @returns Rate limit result with success status and remaining count
+ */
+export async function rateLimit(
+    action: RateLimitAction | string,
+    identifier: string,
+    config?: Partial<RateLimitConfig>
+): Promise<RateLimitResult> {
+    const defaultConfig = RATE_LIMIT_CONFIGS[action as RateLimitAction] || RATE_LIMIT_CONFIGS.api
+    const { limit, window } = { ...defaultConfig, ...config }
+    
+    // Use distributed rate limiting in production
+    if (useDistributed) {
+        return distributedRateLimit(action, identifier, limit, window)
+    }
+    
+    // Fall back to in-memory for development
+    return inMemoryRateLimit(action, identifier, limit, window)
 }
 
 /**

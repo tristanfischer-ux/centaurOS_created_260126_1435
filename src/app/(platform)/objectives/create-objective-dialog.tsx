@@ -84,8 +84,10 @@ export function CreateObjectiveDialog({ children }: CreateObjectiveDialogProps) 
     // Manual Data
     const [title, setTitle] = useState("")
     const [description, setDescription] = useState("")
+    const [extendedDescription, setExtendedDescription] = useState("")
     const [titleError, setTitleError] = useState<string | null>(null)
     const [descriptionError, setDescriptionError] = useState<string | null>(null)
+    const [extendedDescriptionError, setExtendedDescriptionError] = useState<string | null>(null)
     const [showAdvanced, setShowAdvanced] = useState(false)
 
     // Pack Data
@@ -135,6 +137,7 @@ export function CreateObjectiveDialog({ children }: CreateObjectiveDialogProps) 
                 setMode('manual')
                 setTitle("")
                 setDescription("")
+                setExtendedDescription("")
                 setSelectedPack(null)
                 setSelectedTaskIds([])
                 setAnalyzedObjectives([])
@@ -225,6 +228,7 @@ export function CreateObjectiveDialog({ children }: CreateObjectiveDialogProps) 
         // Reset errors
         setTitleError(null)
         setDescriptionError(null)
+        setExtendedDescriptionError(null)
 
         // Validate title
         if (!title.trim()) {
@@ -240,9 +244,16 @@ export function CreateObjectiveDialog({ children }: CreateObjectiveDialogProps) 
         }
 
         // Validate description (optional but if provided, must meet requirements)
-        if (description && description.trim().length > 10000) {
-            setDescriptionError("Description must be 10,000 characters or less")
-            toast.error("Description must be 10,000 characters or less")
+        if (description && description.trim().length > 500) {
+            setDescriptionError("Summary must be 500 characters or less")
+            toast.error("Summary must be 500 characters or less")
+            return
+        }
+
+        // Validate extended description
+        if (extendedDescription && extendedDescription.trim().length > 50000) {
+            setExtendedDescriptionError("Extended description must be 50,000 characters or less")
+            toast.error("Extended description must be 50,000 characters or less")
             return
         }
 
@@ -250,6 +261,7 @@ export function CreateObjectiveDialog({ children }: CreateObjectiveDialogProps) 
         const formData = new FormData()
         formData.append('title', title)
         formData.append('description', description)
+        formData.append('extendedDescription', extendedDescription)
 
         // Add special handling for Packs
         if (mode === 'pack' && selectedPack) {
@@ -427,32 +439,64 @@ export function CreateObjectiveDialog({ children }: CreateObjectiveDialogProps) 
                                     </Button>
                                 </div>
 
-                                {/* Optional Description */}
+                                {/* Optional Descriptions */}
                                 {showAdvanced && (
-                                    <div className="space-y-2">
-                                        <Label htmlFor="description" className="text-base font-semibold">Description & Success Criteria</Label>
-                                        <Textarea
-                                            id="description"
-                                            placeholder="Define the scope, key results, and success metrics..."
-                                            value={description}
-                                            onChange={(e) => {
-                                                setDescription(e.target.value)
-                                                setDescriptionError(null)
-                                            }}
-                                            className={cn("min-h-[200px] resize-none", descriptionError && "border-destructive")}
-                                            aria-describedby={descriptionError ? "description-error" : undefined}
-                                            aria-invalid={!!descriptionError}
-                                        />
-                                        {descriptionError && (
-                                            <p id="description-error" className="text-sm text-destructive mt-1" role="alert">
-                                                {descriptionError}
-                                            </p>
-                                        )}
-                                        {!descriptionError && (
-                                            <p className="text-xs text-muted-foreground text-right">
-                                                {description.length} / 10,000 characters {description.length > 0 && '(Markdown supported)'}
-                                            </p>
-                                        )}
+                                    <div className="space-y-6">
+                                        {/* Short Summary */}
+                                        <div className="space-y-2">
+                                            <Label htmlFor="description" className="text-base font-semibold">Summary</Label>
+                                            <p className="text-sm text-muted-foreground">A brief 1-2 sentence overview shown in lists</p>
+                                            <Textarea
+                                                id="description"
+                                                placeholder="e.g. Acquire first 10 paying customers through systematic cold outreach..."
+                                                value={description}
+                                                onChange={(e) => {
+                                                    setDescription(e.target.value)
+                                                    setDescriptionError(null)
+                                                }}
+                                                className={cn("min-h-[80px] resize-none", descriptionError && "border-destructive")}
+                                                aria-describedby={descriptionError ? "description-error" : undefined}
+                                                aria-invalid={!!descriptionError}
+                                            />
+                                            {descriptionError && (
+                                                <p id="description-error" className="text-sm text-destructive mt-1" role="alert">
+                                                    {descriptionError}
+                                                </p>
+                                            )}
+                                            {!descriptionError && (
+                                                <p className="text-xs text-muted-foreground text-right">
+                                                    {description.length} / 500 characters
+                                                </p>
+                                            )}
+                                        </div>
+
+                                        {/* Extended Description */}
+                                        <div className="space-y-2">
+                                            <Label htmlFor="extendedDescription" className="text-base font-semibold">Extended Description</Label>
+                                            <p className="text-sm text-muted-foreground">Full context, background, success criteria, and detailed instructions</p>
+                                            <Textarea
+                                                id="extendedDescription"
+                                                placeholder="## Background&#10;Explain the context and why this objective matters...&#10;&#10;## Success Criteria&#10;- Metric 1&#10;- Metric 2&#10;&#10;## Approach&#10;Detailed strategy and methodology..."
+                                                value={extendedDescription}
+                                                onChange={(e) => {
+                                                    setExtendedDescription(e.target.value)
+                                                    setExtendedDescriptionError(null)
+                                                }}
+                                                className={cn("min-h-[250px] resize-none font-mono text-sm", extendedDescriptionError && "border-destructive")}
+                                                aria-describedby={extendedDescriptionError ? "extended-description-error" : undefined}
+                                                aria-invalid={!!extendedDescriptionError}
+                                            />
+                                            {extendedDescriptionError && (
+                                                <p id="extended-description-error" className="text-sm text-destructive mt-1" role="alert">
+                                                    {extendedDescriptionError}
+                                                </p>
+                                            )}
+                                            {!extendedDescriptionError && (
+                                                <p className="text-xs text-muted-foreground text-right">
+                                                    {extendedDescription.length} / 50,000 characters (Markdown supported)
+                                                </p>
+                                            )}
+                                        </div>
                                     </div>
                                 )}
                             </div>

@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react"
 import { Button } from "@/components/ui/button"
-import { Plus, Loader2, Upload, X, FileIcon, Volume2, Check, ChevronsUpDown, ChevronDown, ChevronUp } from "lucide-react"
+import { Plus, Loader2, Upload, X, FileIcon, Check, ChevronsUpDown, ChevronDown, ChevronUp } from "lucide-react"
 import {
     Dialog,
     DialogContent,
@@ -234,7 +234,6 @@ export function CreateTaskDialog({ objectives, members, teams = [], currentUserI
         }
     }
 
-    // Helper to format role for display
     const getRoleLabel = (role: string) => {
         if (role === 'AI_Agent') return '🤖'
         if (role === 'Founder') return '👑'
@@ -541,8 +540,14 @@ export function CreateTaskDialog({ objectives, members, teams = [], currentUserI
                                 <div className="grid gap-2">
                                     <Label htmlFor="file-upload">Attachments (Optional)</Label>
                                     <div
-                                        className="border-2 border-dashed border rounded-lg p-4 text-center cursor-pointer hover:border-slate-300 hover:bg-muted transition-colors"
+                                        className={cn(
+                                            "border-2 border-dashed border rounded-lg p-4 text-center cursor-pointer hover:border-slate-300 hover:bg-muted transition-colors",
+                                            isDragging && "border-primary bg-primary/10"
+                                        )}
                                         onClick={() => fileInputRef.current?.click()}
+                                        onDragOver={handleDragOver}
+                                        onDragLeave={handleDragLeave}
+                                        onDrop={handleDrop}
                                         role="button"
                                         tabIndex={0}
                                         aria-label="Click to upload files or drag and drop"

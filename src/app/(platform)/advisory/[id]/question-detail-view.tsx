@@ -142,20 +142,17 @@ export function QuestionDetailView({
 
     const handleVote = async (answerId: string, voteType: "up" | "down") => {
         // In production, call server action
-        console.log("Voting:", answerId, voteType)
         return {}
     }
 
     const handleVerify = async (answerId: string, status: VerificationStatus, note?: string) => {
         // In production, call server action
-        console.log("Verifying:", answerId, status, note)
         toast.success(`Answer ${status === 'verified' ? 'verified' : 'endorsed'} successfully`)
         return {}
     }
 
     const handleComment = async (answerId: string, content: string) => {
         // In production, call server action
-        console.log("Commenting:", answerId, content)
         return {}
     }
 

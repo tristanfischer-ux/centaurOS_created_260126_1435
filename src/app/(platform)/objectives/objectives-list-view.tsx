@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { useAutoRefresh } from "@/hooks/useAutoRefresh"
 import { RefreshButton } from "@/components/RefreshButton"
-import { ChevronDown, ChevronRight, Target, CheckCircle2, Clock, AlertCircle, ArrowRight, Trash, MessageSquare, Paperclip, Loader2, Plus } from "lucide-react"
+import { ChevronDown, ChevronRight, Target, CheckCircle2, Clock, AlertCircle, ArrowRight, Trash, MessageSquare, Paperclip, Loader2, Plus, FileText } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
@@ -44,6 +44,7 @@ interface Objective {
     id: string
     title: string
     description: string | null
+    extended_description: string | null
     created_at: string | null
     tasks: Task[]
 }
@@ -337,6 +338,12 @@ export function ObjectivesListView({ objectives, objectivesForDialog, members, t
                                         <Link href={`/objectives/${objective.id}`} className="font-semibold text-foreground hover:text-status-warning transition-colors" onClick={(e) => e.stopPropagation()}>
                                             {objective.title}
                                         </Link>
+                                        {objective.extended_description && (
+                                            <Badge variant="secondary" className="ml-1 text-xs gap-1">
+                                                <FileText className="h-3 w-3" />
+                                                Full Context
+                                            </Badge>
+                                        )}
                                         {hasOverdueTasks && (
                                             <Badge variant="destructive" className="ml-2">
                                                 ⚠️ Overdue Tasks

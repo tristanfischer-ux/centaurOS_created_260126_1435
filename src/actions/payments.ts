@@ -3,10 +3,13 @@
 /**
  * Payment Server Actions
  * Server-side actions for payment operations in the marketplace
+ * SECURITY: All functions include rate limiting, input validation, and authorization checks
  */
 
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { headers } from 'next/headers'
+import { z } from 'zod'
 import {
   initiatePayment as initiatePaymentService,
   confirmPayment as confirmPaymentService,
@@ -14,11 +17,20 @@ import {
   getPaymentStatus as getPaymentStatusService,
 } from '@/lib/payments/flow'
 import { processRefund, releaseAllEscrow, getEscrowBalance } from '@/lib/stripe/escrow'
+import { rateLimit, getClientIP } from '@/lib/security/rate-limit'
+import { sanitizeErrorMessage } from '@/lib/security/sanitize'
 import {
   PaymentStatusResponse,
   PaymentIntent,
   EscrowTransaction,
 } from '@/types/payments'
+
+// Input validation schemas
+const refundSchema = z.object({
+  orderId: z.string().uuid('Invalid order ID'),
+  amount: z.number().positive('Amount must be positive').optional(),
+  reason: z.string().max(1000, 'Reason too long').optional()
+})
 
 /**
  * Result type for server actions
@@ -29,9 +41,16 @@ type ActionResult<T> = { data: T; error: null } | { data: null; error: string }
  * Creates a payment intent for an order
  * @param orderId - The order ID
  * @returns Payment intent with client secret
+ * SECURITY: Includes rate limiting and input validation
  */
 export async function createOrderPayment(orderId: string): Promise<ActionResult<PaymentIntent>> {
   try {
+    // SECURITY: Validate orderId is a valid UUID
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+    if (!orderId || !uuidRegex.test(orderId)) {
+      return { data: null, error: 'Invalid order ID' }
+    }
+    
     const supabase = await createClient()
 
     // Get current user
@@ -41,6 +60,14 @@ export async function createOrderPayment(orderId: string): Promise<ActionResult<
 
     if (!user) {
       return { data: null, error: 'Not authenticated' }
+    }
+    
+    // SECURITY: Rate limiting for payment creation
+    const headersList = await headers()
+    const clientIP = getClientIP(headersList)
+    const rateLimitResult = await rateLimit('api', `payment:${user.id}:${clientIP}`, { limit: 10, window: 60 * 1000 })
+    if (!rateLimitResult.success) {
+      return { data: null, error: 'Too many payment requests. Please try again later.' }
     }
 
     // Get order and verify ownership
@@ -85,9 +112,10 @@ export async function createOrderPayment(orderId: string): Promise<ActionResult<
     return { data: result.paymentIntent, error: null }
   } catch (error) {
     console.error('Error creating order payment:', error)
+    // SECURITY: Sanitize error message before returning to client
     return {
       data: null,
-      error: error instanceof Error ? error.message : 'Failed to create payment',
+      error: sanitizeErrorMessage(error),
     }
   }
 }
@@ -368,6 +396,7 @@ export async function releaseFullPayment(
  * @param amount - Optional partial refund amount (full refund if not specified)
  * @param reason - Optional reason for the refund
  * @returns Refund details
+ * SECURITY: Includes rate limiting, input validation, and authorization
  */
 export async function requestRefund(
   orderId: string,
@@ -381,6 +410,12 @@ export async function requestRefund(
   }>
 > {
   try {
+    // SECURITY: Validate input
+    const validation = refundSchema.safeParse({ orderId, amount, reason })
+    if (!validation.success) {
+      return { data: null, error: validation.error.issues[0].message }
+    }
+    
     const supabase = await createClient()
 
     // Get current user
@@ -390,6 +425,14 @@ export async function requestRefund(
 
     if (!user) {
       return { data: null, error: 'Not authenticated' }
+    }
+    
+    // SECURITY: Rate limiting for refund requests
+    const headersList = await headers()
+    const clientIP = getClientIP(headersList)
+    const rateLimitResult = await rateLimit('api', `refund:${user.id}:${clientIP}`, { limit: 5, window: 60 * 1000 })
+    if (!rateLimitResult.success) {
+      return { data: null, error: 'Too many refund requests. Please try again later.' }
     }
 
     // Get order

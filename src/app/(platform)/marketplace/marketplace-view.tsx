@@ -575,9 +575,9 @@ export function MarketplaceView({
                 <MarketplaceOnboardingModal
                     recommendations={onboardingRecommendations}
                     userRole={userRole}
-                    onComplete={() => {
-                        console.log('Marketplace onboarding completed!')
-                    }}
+                        onComplete={() => {
+                            // Onboarding complete
+                        }}
                 />
             )}
 

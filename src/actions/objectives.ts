@@ -22,6 +22,7 @@ export async function createObjective(formData: FormData) {
 
     const title = formData.get('title') as string
     const description = formData.get('description') as string
+    const extendedDescription = formData.get('extendedDescription') as string
     const playbookId = formData.get('playbookId') as string
 
     // Get selected tasks (handle multiple values with same name)
@@ -51,6 +52,7 @@ export async function createObjective(formData: FormData) {
             const res = await supabase.from('objectives').insert({
                 title: validatedTitle,
                 description: validatedDescription || null,
+                extended_description: extendedDescription?.trim() || null,
                 creator_id: user.id,
                 foundry_id
             }).select().single()
@@ -269,14 +271,25 @@ export async function deleteObjective(id: string) {
 
     if (!user) return { error: 'Unauthorized' }
 
-    // 1. Verify ownership
+    // SECURITY: Get user's foundry_id for multi-tenant isolation
+    const foundry_id = await getFoundryIdCached()
+    if (!foundry_id) return { error: 'User not in a foundry' }
+
+    // 1. Verify ownership AND foundry isolation
     const { data: objective, error: fetchError } = await supabase
         .from('objectives')
-        .select('creator_id')
+        .select('creator_id, foundry_id')
         .eq('id', id)
         .single()
 
     if (fetchError || !objective) return { error: 'Objective not found' }
+    
+    // SECURITY: Check foundry isolation first
+    if (objective.foundry_id !== foundry_id) {
+        console.warn(`[SECURITY] User ${user.id} attempted to delete objective ${id} from different foundry`)
+        return { error: 'Objective not found' } // Don't reveal it exists
+    }
+    
     if (objective.creator_id !== user.id) return { error: 'Unauthorized: Only the creator can delete this objective' }
 
     // 2. Perform delete with Admin Client to bypass RLS on child tables (tasks, history, comments)
@@ -306,18 +319,21 @@ export async function deleteObjectives(ids: string[]) {
 
     if (!user) return { error: 'Unauthorized' }
 
-    // 1. Verify ownership of ALL objectives
-    // We only delete the ones the user owns to be safe, or fail if they don't own all?
-    // Let's delete only what they own.
+    // SECURITY: Get user's foundry_id for multi-tenant isolation
+    const foundry_id = await getFoundryIdCached()
+    if (!foundry_id) return { error: 'User not in a foundry' }
+
+    // 1. Verify ownership AND foundry isolation of ALL objectives
     const { data: objectives, error: fetchError } = await supabase
         .from('objectives')
-        .select('id, creator_id')
+        .select('id, creator_id, foundry_id')
         .in('id', ids)
 
     if (fetchError) return { error: fetchError.message }
 
+    // SECURITY: Only delete objectives that belong to user's foundry AND are owned by user
     const idsToDelete = objectives
-        .filter(o => o.creator_id === user.id)
+        .filter(o => o.creator_id === user.id && o.foundry_id === foundry_id)
         .map(o => o.id)
 
     if (idsToDelete.length === 0) return { error: 'No authorized objectives to delete' }

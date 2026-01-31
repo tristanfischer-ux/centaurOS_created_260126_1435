@@ -111,12 +111,46 @@ export const addCommentSchema = z.object({
     .max(5000, 'Comment must be 5,000 characters or less')
 })
 
+// Allowed MIME types for file uploads (security hardening)
+const ALLOWED_MIME_TYPES = [
+  // Documents
+  'application/pdf',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/vnd.ms-powerpoint',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  // Text
+  'text/plain',
+  'text/csv',
+  'text/markdown',
+  // Images
+  'image/jpeg',
+  'image/png',
+  'image/gif',
+  'image/webp',
+  'image/svg+xml',
+  // Archives
+  'application/zip',
+  'application/x-zip-compressed',
+] as const
+
 // Attachment schemas
 export const uploadAttachmentSchema = z.object({
   taskId: z.string().uuid('Invalid task ID'),
-  fileName: z.string().min(1),
+  fileName: z.string()
+    .min(1, 'Filename is required')
+    .max(255, 'Filename too long')
+    .refine(
+      (name) => !name.includes('..') && !name.includes('/') && !name.includes('\\'),
+      { message: 'Invalid filename' }
+    ),
   fileSize: z.number().int().max(10 * 1024 * 1024, 'File must be 10MB or less'),
-  fileType: z.string()
+  fileType: z.string().refine(
+    (type) => ALLOWED_MIME_TYPES.includes(type as typeof ALLOWED_MIME_TYPES[number]),
+    { message: 'File type not allowed. Supported: PDF, Office docs, images, text, and ZIP files.' }
+  )
 })
 
 // Helper function to validate and return typed result

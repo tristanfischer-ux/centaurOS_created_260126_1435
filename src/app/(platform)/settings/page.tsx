@@ -1,8 +1,20 @@
 import { createClient } from '@/lib/supabase/server'
+import { createClient as createAdminClient } from '@supabase/supabase-js'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { redirect } from 'next/navigation'
+import { TelegramLink } from '@/components/settings/telegram-link'
+
+// Admin client for messaging_links table (not in types yet)
+function getAdminClient() {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+    if (!url || !serviceKey) return null
+    return createAdminClient(url, serviceKey, {
+        auth: { autoRefreshToken: false, persistSession: false },
+    })
+}
 
 export default async function SettingsPage() {
     const supabase = await createClient()
@@ -13,6 +25,22 @@ export default async function SettingsPage() {
     }
 
     const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single()
+
+    // Get existing Telegram link using admin client (table not in types yet)
+    const admin = getAdminClient()
+    let telegramLink: { id: string; platform_username: string | null; verified_at: string | null } | null = null
+    
+    if (admin) {
+        const { data } = await admin
+            .from('messaging_links')
+            .select('id, platform_username, verified_at')
+            .eq('profile_id', user.id)
+            .eq('platform', 'telegram')
+            .single()
+        telegramLink = data as typeof telegramLink
+    }
+
+    const botUsername = process.env.TELEGRAM_BOT_USERNAME || 'CentaurOSBot'
 
     return (
         <div className="space-y-6">
@@ -50,6 +78,11 @@ export default async function SettingsPage() {
                     </div>
                 </CardContent>
             </Card>
+
+            <TelegramLink 
+                initialLink={telegramLink} 
+                botUsername={botUsername}
+            />
 
             <Card className="border-destructive/20 bg-status-error-light/50">
                 <CardHeader>

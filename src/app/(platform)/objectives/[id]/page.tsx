@@ -2,8 +2,9 @@ import { createClient } from '@/lib/supabase/server'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { UserAvatar } from '@/components/ui/user-avatar'
+import { Markdown } from '@/components/ui/markdown'
 import Link from 'next/link'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, FileText } from 'lucide-react'
 
 export default async function ObjectiveDetailPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = await params
@@ -31,17 +32,34 @@ export default async function ObjectiveDetailPage({ params }: { params: Promise<
         <div className="space-y-8 max-w-5xl mx-auto">
             {/* Header / Back Link */}
             <div>
-                <Link href="/objectives" className="text-sm text-muted-foreground hover:text-muted-foreground flex items-center mb-4 transition-colors">
+                <Link href="/objectives" className="text-sm text-muted-foreground hover:text-foreground flex items-center mb-4 transition-colors">
                     <ArrowLeft className="h-4 w-4 mr-1" /> Back to Objectives
                 </Link>
                 <h1 className="text-3xl font-bold tracking-tight text-foreground mb-2">{objective.title}</h1>
-                <p className="text-lg text-muted-foreground leading-relaxed max-w-3xl">{objective.description}</p>
+                {objective.description && (
+                    <p className="text-lg text-muted-foreground leading-relaxed max-w-3xl">{objective.description}</p>
+                )}
                 <div className="flex items-center gap-4 mt-4 text-sm text-muted-foreground">
-                    <span>ID: {objective.id}</span>
-                    <span>•</span>
                     <span>Created: {new Date(objective.created_at!).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
                 </div>
             </div>
+
+            {/* Extended Description */}
+            {objective.extended_description && (
+                <Card className="bg-muted/30 border-l-4 border-l-international-orange">
+                    <CardHeader className="pb-2">
+                        <CardTitle className="text-lg flex items-center gap-2">
+                            <FileText className="h-5 w-5 text-international-orange" />
+                            Full Context & Instructions
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="prose prose-sm max-w-none dark:prose-invert">
+                            <Markdown content={objective.extended_description} />
+                        </div>
+                    </CardContent>
+                </Card>
+            )}
 
             {/* Tasks Section */}
             <div className="pt-8 mt-4">

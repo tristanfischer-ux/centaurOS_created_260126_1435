@@ -593,7 +593,7 @@ export default async function TodayPage() {
                                                         </div>
                                                     )}
                                                     <p className="text-sm text-foundry-600 line-clamp-2">
-                                                        {mention.content.replace(/@\[[^\]]+\]/g, (_) => {
+                                                        {mention.content.replace(/@\[[^\]]+\]/g, () => {
                                                             // Replace mention placeholders with readable text
                                                             return '@someone'
                                                         })}

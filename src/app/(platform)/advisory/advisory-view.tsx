@@ -264,7 +264,6 @@ export function AdvisoryView({
         getAiAnswer: boolean
     }) => {
         // In production, this would call a server action to create the question
-        console.log("Submitting question:", data)
         toast.success("Question submitted! (Mock - implement server action)")
         return { questionId: "new-question-id" }
     }

@@ -2865,6 +2865,7 @@ export type Database = {
           created_at: string | null
           creator_id: string
           description: string | null
+          extended_description: string | null
           foundry_id: string
           id: string
           parent_objective_id: string | null
@@ -2877,6 +2878,7 @@ export type Database = {
           created_at?: string | null
           creator_id: string
           description?: string | null
+          extended_description?: string | null
           foundry_id: string
           id?: string
           parent_objective_id?: string | null
@@ -2889,6 +2891,7 @@ export type Database = {
           created_at?: string | null
           creator_id?: string
           description?: string | null
+          extended_description?: string | null
           foundry_id?: string
           id?: string
           parent_objective_id?: string | null

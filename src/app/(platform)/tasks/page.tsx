@@ -26,13 +26,14 @@ export default async function TasksPage() {
         .order('created_at', { ascending: false })
 
     if (error) {
+        // SECURITY: Log detailed error server-side only, show generic message to user
         console.error("Error loading tasks:", error)
         return (
-            <div className="p-8 text-red-500">
-                <h1 className="font-bold mb-2">Error loading tasks</h1>
-                <pre className="bg-red-50 p-4 rounded text-sm overflow-auto">
-                    {JSON.stringify(error, null, 2)}
-                </pre>
+            <div className="p-8">
+                <h1 className="font-bold mb-2 text-destructive">Error loading tasks</h1>
+                <p className="text-muted-foreground">
+                    Unable to load tasks. Please try refreshing the page or contact support if the problem persists.
+                </p>
             </div>
         )
     }

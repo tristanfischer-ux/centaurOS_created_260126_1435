@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { uploadAttachmentSchema, validate } from '@/lib/validations'
 import { getFoundryIdCached } from '@/lib/supabase/foundry-context'
+import { sanitizeFileName, escapeHtml } from '@/lib/security/sanitize'
 
 export async function uploadTaskAttachment(taskId: string, formData: FormData) {
     const supabase = await createClient()
@@ -51,8 +52,11 @@ export async function uploadTaskAttachment(taskId: string, formData: FormData) {
         return { error: 'Unauthorized: Task belongs to a different foundry' }
     }
 
-    // Upload to Supabase Storage
-    const fileExt = file.name.split('.').pop()
+    // SECURITY: Sanitize filename to prevent path traversal
+    const sanitizedOriginalName = sanitizeFileName(file.name)
+    
+    // Upload to Supabase Storage with safe filename
+    const fileExt = sanitizedOriginalName.split('.').pop() || 'bin'
     const fileName = `${taskId}/${Date.now()}.${fileExt}`
 
     // Use task-files bucket (consolidated storage with proper RLS policies)
@@ -70,12 +74,15 @@ export async function uploadTaskAttachment(taskId: string, formData: FormData) {
         .from('task-files')
         .getPublicUrl(fileName)
 
+    // SECURITY: Escape filename to prevent XSS in markdown rendering
+    const safeFileName = escapeHtml(sanitizedOriginalName)
+    
     // Store reference as a system comment (keeping this for the thread)
     const { error: commentError } = await supabase.from('task_comments').insert({
         task_id: taskId,
         foundry_id: task.foundry_id,
         user_id: user.id,
-        content: `📎 Attached: [${file.name}](${urlData.publicUrl})`,
+        content: `📎 Attached: [${safeFileName}](${urlData.publicUrl})`,
         is_system_log: true
     })
 
@@ -87,7 +94,7 @@ export async function uploadTaskAttachment(taskId: string, formData: FormData) {
     // Insert into task_files table for the attachment count
     const { error: fileRecordError } = await supabase.from('task_files').insert({
         task_id: taskId,
-        file_name: file.name,
+        file_name: sanitizedOriginalName, // Use sanitized name
         file_path: fileName, // Store the full storage path
         file_size: file.size,
         mime_type: file.type,

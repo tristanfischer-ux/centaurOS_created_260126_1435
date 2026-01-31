@@ -3,9 +3,16 @@ import { createClient } from "@/lib/supabase/server";
 import OpenAI from "openai";
 import { z } from "zod";
 import { zodResponseFormat } from "openai/helpers/zod";
+import { sanitizeFileName } from "@/lib/security/sanitize";
+
+// SECURITY: Fail fast if OpenAI API key is not configured
+const apiKey = process.env.OPENAI_API_KEY
+if (!apiKey && process.env.NODE_ENV === 'production') {
+    console.error('[CRITICAL] OPENAI_API_KEY not configured in production!')
+}
 
 const openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY || "dummy-key-for-build",
+    apiKey: apiKey || 'dummy-key-for-build', // Build-time only fallback
 });
 
 // Schema for Task Extraction
@@ -19,6 +26,12 @@ const TaskSchema = z.object({
 
 export async function POST(req: NextRequest) {
     try {
+        // SECURITY: Check if OpenAI is configured before processing
+        if (!process.env.OPENAI_API_KEY) {
+            console.error('[VOICE-TO-TASK] OpenAI API key not configured')
+            return NextResponse.json({ error: "Service temporarily unavailable" }, { status: 503 });
+        }
+        
         const supabase = await createClient();
         const { data: { user } } = await supabase.auth.getUser();
 
@@ -62,10 +75,10 @@ export async function POST(req: NextRequest) {
             }, { status: 400 });
         }
 
-        // Sanitize filename to prevent path traversal
-        const sanitizedName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+        // SECURITY: Sanitize filename to prevent path traversal using proper sanitization
+        const sanitizedName = sanitizeFileName(file.name);
         if (sanitizedName !== file.name) {
-            console.warn(`Filename sanitized from "${file.name}" to "${sanitizedName}"`);
+            console.warn(`[SECURITY] Filename sanitized from "${file.name}" to "${sanitizedName}"`);
         }
 
         // 1. Transcribe with Whisper

@@ -62,8 +62,16 @@ export async function updateSession(request: NextRequest) {
     const pathname = request.nextUrl.pathname
     const hostname = request.headers.get('host') || ''
 
-    // Check if route is public
-    const isPublicRoute = PUBLIC_ROUTES.some(route => pathname.startsWith(route))
+    // Check if route is public (use exact matching to prevent bypass attacks)
+    const isPublicRoute = PUBLIC_ROUTES.some(route => {
+        // Exact match
+        if (pathname === route) return true
+        // Match with trailing slash
+        if (pathname === `${route}/`) return true
+        // Match nested paths under the route (e.g., /api/webhooks/stripe matches /api/webhooks)
+        if (pathname.startsWith(`${route}/`)) return true
+        return false
+    })
 
     // Special handling for app domain root: authenticated users go to dashboard
     if (hostname.includes('centauros.io') && pathname === '/') {
