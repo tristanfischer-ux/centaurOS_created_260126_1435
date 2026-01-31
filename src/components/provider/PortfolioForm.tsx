@@ -159,7 +159,7 @@ export function PortfolioForm({
             {/* Title */}
             <div className="grid gap-2">
                 <Label htmlFor="title">
-                    Title <span className="text-red-500">*</span>
+                    Title <span className="text-destructive">*</span>
                 </Label>
                 <Input
                     id="title"
@@ -265,7 +265,7 @@ export function PortfolioForm({
                                 <button
                                     type="button"
                                     onClick={() => handleRemoveImageUrl(url)}
-                                    className="absolute -top-2 -right-2 w-5 h-5 rounded-full bg-red-500 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                                    className="absolute -top-2 -right-2 w-5 h-5 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
                                 >
                                     <X className="w-3 h-3" />
                                 </button>

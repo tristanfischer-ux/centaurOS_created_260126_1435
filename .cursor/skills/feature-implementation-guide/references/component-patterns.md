@@ -139,9 +139,9 @@ export function CreateFeatureForm() {
 }
 ```
 
-### Pattern 2: Form with Validation
+### Pattern 2: Form with Validation & Accessibility
 
-Using react-hook-form with Zod validation:
+Using react-hook-form with Zod validation and proper accessibility:
 
 ```typescript
 'use client';
@@ -151,7 +151,9 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
+import { cn } from '@/lib/utils';
 
 const featureSchema = z.object({
   name: z.string().min(1, 'Name is required'),
@@ -178,10 +180,24 @@ export function ValidatedFeatureForm() {
   
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-      <div>
-        <Input {...register('name')} placeholder="Name" />
+      <div className="space-y-2">
+        <Label htmlFor="name">
+          Name
+          <span className="text-destructive ml-1" aria-label="required">*</span>
+        </Label>
+        <Input
+          id="name"
+          {...register('name')}
+          placeholder="Name"
+          aria-required
+          aria-invalid={!!errors.name}
+          aria-describedby={errors.name ? "name-error" : undefined}
+          className={cn(errors.name && "border-destructive")}
+        />
         {errors.name && (
-          <p className="text-sm text-red-500 mt-1">{errors.name.message}</p>
+          <p id="name-error" role="alert" className="text-sm text-destructive">
+            {errors.name.message}
+          </p>
         )}
       </div>
       
@@ -300,6 +316,24 @@ export function FeatureCard({ feature }: FeatureCardProps) {
 
 ## Modal & Dialog Patterns
 
+### Dialog Size Guidelines
+
+Always use the `size` prop instead of custom width classes:
+
+| Size | Width | Use For |
+|------|-------|---------|
+| `sm` | 425px | Confirmations, simple forms |
+| `md` | 600px | Standard forms (most dialogs) |
+| `lg` | 800px | Complex forms, multi-step wizards |
+
+```tsx
+// ✅ CORRECT - Use size prop
+<DialogContent size="md">
+
+// ❌ WRONG - Don't use custom widths
+<DialogContent className="sm:max-w-[600px]">
+```
+
 ### Pattern 1: Dialog with Form
 
 ```typescript
@@ -325,7 +359,7 @@ export function CreateFeatureDialog() {
       <DialogTrigger asChild>
         <Button>Create Feature</Button>
       </DialogTrigger>
-      <DialogContent>
+      <DialogContent size="md">
         <DialogHeader>
           <DialogTitle>Create New Feature</DialogTitle>
         </DialogHeader>
@@ -581,7 +615,12 @@ export default function FeaturesPage() {
 <Button size="sm">Small</Button>
 <Button size="lg">Large</Button>
 
-// Cards
+// Icon buttons - MUST have aria-label
+<Button variant="ghost" size="icon" aria-label="Close">
+  <X className="h-4 w-4" />
+</Button>
+
+// Cards - ALWAYS use Card component
 <Card>
   <CardHeader>
     <CardTitle>Title</CardTitle>
@@ -591,12 +630,12 @@ export default function FeaturesPage() {
   <CardFooter>Footer</CardFooter>
 </Card>
 
-// Dialogs
+// Dialogs - Use size prop
 <Dialog open={open} onOpenChange={setOpen}>
   <DialogTrigger asChild>
     <Button>Open</Button>
   </DialogTrigger>
-  <DialogContent>
+  <DialogContent size="md">
     <DialogHeader>
       <DialogTitle>Title</DialogTitle>
     </DialogHeader>
@@ -604,11 +643,37 @@ export default function FeaturesPage() {
   </DialogContent>
 </Dialog>
 
-// Badges
+// Badges (for non-status labels)
 <Badge>Default</Badge>
 <Badge variant="secondary">Secondary</Badge>
 <Badge variant="destructive">Error</Badge>
 <Badge variant="outline">Outline</Badge>
+
+// StatusBadge (for status indicators) - USE THIS for statuses
+import { StatusBadge } from '@/components/ui/status-badge'
+
+<StatusBadge status="success">Completed</StatusBadge>
+<StatusBadge status="warning">Pending</StatusBadge>
+<StatusBadge status="error">Failed</StatusBadge>
+<StatusBadge status="info">In Progress</StatusBadge>
+```
+
+### Color Token Quick Reference
+
+```typescript
+// ❌ DON'T use hardcoded status colors
+text-red-500, text-green-500, text-amber-500, text-blue-500
+bg-red-100, bg-green-100, bg-amber-100, bg-blue-100
+
+// ✅ DO use semantic tokens
+text-destructive        // errors
+text-status-success     // success
+text-status-warning     // warnings
+text-status-info        // information
+bg-status-error-light   // error backgrounds
+bg-status-success-light // success backgrounds
+bg-status-warning-light // warning backgrounds
+bg-status-info-light    // info backgrounds
 ```
 
 ### Notification Patterns

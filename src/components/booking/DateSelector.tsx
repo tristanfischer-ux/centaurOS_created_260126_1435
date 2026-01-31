@@ -264,7 +264,7 @@ export function DateSelector({
                                     Start: {format(selectionStart, 'dd MMM yyyy')} - Select end date
                                 </Badge>
                             ) : selectedDates.startDate && selectedDates.endDate ? (
-                                <Badge variant="secondary" className="bg-emerald-50 text-emerald-700">
+                                <Badge variant="secondary" className="bg-status-success-light text-status-success-dark">
                                     <CalendarCheck className="h-3 w-3 mr-1" />
                                     {format(selectedDates.startDate, 'dd MMM')} - {format(selectedDates.endDate, 'dd MMM yyyy')}
                                     {' '}({selectedDates.numberOfDays} day{selectedDates.numberOfDays !== 1 ? 's' : ''})
@@ -332,7 +332,7 @@ export function DateSelector({
                                     // Start/End dates
                                     (isStartDate || isEndDate || isSelectionStartDate) && "bg-status-success text-status-success-foreground border-status-success",
                                     // Today
-                                    isSameDay(date, today) && isCurrentMonth && "ring-2 ring-amber-400 ring-offset-1"
+                                    isSameDay(date, today) && isCurrentMonth && "ring-2 ring-status-warning ring-offset-1"
                                 )}
                             >
                                 <span className="block text-center">
@@ -359,7 +359,7 @@ export function DateSelector({
                 {/* Validation Message */}
                 {selectedDates.validationMessage && (
                     <div className="mt-4 p-3 rounded-lg bg-status-warning-light border border-status-warning">
-                        <p className="text-sm text-amber-700 flex items-center gap-2">
+                        <p className="text-sm text-status-warning-dark flex items-center gap-2">
                             <AlertCircle className="h-4 w-4" />
                             {selectedDates.validationMessage}
                         </p>

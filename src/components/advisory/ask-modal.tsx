@@ -172,7 +172,7 @@ export function AskModal({ onSubmit, trigger }: AskModalProps) {
                     {/* Title */}
                     <div className="space-y-2">
                         <Label htmlFor="title" className="text-sm font-medium">
-                            Question Title <span className="text-red-500">*</span>
+                            Question Title <span className="text-destructive">*</span>
                         </Label>
                         <Input
                             id="title"
@@ -182,10 +182,10 @@ export function AskModal({ onSubmit, trigger }: AskModalProps) {
                                 if (errors.title) setErrors(prev => ({ ...prev, title: "" }))
                             }}
                             placeholder="What would you like to know?"
-                            className={cn(errors.title && "border-red-500")}
+                            className={cn(errors.title && "border-destructive")}
                         />
                         {errors.title && (
-                            <p className="text-xs text-red-500 flex items-center gap-1">
+                            <p className="text-xs text-destructive flex items-center gap-1">
                                 <AlertCircle className="h-3 w-3" />
                                 {errors.title}
                             </p>
@@ -195,7 +195,7 @@ export function AskModal({ onSubmit, trigger }: AskModalProps) {
                     {/* Body */}
                     <div className="space-y-2">
                         <Label htmlFor="body" className="text-sm font-medium">
-                            Details <span className="text-red-500">*</span>
+                            Details <span className="text-destructive">*</span>
                         </Label>
                         <Textarea
                             id="body"
@@ -205,10 +205,10 @@ export function AskModal({ onSubmit, trigger }: AskModalProps) {
                                 if (errors.body) setErrors(prev => ({ ...prev, body: "" }))
                             }}
                             placeholder="Provide context and specifics to get better answers..."
-                            className={cn("min-h-[120px] resize-none", errors.body && "border-red-500")}
+                            className={cn("min-h-[120px] resize-none", errors.body && "border-destructive")}
                         />
                         {errors.body && (
-                            <p className="text-xs text-red-500 flex items-center gap-1">
+                            <p className="text-xs text-destructive flex items-center gap-1">
                                 <AlertCircle className="h-3 w-3" />
                                 {errors.body}
                             </p>
@@ -221,7 +221,7 @@ export function AskModal({ onSubmit, trigger }: AskModalProps) {
                     {/* Category */}
                     <div className="space-y-2">
                         <Label className="text-sm font-medium">
-                            Category <span className="text-red-500">*</span>
+                            Category <span className="text-destructive">*</span>
                         </Label>
                         <Select 
                             value={category} 
@@ -230,7 +230,7 @@ export function AskModal({ onSubmit, trigger }: AskModalProps) {
                                 if (errors.category) setErrors(prev => ({ ...prev, category: "" }))
                             }}
                         >
-                            <SelectTrigger className={cn(errors.category && "border-red-500")}>
+                            <SelectTrigger className={cn(errors.category && "border-destructive")}>
                                 <SelectValue placeholder="Select a category" />
                             </SelectTrigger>
                             <SelectContent>
@@ -245,7 +245,7 @@ export function AskModal({ onSubmit, trigger }: AskModalProps) {
                             </SelectContent>
                         </Select>
                         {errors.category && (
-                            <p className="text-xs text-red-500 flex items-center gap-1">
+                            <p className="text-xs text-destructive flex items-center gap-1">
                                 <AlertCircle className="h-3 w-3" />
                                 {errors.category}
                             </p>

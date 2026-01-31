@@ -56,39 +56,39 @@ export function UserRiskCard({
   const getRiskIcon = () => {
     switch (riskLevel) {
       case "critical":
-        return <ShieldAlert className="h-5 w-5 text-red-500" />
+        return <ShieldAlert className="h-5 w-5 text-destructive" />
       case "high":
         return <AlertTriangle className="h-5 w-5 text-orange-500" />
       case "medium":
-        return <Shield className="h-5 w-5 text-amber-500" />
+        return <Shield className="h-5 w-5 text-status-warning" />
       default:
-        return <ShieldCheck className="h-5 w-5 text-emerald-500" />
+        return <ShieldCheck className="h-5 w-5 text-status-success" />
     }
   }
 
   const getRiskColor = () => {
     switch (riskLevel) {
       case "critical":
-        return "text-red-500"
+        return "text-destructive"
       case "high":
         return "text-orange-500"
       case "medium":
-        return "text-amber-500"
+        return "text-status-warning"
       default:
-        return "text-emerald-500"
+        return "text-status-success"
     }
   }
 
   const getProgressColor = () => {
     switch (riskLevel) {
       case "critical":
-        return "bg-red-500"
+        return "bg-destructive"
       case "high":
         return "bg-orange-500"
       case "medium":
-        return "bg-amber-500"
+        return "bg-status-warning"
       default:
-        return "bg-emerald-500"
+        return "bg-status-success"
     }
   }
 
@@ -109,7 +109,7 @@ export function UserRiskCard({
       <div
         className={cn(
           "flex items-center justify-between p-4 rounded-lg border",
-          riskLevel === "critical" && "border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950/20",
+          riskLevel === "critical" && "border-destructive bg-status-error-light dark:border-destructive dark:bg-destructive/10",
           riskLevel === "high" && "border-orange-200 bg-orange-50 dark:border-orange-800 dark:bg-orange-950/20"
         )}
       >
@@ -146,7 +146,7 @@ export function UserRiskCard({
     <Card
       className={cn(
         riskLevel === "critical" &&
-          "border-red-200 dark:border-red-800",
+          "border-destructive dark:border-destructive",
         riskLevel === "high" &&
           "border-orange-200 dark:border-orange-800"
       )}

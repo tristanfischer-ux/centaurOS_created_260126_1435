@@ -23,7 +23,7 @@ export default async function ObjectivesPage() {
 
     if (error) {
         console.error(error)
-        return <div className="text-red-500">Error loading objectives</div>
+        return <div className="text-destructive">Error loading objectives</div>
     }
 
     // Type definitions for task joins

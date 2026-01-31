@@ -106,16 +106,16 @@ export function PendingInvitations() {
             >
                 <div className="flex items-center gap-3">
                     <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
-                        <Mail className="h-5 w-5 text-blue-500" />
+                        <Mail className="h-5 w-5 text-status-info" />
                         Pending Invitations
                     </h2>
                     {pendingCount > 0 && (
-                        <Badge variant="secondary" className="bg-blue-100 text-blue-700">
+                        <Badge variant="secondary" className="bg-status-info-light text-status-info-dark">
                             {pendingCount} pending
                         </Badge>
                     )}
                     {expiredCount > 0 && (
-                        <Badge variant="secondary" className="bg-orange-100 text-orange-700">
+                        <Badge variant="secondary" className="bg-status-warning-light text-status-warning-dark">
                             {expiredCount} expired
                         </Badge>
                     )}
@@ -135,8 +135,8 @@ export function PendingInvitations() {
                                     className="flex items-center justify-between p-4 hover:bg-muted transition-colors"
                                 >
                                     <div className="flex items-center gap-4">
-                                        <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
-                                            <Mail className="h-5 w-5 text-blue-600" />
+<div className="w-10 h-10 rounded-full bg-status-info-light flex items-center justify-center">
+                                                            <Mail className="h-5 w-5 text-status-info" />
                                         </div>
                                         <div>
                                             <div className="flex items-center gap-2">
@@ -161,7 +161,7 @@ export function PendingInvitations() {
                                             size="sm"
                                             onClick={() => handleResend(invitation.id)}
                                             disabled={isPending && actionId === invitation.id}
-                                            className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                                            className="text-status-info hover:text-status-info-dark hover:bg-status-info-light"
                                         >
                                             {isPending && actionId === invitation.id ? (
                                                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -177,7 +177,7 @@ export function PendingInvitations() {
                                             size="sm"
                                             onClick={() => handleCancel(invitation.id)}
                                             disabled={isPending && actionId === invitation.id}
-                                            className="text-muted-foreground hover:text-red-600 hover:bg-red-50"
+                                            className="text-muted-foreground hover:text-destructive hover:bg-status-error-light"
                                         >
                                             <X className="h-4 w-4" />
                                         </Button>
@@ -199,13 +199,13 @@ export function PendingInvitations() {
                                             <div className="flex items-center gap-4">
                                                 <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
                                                     invitation.status === 'accepted' 
-                                                        ? 'bg-green-100' 
-                                                        : 'bg-orange-100'
+                                                        ? 'bg-status-success-light' 
+                                                        : 'bg-status-warning-light'
                                                 }`}>
                                                     {invitation.status === 'accepted' ? (
-                                                        <CheckCircle2 className="h-5 w-5 text-green-600" />
+                                                        <CheckCircle2 className="h-5 w-5 text-status-success" />
                                                     ) : (
-                                                        <Clock className="h-5 w-5 text-orange-600" />
+                                                        <Clock className="h-5 w-5 text-status-warning" />
                                                     )}
                                                 </div>
                                                 <div>
@@ -216,7 +216,7 @@ export function PendingInvitations() {
                                                             className={`text-xs ${
                                                                 invitation.status === 'accepted'
                                                                     ? 'border-status-success text-status-success-dark bg-status-success-light'
-                                                                    : 'border-orange-200 text-orange-700 bg-orange-50'
+                                                                    : 'border-status-warning text-status-warning-dark bg-status-warning-light'
                                                             }`}
                                                         >
                                                             {invitation.status}
@@ -233,7 +233,7 @@ export function PendingInvitations() {
                                                     size="sm"
                                                     onClick={() => handleResend(invitation.id)}
                                                     disabled={isPending && actionId === invitation.id}
-                                                    className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                                                    className="text-status-info hover:text-status-info-dark hover:bg-status-info-light"
                                                 >
                                                     {isPending && actionId === invitation.id ? (
                                                         <Loader2 className="h-4 w-4 animate-spin" />

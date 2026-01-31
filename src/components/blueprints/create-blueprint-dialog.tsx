@@ -112,7 +112,7 @@ export function CreateBlueprintDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[700px]">
+      <DialogContent size="lg">
         <DialogHeader>
           <DialogTitle className="text-xl">Create New Blueprint</DialogTitle>
         </DialogHeader>
@@ -145,18 +145,20 @@ export function CreateBlueprintDialog({
               <Label htmlFor="stage">Project Stage</Label>
               <div className="grid grid-cols-3 gap-2">
                 {PROJECT_STAGES.slice(0, 6).map((s) => (
-                  <Button
+                  <button
                     key={s.value}
                     type="button"
-                    variant={stage === s.value ? 'default' : 'secondary'}
-                    size="sm"
                     onClick={() => setStage(s.value)}
                     className={cn(
-                      stage === s.value && 'bg-international-orange hover:bg-international-orange/90'
+                      "h-9 px-3 rounded-md text-sm font-medium transition-all duration-200",
+                      "border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+                      stage === s.value
+                        ? "bg-international-orange text-white border-international-orange hover:bg-international-orange/90"
+                        : "bg-background text-foreground border-input hover:bg-muted hover:border-muted-foreground/30"
                     )}
                   >
                     {s.label}
-                  </Button>
+                  </button>
                 ))}
               </div>
             </div>

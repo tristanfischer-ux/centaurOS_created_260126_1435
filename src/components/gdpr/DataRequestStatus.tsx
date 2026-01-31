@@ -47,17 +47,17 @@ const TYPE_CONFIG: Record<
   access: {
     label: "Data Access",
     icon: Eye,
-    color: "text-blue-500",
+    color: "text-status-info",
   },
   export: {
     label: "Data Export",
     icon: Download,
-    color: "text-green-500",
+    color: "text-status-success",
   },
   deletion: {
     label: "Account Deletion",
     icon: Trash2,
-    color: "text-orange-500",
+    color: "text-status-warning",
   },
 }
 
@@ -164,7 +164,7 @@ export function DataRequestStatusCard({
             request.status === "denied"
               ? "bg-destructive"
               : request.status === "completed"
-              ? "bg-green-500"
+              ? "bg-status-success"
               : "bg-primary"
           }`}
           style={{ width: `${getProgressPercentage()}%` }}
@@ -195,8 +195,8 @@ export function DataRequestStatusCard({
             <div
               className={`h-2 w-2 rounded-full ${
                 request.status === "pending"
-                  ? "bg-yellow-500 animate-pulse"
-                  : "bg-green-500"
+                  ? "bg-status-warning animate-pulse"
+                  : "bg-status-success"
               }`}
             />
             <span className="text-muted-foreground">Request received</span>
@@ -212,8 +212,8 @@ export function DataRequestStatusCard({
               <div
                 className={`h-2 w-2 rounded-full ${
                   request.status === "processing"
-                    ? "bg-blue-500 animate-pulse"
-                    : "bg-green-500"
+                    ? "bg-status-info animate-pulse"
+                    : "bg-status-success"
                 }`}
               />
               <span className="text-muted-foreground">Processing started</span>
@@ -222,7 +222,7 @@ export function DataRequestStatusCard({
 
           {request.status === "completed" && (
             <div className="flex items-center gap-2 text-sm">
-              <div className="h-2 w-2 rounded-full bg-green-500" />
+              <div className="h-2 w-2 rounded-full bg-status-success" />
               <span className="text-muted-foreground">Request completed</span>
               {request.completed_at && (
                 <span className="text-xs text-muted-foreground ml-auto">

@@ -394,15 +394,15 @@ export function BookingWizard({ listing, provider, onCancel }: BookingWizardProp
                                         </p>
                                         <ul className="mt-4 space-y-1 text-sm text-muted-foreground">
                                             <li className="flex items-center gap-2">
-                                                <CheckCircle className="h-3 w-3 text-emerald-500" />
+                                                <CheckCircle className="h-3 w-3 text-status-success" />
                                                 Flexible date selection
                                             </li>
                                             <li className="flex items-center gap-2">
-                                                <CheckCircle className="h-3 w-3 text-emerald-500" />
+                                                <CheckCircle className="h-3 w-3 text-status-success" />
                                                 Escrow payment protection
                                             </li>
                                             <li className="flex items-center gap-2">
-                                                <CheckCircle className="h-3 w-3 text-emerald-500" />
+                                                <CheckCircle className="h-3 w-3 text-status-success" />
                                                 Clear deliverable scope
                                             </li>
                                         </ul>
@@ -428,15 +428,15 @@ export function BookingWizard({ listing, provider, onCancel }: BookingWizardProp
                                         </p>
                                         <ul className="mt-4 space-y-1 text-sm text-muted-foreground">
                                             <li className="flex items-center gap-2">
-                                                <CheckCircle className="h-3 w-3 text-emerald-500" />
+                                                <CheckCircle className="h-3 w-3 text-status-success" />
                                                 10, 20, or 40 hrs/week options
                                             </li>
                                             <li className="flex items-center gap-2">
-                                                <CheckCircle className="h-3 w-3 text-emerald-500" />
+                                                <CheckCircle className="h-3 w-3 text-status-success" />
                                                 Weekly billing in arrears
                                             </li>
                                             <li className="flex items-center gap-2">
-                                                <CheckCircle className="h-3 w-3 text-emerald-500" />
+                                                <CheckCircle className="h-3 w-3 text-status-success" />
                                                 Flexible pause/cancel
                                             </li>
                                         </ul>
@@ -605,11 +605,11 @@ export function BookingWizard({ listing, provider, onCancel }: BookingWizardProp
                         />
 
                         {/* Terms */}
-                        <Card className="border-amber-200 bg-amber-50">
+                        <Card className="border-status-warning bg-status-warning-light">
                             <CardContent className="pt-6">
                                 <div className="flex gap-3">
-                                    <AlertCircle className="h-5 w-5 text-amber-600 mt-0.5 flex-shrink-0" />
-                                    <div className="text-sm text-amber-800">
+                                    <AlertCircle className="h-5 w-5 text-status-warning mt-0.5 flex-shrink-0" />
+                                    <div className="text-sm text-status-warning-dark">
                                         <p className="font-medium">Important</p>
                                         <p className="mt-1">
                                             By proceeding to payment, you agree to our terms of service. 
@@ -750,7 +750,7 @@ export function BookingWizard({ listing, provider, onCancel }: BookingWizardProp
                                     className={cn(
                                         "w-8 h-8 rounded-full flex items-center justify-center transition-colors",
                                         isActive && "bg-primary text-primary-foreground",
-                                        isCompleted && "bg-emerald-500 text-white",
+                                        isCompleted && "bg-status-success text-status-success-foreground",
                                         !isActive && !isCompleted && "bg-muted text-muted-foreground"
                                     )}
                                     aria-hidden="true"

@@ -191,7 +191,7 @@ export function ConversationThread({
         <div className="h-16 border-b border-border flex items-center justify-between px-4 flex-shrink-0">
           <div className="flex items-center gap-3">
             {onBack && (
-              <Button variant="ghost" size="icon" onClick={onBack} className="md:hidden">
+              <Button variant="ghost" size="icon" onClick={onBack} className="md:hidden" aria-label="Go back">
                 <ArrowLeft className="w-5 h-5" />
               </Button>
             )}
@@ -215,7 +215,7 @@ export function ConversationThread({
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon">
+              <Button variant="ghost" size="icon" aria-label="Open menu">
                 <MoreVertical className="w-5 h-5" />
               </Button>
             </DropdownMenuTrigger>
@@ -294,6 +294,7 @@ export function ConversationThread({
             size="icon" 
             onClick={handleFileClick}
             className="flex-shrink-0"
+            aria-label="Attach file"
           >
             <Paperclip className="w-5 h-5" />
           </Button>
@@ -313,6 +314,7 @@ export function ConversationThread({
             size="icon" 
             disabled={!inputValue.trim() || isSending}
             className="flex-shrink-0"
+            aria-label={isSending ? "Sending message" : "Send message"}
           >
             {isSending ? (
               <Loader2 className="w-5 h-5 animate-spin" />

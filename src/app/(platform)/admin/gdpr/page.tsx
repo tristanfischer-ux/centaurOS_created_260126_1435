@@ -51,9 +51,9 @@ import {
 import { formatDistanceToNow } from "date-fns"
 
 const TYPE_CONFIG: Record<DataRequestType, { label: string; icon: typeof Eye; color: string }> = {
-  access: { label: "Data Access", icon: Eye, color: "text-blue-500" },
-  export: { label: "Data Export", icon: Download, color: "text-green-500" },
-  deletion: { label: "Account Deletion", icon: Trash2, color: "text-orange-500" },
+  access: { label: "Data Access", icon: Eye, color: "text-status-info" },
+  export: { label: "Data Export", icon: Download, color: "text-status-success" },
+  deletion: { label: "Account Deletion", icon: Trash2, color: "text-status-warning" },
 }
 
 const STATUS_CONFIG: Record<DataRequestStatus, { label: string; variant: "default" | "warning" | "success" | "destructive" }> = {
@@ -220,7 +220,7 @@ export default function AdminGDPRPage() {
           <Card>
             <CardHeader className="pb-2">
               <CardDescription>Completed (This Month)</CardDescription>
-              <CardTitle className="text-3xl text-green-600">{stats.completedThisMonth}</CardTitle>
+              <CardTitle className="text-3xl text-status-success">{stats.completedThisMonth}</CardTitle>
             </CardHeader>
           </Card>
 
@@ -486,21 +486,21 @@ export default function AdminGDPRPage() {
               <CardContent className="space-y-2">
                 <div className="flex items-center justify-between">
                   <span className="text-sm flex items-center gap-2">
-                    <Eye className="h-4 w-4 text-blue-500" />
+                    <Eye className="h-4 w-4 text-status-info" />
                     Access Requests
                   </span>
                   <Badge variant="secondary">{stats.requestsByType.access}</Badge>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-sm flex items-center gap-2">
-                    <Download className="h-4 w-4 text-green-500" />
+                    <Download className="h-4 w-4 text-status-success" />
                     Export Requests
                   </span>
                   <Badge variant="secondary">{stats.requestsByType.export}</Badge>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-sm flex items-center gap-2">
-                    <Trash2 className="h-4 w-4 text-orange-500" />
+                    <Trash2 className="h-4 w-4 text-status-warning" />
                     Deletion Requests
                   </span>
                   <Badge variant="secondary">{stats.requestsByType.deletion}</Badge>

@@ -309,8 +309,8 @@ export function RetainerSetup({
             </div>
 
             {selectedPricing.discountPercent > 0 && (
-              <div className="p-3 bg-emerald-50 rounded-lg">
-                <div className="flex items-center gap-2 text-emerald-700">
+              <div className="p-3 bg-status-success-light rounded-lg">
+                <div className="flex items-center gap-2 text-status-success-dark">
                   <TrendingDown className="h-4 w-4" />
                   <span className="font-medium">
                     You save {selectedPricing.discountPercent}% with this commitment
@@ -341,11 +341,11 @@ export function RetainerSetup({
       </Card>
 
       {/* Terms */}
-      <Card className="border-amber-200 bg-amber-50">
+      <Card className="border-status-warning bg-status-warning-light">
         <CardContent className="pt-6">
           <div className="flex gap-3">
-            <AlertCircle className="h-5 w-5 text-amber-600 mt-0.5 flex-shrink-0" />
-            <div className="text-sm text-amber-800">
+            <AlertCircle className="h-5 w-5 text-status-warning mt-0.5 flex-shrink-0" />
+            <div className="text-sm text-status-warning-dark">
               <p className="font-medium">Retainer Terms</p>
               <ul className="mt-2 space-y-1 list-disc list-inside">
                 <li>Weekly billing in arrears (charged after the week ends)</li>

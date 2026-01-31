@@ -364,7 +364,7 @@ export default function JoinPage({ params }: { params: Promise<{ role: string }>
                                     <div key={field.id} className="space-y-2">
                                         <Label htmlFor={field.id} className="text-sm font-medium text-foreground">
                                             {field.label}
-                                            {field.required && <span className="text-red-500 ml-1">*</span>}
+                                            {field.required && <span className="text-destructive ml-1">*</span>}
                                         </Label>
                                         <Input
                                             id={field.id}

@@ -302,18 +302,18 @@ export function TaxProfileForm({
                     onChange={(e) => setVatNumber(e.target.value.toUpperCase())}
                     className={
                       vatValidation.valid === true
-                        ? "border-green-500 pr-10"
+                        ? "border-status-success pr-10"
                         : vatValidation.valid === false
-                        ? "border-red-500 pr-10"
+                        ? "border-destructive pr-10"
                         : ""
                     }
                   />
                   {vatValidation.valid !== null && (
                     <div className="absolute right-3 top-1/2 -translate-y-1/2">
                       {vatValidation.valid ? (
-                        <Check className="h-4 w-4 text-green-500" />
+                        <Check className="h-4 w-4 text-status-success" />
                       ) : (
-                        <X className="h-4 w-4 text-red-500" />
+                        <X className="h-4 w-4 text-destructive" />
                       )}
                     </div>
                   )}
@@ -337,7 +337,7 @@ export function TaxProfileForm({
               {vatValidation.message && (
                 <p
                   className={`text-sm ${
-                    vatValidation.valid ? "text-green-600" : "text-red-600"
+                    vatValidation.valid ? "text-status-success" : "text-destructive"
                   }`}
                 >
                   {vatValidation.message}
@@ -348,7 +348,7 @@ export function TaxProfileForm({
               {profile?.vatNumber && (
                 <div className="flex items-center gap-2 mt-2">
                   {profile.vatVerified ? (
-                    <Badge variant="default" className="bg-green-600">
+                    <Badge variant="default" className="bg-status-success">
                       <Check className="h-3 w-3 mr-1" />
                       Verified
                     </Badge>

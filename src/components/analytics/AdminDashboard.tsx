@@ -132,7 +132,7 @@ export function AdminDashboard({
       <Card className={className}>
         <CardContent className="flex items-center justify-center py-12">
           <div className="text-center">
-            <p className="text-red-500 mb-4">{error}</p>
+            <p className="text-destructive mb-4">{error}</p>
             <Button onClick={() => onPeriodChange(period)}>Retry</Button>
           </div>
         </CardContent>
@@ -192,21 +192,21 @@ export function AdminDashboard({
       {/* Key Metrics */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Total GMV */}
-        <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border">
+        <Card className="bg-gradient-to-br from-status-info-light to-blue-100 border">
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-blue-700">Total GMV</p>
-                <p className="text-3xl font-bold text-blue-900">
+                <p className="text-sm font-medium text-status-info-dark">Total GMV</p>
+                <p className="text-3xl font-bold text-foreground">
                   {formatCurrency(analytics.totalGmv)}
                 </p>
               </div>
-              <DollarSign className="h-10 w-10 text-blue-600 opacity-80" />
+              <DollarSign className="h-10 w-10 text-status-info opacity-80" />
             </div>
             {gmvChange !== null && (
               <div className={cn(
                 "mt-2 flex items-center gap-1 text-sm",
-                gmvChange >= 0 ? "text-green-700" : "text-red-700"
+                gmvChange >= 0 ? "text-status-success-dark" : "text-destructive"
               )}>
                 {gmvChange >= 0 ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
                 {Math.abs(gmvChange).toFixed(1)}% this period
@@ -216,18 +216,18 @@ export function AdminDashboard({
         </Card>
 
         {/* Take Rate */}
-        <Card className="bg-gradient-to-br from-green-50 to-green-100 border-green-200">
+        <Card className="bg-gradient-to-br from-status-success-light to-emerald-100 border-status-success">
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-green-700">Take Rate</p>
-                <p className="text-3xl font-bold text-green-900">
+                <p className="text-sm font-medium text-status-success-dark">Take Rate</p>
+                <p className="text-3xl font-bold text-foreground">
                   {analytics.takeRate.toFixed(2)}%
                 </p>
               </div>
-              <Percent className="h-10 w-10 text-green-600 opacity-80" />
+              <Percent className="h-10 w-10 text-status-success opacity-80" />
             </div>
-            <p className="mt-2 text-sm text-green-700">
+            <p className="mt-2 text-sm text-status-success-dark">
               {formatCurrency(analytics.totalFees)} in fees
             </p>
           </CardContent>
@@ -239,7 +239,7 @@ export function AdminDashboard({
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-purple-700">Total Users</p>
-                <p className="text-3xl font-bold text-purple-900">
+                <p className="text-3xl font-bold text-foreground">
                   {formatNumber(analytics.totalUsers)}
                 </p>
               </div>
@@ -252,18 +252,18 @@ export function AdminDashboard({
         </Card>
 
         {/* Total Orders */}
-        <Card className="bg-gradient-to-br from-amber-50 to-amber-100 border-amber-200">
+        <Card className="bg-gradient-to-br from-status-warning-light to-amber-100 border-status-warning">
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-amber-700">Total Orders</p>
-                <p className="text-3xl font-bold text-amber-900">
+                <p className="text-sm font-medium text-status-warning-dark">Total Orders</p>
+                <p className="text-3xl font-bold text-foreground">
                   {formatNumber(analytics.totalOrders)}
                 </p>
               </div>
-              <ShoppingCart className="h-10 w-10 text-amber-600 opacity-80" />
+              <ShoppingCart className="h-10 w-10 text-status-warning opacity-80" />
             </div>
-            <p className="mt-2 text-sm text-amber-700">
+            <p className="mt-2 text-sm text-status-warning-dark">
               {analytics.completedOrdersRate.toFixed(1)}% completion rate
             </p>
           </CardContent>

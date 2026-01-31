@@ -10,6 +10,7 @@ import {
   getBlueprintSuppliers,
 } from '@/actions/blueprints'
 import { Skeleton } from '@/components/ui/skeleton'
+import { DomainCoverageWithDetails } from '@/types/blueprints'
 
 export const metadata = {
   title: 'Blueprint | CentaurOS',
@@ -38,7 +39,7 @@ async function BlueprintDetailData({ params }: BlueprintDetailPageProps) {
   return (
     <BlueprintDetailView
       blueprint={blueprintResult.data}
-      coverage={coverageResult.data || []}
+      coverage={(coverageResult.data || []) as DomainCoverageWithDetails[]}
       summary={summaryResult.data}
       nextAction={nextActionResult.data}
       milestones={milestonesResult.data || []}

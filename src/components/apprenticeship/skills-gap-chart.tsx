@@ -17,10 +17,10 @@ interface SkillsGapChartProps {
 
 const CATEGORY_COLORS: Record<string, string> = {
   technical: 'bg-primary',
-  professional: 'bg-amber-500',
+  professional: 'bg-status-warning',
   ai: 'bg-electric-blue',
   functional: 'bg-purple-500',
-  leadership: 'bg-emerald-500'
+  leadership: 'bg-status-success'
 }
 
 const LEVEL_LABELS = ['None', 'Awareness', 'Understanding', 'Application', 'Analysis', 'Mastery']

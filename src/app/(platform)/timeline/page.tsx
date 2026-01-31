@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import { GanttView, JoinedTask } from '@/components/timeline/GanttView'
 import { TimelineListView } from '@/components/timeline/TimelineListView'
 import { CreateTaskDialog } from '@/app/(platform)/tasks/create-task-dialog'
+import { Database } from '@/types/database.types'
 
 // Force dynamic rendering to ensure fresh data on router.refresh()
 export const dynamic = 'force-dynamic'
@@ -34,7 +35,7 @@ export default async function TimelinePage() {
 
     if (error) {
         console.error(error)
-        return <div className="text-red-500">Error loading timeline data</div>
+        return <div className="text-destructive">Error loading timeline data</div>
     }
 
     // Format members for CreateTaskDialog and TimelineListView
@@ -72,7 +73,7 @@ export default async function TimelinePage() {
                 <GanttView
                     tasks={tasks as unknown as JoinedTask[]}
                     objectives={objectives || []}
-                    profiles={profiles || []}
+                    profiles={profiles as unknown as Database["public"]["Tables"]["profiles"]["Row"][]}
                     members={members}
                     currentUserId={user.id}
                 />

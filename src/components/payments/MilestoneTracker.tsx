@@ -56,27 +56,27 @@ const STATUS_CONFIG: Record<
   },
   submitted: {
     label: 'Submitted',
-    color: 'text-amber-600',
+    color: 'text-status-warning',
     icon: <Clock className="h-4 w-4" />,
-    bgColor: 'bg-amber-100',
+    bgColor: 'bg-status-warning-light',
   },
   approved: {
     label: 'Approved',
-    color: 'text-blue-600',
+    color: 'text-status-info',
     icon: <CheckCircle2 className="h-4 w-4" />,
-    bgColor: 'bg-blue-100',
+    bgColor: 'bg-status-info-light',
   },
   rejected: {
     label: 'Disputed',
-    color: 'text-red-600',
+    color: 'text-destructive',
     icon: <XCircle className="h-4 w-4" />,
-    bgColor: 'bg-red-100',
+    bgColor: 'bg-status-error-light',
   },
   paid: {
     label: 'Paid',
-    color: 'text-green-600',
+    color: 'text-status-success',
     icon: <DollarSign className="h-4 w-4" />,
-    bgColor: 'bg-green-100',
+    bgColor: 'bg-status-success-light',
   },
 }
 
@@ -228,7 +228,7 @@ function MilestoneItem({
                 size="sm"
                 onClick={handleApprove}
                 disabled={isLoading}
-                className="bg-green-600 hover:bg-green-700"
+                className="bg-status-success hover:bg-status-success/90"
               >
                 {isLoading ? (
                   <Loader2 className="h-4 w-4 mr-1 animate-spin" />
@@ -479,7 +479,7 @@ export function MilestoneProgress({
       </div>
       <Progress value={(completed / total) * 100} className="h-1.5" />
       {pending > 0 && (
-        <p className="text-xs text-amber-600">
+        <p className="text-xs text-status-warning">
           {pending} awaiting approval
         </p>
       )}

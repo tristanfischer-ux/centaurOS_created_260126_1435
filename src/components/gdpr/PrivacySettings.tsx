@@ -179,7 +179,7 @@ export function PrivacySettings({ initialRequests = [] }: PrivacySettingsProps) 
         <Card className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => setShowForm(true)}>
           <CardHeader className="pb-2">
             <div className="flex items-center gap-2">
-              <div className="p-2 rounded-lg bg-green-100 text-green-600 dark:bg-green-950">
+              <div className="p-2 rounded-lg bg-status-success-light text-status-success dark:bg-green-950">
                 <Download className="h-5 w-5" />
               </div>
               <CardTitle className="text-base">Export My Data</CardTitle>

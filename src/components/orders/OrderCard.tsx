@@ -38,12 +38,12 @@ const orderTypeConfig: Record<
   people_booking: {
     label: "Booking",
     icon: Briefcase,
-    color: "text-blue-600",
+    color: "text-status-info",
   },
   product_rfq: {
     label: "Product RFQ",
     icon: ShoppingCart,
-    color: "text-green-600",
+    color: "text-status-success",
   },
   service: {
     label: "Service",
@@ -62,7 +62,7 @@ export const OrderCard = memo(function OrderCard({
   const typeConfig = orderTypeConfig[order.order_type] || {
     label: order.order_type,
     icon: Package,
-    color: "text-gray-600",
+    color: "text-muted-foreground",
   }
   const TypeIcon = typeConfig.icon
 
@@ -136,7 +136,7 @@ export const OrderCard = memo(function OrderCard({
 
             {/* Completed date if applicable */}
             {order.completed_at && (
-              <p className="text-xs text-green-600 flex items-center gap-1">
+              <p className="text-xs text-status-success flex items-center gap-1">
                 <span className="font-medium">Completed</span>
                 <span>
                   {format(new Date(order.completed_at), "MMM d, yyyy")}

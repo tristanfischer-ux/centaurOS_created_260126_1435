@@ -109,7 +109,7 @@ export default function ProviderSettingsPage() {
     if (!profile) {
         return (
             <div className="text-center py-12">
-                <AlertCircle className="h-12 w-12 mx-auto text-amber-500 mb-4" />
+                <AlertCircle className="h-12 w-12 mx-auto text-status-warning mb-4" />
                 <h2 className="text-xl font-semibold">Profile Not Found</h2>
                 <p className="text-muted-foreground mt-2">
                     You don&apos;t have a provider profile yet.
@@ -141,14 +141,14 @@ export default function ProviderSettingsPage() {
             {/* Success/Error Messages */}
             {success && (
                 <div className="flex items-center gap-2 p-4 rounded-lg bg-status-success-light border border-status-success">
-                    <CheckCircle2 className="h-5 w-5 text-green-600" />
-                    <p className="text-sm text-green-700">Settings updated successfully!</p>
+                    <CheckCircle2 className="h-5 w-5 text-status-success" />
+                    <p className="text-sm text-status-success">Settings updated successfully!</p>
                 </div>
             )}
             {error && (
                 <div className="flex items-center gap-2 p-4 rounded-lg bg-status-error-light border border-destructive">
-                    <AlertCircle className="h-5 w-5 text-red-600" />
-                    <p className="text-sm text-red-700">{error}</p>
+                    <AlertCircle className="h-5 w-5 text-destructive" />
+                    <p className="text-sm text-destructive">{error}</p>
                 </div>
             )}
 
@@ -189,10 +189,10 @@ export default function ProviderSettingsPage() {
                                             className={cn(
                                                 "h-full transition-all rounded-full",
                                                 profile.current_order_count / maxConcurrentOrders >= 0.9 
-                                                    ? "bg-red-500"
+                                                    ? "bg-destructive"
                                                     : profile.current_order_count / maxConcurrentOrders >= 0.7
-                                                        ? "bg-amber-500"
-                                                        : "bg-green-500"
+                                                        ? "bg-status-warning"
+                                                        : "bg-status-success"
                                             )}
                                             style={{ 
                                                 width: `${Math.min((profile.current_order_count / maxConcurrentOrders) * 100, 100)}%` 

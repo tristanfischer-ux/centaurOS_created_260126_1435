@@ -79,7 +79,7 @@ export function ProjectAssignmentsList() {
         return (
             <Card className="border">
                 <CardContent className="p-8 text-center">
-                    <Loader2 className="h-8 w-8 animate-spin text-blue-500 mx-auto mb-4" />
+                    <Loader2 className="h-8 w-8 animate-spin text-status-info mx-auto mb-4" />
                     <p className="text-muted-foreground">Loading assignments...</p>
                 </CardContent>
             </Card>
@@ -104,8 +104,8 @@ export function ProjectAssignmentsList() {
         <Card className="border">
             <CardHeader className="pb-4">
                 <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-lg bg-green-100 flex items-center justify-center">
-                        <Briefcase className="h-5 w-5 text-green-600" />
+                    <div className="w-10 h-10 rounded-lg bg-status-success-light flex items-center justify-center">
+                        <Briefcase className="h-5 w-5 text-status-success" />
                     </div>
                     <div>
                         <CardTitle className="text-lg">Project Assignments</CardTitle>
@@ -163,14 +163,14 @@ export function ProjectAssignmentsList() {
                                             <DropdownMenuContent align="end">
                                                 <DropdownMenuItem
                                                     onClick={() => handleStatusUpdate(assignment.id, 'completed')}
-                                                    className="text-green-600"
+                                                    className="text-status-success"
                                                 >
                                                     <CheckCircle2 className="h-4 w-4 mr-2" />
                                                     Mark Complete
                                                 </DropdownMenuItem>
                                                 <DropdownMenuItem
                                                     onClick={() => handleStatusUpdate(assignment.id, 'cancelled')}
-                                                    className="text-red-600"
+                                                    className="text-destructive"
                                                 >
                                                     <XCircle className="h-4 w-4 mr-2" />
                                                     Cancel Assignment
@@ -211,7 +211,7 @@ export function ProjectAssignmentsList() {
                                         variant="outline" 
                                         className={
                                             assignment.status === 'completed'
-                                                ? 'bg-blue-50 text-blue-700 border'
+                                                ? 'bg-status-info-light text-status-info border-status-info'
                                                 : 'bg-status-error-light text-destructive border-destructive'
                                         }
                                     >

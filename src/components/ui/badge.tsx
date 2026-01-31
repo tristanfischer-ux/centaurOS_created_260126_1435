@@ -18,9 +18,9 @@ const badgeVariants = cva(
         warning:
           "bg-orange-100 text-international-orange hover:bg-orange-200 dark:bg-orange-950 dark:text-orange-400",
         success:
-          "bg-green-100 text-green-800 hover:bg-green-200 dark:bg-green-950 dark:text-green-400",
+          "bg-status-success-light text-status-success-dark hover:bg-status-success-light/80 dark:bg-status-success/20 dark:text-status-success",
         info:
-          "bg-blue-100 text-electric-blue hover:bg-blue-200 dark:bg-blue-950 dark:text-blue-400",
+          "bg-status-info-light text-status-info-dark hover:bg-status-info-light/80 dark:bg-status-info/20 dark:text-status-info",
         outline: "text-foreground bg-muted/50",
         // System status badge - Industrial style
         system:

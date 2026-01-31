@@ -92,7 +92,7 @@ function PortfolioGridCard({ item, showFeaturedHighlight, onClick }: PortfolioGr
             className={cn(
                 'group overflow-hidden transition-shadow',
                 onClick && 'cursor-pointer hover:shadow-md',
-                showFeaturedHighlight && item.is_featured && 'ring-2 ring-amber-400'
+                showFeaturedHighlight && item.is_featured && 'ring-2 ring-status-warning'
             )}
             onClick={onClick}
         >
@@ -169,9 +169,9 @@ function PortfolioGridCard({ item, showFeaturedHighlight, onClick }: PortfolioGr
                 {showFeaturedHighlight && item.is_featured && (
                     <Badge
                         variant="secondary"
-                        className="absolute top-2 left-2 bg-amber-50/90 text-amber-700 border-amber-200"
+                        className="absolute top-2 left-2 bg-status-warning-light/90 text-status-warning-dark border-status-warning"
                     >
-                        <Star className="w-3 h-3 mr-1 fill-amber-500" />
+                        <Star className="w-3 h-3 mr-1 fill-status-warning" />
                         Featured
                     </Badge>
                 )}
@@ -204,7 +204,7 @@ function PortfolioGridCard({ item, showFeaturedHighlight, onClick }: PortfolioGr
                             href={sanitizeHref(item.project_url)}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="flex items-center gap-1 text-blue-600 hover:underline"
+                            className="flex items-center gap-1 text-status-info hover:underline"
                             onClick={(e) => e.stopPropagation()}
                         >
                             <ExternalLink className="w-3 h-3" />

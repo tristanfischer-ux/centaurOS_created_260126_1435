@@ -121,7 +121,7 @@ export function FocusModeToggle({ compact = false, showLabel = true, className }
 
             {/* Focus Mode Setup Dialog */}
             <Dialog open={showDialog} onOpenChange={setShowDialog}>
-                <DialogContent className="sm:max-w-[400px] bg-white">
+                <DialogContent size="sm" className="bg-white">
                     <DialogHeader>
                         <DialogTitle className="flex items-center gap-2 text-foreground">
                             <Focus className="h-5 w-5 text-purple-600" />
@@ -280,7 +280,7 @@ export function UrgentOverrideButton({
             </Button>
 
             <Dialog open={showDialog} onOpenChange={setShowDialog}>
-                <DialogContent className="sm:max-w-[400px] bg-white">
+                <DialogContent size="sm" className="bg-white">
                     <DialogHeader>
                         <DialogTitle className="flex items-center gap-2 text-foreground">
                             <Zap className="h-5 w-5 text-amber-500" />

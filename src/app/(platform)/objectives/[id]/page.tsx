@@ -18,7 +18,7 @@ export default async function ObjectiveDetailPage({ params }: { params: Promise<
         .single()
 
     if (error || !objective) {
-        return <div className="p-8 text-red-500">Objective not found.</div>
+        return <div className="p-8 text-destructive">Objective not found.</div>
     }
 
     // Fetch Linked Tasks

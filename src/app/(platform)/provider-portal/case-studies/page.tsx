@@ -25,6 +25,16 @@ import {
     DialogTrigger,
     DialogFooter,
 } from '@/components/ui/dialog'
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { 
     getCaseStudies, 
     createCaseStudy, 
@@ -76,6 +86,7 @@ export default function CaseStudiesPage() {
     const [editingId, setEditingId] = useState<string | null>(null)
     const [showDialog, setShowDialog] = useState(false)
     const [error, setError] = useState<string | null>(null)
+    const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
     
     // Form state
     const [formData, setFormData] = useState<CaseStudyInput>({
@@ -201,11 +212,18 @@ export default function CaseStudiesPage() {
         })
     }
     
-    async function handleDelete(id: string) {
-        if (!confirm('Are you sure you want to delete this case study?')) return
+    function handleDeleteClick(id: string) {
+        setDeleteConfirmId(id)
+    }
+
+    async function handleDeleteConfirm() {
+        if (!deleteConfirmId) return
+        
+        const idToDelete = deleteConfirmId
+        setDeleteConfirmId(null)
         
         startTransition(async () => {
-            const result = await deleteCaseStudy(id)
+            const result = await deleteCaseStudy(idToDelete)
             if (result.success) {
                 toast.success('Case study deleted')
                 loadCaseStudies()
@@ -254,7 +272,7 @@ export default function CaseStudiesPage() {
                             Add Case Study
                         </Button>
                     </DialogTrigger>
-                    <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                    <DialogContent size="lg" className="max-h-[90vh] overflow-y-auto">
                         <DialogHeader>
                             <DialogTitle>
                                 {editingId ? 'Edit Case Study' : 'Create Case Study'}
@@ -548,7 +566,7 @@ export default function CaseStudiesPage() {
                                         <Button 
                                             variant="ghost" 
                                             size="sm"
-                                            onClick={() => handleDelete(cs.id)}
+                                            onClick={() => handleDeleteClick(cs.id)}
                                             className="text-destructive hover:text-destructive"
                                         >
                                             <Trash2 className="h-4 w-4" />
@@ -601,6 +619,27 @@ export default function CaseStudiesPage() {
                     ))}
                 </div>
             )}
+
+            {/* Delete Confirmation Dialog */}
+            <AlertDialog open={!!deleteConfirmId} onOpenChange={(open) => !open && setDeleteConfirmId(null)}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Delete Case Study?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Are you sure you want to delete this case study? This action cannot be undone.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={handleDeleteConfirm}
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        >
+                            Delete
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </div>
     )
 }

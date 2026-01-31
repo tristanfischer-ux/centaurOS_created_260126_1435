@@ -207,9 +207,9 @@ export function CommandPalette() {
                   setOpen(false) 
                 }}
               >
-                <ClipboardCheck className="mr-2 h-4 w-4 text-amber-500" />
+                <ClipboardCheck className="mr-2 h-4 w-4 text-status-warning" />
                 Review Pending Approvals
-                <span className="ml-auto bg-amber-100 text-amber-700 text-xs px-2 py-0.5 rounded-full">
+                <span className="ml-auto bg-status-warning-light text-status-warning-dark text-xs px-2 py-0.5 rounded-full">
                   {pendingApprovalCount}
                 </span>
               </CommandItem>

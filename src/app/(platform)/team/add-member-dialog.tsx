@@ -84,21 +84,26 @@ export function AddMemberDialog() {
                 <form action={clientAction}>
                     <div className="grid gap-4 py-4">
                         <div className="grid gap-2">
-                            <Label htmlFor="full_name">Full Name <span className="text-red-500">*</span></Label>
+                            <Label htmlFor="full_name">
+                                Full Name <span className="text-destructive ml-1" aria-label="required">*</span>
+                            </Label>
                             <Input
                                 id="full_name"
                                 name="full_name"
                                 required
                                 aria-required={true}
+                                aria-invalid={!!error}
                                 placeholder="John Doe"
                                 autoComplete="name"
                                 enterKeyHint="next"
-                                className="bg-background border-slate-200"
+                                className="bg-background"
                                 autoFocus
                             />
                         </div>
                         <div className="grid gap-2">
-                            <Label htmlFor="email">Email Address <span className="text-red-500">*</span></Label>
+                            <Label htmlFor="email">
+                                Email Address <span className="text-destructive ml-1" aria-label="required">*</span>
+                            </Label>
                             <Input
                                 id="email"
                                 name="email"
@@ -108,28 +113,31 @@ export function AddMemberDialog() {
                                 enterKeyHint="done"
                                 required
                                 aria-required={true}
+                                aria-invalid={!!error}
                                 placeholder="john@example.com"
-                                className="bg-background border-slate-200"
+                                className="bg-background"
                             />
                         </div>
                         <div className="grid gap-2">
-                            <Label htmlFor="role_type">Role <span className="text-red-500">*</span></Label>
+                            <Label htmlFor="role_type">
+                                Role <span className="text-destructive ml-1" aria-label="required">*</span>
+                            </Label>
                             <Select name="role_type" defaultValue="Apprentice" required>
                                 <SelectTrigger 
                                     id="role_type"
-                                    className="bg-background border-slate-200"
+                                    className="bg-background"
                                     aria-required={true}
                                 >
                                     <SelectValue placeholder="Select a role" />
                                 </SelectTrigger>
-                                <SelectContent className="bg-background border-slate-200">
+                                <SelectContent className="bg-background">
                                     <SelectItem value="Apprentice">Apprentice</SelectItem>
                                     <SelectItem value="Executive">Executive</SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>
                         {error && (
-                            <div className="text-red-500 text-sm font-medium">
+                            <div className="text-destructive text-sm font-medium" role="alert">
                                 {error}
                             </div>
                         )}

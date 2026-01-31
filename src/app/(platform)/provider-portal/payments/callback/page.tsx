@@ -69,8 +69,8 @@ async function CallbackContent({
             <div className="max-w-md mx-auto py-12">
                 <Card>
                     <CardContent className="pt-12 pb-8 text-center">
-                        <div className="w-20 h-20 mx-auto bg-amber-100 rounded-full flex items-center justify-center mb-6">
-                            <AlertCircle className="h-10 w-10 text-amber-600" />
+                        <div className="w-20 h-20 mx-auto bg-status-warning-light rounded-full flex items-center justify-center mb-6">
+                            <AlertCircle className="h-10 w-10 text-status-warning" />
                         </div>
                         <h1 className="text-2xl font-bold mb-2">Session Expired</h1>
                         <p className="text-muted-foreground mb-6">
@@ -92,8 +92,8 @@ async function CallbackContent({
             <div className="max-w-md mx-auto py-12">
                 <Card>
                     <CardContent className="pt-12 pb-8 text-center">
-                        <div className="w-20 h-20 mx-auto bg-green-100 rounded-full flex items-center justify-center mb-6">
-                            <CheckCircle2 className="h-10 w-10 text-green-600" />
+                        <div className="w-20 h-20 mx-auto bg-status-success-light rounded-full flex items-center justify-center mb-6">
+                            <CheckCircle2 className="h-10 w-10 text-status-success" />
                         </div>
                         <h1 className="text-2xl font-bold mb-2">Setup Complete!</h1>
                         <p className="text-muted-foreground mb-6">
@@ -129,19 +129,19 @@ async function CallbackContent({
                     </p>
                     
                     {stripeStatus.requirements && stripeStatus.requirements.currentlyDue.length > 0 && (
-                        <div className="mb-6 p-4 rounded-lg bg-amber-50 border border-amber-200 text-left">
-                            <p className="text-sm font-medium text-amber-800 mb-2">
+                        <div className="mb-6 p-4 rounded-lg bg-status-warning-light border border-status-warning text-left">
+                            <p className="text-sm font-medium text-status-warning-dark mb-2">
                                 Items needed:
                             </p>
-                            <ul className="text-sm text-amber-700 space-y-1">
+                            <ul className="text-sm text-status-warning space-y-1">
                                 {stripeStatus.requirements.currentlyDue.slice(0, 5).map((item, i) => (
                                     <li key={i} className="flex items-start gap-2">
-                                        <span className="text-amber-500 mt-1">•</span>
+                                        <span className="text-status-warning mt-1">•</span>
                                         <span>{formatRequirement(item)}</span>
                                     </li>
                                 ))}
                                 {stripeStatus.requirements.currentlyDue.length > 5 && (
-                                    <li className="text-amber-600">
+                                    <li className="text-status-warning">
                                         +{stripeStatus.requirements.currentlyDue.length - 5} more items
                                     </li>
                                 )}

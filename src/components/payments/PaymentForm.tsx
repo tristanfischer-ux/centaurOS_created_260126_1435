@@ -320,12 +320,12 @@ export function PaymentSuccess({ amount, currency }: { amount: number; currency:
       <CardContent className="pt-6">
         <div className="text-center space-y-3">
           <div className="flex justify-center">
-            <div className="h-12 w-12 rounded-full bg-green-100 flex items-center justify-center">
-              <CheckCircle2 className="h-6 w-6 text-green-600" />
+            <div className="h-12 w-12 rounded-full bg-status-success-light flex items-center justify-center">
+              <CheckCircle2 className="h-6 w-6 text-status-success" />
             </div>
           </div>
-          <h3 className="text-lg font-semibold text-green-800">Payment Successful</h3>
-          <p className="text-green-700">
+          <h3 className="text-lg font-semibold text-status-success-dark">Payment Successful</h3>
+          <p className="text-status-success">
             Your payment of {formatCurrency(amount, currency)} has been processed and is now held securely in escrow.
           </p>
           <Badge variant="success">Funds Protected</Badge>

@@ -71,6 +71,13 @@ VALUES
     ('Services', 'Software', 'Jira Enterprise Setup', 'Custom workflow configuration for complex engineering teams.', '{"platform": "Jira", "service": "Implementation", "timeframe": "2-4 weeks"}', NULL, true),
     ('Services', 'Software', 'HubSpot Integration Agency', 'Connecting CRM with ERP for seamless data flow.', '{"platform": "HubSpot", "service": "Integration", "expertise": ["Salesforce", "NetSuite"]}', NULL, true),
 
+    -- Pitch Prep (Investment Readiness)
+    ('Services', 'Pitch Prep', 'Deck Doctor', 'Expert pitch deck design and narrative development. We''ve helped 50+ startups raise £100M+.', '{"service": "Pitch Deck Design", "rate": "£2,500-£5,000", "deliverables": ["Investor Deck", "One-Pager", "Financial Model Review"], "turnaround": "5-7 days"}', NULL, true),
+    ('Services', 'Pitch Prep', 'Founder Coaching Co', 'One-on-one pitch coaching with ex-VCs. Practice sessions, Q&A prep, and live feedback.', '{"service": "Pitch Coaching", "rate": "£500/session", "deliverables": ["3x Practice Sessions", "Q&A Preparation", "Video Review"], "turnaround": "1-2 weeks"}', NULL, true),
+    ('Services', 'Pitch Prep', 'Story Capital', 'Narrative strategy for deep tech founders. We translate complex tech into investor-friendly stories.', '{"service": "Narrative Development", "rate": "£3,000-£8,000", "deliverables": ["Investment Thesis", "Market Story", "Competitive Positioning"], "focus": ["Deep Tech", "Hardware", "Climate"]}', NULL, true),
+    ('Services', 'Pitch Prep', 'Financial Model Factory', 'Investor-grade financial models for hardware and SaaS companies. Built by ex-investment bankers.', '{"service": "Financial Modeling", "rate": "£1,500-£4,000", "deliverables": ["3-Statement Model", "Unit Economics", "Scenario Analysis"], "turnaround": "7-10 days"}', NULL, true),
+    ('Services', 'Pitch Prep', 'Due Diligence Ready', 'Comprehensive data room preparation and due diligence document assembly.', '{"service": "Data Room Setup", "rate": "£2,000-£3,500", "deliverables": ["Virtual Data Room", "Document Checklist", "Cap Table Clean-up"], "turnaround": "2-3 weeks"}', NULL, true),
+
 
 -- CATEGORY D: AI (Agents)
     ('AI', 'Agent', 'Supply Chain Sentinel', '24/7 Risk monitoring for your global supply chain.', '{"function": "Risk Monitoring", "cost": "£50/month", "inputs": ["News API", "Supplier Data"], "latency": "Real-time"}', NULL, true),

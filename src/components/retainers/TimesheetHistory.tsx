@@ -43,25 +43,25 @@ const STATUS_CONFIG: Record<TimesheetStatus, {
     label: 'Submitted',
     variant: 'default',
     icon: Clock,
-    color: 'text-blue-600',
+    color: 'text-status-info',
   },
   approved: {
     label: 'Approved',
     variant: 'default',
     icon: CheckCircle,
-    color: 'text-emerald-600',
+    color: 'text-status-success',
   },
   disputed: {
     label: 'Disputed',
     variant: 'destructive',
     icon: AlertCircle,
-    color: 'text-red-600',
+    color: 'text-destructive',
   },
   paid: {
     label: 'Paid',
     variant: 'default',
     icon: CreditCard,
-    color: 'text-emerald-600',
+    color: 'text-status-success',
   },
 }
 

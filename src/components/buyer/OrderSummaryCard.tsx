@@ -40,17 +40,17 @@ function getStatusConfig(status: BookingStatus) {
         case 'draft':
             return { label: 'Draft', color: 'bg-muted text-foreground', icon: Clock }
         case 'pending_payment':
-            return { label: 'Pending Payment', color: 'bg-amber-100 text-amber-700', icon: Clock }
+            return { label: 'Pending Payment', color: 'bg-status-warning-light text-status-warning-dark', icon: Clock }
         case 'confirmed':
-            return { label: 'Confirmed', color: 'bg-blue-100 text-blue-700', icon: CheckCircle }
+            return { label: 'Confirmed', color: 'bg-status-info-light text-status-info-dark', icon: CheckCircle }
         case 'in_progress':
-            return { label: 'In Progress', color: 'bg-emerald-100 text-emerald-700', icon: Clock }
+            return { label: 'In Progress', color: 'bg-status-success-light text-status-success-dark', icon: Clock }
         case 'completed':
-            return { label: 'Completed', color: 'bg-emerald-100 text-emerald-700', icon: CheckCircle }
+            return { label: 'Completed', color: 'bg-status-success-light text-status-success-dark', icon: CheckCircle }
         case 'cancelled':
             return { label: 'Cancelled', color: 'bg-muted text-muted-foreground', icon: XCircle }
         case 'disputed':
-            return { label: 'Disputed', color: 'bg-red-100 text-red-700', icon: AlertCircle }
+            return { label: 'Disputed', color: 'bg-status-error-light text-destructive', icon: AlertCircle }
         default:
             return { label: status, color: 'bg-muted text-foreground', icon: Clock }
     }
@@ -59,13 +59,13 @@ function getStatusConfig(status: BookingStatus) {
 function getEscrowConfig(status: PaymentStatus) {
     switch (status) {
         case 'pending':
-            return { label: 'Payment Pending', color: 'text-amber-600' }
+            return { label: 'Payment Pending', color: 'text-status-warning' }
         case 'held':
-            return { label: 'Funds in Escrow', color: 'text-blue-600' }
+            return { label: 'Funds in Escrow', color: 'text-status-info' }
         case 'partial_release':
-            return { label: 'Partial Release', color: 'text-emerald-600' }
+            return { label: 'Partial Release', color: 'text-status-success' }
         case 'released':
-            return { label: 'Payment Released', color: 'text-emerald-600' }
+            return { label: 'Payment Released', color: 'text-status-success' }
         case 'refunded':
             return { label: 'Refunded', color: 'text-muted-foreground' }
         default:

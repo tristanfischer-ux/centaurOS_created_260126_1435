@@ -59,16 +59,16 @@ export const DOMAIN_CATEGORY_COLORS: Record<DomainCategory, { bg: string; text: 
   Software: { bg: 'bg-violet-50', text: 'text-violet-700', border: 'border-violet-200' },
   Manufacturing: { bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200' },
   Regulatory: { bg: 'bg-rose-50', text: 'text-rose-700', border: 'border-rose-200' },
-  Business: { bg: 'bg-cyan-50', text: 'text-cyan-700', border: 'border-cyan-200' },
+  Business: { bg: 'bg-sky-50', text: 'text-sky-700', border: 'border-sky-200' },
   Operations: { bg: 'bg-slate-50', text: 'text-slate-700', border: 'border-slate-200' },
 }
 
 // Coverage status colors
 export const COVERAGE_STATUS_COLORS: Record<CoverageStatus, { bg: string; text: string; border: string; dot: string }> = {
-  covered: { bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200', dot: 'bg-emerald-500' },
-  partial: { bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-200', dot: 'bg-amber-500' },
-  gap: { bg: 'bg-rose-50', text: 'text-rose-700', border: 'border-rose-200', dot: 'bg-rose-500' },
-  not_needed: { bg: 'bg-slate-50', text: 'text-slate-500', border: 'border-slate-200', dot: 'bg-slate-400' },
+  covered: { bg: 'bg-status-success-light', text: 'text-status-success', border: 'border-status-success', dot: 'bg-status-success' },
+  partial: { bg: 'bg-status-warning-light', text: 'text-status-warning', border: 'border-status-warning', dot: 'bg-status-warning' },
+  gap: { bg: 'bg-status-error-light', text: 'text-destructive', border: 'border-destructive', dot: 'bg-destructive' },
+  not_needed: { bg: 'bg-muted', text: 'text-muted-foreground', border: 'border-muted', dot: 'bg-muted-foreground' },
 }
 
 // ============================================================================

@@ -142,7 +142,7 @@ export function DataRequestForm({
       <Card>
         <CardHeader>
           <div className="flex items-center gap-2">
-            <CheckCircle className="h-5 w-5 text-green-500" />
+            <CheckCircle className="h-5 w-5 text-status-success" />
             <CardTitle>Request Submitted</CardTitle>
           </div>
         </CardHeader>
@@ -288,7 +288,7 @@ export function DataRequestForm({
             </Alert>
 
             <label htmlFor="reason" className="text-sm font-medium">
-              Reason for Deletion <span className="text-red-500">*</span>
+              Reason for Deletion <span className="text-destructive">*</span>
             </label>
             <textarea
               id="reason"

@@ -16,6 +16,18 @@ Run these checks before committing:
 npm run lint && npx tsc --noEmit && npm run test && npm run build
 ```
 
+### UI Standards Check (for UI changes)
+
+When modifying UI code, also verify:
+
+```bash
+# Check for hardcoded status colors (should return 0 matches in your changed files)
+rg "text-red-|text-green-|text-amber-|text-blue-" src/path/to/your/file.tsx
+rg "bg-red-|bg-green-|bg-amber-|bg-blue-" src/path/to/your/file.tsx
+```
+
+See the **ui-component-standards** skill for the complete color token mapping.
+
 ## Linting
 
 ### Run ESLint
@@ -139,6 +151,15 @@ Checklist:
 - [ ] No obvious N+1 queries
 - [ ] No unnecessary re-renders
 - [ ] Large lists use virtualization if needed
+
+**UI Standards (for UI changes):**
+- [ ] No hardcoded status colors (`text-red-*`, `bg-green-*`, etc.)
+- [ ] Semantic tokens used (`text-destructive`, `text-status-success`, etc.)
+- [ ] Forms have ARIA accessibility (`aria-required`, `aria-invalid`, `aria-describedby`)
+- [ ] Error messages use `text-destructive` and `role="alert"`
+- [ ] Dialogs use `size` prop (not custom `max-w-[]`)
+- [ ] Status indicators use `StatusBadge` component
+- [ ] Icon-only buttons have `aria-label`
 
 ### Code Style Guidelines
 

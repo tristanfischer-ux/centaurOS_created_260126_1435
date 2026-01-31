@@ -115,7 +115,7 @@ export function SupplierDashboard({
       <Card className={className}>
         <CardContent className="flex items-center justify-center py-12">
           <div className="text-center">
-            <p className="text-red-500 mb-4">{error}</p>
+            <p className="text-destructive mb-4">{error}</p>
             <Button onClick={() => onPeriodChange(period)}>Retry</Button>
           </div>
         </CardContent>
@@ -177,8 +177,8 @@ export function SupplierDashboard({
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-green-50">
-                <DollarSign className="h-5 w-5 text-green-600" />
+              <div className="p-2 rounded-lg bg-status-success-light">
+                <DollarSign className="h-5 w-5 text-status-success" />
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Lifetime GMV</p>
@@ -192,8 +192,8 @@ export function SupplierDashboard({
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-blue-50">
-                <ShoppingCart className="h-5 w-5 text-blue-600" />
+              <div className="p-2 rounded-lg bg-status-info-light">
+                <ShoppingCart className="h-5 w-5 text-status-info" />
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Total Orders</p>
@@ -208,8 +208,8 @@ export function SupplierDashboard({
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-amber-50">
-                <TrendingUp className="h-5 w-5 text-amber-600" />
+              <div className="p-2 rounded-lg bg-status-warning-light">
+                <TrendingUp className="h-5 w-5 text-status-warning" />
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Avg Order Value</p>
@@ -318,7 +318,7 @@ export function SupplierDashboard({
         <Card className="lg:col-span-2">
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
-              <Users className="h-5 w-5 text-blue-600" />
+              <Users className="h-5 w-5 text-status-info" />
               Top Clients
             </CardTitle>
             <CardDescription>Your best customers by spend</CardDescription>
@@ -371,7 +371,7 @@ export function SupplierDashboard({
         <Card>
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
-              <Zap className="h-5 w-5 text-amber-600" />
+              <Zap className="h-5 w-5 text-status-warning" />
               Trending Skills Demand
             </CardTitle>
             <CardDescription>Skills in high demand right now</CardDescription>
@@ -384,8 +384,8 @@ export function SupplierDashboard({
                   variant="secondary"
                   className={cn(
                     "px-3 py-1",
-                    skill.trend === 'up' && "bg-green-100 text-green-700",
-                    skill.trend === 'down' && "bg-red-100 text-red-700"
+                    skill.trend === 'up' && "bg-status-success-light text-status-success",
+                    skill.trend === 'down' && "bg-status-error-light text-destructive"
                   )}
                 >
                   {skill.skill}

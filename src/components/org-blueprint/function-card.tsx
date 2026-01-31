@@ -62,17 +62,17 @@ const CATEGORY_COLORS: Record<string, string> = {
 
 // Status colors
 const STATUS_COLORS: Record<CoverageStatus, { bg: string; text: string; label: string }> = {
-    'covered': { bg: 'bg-green-100', text: 'text-green-700', label: 'Covered' },
-    'partial': { bg: 'bg-yellow-100', text: 'text-yellow-700', label: 'Partial' },
-    'gap': { bg: 'bg-red-100', text: 'text-red-700', label: 'Gap' },
-    'not_needed': { bg: 'bg-gray-100', text: 'text-gray-500', label: 'N/A' },
+    'covered': { bg: 'bg-status-success-light', text: 'text-status-success', label: 'Covered' },
+    'partial': { bg: 'bg-status-warning-light', text: 'text-status-warning', label: 'Partial' },
+    'gap': { bg: 'bg-status-error-light', text: 'text-destructive', label: 'Gap' },
+    'not_needed': { bg: 'bg-muted', text: 'text-muted-foreground', label: 'N/A' },
 }
 
 const statusIcons: Record<CoverageStatus, React.ReactNode> = {
-    covered: <CheckCircle2 className="h-4 w-4 text-green-600" />,
-    partial: <AlertCircle className="h-4 w-4 text-yellow-600" />,
-    gap: <XCircle className="h-4 w-4 text-red-600" />,
-    not_needed: <MinusCircle className="h-4 w-4 text-gray-400" />,
+    covered: <CheckCircle2 className="h-4 w-4 text-status-success" />,
+    partial: <AlertCircle className="h-4 w-4 text-status-warning" />,
+    gap: <XCircle className="h-4 w-4 text-destructive" />,
+    not_needed: <MinusCircle className="h-4 w-4 text-muted-foreground" />,
 }
 
 export function FunctionCard({ businessFunction, onUpdate }: FunctionCardProps) {
@@ -197,15 +197,15 @@ export function FunctionCard({ businessFunction, onUpdate }: FunctionCardProps) 
                                 <DropdownMenuLabel>Set Coverage Status</DropdownMenuLabel>
                                 <DropdownMenuSeparator />
                                 <DropdownMenuItem onClick={() => handleStatusChange('covered')}>
-                                    <CheckCircle2 className="h-4 w-4 mr-2 text-green-600" />
+                                    <CheckCircle2 className="h-4 w-4 mr-2 text-status-success" />
                                     Covered
                                 </DropdownMenuItem>
                                 <DropdownMenuItem onClick={() => handleStatusChange('partial')}>
-                                    <AlertCircle className="h-4 w-4 mr-2 text-yellow-600" />
+                                    <AlertCircle className="h-4 w-4 mr-2 text-status-warning" />
                                     Partial Coverage
                                 </DropdownMenuItem>
                                 <DropdownMenuItem onClick={() => handleStatusChange('gap')}>
-                                    <XCircle className="h-4 w-4 mr-2 text-red-600" />
+                                    <XCircle className="h-4 w-4 mr-2 text-destructive" />
                                     Gap
                                 </DropdownMenuItem>
                                 <DropdownMenuSeparator />

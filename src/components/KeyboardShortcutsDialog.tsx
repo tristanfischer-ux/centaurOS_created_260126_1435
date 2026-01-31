@@ -57,7 +57,7 @@ export function KeyboardShortcutsDialog() {
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogContent className="max-w-2xl bg-white">
+      <DialogContent size="lg" className="bg-white">
         <DialogHeader>
           <DialogTitle className="text-foreground">Keyboard Shortcuts</DialogTitle>
           <DialogDescription>

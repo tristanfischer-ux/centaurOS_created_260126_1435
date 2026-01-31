@@ -85,7 +85,7 @@ export function EarningsChart({
           {change !== null && (
             <div className={cn(
               "flex items-center gap-1 px-2 py-1 rounded-full text-sm font-medium",
-              isPositive ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
+              isPositive ? "bg-status-success-light text-status-success" : "bg-status-error-light text-destructive"
             )}>
               {isPositive ? (
                 <TrendingUp className="h-4 w-4" />

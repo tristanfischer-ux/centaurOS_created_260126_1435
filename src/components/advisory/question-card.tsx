@@ -36,12 +36,12 @@ interface QuestionCardProps {
 }
 
 const categoryColors: Record<string, string> = {
-    Finance: "bg-emerald-100 text-emerald-800",
+    Finance: "bg-status-success-light text-status-success-dark",
     Legal: "bg-purple-100 text-purple-800",
-    Sales: "bg-blue-100 text-blue-800",
-    Operations: "bg-amber-100 text-amber-800",
+    Sales: "bg-status-info-light text-status-info-dark",
+    Operations: "bg-status-warning-light text-status-warning-dark",
     HR: "bg-pink-100 text-pink-800",
-    Technology: "bg-cyan-100 text-cyan-800",
+    Technology: "bg-sky-100 text-sky-800",
     Strategy: "bg-indigo-100 text-indigo-800",
     General: "bg-muted text-foreground",
 }

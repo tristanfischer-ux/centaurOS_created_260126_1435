@@ -68,7 +68,7 @@ const categoryColors: Record<string, string> = {
     Sales: "bg-blue-100 text-blue-800",
     Operations: "bg-amber-100 text-amber-800",
     HR: "bg-pink-100 text-pink-800",
-    Technology: "bg-cyan-100 text-cyan-800",
+    Technology: "bg-sky-100 text-sky-800",
     Strategy: "bg-indigo-100 text-indigo-800",
     General: "bg-muted text-foreground",
 }

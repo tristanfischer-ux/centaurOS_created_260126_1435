@@ -177,7 +177,7 @@ export function VideoIntroUpload({ currentVideoUrl, currentThumbnailUrl }: Video
                         )}
                     </div>
                     {videoUrl && !isValid && (
-                        <p className="text-xs text-red-500 flex items-center gap-1">
+                        <p className="text-xs text-destructive flex items-center gap-1">
                             <AlertCircle className="h-3 w-3" />
                             Please enter a valid YouTube, Vimeo, or Loom URL
                         </p>
@@ -198,8 +198,8 @@ export function VideoIntroUpload({ currentVideoUrl, currentThumbnailUrl }: Video
                 
                 {/* Tips */}
                 <div className="bg-status-info-light rounded-lg p-4 border border-status-info">
-                    <h4 className="font-medium text-blue-900 text-sm mb-2">Tips for a great intro video</h4>
-                    <ul className="text-xs text-blue-800 space-y-1">
+                    <h4 className="font-medium text-status-info-dark text-sm mb-2">Tips for a great intro video</h4>
+                    <ul className="text-xs text-status-info-dark space-y-1">
                         <li>• Keep it 60-90 seconds - attention spans are short!</li>
                         <li>• Introduce yourself and your expertise</li>
                         <li>• Share what types of clients you work best with</li>

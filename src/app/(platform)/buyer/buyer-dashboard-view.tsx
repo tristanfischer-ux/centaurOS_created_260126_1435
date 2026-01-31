@@ -94,7 +94,7 @@ export function BuyerDashboardView({
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                         <CardTitle className="text-sm font-medium">Completed</CardTitle>
-                        <CheckCircle className="h-4 w-4 text-emerald-500" />
+                        <CheckCircle className="h-4 w-4 text-status-success" />
                     </CardHeader>
                     <CardContent>
                         <div className="text-2xl font-bold">
@@ -110,7 +110,7 @@ export function BuyerDashboardView({
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                         <CardTitle className="text-sm font-medium">This Month</CardTitle>
-                        <TrendingUp className="h-4 w-4 text-blue-500" />
+                        <TrendingUp className="h-4 w-4 text-status-info" />
                     </CardHeader>
                     <CardContent>
                         <div className="text-2xl font-bold">
@@ -319,7 +319,7 @@ export function BuyerDashboardView({
                                                 </p>
                                             </div>
                                             {provider.isAvailable && (
-                                                <Badge variant="secondary" className="text-emerald-600 border-emerald-200 text-xs">
+                                                <Badge variant="secondary" className="text-status-success border-status-success-light text-xs">
                                                     Available
                                                 </Badge>
                                             )}
@@ -395,7 +395,7 @@ function ProviderCard({ provider, onClick }: ProviderCardProps) {
                         {provider.currency} {provider.dayRate?.toLocaleString()}/day
                     </span>
                     {provider.isAvailable ? (
-                        <Badge variant="secondary" className="text-emerald-600 border-emerald-200">
+                        <Badge variant="secondary" className="text-status-success border-status-success-light">
                             Available
                         </Badge>
                     ) : (

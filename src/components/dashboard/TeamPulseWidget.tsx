@@ -59,7 +59,7 @@ export function TeamPulseWidget({ members }: TeamPulseWidgetProps) {
                 {/* Status summary */}
                 <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs">
                     <div className="flex items-center gap-1.5">
-                        <span className="h-2 w-2 shrink-0 rounded-full bg-green-500" />
+                        <span className="h-2 w-2 shrink-0 rounded-full bg-status-success" />
                         <span className="text-muted-foreground">{onlineCount} online</span>
                     </div>
                     <div className="flex items-center gap-1.5">
@@ -67,7 +67,7 @@ export function TeamPulseWidget({ members }: TeamPulseWidgetProps) {
                         <span className="text-muted-foreground">{focusCount} focus</span>
                     </div>
                     <div className="flex items-center gap-1.5">
-                        <span className="h-2 w-2 shrink-0 rounded-full bg-yellow-500" />
+                        <span className="h-2 w-2 shrink-0 rounded-full bg-status-warning" />
                         <span className="text-muted-foreground">{awayCount} away</span>
                     </div>
                     <div className="flex items-center gap-1.5">

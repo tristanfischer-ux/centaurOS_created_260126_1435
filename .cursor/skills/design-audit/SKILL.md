@@ -7,6 +7,18 @@ description: Systematic audit of codebase for design inconsistencies, with quant
 
 Systematic methodology for identifying and fixing design inconsistencies across a codebase.
 
+## Prevention vs Detection
+
+**For PREVENTING inconsistencies when writing new code:**
+→ Use the **ui-component-standards** skill which provides:
+- Color token mapping (what to use instead of hardcoded colors)
+- Form accessibility requirements
+- Dialog size guidelines
+- Component usage patterns
+
+**For DETECTING existing inconsistencies (this skill):**
+→ Use the audit workflow below to find and fix problems in existing code.
+
 ## Audit Workflow
 
 ### Step 1: Scan for Inconsistencies
@@ -114,8 +126,16 @@ rg "bg-green-|bg-red-|bg-amber-|bg-blue-" src/
 | `bg-white` | `bg-background` |
 | `bg-slate-50` | `bg-muted` |
 | `border-slate-200` | `border` |
-| `text-red-600` | `text-destructive` |
-| `bg-green-100` | `bg-status-success-light` |
+| `text-red-*` | `text-destructive` |
+| `text-green-*` | `text-status-success` |
+| `text-amber-*` | `text-status-warning` |
+| `text-blue-*` | `text-status-info` |
+| `bg-red-*` | `bg-status-error-light` |
+| `bg-green-*` | `bg-status-success-light` |
+| `bg-amber-*` | `bg-status-warning-light` |
+| `bg-blue-*` | `bg-status-info-light` |
+
+**See ui-component-standards skill for complete mapping.**
 
 ### 2. Form Validation Inconsistencies
 

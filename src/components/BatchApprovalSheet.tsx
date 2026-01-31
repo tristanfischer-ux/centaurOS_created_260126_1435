@@ -158,7 +158,7 @@ export function BatchApprovalSheet({ onApprovalComplete, trigger }: BatchApprova
                         </Button>
                     )}
                 </DialogTrigger>
-                <DialogContent className="sm:max-w-[600px] max-h-[85vh] flex flex-col p-0 overflow-hidden">
+                <DialogContent size="md" className="max-h-[85vh] flex flex-col p-0 overflow-hidden">
                     <DialogHeader className="px-6 pt-6 pb-4 flex-shrink-0">
                         <DialogTitle className="flex items-center gap-2 text-foreground">
                             <AlertTriangle className="h-5 w-5 text-international-orange" />
@@ -188,7 +188,7 @@ export function BatchApprovalSheet({ onApprovalComplete, trigger }: BatchApprova
                                         size="sm"
                                         onClick={handleBatchApprove}
                                         disabled={isPending}
-                                        className="bg-green-600 hover:bg-green-700 text-white"
+                                        className="bg-status-success hover:bg-status-success/90 text-white"
                                     >
                                         {isPending ? (
                                             <Loader2 className="h-4 w-4 animate-spin mr-1" />
@@ -219,7 +219,7 @@ export function BatchApprovalSheet({ onApprovalComplete, trigger }: BatchApprova
                             </div>
                         ) : tasks.length === 0 ? (
                             <div className="flex flex-col items-center justify-center h-40 text-center">
-                                <CheckCircle2 className="h-12 w-12 text-green-500 mb-2" />
+                                <CheckCircle2 className="h-12 w-12 text-status-success mb-2" />
                                 <p className="text-foreground font-medium">All caught up!</p>
                                 <p className="text-muted-foreground text-sm">No tasks pending approval</p>
                             </div>
@@ -304,7 +304,7 @@ export function BatchApprovalSheet({ onApprovalComplete, trigger }: BatchApprova
                                                                 variant="ghost"
                                                                 onClick={() => handleQuickApprove(task.id)}
                                                                 disabled={isPending}
-                                                                className="h-8 px-2 text-green-600 hover:text-green-700 hover:bg-green-50"
+                                                                className="h-8 px-2 text-status-success hover:text-status-success/90 hover:bg-status-success-light"
                                                             >
                                                                 <Check className="h-4 w-4" />
                                                             </Button>
@@ -345,7 +345,7 @@ export function BatchApprovalSheet({ onApprovalComplete, trigger }: BatchApprova
 
             {/* Batch Reject Dialog */}
             <Dialog open={rejectDialogOpen} onOpenChange={setRejectDialogOpen}>
-                <DialogContent className="sm:max-w-[425px]">
+                <DialogContent size="sm">
                     <DialogHeader>
                         <DialogTitle>Reject Tasks</DialogTitle>
                         <DialogDescription>

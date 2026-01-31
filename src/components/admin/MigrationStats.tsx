@@ -29,16 +29,16 @@ export function MigrationStatsCard({
             value: 'text-foreground'
         },
         success: {
-            icon: 'text-green-600 bg-green-50',
-            value: 'text-green-600'
+            icon: 'text-status-success bg-status-success-light',
+            value: 'text-status-success'
         },
         warning: {
-            icon: 'text-amber-600 bg-amber-50',
-            value: 'text-amber-600'
+            icon: 'text-status-warning bg-status-warning-light',
+            value: 'text-status-warning'
         },
         danger: {
-            icon: 'text-red-600 bg-red-50',
-            value: 'text-red-600'
+            icon: 'text-destructive bg-status-error-light',
+            value: 'text-destructive'
         }
     }
     
@@ -86,10 +86,10 @@ export function MigrationStatsOverview({
     const statItems = [
         { label: 'Total Listings', value: totalListings, color: 'bg-muted' },
         { label: 'Pending', value: pendingCount, color: 'bg-muted-foreground' },
-        { label: 'Invited', value: invitedCount, color: 'bg-amber-500' },
-        { label: 'In Progress', value: inProgressCount, color: 'bg-blue-500' },
-        { label: 'Completed', value: completedCount, color: 'bg-green-500' },
-        { label: 'Declined', value: declinedCount, color: 'bg-red-500' },
+        { label: 'Invited', value: invitedCount, color: 'bg-status-warning' },
+        { label: 'In Progress', value: inProgressCount, color: 'bg-status-info' },
+        { label: 'Completed', value: completedCount, color: 'bg-status-success' },
+        { label: 'Declined', value: declinedCount, color: 'bg-destructive' },
     ]
     
     return (
@@ -119,19 +119,19 @@ export function MigrationStatsOverview({
             <div className="pt-2">
                 <div className="h-2 bg-muted rounded-full overflow-hidden flex">
                     <div 
-                        className="bg-green-500 transition-all"
+                        className="bg-status-success transition-all"
                         style={{ width: `${(completedCount / Math.max(totalListings, 1)) * 100}%` }}
                     />
                     <div 
-                        className="bg-blue-500 transition-all"
+                        className="bg-status-info transition-all"
                         style={{ width: `${(inProgressCount / Math.max(totalListings, 1)) * 100}%` }}
                     />
                     <div 
-                        className="bg-amber-500 transition-all"
+                        className="bg-status-warning transition-all"
                         style={{ width: `${(invitedCount / Math.max(totalListings, 1)) * 100}%` }}
                     />
                     <div 
-                        className="bg-red-500 transition-all"
+                        className="bg-destructive transition-all"
                         style={{ width: `${(declinedCount / Math.max(totalListings, 1)) * 100}%` }}
                     />
                 </div>

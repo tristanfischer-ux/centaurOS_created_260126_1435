@@ -99,11 +99,11 @@ export function CertificationsView({ certifications, error }: CertificationsView
             {expiringSoon.length > 0 && (
                 <Card className="border-status-warning bg-status-warning-light">
                     <CardHeader className="pb-3">
-                        <CardTitle className="text-lg flex items-center gap-2 text-amber-800">
+                        <CardTitle className="text-lg flex items-center gap-2 text-status-warning-dark">
                             <AlertTriangle className="w-5 h-5" />
                             Expiring Soon
                         </CardTitle>
-                        <CardDescription className="text-amber-700">
+                        <CardDescription className="text-status-warning">
                             {expiringSoon.length} certification{expiringSoon.length > 1 ? 's' : ''} expiring within 90 days
                         </CardDescription>
                     </CardHeader>
@@ -151,7 +151,7 @@ export function CertificationsView({ certifications, error }: CertificationsView
             {verified.length > 0 && (
                 <div className="space-y-4">
                     <h2 className="text-lg font-semibold flex items-center gap-2">
-                        <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                        <span className="w-2 h-2 rounded-full bg-status-success" />
                         Verified ({verified.length})
                     </h2>
                     <div className="space-y-3">
@@ -177,8 +177,8 @@ export function CertificationsView({ certifications, error }: CertificationsView
                         </h2>
                     </div>
                     <div className="rounded-lg border border-status-info bg-status-info-light p-3 flex items-start gap-2">
-                        <Info className="w-4 h-4 text-blue-600 mt-0.5 shrink-0" />
-                        <p className="text-sm text-blue-800">
+                        <Info className="w-4 h-4 text-status-info mt-0.5 shrink-0" />
+                        <p className="text-sm text-status-info">
                             Add a verification URL to your certifications to request verification. 
                             Verified certifications are more trustworthy to potential clients.
                         </p>
@@ -216,7 +216,7 @@ export function CertificationsView({ certifications, error }: CertificationsView
                         <AlertDialogAction
                             onClick={handleDelete}
                             disabled={isDeleting}
-                            className="bg-red-600 hover:bg-red-700"
+                            className="bg-destructive hover:bg-destructive/90"
                         >
                             {isDeleting ? 'Deleting...' : 'Delete'}
                         </AlertDialogAction>

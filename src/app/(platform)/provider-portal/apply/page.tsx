@@ -151,8 +151,8 @@ export default function ProviderApplicationPage() {
             <div className="max-w-2xl mx-auto py-12">
                 <Card className="text-center">
                     <CardContent className="pt-12 pb-8">
-                        <div className="w-20 h-20 mx-auto bg-green-100 rounded-full flex items-center justify-center mb-6">
-                            <CheckCircle2 className="h-10 w-10 text-green-600" />
+                        <div className="w-20 h-20 mx-auto bg-status-success-light rounded-full flex items-center justify-center mb-6">
+                            <CheckCircle2 className="h-10 w-10 text-status-success" />
                         </div>
                         <h1 className="text-2xl font-bold mb-2">Application Submitted!</h1>
                         <p className="text-muted-foreground mb-6 max-w-md mx-auto">
@@ -206,8 +206,8 @@ export default function ProviderApplicationPage() {
                 <CardContent className="space-y-6">
                     {error && (
                         <div className="flex items-center gap-2 p-4 rounded-lg bg-status-error-light border border-destructive">
-                            <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0" />
-                            <p className="text-sm text-red-700">{error}</p>
+                            <AlertCircle className="h-5 w-5 text-destructive flex-shrink-0" />
+                            <p className="text-sm text-destructive">{error}</p>
                         </div>
                     )}
 
@@ -273,7 +273,7 @@ export default function ProviderApplicationPage() {
 
                             <div className="space-y-2">
                                 <Label htmlFor="experience">
-                                    Experience & Background <span className="text-red-500">*</span>
+                                    Experience & Background <span className="text-destructive">*</span>
                                 </Label>
                                 <Textarea
                                     id="experience"
@@ -290,7 +290,7 @@ export default function ProviderApplicationPage() {
 
                             <div className="space-y-2">
                                 <Label>
-                                    Key Capabilities <span className="text-red-500">*</span>
+                                    Key Capabilities <span className="text-destructive">*</span>
                                 </Label>
                                 <div className="flex gap-2">
                                     <Input
@@ -363,7 +363,7 @@ export default function ProviderApplicationPage() {
                         <div className="space-y-6">
                             <div className="space-y-2">
                                 <Label>
-                                    Pricing Model <span className="text-red-500">*</span>
+                                    Pricing Model <span className="text-destructive">*</span>
                                 </Label>
                                 <Select value={pricingModel} onValueChange={setPricingModel}>
                                     <SelectTrigger>
@@ -381,7 +381,7 @@ export default function ProviderApplicationPage() {
 
                             <div className="space-y-2">
                                 <Label>
-                                    Availability <span className="text-red-500">*</span>
+                                    Availability <span className="text-destructive">*</span>
                                 </Label>
                                 <Select value={availability} onValueChange={setAvailability}>
                                     <SelectTrigger>
@@ -398,10 +398,10 @@ export default function ProviderApplicationPage() {
                             </div>
 
                             <div className="p-4 rounded-lg bg-status-info-light border border-status-info">
-                                <p className="text-sm text-blue-800">
-                                    <strong>What happens next?</strong>
-                                </p>
-                                <ul className="text-sm text-blue-700 mt-2 space-y-1">
+<p className="text-sm text-status-info-dark">
+                                                    <strong>What happens next?</strong>
+                                                </p>
+                                                <ul className="text-sm text-status-info mt-2 space-y-1">
                                     <li>• Our team will review your application within 2-3 business days</li>
                                     <li>• You&apos;ll receive an email with the decision</li>
                                     <li>• Once approved, you can set up your full profile and start receiving orders</li>

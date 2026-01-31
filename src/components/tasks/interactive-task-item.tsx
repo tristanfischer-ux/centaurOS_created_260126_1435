@@ -118,8 +118,8 @@ export function InteractiveTaskItem({ task, members, currentUserId, variant = "d
                             
                             <Badge className={cn(
                                 "capitalize text-xs shrink-0",
-                                task.risk_level === 'High' ? "bg-red-100 text-red-700 border-red-200" :
-                                task.risk_level === 'Medium' ? "bg-amber-100 text-amber-700 border-amber-200" :
+                                task.risk_level === 'High' ? "bg-status-error-light text-destructive border-destructive" :
+                                task.risk_level === 'Medium' ? "bg-status-warning-light text-status-warning-dark border-status-warning" :
                                 "bg-foundry-100 text-foundry-600 border"
                             )}>
                                 {task.risk_level || 'Low'}

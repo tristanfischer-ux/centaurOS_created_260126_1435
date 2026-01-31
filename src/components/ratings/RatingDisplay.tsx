@@ -63,9 +63,9 @@ export function RatingDisplay({
   const getTrendIcon = () => {
     switch (trend) {
       case "improving":
-        return <TrendingUp className="h-3 w-3 text-emerald-500" />
+        return <TrendingUp className="h-3 w-3 text-status-success" />
       case "declining":
-        return <TrendingDown className="h-3 w-3 text-red-500" />
+        return <TrendingDown className="h-3 w-3 text-destructive" />
       case "stable":
         return <Minus className="h-3 w-3 text-muted-foreground" />
       default:
@@ -227,8 +227,8 @@ interface ConfidenceIndicatorProps {
 
 export function ConfidenceIndicator({ wilsonScore, className }: ConfidenceIndicatorProps) {
   const getConfidenceLevel = () => {
-    if (wilsonScore >= 4) return { label: "High confidence", color: "text-emerald-500" }
-    if (wilsonScore >= 3) return { label: "Medium confidence", color: "text-amber-500" }
+    if (wilsonScore >= 4) return { label: "High confidence", color: "text-status-success" }
+    if (wilsonScore >= 3) return { label: "Medium confidence", color: "text-status-warning" }
     return { label: "Low confidence", color: "text-muted-foreground" }
   }
 

@@ -232,7 +232,7 @@ export function CreateRFQDialog() {
             <DialogTrigger asChild>
                 <Button size="sm" variant="default" className="shadow-md">Create RFQ</Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[425px] bg-background text-foreground border-slate-200">
+            <DialogContent size="sm" className="bg-background text-foreground border-slate-200">
                 <DialogHeader>
                     <DialogTitle>Create Manufacturing RFQ</DialogTitle>
                     <DialogDescription>
@@ -248,7 +248,7 @@ export function CreateRFQDialog() {
                         )}>
                             {isRecording ? (
                                 <>
-                                    <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
+                                    <span className="w-2 h-2 bg-destructive rounded-full animate-pulse" />
                                     Recording... {formatDuration(recordingDuration)}
                                 </>
                             ) : (

@@ -106,10 +106,10 @@ function getBannerConfig(
                     Icon: AlertCircle,
                     title: 'Upgrade Your Listing',
                     description: 'Upgrade to accept bookings directly through the platform with secure payments.',
-                    containerClass: 'border bg-blue-50/50',
-                    iconClass: 'bg-blue-100 text-blue-600',
-                    titleClass: 'text-blue-900',
-                    descriptionClass: 'text-blue-700',
+                    containerClass: 'border bg-status-info-light/50',
+                    iconClass: 'bg-status-info-light text-status-info',
+                    titleClass: 'text-status-info-dark',
+                    descriptionClass: 'text-status-info-dark',
                     cta: {
                         href: `/provider-signup?listing=${listingId}`,
                         label: 'Upgrade Now',
@@ -126,11 +126,11 @@ function getBannerConfig(
                     Icon: Clock,
                     title: 'Coming Soon',
                     description: 'This provider is setting up online booking. Contact them directly for now.',
-                    containerClass: 'border-amber-200 bg-amber-50/50',
-                    iconClass: 'bg-amber-100 text-amber-600',
-                    titleClass: 'text-amber-900',
-                    descriptionClass: 'text-amber-700',
-                    badge: { label: 'Setting Up', class: 'bg-amber-100 text-amber-700' }
+                    containerClass: 'border-status-warning bg-status-warning-light/50',
+                    iconClass: 'bg-status-warning-light text-status-warning',
+                    titleClass: 'text-status-warning-dark',
+                    descriptionClass: 'text-status-warning-dark',
+                    badge: { label: 'Setting Up', class: 'bg-status-warning-light text-status-warning-dark' }
                 }
             case 'contact_only':
                 return {
@@ -164,17 +164,17 @@ export function MigrationStatusIndicator({
         transactional: {
             icon: CheckCircle2,
             label: 'Book Now',
-            className: 'text-green-600'
+            className: 'text-status-success'
         },
         invite_sent: {
             icon: Clock,
             label: 'Coming Soon',
-            className: 'text-amber-600'
+            className: 'text-status-warning'
         },
         pending_signup: {
             icon: Clock,
             label: 'Setting Up',
-            className: 'text-blue-600'
+            className: 'text-status-info'
         },
         contact_only: {
             icon: AlertCircle,

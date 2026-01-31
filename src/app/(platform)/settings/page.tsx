@@ -69,7 +69,7 @@ export default async function SettingsPage() {
                         </div>
                         <div>
                             <Label>Role</Label>
-                            <div className="p-2 bg-muted rounded border border-slate-200 font-mono text-amber-600">{profile?.role}</div>
+                            <div className="p-2 bg-muted rounded border border-slate-200 font-mono text-status-warning">{profile?.role}</div>
                         </div>
                         <div>
                             <Label>Foundry ID</Label>
@@ -86,8 +86,8 @@ export default async function SettingsPage() {
 
             <Card className="border-destructive/20 bg-status-error-light/50">
                 <CardHeader>
-                    <CardTitle className="text-red-900">Sign Out</CardTitle>
-                    <CardDescription className="text-red-700">
+                    <CardTitle className="text-destructive">Sign Out</CardTitle>
+                    <CardDescription className="text-destructive">
                         Securely sign out of your account on this device. You will need to sign in again to access the platform.
                     </CardDescription>
                 </CardHeader>
@@ -99,7 +99,7 @@ export default async function SettingsPage() {
                         const { data: { user } } = await supabase.auth.getUser()
                         // SECURITY: Log logout event before signing out
                         if (user) {
-                            await logSecurityEvent('LOGOUT', user.id, { success: true })
+                            await logSecurityEvent({ type: 'LOGOUT', userId: user.id, success: true })
                         }
                         await supabase.auth.signOut()
                         redirect('/login')

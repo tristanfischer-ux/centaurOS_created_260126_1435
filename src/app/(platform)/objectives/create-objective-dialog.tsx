@@ -322,7 +322,7 @@ export function CreateObjectiveDialog({ children }: CreateObjectiveDialogProps) 
                     </Button>
                 )}
             </DialogTrigger>
-            <DialogContent className="w-[calc(100vw-2rem)] sm:max-w-[800px] max-h-[90dvh] flex flex-col p-0 gap-0 bg-background sm:rounded-xl overflow-hidden">
+            <DialogContent size="lg" className="w-[calc(100vw-2rem)] max-h-[90dvh] flex flex-col p-0 gap-0 bg-background sm:rounded-xl overflow-hidden">
                 {/* Header Section */}
                 <div className="p-6 pb-4 bg-muted/50">
                     <DialogHeader>

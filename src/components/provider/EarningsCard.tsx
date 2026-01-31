@@ -43,17 +43,17 @@ export function EarningsCard({
         <Card className={cn("", className)}>
             <CardHeader className="pb-2">
                 <CardTitle className="text-lg flex items-center gap-2">
-                    <DollarSign className="h-5 w-5 text-green-600" />
+                    <DollarSign className="h-5 w-5 text-status-success" />
                     Earnings Overview
                 </CardTitle>
                 <CardDescription>Your earnings summary</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
                 {/* This Month */}
-                <div className="flex items-center justify-between p-4 rounded-lg bg-green-50 border border-green-100">
+                <div className="flex items-center justify-between p-4 rounded-lg bg-status-success-light border border-status-success">
                     <div>
-                        <p className="text-sm text-green-700 font-medium">This Month</p>
-                        <p className="text-2xl font-bold text-green-900 mt-1">
+                        <p className="text-sm text-status-success-dark font-medium">This Month</p>
+                        <p className="text-2xl font-bold text-status-success-foreground mt-1">
                             {formatCurrency(earningsThisMonth, currency)}
                         </p>
                     </div>
@@ -61,8 +61,8 @@ export function EarningsCard({
                         <div className={cn(
                             "flex items-center gap-1 px-2 py-1 rounded-full text-sm font-medium",
                             isPositive 
-                                ? "bg-green-100 text-green-700" 
-                                : "bg-red-100 text-red-700"
+                                ? "bg-status-success-light text-status-success-dark" 
+                                : "bg-status-error-light text-destructive"
                         )}>
                             {isPositive ? (
                                 <TrendingUp className="h-4 w-4" />
@@ -76,12 +76,12 @@ export function EarningsCard({
 
                 {/* Pending and Total */}
                 <div className="grid grid-cols-2 gap-4">
-                    <div className="p-4 rounded-lg bg-amber-50 border border-amber-100">
-                        <div className="flex items-center gap-2 text-amber-700">
+                    <div className="p-4 rounded-lg bg-status-warning-light border border-status-warning">
+                        <div className="flex items-center gap-2 text-status-warning-dark">
                             <Clock className="h-4 w-4" />
                             <p className="text-sm font-medium">Pending Payout</p>
                         </div>
-                        <p className="text-xl font-bold text-amber-900 mt-2">
+                        <p className="text-xl font-bold text-status-warning-foreground mt-2">
                             {formatCurrency(pendingPayout, currency)}
                         </p>
                     </div>

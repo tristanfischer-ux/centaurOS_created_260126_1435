@@ -81,7 +81,7 @@ export function MultiSelect({
                                     {opt.icon}
                                     <span className="truncate max-w-[80px]">{opt.label}</span>
                                     <X
-                                        className="h-3 w-3 cursor-pointer hover:text-amber-900"
+                                        className="h-3 w-3 cursor-pointer hover:text-status-warning-dark"
                                         onClick={(e) => handleRemove(opt.value, e)}
                                     />
                                 </Badge>
@@ -93,7 +93,7 @@ export function MultiSelect({
                             >
                                 {selectedOptions.length} selected
                                 <X
-                                    className="h-3 w-3 ml-1 cursor-pointer hover:text-amber-900"
+                                    className="h-3 w-3 ml-1 cursor-pointer hover:text-status-warning-dark"
                                     onClick={handleClearAll}
                                 />
                             </Badge>

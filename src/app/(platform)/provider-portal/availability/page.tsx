@@ -73,11 +73,11 @@ export default async function AvailabilityPage() {
                 
                 <Card className="border-status-warning/50 bg-status-warning-light/50">
                     <CardHeader>
-                        <CardTitle className="flex items-center gap-2 text-amber-900">
+                        <CardTitle className="flex items-center gap-2 text-status-warning-dark">
                             <AlertCircle className="h-5 w-5" />
                             Provider Profile Required
                         </CardTitle>
-                        <CardDescription className="text-amber-700">
+                        <CardDescription className="text-status-warning">
                             You need to set up your provider profile before managing availability.
                         </CardDescription>
                     </CardHeader>
@@ -119,8 +119,8 @@ export default async function AvailabilityPage() {
                 <Card>
                     <CardContent className="pt-6">
                         <div className="flex items-center gap-4">
-                            <div className="p-3 rounded-full bg-emerald-100">
-                                <Check className="h-6 w-6 text-emerald-600" />
+                            <div className="p-3 rounded-full bg-status-success-light">
+                                <Check className="h-6 w-6 text-status-success" />
                             </div>
                             <div>
                                 <p className="text-2xl font-bold text-foreground">
@@ -136,8 +136,8 @@ export default async function AvailabilityPage() {
                 <Card>
                     <CardContent className="pt-6">
                         <div className="flex items-center gap-4">
-                            <div className="p-3 rounded-full bg-blue-100">
-                                <Calendar className="h-6 w-6 text-blue-600" />
+                            <div className="p-3 rounded-full bg-status-info-light">
+                                <Calendar className="h-6 w-6 text-status-info" />
                             </div>
                             <div>
                                 <p className="text-2xl font-bold text-foreground">
@@ -170,8 +170,8 @@ export default async function AvailabilityPage() {
                 <Card>
                     <CardContent className="pt-6">
                         <div className="flex items-center gap-4">
-                            <div className="p-3 rounded-full bg-amber-100">
-                                <Settings className="h-6 w-6 text-amber-600" />
+                            <div className="p-3 rounded-full bg-status-warning-light">
+                                <Settings className="h-6 w-6 text-status-warning" />
                             </div>
                             <div className="flex flex-col gap-1">
                                 <Badge variant={profile.is_active ? "default" : "secondary"}>
@@ -189,10 +189,10 @@ export default async function AvailabilityPage() {
                 <Card className="border-status-warning bg-status-warning-light">
                     <CardContent className="pt-6">
                         <div className="flex items-start gap-3">
-                            <AlertCircle className="h-5 w-5 text-amber-600 mt-0.5" />
+                            <AlertCircle className="h-5 w-5 text-status-warning mt-0.5" />
                             <div>
-                                <p className="font-medium text-amber-900">Out of Office Mode Active</p>
-                                <p className="text-sm text-amber-700 mt-1">
+                                <p className="font-medium text-status-warning-dark">Out of Office Mode Active</p>
+                                <p className="text-sm text-status-warning mt-1">
                                     {profile.out_of_office_message || 'You are currently marked as out of office.'}
                                     {profile.out_of_office_until && (
                                         <span className="block mt-1">
@@ -255,7 +255,7 @@ export default async function AvailabilityPage() {
                         <div className="p-4 border rounded-lg bg-muted/50">
                             <div className="flex items-start gap-3">
                                 <div className="p-2 rounded-lg bg-background border">
-                                    <Calendar className="h-5 w-5 text-blue-500" />
+                                    <Calendar className="h-5 w-5 text-status-info" />
                                 </div>
                                 <div className="flex-1">
                                     <h4 className="font-medium text-foreground">Google Calendar</h4>
@@ -278,7 +278,7 @@ export default async function AvailabilityPage() {
                         <div className="p-4 border rounded-lg bg-muted/50">
                             <div className="flex items-start gap-3">
                                 <div className="p-2 rounded-lg bg-background border">
-                                    <ExternalLink className="h-5 w-5 text-blue-600" />
+                                    <ExternalLink className="h-5 w-5 text-status-info" />
                                 </div>
                                 <div className="flex-1">
                                     <h4 className="font-medium text-foreground">Outlook</h4>
@@ -300,8 +300,8 @@ export default async function AvailabilityPage() {
 
                     <div className="mt-4 p-3 bg-status-info-light rounded-lg border border-status-info">
                         <div className="flex items-start gap-2">
-                            <AlertCircle className="h-4 w-4 text-blue-600 mt-0.5" />
-                            <p className="text-sm text-blue-700">
+                            <AlertCircle className="h-4 w-4 text-status-info mt-0.5" />
+                            <p className="text-sm text-status-info">
                                 Calendar sync is coming soon. When enabled, you&apos;ll be able to automatically block 
                                 dates from your external calendar and export your availability for clients.
                             </p>

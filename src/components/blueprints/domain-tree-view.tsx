@@ -91,9 +91,9 @@ function DomainTreeItem({
         <StatusIcon
           className={cn(
             'h-4 w-4 flex-shrink-0',
-            coverage.status === 'covered' && 'text-emerald-500',
-            coverage.status === 'partial' && 'text-amber-500',
-            coverage.status === 'gap' && 'text-rose-500',
+            coverage.status === 'covered' && 'text-status-success',
+            coverage.status === 'partial' && 'text-status-warning',
+            coverage.status === 'gap' && 'text-destructive',
             coverage.status === 'not_needed' && 'text-muted-foreground'
           )}
         />

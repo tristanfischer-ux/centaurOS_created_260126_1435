@@ -103,15 +103,15 @@ export function CoverageBar({
     <div className={cn('space-y-1', className)}>
       <div className="flex h-2 w-full overflow-hidden rounded-full bg-muted">
         <div
-          className="bg-emerald-500 transition-all"
+          className="bg-status-success transition-all"
           style={{ width: `${coveredPct}%` }}
         />
         <div
-          className="bg-amber-500 transition-all"
+          className="bg-status-warning transition-all"
           style={{ width: `${partialPct}%` }}
         />
         <div
-          className="bg-rose-500 transition-all"
+          className="bg-destructive transition-all"
           style={{ width: `${gapsPct}%` }}
         />
       </div>
@@ -140,9 +140,9 @@ export function CoverageScore({
   className,
 }: CoverageScoreProps) {
   const getScoreColor = (score: number) => {
-    if (score >= 80) return 'text-emerald-600'
-    if (score >= 50) return 'text-amber-600'
-    return 'text-rose-600'
+    if (score >= 80) return 'text-status-success'
+    if (score >= 50) return 'text-status-warning'
+    return 'text-destructive'
   }
 
   const sizeStyles = {

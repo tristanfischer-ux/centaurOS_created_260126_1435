@@ -27,9 +27,27 @@ Feature Implementation Progress:
 - [ ] 4. Implement service layer logic
 - [ ] 5. Create server actions
 - [ ] 6. Build UI components
-- [ ] 7. Add to appropriate route
-- [ ] 8. Test functionality
+- [ ] 7. UI Standards compliance check ← NEW
+- [ ] 8. Add to appropriate route
+- [ ] 9. Test functionality
 ```
+
+### Step 7: UI Standards Compliance
+
+**IMPORTANT:** Before committing UI code, verify:
+
+```
+UI Compliance Checklist:
+- [ ] No hardcoded status colors (text-red/green/amber/blue-*)
+- [ ] Forms have proper ARIA attributes (aria-required, aria-invalid, aria-describedby)
+- [ ] Error messages use text-destructive and role="alert"
+- [ ] Dialogs use size prop (not custom max-w-[])
+- [ ] Status indicators use StatusBadge component
+- [ ] Icon-only buttons have aria-label
+- [ ] Cards use Card component (not custom divs)
+```
+
+See the **ui-component-standards** skill for complete reference.
 
 ## Step-by-Step Workflow
 

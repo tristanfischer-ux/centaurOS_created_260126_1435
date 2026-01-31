@@ -219,7 +219,7 @@ export function DelegationManager({ members, currentUserId, userRole }: Delegati
                                                 size="sm"
                                                 onClick={() => handleRevoke(delegation.id)}
                                                 disabled={isPending}
-                                                className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                                className="text-destructive hover:text-destructive hover:bg-status-error-light"
                                             >
                                                 <Trash2 className="h-4 w-4" />
                                             </Button>
@@ -237,7 +237,7 @@ export function DelegationManager({ members, currentUserId, userRole }: Delegati
                 <Card>
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2">
-                            <Shield className="h-5 w-5 text-green-600" />
+                            <Shield className="h-5 w-5 text-status-success" />
                             Delegated Authority
                         </CardTitle>
                         <CardDescription>
@@ -252,7 +252,7 @@ export function DelegationManager({ members, currentUserId, userRole }: Delegati
                                 return (
                                     <div 
                                         key={delegation.id}
-                                        className="flex items-center gap-3 p-3 rounded-lg border border-green-200 bg-green-50"
+                                        className="flex items-center gap-3 p-3 rounded-lg border border-status-success bg-status-success-light"
                                     >
                                         <UserAvatar
                                             name={delegator?.full_name || null}
@@ -265,7 +265,7 @@ export function DelegationManager({ members, currentUserId, userRole }: Delegati
                                                     {delegator?.full_name || 'Unknown'}
                                                 </span>
                                                 <ArrowRight className="h-3 w-3 text-muted-foreground" />
-                                                <span className="text-green-700 font-medium">You</span>
+                                                <span className="text-status-success font-medium">You</span>
                                             </div>
                                             <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
                                                 <Clock className="h-3 w-3" />
@@ -278,7 +278,7 @@ export function DelegationManager({ members, currentUserId, userRole }: Delegati
                                                 )}
                                             </div>
                                         </div>
-                                        <Badge className="bg-green-100 text-green-700 border-green-200">
+                                        <Badge className="bg-status-success-light text-status-success border-status-success">
                                             Active
                                         </Badge>
                                     </div>
@@ -291,7 +291,7 @@ export function DelegationManager({ members, currentUserId, userRole }: Delegati
 
             {/* Create Delegation Dialog */}
             <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
-                <DialogContent className="sm:max-w-[425px] bg-white">
+                <DialogContent size="sm" className="bg-white">
                     <DialogHeader>
                         <DialogTitle className="text-foreground">Create Delegation</DialogTitle>
                         <DialogDescription>

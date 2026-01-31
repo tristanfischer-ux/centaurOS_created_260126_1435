@@ -250,7 +250,7 @@ function ResultCard({
                 {result.subcategory}
               </Badge>
               {result.is_verified && (
-                <ShieldCheck className="h-4 w-4 text-emerald-600 shrink-0" />
+                <ShieldCheck className="h-4 w-4 text-status-success shrink-0" />
               )}
             </div>
             <h3 className="font-semibold truncate">{result.title}</h3>
@@ -378,7 +378,7 @@ function ResultListItem({
                   {result.subcategory}
                 </Badge>
                 {result.is_verified && (
-                  <ShieldCheck className="h-4 w-4 text-emerald-600" />
+                  <ShieldCheck className="h-4 w-4 text-status-success" />
                 )}
                 {result.provider && (
                   <Badge
@@ -462,11 +462,11 @@ function ResultListItem({
 function getTierBadgeClass(tier: ProviderTier): string {
   switch (tier) {
     case "premium":
-      return "bg-amber-100 text-amber-800 border-amber-300"
+      return "bg-status-warning-light text-status-warning-dark border-status-warning"
     case "verified":
-      return "bg-emerald-100 text-emerald-800 border-emerald-300"
+      return "bg-status-success-light text-status-success-dark border-status-success"
     case "standard":
-      return "bg-blue-100 text-blue-800 border-blue-300"
+      return "bg-status-info-light text-status-info-dark border-status-info"
     default:
       return "bg-muted text-foreground"
   }

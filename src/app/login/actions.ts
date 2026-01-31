@@ -25,7 +25,7 @@ export async function login(formData: FormData) {
             success: false,
             details: { 
                 remaining: rateLimitResult.remaining,
-                resetIn: rateLimitResult.reset 
+                resetIn: rateLimitResult.resetTime 
             }
         })
         redirect(`/login?error=${encodeURIComponent('Too many login attempts. Please try again in 15 minutes.')}`)

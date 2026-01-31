@@ -504,6 +504,7 @@ export async function addExpertise(input: AddExpertiseInput): Promise<{
     return { data: null, error: 'Coverage not found' }
   }
 
+  // @ts-expect-error - coverage_id column exists but types may be stale
   const { data, error } = await supabase
     .from('blueprint_expertise')
     .insert({

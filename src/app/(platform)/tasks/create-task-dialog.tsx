@@ -350,7 +350,7 @@ export function CreateTaskDialog({ objectives, members, teams = [], currentUserI
                     </Button>
                 )}
             </DialogTrigger>
-            <DialogContent className="w-[calc(100vw-2rem)] sm:max-w-[600px] bg-background text-foreground border max-h-[90dvh] overflow-y-auto">
+            <DialogContent size="md" className="w-[calc(100vw-2rem)] bg-background text-foreground border max-h-[90dvh] overflow-y-auto">
                 <form onSubmit={onSubmit}>
                     <DialogHeader>
                         <div className="flex items-start justify-between pr-8">
@@ -367,7 +367,7 @@ export function CreateTaskDialog({ objectives, members, teams = [], currentUserI
                                         className={`flex items-center gap-2 ${showVoiceNudge ? 'animate-pulse' : ''}`}
                                     />
                                     {showVoiceNudge && (
-                                        <div className="absolute -top-8 right-0 bg-amber-500 text-white text-xs px-2 py-1 rounded shadow-lg whitespace-nowrap animate-pulse">
+                                        <div className="absolute -top-8 right-0 bg-status-warning text-status-warning-foreground text-xs px-2 py-1 rounded shadow-lg whitespace-nowrap animate-pulse">
                                             ✨ Try voice input
                                         </div>
                                     )}

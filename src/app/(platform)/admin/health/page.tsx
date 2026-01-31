@@ -18,7 +18,7 @@ export default async function PlatformHealthPage() {
     if (error || !health) {
         return (
             <div className="text-center py-12">
-                <AlertCircle className="h-12 w-12 text-red-600 mx-auto mb-4" />
+                <AlertCircle className="h-12 w-12 text-destructive mx-auto mb-4" />
                 <h2 className="text-lg font-semibold mb-2">Failed to load health data</h2>
                 <p className="text-muted-foreground">{error}</p>
             </div>
@@ -110,7 +110,7 @@ export default async function PlatformHealthPage() {
                                 </div>
                                 <div>
                                     <p className="text-xs text-muted-foreground">Failed Events</p>
-                                    <p className={`text-lg font-semibold ${health.stripe.failedEvents > 0 ? 'text-red-600' : ''}`}>
+                                    <p className={`text-lg font-semibold ${health.stripe.failedEvents > 0 ? 'text-destructive' : ''}`}>
                                         {health.stripe.failedEvents}
                                     </p>
                                 </div>
@@ -136,7 +136,7 @@ export default async function PlatformHealthPage() {
                                 <RefreshCw className="h-4 w-4 text-muted-foreground" />
                                 <span className="text-sm text-muted-foreground">Failed Payments</span>
                             </div>
-                            <p className={`text-2xl font-bold ${health.failedPayments > 0 ? 'text-amber-600' : 'text-foreground'}`}>
+                            <p className={`text-2xl font-bold ${health.failedPayments > 0 ? 'text-status-warning' : 'text-foreground'}`}>
                                 {health.failedPayments}
                             </p>
                             <p className="text-xs text-muted-foreground mt-1">
@@ -151,7 +151,7 @@ export default async function PlatformHealthPage() {
                             </div>
                             <p className={`text-2xl font-bold ${
                                 (health.stripe.pendingEvents + health.stripe.failedEvents) > 20 
-                                    ? 'text-amber-600' 
+                                    ? 'text-status-warning' 
                                     : 'text-foreground'
                             }`}>
                                 {health.stripe.pendingEvents + health.stripe.failedEvents}
@@ -195,7 +195,7 @@ export default async function PlatformHealthPage() {
                                     className="flex items-center justify-between p-3 rounded-lg bg-muted/50"
                                 >
                                     <div className="flex items-center gap-3">
-                                        <AlertCircle className={`h-4 w-4 ${error.count > 5 ? 'text-red-600' : 'text-amber-600'}`} />
+                                        <AlertCircle className={`h-4 w-4 ${error.count > 5 ? 'text-destructive' : 'text-status-warning'}`} />
                                         <div>
                                             <p className="font-medium text-sm">{error.type}</p>
                                             <div className="flex items-center gap-1 text-xs text-muted-foreground">
@@ -212,7 +212,7 @@ export default async function PlatformHealthPage() {
                         </div>
                     ) : (
                         <div className="text-center py-8">
-                            <Activity className="h-8 w-8 text-green-600 mx-auto mb-2" />
+                            <Activity className="h-8 w-8 text-status-success mx-auto mb-2" />
                             <p className="text-sm text-muted-foreground">
                                 No recent errors recorded
                             </p>

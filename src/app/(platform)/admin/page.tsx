@@ -41,7 +41,7 @@ export default async function AdminDashboardPage() {
     if (statsError || !stats) {
         return (
             <div className="text-center py-12">
-                <p className="text-red-600">{statsError || 'Failed to load dashboard'}</p>
+                <p className="text-destructive">{statsError || 'Failed to load dashboard'}</p>
             </div>
         )
     }
@@ -77,9 +77,9 @@ export default async function AdminDashboardPage() {
             
             {/* Platform Health Banner */}
             <Card className={stats.platformHealth === 'critical' 
-                ? 'border-red-500 bg-red-50 dark:bg-red-950/20' 
+                ? 'border-destructive bg-status-error-light' 
                 : stats.platformHealth === 'degraded' 
-                ? 'border-amber-500 bg-amber-50 dark:bg-amber-950/20'
+                ? 'border-status-warning bg-status-warning-light'
                 : ''
             }>
                 <CardContent className="p-4">
@@ -291,8 +291,8 @@ export default async function AdminDashboardPage() {
 }
 
 function getActivityIcon(action: string) {
-    if (action.includes('approve')) return <CheckCircle2 className="h-4 w-4 text-green-600" />
-    if (action.includes('reject')) return <XCircle className="h-4 w-4 text-red-600" />
+    if (action.includes('approve')) return <CheckCircle2 className="h-4 w-4 text-status-success" />
+    if (action.includes('reject')) return <XCircle className="h-4 w-4 text-destructive" />
     return <RefreshCw className="h-4 w-4 text-muted-foreground" />
 }
 

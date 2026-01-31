@@ -152,12 +152,12 @@ export function DataSyncTab({ foundryId, isFounder }: DataSyncTabProps) {
                 <div className="flex items-center gap-2">
                     {isConnected ? (
                         <>
-                            <CheckCircle2 className="h-5 w-5 text-green-500" />
+                            <CheckCircle2 className="h-5 w-5 text-status-success" />
                             <span className="text-sm font-medium text-foundry-900">Connected</span>
                         </>
                     ) : (
                         <>
-                            <AlertCircle className="h-5 w-5 text-amber-500" />
+                            <AlertCircle className="h-5 w-5 text-status-warning" />
                             <span className="text-sm font-medium text-foundry-900">Not Connected</span>
                         </>
                     )}
@@ -171,12 +171,12 @@ export function DataSyncTab({ foundryId, isFounder }: DataSyncTabProps) {
             </div>
             
             {error && (
-                <div className="p-2 text-xs bg-red-50 text-red-700 rounded-md">
+                <div className="p-2 text-xs bg-status-error-light text-destructive rounded-md">
                     {error}
                 </div>
             )}
             {success && (
-                <div className="p-2 text-xs bg-green-50 text-green-700 rounded-md">
+                <div className="p-2 text-xs bg-status-success-light text-status-success-dark rounded-md">
                     {success}
                 </div>
             )}

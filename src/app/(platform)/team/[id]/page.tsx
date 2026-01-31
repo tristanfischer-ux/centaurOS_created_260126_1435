@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
-import { Mail, Briefcase, Shield, Award } from 'lucide-react'
+import Link from 'next/link'
+import { Mail, Briefcase, Shield, Award, ChevronRight } from 'lucide-react'
 import { Badge } from "@/components/ui/badge"
 import { CompareToDialog } from './compare-to-dialog'
 
@@ -22,7 +23,7 @@ export default async function ProfilePage({ params }: { params: Promise<{ id: st
     const foundry_id = profile.foundry_id
 
     if (!foundry_id) {
-        return <div className="p-8 text-red-500">Error: This profile is not correctly associated with a Foundry.</div>
+        return <div className="p-8 text-destructive">Error: This profile is not correctly associated with a Foundry.</div>
     }
 
     // Fetch assigned tasks for this profile
@@ -64,11 +65,25 @@ export default async function ProfilePage({ params }: { params: Promise<{ id: st
 
     if (!currentMemberMetrics) {
         // Fallback if not found in the list (e.g. newly joined)
-        return <div className="p-8 text-amber-600 bg-amber-50 rounded-lg">Profile metadata sync in progress. Please refresh in a moment.</div>
+        return <div className="p-8 text-status-warning bg-status-warning-light rounded-lg">Profile metadata sync in progress. Please refresh in a moment.</div>
     }
 
     return (
         <div className="space-y-8">
+            {/* Breadcrumb Navigation */}
+            <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-sm">
+                <Link 
+                    href="/team" 
+                    className="text-muted-foreground hover:text-foreground transition-colors"
+                >
+                    Team
+                </Link>
+                <ChevronRight className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                <span className="text-foreground font-medium truncate max-w-[200px]">
+                    {profile.full_name || 'Team Member'}
+                </span>
+            </nav>
+
             {/* Header / Profile Card */}
             <div className="bg-background border border-slate-200 rounded-xl p-8 shadow-sm flex items-start gap-8">
                 <div className="h-32 w-32 bg-muted rounded-full flex items-center justify-center text-4xl border-4 border-slate-50 shadow-inner">
@@ -100,8 +115,8 @@ export default async function ProfilePage({ params }: { params: Promise<{ id: st
                         return (
                             <div className="grid grid-cols-3 gap-6 mt-8 border-t border-slate-100 pt-6">
                                 <div className="flex items-center gap-3">
-                                    <div className="p-2 bg-blue-50 text-blue-600 rounded-lg">
-                                        <Briefcase className="w-5 h-5" />
+<div className="p-2 bg-status-info-light text-status-info rounded-lg">
+                                                        <Briefcase className="w-5 h-5" />
                                     </div>
                                     <div>
                                         <div className="text-sm text-muted-foreground">Active Tasks</div>
@@ -109,8 +124,8 @@ export default async function ProfilePage({ params }: { params: Promise<{ id: st
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-3">
-                                    <div className="p-2 bg-green-50 text-green-600 rounded-lg">
-                                        <Shield className="w-5 h-5" />
+<div className="p-2 bg-status-success-light text-status-success rounded-lg">
+                                                        <Shield className="w-5 h-5" />
                                     </div>
                                     <div>
                                         <div className="text-sm text-muted-foreground">Completed</div>
@@ -118,8 +133,8 @@ export default async function ProfilePage({ params }: { params: Promise<{ id: st
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-3">
-                                    <div className="p-2 bg-amber-50 text-amber-600 rounded-lg">
-                                        <Award className="w-5 h-5" />
+<div className="p-2 bg-status-warning-light text-status-warning rounded-lg">
+                                                        <Award className="w-5 h-5" />
                                     </div>
                                     <div>
                                         <div className="text-sm text-muted-foreground">Reputation</div>

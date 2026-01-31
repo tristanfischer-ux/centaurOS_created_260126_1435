@@ -82,7 +82,7 @@ export function PendingApprovalsWidget({ userRole }: PendingApprovalsWidgetProps
                         <CardDescription>Tasks awaiting your review</CardDescription>
                     </div>
                     {tasks.length > 0 && (
-                        <Badge variant="secondary" className="bg-amber-100 text-amber-700">
+                        <Badge variant="secondary" className="bg-status-warning-light text-status-warning">
                             {tasks.length}
                         </Badge>
                     )}
@@ -95,7 +95,7 @@ export function PendingApprovalsWidget({ userRole }: PendingApprovalsWidgetProps
                     </div>
                 ) : tasks.length === 0 ? (
                     <div className="text-center py-6">
-                        <Check className="h-10 w-10 mx-auto text-green-500 mb-2" />
+                        <Check className="h-10 w-10 mx-auto text-status-success mb-2" />
                         <p className="text-sm text-muted-foreground font-medium">All caught up!</p>
                         <p className="text-xs text-muted-foreground">No tasks pending approval</p>
                     </div>
@@ -143,7 +143,7 @@ export function PendingApprovalsWidget({ userRole }: PendingApprovalsWidgetProps
                                                     variant="ghost"
                                                     onClick={() => handleQuickApprove(task.id)}
                                                     disabled={isPending}
-                                                    className="shrink-0 min-h-[44px] min-w-[44px] h-9 w-9 p-0 text-green-600 hover:text-green-700 hover:bg-green-50"
+                                                    className="shrink-0 min-h-[44px] min-w-[44px] h-9 w-9 p-0 text-status-success hover:text-status-success-dark hover:bg-status-success-light"
                                                 >
                                                     {isApproving ? (
                                                         <Loader2 className="h-4 w-4 animate-spin" />
@@ -164,7 +164,7 @@ export function PendingApprovalsWidget({ userRole }: PendingApprovalsWidgetProps
                         {tasks.length > 3 && (
                             <Link 
                                 href="/tasks?filter=pending_approval"
-                                className="flex items-center justify-center gap-1 text-sm text-blue-600 hover:text-blue-700 py-2"
+                                className="flex items-center justify-center gap-1 text-sm text-primary hover:text-primary/80 py-2"
                             >
                                 View all {tasks.length} pending
                                 <ArrowRight className="h-3 w-3" />

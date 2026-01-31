@@ -24,10 +24,10 @@ interface NextActionCardProps {
 
 export function NextActionCard({ action, onAction, className }: NextActionCardProps) {
   const priorityColors = {
-    critical: 'border-l-rose-500 bg-rose-50/50',
-    high: 'border-l-amber-500 bg-amber-50/50',
-    medium: 'border-l-blue-500 bg-blue-50/50',
-    low: 'border-l-emerald-500 bg-emerald-50/50',
+    critical: 'border-l-destructive bg-status-error-light/50',
+    high: 'border-l-status-warning bg-status-warning-light/50',
+    medium: 'border-l-status-info bg-status-info-light/50',
+    low: 'border-l-status-success bg-status-success-light/50',
   }
 
   const priorityBadge = {
@@ -52,11 +52,11 @@ export function NextActionCard({ action, onAction, className }: NextActionCardPr
           <div className="flex items-center gap-3">
             <div className={cn(
               'flex h-10 w-10 items-center justify-center rounded-lg',
-              action.type === 'gap' ? 'bg-rose-100' : 'bg-emerald-100'
+              action.type === 'gap' ? 'bg-status-error-light' : 'bg-status-success-light'
             )}>
               <TypeIcon className={cn(
                 'h-5 w-5',
-                action.type === 'gap' ? 'text-rose-600' : 'text-emerald-600'
+                action.type === 'gap' ? 'text-destructive' : 'text-status-success'
               )} />
             </div>
             <div>
@@ -127,7 +127,7 @@ export function NextMoveWidget({
   return (
     <div className={cn(
       'rounded-lg border bg-card p-4 space-y-3',
-      action.priority === 'critical' && 'border-rose-200 bg-rose-50/50',
+      action.priority === 'critical' && 'border-destructive bg-status-error-light/50',
       className
     )}>
       <div className="flex items-center justify-between">

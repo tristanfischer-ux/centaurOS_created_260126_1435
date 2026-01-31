@@ -51,7 +51,7 @@ export const ReviewCard = memo(function ReviewCard({
                                         {displayName}
                                     </span>
                                     {review.is_verified_purchase && (
-                                        <Badge variant="secondary" className="bg-emerald-50 text-emerald-700 border-emerald-200 text-xs">
+                                        <Badge variant="secondary" className="bg-status-success-light text-status-success-dark border-status-success text-xs">
                                             <CheckCircle2 className="w-3 h-3 mr-1" />
                                             Verified
                                         </Badge>
@@ -118,7 +118,7 @@ export const ReviewListItem = memo(function ReviewListItem({
                 <div className="flex items-center gap-2">
                     <span className="font-medium text-sm">{displayName}</span>
                     {review.is_verified_purchase && (
-                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                        <CheckCircle2 className="w-3.5 h-3.5 text-status-success" />
                     )}
                 </div>
                 <div className="flex items-center gap-0.5">

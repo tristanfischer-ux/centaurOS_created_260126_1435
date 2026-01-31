@@ -175,7 +175,7 @@ export const CATEGORY_COLORS: Record<FunctionCategory, string> = {
     'Marketing': 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200',
     'Sales': 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200',
     'Product': 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200',
-    'Engineering': 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900 dark:text-cyan-200',
+    'Engineering': 'bg-sky-100 text-sky-800 dark:bg-sky-900 dark:text-sky-200',
     'Customer Success': 'bg-teal-100 text-teal-800 dark:bg-teal-900 dark:text-teal-200',
     'Administration': 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200',
 }
@@ -183,24 +183,24 @@ export const CATEGORY_COLORS: Record<FunctionCategory, string> = {
 // Color mappings for coverage status (for UI)
 export const STATUS_COLORS: Record<CoverageStatus, { bg: string; text: string; border: string }> = {
     'covered': {
-        bg: 'bg-green-100 dark:bg-green-900/30',
-        text: 'text-green-700 dark:text-green-400',
-        border: 'border-green-300 dark:border-green-700',
+        bg: 'bg-status-success-light',
+        text: 'text-status-success',
+        border: 'border-status-success',
     },
     'partial': {
-        bg: 'bg-yellow-100 dark:bg-yellow-900/30',
-        text: 'text-yellow-700 dark:text-yellow-400',
-        border: 'border-yellow-300 dark:border-yellow-700',
+        bg: 'bg-status-warning-light',
+        text: 'text-status-warning',
+        border: 'border-status-warning',
     },
     'gap': {
-        bg: 'bg-red-100 dark:bg-red-900/30',
-        text: 'text-red-700 dark:text-red-400',
-        border: 'border-red-300 dark:border-red-700',
+        bg: 'bg-status-error-light',
+        text: 'text-destructive',
+        border: 'border-destructive',
     },
     'not_needed': {
-        bg: 'bg-gray-100 dark:bg-gray-900/30',
-        text: 'text-gray-500 dark:text-gray-400',
-        border: 'border-gray-300 dark:border-gray-700',
+        bg: 'bg-muted',
+        text: 'text-muted-foreground',
+        border: 'border-muted',
     },
 }
 

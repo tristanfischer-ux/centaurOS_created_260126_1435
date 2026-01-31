@@ -788,7 +788,7 @@ export function GanttView({ tasks, objectives, profiles, members = [], currentUs
 
             {/* Task Detail Modal */}
             <Dialog open={!!selectedTask} onOpenChange={(open) => !open && setSelectedTaskId(null)}>
-                <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto p-0 bg-transparent border-0 shadow-none">
+                <DialogContent size="lg" className="max-h-[90vh] overflow-y-auto p-0 bg-transparent border-0 shadow-none">
                     <Button
                         variant="ghost"
                         size="icon"

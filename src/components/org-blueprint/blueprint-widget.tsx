@@ -92,37 +92,37 @@ export function BlueprintWidget({ summary }: BlueprintWidgetProps) {
                         initial={{ opacity: 0, scale: 0.9 }}
                         animate={{ opacity: 1, scale: 1 }}
                         transition={{ delay: 0.1 }}
-                        className="p-2 rounded-lg bg-green-50"
+                        className="p-2 rounded-lg bg-status-success-light"
                     >
-                        <div className="text-lg font-bold text-green-700">{summary.covered}</div>
-                        <div className="text-[10px] text-green-600 uppercase tracking-wider">Covered</div>
+                        <div className="text-lg font-bold text-status-success-dark">{summary.covered}</div>
+                        <div className="text-[10px] text-status-success uppercase tracking-wider">Covered</div>
                     </motion.div>
                     <motion.div
                         initial={{ opacity: 0, scale: 0.9 }}
                         animate={{ opacity: 1, scale: 1 }}
                         transition={{ delay: 0.2 }}
-                        className="p-2 rounded-lg bg-yellow-50"
+                        className="p-2 rounded-lg bg-status-warning-light"
                     >
-                        <div className="text-lg font-bold text-yellow-700">{summary.partial}</div>
-                        <div className="text-[10px] text-yellow-600 uppercase tracking-wider">Partial</div>
+                        <div className="text-lg font-bold text-status-warning-dark">{summary.partial}</div>
+                        <div className="text-[10px] text-status-warning uppercase tracking-wider">Partial</div>
                     </motion.div>
                     <motion.div
                         initial={{ opacity: 0, scale: 0.9 }}
                         animate={{ opacity: 1, scale: 1 }}
                         transition={{ delay: 0.3 }}
-                        className="p-2 rounded-lg bg-red-50"
+                        className="p-2 rounded-lg bg-status-error-light"
                     >
-                        <div className="text-lg font-bold text-red-700">{summary.gaps}</div>
-                        <div className="text-[10px] text-red-600 uppercase tracking-wider">Gaps</div>
+                        <div className="text-lg font-bold text-destructive">{summary.gaps}</div>
+                        <div className="text-[10px] text-destructive uppercase tracking-wider">Gaps</div>
                     </motion.div>
                     <motion.div
                         initial={{ opacity: 0, scale: 0.9 }}
                         animate={{ opacity: 1, scale: 1 }}
                         transition={{ delay: 0.4 }}
-                        className="p-2 rounded-lg bg-gray-50"
+                        className="p-2 rounded-lg bg-muted"
                     >
-                        <div className="text-lg font-bold text-gray-500">{summary.notApplicable}</div>
-                        <div className="text-[10px] text-gray-500 uppercase tracking-wider">N/A</div>
+                        <div className="text-lg font-bold text-muted-foreground">{summary.notApplicable}</div>
+                        <div className="text-[10px] text-muted-foreground uppercase tracking-wider">N/A</div>
                     </motion.div>
                 </div>
 
@@ -177,12 +177,12 @@ export function BlueprintWidgetCompact({ summary }: BlueprintWidgetProps) {
                     <div className="flex items-center gap-3">
                         <div className={cn(
                             "p-2 rounded-lg",
-                            summary.gaps > 0 ? "bg-amber-100" : "bg-green-100"
+                            summary.gaps > 0 ? "bg-status-warning-light" : "bg-status-success-light"
                         )}>
                             {summary.gaps > 0 ? (
-                                <AlertTriangle className="h-5 w-5 text-amber-600" />
+                                <AlertTriangle className="h-5 w-5 text-status-warning" />
                             ) : (
-                                <CheckCircle2 className="h-5 w-5 text-green-600" />
+                                <CheckCircle2 className="h-5 w-5 text-status-success" />
                             )}
                         </div>
                         <div className="flex-1 min-w-0">

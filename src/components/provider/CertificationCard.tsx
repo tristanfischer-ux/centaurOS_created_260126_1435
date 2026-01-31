@@ -51,8 +51,8 @@ export const CertificationCard = memo(function CertificationCard({
     return (
         <Card className={cn(
             'transition-colors',
-            isExpired && 'border-red-200 bg-red-50/50',
-            isExpiringSoon && !isExpired && 'border-amber-200 bg-amber-50/50',
+            isExpired && 'border-destructive bg-status-error-light/50',
+            isExpiringSoon && !isExpired && 'border-status-warning bg-status-warning-light/50',
             className
         )}>
             <CardContent className="p-4">
@@ -65,7 +65,7 @@ export const CertificationCard = memo(function CertificationCard({
                             </h3>
                             {/* Verification Status */}
                             {certification.is_verified ? (
-                                <Badge variant="secondary" className="bg-emerald-50 text-emerald-700 border-emerald-200 shrink-0">
+                                <Badge variant="secondary" className="bg-status-success-light text-status-success-dark border-status-success shrink-0">
                                     <CheckCircle2 className="w-3 h-3 mr-1" />
                                     Verified
                                 </Badge>
@@ -96,8 +96,8 @@ export const CertificationCard = memo(function CertificationCard({
                             )}
                             {certification.expiry_date && (
                                 <span className={cn(
-                                    isExpired && 'text-red-600 font-medium',
-                                    isExpiringSoon && !isExpired && 'text-amber-600 font-medium'
+                                    isExpired && 'text-destructive font-medium',
+                                    isExpiringSoon && !isExpired && 'text-status-warning font-medium'
                                 )}>
                                     {isExpired ? (
                                         <>Expired {formatDistanceToNow(new Date(certification.expiry_date))} ago</>
@@ -112,14 +112,14 @@ export const CertificationCard = memo(function CertificationCard({
 
                         {/* Expiry Warning */}
                         {isExpiringSoon && !isExpired && (
-                            <div className="flex items-center gap-1.5 mt-2 text-amber-700 text-sm">
+                            <div className="flex items-center gap-1.5 mt-2 text-status-warning-dark text-sm">
                                 <AlertTriangle className="w-4 h-4" />
                                 <span>Expiring soon - consider renewing</span>
                             </div>
                         )}
 
                         {isExpired && (
-                            <div className="flex items-center gap-1.5 mt-2 text-red-700 text-sm">
+                            <div className="flex items-center gap-1.5 mt-2 text-destructive text-sm">
                                 <AlertTriangle className="w-4 h-4" />
                                 <span>This certification has expired</span>
                             </div>
@@ -131,7 +131,7 @@ export const CertificationCard = memo(function CertificationCard({
                                 href={sanitizeHref(certification.verification_url)}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="inline-flex items-center gap-1 mt-2 text-sm text-blue-600 hover:underline"
+                                className="inline-flex items-center gap-1 mt-2 text-sm text-status-info hover:underline"
                             >
                                 <ExternalLink className="w-3 h-3" />
                                 Verify
@@ -166,7 +166,7 @@ export const CertificationCard = memo(function CertificationCard({
                                 )}
                                 <DropdownMenuItem
                                     onClick={onDelete}
-                                    className="text-red-600 focus:text-red-600"
+                                    className="text-destructive focus:text-destructive"
                                 >
                                     <Trash2 className="w-4 h-4 mr-2" />
                                     Delete
@@ -199,8 +199,8 @@ export const CertificationBadge = memo(function CertificationBadge({
             variant="secondary" 
             className={cn(
                 certification.is_verified 
-                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                    : 'bg-muted text-muted-foreground border-slate-200',
+                    ? 'bg-status-success-light text-status-success-dark border-status-success'
+                    : 'bg-muted text-muted-foreground border',
                 className
             )}
         >

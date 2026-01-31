@@ -14,18 +14,18 @@ interface HealthIndicatorProps {
 
 const statusConfig: Record<HealthStatus, { color: string; bgColor: string; label: string }> = {
     healthy: {
-        color: 'bg-green-500',
-        bgColor: 'bg-green-500/10',
+        color: 'bg-status-success',
+        bgColor: 'bg-status-success/10',
         label: 'Healthy'
     },
     degraded: {
-        color: 'bg-amber-500',
-        bgColor: 'bg-amber-500/10',
+        color: 'bg-status-warning',
+        bgColor: 'bg-status-warning/10',
         label: 'Degraded'
     },
     critical: {
-        color: 'bg-red-500',
-        bgColor: 'bg-red-500/10',
+        color: 'bg-destructive',
+        bgColor: 'bg-destructive/10',
         label: 'Critical'
     }
 }

@@ -160,7 +160,7 @@ export function SearchBar({
             className={cn(
               aiSearchEnabled && "bg-primary hover:bg-primary/90"
             )}
-            title={aiSearchEnabled ? "Search with AI" : "Enable AI Search"}
+            aria-label={aiSearchEnabled ? "Search with AI" : "Enable AI Search"}
           >
             {isLoading ? (
               <Loader2 className="h-4 w-4 animate-spin" />

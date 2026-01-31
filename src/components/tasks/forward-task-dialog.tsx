@@ -83,7 +83,7 @@ export function ForwardTaskDialog({
         </TooltipTrigger>
         <TooltipContent>Forward or reassign task</TooltipContent>
       </Tooltip>
-      <DialogContent className="bg-background shadow-xl text-foreground max-w-lg">
+      <DialogContent className="bg-background shadow-xl text-foreground">
         <DialogHeader>
           <DialogTitle>Forward Task</DialogTitle>
           <p className="text-sm text-muted-foreground mt-1">

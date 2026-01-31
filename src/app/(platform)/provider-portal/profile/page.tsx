@@ -140,7 +140,7 @@ export default function ProviderProfilePage() {
     if (!profile) {
         return (
             <div className="text-center py-12">
-                <AlertCircle className="h-12 w-12 mx-auto text-amber-500 mb-4" />
+                <AlertCircle className="h-12 w-12 mx-auto text-status-warning mb-4" />
                 <h2 className="text-xl font-semibold">Profile Not Found</h2>
                 <p className="text-muted-foreground mt-2">
                     You don&apos;t have a provider profile yet.
@@ -181,14 +181,14 @@ export default function ProviderProfilePage() {
             {/* Success/Error Messages */}
             {success && (
                 <div className="flex items-center gap-2 p-4 rounded-lg bg-status-success-light border border-status-success">
-                    <CheckCircle2 className="h-5 w-5 text-green-600" />
-                    <p className="text-sm text-green-700">Profile updated successfully!</p>
+                    <CheckCircle2 className="h-5 w-5 text-status-success" />
+                    <p className="text-sm text-status-success">Profile updated successfully!</p>
                 </div>
             )}
             {error && (
                 <div className="flex items-center gap-2 p-4 rounded-lg bg-status-error-light border border-destructive">
-                    <AlertCircle className="h-5 w-5 text-red-600" />
-                    <p className="text-sm text-red-700">{error}</p>
+                    <AlertCircle className="h-5 w-5 text-destructive" />
+                    <p className="text-sm text-destructive">{error}</p>
                 </div>
             )}
 
@@ -437,7 +437,7 @@ export default function ProviderProfilePage() {
                                                     {headline || "No headline set"}
                                                 </p>
                                                 {dayRate && (
-                                                <p className="text-sm font-medium text-green-600 mt-2">
+                                                <p className="text-sm font-medium text-status-success mt-2">
                                                     {currency} {parseFloat(dayRate).toFixed(0)} / day
                                                 </p>
                                                 )}
@@ -449,7 +449,7 @@ export default function ProviderProfilePage() {
                                             </p>
                                         )}
                                         {outOfOffice && (
-                                            <div className="mt-4 p-2 rounded bg-amber-50 text-amber-800 text-xs">
+                                            <div className="mt-4 p-2 rounded bg-status-warning-light text-status-warning-dark text-xs">
                                                 Currently unavailable
                                             </div>
                                         )}

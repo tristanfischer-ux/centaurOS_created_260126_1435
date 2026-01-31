@@ -349,7 +349,7 @@ export const ProviderTrustSection = memo(function ProviderTrustSection({
                                         >
                                             <div className="flex items-center gap-2">
                                                 {cert.is_verified && (
-                                                    <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                                                    <CheckCircle2 className="w-4 h-4 text-status-success" />
                                                 )}
                                                 <div>
                                                     <p className="font-medium text-sm">{cert.certification_name}</p>

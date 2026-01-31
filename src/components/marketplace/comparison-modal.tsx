@@ -71,7 +71,7 @@ const LOWER_IS_BETTER = ['cost', 'latency', 'setup_time', 'lead_time', 'price']
 const categoryBadgeStyles: Record<string, string> = {
     'People': 'bg-stone-100 text-stone-700',
     'Products': 'bg-muted text-foreground',
-    'Services': 'bg-blue-50 text-blue-700',
+    'Services': 'bg-status-info-light text-status-info-dark',
     'AI': 'bg-violet-50 text-violet-700'
 }
 
@@ -559,8 +559,8 @@ function renderValue(
     
     if (typeof value === 'boolean') {
         return value 
-            ? <Check className="w-4 h-4 text-emerald-500" /> 
-            : <X className="w-4 h-4 text-red-400" />
+            ? <Check className="w-4 h-4 text-status-success" /> 
+            : <X className="w-4 h-4 text-destructive" />
     }
     
     // Handle arrays with smart truncation

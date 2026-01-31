@@ -109,8 +109,8 @@ export const PortfolioGallery = memo(function PortfolioGallery({
                                             {selectedItem.title}
                                         </DialogTitle>
                                         {selectedItem.is_featured && (
-                                            <Badge variant="secondary" className="mt-2 bg-amber-50 text-amber-700 border-amber-200">
-                                                <Star className="w-3 h-3 mr-1 fill-amber-500" />
+                                            <Badge variant="secondary" className="mt-2 bg-status-warning-light text-status-warning-dark border-status-warning">
+                                                <Star className="w-3 h-3 mr-1 fill-status-warning" />
                                                 Featured
                                             </Badge>
                                         )}
@@ -300,9 +300,9 @@ function PortfolioCard({ item, onClick, onImageClick }: PortfolioCardProps) {
                     {item.is_featured && (
                         <Badge
                             variant="secondary"
-                            className="absolute top-2 left-2 bg-amber-50/90 text-amber-700 border-amber-200"
+                            className="absolute top-2 left-2 bg-status-warning-light/90 text-status-warning-dark border-status-warning"
                         >
-                            <Star className="w-3 h-3 mr-1 fill-amber-500" />
+                            <Star className="w-3 h-3 mr-1 fill-status-warning" />
                             Featured
                         </Badge>
                     )}
@@ -318,9 +318,9 @@ function PortfolioCard({ item, onClick, onImageClick }: PortfolioCardProps) {
                     {item.is_featured && (
                         <Badge
                             variant="secondary"
-                            className="absolute top-2 left-2 bg-amber-50/90 text-amber-700 border-amber-200"
+                            className="absolute top-2 left-2 bg-status-warning-light/90 text-status-warning-dark border-status-warning"
                         >
-                            <Star className="w-3 h-3 mr-1 fill-amber-500" />
+                            <Star className="w-3 h-3 mr-1 fill-status-warning" />
                             Featured
                         </Badge>
                     )}

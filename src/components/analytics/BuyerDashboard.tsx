@@ -121,7 +121,7 @@ export function BuyerDashboard({
       <Card className={className}>
         <CardContent className="flex items-center justify-center py-12">
           <div className="text-center">
-            <p className="text-red-500 mb-4">{error}</p>
+            <p className="text-destructive mb-4">{error}</p>
             <Button onClick={() => onPeriodChange(period)}>Retry</Button>
           </div>
         </CardContent>
@@ -183,8 +183,8 @@ export function BuyerDashboard({
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-blue-50">
-                <Wallet className="h-5 w-5 text-blue-600" />
+              <div className="p-2 rounded-lg bg-status-info-light">
+                <Wallet className="h-5 w-5 text-status-info" />
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Total Spend</p>
@@ -198,8 +198,8 @@ export function BuyerDashboard({
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-green-50">
-                <TrendingUp className="h-5 w-5 text-green-600" />
+              <div className="p-2 rounded-lg bg-status-success-light">
+                <TrendingUp className="h-5 w-5 text-status-success" />
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">This Period</p>
@@ -209,7 +209,7 @@ export function BuyerDashboard({
                 {spendChange !== null && (
                   <p className={cn(
                     "text-xs flex items-center gap-1",
-                    spendChange >= 0 ? "text-amber-600" : "text-green-600"
+                    spendChange >= 0 ? "text-status-warning" : "text-status-success"
                   )}>
                     {spendChange >= 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
                     {Math.abs(spendChange).toFixed(1)}% vs last period
@@ -260,7 +260,7 @@ export function BuyerDashboard({
         <Card>
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
-              <BarChart3 className="h-5 w-5 text-blue-600" />
+              <BarChart3 className="h-5 w-5 text-status-info" />
               Budget Tracking
             </CardTitle>
           </CardHeader>
@@ -284,7 +284,7 @@ export function BuyerDashboard({
                 className="h-3"
               />
               <div className="flex justify-between text-sm">
-                <span className="text-green-600">
+                <span className="text-status-success">
                   {formatCurrency(analytics.budgetRemaining || 0, analytics.currency)} remaining
                 </span>
                 <span className="text-muted-foreground">

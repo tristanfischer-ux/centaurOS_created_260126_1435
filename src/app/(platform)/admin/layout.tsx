@@ -47,8 +47,8 @@ export default async function AdminLayout({
     if (!hasAdminAccess) {
         return (
             <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-4">
-                <div className="p-4 rounded-full bg-red-100 mb-4">
-                    <ShieldAlert className="h-12 w-12 text-red-600" />
+                <div className="p-4 rounded-full bg-status-error-light mb-4">
+                    <ShieldAlert className="h-12 w-12 text-destructive" />
                 </div>
                 <h1 className="text-2xl font-bold text-foreground mb-2">
                     Access Denied

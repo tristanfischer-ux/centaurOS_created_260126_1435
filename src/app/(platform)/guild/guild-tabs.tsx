@@ -40,15 +40,15 @@ export function GuildTabs({ events, members, isExecutive }: GuildTabsProps) {
     const getRoleBadgeClass = (role: string | null) => {
         switch (role) {
             case 'Founder':
-                return 'bg-purple-100 text-purple-700 border-purple-200'
+                return 'bg-chart-5/20 text-chart-5 border-chart-5/30'
             case 'Executive':
-                return 'bg-amber-100 text-amber-700 border-amber-200'
+                return 'bg-status-warning-light text-status-warning-dark border-status-warning/30'
             case 'Apprentice':
-                return 'bg-blue-100 text-blue-700 border'
+                return 'bg-status-info-light text-status-info border-status-info/30'
             case 'AI_Agent':
-                return 'bg-indigo-100 text-indigo-700 border-indigo-200'
+                return 'bg-chart-5/20 text-chart-5 border-chart-5/30'
             default:
-                return 'bg-muted text-muted-foreground border-slate-200'
+                return 'bg-muted text-muted-foreground border'
         }
     }
 
@@ -102,7 +102,7 @@ export function GuildTabs({ events, members, isExecutive }: GuildTabsProps) {
                                             <MapPin className="mr-1 h-3 w-3" /> {event.location_geo || "TBD"}
                                         </Badge>
                                         {event.is_executive_only && (
-                                            <Badge className="bg-amber-100 text-amber-700 border border-amber-200">
+                                            <Badge className="bg-status-warning-light text-status-warning-dark border border-status-warning/30">
                                                 <Lock className="mr-1 h-3 w-3" /> Executive Only
                                             </Badge>
                                         )}

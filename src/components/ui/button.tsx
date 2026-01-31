@@ -46,6 +46,9 @@ const buttonVariants = cva(
         // Secondary - Outline with border
         secondary:
           "border-2 border-input bg-background hover:bg-accent/10 hover:text-accent-foreground",
+        // Outline - Alias for secondary (backward compatibility)
+        outline:
+          "border-2 border-input bg-background hover:bg-accent/10 hover:text-accent-foreground",
         // Ghost - Transparent, text only
         ghost: "hover:bg-accent/10 hover:text-accent-foreground",
         // Link - No padding, underline on hover

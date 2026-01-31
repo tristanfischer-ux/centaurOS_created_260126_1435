@@ -102,7 +102,7 @@ export function ApprenticePoolBrowser() {
         return (
             <Card className="border">
                 <CardContent className="p-8 text-center">
-                    <Loader2 className="h-8 w-8 animate-spin text-blue-500 mx-auto mb-4" />
+                    <Loader2 className="h-8 w-8 animate-spin text-status-info mx-auto mb-4" />
                     <p className="text-muted-foreground">Loading Guild apprentices...</p>
                 </CardContent>
             </Card>
@@ -129,8 +129,8 @@ export function ApprenticePoolBrowser() {
                 <CardHeader className="pb-4">
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center">
-                                <GraduationCap className="h-5 w-5 text-blue-600" />
+                            <div className="w-10 h-10 rounded-lg bg-status-info-light flex items-center justify-center">
+                                <GraduationCap className="h-5 w-5 text-status-info" />
                             </div>
                             <div>
                                 <CardTitle className="text-lg">Guild Apprentice Pool</CardTitle>
@@ -201,7 +201,7 @@ export function ApprenticePoolBrowser() {
                                     <Button
                                         size="sm"
                                         onClick={() => setSelectedApprentice(apprentice)}
-                                        className="bg-blue-600 hover:bg-blue-700"
+                                        className="bg-electric-blue hover:bg-electric-blue-hover"
                                     >
                                         <UserPlus className="h-4 w-4 mr-1" />
                                         Assign
@@ -221,13 +221,13 @@ export function ApprenticePoolBrowser() {
 
             {/* Assignment Dialog */}
             <Dialog open={!!selectedApprentice} onOpenChange={(open) => !open && handleCloseDialog()}>
-                <DialogContent className="sm:max-w-[450px]">
+                <DialogContent size="sm">
                     {success ? (
                         // Success state
                         <>
                             <DialogHeader>
                                 <DialogTitle className="flex items-center gap-2">
-                                    <CheckCircle2 className="h-5 w-5 text-green-500" />
+                                    <CheckCircle2 className="h-5 w-5 text-status-success" />
                                     Apprentice Assigned
                                 </DialogTitle>
                             </DialogHeader>
@@ -284,7 +284,7 @@ export function ApprenticePoolBrowser() {
                             <div className="space-y-4">
                                 <div className="space-y-2">
                                     <Label htmlFor="projectName">
-                                        Project Name <span className="text-red-500">*</span>
+                                        Project Name <span className="text-destructive">*</span>
                                     </Label>
                                     <Input
                                         id="projectName"
@@ -314,7 +314,7 @@ export function ApprenticePoolBrowser() {
                                 <Button 
                                     onClick={handleAssign}
                                     disabled={!projectName.trim() || isPending}
-                                    className="bg-blue-600 hover:bg-blue-700"
+                                    className="bg-electric-blue hover:bg-electric-blue-hover"
                                 >
                                     {isPending ? (
                                         <>

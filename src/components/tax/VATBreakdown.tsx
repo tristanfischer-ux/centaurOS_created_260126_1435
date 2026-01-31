@@ -135,8 +135,8 @@ export function VATBreakdown({
       {/* Reverse Charge Notice */}
       {breakdown.taxTreatment === "reverse_charge" && (
         <div className="flex items-start gap-2 p-2 rounded bg-status-warning-light border border-status-warning text-sm">
-          <AlertCircle className="h-4 w-4 text-amber-600 mt-0.5 flex-shrink-0" />
-          <p className="text-amber-800">
+          <AlertCircle className="h-4 w-4 text-status-warning mt-0.5 flex-shrink-0" />
+          <p className="text-status-warning-dark">
             Reverse charge applies: You must account for VAT at the
             applicable rate in your country.
           </p>
@@ -146,8 +146,8 @@ export function VATBreakdown({
       {/* Zero-Rated Notice */}
       {breakdown.taxTreatment === "zero_rated" && (
         <div className="flex items-start gap-2 p-2 rounded bg-status-info-light border border-status-info text-sm">
-          <Info className="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0" />
-          <p className="text-blue-800">
+          <Info className="h-4 w-4 text-status-info mt-0.5 flex-shrink-0" />
+          <p className="text-status-info-dark">
             Zero-rated export: No VAT is charged on this transaction.
           </p>
         </div>

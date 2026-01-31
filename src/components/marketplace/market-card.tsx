@@ -86,7 +86,7 @@ export const MarketCard = memo(function MarketCard({
     const categoryBadgeStyles: Record<string, string> = {
         'People': 'bg-stone-100 text-stone-700',
         'Products': 'bg-muted text-foreground',
-        'Services': 'bg-blue-50 text-blue-700',
+        'Services': 'bg-status-info-light text-status-info-dark',
         'AI': 'bg-violet-50 text-violet-700'
     }
 
@@ -155,7 +155,7 @@ export const MarketCard = memo(function MarketCard({
                             </Badge>
                             {listing.is_verified && (
                                 <div title="Verified" className="shrink-0">
-                                    <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                                    <ShieldCheck className="w-4 h-4 text-status-success" />
                                 </div>
                             )}
                         </div>

@@ -6,6 +6,16 @@ import { typography } from '@/lib/design-system'
 import { Button } from '@/components/ui/button'
 import { EmptyState } from '@/components/ui/empty-state'
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import {
   BlueprintGrid,
   CreateBlueprintDialog,
 } from '@/components/blueprints'
@@ -29,6 +39,7 @@ export function BlueprintsView({ blueprints, templates }: BlueprintsViewProps) {
   const router = useRouter()
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [isDeleting, setIsDeleting] = useState<string | null>(null)
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
 
   const handleArchive = async (id: string) => {
     const { error } = await archiveBlueprint(id)
@@ -40,13 +51,12 @@ export function BlueprintsView({ blueprints, templates }: BlueprintsViewProps) {
     }
   }
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this blueprint? This action cannot be undone.')) {
-      return
-    }
+  const handleDeleteConfirm = async () => {
+    if (!deleteConfirmId) return
 
-    setIsDeleting(id)
-    const { error } = await deleteBlueprint(id)
+    setIsDeleting(deleteConfirmId)
+    setDeleteConfirmId(null)
+    const { error } = await deleteBlueprint(deleteConfirmId)
     setIsDeleting(null)
 
     if (error) {
@@ -55,6 +65,10 @@ export function BlueprintsView({ blueprints, templates }: BlueprintsViewProps) {
       toast.success('Blueprint deleted')
       router.refresh()
     }
+  }
+
+  const handleDelete = (id: string) => {
+    setDeleteConfirmId(id)
   }
 
   const handleDuplicate = async (id: string) => {
@@ -157,6 +171,27 @@ export function BlueprintsView({ blueprints, templates }: BlueprintsViewProps) {
         onOpenChange={setIsCreateOpen}
         templates={templates}
       />
+
+      {/* Delete confirmation dialog */}
+      <AlertDialog open={!!deleteConfirmId} onOpenChange={(open) => !open && setDeleteConfirmId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Blueprint?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this blueprint? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteConfirm}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDeleting ? 'Deleting...' : 'Delete'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
@@ -175,8 +210,8 @@ function StatCard({
 }) {
   const colors = {
     default: 'text-foreground',
-    warning: 'text-amber-600',
-    success: 'text-emerald-600',
+    warning: 'text-status-warning',
+    success: 'text-status-success',
   }
 
   return (

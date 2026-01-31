@@ -44,7 +44,7 @@ export function Markdown({ content, className }: MarkdownProps) {
               href={safeHref} 
               target="_blank" 
               rel="noopener noreferrer"
-              className="text-blue-600 hover:underline"
+              className="text-primary hover:underline"
             >
               {children}
             </a>

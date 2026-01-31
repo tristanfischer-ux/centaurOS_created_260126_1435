@@ -306,7 +306,7 @@ export function PricingForm({
                                     />
                                 </div>
                                 {suggestedRetainerRate && (
-                                    <p className="text-xs text-emerald-600">
+                                    <p className="text-xs text-status-success">
                                         Suggested: {formatPrice(suggestedRetainerRate, currency)}/hr 
                                         ({retainerDiscountPercent}% discount)
                                     </p>
@@ -410,15 +410,15 @@ export function PricingForm({
                                 <>
                                     <Separator className="my-3" />
                                     <div className="flex items-center gap-2">
-                                        <Users className="h-4 w-4 text-blue-600" />
+                                        <Users className="h-4 w-4 text-status-info" />
                                         <span className="text-sm text-muted-foreground">
                                             Retainer available at{' '}
-                                            <span className="font-semibold text-blue-600">
+                                            <span className="font-semibold text-status-info">
                                                 {formatPrice(parsedRetainerRate, currency)}/hr
                                             </span>
                                         </span>
                                         {retainerDiscountPercent > 0 && (
-                                            <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100">
+                                            <Badge className="bg-status-success-light text-status-success-dark hover:bg-status-success-light">
                                                 Save {retainerDiscountPercent}%
                                             </Badge>
                                         )}
@@ -427,7 +427,7 @@ export function PricingForm({
                             )}
                             
                             {!parsedDayRate && !retainerEnabled && (
-                                <div className="flex items-center gap-2 text-amber-600">
+                                <div className="flex items-center gap-2 text-status-warning">
                                     <AlertCircle className="h-4 w-4" />
                                     <span className="text-sm">Set your pricing to appear in the marketplace</span>
                                 </div>

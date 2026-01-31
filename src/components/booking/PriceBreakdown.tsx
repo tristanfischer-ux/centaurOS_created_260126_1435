@@ -33,11 +33,11 @@ function ItemIcon({ type }: { type: PriceBreakdownItem['type'] }) {
         case 'subtotal':
             return <Receipt className="h-4 w-4 text-muted-foreground" />
         case 'fee':
-            return <ShieldCheck className="h-4 w-4 text-blue-500" />
+            return <ShieldCheck className="h-4 w-4 text-status-info" />
         case 'tax':
             return <Building2 className="h-4 w-4 text-muted-foreground" />
         case 'discount':
-            return <Tag className="h-4 w-4 text-emerald-500" />
+            return <Tag className="h-4 w-4 text-status-success" />
         default:
             return null
     }
@@ -111,7 +111,7 @@ export function PriceBreakdown({
                                 <div>
                                     <p className={cn(
                                         "font-medium",
-                                        item.type === 'discount' && "text-emerald-600"
+                                        item.type === 'discount' && "text-status-success"
                                     )}>
                                         {item.label}
                                     </p>
@@ -124,7 +124,7 @@ export function PriceBreakdown({
                             </div>
                             <span className={cn(
                                 "font-medium tabular-nums",
-                                item.type === 'discount' && "text-emerald-600"
+                                item.type === 'discount' && "text-status-success"
                             )}>
                                 {item.type === 'discount' 
                                     ? `-${formatCurrency(item.amount, breakdown.currency)}`
@@ -149,12 +149,12 @@ export function PriceBreakdown({
 
                 {/* Escrow Info */}
                 {showEscrowInfo && (
-                    <div className="mt-4 p-3 rounded-lg bg-blue-50 border border-blue-100">
+                    <div className="mt-4 p-3 rounded-lg bg-status-info-light border border-status-info">
                         <div className="flex items-start gap-2">
-                            <ShieldCheck className="h-4 w-4 text-blue-600 mt-0.5" />
+                            <ShieldCheck className="h-4 w-4 text-status-info mt-0.5" />
                             <div className="text-sm">
-                                <p className="font-medium text-blue-700">Escrow Protection</p>
-                                <p className="text-blue-600 mt-0.5">
+                                <p className="font-medium text-status-info-dark">Escrow Protection</p>
+                                <p className="text-status-info mt-0.5">
                                     Your payment is held securely until the work is completed. 
                                     The provider only receives payment when you approve the deliverables.
                                 </p>
@@ -165,7 +165,7 @@ export function PriceBreakdown({
 
                 {/* Discount Badge */}
                 {breakdown.discountPercent > 0 && (
-                    <Badge variant="secondary" className="bg-emerald-50 text-emerald-700">
+                    <Badge variant="secondary" className="bg-status-success-light text-status-success-dark">
                         <Percent className="h-3 w-3 mr-1" />
                         {breakdown.discountPercent}% discount applied
                     </Badge>
@@ -198,7 +198,7 @@ export function PriceBreakdownCompact({
                 </div>
             )}
             {breakdown.discountAmount > 0 && (
-                <div className="flex justify-between text-sm text-emerald-600">
+                <div className="flex justify-between text-sm text-status-success">
                     <span>Discount</span>
                     <span>-{formatCurrency(breakdown.discountAmount, breakdown.currency)}</span>
                 </div>

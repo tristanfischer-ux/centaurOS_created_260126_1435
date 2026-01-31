@@ -165,7 +165,7 @@ export function StripeAccountStatus({
                         <div className="text-center p-3 rounded-lg bg-muted">
                             <div className={cn(
                                 "text-sm font-medium",
-                                chargesEnabled ? "text-green-600" : "text-muted-foreground"
+                                chargesEnabled ? "text-status-success" : "text-muted-foreground"
                             )}>
                                 {chargesEnabled ? "Enabled" : "Disabled"}
                             </div>
@@ -174,7 +174,7 @@ export function StripeAccountStatus({
                         <div className="text-center p-3 rounded-lg bg-muted">
                             <div className={cn(
                                 "text-sm font-medium",
-                                payoutsEnabled ? "text-green-600" : "text-muted-foreground"
+                                payoutsEnabled ? "text-status-success" : "text-muted-foreground"
                             )}>
                                 {payoutsEnabled ? "Enabled" : "Disabled"}
                             </div>
@@ -183,7 +183,7 @@ export function StripeAccountStatus({
                         <div className="text-center p-3 rounded-lg bg-muted">
                             <div className={cn(
                                 "text-sm font-medium",
-                                detailsSubmitted ? "text-green-600" : "text-muted-foreground"
+                                detailsSubmitted ? "text-status-success" : "text-muted-foreground"
                             )}>
                                 {detailsSubmitted ? "Complete" : "Incomplete"}
                             </div>
@@ -194,14 +194,14 @@ export function StripeAccountStatus({
 
                 {/* Requirements warning */}
                 {requirements && requirements.currentlyDue.length > 0 && (
-                    <div className="p-3 rounded-lg bg-amber-50 border border-amber-200">
+                    <div className="p-3 rounded-lg bg-status-warning-light border border-status-warning">
                         <div className="flex items-start gap-2">
-                            <AlertCircle className="h-4 w-4 text-amber-600 mt-0.5 flex-shrink-0" />
+                            <AlertCircle className="h-4 w-4 text-status-warning mt-0.5 flex-shrink-0" />
                             <div>
-                                <p className="text-sm font-medium text-amber-800">
+                                <p className="text-sm font-medium text-status-warning-dark">
                                     Action Required
                                 </p>
-                                <p className="text-xs text-amber-700 mt-1">
+                                <p className="text-xs text-status-warning-dark mt-1">
                                     {requirements.currentlyDue.length} item{requirements.currentlyDue.length !== 1 ? 's' : ''} need your attention to continue accepting payments.
                                 </p>
                             </div>
@@ -211,8 +211,8 @@ export function StripeAccountStatus({
 
                 {/* Error message */}
                 {error && (
-                    <div className="p-3 rounded-lg bg-red-50 border border-red-200">
-                        <p className="text-sm text-red-700">{error}</p>
+                    <div className="p-3 rounded-lg bg-status-error-light border border-destructive">
+                        <p className="text-sm text-destructive">{error}</p>
                     </div>
                 )}
 

@@ -279,7 +279,7 @@ export function AnswerThread({
                             disabled={isVoting}
                             className={cn(
                                 "h-8 gap-1.5",
-                                localVote === "down" && "text-red-600 bg-red-50"
+                                localVote === "down" && "text-destructive bg-status-error-light"
                             )}
                         >
                             <ThumbsDown className={cn("h-4 w-4", localVote === "down" && "fill-current")} />

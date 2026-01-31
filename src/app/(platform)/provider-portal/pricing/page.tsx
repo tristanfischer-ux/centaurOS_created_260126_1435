@@ -167,10 +167,10 @@ export default function PricingPage() {
                 <Card className="border-status-warning bg-status-warning-light">
                     <CardContent className="pt-6">
                         <div className="flex items-start gap-3">
-                            <Pause className="h-5 w-5 text-amber-600 mt-0.5" />
+                            <Pause className="h-5 w-5 text-status-warning mt-0.5" />
                             <div>
-                                <p className="font-medium text-amber-900">At Maximum Capacity</p>
-                                <p className="text-sm text-amber-700 mt-1">
+                                <p className="font-medium text-status-warning-dark">At Maximum Capacity</p>
+                                <p className="text-sm text-status-warning mt-1">
                                     You have {profile.current_order_count} active orders, which is your maximum.
                                     {autoPauseAtCapacity && ' New bookings are automatically paused.'}
                                 </p>
@@ -277,7 +277,7 @@ export default function PricingPage() {
                                     <div className="mt-2 h-2 bg-muted rounded-full overflow-hidden">
                                         <div 
                                             className={`h-full transition-all ${
-                                                isAtCapacity ? 'bg-red-500' : 'bg-emerald-500'
+                                                isAtCapacity ? 'bg-destructive' : 'bg-status-success'
                                             }`}
                                             style={{ 
                                                 width: `${Math.min(

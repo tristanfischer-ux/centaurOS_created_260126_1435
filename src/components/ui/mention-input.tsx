@@ -190,7 +190,7 @@ export function MentionInput({
               onClick={() => insertMention(profile, false)}
               className={cn(
                 'w-full px-3 py-2 text-left text-sm flex items-center gap-3 transition-colors',
-                index === selectedIndex ? 'bg-blue-50 text-blue-900' : 'hover:bg-muted'
+                index === selectedIndex ? 'bg-status-info-light text-status-info-dark' : 'hover:bg-muted'
               )}
             >
               <UserAvatar

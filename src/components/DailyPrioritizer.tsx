@@ -189,15 +189,15 @@ export function DailyPrioritizer({ tasks, maxTasks = 5 }: DailyPrioritizerProps)
                                                     className={cn(
                                                         "text-[10px] font-medium px-1.5 py-0",
                                                         isOverdue 
-                                                            ? "bg-red-100 text-red-700 border-red-200" 
+                                                            ? "bg-status-error-light text-destructive border-destructive" 
                                                             : isDueToday
-                                                                ? "bg-amber-100 text-amber-700 border-amber-200"
+                                                                ? "bg-status-warning-light text-status-warning-dark border-status-warning"
                                                                 : isDueTomorrow
-                                                                    ? "bg-orange-100 text-orange-700 border-orange-200"
+                                                                    ? "bg-status-warning-light/80 text-status-warning-dark border-status-warning"
                                                                     : isStale
-                                                                        ? "bg-purple-100 text-purple-700 border-purple-200"
+                                                                        ? "bg-status-info-light text-status-info-dark border-status-info"
                                                                         : isApproval
-                                                                            ? "bg-blue-100 text-blue-700 border"
+                                                                            ? "bg-status-info-light text-status-info-dark border-status-info"
                                                                             : "bg-foundry-100 text-foundry-600 border"
                                                     )}
                                                 >

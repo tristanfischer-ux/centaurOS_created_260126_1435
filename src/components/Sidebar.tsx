@@ -4,7 +4,7 @@ import React from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
-import { LayoutDashboard, Users, CheckSquare, Clock, Store, Target, Compass, LayoutGrid, MessageCircleQuestion, ShieldAlert, FileText, Sun, Bookmark, Settings, HelpCircle, GraduationCap, Repeat, ShoppingCart, Briefcase, Map } from "lucide-react"
+import { LayoutDashboard, Users, CheckSquare, Clock, Store, Target, Compass, LayoutGrid, MessageCircleQuestion, ShieldAlert, FileText, Sun, Bookmark, Settings, HelpCircle, GraduationCap, Repeat, ShoppingCart, Briefcase, Map, Presentation } from "lucide-react"
 import { NotificationCenter } from "@/components/NotificationCenter"
 import { ThemeToggle } from "@/components/ThemeToggle"
 import { FocusModeToggle } from "@/components/FocusModeToggle"
@@ -45,6 +45,7 @@ const coreNavigation = [
 const communityNavigation = [
     { name: "Marketplace", href: "/marketplace", icon: Store, tooltip: "Browse and compare service providers" },
     { name: "RFQs", href: "/rfq", icon: FileText, tooltip: "Request quotes from suppliers or respond to opportunities" },
+    { name: "Pitch Prep", href: "/pitch-prep", icon: Presentation, tooltip: "Prepare your pitch for investor conversations" },
     { name: "Guild", href: "/guild", icon: Compass, tooltip: "Community events and resources" },
     { name: "Apprenticeship", href: "/apprenticeship", icon: GraduationCap, tooltip: "Apprenticeship program and OTJT tracking" },
     { name: "Advice", href: "/advisory", icon: MessageCircleQuestion, tooltip: "Ask questions and get expert guidance" },

@@ -41,7 +41,7 @@ interface ListingDetailDrawerProps {
 const categoryBadgeStyles = {
     'People': 'bg-stone-100 text-stone-700',
     'Products': 'bg-muted text-foreground',
-    'Services': 'bg-blue-50 text-blue-700',
+    'Services': 'bg-status-info-light text-status-info-dark',
     'AI': 'bg-violet-50 text-violet-700'
 }
 
@@ -75,7 +75,7 @@ export function ListingDetailDrawer({ open, onOpenChange, listing }: ListingDeta
                             {listing.subcategory}
                         </Badge>
                         {listing.is_verified && (
-                            <div className="flex items-center gap-1 text-emerald-600" title="Verified">
+                            <div className="flex items-center gap-1 text-status-success" title="Verified">
                                 <ShieldCheck className="w-4 h-4" />
                                 <span className="text-xs font-medium">Verified</span>
                             </div>
@@ -327,14 +327,14 @@ function AISection({ attrs }: { attrs: Record<string, any> }) {
                     </h4>
                     <div className="grid grid-cols-3 gap-2 text-sm">
                         {attrs.accuracy && (
-                            <div className="bg-emerald-50 p-2 text-center border border-emerald-100">
-                                <p className="font-bold text-emerald-700">{attrs.accuracy}</p>
+                            <div className="bg-status-success-light p-2 text-center border border-status-success">
+                                <p className="font-bold text-status-success-dark">{attrs.accuracy}</p>
                                 <span className="text-muted-foreground text-xs">Accuracy</span>
                             </div>
                         )}
                         {attrs.latency && (
-                            <div className="bg-blue-50 p-2 text-center border border-blue-100">
-                                <p className="font-bold text-blue-700">{attrs.latency}</p>
+                            <div className="bg-status-info-light p-2 text-center border border-status-info">
+                                <p className="font-bold text-status-info-dark">{attrs.latency}</p>
                                 <span className="text-muted-foreground text-xs">Latency</span>
                             </div>
                         )}
@@ -365,7 +365,7 @@ function ProductsSection({ attrs }: { attrs: Record<string, any> }) {
                     {Array.isArray(attrs.certifications) ? (
                         <div className="flex flex-wrap gap-2">
                             {attrs.certifications.map((cert: string, i: number) => (
-                                <span key={i} className="text-xs px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700">
+                                <span key={i} className="text-xs px-2.5 py-1 rounded-full bg-status-success-light text-status-success-dark">
                                     {cert}
                                 </span>
                             ))}
@@ -436,7 +436,7 @@ function ServicesSection({ attrs }: { attrs: Record<string, any> }) {
                     {Array.isArray(attrs.specialty) ? (
                         <div className="flex flex-wrap gap-2">
                             {attrs.specialty.map((spec: string, i: number) => (
-                                <span key={i} className="text-xs px-2.5 py-1 rounded-full bg-blue-50 text-blue-700">
+                                <span key={i} className="text-xs px-2.5 py-1 rounded-full bg-status-info-light text-status-info-dark">
                                     {spec}
                                 </span>
                             ))}
@@ -457,7 +457,7 @@ function ServicesSection({ attrs }: { attrs: Record<string, any> }) {
                     {Array.isArray(attrs.focus_areas) ? (
                         <div className="flex flex-wrap gap-2">
                             {attrs.focus_areas.map((area: string, i: number) => (
-                                <span key={i} className="text-xs px-2.5 py-1 rounded-full bg-blue-50 text-blue-700">
+                                <span key={i} className="text-xs px-2.5 py-1 rounded-full bg-status-info-light text-status-info-dark">
                                     {area}
                                 </span>
                             ))}
@@ -572,7 +572,7 @@ function AttributeRow({ label, value }: { label: string; value: any }) {
                 </div>
                 <span className={cn(
                     "text-xs px-2 py-0.5 rounded-full",
-                    value ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700"
+                    value ? "bg-status-success-light text-status-success-dark" : "bg-status-error-light text-destructive"
                 )}>
                     {value ? 'Yes' : 'No'}
                 </span>

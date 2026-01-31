@@ -106,8 +106,8 @@ export function OrderDetail({
               {/* Buyer */}
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100">
-                    <User className="h-5 w-5 text-blue-600" />
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-status-info-light">
+                    <User className="h-5 w-5 text-status-info" />
                   </div>
                   <div>
                     <p className="font-medium">
@@ -131,8 +131,8 @@ export function OrderDetail({
               {/* Seller */}
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-green-100">
-                    <Store className="h-5 w-5 text-green-600" />
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-status-success-light">
+                    <Store className="h-5 w-5 text-status-success" />
                   </div>
                   <div>
                     <p className="font-medium">
@@ -186,18 +186,18 @@ export function OrderDetail({
 
           {/* Dispute Info */}
           {order.dispute && (
-            <Card className="border-orange-200 bg-orange-50/50">
+            <Card className="border-status-warning bg-status-warning-light/50">
               <CardHeader>
-                <CardTitle className="text-base flex items-center gap-2 text-orange-700">
+                <CardTitle className="text-base flex items-center gap-2 text-status-warning-dark">
                   <AlertTriangle className="h-4 w-4" />
                   Active Dispute
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-sm text-orange-700 mb-2">
+                <p className="text-sm text-status-warning-dark mb-2">
                   {order.dispute.reason}
                 </p>
-                <div className="flex items-center justify-between text-xs text-orange-600">
+                <div className="flex items-center justify-between text-xs text-status-warning">
                   <span>Status: {order.dispute.status}</span>
                   <span>
                     Opened:{" "}
@@ -279,7 +279,7 @@ export function OrderDetail({
                     <span>Platform Fee</span>
                     <span>-{formattedFee}</span>
                   </div>
-                  <div className="flex justify-between text-sm font-medium text-green-600">
+                  <div className="flex justify-between text-sm font-medium text-status-success">
                     <span>Your Earnings</span>
                     <span>
                       {new Intl.NumberFormat("en-GB", {
@@ -355,9 +355,9 @@ function DetailRow({
   badge?: boolean
 }) {
   const highlightClasses = {
-    green: "text-green-600",
-    red: "text-red-600",
-    yellow: "text-yellow-600",
+    green: "text-status-success",
+    red: "text-destructive",
+    yellow: "text-status-warning",
   }
 
   return (
@@ -398,20 +398,20 @@ function MilestoneList({
           key={milestone.id}
           className={cn(
             "flex items-center justify-between p-3 rounded-lg border",
-            milestone.status === "approved" && "border-green-200 bg-green-50/50",
-            milestone.status === "rejected" && "border-red-200 bg-red-50/50",
-            milestone.status === "submitted" && "border-yellow-200 bg-yellow-50/50"
+            milestone.status === "approved" && "border-status-success bg-status-success-light/50",
+            milestone.status === "rejected" && "border-destructive bg-status-error-light/50",
+            milestone.status === "submitted" && "border-status-warning bg-status-warning-light/50"
           )}
         >
           <div className="flex items-center gap-3">
             <div
               className={cn(
                 "flex h-8 w-8 items-center justify-center rounded-full text-sm font-medium",
-                milestone.status === "approved" && "bg-green-100 text-green-700",
-                milestone.status === "rejected" && "bg-red-100 text-red-700",
-                milestone.status === "submitted" && "bg-yellow-100 text-yellow-700",
+                milestone.status === "approved" && "bg-status-success-light text-status-success-dark",
+                milestone.status === "rejected" && "bg-status-error-light text-destructive",
+                milestone.status === "submitted" && "bg-status-warning-light text-status-warning-dark",
                 milestone.status === "pending" && "bg-muted text-muted-foreground",
-                milestone.status === "paid" && "bg-green-100 text-green-700"
+                milestone.status === "paid" && "bg-status-success-light text-status-success-dark"
               )}
             >
               {milestone.status === "approved" || milestone.status === "paid" ? (

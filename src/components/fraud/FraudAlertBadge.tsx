@@ -57,14 +57,14 @@ export function FraudAlertBadge({
 
     switch (riskLevel) {
       case "critical":
-        return <ShieldAlert className={cn(iconClass, "text-red-500")} />
+        return <ShieldAlert className={cn(iconClass, "text-destructive")} />
       case "high":
         return <AlertTriangle className={cn(iconClass, "text-orange-500")} />
       case "medium":
-        return <Shield className={cn(iconClass, "text-amber-500")} />
+        return <Shield className={cn(iconClass, "text-status-warning")} />
       case "low":
       default:
-        return <ShieldCheck className={cn(iconClass, "text-emerald-500")} />
+        return <ShieldCheck className={cn(iconClass, "text-status-success")} />
     }
   }
 
@@ -85,14 +85,14 @@ export function FraudAlertBadge({
   const getBackgroundColor = () => {
     switch (riskLevel) {
       case "critical":
-        return "bg-red-100 dark:bg-red-950/30 border-red-300 dark:border-red-800"
+        return "bg-status-error-light dark:bg-destructive/10 border-destructive dark:border-destructive"
       case "high":
         return "bg-orange-100 dark:bg-orange-950/30 border-orange-300 dark:border-orange-800"
       case "medium":
-        return "bg-amber-100 dark:bg-amber-950/30 border-amber-300 dark:border-amber-800"
+        return "bg-status-warning-light dark:bg-status-warning/10 border-status-warning dark:border-status-warning"
       case "low":
       default:
-        return "bg-emerald-100 dark:bg-emerald-950/30 border-emerald-300 dark:border-emerald-800"
+        return "bg-status-success-light dark:bg-status-success/10 border-status-success dark:border-status-success"
     }
   }
 
@@ -170,13 +170,13 @@ export function FraudAlertBadge({
           {/* Risk Score Bar */}
           <div className="space-y-1">
             <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
-              <div
+                <div
                 className={cn(
                   "h-full transition-all duration-300",
-                  riskLevel === "critical" && "bg-red-500",
+                  riskLevel === "critical" && "bg-destructive",
                   riskLevel === "high" && "bg-orange-500",
-                  riskLevel === "medium" && "bg-amber-500",
-                  riskLevel === "low" && "bg-emerald-500"
+                  riskLevel === "medium" && "bg-status-warning",
+                  riskLevel === "low" && "bg-status-success"
                 )}
                 style={{ width: `${riskScore}%` }}
               />
@@ -240,11 +240,11 @@ export function FraudAlertIcon({ riskLevel, className }: FraudAlertIconProps) {
       <Tooltip>
         <TooltipTrigger>
           {riskLevel === "critical" ? (
-            <ShieldAlert className={cn("h-4 w-4 text-red-500", className)} />
+            <ShieldAlert className={cn("h-4 w-4 text-destructive", className)} />
           ) : riskLevel === "high" ? (
             <AlertTriangle className={cn("h-4 w-4 text-orange-500", className)} />
           ) : (
-            <Shield className={cn("h-4 w-4 text-amber-500", className)} />
+            <Shield className={cn("h-4 w-4 text-status-warning", className)} />
           )}
         </TooltipTrigger>
         <TooltipContent>
@@ -282,11 +282,11 @@ export function FraudAlertBanner({
   const getBackgroundColor = () => {
     switch (riskLevel) {
       case "critical":
-        return "bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-800"
+        return "bg-status-error-light dark:bg-destructive/10 border-destructive dark:border-destructive"
       case "high":
         return "bg-orange-50 dark:bg-orange-950/20 border-orange-200 dark:border-orange-800"
       case "medium":
-        return "bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800"
+        return "bg-status-warning-light dark:bg-status-warning/10 border-status-warning dark:border-status-warning"
       default:
         return ""
     }
@@ -295,11 +295,11 @@ export function FraudAlertBanner({
   const getIconColor = () => {
     switch (riskLevel) {
       case "critical":
-        return "text-red-600"
+        return "text-destructive"
       case "high":
         return "text-orange-600"
       case "medium":
-        return "text-amber-600"
+        return "text-status-warning"
       default:
         return ""
     }

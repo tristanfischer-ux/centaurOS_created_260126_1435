@@ -146,8 +146,8 @@ export function InlineBatchApproval({ onApprovalComplete }: InlineBatchApprovalP
                 className="w-full flex items-center justify-between p-4 hover:bg-muted transition-colors"
             >
                 <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-full bg-amber-50">
-                        <AlertTriangle className="h-5 w-5 text-amber-500" />
+                    <div className="p-2 rounded-full bg-status-warning-light">
+                        <AlertTriangle className="h-5 w-5 text-status-warning" />
                     </div>
                     <div className="text-left">
                         <h3 className="font-semibold text-foreground">Pending Approvals</h3>
@@ -188,7 +188,7 @@ export function InlineBatchApproval({ onApprovalComplete }: InlineBatchApprovalP
                                             size="sm"
                                             onClick={handleBatchApprove}
                                             disabled={isPending}
-                                            className="h-7 text-xs bg-green-600 hover:bg-green-700 text-white"
+                                            className="h-7 text-xs bg-status-success hover:bg-status-success/90 text-white"
                                         >
                                             {isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <CheckCircle2 className="h-3 w-3 mr-1" />}
                                             Approve
@@ -223,7 +223,7 @@ export function InlineBatchApproval({ onApprovalComplete }: InlineBatchApprovalP
                                                 key={task.id}
                                                 className={cn(
                                                     'p-3 transition-colors',
-                                                    isSelected ? 'bg-blue-50/50' : 'hover:bg-muted'
+                                                    isSelected ? 'bg-status-info-light/50' : 'hover:bg-muted'
                                                 )}
                                             >
                                                 <div className="flex items-start gap-2">
@@ -242,7 +242,7 @@ export function InlineBatchApproval({ onApprovalComplete }: InlineBatchApprovalP
                                                                 variant="ghost"
                                                                 onClick={() => handleQuickApprove(task.id)}
                                                                 disabled={isPending}
-                                                                className="h-6 w-6 p-0 text-green-600 hover:text-green-700 hover:bg-green-50 shrink-0"
+                                                                className="h-6 w-6 p-0 text-status-success hover:text-status-success/90 hover:bg-status-success-light shrink-0"
                                                             >
                                                                 <Check className="h-4 w-4" />
                                                             </Button>
@@ -285,7 +285,7 @@ export function InlineBatchApproval({ onApprovalComplete }: InlineBatchApprovalP
 
             {/* Batch Reject Dialog */}
             <Dialog open={rejectDialogOpen} onOpenChange={setRejectDialogOpen}>
-                <DialogContent className="sm:max-w-[425px] bg-white">
+                <DialogContent size="sm" className="bg-white">
                     <DialogHeader>
                         <DialogTitle className="text-foreground">Reject Tasks</DialogTitle>
                         <DialogDescription>

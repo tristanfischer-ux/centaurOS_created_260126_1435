@@ -66,7 +66,7 @@ export function BlockersWidget({ userRole }: BlockersWidgetProps) {
                             variant="secondary" 
                             className={cn(
                                 criticalBlockers.length > 0 
-                                    ? "bg-amber-100 text-amber-700" 
+                                    ? "bg-status-warning-light text-status-warning" 
                                     : "bg-muted text-muted-foreground"
                             )}
                         >
@@ -82,7 +82,7 @@ export function BlockersWidget({ userRole }: BlockersWidgetProps) {
                     </div>
                 ) : standups.length === 0 ? (
                     <div className="text-center py-6">
-                        <CheckCircle className="h-10 w-10 mx-auto text-green-500 mb-2" />
+                        <CheckCircle className="h-10 w-10 mx-auto text-status-success mb-2" />
                         <p className="text-sm text-muted-foreground font-medium">No blockers reported</p>
                         <p className="text-xs text-muted-foreground">Team is running smoothly</p>
                     </div>
@@ -98,7 +98,7 @@ export function BlockersWidget({ userRole }: BlockersWidgetProps) {
                                     className={cn(
                                         'p-3 rounded-lg border transition-colors',
                                         isCritical 
-                                            ? 'border-amber-200 bg-amber-50' 
+                                            ? 'border-status-warning bg-status-warning-light' 
                                             : 'border bg-white'
                                     )}
                                 >
@@ -120,7 +120,7 @@ export function BlockersWidget({ userRole }: BlockersWidgetProps) {
                                                     </Badge>
                                                 )}
                                                 {isCritical && (
-                                                    <Badge variant="secondary" className="text-[10px] py-0 bg-amber-100 text-amber-700">
+                                                    <Badge variant="secondary" className="text-[10px] py-0 bg-status-warning-light text-status-warning">
                                                         {standup.blocker_severity}
                                                     </Badge>
                                                 )}

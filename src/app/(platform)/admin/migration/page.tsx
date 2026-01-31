@@ -49,7 +49,7 @@ async function MigrationContent() {
         return (
             <div className="text-center py-12">
                 <AlertTriangle className="h-8 w-8 mx-auto text-amber-500 mb-2" />
-                <p className="text-red-600">{statsError || 'Failed to load migration data'}</p>
+                <p className="text-destructive">{statsError || 'Failed to load migration data'}</p>
             </div>
         )
     }
@@ -119,19 +119,19 @@ async function MigrationContent() {
                         <div className="h-3 bg-muted rounded-full overflow-hidden">
                             <div className="h-full flex">
                                 <div 
-                                    className="bg-green-500 transition-all"
+                                    className="bg-status-success transition-all"
                                     style={{ 
                                         width: `${(stats.completedCount / Math.max(stats.totalListings, 1)) * 100}%` 
                                     }}
                                 />
                                 <div 
-                                    className="bg-blue-500 transition-all"
+                                    className="bg-status-info transition-all"
                                     style={{ 
                                         width: `${(stats.inProgressCount / Math.max(stats.totalListings, 1)) * 100}%` 
                                     }}
                                 />
                                 <div 
-                                    className="bg-amber-500 transition-all"
+                                    className="bg-status-warning transition-all"
                                     style={{ 
                                         width: `${(stats.invitedCount / Math.max(stats.totalListings, 1)) * 100}%` 
                                     }}
@@ -140,15 +140,15 @@ async function MigrationContent() {
                         </div>
                         <div className="flex gap-4 text-xs text-muted-foreground">
                             <span className="flex items-center gap-1">
-                                <span className="w-2 h-2 rounded-full bg-green-500" />
+                                <span className="w-2 h-2 rounded-full bg-status-success" />
                                 Completed
                             </span>
                             <span className="flex items-center gap-1">
-                                <span className="w-2 h-2 rounded-full bg-blue-500" />
+                                <span className="w-2 h-2 rounded-full bg-status-info" />
                                 In Progress
                             </span>
                             <span className="flex items-center gap-1">
-                                <span className="w-2 h-2 rounded-full bg-amber-500" />
+                                <span className="w-2 h-2 rounded-full bg-status-warning" />
                                 Invited
                             </span>
                         </div>
@@ -158,22 +158,22 @@ async function MigrationContent() {
             
             {/* Candidates Summary */}
             {candidates && candidates.length > 0 && (
-                <Card className="border bg-blue-50/30">
-                    <CardContent className="flex items-center justify-between py-4">
-                        <div className="flex items-center gap-3">
-                            <div className="p-2 rounded-lg bg-blue-100">
-                                <ArrowUpRight className="h-5 w-5 text-blue-600" />
-                            </div>
-                            <div>
-                                <p className="font-medium text-blue-900">
-                                    {candidates.length} listings not yet in migration queue
-                                </p>
-                                <p className="text-sm text-blue-700">
-                                    {candidatesWithEmail} with contact email, {candidatesWithoutEmail} without
-                                </p>
-                            </div>
+<Card className="border bg-status-info-light">
+                <CardContent className="flex items-center justify-between py-4">
+                    <div className="flex items-center gap-3">
+                        <div className="p-2 rounded-lg bg-status-info-light">
+                            <ArrowUpRight className="h-5 w-5 text-status-info" />
                         </div>
-                        <Button variant="secondary" className="border-blue-300 hover:bg-blue-100">
+                        <div>
+                            <p className="font-medium text-status-info-dark">
+                                {candidates.length} listings not yet in migration queue
+                            </p>
+                            <p className="text-sm text-status-info">
+                                {candidatesWithEmail} with contact email, {candidatesWithoutEmail} without
+                            </p>
+                        </div>
+                    </div>
+                    <Button variant="secondary" className="border-status-info hover:bg-status-info-light">
                             <RefreshCw className="h-4 w-4 mr-2" />
                             Add to Queue
                         </Button>

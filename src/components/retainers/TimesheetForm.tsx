@@ -226,7 +226,7 @@ export function TimesheetForm({
               )}
             />
             {hoursLogged > maxHours && (
-              <p className="text-xs text-amber-600">
+              <p className="text-xs text-status-warning">
                 {hoursLogged - maxHours} hours over commitment
               </p>
             )}
@@ -277,10 +277,10 @@ export function TimesheetForm({
           )}
 
           {success && (
-            <Alert className="border-emerald-200 bg-emerald-50">
-              <CheckCircle className="h-4 w-4 text-emerald-600" />
-              <AlertTitle className="text-emerald-800">Success</AlertTitle>
-              <AlertDescription className="text-emerald-700">{success}</AlertDescription>
+            <Alert className="border-status-success bg-status-success-light">
+              <CheckCircle className="h-4 w-4 text-status-success" />
+              <AlertTitle className="text-status-success-dark">Success</AlertTitle>
+              <AlertDescription className="text-status-success-dark">{success}</AlertDescription>
             </Alert>
           )}
 
@@ -306,10 +306,10 @@ export function TimesheetForm({
           )}
 
           {status === 'approved' && (
-            <Alert className="border-emerald-200 bg-emerald-50">
-              <CheckCircle className="h-4 w-4 text-emerald-600" />
-              <AlertTitle className="text-emerald-800">Approved</AlertTitle>
-              <AlertDescription className="text-emerald-700">
+            <Alert className="border-status-success bg-status-success-light">
+              <CheckCircle className="h-4 w-4 text-status-success" />
+              <AlertTitle className="text-status-success-dark">Approved</AlertTitle>
+              <AlertDescription className="text-status-success-dark">
                 This timesheet has been approved and will be processed for payment.
               </AlertDescription>
             </Alert>

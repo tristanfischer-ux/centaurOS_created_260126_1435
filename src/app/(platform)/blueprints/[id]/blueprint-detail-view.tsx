@@ -373,10 +373,10 @@ export function BlueprintDetailView({
                     >
                       <div className={cn(
                         'h-10 w-10 rounded-full flex items-center justify-center',
-                        m.status === 'complete' && 'bg-emerald-100 text-emerald-600',
-                        m.status === 'in_progress' && 'bg-blue-100 text-blue-600',
-                        m.status === 'blocked' && 'bg-rose-100 text-rose-600',
-                        m.status === 'upcoming' && 'bg-slate-100 text-slate-600'
+                        m.status === 'complete' && 'bg-status-success-light text-status-success',
+                        m.status === 'in_progress' && 'bg-status-info-light text-status-info',
+                        m.status === 'blocked' && 'bg-status-error-light text-destructive',
+                        m.status === 'upcoming' && 'bg-muted text-muted-foreground'
                       )}>
                         <Target className="h-5 w-5" />
                       </div>
@@ -440,9 +440,9 @@ function SummaryCard({
   color?: 'emerald' | 'amber' | 'rose'
 }) {
   const colorClasses = {
-    emerald: 'text-emerald-600',
-    amber: 'text-amber-600',
-    rose: 'text-rose-600',
+    emerald: 'text-status-success',
+    amber: 'text-status-warning',
+    rose: 'text-destructive',
   }
 
   return (

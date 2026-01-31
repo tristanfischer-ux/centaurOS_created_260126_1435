@@ -88,19 +88,19 @@ function MetricCard({ metric, showComparison }: MetricCardProps) {
       value: 'text-foreground',
     },
     success: {
-      bg: 'bg-green-50 border-green-100',
-      icon: 'text-green-600',
-      value: 'text-green-900',
+      bg: 'bg-status-success-light border-status-success',
+      icon: 'text-status-success',
+      value: 'text-status-success-dark',
     },
     warning: {
-      bg: 'bg-amber-50 border-amber-100',
-      icon: 'text-amber-600',
-      value: 'text-amber-900',
+      bg: 'bg-status-warning-light border-status-warning',
+      icon: 'text-status-warning',
+      value: 'text-status-warning-dark',
     },
     danger: {
-      bg: 'bg-red-50 border-red-100',
-      icon: 'text-red-600',
-      value: 'text-red-900',
+      bg: 'bg-status-error-light border-status-error',
+      icon: 'text-destructive',
+      value: 'text-status-error-dark',
     },
   }
   
@@ -116,12 +116,12 @@ function MetricCard({ metric, showComparison }: MetricCardProps) {
   // Determine trend color - context-aware (isPositive flag)
   const trendColor = metric.trend?.isPositive !== undefined
     ? metric.trend.isPositive 
-      ? 'text-green-600' 
-      : 'text-red-600'
+      ? 'text-status-success' 
+      : 'text-destructive'
     : metric.trend?.direction === 'up'
-      ? 'text-green-600'
+      ? 'text-status-success'
       : metric.trend?.direction === 'down'
-        ? 'text-red-600'
+        ? 'text-destructive'
         : 'text-muted-foreground'
 
   return (
@@ -290,8 +290,8 @@ export function ComparisonMetrics({
                   <div className={cn(
                     "flex items-center gap-1 text-xs font-medium px-1.5 py-0.5 rounded",
                     comparison.changePercent >= 0 
-                      ? "bg-green-100 text-green-700" 
-                      : "bg-red-100 text-red-700"
+                      ? "bg-status-success-light text-status-success" 
+                      : "bg-status-error-light text-destructive"
                   )}>
                     {comparison.changePercent >= 0 ? (
                       <TrendingUp className="h-3 w-3" />

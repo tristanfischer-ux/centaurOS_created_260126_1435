@@ -200,7 +200,7 @@ export function OnboardingModal({ userRole }: OnboardingModalProps) {
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="sm:max-w-[480px] p-0 overflow-hidden bg-background border-none shadow-brand-lg">
+      <DialogContent size="sm" className="p-0 overflow-hidden bg-background border-none shadow-brand-lg">
         {/* Accessibility: Hidden title for screen readers */}
         <VisuallyHidden>
           <DialogTitle>{step.title}</DialogTitle>

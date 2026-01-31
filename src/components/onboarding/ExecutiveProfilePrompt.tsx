@@ -118,7 +118,7 @@ export function ExecutiveProfilePrompt({
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <div className="flex items-center justify-between mb-2">
             <Badge variant="secondary" className="text-xs bg-orange-100 text-orange-700">

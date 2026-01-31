@@ -54,20 +54,20 @@ export function BookingConfirmation({
     return (
         <div className={cn("space-y-6", className)}>
             {/* Success Header */}
-            <Card className="border-emerald-200 bg-gradient-to-br from-emerald-50 to-emerald-100/50">
+            <Card className="border-status-success bg-gradient-to-br from-status-success-light to-status-success-light/50">
                 <CardContent className="pt-8 pb-6 text-center">
-                    <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-emerald-500 text-white mb-4">
+                    <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-status-success text-status-success-foreground mb-4">
                         <CheckCircle className="h-8 w-8" />
                     </div>
-                    <h2 className="text-2xl font-bold text-emerald-900 mb-2">
+                    <h2 className="text-2xl font-bold text-status-success-dark mb-2">
                         Booking Confirmed!
                     </h2>
-                    <p className="text-emerald-700">
+                    <p className="text-status-success">
                         Your booking has been successfully created and payment received.
                     </p>
                     <Badge 
                         variant="secondary" 
-                        className="mt-4 bg-white/80 text-emerald-700 font-mono text-lg px-4 py-2"
+                        className="mt-4 bg-white/80 text-status-success-dark font-mono text-lg px-4 py-2"
                     >
                         Order #{confirmation.orderNumber}
                     </Badge>
@@ -120,7 +120,7 @@ export function BookingConfirmation({
                     {/* Payment */}
                     <div className="flex items-center gap-4">
                         <div className="p-3 bg-muted rounded-lg">
-                            <ShieldCheck className="h-5 w-5 text-blue-500" />
+                            <ShieldCheck className="h-5 w-5 text-status-info" />
                         </div>
                         <div className="flex-1">
                             <p className="font-medium">Payment in Escrow</p>
@@ -139,7 +139,7 @@ export function BookingConfirmation({
             <Card>
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2">
-                        <Sparkles className="h-5 w-5 text-amber-500" />
+                        <Sparkles className="h-5 w-5 text-status-warning" />
                         What Happens Next
                     </CardTitle>
                 </CardHeader>
@@ -168,11 +168,11 @@ export function BookingConfirmation({
                 <CardContent>
                     <div className="relative pl-6 space-y-4">
                         {/* Timeline line */}
-                        <div className="absolute left-[7px] top-2 bottom-2 w-0.5 bg-emerald-200" />
+                        <div className="absolute left-[7px] top-2 bottom-2 w-0.5 bg-status-success-light" />
                         
                         {/* Timeline items */}
                         <div className="relative flex items-start gap-4">
-                            <div className="absolute -left-6 w-4 h-4 rounded-full bg-emerald-500 border-2 border-white" />
+                            <div className="absolute -left-6 w-4 h-4 rounded-full bg-status-success border-2 border-white" />
                             <div>
                                 <p className="font-medium">Booking Created</p>
                                 <p className="text-sm text-muted-foreground">
@@ -182,7 +182,7 @@ export function BookingConfirmation({
                         </div>
 
                         <div className="relative flex items-start gap-4">
-                            <div className="absolute -left-6 w-4 h-4 rounded-full bg-emerald-500 border-2 border-white" />
+                            <div className="absolute -left-6 w-4 h-4 rounded-full bg-status-success border-2 border-white" />
                             <div>
                                 <p className="font-medium">Payment Received</p>
                                 <p className="text-sm text-muted-foreground">

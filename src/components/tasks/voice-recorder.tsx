@@ -132,14 +132,14 @@ export function VoiceRecorder({ onTaskParsed, className }: VoiceRecorderProps) {
             <div className="fixed bottom-24 right-6 md:bottom-8 md:right-8 z-50 flex flex-col items-end gap-2">
                 {/* Recording indicator */}
                 {isRecording && (
-                    <div className="bg-red-500 text-white px-3 py-1.5 rounded-full text-sm font-medium animate-pulse shadow-lg">
+                    <div className="bg-destructive text-white px-3 py-1.5 rounded-full text-sm font-medium animate-pulse shadow-lg">
                         🎙️ {formatDuration(recordingDuration)}
                     </div>
                 )}
 
                 {/* Processing indicator */}
                 {isProcessing && (
-                    <div className="bg-amber-500 text-white px-3 py-1.5 rounded-full text-sm font-medium shadow-lg">
+                    <div className="bg-status-warning text-white px-3 py-1.5 rounded-full text-sm font-medium shadow-lg">
                         🧠 Analyzing...
                     </div>
                 )}
@@ -147,8 +147,8 @@ export function VoiceRecorder({ onTaskParsed, className }: VoiceRecorderProps) {
                 <Button
                     size="icon"
                     className={`h-14 w-14 rounded-full shadow-lg transition-all duration-300 ${isRecording
-                        ? "bg-red-500 hover:bg-red-600 animate-pulse ring-4 ring-red-200"
-                        : "bg-amber-500 hover:bg-amber-600 text-white"
+                        ? "bg-destructive hover:bg-destructive/90 animate-pulse ring-4 ring-destructive/30"
+                        : "bg-status-warning hover:bg-status-warning/90 text-white"
                         }`}
                     onClick={isRecording ? stopRecording : startRecording}
                     disabled={isProcessing}
@@ -169,12 +169,12 @@ export function VoiceRecorder({ onTaskParsed, className }: VoiceRecorderProps) {
     return (
         <div className={className || "flex items-center gap-2"}>
             {isRecording && (
-                <span className="text-red-500 text-xs font-mono animate-pulse mr-2">
+                <span className="text-destructive text-xs font-mono animate-pulse mr-2">
                     {formatDuration(recordingDuration)}
                 </span>
             )}
             {isProcessing && (
-                <span className="text-amber-500 text-xs font-mono animate-pulse mr-2">
+                <span className="text-status-warning text-xs font-mono animate-pulse mr-2">
                     Analyzing...
                 </span>
             )}

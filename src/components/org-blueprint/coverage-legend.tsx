@@ -12,17 +12,17 @@ interface CoverageItem {
 const COVERAGE_ITEMS: CoverageItem[] = [
     {
         label: "Covered",
-        color: "bg-green-500",
+        color: "bg-status-success",
         icon: CheckCircle2,
     },
     {
         label: "Partial",
-        color: "bg-yellow-500",
+        color: "bg-status-warning",
         icon: Minus,
     },
     {
         label: "Gap",
-        color: "bg-muted-foreground/50",
+        color: "bg-destructive/50",
         icon: AlertTriangle,
     },
 ]

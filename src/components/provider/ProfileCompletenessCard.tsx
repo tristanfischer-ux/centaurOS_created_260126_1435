@@ -172,9 +172,9 @@ export function ProfileCompletenessCard({ profile, caseStudyCount, portfolioCoun
                     <div>
                         <CardTitle className="text-lg flex items-center gap-2">
                             {requiredComplete ? (
-                                <CheckCircle2 className="h-5 w-5 text-green-600" />
+                                <CheckCircle2 className="h-5 w-5 text-status-success" />
                             ) : (
-                                <Circle className="h-5 w-5 text-amber-600" />
+                                <Circle className="h-5 w-5 text-status-warning" />
                             )}
                             Profile Completeness
                         </CardTitle>
@@ -198,18 +198,18 @@ export function ProfileCompletenessCard({ profile, caseStudyCount, portfolioCoun
                 {/* Status badges */}
                 <div className="flex flex-wrap gap-2">
                     {requiredComplete ? (
-                        <Badge variant="secondary" className="bg-green-100 text-green-800">
+                        <Badge variant="secondary" className="bg-status-success-light text-status-success-dark">
                             <CheckCircle2 className="h-3 w-3 mr-1" />
                             Required fields complete
                         </Badge>
                     ) : (
-                        <Badge variant="secondary" className="bg-amber-100 text-amber-800">
+                        <Badge variant="secondary" className="bg-status-warning-light text-status-warning-dark">
                             {requiredFields.length - requiredCompletedCount} required field(s) remaining
                         </Badge>
                     )}
                     
                     {completeness >= 80 && (
-                        <Badge variant="secondary" className="bg-blue-100 text-blue-800">
+                        <Badge variant="secondary" className="bg-status-info-light text-status-info-dark">
                             Profile excellence
                         </Badge>
                     )}
@@ -228,8 +228,8 @@ export function ProfileCompletenessCard({ profile, caseStudyCount, portfolioCoun
                                         href={field.editPath}
                                         className="flex items-center gap-3 p-2 rounded-lg hover:bg-background transition-colors group"
                                     >
-                                        <div className="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center">
-                                            <Icon className="h-4 w-4 text-amber-600" />
+                                        <div className="w-8 h-8 rounded-full bg-status-warning-light flex items-center justify-center">
+                                            <Icon className="h-4 w-4 text-status-warning" />
                                         </div>
                                         <span className="flex-1 text-sm">{field.label}</span>
                                         <Badge variant="outline" className="text-xs">Required</Badge>
@@ -270,9 +270,9 @@ export function ProfileCompletenessCard({ profile, caseStudyCount, portfolioCoun
                 {/* All complete */}
                 {completeness >= 100 && (
                     <div className="text-center py-4">
-                        <CheckCircle2 className="h-12 w-12 text-green-600 mx-auto mb-2" />
-                        <p className="text-sm font-medium text-green-800">Profile 100% complete!</p>
-                        <p className="text-xs text-green-600">Your profile is fully optimized for the marketplace</p>
+                        <CheckCircle2 className="h-12 w-12 text-status-success mx-auto mb-2" />
+                        <p className="text-sm font-medium text-status-success-dark">Profile 100% complete!</p>
+                        <p className="text-xs text-status-success">Your profile is fully optimized for the marketplace</p>
                     </div>
                 )}
                 

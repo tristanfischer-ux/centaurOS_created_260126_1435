@@ -55,7 +55,7 @@ export function RubberStampModal({ taskId, isOpen, onClose }: RubberStampModalPr
 
     return (
         <Dialog open={isOpen} onOpenChange={() => !isSubmitting && onClose()}>
-            <DialogContent className="sm:max-w-md bg-background border-destructive text-foreground overflow-hidden relative shadow-brand-lg">
+            <DialogContent size="sm" className="bg-background border-destructive text-foreground overflow-hidden relative shadow-brand-lg">
 
                 {/* STAMP ANIMATION OVERLAY */}
                 <AnimatePresence>
@@ -80,7 +80,7 @@ export function RubberStampModal({ taskId, isOpen, onClose }: RubberStampModalPr
                 </AnimatePresence>
 
                 <DialogHeader>
-                    <div className="flex items-center gap-2 text-red-600 mb-2">
+                    <div className="flex items-center gap-2 text-destructive mb-2">
                         <ShieldAlert className="w-6 h-6" />
                         <span className="text-sm font-mono uppercase tracking-widest font-bold">Executive Airlock</span>
                     </div>
@@ -91,55 +91,55 @@ export function RubberStampModal({ taskId, isOpen, onClose }: RubberStampModalPr
                 </DialogHeader>
 
                 <div className="flex flex-col gap-4 py-4 relative">
-                    <div className="flex items-start space-x-3 p-3 rounded-lg border border-red-100 bg-red-50/50 hover:bg-red-50 transition-colors">
+                    <div className="flex items-start space-x-3 p-3 rounded-lg border border-destructive/20 bg-status-error-light/50 hover:bg-status-error-light transition-colors">
                         <Checkbox
                             id="pricing"
                             checked={checks.pricing}
                             onCheckedChange={(c) => setChecks(prev => ({ ...prev, pricing: !!c }))}
                             disabled={isSubmitting}
-                            className="border-red-300 data-[state=checked]:bg-red-600 data-[state=checked]:border-red-600"
+                            className="border-destructive/50 data-[state=checked]:bg-destructive data-[state=checked]:border-destructive"
                         />
                         <div className="grid gap-1.5 leading-none">
-                            <label htmlFor="pricing" className="text-sm font-semibold leading-none text-red-900 cursor-pointer">
+                            <label htmlFor="pricing" className="text-sm font-semibold leading-none text-foreground cursor-pointer">
                                 I have checked the pricing
                             </label>
-                            <p className="text-xs text-red-700/80">
+                            <p className="text-xs text-destructive/80">
                                 Margins and quote accuracy verified.
                             </p>
                         </div>
                     </div>
 
-                    <div className="flex items-start space-x-3 p-3 rounded-lg border border-red-100 bg-red-50/50 hover:bg-red-50 transition-colors">
+                    <div className="flex items-start space-x-3 p-3 rounded-lg border border-destructive/20 bg-status-error-light/50 hover:bg-status-error-light transition-colors">
                         <Checkbox
                             id="accreditation"
                             checked={checks.accreditation}
                             onCheckedChange={(c) => setChecks(prev => ({ ...prev, accreditation: !!c }))}
                             disabled={isSubmitting}
-                            className="border-red-300 data-[state=checked]:bg-red-600 data-[state=checked]:border-red-600"
+                            className="border-destructive/50 data-[state=checked]:bg-destructive data-[state=checked]:border-destructive"
                         />
                         <div className="grid gap-1.5 leading-none">
-                            <label htmlFor="accreditation" className="text-sm font-semibold leading-none text-red-900 cursor-pointer">
+                            <label htmlFor="accreditation" className="text-sm font-semibold leading-none text-foreground cursor-pointer">
                                 I have verified supplier accreditation
                             </label>
-                            <p className="text-xs text-red-700/80">
+                            <p className="text-xs text-destructive/80">
                                 Vendor is cleared for this risk level.
                             </p>
                         </div>
                     </div>
 
-                    <div className="flex items-start space-x-3 p-3 rounded-lg border border-red-100 bg-red-50/50 hover:bg-red-50 transition-colors">
+                    <div className="flex items-start space-x-3 p-3 rounded-lg border border-destructive/20 bg-status-error-light/50 hover:bg-status-error-light transition-colors">
                         <Checkbox
                             id="liability"
                             checked={checks.liability}
                             onCheckedChange={(c) => setChecks(prev => ({ ...prev, liability: !!c }))}
                             disabled={isSubmitting}
-                            className="border-red-300 data-[state=checked]:bg-red-600 data-[state=checked]:border-red-600"
+                            className="border-destructive/50 data-[state=checked]:bg-destructive data-[state=checked]:border-destructive"
                         />
                         <div className="grid gap-1.5 leading-none">
-                            <label htmlFor="liability" className="text-sm font-semibold leading-none text-red-900 cursor-pointer">
+                            <label htmlFor="liability" className="text-sm font-semibold leading-none text-foreground cursor-pointer">
                                 I accept liability for this output
                             </label>
-                            <p className="text-xs text-red-700/80">
+                            <p className="text-xs text-destructive/80">
                                 Personal executive sign-off.
                             </p>
                         </div>

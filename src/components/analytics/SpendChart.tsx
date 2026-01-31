@@ -90,7 +90,7 @@ export function SpendChart({
       return (
         <div className="bg-background p-3 border rounded-lg shadow-lg">
           <p className="text-sm font-medium text-muted-foreground">{label}</p>
-          <p className="text-sm font-semibold text-blue-600">
+          <p className="text-sm font-semibold text-status-info">
             {formatValue(payload[0].value)}
           </p>
         </div>
@@ -132,7 +132,7 @@ export function SpendChart({
           {change !== null && (
             <div className={cn(
               "flex items-center gap-1 px-2 py-1 rounded-full text-sm font-medium",
-              isBetterTrend ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-700"
+              isBetterTrend ? "bg-status-success-light text-status-success" : "bg-status-warning-light text-status-warning"
             )}>
               {change >= 0 ? (
                 <TrendingUp className="h-4 w-4" />
@@ -172,9 +172,9 @@ export function SpendChart({
                   <div 
                     className={cn(
                       "h-full rounded-full transition-all",
-                      budgetUsedPercent >= 90 ? "bg-red-500" :
-                      budgetUsedPercent >= 75 ? "bg-amber-500" :
-                      "bg-blue-500"
+                      budgetUsedPercent >= 90 ? "bg-status-error" :
+                      budgetUsedPercent >= 75 ? "bg-status-warning" :
+                      "bg-status-info"
                     )}
                     style={{ width: `${budgetUsedPercent}%` }}
                   />

@@ -59,25 +59,25 @@ const statusOptions: { status: CoverageStatus; label: string; description: strin
         status: 'covered',
         label: 'Covered Internally',
         description: 'We have this fully covered by our team',
-        icon: <User className="h-5 w-5 text-green-600" />,
+        icon: <User className="h-5 w-5 text-status-success" />,
     },
     {
         status: 'partial',
         label: 'External Provider',
         description: 'We use an external provider/contractor',
-        icon: <Building2 className="h-5 w-5 text-blue-600" />,
+        icon: <Building2 className="h-5 w-5 text-status-info" />,
     },
     {
         status: 'gap',
         label: 'Gap to Fill',
         description: 'This is a gap we need to address',
-        icon: <XCircle className="h-5 w-5 text-red-600" />,
+        icon: <XCircle className="h-5 w-5 text-destructive" />,
     },
     {
         status: 'not_needed',
         label: 'Not Applicable',
         description: "Doesn't apply to our business",
-        icon: <MinusCircle className="h-5 w-5 text-gray-400" />,
+        icon: <MinusCircle className="h-5 w-5 text-muted-foreground" />,
     },
 ]
 

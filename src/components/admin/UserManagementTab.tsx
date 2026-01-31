@@ -307,7 +307,7 @@ export function UserManagementTab({ foundryId, isFounder }: UserManagementTabPro
             
             {/* Invite Dialog */}
             <Dialog open={showInviteDialog} onOpenChange={setShowInviteDialog}>
-                <DialogContent className="sm:max-w-md">
+                <DialogContent size="sm">
                     <DialogHeader>
                         <DialogTitle>Invite Team Member</DialogTitle>
                         <DialogDescription>

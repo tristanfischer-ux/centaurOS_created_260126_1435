@@ -41,6 +41,16 @@ import {
     CommandItem,
     CommandList,
 } from "@/components/ui/command"
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { EmptyState } from "@/components/ui/empty-state"
 import { Inbox } from "lucide-react"
 import { getStatusBadgeClass } from "@/lib/status-colors"
@@ -82,6 +92,7 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
     const [isBulkOperating, setIsBulkOperating] = useState(false)
     const [assignDialogOpen, setAssignDialogOpen] = useState(false)
     const [selectedAssigneeId, setSelectedAssigneeId] = useState<string>("")
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
 
     // Filter & Sort State
     const [statusFilter, setStatusFilter] = useState<string[]>([])
@@ -268,10 +279,13 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
         })
     }, [])
 
-    const handleBulkDelete = async () => {
+    const handleBulkDeleteClick = () => {
         if (selectedTaskIds.size === 0) return
-        if (!confirm(`Are you sure you want to delete ${selectedTaskIds.size} tasks?`)) return
+        setShowDeleteConfirm(true)
+    }
 
+    const handleBulkDeleteConfirm = async () => {
+        setShowDeleteConfirm(false)
         setIsBulkDeleting(true)
         try {
             const result = await deleteTasks(Array.from(selectedTaskIds))
@@ -401,7 +415,7 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                         <div className="flex items-center gap-2">
                             {isSelectionMode ? (
                                 <div className="flex items-center gap-2 mr-2">
-                                    <Button variant="destructive" size="sm" onClick={handleBulkDelete} disabled={selectedTaskIds.size === 0 || isBulkDeleting}>
+                                    <Button variant="destructive" size="sm" onClick={handleBulkDeleteClick} disabled={selectedTaskIds.size === 0 || isBulkDeleting}>
                                         {isBulkDeleting ? (
                                             <>
                                                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -443,6 +457,7 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                                     size="sm"
                                     onClick={() => setViewMode('grid')}
                                     className={viewMode === 'grid' ? 'shadow-sm' : ''}
+                                    aria-label="Grid view"
                                 >
                                     <LayoutGrid className="h-4 w-4" />
                                 </Button>
@@ -451,6 +466,7 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                                     size="sm"
                                     onClick={() => setViewMode('list')}
                                     className={viewMode === 'list' ? 'shadow-sm' : ''}
+                                    aria-label="List view"
                                 >
                                     <List className="h-4 w-4" />
                                 </Button>
@@ -570,7 +586,7 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                                                                 setAssigneeFilter('all')
                                                                 setSortBy('due_date_asc')
                                                             }}
-                                                            className="text-muted-foreground hover:text-red-500 active:text-red-600 h-8 ml-2 transition-colors duration-200"
+                                                            className="text-muted-foreground hover:text-destructive active:text-destructive h-8 ml-2 transition-colors duration-200"
                                                         >
                                                             <X className="w-3 h-3 mr-1" /> Clear
                                                         </Button>
@@ -658,7 +674,7 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                                                         setAssigneeFilter('all')
                                                         setActivePreset(null)
                                                     }}
-                                                    className="text-blue-600"
+                                                    className="text-status-info"
                                                 >
                                                     Reset Filters
                                                 </Button>
@@ -934,9 +950,8 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                         <Button
                             size="sm"
                             variant="destructive"
-                            onClick={handleBulkDelete}
+                            onClick={handleBulkDeleteClick}
                             disabled={isBulkDeleting || isBulkOperating}
-                            className="bg-red-600 hover:bg-red-700"
                         >
                             {isBulkDeleting ? (
                                 <>
@@ -981,6 +996,27 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                 isCreator={selectedTask?.creator_id === currentUserId}
                 members={members}
             />
+
+            {/* Bulk Delete Confirmation Dialog */}
+            <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Delete {selectedTaskIds.size} task{selectedTaskIds.size > 1 ? 's' : ''}?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            This action cannot be undone. The selected task{selectedTaskIds.size > 1 ? 's' : ''} will be permanently deleted.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={handleBulkDeleteConfirm}
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        >
+                            Delete
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </>
     )
 }

@@ -37,10 +37,10 @@ import { Markdown } from '@/components/ui/markdown'
 import { UserAvatar } from '@/components/ui/user-avatar'
 
 const moodOptions = [
-    { value: 'great', icon: Smile, label: 'Great', color: 'text-green-500 bg-green-50 border-green-200' },
-    { value: 'good', icon: Smile, label: 'Good', color: 'text-blue-500 bg-blue-50 border' },
-    { value: 'okay', icon: Meh, label: 'Okay', color: 'text-yellow-500 bg-yellow-50 border-yellow-200' },
-    { value: 'struggling', icon: Frown, label: 'Struggling', color: 'text-red-500 bg-red-50 border-red-200' }
+    { value: 'great', icon: Smile, label: 'Great', color: 'text-status-success bg-status-success-light border-status-success' },
+    { value: 'good', icon: Smile, label: 'Good', color: 'text-status-info bg-status-info-light border' },
+    { value: 'okay', icon: Meh, label: 'Okay', color: 'text-status-warning bg-status-warning-light border-status-warning' },
+    { value: 'struggling', icon: Frown, label: 'Struggling', color: 'text-destructive bg-status-error-light border-destructive' }
 ] as const
 
 interface StandupWidgetProps {
@@ -175,12 +175,12 @@ export function StandupWidget({ userRole, compact = false }: StandupWidgetProps)
                             Daily Standup
                         </CardTitle>
                         {hasSubmitted ? (
-                            <Badge variant="secondary" className="bg-green-100 text-green-700">
+                            <Badge variant="secondary" className="bg-status-success-light text-status-success-dark">
                                 <CheckCircle2 className="h-3 w-3 mr-1" />
                                 Done
                             </Badge>
                         ) : (
-                            <Badge variant="secondary" className="bg-amber-100 text-amber-700">
+                            <Badge variant="secondary" className="bg-status-warning-light text-status-warning-dark">
                                 Pending
                             </Badge>
                         )}
@@ -237,7 +237,7 @@ export function StandupWidget({ userRole, compact = false }: StandupWidgetProps)
                         </CardDescription>
                     </div>
                     {hasSubmitted && !showForm && (
-                        <Badge variant="secondary" className="bg-green-100 text-green-700">
+                        <Badge variant="secondary" className="bg-status-success-light text-status-success-dark">
                             <CheckCircle2 className="h-3 w-3 mr-1" />
                             Submitted
                         </Badge>
@@ -250,7 +250,7 @@ export function StandupWidget({ userRole, compact = false }: StandupWidgetProps)
                     <div className="space-y-4">
                         <div className="space-y-2">
                             <label htmlFor="standup-yesterday" className="text-sm font-medium text-foreground flex items-center gap-2">
-                                <CheckCircle2 className="h-4 w-4 text-green-500" />
+                                <CheckCircle2 className="h-4 w-4 text-status-success" />
                                 What did you accomplish?
                             </label>
                             <Textarea
@@ -264,7 +264,7 @@ export function StandupWidget({ userRole, compact = false }: StandupWidgetProps)
                         
                         <div className="space-y-2">
                             <label htmlFor="standup-today" className="text-sm font-medium text-foreground flex items-center gap-2">
-                                <Target className="h-4 w-4 text-blue-500" />
+                                <Target className="h-4 w-4 text-status-info" />
                                 What will you work on today?
                             </label>
                             <Textarea
@@ -278,7 +278,7 @@ export function StandupWidget({ userRole, compact = false }: StandupWidgetProps)
                         
                         <div className="space-y-2">
                             <label htmlFor="standup-blockers" className="text-sm font-medium text-foreground flex items-center gap-2">
-                                <AlertTriangle className="h-4 w-4 text-amber-500" />
+                                <AlertTriangle className="h-4 w-4 text-status-warning" />
                                 Any blockers or issues?
                             </label>
                             <Textarea
@@ -358,7 +358,7 @@ export function StandupWidget({ userRole, compact = false }: StandupWidgetProps)
                         {myStandup?.completed && (
                             <div className="text-sm">
                                 <div className="flex items-center gap-2 text-muted-foreground mb-1">
-                                    <CheckCircle2 className="h-4 w-4 text-green-500" />
+                                    <CheckCircle2 className="h-4 w-4 text-status-success" />
                                     Completed
                                 </div>
                                 <p className="text-foreground pl-6">{myStandup.completed}</p>
@@ -367,7 +367,7 @@ export function StandupWidget({ userRole, compact = false }: StandupWidgetProps)
                         {myStandup?.planned && (
                             <div className="text-sm">
                                 <div className="flex items-center gap-2 text-muted-foreground mb-1">
-                                    <Target className="h-4 w-4 text-blue-500" />
+                                    <Target className="h-4 w-4 text-status-info" />
                                     Planned
                                 </div>
                                 <p className="text-foreground pl-6">{myStandup.planned}</p>
@@ -376,7 +376,7 @@ export function StandupWidget({ userRole, compact = false }: StandupWidgetProps)
                         {myStandup?.blockers && (
                             <div className="text-sm">
                                 <div className="flex items-center gap-2 text-muted-foreground mb-1">
-                                    <AlertTriangle className="h-4 w-4 text-amber-500" />
+                                    <AlertTriangle className="h-4 w-4 text-status-warning" />
                                     Blockers
                                 </div>
                                 <p className="text-foreground pl-6">{myStandup.blockers}</p>
@@ -414,7 +414,7 @@ export function StandupWidget({ userRole, compact = false }: StandupWidgetProps)
                                 <p className="text-xs text-muted-foreground mt-1">
                                     {stats.participationRate}% participation
                                     {stats.membersWithBlockers > 0 && (
-                                        <span className="text-amber-600 ml-2">
+                                        <span className="text-status-warning ml-2">
                                             • {stats.membersWithBlockers} with blockers
                                         </span>
                                     )}
@@ -494,7 +494,7 @@ export function StandupWidget({ userRole, compact = false }: StandupWidgetProps)
                                                             </p>
                                                         )}
                                                         {standup.blockers && (
-                                                            <p className="text-sm text-amber-600 mt-1 line-clamp-2">
+                                                            <p className="text-sm text-status-warning mt-1 line-clamp-2">
                                                                 <AlertTriangle className="h-3 w-3 inline mr-1" />
                                                                 {standup.blockers}
                                                             </p>

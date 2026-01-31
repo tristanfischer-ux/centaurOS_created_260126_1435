@@ -148,7 +148,12 @@ export async function sendNewMessage(
     
     const messageWithSender: MessageWithSender = {
       ...message,
-      sender: sender || { id: user.id, full_name: null, avatar_url: null }
+      sender: {
+        id: sender?.id || user.id,
+        full_name: sender?.full_name || null,
+        avatar_url: sender?.avatar_url || null,
+        email: '', // Intentionally empty for security - not sent to client
+      }
     }
     
     return { 

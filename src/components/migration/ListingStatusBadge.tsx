@@ -85,7 +85,7 @@ function getStatusConfig(status: ListingTransactionStatus) {
             return {
                 Icon: Clock,
                 label: 'Setting Up',
-                className: 'bg-blue-100 text-blue-800 hover:bg-blue-100 border',
+                className: 'bg-status-info-light text-status-info-dark hover:bg-status-info-light border',
                 description: 'Provider is completing their profile'
             }
         case 'contact_only':
@@ -115,9 +115,9 @@ export function StatusDot({ status, size = 'md', className }: StatusDotProps) {
     }
     
     const colors = {
-        transactional: 'bg-green-500',
-        invite_sent: 'bg-amber-500',
-        pending_signup: 'bg-blue-500',
+        transactional: 'bg-status-success',
+        invite_sent: 'bg-status-warning',
+        pending_signup: 'bg-status-info',
         contact_only: 'bg-muted-foreground'
     }
     
@@ -154,9 +154,9 @@ export function StatusDisplay({
         <div className={cn('flex items-start gap-2', className)}>
             <div className={cn(
                 'p-1.5 rounded-lg mt-0.5',
-                status === 'transactional' && 'bg-green-100 text-green-600',
-                status === 'invite_sent' && 'bg-amber-100 text-amber-600',
-                status === 'pending_signup' && 'bg-blue-100 text-blue-600',
+                status === 'transactional' && 'bg-status-success-light text-status-success',
+                status === 'invite_sent' && 'bg-status-warning-light text-status-warning',
+                status === 'pending_signup' && 'bg-status-info-light text-status-info',
                 status === 'contact_only' && 'bg-muted text-muted-foreground'
             )}>
                 <config.Icon className="h-4 w-4" />
@@ -164,9 +164,9 @@ export function StatusDisplay({
             <div>
                 <p className={cn(
                     'font-medium text-sm',
-                    status === 'transactional' && 'text-green-800',
-                    status === 'invite_sent' && 'text-amber-800',
-                    status === 'pending_signup' && 'text-blue-800',
+                    status === 'transactional' && 'text-status-success-dark',
+                    status === 'invite_sent' && 'text-status-warning-dark',
+                    status === 'pending_signup' && 'text-status-info-dark',
                     status === 'contact_only' && 'text-muted-foreground'
                 )}>
                     {config.label}

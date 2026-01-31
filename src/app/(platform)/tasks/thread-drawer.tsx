@@ -313,7 +313,7 @@ export function ThreadDrawer({
                                     size="sm"
                                     onClick={handleAccept}
                                     disabled={isActionLoading}
-                                    className="bg-green-500 hover:bg-green-600 text-white"
+                                    className="bg-status-success hover:bg-status-success/90 text-white"
                                 >
                                     <Check className="h-4 w-4 mr-1" /> Accept
                                 </Button>
@@ -334,7 +334,7 @@ export function ThreadDrawer({
                                 size="sm"
                                 onClick={handleComplete}
                                 disabled={isActionLoading}
-                                className="bg-green-500 hover:bg-green-600 text-white"
+                                className="bg-status-success hover:bg-status-success/90 text-white"
                             >
                                 <Check className="h-4 w-4 mr-1" /> Mark Complete
                             </Button>
@@ -342,12 +342,12 @@ export function ThreadDrawer({
 
                         {/* Show status indicator if no actions available */}
                         {taskStatus === 'Completed' && (
-                            <div className="flex items-center gap-2 text-green-600 text-sm font-medium">
+                            <div className="flex items-center gap-2 text-status-success text-sm font-medium">
                                 <Check className="h-4 w-4" /> Task Completed
                             </div>
                         )}
                         {taskStatus === 'Rejected' && (
-                            <div className="flex items-center gap-2 text-red-600 text-sm font-medium">
+                            <div className="flex items-center gap-2 text-destructive text-sm font-medium">
                                 <X className="h-4 w-4" /> Task Rejected
                             </div>
                         )}
@@ -388,11 +388,11 @@ export function ThreadDrawer({
                                     setForwardError(null)
                                 }}
                             >
-                                <SelectTrigger 
-                                    className={`w-full ${forwardError ? 'border-red-500' : ''}`}
-                                    aria-describedby={forwardError ? "forward-error" : undefined}
-                                    aria-invalid={!!forwardError}
-                                >
+                            <SelectTrigger 
+                                className={`w-full ${forwardError ? 'border-destructive' : ''}`}
+                                aria-describedby={forwardError ? "forward-error" : undefined}
+                                aria-invalid={!!forwardError}
+                            >
                                     <SelectValue placeholder="Select team member..." />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -422,7 +422,7 @@ export function ThreadDrawer({
                                 onChange={(e) => setForwardReason(e.target.value)}
                             />
                             {forwardError && (
-                                <p id="forward-error" className="text-sm text-red-600 mt-1" role="alert">
+                                <p id="forward-error" className="text-sm text-destructive mt-1" role="alert">
                                     {forwardError}
                                 </p>
                             )}

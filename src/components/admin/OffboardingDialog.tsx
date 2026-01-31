@@ -160,7 +160,7 @@ export function OffboardingDialog({
     
     return (
         <Dialog open={open} onOpenChange={handleClose}>
-            <DialogContent className="sm:max-w-lg">
+            <DialogContent>
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
                         <UserMinus className="h-5 w-5 text-red-500" />

@@ -173,15 +173,15 @@ export default function SelfServiceListingPage() {
                     approvalStatus === 'changes_requested' && 'border-status-info bg-status-info-light'
                 )}>
                     <div className="flex items-center gap-2">
-                        {approvalStatus === 'approved' && <CheckCircle2 className="h-4 w-4 text-green-600" />}
-                        {approvalStatus === 'pending' && <Clock className="h-4 w-4 text-amber-600" />}
-                        {approvalStatus === 'rejected' && <XCircle className="h-4 w-4 text-red-600" />}
-                        {approvalStatus === 'changes_requested' && <AlertCircle className="h-4 w-4 text-blue-600" />}
+                        {approvalStatus === 'approved' && <CheckCircle2 className="h-4 w-4 text-status-success" />}
+                        {approvalStatus === 'pending' && <Clock className="h-4 w-4 text-status-warning" />}
+                        {approvalStatus === 'rejected' && <XCircle className="h-4 w-4 text-destructive" />}
+                        {approvalStatus === 'changes_requested' && <AlertCircle className="h-4 w-4 text-status-info" />}
                         <AlertDescription className={cn(
-                            approvalStatus === 'approved' && 'text-green-800',
-                            approvalStatus === 'pending' && 'text-amber-800',
-                            approvalStatus === 'rejected' && 'text-red-800',
-                            approvalStatus === 'changes_requested' && 'text-blue-800'
+                            approvalStatus === 'approved' && 'text-status-success-dark',
+                            approvalStatus === 'pending' && 'text-status-warning-dark',
+                            approvalStatus === 'rejected' && 'text-destructive',
+                            approvalStatus === 'changes_requested' && 'text-status-info'
                         )}>
                             {approvalStatus === 'approved' && 'Your listing is live in the marketplace.'}
                             {approvalStatus === 'pending' && 'Your listing is pending approval. This usually takes 24-48 hours.'}
@@ -279,8 +279,8 @@ export default function SelfServiceListingPage() {
                         
                         {/* Tips */}
                         <div className="bg-status-info-light rounded-lg p-4 border border-status-info">
-                            <h4 className="font-medium text-blue-900 text-sm mb-2">Tips for a great listing</h4>
-                            <ul className="text-xs text-blue-800 space-y-1">
+                            <h4 className="font-medium text-status-info-dark text-sm mb-2">Tips for a great listing</h4>
+                            <ul className="text-xs text-status-info space-y-1">
                                 <li>• Use a clear, specific title that describes your offering</li>
                                 <li>• Highlight your unique value proposition in the description</li>
                                 <li>• Include relevant keywords buyers might search for</li>

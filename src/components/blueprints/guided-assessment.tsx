@@ -123,7 +123,7 @@ export function GuidedAssessment({
     return (
       <Card className={className}>
         <CardContent className="py-8 text-center">
-          <CheckCircle2 className="h-12 w-12 text-emerald-500 mx-auto mb-4" />
+          <CheckCircle2 className="h-12 w-12 text-status-success mx-auto mb-4" />
           <h3 className="text-lg font-semibold">Assessment Complete!</h3>
           <p className="text-muted-foreground mt-2">
             You&apos;ve answered {answeredCount} questions.
@@ -330,17 +330,17 @@ function AnswerButton({
   onClick,
 }: AnswerButtonProps) {
   const colors = {
-    covered: 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100',
-    partial: 'border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100',
-    gap: 'border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100',
-    not_needed: 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100',
+    covered: 'border-status-success bg-status-success-light text-status-success-dark hover:bg-status-success-light/80',
+    partial: 'border-status-warning bg-status-warning-light text-status-warning-dark hover:bg-status-warning-light/80',
+    gap: 'border-destructive bg-status-error-light text-destructive hover:bg-status-error-light/80',
+    not_needed: 'border-muted bg-muted text-muted-foreground hover:bg-muted/80',
   }
 
   const selectedColors = {
-    covered: 'ring-2 ring-emerald-500',
-    partial: 'ring-2 ring-amber-500',
-    gap: 'ring-2 ring-rose-500',
-    not_needed: 'ring-2 ring-slate-400',
+    covered: 'ring-2 ring-status-success',
+    partial: 'ring-2 ring-status-warning',
+    gap: 'ring-2 ring-destructive',
+    not_needed: 'ring-2 ring-muted-foreground',
   }
 
   return (

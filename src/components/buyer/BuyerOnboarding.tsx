@@ -42,7 +42,7 @@ const ONBOARDING_STEPS: OnboardingStep[] = [
                 </p>
                 <div className="space-y-3">
                     <div className="flex items-start gap-3 p-3 bg-muted/50 rounded-lg">
-                        <div className="w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-sm font-medium flex-shrink-0">
+                        <div className="w-6 h-6 rounded-full bg-status-info-light text-status-info flex items-center justify-center text-sm font-medium flex-shrink-0">
                             1
                         </div>
                         <div>
@@ -53,7 +53,7 @@ const ONBOARDING_STEPS: OnboardingStep[] = [
                         </div>
                     </div>
                     <div className="flex items-start gap-3 p-3 bg-muted/50 rounded-lg">
-                        <div className="w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-sm font-medium flex-shrink-0">
+                        <div className="w-6 h-6 rounded-full bg-status-info-light text-status-info flex items-center justify-center text-sm font-medium flex-shrink-0">
                             2
                         </div>
                         <div>
@@ -64,7 +64,7 @@ const ONBOARDING_STEPS: OnboardingStep[] = [
                         </div>
                     </div>
                     <div className="flex items-start gap-3 p-3 bg-muted/50 rounded-lg">
-                        <div className="w-6 h-6 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center text-sm font-medium flex-shrink-0">
+                        <div className="w-6 h-6 rounded-full bg-status-success-light text-status-success flex items-center justify-center text-sm font-medium flex-shrink-0">
                             3
                         </div>
                         <div>
@@ -90,8 +90,8 @@ const ONBOARDING_STEPS: OnboardingStep[] = [
                 </p>
                 <div className="grid gap-3">
                     <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
-                        <div className="w-10 h-10 rounded-lg bg-amber-100 flex items-center justify-center">
-                            <Star className="h-5 w-5 text-amber-600" />
+                        <div className="w-10 h-10 rounded-lg bg-status-warning-light flex items-center justify-center">
+                            <Star className="h-5 w-5 text-status-warning" />
                         </div>
                         <div>
                             <p className="font-medium">Ratings & Reviews</p>
@@ -101,8 +101,8 @@ const ONBOARDING_STEPS: OnboardingStep[] = [
                         </div>
                     </div>
                     <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
-                        <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center">
-                            <CheckCircle className="h-5 w-5 text-blue-600" />
+                        <div className="w-10 h-10 rounded-lg bg-status-info-light flex items-center justify-center">
+                            <CheckCircle className="h-5 w-5 text-status-info" />
                         </div>
                         <div>
                             <p className="font-medium">Verified Identity</p>
@@ -112,8 +112,8 @@ const ONBOARDING_STEPS: OnboardingStep[] = [
                         </div>
                     </div>
                     <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
-                        <div className="w-10 h-10 rounded-lg bg-emerald-100 flex items-center justify-center">
-                            <ShieldCheck className="h-5 w-5 text-emerald-600" />
+                        <div className="w-10 h-10 rounded-lg bg-status-success-light flex items-center justify-center">
+                            <ShieldCheck className="h-5 w-5 text-status-success" />
                         </div>
                         <div>
                             <p className="font-medium">Badges & Certifications</p>
@@ -151,9 +151,9 @@ const ONBOARDING_STEPS: OnboardingStep[] = [
                             covers escrow protection, support, and dispute resolution.
                         </p>
                     </div>
-                    <div className="p-3 bg-blue-50 rounded-lg border border-blue-100">
-                        <p className="font-medium mb-1 text-blue-700">Powered by Stripe</p>
-                        <p className="text-sm text-blue-600">
+                    <div className="p-3 bg-status-info-light rounded-lg border border-status-info">
+                        <p className="font-medium mb-1 text-status-info-dark">Powered by Stripe</p>
+                        <p className="text-sm text-status-info">
                             Your payment details are handled by Stripe, trusted by millions 
                             of businesses worldwide. We never store your card information.
                         </p>
@@ -194,8 +194,8 @@ const ONBOARDING_STEPS: OnboardingStep[] = [
                         </div>
                     </div>
                 </div>
-                <div className="p-3 bg-emerald-50 rounded-lg border border-emerald-100">
-                    <p className="text-sm text-emerald-700">
+                <div className="p-3 bg-status-success-light rounded-lg border border-status-success">
+                    <p className="text-sm text-status-success-dark">
                         <strong>Tip:</strong> Communicate clearly about your requirements 
                         before booking to ensure the best outcome.
                     </p>
@@ -385,16 +385,16 @@ export function BuyerOnboardingBanner({
     if (isDismissed) return null
 
     return (
-        <Card className={cn("border bg-blue-50", className)}>
+        <Card className={cn("border bg-status-info-light", className)}>
             <CardContent className="py-4">
                 <div className="flex items-center justify-between gap-4">
                     <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
-                            <ShieldCheck className="h-5 w-5 text-blue-600" />
+                        <div className="w-10 h-10 rounded-full bg-status-info-light flex items-center justify-center">
+                            <ShieldCheck className="h-5 w-5 text-status-info" />
                         </div>
                         <div>
-                            <p className="font-medium text-blue-900">New to the marketplace?</p>
-                            <p className="text-sm text-blue-700">
+                            <p className="font-medium text-status-info-dark">New to the marketplace?</p>
+                            <p className="text-sm text-status-info-dark">
                                 Learn how escrow, payments, and provider verification work.
                             </p>
                         </div>
@@ -407,14 +407,14 @@ export function BuyerOnboardingBanner({
                                 localStorage.setItem(ONBOARDING_STORAGE_KEY, 'true')
                                 setIsDismissed(true)
                             }}
-                            className="border text-blue-700 hover:bg-blue-100"
+                            className="border text-status-info-dark hover:bg-status-info-light"
                         >
                             Dismiss
                         </Button>
                         <Button
                             size="sm"
                             onClick={onGetStarted}
-                            className="bg-blue-600 hover:bg-blue-700"
+                            className="bg-status-info hover:bg-status-info/90"
                         >
                             Learn More
                             <ChevronRight className="h-4 w-4 ml-1" />

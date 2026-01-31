@@ -98,8 +98,8 @@ async function PaymentsContent() {
                     <Card>
                         <CardContent className="pt-6">
                             <div className="flex items-center gap-3">
-                                <div className="p-2 rounded-lg bg-green-50">
-                                    <Wallet className="h-5 w-5 text-green-600" />
+<div className="p-2 rounded-lg bg-status-success-light">
+                                                    <Wallet className="h-5 w-5 text-status-success" />
                                 </div>
                                 <div>
                                     <p className="text-sm text-muted-foreground">Available Balance</p>
@@ -120,8 +120,8 @@ async function PaymentsContent() {
                     <Card>
                         <CardContent className="pt-6">
                             <div className="flex items-center gap-3">
-                                <div className="p-2 rounded-lg bg-amber-50">
-                                    <Clock className="h-5 w-5 text-amber-600" />
+<div className="p-2 rounded-lg bg-status-warning-light">
+                                                    <Clock className="h-5 w-5 text-status-warning" />
                                 </div>
                                 <div>
                                     <p className="text-sm text-muted-foreground">Pending</p>
@@ -142,8 +142,8 @@ async function PaymentsContent() {
                     <Card>
                         <CardContent className="pt-6">
                             <div className="flex items-center gap-3">
-                                <div className="p-2 rounded-lg bg-blue-50">
-                                    <TrendingUp className="h-5 w-5 text-blue-600" />
+<div className="p-2 rounded-lg bg-status-info-light">
+                                                    <TrendingUp className="h-5 w-5 text-status-info" />
                                 </div>
                                 <div>
                                     <p className="text-sm text-muted-foreground">Total Paid Out</p>
@@ -187,12 +187,12 @@ async function PaymentsContent() {
                             </div>
                         </div>
                         <div className="flex items-start gap-2 p-4 rounded-lg bg-status-info-light border border-status-info">
-                            <Info className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
-                            <div>
-                                <p className="text-sm font-medium text-blue-900">
-                                    Manage your payout settings in Stripe
-                                </p>
-                                <p className="text-sm text-blue-700 mt-1">
+<Info className="h-5 w-5 text-status-info flex-shrink-0 mt-0.5" />
+                                <div>
+                                    <p className="text-sm font-medium text-status-info-dark">
+                                        Manage your payout settings in Stripe
+                                    </p>
+                                    <p className="text-sm text-status-info mt-1">
                                     You can change your payout schedule, add bank accounts, and view detailed
                                     transaction history in your Stripe Dashboard.
                                 </p>
@@ -231,7 +231,7 @@ async function PaymentsContent() {
                                 </p>
                             </div>
                             <div className="p-4 rounded-lg border">
-                                <p className="text-lg font-bold text-green-600">~87%</p>
+                                <p className="text-lg font-bold text-status-success">~87%</p>
                                 <p className="text-sm font-medium mt-1">You Keep</p>
                                 <p className="text-xs text-muted-foreground mt-1">
                                     Your approximate earnings after fees
@@ -261,12 +261,12 @@ async function PaymentsContent() {
                     <div className="space-y-4">
                         <div className="p-4 rounded-lg bg-status-warning-light border border-status-warning">
                             <div className="flex items-start gap-2">
-                                <Info className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                                <Info className="h-5 w-5 text-status-warning flex-shrink-0 mt-0.5" />
                                 <div>
-                                    <p className="text-sm font-medium text-amber-900">
+                                    <p className="text-sm font-medium text-status-warning-dark">
                                         You are responsible for your own taxes
                                     </p>
-                                    <p className="text-sm text-amber-700 mt-1">
+                                    <p className="text-sm text-status-warning mt-1">
                                         As a provider on our marketplace, you are considered self-employed.
                                         You are responsible for reporting and paying any applicable taxes
                                         on your earnings. We recommend consulting with a tax professional.

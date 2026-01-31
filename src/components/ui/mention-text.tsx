@@ -46,7 +46,7 @@ export function MentionText({ content, members = [] }: MentionTextProps) {
           return (
             <span 
               key={i} 
-              className="text-blue-600 font-medium bg-blue-50 px-1 rounded"
+              className="text-status-info font-medium bg-status-info-light px-1 rounded"
               title={member?.full_name || undefined}
             >
               {part}

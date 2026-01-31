@@ -130,25 +130,25 @@ export function DomainDetailPanel({
             <SelectContent>
               <SelectItem value="covered">
                 <div className="flex items-center gap-2">
-                  <div className="h-2 w-2 rounded-full bg-emerald-500" />
+                  <div className="h-2 w-2 rounded-full bg-status-success" />
                   Covered
                 </div>
               </SelectItem>
               <SelectItem value="partial">
                 <div className="flex items-center gap-2">
-                  <div className="h-2 w-2 rounded-full bg-amber-500" />
+                  <div className="h-2 w-2 rounded-full bg-status-warning" />
                   Partial
                 </div>
               </SelectItem>
               <SelectItem value="gap">
                 <div className="flex items-center gap-2">
-                  <div className="h-2 w-2 rounded-full bg-rose-500" />
+                  <div className="h-2 w-2 rounded-full bg-destructive" />
                   Gap
                 </div>
               </SelectItem>
               <SelectItem value="not_needed">
                 <div className="flex items-center gap-2">
-                  <div className="h-2 w-2 rounded-full bg-slate-400" />
+                  <div className="h-2 w-2 rounded-full bg-muted-foreground" />
                   Not Needed
                 </div>
               </SelectItem>
@@ -310,9 +310,9 @@ function ExpertiseItem({
   }
 
   const getLevelColor = () => {
-    if (expertise.expertise_level === 'expert') return 'text-emerald-600'
-    if (expertise.expertise_level === 'competent') return 'text-blue-600'
-    return 'text-amber-600'
+    if (expertise.expertise_level === 'expert') return 'text-status-success'
+    if (expertise.expertise_level === 'competent') return 'text-status-info'
+    return 'text-status-warning'
   }
 
   return (

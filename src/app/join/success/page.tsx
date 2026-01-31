@@ -161,7 +161,7 @@ export default async function SuccessPage({
                     </div>
                     <span>{item.label}</span>
                     <div className="ml-auto">
-                      <Check className="w-4 h-4 text-emerald-400 animate-scale-in" style={{ animationDelay: `${(index * 200) + 400}ms` }} />
+                      <Check className="w-4 h-4 text-status-success animate-scale-in" style={{ animationDelay: `${(index * 200) + 400}ms` }} />
                     </div>
                   </div>
                 );
