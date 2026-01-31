@@ -28,6 +28,7 @@ import {
     Shield
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { sanitizeHref, sanitizeVideoEmbedUrl } from '@/lib/security/url-validation'
 
 interface PublicProfileViewProps {
     profile: PublicProfile
@@ -189,9 +190,9 @@ export function PublicProfileView({ profile }: PublicProfileViewProps) {
                             {/* Social Links */}
                             {(profile.linkedin_url || profile.website_url) && (
                                 <div className="flex items-center justify-center gap-4 mt-6 pt-6 border-t">
-                                    {profile.linkedin_url && (
+                                    {profile.linkedin_url && sanitizeHref(profile.linkedin_url) !== '#' && (
                                         <a 
-                                            href={profile.linkedin_url}
+                                            href={sanitizeHref(profile.linkedin_url)}
                                             target="_blank"
                                             rel="noopener noreferrer"
                                             className="text-muted-foreground hover:text-foreground transition-colors"
@@ -199,9 +200,9 @@ export function PublicProfileView({ profile }: PublicProfileViewProps) {
                                             <Linkedin className="w-5 h-5" />
                                         </a>
                                     )}
-                                    {profile.website_url && (
+                                    {profile.website_url && sanitizeHref(profile.website_url) !== '#' && (
                                         <a 
-                                            href={profile.website_url}
+                                            href={sanitizeHref(profile.website_url)}
                                             target="_blank"
                                             rel="noopener noreferrer"
                                             className="text-muted-foreground hover:text-foreground transition-colors"
@@ -218,13 +219,14 @@ export function PublicProfileView({ profile }: PublicProfileViewProps) {
                 {/* Main Content */}
                 <div className="lg:w-2/3 space-y-6">
                     {/* Video Introduction */}
-                    {profile.video_url && (
+                    {/* SECURITY: Only render video if URL is from allowed platforms */}
+                    {profile.video_url && sanitizeVideoEmbedUrl(profile.video_url) && (
                         <Card>
                             <CardContent className="p-0">
                                 {showVideo ? (
                                     <div className="aspect-video">
                                         <iframe
-                                            src={profile.video_url}
+                                            src={sanitizeVideoEmbedUrl(profile.video_url)!}
                                             className="w-full h-full rounded-lg"
                                             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                                             allowFullScreen

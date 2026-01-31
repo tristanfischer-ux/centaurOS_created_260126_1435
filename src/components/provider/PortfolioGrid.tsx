@@ -16,6 +16,7 @@ import {
 } from 'lucide-react'
 import { format } from 'date-fns'
 import type { PortfolioItem } from '@/actions/trust-signals'
+import { sanitizeHref } from '@/lib/security/url-validation'
 
 interface PortfolioGridProps {
     items: PortfolioItem[]
@@ -197,9 +198,9 @@ function PortfolioGridCard({ item, showFeaturedHighlight, onClick }: PortfolioGr
                             {format(new Date(item.completion_date), 'MMM yyyy')}
                         </span>
                     )}
-                    {item.project_url && (
+                    {item.project_url && sanitizeHref(item.project_url) !== '#' && (
                         <a
-                            href={item.project_url}
+                            href={sanitizeHref(item.project_url)}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="flex items-center gap-1 text-blue-600 hover:underline"

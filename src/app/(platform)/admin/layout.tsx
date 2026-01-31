@@ -8,7 +8,12 @@ import {
     ClipboardList, 
     Activity, 
     ShieldAlert,
-    ArrowLeft
+    ArrowLeft,
+    Info,
+    BarChart3,
+    Shield,
+    Settings,
+    Users
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
@@ -16,6 +21,11 @@ const adminNavigation = [
     { name: "Overview", href: "/admin", icon: LayoutDashboard },
     { name: "Applications", href: "/admin/applications", icon: ClipboardList },
     { name: "Platform Health", href: "/admin/health", icon: Activity },
+    { name: "Analytics", href: "/admin/analytics", icon: BarChart3 },
+    { name: "GDPR", href: "/admin/gdpr", icon: Shield },
+    { name: "Migration", href: "/admin/migration", icon: Users },
+    { name: "Settings", href: "/admin/settings", icon: Settings },
+    { name: "About", href: "/admin/about", icon: Info },
 ]
 
 export default async function AdminLayout({

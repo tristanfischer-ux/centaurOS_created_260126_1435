@@ -94,7 +94,13 @@ export default async function SettingsPage() {
                 <CardContent>
                     <form action={async () => {
                         'use server'
+                        const { logSecurityEvent } = await import('@/lib/security/audit-log')
                         const supabase = await createClient()
+                        const { data: { user } } = await supabase.auth.getUser()
+                        // SECURITY: Log logout event before signing out
+                        if (user) {
+                            await logSecurityEvent('LOGOUT', user.id, { success: true })
+                        }
                         await supabase.auth.signOut()
                         redirect('/login')
                     }}>

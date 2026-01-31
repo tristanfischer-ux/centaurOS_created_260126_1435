@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
+import { headers } from "next/headers";
 import OpenAI from "openai";
 import { Json } from "@/types/database.types";
 import { createClient } from "@/lib/supabase/server";
+import { rateLimit, getClientIP } from "@/lib/security/rate-limit";
 
 // Validate API key at runtime rather than using dummy fallback
 const apiKey = process.env.OPENAI_API_KEY;
@@ -60,6 +62,17 @@ export async function POST(req: NextRequest) {
             return NextResponse.json(
                 { error: "Unauthorized" },
                 { status: 401 }
+            );
+        }
+
+        // SECURITY: Rate limit to prevent OpenAI cost abuse (5 requests per minute per user)
+        const headersList = await headers()
+        const clientIP = getClientIP(headersList)
+        const rateLimitResult = await rateLimit('api', `compare:${user.id}`, { limit: 5, window: 60 })
+        if (!rateLimitResult.success) {
+            return NextResponse.json(
+                { error: "Rate limit exceeded. Please wait before comparing again." },
+                { status: 429 }
             );
         }
 

@@ -60,7 +60,9 @@ const nextConfig: NextConfig = {
             key: "Content-Security-Policy",
             value: [
               "default-src 'self'",
-              "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.supabase.co https://*.stripe.com",
+              // SECURITY: unsafe-inline needed for Next.js/React, unsafe-eval removed for security
+              // Note: If eval is needed for specific features, use nonces instead
+              "script-src 'self' 'unsafe-inline' https://*.supabase.co https://*.stripe.com",
               "style-src 'self' 'unsafe-inline'",
               "img-src 'self' data: https: blob:",
               "font-src 'self' data:",

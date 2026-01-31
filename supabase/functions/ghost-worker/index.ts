@@ -2,22 +2,78 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts"
 import { createClient } from 'jsr:@supabase/supabase-js@2'
 import OpenAI from 'npm:openai'
 
+// SECURITY: Validate required environment variables
+const supabaseUrl = Deno.env.get('SUPABASE_URL')
+const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+const openaiKey = Deno.env.get('OPENAI_API_KEY')
+
+if (!supabaseUrl || !supabaseKey) {
+    console.error('[CRITICAL] Missing required Supabase environment variables')
+}
+
 const openai = new OpenAI({
-    apiKey: Deno.env.get('OPENAI_API_KEY'),
+    apiKey: openaiKey,
 })
 
-const supabaseUrl = Deno.env.get('SUPABASE_URL')!
-const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-const supabase = createClient(supabaseUrl, supabaseKey)
+const supabase = supabaseUrl && supabaseKey ? createClient(supabaseUrl, supabaseKey) : null
+
+// SECURITY: Sanitize text for AI prompts to prevent injection
+function sanitizeForPrompt(text: string | null | undefined): string {
+    if (!text) return ''
+    return text
+        .replace(/[<>]/g, '')
+        .substring(0, 10000)
+}
+
+// SECURITY: Validate UUID format
+function isValidUUID(str: string): boolean {
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+    return uuidRegex.test(str)
+}
 
 Deno.serve(async (req) => {
+    // SECURITY: Verify authorization header
+    const authHeader = req.headers.get('Authorization')
+    const expectedToken = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+    
+    if (!authHeader || authHeader !== `Bearer ${expectedToken}`) {
+        return new Response(JSON.stringify({ error: 'Unauthorized' }), { 
+            status: 401,
+            headers: { 'Content-Type': 'application/json' }
+        })
+    }
+
+    // SECURITY: Check environment configuration
+    if (!supabase || !openaiKey) {
+        return new Response(JSON.stringify({ error: 'Service configuration error' }), { 
+            status: 500,
+            headers: { 'Content-Type': 'application/json' }
+        })
+    }
+
     try {
         const payload = await req.json()
         const { record } = payload
 
+        // SECURITY: Validate payload structure
+        if (!record || typeof record !== 'object') {
+            return new Response(JSON.stringify({ error: 'Invalid payload' }), { 
+                status: 400,
+                headers: { 'Content-Type': 'application/json' }
+            })
+        }
+
         // Only process INSERT or UPDATE where assignee_id changed
         if (!record.assignee_id) {
             return new Response('No assignee', { status: 200 })
+        }
+
+        // SECURITY: Validate assignee_id is a valid UUID
+        if (!isValidUUID(record.assignee_id)) {
+            return new Response(JSON.stringify({ error: 'Invalid assignee ID' }), { 
+                status: 400,
+                headers: { 'Content-Type': 'application/json' }
+            })
         }
 
         // Check if Assignee is an AI Agent
@@ -48,21 +104,29 @@ Deno.serve(async (req) => {
         }
 
         // 2. Generate Output with GPT-4o
-        const systemPrompt = `You are ${profile.full_name}, a highly capable AI employee at a fractional foundry.
-    Your role is: ${profile.full_name}.
+        // SECURITY: Sanitize user-controlled input before using in prompts
+        const sanitizedTitle = sanitizeForPrompt(record.title)
+        const sanitizedDescription = sanitizeForPrompt(record.description)
+        const sanitizedName = sanitizeForPrompt(profile.full_name)
+        
+        const systemPrompt = `You are ${sanitizedName}, a highly capable AI employee at a fractional foundry.
+    Your role is: ${sanitizedName}.
     
     You have been assigned a task. You must execute it or provide a detailed plan/draft.
-    Output your work directly. Do not be chatty.
-    
-    Task: ${record.title}
-    Description: ${record.description}
-    ${context}`
+    Output your work directly. Do not be chatty.`
+
+        // SECURITY: Separate system instructions from user-controlled content
+        const userMessage = `Task: ${sanitizedTitle}
+Description: ${sanitizedDescription}
+${context}
+
+Execute this task.`
 
         const completion = await openai.chat.completions.create({
             model: "gpt-4o",
             messages: [
                 { role: "system", content: systemPrompt },
-                { role: "user", content: "Execute this task." }
+                { role: "user", content: userMessage }
             ]
         })
 
@@ -88,8 +152,9 @@ Deno.serve(async (req) => {
         return new Response('AI Execution Complete', { status: 200 })
 
     } catch (error) {
-        console.error(error)
-        return new Response(JSON.stringify({ error: error.message }), {
+        console.error('[ghost-worker] Error:', error instanceof Error ? error.message : 'Unknown error')
+        // SECURITY: Don't expose internal error details to clients
+        return new Response(JSON.stringify({ error: 'Internal server error' }), {
             status: 500,
             headers: { "Content-Type": "application/json" }
         })

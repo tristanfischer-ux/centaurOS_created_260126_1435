@@ -193,7 +193,13 @@ export async function getMyNotifications(options?: {
 export async function markNotificationAsRead(notificationId: string): Promise<{ success: boolean; error: string | null }> {
     try {
         const supabase = await createClient()
+        const { data: { user } } = await supabase.auth.getUser()
+        
+        if (!user) {
+            return { success: false, error: 'Not authenticated' }
+        }
 
+        // SECURITY: Only update notifications that belong to the current user
         const { error } = await supabase
             .from('notifications')
             .update({
@@ -201,10 +207,11 @@ export async function markNotificationAsRead(notificationId: string): Promise<{ 
                 read_at: new Date().toISOString()
             })
             .eq('id', notificationId)
+            .eq('user_id', user.id)  // SECURITY: Ownership check
 
         if (error) {
             console.error('Error marking notification as read:', error)
-            return { success: false, error: error.message }
+            return { success: false, error: 'Failed to mark as read' }
         }
 
         return { success: true, error: null }
@@ -254,15 +261,22 @@ export async function markAllNotificationsAsRead(): Promise<{ success: boolean; 
 export async function deleteNotification(notificationId: string): Promise<{ success: boolean; error: string | null }> {
     try {
         const supabase = await createClient()
+        const { data: { user } } = await supabase.auth.getUser()
+        
+        if (!user) {
+            return { success: false, error: 'Not authenticated' }
+        }
 
+        // SECURITY: Only delete notifications that belong to the current user
         const { error } = await supabase
             .from('notifications')
             .delete()
             .eq('id', notificationId)
+            .eq('user_id', user.id)  // SECURITY: Ownership check
 
         if (error) {
             console.error('Error deleting notification:', error)
-            return { success: false, error: error.message }
+            return { success: false, error: 'Failed to delete notification' }
         }
 
         return { success: true, error: null }

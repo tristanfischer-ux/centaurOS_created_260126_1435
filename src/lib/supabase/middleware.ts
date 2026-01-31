@@ -35,6 +35,8 @@ export async function updateSession(request: NextRequest) {
         },
     })
 
+    const isProduction = process.env.NODE_ENV === 'production'
+    
     const supabase = createServerClient<Database>(url, key, {
             cookies: {
                 getAll() {
@@ -47,8 +49,15 @@ export async function updateSession(request: NextRequest) {
                             headers: request.headers,
                         },
                     })
+                    // SECURITY: Set secure cookie attributes
                     cookiesToSet.forEach(({ name, value, options }) =>
-                        response.cookies.set(name, value, options)
+                        response.cookies.set(name, value, {
+                            ...options,
+                            sameSite: 'lax', // Protect against CSRF
+                            secure: isProduction, // HTTPS only in production
+                            httpOnly: true, // Prevent XSS access to cookies
+                            path: '/',
+                        })
                     )
                 },
             },

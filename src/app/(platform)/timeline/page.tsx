@@ -23,13 +23,14 @@ export default async function TimelinePage() {
         *,
         profiles:assignee_id(*),
         objectives:objective_id(*),
-        task_assignees(profile:profiles(id, full_name, role, email))
+        task_assignees(profile:profiles(id, full_name, role))
     `)
         .order('start_date', { ascending: true })
 
     // Fetch Filter Data
+    // SECURITY: Don't fetch email in SSR to prevent exposure in page source
     const { data: objectives } = await supabase.from('objectives').select('*')
-    const { data: profiles } = await supabase.from('profiles').select('*')
+    const { data: profiles } = await supabase.from('profiles').select('id, full_name, role')
 
     if (error) {
         console.error(error)
@@ -40,8 +41,7 @@ export default async function TimelinePage() {
     const members = (profiles || []).map(p => ({
         id: p.id,
         full_name: p.full_name || 'Unnamed',
-        role: p.role || 'Apprentice',
-        email: p.email || ''
+        role: p.role || 'Apprentice'
     }))
 
     // Format objectives for CreateTaskDialog

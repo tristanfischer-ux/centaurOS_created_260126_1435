@@ -13,15 +13,16 @@ export default async function TasksPage() {
         redirect('/login')
     }
 
+    // SECURITY: Don't fetch email in SSR to prevent exposure in page source
     const { data: tasks, error } = await supabase
         .from('tasks')
         .select(`
             *,
-            assignee:profiles!assignee_id(id, full_name, role, email),
+            assignee:profiles!assignee_id(id, full_name, role),
             creator:profiles!creator_id(id, full_name, role),
             objective:objectives!objective_id(id, title),
             task_files(id, file_name, file_size, created_at),
-            task_assignees(profile:profiles(id, full_name, role, email))
+            task_assignees(profile:profiles(id, full_name, role))
         `)
         .order('created_at', { ascending: false })
 
@@ -39,6 +40,7 @@ export default async function TasksPage() {
     }
 
     // Parallelize independent queries
+    // SECURITY: Don't fetch email in SSR to prevent exposure in page source
     const [
         { data: currentUserProfile },
         { data: objectives },
@@ -47,7 +49,7 @@ export default async function TasksPage() {
     ] = await Promise.all([
         supabase.from('profiles').select('id, foundry_id, role').eq('id', user.id).single(),
         supabase.from('objectives').select('id, title'),
-        supabase.from('profiles').select('id, full_name, role, email'),
+        supabase.from('profiles').select('id, full_name, role'),
         supabase.from('teams').select('id, name')
     ])
 
@@ -56,8 +58,7 @@ export default async function TasksPage() {
     const members = (membersData || []).map(p => ({
         id: p.id,
         full_name: p.full_name || 'Unknown',
-        role: p.role,
-        email: p.email
+        role: p.role
     }))
     const teams = teamsData || []
 

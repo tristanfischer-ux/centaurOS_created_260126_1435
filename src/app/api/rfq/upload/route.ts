@@ -5,11 +5,23 @@ import { getFoundryIdCached } from '@/lib/supabase/foundry-context'
 // Maximum file size: 25MB
 const MAX_FILE_SIZE = 25 * 1024 * 1024
 
-// Allowed file extensions
+// Allowed file extensions and MIME types
 const ALLOWED_EXTENSIONS = [
   'pdf', 'jpg', 'jpeg', 'png', 'gif', 'webp',
   'doc', 'docx', 'xls', 'xlsx', 'txt', 'csv', 'zip',
   'stl', 'step', 'stp', 'iges', 'igs', 'dxf', 'dwg',
+]
+
+// SECURITY: MIME type allowlist for additional validation
+const ALLOWED_MIME_TYPES = [
+  'application/pdf',
+  'image/jpeg', 'image/png', 'image/gif', 'image/webp',
+  'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'text/plain', 'text/csv',
+  'application/zip', 'application/x-zip-compressed',
+  'application/octet-stream', // Allow for CAD files that don't have standard MIME types
+  'model/stl', 'application/sla', // STL files
 ]
 
 export async function POST(request: NextRequest) {
@@ -62,10 +74,33 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // SECURITY: Also validate MIME type to prevent extension spoofing
+    const mimeType = file.type || 'application/octet-stream'
+    if (!ALLOWED_MIME_TYPES.includes(mimeType)) {
+      return NextResponse.json(
+        { error: 'File type not supported' },
+        { status: 400 }
+      )
+    }
+
+    // SECURITY: Validate foundryId and userId are valid UUIDs
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+    if (!uuidRegex.test(foundryId) || !uuidRegex.test(user.id)) {
+      return NextResponse.json(
+        { error: 'Invalid request' },
+        { status: 400 }
+      )
+    }
+
     // Generate unique file path
     // Format: rfq/{foundry_id}/{user_id}/{timestamp}_{filename}
     const timestamp = Date.now()
-    const sanitizedName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_')
+    // SECURITY: More thorough sanitization to prevent path traversal
+    const sanitizedName = file.name
+      .replace(/\.\./g, '') // Remove path traversal
+      .replace(/[\/\\]/g, '') // Remove path separators
+      .replace(/[^a-zA-Z0-9._-]/g, '_') // Allow only safe characters
+      .substring(0, 200) // Limit length
     const filePath = `rfq/${foundryId}/${user.id}/${timestamp}_${sanitizedName}`
 
     // Upload to Supabase Storage
@@ -127,8 +162,21 @@ export async function DELETE(request: NextRequest) {
       )
     }
 
-    // Verify the path belongs to this user (security check)
-    if (!path.includes(`/${user.id}/`)) {
+    // SECURITY: Get foundry ID for path validation
+    const foundryId = await getFoundryIdCached()
+    if (!foundryId) {
+      return NextResponse.json(
+        { error: 'User not in a foundry' },
+        { status: 400 }
+      )
+    }
+
+    // SECURITY: Strict path validation to prevent path traversal
+    // Expected format: rfq/{foundryId}/{userId}/{timestamp}_{filename}
+    const expectedPrefix = `rfq/${foundryId}/${user.id}/`
+    
+    // Check for path traversal attempts
+    if (path.includes('..') || path.includes('//') || !path.startsWith(expectedPrefix)) {
       return NextResponse.json(
         { error: 'Unauthorized to delete this file' },
         { status: 403 }

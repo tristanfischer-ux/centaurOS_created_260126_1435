@@ -4,6 +4,7 @@ import { cn } from '@/lib/utils'
 import { UserAvatar } from '@/components/ui/user-avatar'
 import { Check, CheckCheck, FileIcon, AlertCircle } from 'lucide-react'
 import type { MessageWithSender } from '@/lib/messaging/service'
+import { sanitizeHref } from '@/lib/security/url-validation'
 
 interface MessageBubbleProps {
   message: MessageWithSender
@@ -113,9 +114,9 @@ export function MessageBubble({
               : 'bg-muted text-foreground rounded-bl-md'
           )}
         >
-          {isFile && message.file_url ? (
+          {isFile && message.file_url && sanitizeHref(message.file_url) !== '#' ? (
             <a 
-              href={message.file_url} 
+              href={sanitizeHref(message.file_url)} 
               target="_blank" 
               rel="noopener noreferrer"
               className={cn(

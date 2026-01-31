@@ -22,6 +22,7 @@ import { RatingsSummary } from '@/components/provider/RatingsSummary'
 import { ReviewCard } from '@/components/provider/ReviewCard'
 import type { PortfolioItem, Certification, ProviderBadge } from '@/actions/trust-signals'
 import type { RatingsSummary as RatingsSummaryType, ProviderRating } from '@/actions/ratings'
+import { sanitizeHref } from '@/lib/security/url-validation'
 
 interface ProviderTrustSectionProps {
     // Rating info
@@ -354,10 +355,10 @@ export const ProviderTrustSection = memo(function ProviderTrustSection({
                                                     <p className="text-xs text-muted-foreground">{cert.issuing_body}</p>
                                                 </div>
                                             </div>
-                                            {cert.verification_url && (
+                                            {cert.verification_url && sanitizeHref(cert.verification_url) !== '#' && (
                                                 <Button variant="ghost" size="sm" asChild>
                                                     <a 
-                                                        href={cert.verification_url} 
+                                                        href={sanitizeHref(cert.verification_url)} 
                                                         target="_blank" 
                                                         rel="noopener noreferrer"
                                                     >

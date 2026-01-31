@@ -69,20 +69,25 @@ export async function uploadTaskAttachment(taskId: string, formData: FormData) {
         return { error: uploadError.message }
     }
 
-    // Get public URL
-    const { data: urlData } = supabase.storage
+    // SECURITY: Use signed URLs instead of public URLs to prevent unauthorized access
+    const { data: urlData } = await supabase.storage
         .from('task-files')
-        .getPublicUrl(fileName)
+        .createSignedUrl(fileName, 60 * 60) // 1 hour expiry
+
+    if (!urlData?.signedUrl) {
+        return { error: 'Failed to generate file URL' }
+    }
 
     // SECURITY: Escape filename to prevent XSS in markdown rendering
     const safeFileName = escapeHtml(sanitizedOriginalName)
     
     // Store reference as a system comment (keeping this for the thread)
+    // Note: We store the file reference, actual URL is generated on-demand via task_files
     const { error: commentError } = await supabase.from('task_comments').insert({
         task_id: taskId,
         foundry_id: task.foundry_id,
         user_id: user.id,
-        content: `📎 Attached: [${safeFileName}](${urlData.publicUrl})`,
+        content: `📎 Attached: ${safeFileName}`,
         is_system_log: true
     })
 
@@ -107,7 +112,7 @@ export async function uploadTaskAttachment(taskId: string, formData: FormData) {
     }
 
     revalidatePath('/tasks')
-    return { success: true, url: urlData.publicUrl }
+    return { success: true, url: urlData.signedUrl }
 }
 
 export async function getTaskAttachments(taskId: string) {

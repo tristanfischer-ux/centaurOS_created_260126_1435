@@ -24,6 +24,7 @@ import {
 import { format, formatDistanceToNow, differenceInDays } from 'date-fns'
 import { CertificationForm } from './CertificationForm'
 import type { Certification } from '@/actions/trust-signals'
+import { sanitizeHref } from '@/lib/security/url-validation'
 
 interface CertificationCardProps {
     certification: Certification
@@ -125,9 +126,9 @@ export const CertificationCard = memo(function CertificationCard({
                         )}
 
                         {/* Verification URL */}
-                        {certification.verification_url && (
+                        {certification.verification_url && sanitizeHref(certification.verification_url) !== '#' && (
                             <a
-                                href={certification.verification_url}
+                                href={sanitizeHref(certification.verification_url)}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="inline-flex items-center gap-1 mt-2 text-sm text-blue-600 hover:underline"

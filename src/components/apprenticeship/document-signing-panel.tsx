@@ -21,6 +21,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog'
+import { sanitizeHref } from '@/lib/security/url-validation'
 import { 
   FileSignature, 
   FileCheck, 
@@ -306,9 +307,9 @@ export function DocumentSigningPanel({ enrollmentId, open, onOpenChange, userRol
               </div>
 
               {/* View Document Link */}
-              {selectedDocument.file_url && (
+              {selectedDocument.file_url && sanitizeHref(selectedDocument.file_url) !== '#' && (
                 <Button variant="outline" className="w-full" asChild>
-                  <a href={selectedDocument.file_url} target="_blank" rel="noopener noreferrer">
+                  <a href={sanitizeHref(selectedDocument.file_url)} target="_blank" rel="noopener noreferrer">
                     <ExternalLink className="h-4 w-4 mr-2" />
                     View Full Document
                   </a>

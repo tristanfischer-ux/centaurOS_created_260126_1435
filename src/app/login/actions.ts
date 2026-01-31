@@ -6,7 +6,7 @@ import { headers } from 'next/headers'
 import { createClient } from '@/lib/supabase/server'
 import { rateLimit, getClientIP, resetRateLimit } from '@/lib/security/rate-limit'
 import { sanitizeEmail } from '@/lib/security/sanitize'
-import { logFailedLogin, logSuccessfulLogin } from '@/lib/security/audit-log'
+import { logFailedLogin, logSuccessfulLogin, logSecurityEvent } from '@/lib/security/audit-log'
 
 export async function login(formData: FormData) {
     // Security: Get client IP for rate limiting
@@ -16,6 +16,18 @@ export async function login(formData: FormData) {
     // Security: Rate limit login attempts
     const rateLimitResult = await rateLimit('login', clientIP)
     if (!rateLimitResult.success) {
+        // SECURITY: Log rate limit exceeded event
+        await logSecurityEvent({
+            type: 'RATE_LIMIT_EXCEEDED',
+            ipAddress: clientIP,
+            resource: 'login',
+            action: 'login_attempt',
+            success: false,
+            details: { 
+                remaining: rateLimitResult.remaining,
+                resetIn: rateLimitResult.reset 
+            }
+        })
         redirect(`/login?error=${encodeURIComponent('Too many login attempts. Please try again in 15 minutes.')}`)
     }
 

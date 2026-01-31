@@ -115,14 +115,17 @@ export async function logSecurityEvent(params: {
         severity: getSeverity(type, success),
     }
 
-    // Log to console with structured format
-    const logMessage = `[SECURITY] [${event.severity}] ${event.type}: ${JSON.stringify({
-        userId: event.userId,
-        ip: event.ipAddress,
-        resource: event.resource,
+    // SECURITY: Sanitize all fields before JSON serialization to prevent log injection
+    const safeLogData = {
+        userId: event.userId?.replace(/[\n\r\t]/g, ''),
+        ip: event.ipAddress?.replace(/[\n\r\t]/g, ''),
+        resource: event.resource?.replace(/[\n\r\t]/g, '').substring(0, 200),
         success: event.success,
         timestamp: event.timestamp,
-    })}`
+    }
+    
+    // Log to console with structured format
+    const logMessage = `[SECURITY] [${event.severity}] ${event.type}: ${JSON.stringify(safeLogData)}`
 
     if (event.severity === 'CRITICAL' || event.severity === 'HIGH') {
         console.error(logMessage)

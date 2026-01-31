@@ -280,6 +280,23 @@ export async function updateAdvisoryQuestion(
 ): Promise<{ success: boolean; error: string | null }> {
     try {
         const supabase = await createClient()
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) return { success: false, error: 'Not authenticated' }
+
+        // SECURITY: Verify ownership before allowing update
+        const { data: question, error: fetchError } = await supabase
+            .from('advisory_questions')
+            .select('asked_by')
+            .eq('id', questionId)
+            .single()
+
+        if (fetchError || !question) {
+            return { success: false, error: 'Question not found' }
+        }
+
+        if (question.asked_by !== user.id) {
+            return { success: false, error: 'Not authorized to modify this question' }
+        }
 
         const { error } = await supabase
             .from('advisory_questions')
@@ -293,7 +310,7 @@ export async function updateAdvisoryQuestion(
 
         if (error) {
             console.error('Error updating advisory question:', error)
-            return { success: false, error: error.message }
+            return { success: false, error: 'Failed to update question' }
         }
 
         revalidatePath('/advisory')
@@ -310,6 +327,23 @@ export async function updateAdvisoryQuestion(
 export async function deleteAdvisoryQuestion(questionId: string): Promise<{ success: boolean; error: string | null }> {
     try {
         const supabase = await createClient()
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) return { success: false, error: 'Not authenticated' }
+
+        // SECURITY: Verify ownership before allowing delete
+        const { data: question, error: fetchError } = await supabase
+            .from('advisory_questions')
+            .select('asked_by')
+            .eq('id', questionId)
+            .single()
+
+        if (fetchError || !question) {
+            return { success: false, error: 'Question not found' }
+        }
+
+        if (question.asked_by !== user.id) {
+            return { success: false, error: 'Not authorized to delete this question' }
+        }
 
         const { error } = await supabase
             .from('advisory_questions')
@@ -318,7 +352,7 @@ export async function deleteAdvisoryQuestion(questionId: string): Promise<{ succ
 
         if (error) {
             console.error('Error deleting advisory question:', error)
-            return { success: false, error: error.message }
+            return { success: false, error: 'Failed to delete question' }
         }
 
         revalidatePath('/advisory')

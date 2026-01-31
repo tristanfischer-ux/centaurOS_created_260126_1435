@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
+import { headers } from "next/headers";
 import OpenAI from "openai";
 import { z } from "zod";
 import { zodResponseFormat } from "openai/helpers/zod";
 import { createClient } from "@/lib/supabase/server";
+import { rateLimit, getClientIP } from "@/lib/security/rate-limit";
 
 const openai = new OpenAI({
     apiKey: process.env.OPENAI_API_KEY || "dummy-key-for-build",
@@ -122,6 +124,17 @@ export async function POST(req: NextRequest): Promise<NextResponse<AISearchRespo
             return NextResponse.json(
                 { success: false, error: "Unauthorized" },
                 { status: 401 }
+            );
+        }
+
+        // SECURITY: Rate limit to prevent OpenAI cost abuse (10 requests per minute per user)
+        const headersList = await headers()
+        const clientIP = getClientIP(headersList)
+        const rateLimitResult = await rateLimit('api', `ai-search:${user.id}`, { limit: 10, window: 60 })
+        if (!rateLimitResult.success) {
+            return NextResponse.json(
+                { success: false, error: "Rate limit exceeded. Please wait before searching again." },
+                { status: 429 }
             );
         }
 

@@ -4,13 +4,14 @@ import React from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
-import { LayoutDashboard, Users, CheckSquare, Clock, Store, Target, Compass, LayoutGrid, MessageCircleQuestion, ShieldAlert, FileText, Sun, Bookmark, Settings, HelpCircle, GraduationCap, Repeat, ShoppingCart, Briefcase } from "lucide-react"
+import { LayoutDashboard, Users, CheckSquare, Clock, Store, Target, Compass, LayoutGrid, MessageCircleQuestion, ShieldAlert, FileText, Sun, Bookmark, Settings, HelpCircle, GraduationCap, Repeat, ShoppingCart, Briefcase, Map } from "lucide-react"
 import { NotificationCenter } from "@/components/NotificationCenter"
 import { ThemeToggle } from "@/components/ThemeToggle"
 import { FocusModeToggle } from "@/components/FocusModeToggle"
 import { ZoomControl } from "@/components/ZoomControl"
 import { useZoomContext } from "@/components/ZoomProvider"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
+import { NewBadge } from "@/components/ui/new-badge"
 
 /**
  * Determines if a navigation item should be marked as active
@@ -50,6 +51,7 @@ const communityNavigation = [
 ]
 
 const strategicNavigation = [
+    { name: "Blueprints", href: "/blueprints", icon: Map, tooltip: "Map knowledge domains, expertise, and supply chain" },
     { name: "Org Blueprint", href: "/org-blueprint", icon: LayoutGrid, tooltip: "Business function coverage and gap analysis" },
 ]
 
@@ -111,17 +113,20 @@ export function Sidebar({ foundryName, foundryId, userName, userRole, isAdmin }:
                                     isActive
                                         ? "bg-orange-50 text-international-orange font-semibold"
                                         : "text-muted-foreground hover:bg-muted hover:text-foreground",
-                                    "group flex items-center px-3 py-2.5 text-sm transition-all duration-200 rounded-md"
+                                    "group flex items-center justify-between px-3 py-2.5 text-sm transition-all duration-200 rounded-md"
                                 )}
                             >
-                                <item.icon
-                                    className={cn(
-                                        isActive ? "text-international-orange" : "text-muted-foreground group-hover:text-foreground",
-                                        "mr-3 h-4 w-4 flex-shrink-0 transition-colors"
-                                    )}
-                                    aria-hidden="true"
-                                />
-                                {item.name}
+                                <span className="flex items-center">
+                                    <item.icon
+                                        className={cn(
+                                            isActive ? "text-international-orange" : "text-muted-foreground group-hover:text-foreground",
+                                            "mr-3 h-4 w-4 flex-shrink-0 transition-colors"
+                                        )}
+                                        aria-hidden="true"
+                                    />
+                                    {item.name}
+                                </span>
+                                <NewBadge route={item.href} />
                             </Link>
                         )
 

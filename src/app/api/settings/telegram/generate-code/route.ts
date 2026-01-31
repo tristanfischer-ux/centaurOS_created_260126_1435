@@ -3,16 +3,19 @@
  */
 
 import { NextResponse } from 'next/server'
+import { headers } from 'next/headers'
 import { createClient } from '@/lib/supabase/server'
 import { createClient as createAdminClient } from '@supabase/supabase-js'
+import { rateLimit, getClientIP } from '@/lib/security/rate-limit'
 
+// SECURITY: Use cryptographically secure random number generation
 function generateVerificationCode(): string {
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789' // Avoid ambiguous chars
-    let code = ''
-    for (let i = 0; i < 6; i++) {
-        code += chars[Math.floor(Math.random() * chars.length)]
-    }
-    return code
+    const randomValues = new Uint8Array(6)
+    crypto.getRandomValues(randomValues)
+    return Array.from(randomValues)
+        .map(byte => chars[byte % chars.length])
+        .join('')
 }
 
 // Admin client for messaging_links table (not in types yet)
@@ -32,6 +35,17 @@ export async function POST() {
 
         if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        }
+
+        // SECURITY: Rate limit code generation (3 codes per 15 minutes per user)
+        const headersList = await headers()
+        const clientIP = getClientIP(headersList)
+        const rateLimitResult = await rateLimit('api', `telegram-code:${user.id}`, { limit: 3, window: 900 })
+        if (!rateLimitResult.success) {
+            return NextResponse.json(
+                { error: 'Rate limit exceeded. Please wait before generating another code.' },
+                { status: 429 }
+            )
         }
 
         // Get user's foundry_id

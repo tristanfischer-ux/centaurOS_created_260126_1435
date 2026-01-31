@@ -363,9 +363,18 @@ export async function forwardTask(taskId: string, newAssigneeId: string, reason:
 
     if (!reason) return { error: 'Reason required for forwarding' }
 
-    // Fetch current task for history
-    const { data: task } = await supabase.from('tasks').select('forwarding_history, assignee_id').eq('id', taskId).single()
+    // SECURITY: Get user's foundry for isolation check
+    const foundry_id = await getFoundryIdCached()
+    if (!foundry_id) return { error: 'User not in a foundry' }
+
+    // Fetch current task for history with foundry_id for security check
+    const { data: task } = await supabase.from('tasks').select('forwarding_history, assignee_id, foundry_id').eq('id', taskId).single()
     if (!task) return { error: 'Task not found' }
+
+    // SECURITY: Verify task belongs to user's foundry
+    if (task.foundry_id !== foundry_id) {
+        return { error: 'Unauthorized: Task belongs to a different foundry' }
+    }
 
     // If task has an assignee, verify user is the current assignee
     if (task.assignee_id && task.assignee_id !== user.id) {

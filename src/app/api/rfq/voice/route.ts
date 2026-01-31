@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
+import { headers } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import OpenAI from "openai";
 import { z } from "zod";
 import { zodResponseFormat } from "openai/helpers/zod";
+import { rateLimit, getClientIP } from "@/lib/security/rate-limit";
 
 const openai = new OpenAI({
     apiKey: process.env.OPENAI_API_KEY || "dummy-key-for-build",
@@ -22,6 +24,17 @@ export async function POST(req: NextRequest) {
 
         if (!user) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        }
+
+        // SECURITY: Rate limit to prevent OpenAI cost abuse (5 requests per hour per user)
+        const headersList = await headers()
+        const clientIP = getClientIP(headersList)
+        const rateLimitResult = await rateLimit('api', `rfq-voice:${user.id}`, { limit: 5, window: 3600 })
+        if (!rateLimitResult.success) {
+            return NextResponse.json(
+                { error: "Rate limit exceeded. Please wait before using voice input again." },
+                { status: 429 }
+            );
         }
 
         const formData = await req.formData();

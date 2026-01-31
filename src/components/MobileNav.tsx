@@ -10,6 +10,7 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { NewBadge } from "@/components/ui/new-badge"
 
 /**
  * Determines if a navigation item should be marked as active
@@ -103,12 +104,15 @@ export function MobileNav() {
                                     <Link
                                         href={item.href}
                                         className={cn(
-                                            "flex items-center gap-2 cursor-pointer",
+                                            "flex items-center justify-between gap-2 cursor-pointer w-full",
                                             isActive && "text-international-orange"
                                         )}
                                     >
-                                        <item.icon className="h-4 w-4" />
-                                        {item.name}
+                                        <span className="flex items-center gap-2">
+                                            <item.icon className="h-4 w-4" />
+                                            {item.name}
+                                        </span>
+                                        <NewBadge route={item.href} />
                                     </Link>
                                 </DropdownMenuItem>
                             )
