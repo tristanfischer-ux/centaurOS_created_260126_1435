@@ -162,7 +162,7 @@ export function GuidedAssessment({
               <div className="flex items-center gap-2 mb-2">
                 {categoryColors && (
                   <Badge
-                    variant="outline"
+                    variant="secondary"
                     className={cn(categoryColors.text, categoryColors.bg, categoryColors.border)}
                   >
                     {currentQuestion.category}
@@ -267,7 +267,7 @@ export function GuidedAssessment({
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Button
-            variant="outline"
+            variant="secondary"
             onClick={handleBack}
             disabled={currentIndex === 0}
           >
@@ -285,7 +285,7 @@ export function GuidedAssessment({
 
         <div className="flex items-center gap-2">
           {onSaveProgress && (
-            <Button variant="outline" onClick={handleSave}>
+            <Button variant="secondary" onClick={handleSave}>
               <Save className="mr-2 h-4 w-4" />
               Save Progress
             </Button>

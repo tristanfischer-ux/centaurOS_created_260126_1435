@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { headers } from 'next/headers'
 import { createClient } from '@/lib/supabase/server'
 import { getFoundryIdCached } from '@/lib/supabase/foundry-context'
+import { rateLimit, getClientIP } from '@/lib/security/rate-limit'
 
 // Maximum file size: 25MB
 const MAX_FILE_SIZE = 25 * 1024 * 1024
@@ -43,6 +45,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: 'User not in a foundry' },
         { status: 400 }
+      )
+    }
+
+    // SECURITY: Rate limit file uploads (10 per minute per user)
+    const headersList = await headers()
+    const clientIP = getClientIP(headersList)
+    const rateLimitResult = await rateLimit('api', `rfq-upload:${user.id}`, { limit: 10, window: 60 })
+    if (!rateLimitResult.success) {
+      return NextResponse.json(
+        { error: 'Rate limit exceeded. Please wait before uploading more files.' },
+        { status: 429 }
       )
     }
 
@@ -120,10 +133,17 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // SECURITY: Generate cryptographically secure ID instead of Math.random()
+    const randomBytes = new Uint8Array(8)
+    crypto.getRandomValues(randomBytes)
+    const secureId = Array.from(randomBytes)
+      .map(b => b.toString(16).padStart(2, '0'))
+      .join('')
+
     // Return the file path (not the full URL for security)
     return NextResponse.json({
       success: true,
-      id: `${timestamp}-${Math.random().toString(36).slice(2)}`,
+      id: `${timestamp}-${secureId}`,
       path: filePath,
       name: file.name,
       size: file.size,

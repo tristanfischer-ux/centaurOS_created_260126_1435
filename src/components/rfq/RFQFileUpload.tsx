@@ -111,7 +111,10 @@ export function RFQFileUpload({
 
     for (const file of filesToProcess) {
       const error = validateFile(file)
-      const tempId = `temp-${Date.now()}-${Math.random().toString(36).slice(2)}`
+      // SECURITY: Use crypto for generating IDs instead of Math.random()
+      const randomBytes = new Uint8Array(8)
+      crypto.getRandomValues(randomBytes)
+      const tempId = `temp-${Date.now()}-${Array.from(randomBytes).map(b => b.toString(16).padStart(2, '0')).join('')}`
       
       newFiles.push({
         id: tempId,

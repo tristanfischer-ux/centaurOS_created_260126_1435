@@ -143,7 +143,7 @@ export function BlueprintDetailView({
 
         <div className="flex items-center gap-2">
           <Link href={`/blueprints/${blueprint.id}/assess`}>
-            <Button variant="outline">
+            <Button variant="secondary">
               <Play className="mr-2 h-4 w-4" />
               Run Assessment
             </Button>
@@ -324,7 +324,7 @@ export function BlueprintDetailView({
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle>Supply Chain</CardTitle>
-              <Button variant="outline" size="sm">
+              <Button variant="secondary" size="sm">
                 Add Supplier
               </Button>
             </CardHeader>
@@ -359,7 +359,7 @@ export function BlueprintDetailView({
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle>Milestones</CardTitle>
-              <Button variant="outline" size="sm">
+              <Button variant="secondary" size="sm">
                 Add Milestone
               </Button>
             </CardHeader>

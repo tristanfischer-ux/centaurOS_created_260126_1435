@@ -79,7 +79,7 @@ export function NextActionCard({ action, onAction, className }: NextActionCardPr
               {act.url ? (
                 <Link href={act.url}>
                   <Button
-                    variant={idx === 0 ? 'default' : 'outline'}
+                    variant={idx === 0 ? 'default' : 'secondary'}
                     size="sm"
                     className={idx === 0 ? 'bg-international-orange hover:bg-international-orange/90' : ''}
                   >
@@ -91,7 +91,7 @@ export function NextActionCard({ action, onAction, className }: NextActionCardPr
                 </Link>
               ) : (
                 <Button
-                  variant={idx === 0 ? 'default' : 'outline'}
+                  variant={idx === 0 ? 'default' : 'secondary'}
                   size="sm"
                   onClick={() => onAction?.(act.action)}
                 >
@@ -162,7 +162,7 @@ export function NextMoveWidget({
           </Button>
         )}
         <Link href={`/blueprints/${blueprintId}`}>
-          <Button variant="outline" size="sm">
+          <Button variant="secondary" size="sm">
             View Blueprint
           </Button>
         </Link>

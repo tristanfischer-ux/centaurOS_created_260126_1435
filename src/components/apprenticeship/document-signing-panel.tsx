@@ -397,9 +397,10 @@ function DocumentCard({ document, onSign, showSignButton }: DocumentCardProps) {
             )}
             
             <div className="flex items-center gap-2 mt-3">
-              {document.file_url && (
+              {/* SECURITY: Sanitize document file URL */}
+              {document.file_url && sanitizeHref(document.file_url) !== '#' && (
                 <Button variant="outline" size="sm" asChild>
-                  <a href={document.file_url} target="_blank" rel="noopener noreferrer">
+                  <a href={sanitizeHref(document.file_url)} target="_blank" rel="noopener noreferrer">
                     <Download className="h-3 w-3 mr-1" />
                     Download
                   </a>

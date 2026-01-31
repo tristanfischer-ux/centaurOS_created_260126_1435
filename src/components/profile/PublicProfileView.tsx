@@ -28,7 +28,7 @@ import {
     Shield
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { sanitizeHref, sanitizeVideoEmbedUrl } from '@/lib/security/url-validation'
+import { sanitizeHref, sanitizeVideoEmbedUrl, sanitizeImageSrc } from '@/lib/security/url-validation'
 
 interface PublicProfileViewProps {
     profile: PublicProfile
@@ -237,9 +237,10 @@ export function PublicProfileView({ profile }: PublicProfileViewProps) {
                                         onClick={() => setShowVideo(true)}
                                         className="relative w-full aspect-video bg-foreground rounded-lg overflow-hidden group"
                                     >
-                                        {profile.video_thumbnail_url ? (
+                                        {/* SECURITY: Sanitize user-provided thumbnail URL */}
+                                        {profile.video_thumbnail_url && sanitizeImageSrc(profile.video_thumbnail_url) ? (
                                             <img 
-                                                src={profile.video_thumbnail_url} 
+                                                src={sanitizeImageSrc(profile.video_thumbnail_url)!} 
                                                 alt="Video thumbnail"
                                                 className="w-full h-full object-cover opacity-80 group-hover:opacity-60 transition-opacity"
                                             />
@@ -395,9 +396,10 @@ export function PublicProfileView({ profile }: PublicProfileViewProps) {
                                                     )}
                                                 </CardDescription>
                                             </div>
-                                            {cs.client_logo_url && (
+                                            {/* SECURITY: Sanitize user-provided logo URL */}
+                                            {cs.client_logo_url && sanitizeImageSrc(cs.client_logo_url) && (
                                                 <img 
-                                                    src={cs.client_logo_url} 
+                                                    src={sanitizeImageSrc(cs.client_logo_url)!} 
                                                     alt={cs.client_name || 'Client'}
                                                     className="h-10 object-contain"
                                                 />
@@ -461,10 +463,11 @@ export function PublicProfileView({ profile }: PublicProfileViewProps) {
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 {profile.portfolio_items.map((item) => (
                                     <Card key={item.id} className={cn(item.is_featured && 'border-status-warning')}>
-                                        {item.image_urls[0] && (
+                                        {/* SECURITY: Sanitize user-provided portfolio image URLs */}
+                                        {item.image_urls[0] && sanitizeImageSrc(item.image_urls[0]) && (
                                             <div className="aspect-video overflow-hidden rounded-t-lg">
                                                 <img 
-                                                    src={item.image_urls[0]} 
+                                                    src={sanitizeImageSrc(item.image_urls[0])!} 
                                                     alt={item.title}
                                                     className="w-full h-full object-cover"
                                                 />
@@ -479,9 +482,10 @@ export function PublicProfileView({ profile }: PublicProfileViewProps) {
                                             )}
                                             <div className="flex items-center justify-between text-xs text-muted-foreground">
                                                 {item.client_name && <span>{item.client_name}</span>}
-                                                {item.project_url && (
+                                                {/* SECURITY: Sanitize user-provided project URL */}
+                                                {item.project_url && sanitizeHref(item.project_url) !== '#' && (
                                                     <a 
-                                                        href={item.project_url}
+                                                        href={sanitizeHref(item.project_url)}
                                                         target="_blank"
                                                         rel="noopener noreferrer"
                                                         className="flex items-center gap-1 hover:text-foreground"
@@ -527,9 +531,10 @@ export function PublicProfileView({ profile }: PublicProfileViewProps) {
                                                 </p>
                                             )}
                                         </div>
-                                        {cert.verification_url && (
+                                        {/* SECURITY: Sanitize certification verification URL */}
+                                        {cert.verification_url && sanitizeHref(cert.verification_url) !== '#' && (
                                             <a
-                                                href={cert.verification_url}
+                                                href={sanitizeHref(cert.verification_url)}
                                                 target="_blank"
                                                 rel="noopener noreferrer"
                                                 className="text-muted-foreground hover:text-foreground"

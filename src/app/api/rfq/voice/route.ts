@@ -130,15 +130,9 @@ Be precise and comprehensive in extracting specifications.`
     } catch (error) {
         console.error("Voice-to-RFQ Error:", error);
         
-        if (error instanceof Error) {
-            return NextResponse.json(
-                { error: error.message },
-                { status: 500 }
-            );
-        }
-        
+        // SECURITY: Don't expose internal error messages to client
         return NextResponse.json(
-            { error: "Internal server error" },
+            { error: "Failed to process voice recording. Please try again." },
             { status: 500 }
         );
     }

@@ -137,9 +137,10 @@ export async function sendNewMessage(
     })
 
     // Get the sender info separately since types aren't generated yet
+    // SECURITY: Don't include email in client-facing response
     const { data: sender } = await supabase
       .from('profiles')
-      .select('id, full_name, avatar_url, email')
+      .select('id, full_name, avatar_url')
       .eq('id', user.id)
       .single()
 
@@ -147,7 +148,7 @@ export async function sendNewMessage(
     
     const messageWithSender: MessageWithSender = {
       ...message,
-      sender: sender || { id: user.id, full_name: null, avatar_url: null, email: '' }
+      sender: sender || { id: user.id, full_name: null, avatar_url: null }
     }
     
     return { 

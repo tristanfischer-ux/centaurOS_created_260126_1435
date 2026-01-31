@@ -16,7 +16,7 @@ import {
 } from 'lucide-react'
 import { format } from 'date-fns'
 import type { PortfolioItem } from '@/actions/trust-signals'
-import { sanitizeHref } from '@/lib/security/url-validation'
+import { sanitizeHref, sanitizeImageSrc } from '@/lib/security/url-validation'
 
 interface PortfolioGridProps {
     items: PortfolioItem[]
@@ -98,11 +98,12 @@ function PortfolioGridCard({ item, showFeaturedHighlight, onClick }: PortfolioGr
         >
             {/* Image Carousel */}
             <div className="relative aspect-video bg-muted">
-                {hasImages ? (
+                {/* SECURITY: Sanitize user-provided image URLs */}
+                {hasImages && sanitizeImageSrc(item.image_urls[currentImageIndex]) ? (
                     <>
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
-                            src={item.image_urls[currentImageIndex]}
+                            src={sanitizeImageSrc(item.image_urls[currentImageIndex])!}
                             alt={item.title}
                             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                         />

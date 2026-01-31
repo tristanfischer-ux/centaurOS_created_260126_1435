@@ -235,6 +235,14 @@ export async function getAdvisoryQuestions(options?: {
 export async function getAdvisoryQuestion(questionId: string): Promise<{ data: AdvisoryQuestion | null; error: string | null }> {
     try {
         const supabase = await createClient()
+        
+        // SECURITY: Verify authentication
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) return { data: null, error: 'Not authenticated' }
+
+        // SECURITY: Verify foundry context for proper isolation
+        const foundryId = await getFoundryIdCached()
+        if (!foundryId) return { data: null, error: 'No foundry context' }
 
         // Increment view count using RPC
         await supabase.rpc('increment_question_views', { p_question_id: questionId })
@@ -250,7 +258,12 @@ export async function getAdvisoryQuestion(questionId: string): Promise<{ data: A
 
         if (error) {
             console.error('Error fetching advisory question:', error)
-            return { data: null, error: error.message }
+            return { data: null, error: 'Question not found' }
+        }
+
+        // SECURITY: Verify user has access to this question (same foundry or network visibility)
+        if (data.foundry_id !== foundryId && data.visibility !== 'network') {
+            return { data: null, error: 'Question not found' }
         }
 
         return {
@@ -413,6 +426,25 @@ export async function createAdvisoryAnswer(data: {
 export async function getAdvisoryAnswers(questionId: string): Promise<{ data: AdvisoryAnswer[]; error: string | null }> {
     try {
         const supabase = await createClient()
+        
+        // SECURITY: Verify authentication
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) return { data: [], error: 'Not authenticated' }
+
+        // SECURITY: Verify foundry context
+        const foundryId = await getFoundryIdCached()
+        if (!foundryId) return { data: [], error: 'No foundry context' }
+
+        // SECURITY: First verify user has access to the question
+        const { data: question } = await supabase
+            .from('advisory_questions')
+            .select('foundry_id, visibility')
+            .eq('id', questionId)
+            .single()
+        
+        if (!question || (question.foundry_id !== foundryId && question.visibility !== 'network')) {
+            return { data: [], error: 'Question not found' }
+        }
 
         const { data, error } = await supabase
             .from('advisory_answers')
@@ -428,7 +460,7 @@ export async function getAdvisoryAnswers(questionId: string): Promise<{ data: Ad
 
         if (error) {
             console.error('Error fetching advisory answers:', error)
-            return { data: [], error: error.message }
+            return { data: [], error: 'Failed to fetch answers' }
         }
 
         return { data: (data || []) as unknown as AdvisoryAnswer[], error: null }
@@ -444,12 +476,29 @@ export async function getAdvisoryAnswers(questionId: string): Promise<{ data: Ad
 export async function acceptAdvisoryAnswer(answerId: string): Promise<{ success: boolean; error: string | null }> {
     try {
         const supabase = await createClient()
+        
+        // SECURITY: Verify authentication
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) return { success: false, error: 'Not authenticated' }
+
+        // SECURITY: Verify user owns the question this answer belongs to
+        const { data: answer } = await supabase
+            .from('advisory_answers')
+            .select('question:advisory_questions(asked_by, foundry_id)')
+            .eq('id', answerId)
+            .single()
+        
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const question = (answer as any)?.question
+        if (!question || question.asked_by !== user.id) {
+            return { success: false, error: 'Not authorized to accept this answer' }
+        }
 
         const { error } = await supabase.rpc('accept_advisory_answer', { p_answer_id: answerId })
 
         if (error) {
             console.error('Error accepting advisory answer:', error)
-            return { success: false, error: error.message }
+            return { success: false, error: 'Failed to accept answer' }
         }
 
         revalidatePath('/advisory')
@@ -469,6 +518,27 @@ export async function verifyAdvisoryAnswer(
 ): Promise<{ success: boolean; error: string | null }> {
     try {
         const supabase = await createClient()
+        
+        // SECURITY: Verify authentication
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) return { success: false, error: 'Not authenticated' }
+
+        // SECURITY: Verify foundry context
+        const foundryId = await getFoundryIdCached()
+        if (!foundryId) return { success: false, error: 'No foundry context' }
+
+        // SECURITY: Verify user has permission to verify (must be in same foundry)
+        const { data: answer } = await supabase
+            .from('advisory_answers')
+            .select('question:advisory_questions(foundry_id)')
+            .eq('id', answerId)
+            .single()
+        
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const question = (answer as any)?.question
+        if (!question || question.foundry_id !== foundryId) {
+            return { success: false, error: 'Answer not found' }
+        }
 
         const { error } = await supabase.rpc('verify_advisory_answer', { 
             p_answer_id: answerId,
@@ -477,7 +547,7 @@ export async function verifyAdvisoryAnswer(
 
         if (error) {
             console.error('Error verifying advisory answer:', error)
-            return { success: false, error: error.message }
+            return { success: false, error: 'Failed to verify answer' }
         }
 
         revalidatePath('/advisory')
@@ -536,6 +606,27 @@ export async function addAdvisoryComment(data: {
 export async function getAdvisoryComments(answerId: string): Promise<{ data: AdvisoryComment[]; error: string | null }> {
     try {
         const supabase = await createClient()
+        
+        // SECURITY: Verify authentication
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) return { data: [], error: 'Not authenticated' }
+
+        // SECURITY: Verify foundry context
+        const foundryId = await getFoundryIdCached()
+        if (!foundryId) return { data: [], error: 'No foundry context' }
+
+        // SECURITY: Verify user has access to the answer's question
+        const { data: answer } = await supabase
+            .from('advisory_answers')
+            .select('question:advisory_questions(foundry_id, visibility)')
+            .eq('id', answerId)
+            .single()
+        
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const question = (answer as any)?.question
+        if (!question || (question.foundry_id !== foundryId && question.visibility !== 'network')) {
+            return { data: [], error: 'Answer not found' }
+        }
 
         const { data, error } = await supabase
             .from('advisory_comments')
@@ -548,7 +639,7 @@ export async function getAdvisoryComments(answerId: string): Promise<{ data: Adv
 
         if (error) {
             console.error('Error fetching advisory comments:', error)
-            return { data: [], error: error.message }
+            return { data: [], error: 'Failed to fetch comments' }
         }
 
         return { data: (data || []) as AdvisoryComment[], error: null }
@@ -668,21 +759,31 @@ export async function getAdvisorySummary(): Promise<{
 }> {
     try {
         const supabase = await createClient()
-        const foundryId = await getFoundryIdCached()
+        
+        // SECURITY: Verify authentication
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) return { data: null, error: 'Not authenticated' }
 
-        // Get counts by status
+        // SECURITY: Verify foundry context
+        const foundryId = await getFoundryIdCached()
+        if (!foundryId) return { data: null, error: 'No foundry context' }
+
+        // SECURITY: Filter by foundry for accurate stats
+        // Get counts by status - filtered by foundry
         const { data: statusCounts } = await supabase
             .from('advisory_questions')
             .select('status')
+            .eq('foundry_id', foundryId)
 
         const openQuestions = statusCounts?.filter(q => q.status === 'open').length || 0
         const answeredQuestions = statusCounts?.filter(q => q.status === 'answered').length || 0
         const verifiedQuestions = statusCounts?.filter(q => q.status === 'verified').length || 0
 
-        // Get category counts
+        // Get category counts - filtered by foundry
         const { data: categoryCounts } = await supabase
             .from('advisory_questions')
             .select('category')
+            .eq('foundry_id', foundryId)
 
         const categoryMap = new Map<string, number>()
         categoryCounts?.forEach(q => {
@@ -696,13 +797,14 @@ export async function getAdvisorySummary(): Promise<{
             .sort((a, b) => b.count - a.count)
             .slice(0, 5)
 
-        // Get recent questions
+        // Get recent questions - filtered by foundry
         const { data: recentQuestions } = await supabase
             .from('advisory_questions')
             .select(`
                 *,
                 author:profiles!advisory_questions_asked_by_fkey(id, full_name, role)
             `)
+            .eq('foundry_id', foundryId)
             .order('created_at', { ascending: false })
             .limit(5)
 

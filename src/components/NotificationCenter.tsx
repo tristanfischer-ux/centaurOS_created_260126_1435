@@ -9,6 +9,7 @@ import { createClient } from '@/lib/supabase/client'
 import { formatDistanceToNow } from 'date-fns'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
+import { sanitizeHref } from '@/lib/security/url-validation'
 
 interface Notification {
   id: string
@@ -190,9 +191,10 @@ export function NotificationCenter() {
                         {formatDistanceToNow(new Date(notification.created_at), { addSuffix: true })}
                       </p>
                     </div>
-                    {notification.link && (
+                    {/* SECURITY: Sanitize notification link URL */}
+                    {notification.link && sanitizeHref(notification.link) !== '#' && (
                       <Link 
-                        href={notification.link} 
+                        href={sanitizeHref(notification.link)} 
                         onClick={(e) => e.stopPropagation()}
                         className="flex-shrink-0"
                       >

@@ -22,7 +22,7 @@ import { RatingsSummary } from '@/components/provider/RatingsSummary'
 import { ReviewCard } from '@/components/provider/ReviewCard'
 import type { PortfolioItem, Certification, ProviderBadge } from '@/actions/trust-signals'
 import type { RatingsSummary as RatingsSummaryType, ProviderRating } from '@/actions/ratings'
-import { sanitizeHref } from '@/lib/security/url-validation'
+import { sanitizeHref, sanitizeImageSrc } from '@/lib/security/url-validation'
 
 interface ProviderTrustSectionProps {
     // Rating info
@@ -237,10 +237,11 @@ export const ProviderTrustSection = memo(function ProviderTrustSection({
                                             key={item.id}
                                             className="aspect-video rounded-lg bg-muted overflow-hidden"
                                         >
-                                            {item.image_urls && item.image_urls[0] ? (
+                                            {/* SECURITY: Sanitize user-provided image URLs */}
+                                            {item.image_urls && item.image_urls[0] && sanitizeImageSrc(item.image_urls[0]) ? (
                                                 /* eslint-disable-next-line @next/next/no-img-element */
                                                 <img
-                                                    src={item.image_urls[0]}
+                                                    src={sanitizeImageSrc(item.image_urls[0])!}
                                                     alt={item.title}
                                                     className="w-full h-full object-cover"
                                                 />

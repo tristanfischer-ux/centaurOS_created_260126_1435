@@ -23,6 +23,7 @@ import {
 } from 'lucide-react'
 import { format } from 'date-fns'
 import type { PortfolioItem } from '@/actions/trust-signals'
+import { sanitizeHref, sanitizeImageSrc } from '@/lib/security/url-validation'
 
 interface PortfolioGalleryProps {
     items: PortfolioItem[]
@@ -119,23 +120,28 @@ export const PortfolioGallery = memo(function PortfolioGallery({
 
                             <div className="space-y-4">
                                 {/* Images Grid */}
+                                {/* SECURITY: Sanitize user-provided image URLs */}
                                 {selectedItem.image_urls && selectedItem.image_urls.length > 0 && (
                                     <div className="grid grid-cols-2 gap-2">
-                                        {selectedItem.image_urls.map((url, index) => (
-                                            <button
-                                                key={index}
-                                                type="button"
-                                                onClick={() => setLightboxImageIndex(index)}
-                                                className="relative aspect-video rounded-lg overflow-hidden bg-muted border border-border hover:ring-2 hover:ring-ring transition-all cursor-zoom-in"
-                                            >
-                                                {/* eslint-disable-next-line @next/next/no-img-element */}
-                                                <img
-                                                    src={url}
-                                                    alt={`${selectedItem.title} - Image ${index + 1}`}
-                                                    className="w-full h-full object-cover"
-                                                />
-                                            </button>
-                                        ))}
+                                        {selectedItem.image_urls.map((url, index) => {
+                                            const sanitizedUrl = sanitizeImageSrc(url)
+                                            if (!sanitizedUrl) return null
+                                            return (
+                                                <button
+                                                    key={index}
+                                                    type="button"
+                                                    onClick={() => setLightboxImageIndex(index)}
+                                                    className="relative aspect-video rounded-lg overflow-hidden bg-muted border border-border hover:ring-2 hover:ring-ring transition-all cursor-zoom-in"
+                                                >
+                                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                                    <img
+                                                        src={sanitizedUrl}
+                                                        alt={`${selectedItem.title} - Image ${index + 1}`}
+                                                        className="w-full h-full object-cover"
+                                                    />
+                                                </button>
+                                            )
+                                        })}
                                     </div>
                                 )}
 
@@ -170,14 +176,15 @@ export const PortfolioGallery = memo(function PortfolioGallery({
                                 </div>
 
                                 {/* Project URL */}
-                                {selectedItem.project_url && (
+                                {/* SECURITY: Sanitize user-provided project URL */}
+                                {selectedItem.project_url && sanitizeHref(selectedItem.project_url) !== '#' && (
                                     <Button
                                         variant="secondary"
                                         size="sm"
                                         asChild
                                     >
                                         <a
-                                            href={selectedItem.project_url}
+                                            href={sanitizeHref(selectedItem.project_url)}
                                             target="_blank"
                                             rel="noopener noreferrer"
                                         >
@@ -234,16 +241,19 @@ export const PortfolioGallery = memo(function PortfolioGallery({
                     )}
 
                     {/* Image */}
+                    {/* SECURITY: Sanitize user-provided image URLs */}
                     <div
                         className="max-w-[90vw] max-h-[90vh]"
                         onClick={(e) => e.stopPropagation()}
                     >
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                            src={selectedItem.image_urls[lightboxImageIndex]}
-                            alt={`${selectedItem.title} - Image ${lightboxImageIndex + 1}`}
-                            className="max-w-full max-h-[90vh] object-contain"
-                        />
+                        {sanitizeImageSrc(selectedItem.image_urls[lightboxImageIndex]) && (
+                            /* eslint-disable-next-line @next/next/no-img-element */
+                            <img
+                                src={sanitizeImageSrc(selectedItem.image_urls[lightboxImageIndex])!}
+                                alt={`${selectedItem.title} - Image ${lightboxImageIndex + 1}`}
+                                className="max-w-full max-h-[90vh] object-contain"
+                            />
+                        )}
                     </div>
 
                     {/* Counter */}
@@ -272,7 +282,8 @@ function PortfolioCard({ item, onClick, onImageClick }: PortfolioCardProps) {
             onClick={onClick}
         >
             {/* Thumbnail */}
-            {hasImages ? (
+            {/* SECURITY: Sanitize user-provided image URLs */}
+            {hasImages && sanitizeImageSrc(item.image_urls[0]) ? (
                 <div
                     className="relative aspect-video bg-muted"
                     onClick={(e) => {
@@ -282,7 +293,7 @@ function PortfolioCard({ item, onClick, onImageClick }: PortfolioCardProps) {
                 >
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
-                        src={item.image_urls[0]}
+                        src={sanitizeImageSrc(item.image_urls[0])!}
                         alt={item.title}
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                     />

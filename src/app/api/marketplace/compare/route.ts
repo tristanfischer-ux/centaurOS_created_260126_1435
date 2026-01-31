@@ -1,9 +1,28 @@
 import { NextRequest, NextResponse } from "next/server";
 import { headers } from "next/headers";
 import OpenAI from "openai";
+import { z } from "zod";
 import { Json } from "@/types/database.types";
 import { createClient } from "@/lib/supabase/server";
 import { rateLimit, getClientIP } from "@/lib/security/rate-limit";
+
+// SECURITY: Zod schema for input validation
+const MarketplaceListingSchema = z.object({
+    id: z.string().min(1),
+    category: z.enum(["People", "Products", "Services", "AI"]),
+    subcategory: z.string(),
+    title: z.string().min(1).max(500),
+    description: z.string().max(5000).nullable(),
+    attributes: z.record(z.unknown()).nullable(),
+});
+
+const CompareRequestSchema = z.object({
+    items: z.array(MarketplaceListingSchema).min(2).max(3),
+    foundryContext: z.object({
+        industry: z.string().optional(),
+        stage: z.string().optional(),
+    }).optional(),
+});
 
 // Validate API key at runtime rather than using dummy fallback
 const apiKey = process.env.OPENAI_API_KEY;
@@ -76,40 +95,18 @@ export async function POST(req: NextRequest) {
             );
         }
 
-        const body: CompareRequest = await req.json();
-        const { items, foundryContext } = body;
-
-        // Validate request
-        if (!items || !Array.isArray(items)) {
+        // SECURITY: Validate request body with Zod
+        const body = await req.json();
+        const validation = CompareRequestSchema.safeParse(body);
+        
+        if (!validation.success) {
             return NextResponse.json(
-                { error: "Invalid request: items array is required" },
+                { error: "Invalid request data" },
                 { status: 400 }
             );
         }
-
-        if (items.length < 2) {
-            return NextResponse.json(
-                { error: "At least 2 items are required for comparison" },
-                { status: 400 }
-            );
-        }
-
-        if (items.length > 3) {
-            return NextResponse.json(
-                { error: "Maximum 3 items can be compared at once" },
-                { status: 400 }
-            );
-        }
-
-        // Validate each item has required fields
-        for (const item of items) {
-            if (!item.id || !item.title || !item.category) {
-                return NextResponse.json(
-                    { error: "Each item must have id, title, and category" },
-                    { status: 400 }
-                );
-            }
-        }
+        
+        const { items, foundryContext } = validation.data;
 
         // Build the prompt
         const systemPrompt = `You are an expert advisor helping startup founders and operators of fractional/distributed businesses evaluate marketplace options.

@@ -247,15 +247,18 @@ export function DataSyncTab({ foundryId, isFounder }: DataSyncTabProps) {
                     <div className="p-3 rounded-lg border border-foundry-200 bg-white">
                         <div className="flex items-center justify-between mb-2">
                             <span className="text-xs font-medium text-foundry-700">Connected Sheet</span>
-                            <a
-                                href={`https://docs.google.com/spreadsheets/d/${config?.sheet_id}`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-xs text-electric-blue hover:underline inline-flex items-center gap-1"
-                            >
-                                Open
-                                <ExternalLink className="h-3 w-3" />
-                            </a>
+                            {/* SECURITY: Validate sheet_id format before building URL */}
+                            {config?.sheet_id && /^[a-zA-Z0-9_-]+$/.test(config.sheet_id) && (
+                                <a
+                                    href={`https://docs.google.com/spreadsheets/d/${encodeURIComponent(config.sheet_id)}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-xs text-electric-blue hover:underline inline-flex items-center gap-1"
+                                >
+                                    Open
+                                    <ExternalLink className="h-3 w-3" />
+                                </a>
+                            )}
                         </div>
                         <code className="text-xs text-foundry-500 break-all">
                             {config?.sheet_id}

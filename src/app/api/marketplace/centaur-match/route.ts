@@ -1,7 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { headers } from 'next/headers'
 import OpenAI from 'openai'
+import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
 import { Database } from '@/types/database.types'
+import { rateLimit, getClientIP } from '@/lib/security/rate-limit'
+
+// SECURITY: Zod schema for input validation
+const CentaurMatchRequestSchema = z.object({
+    memberId: z.string().uuid(),
+})
 
 // Types for the API
 type Profile = Database['public']['Tables']['profiles']['Row']
@@ -51,21 +59,35 @@ export async function POST(
             )
         }
 
-        // Parse request body
-        const body: CentaurMatchRequest = await request.json()
-        
-        if (!body.memberId) {
+        // SECURITY: Rate limit AI endpoints (10 requests per minute per user)
+        const headersList = await headers()
+        const clientIP = getClientIP(headersList)
+        const rateLimitResult = await rateLimit('api', `centaur-match:${user.id}`, { limit: 10, window: 60 })
+        if (!rateLimitResult.success) {
             return NextResponse.json(
-                { error: 'memberId is required' },
+                { error: 'Rate limit exceeded. Please wait before requesting more matches.' },
+                { status: 429 }
+            )
+        }
+
+        // SECURITY: Parse and validate request body with Zod
+        const body = await request.json()
+        const validation = CentaurMatchRequestSchema.safeParse(body)
+        
+        if (!validation.success) {
+            return NextResponse.json(
+                { error: 'Invalid request: memberId must be a valid UUID' },
                 { status: 400 }
             )
         }
+        
+        const { memberId } = validation.data
 
         // Fetch member profile and verify foundry membership
         const { data: member, error: memberError } = await supabase
             .from('profiles')
             .select('id, full_name, role, skills, capacity_score, bio, foundry_id')
-            .eq('id', body.memberId)
+            .eq('id', memberId)
             .single()
 
         if (memberError || !member) {

@@ -922,6 +922,458 @@ export type Database = {
           },
         ]
       }
+      blueprint_domain_coverage: {
+        Row: {
+          blockers: string[] | null
+          blueprint_id: string
+          decisions: Json | null
+          domain_id: string
+          domain_name: string | null
+          domain_path: string | null
+          id: string
+          is_critical: boolean | null
+          notes: string | null
+          questions_answered: Json | null
+          questions_open: Json | null
+          status: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          blockers?: string[] | null
+          blueprint_id: string
+          decisions?: Json | null
+          domain_id: string
+          domain_name?: string | null
+          domain_path?: string | null
+          id?: string
+          is_critical?: boolean | null
+          notes?: string | null
+          questions_answered?: Json | null
+          questions_open?: Json | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          blockers?: string[] | null
+          blueprint_id?: string
+          decisions?: Json | null
+          domain_id?: string
+          domain_name?: string | null
+          domain_path?: string | null
+          id?: string
+          is_critical?: boolean | null
+          notes?: string | null
+          questions_answered?: Json | null
+          questions_open?: Json | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "blueprint_domain_coverage_blueprint_id_fkey"
+            columns: ["blueprint_id"]
+            isOneToOne: false
+            referencedRelation: "blueprints"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "blueprint_domain_coverage_domain_id_fkey"
+            columns: ["domain_id"]
+            isOneToOne: false
+            referencedRelation: "knowledge_domains"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      blueprint_expertise: {
+        Row: {
+          availability: Json | null
+          confidence: number | null
+          coverage_id: string
+          created_at: string | null
+          expertise_level: string | null
+          external_contact: Json | null
+          id: string
+          marketplace_listing_id: string | null
+          notes: string | null
+          person_type: string
+          profile_id: string | null
+          specific_skills: string[] | null
+          verification_status: string | null
+        }
+        Insert: {
+          availability?: Json | null
+          confidence?: number | null
+          coverage_id: string
+          created_at?: string | null
+          expertise_level?: string | null
+          external_contact?: Json | null
+          id?: string
+          marketplace_listing_id?: string | null
+          notes?: string | null
+          person_type: string
+          profile_id?: string | null
+          specific_skills?: string[] | null
+          verification_status?: string | null
+        }
+        Update: {
+          availability?: Json | null
+          confidence?: number | null
+          coverage_id?: string
+          created_at?: string | null
+          expertise_level?: string | null
+          external_contact?: Json | null
+          id?: string
+          marketplace_listing_id?: string | null
+          notes?: string | null
+          person_type?: string
+          profile_id?: string | null
+          specific_skills?: string[] | null
+          verification_status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "blueprint_expertise_coverage_id_fkey"
+            columns: ["coverage_id"]
+            isOneToOne: false
+            referencedRelation: "blueprint_domain_coverage"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "blueprint_expertise_marketplace_listing_id_fkey"
+            columns: ["marketplace_listing_id"]
+            isOneToOne: false
+            referencedRelation: "marketplace_listings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "blueprint_expertise_marketplace_listing_id_fkey"
+            columns: ["marketplace_listing_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_search_ranking"
+            referencedColumns: ["listing_id"]
+          },
+          {
+            foreignKeyName: "blueprint_expertise_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "buyer_stats"
+            referencedColumns: ["buyer_id"]
+          },
+          {
+            foreignKeyName: "blueprint_expertise_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      blueprint_history: {
+        Row: {
+          action: string
+          blueprint_id: string
+          created_at: string | null
+          details: Json | null
+          id: string
+          user_id: string | null
+        }
+        Insert: {
+          action: string
+          blueprint_id: string
+          created_at?: string | null
+          details?: Json | null
+          id?: string
+          user_id?: string | null
+        }
+        Update: {
+          action?: string
+          blueprint_id?: string
+          created_at?: string | null
+          details?: Json | null
+          id?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "blueprint_history_blueprint_id_fkey"
+            columns: ["blueprint_id"]
+            isOneToOne: false
+            referencedRelation: "blueprints"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "blueprint_history_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "buyer_stats"
+            referencedColumns: ["buyer_id"]
+          },
+          {
+            foreignKeyName: "blueprint_history_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      blueprint_milestones: {
+        Row: {
+          blueprint_id: string
+          completed_at: string | null
+          created_at: string | null
+          description: string | null
+          display_order: number | null
+          id: string
+          name: string
+          required_domain_ids: string[] | null
+          status: string | null
+          target_date: string | null
+        }
+        Insert: {
+          blueprint_id: string
+          completed_at?: string | null
+          created_at?: string | null
+          description?: string | null
+          display_order?: number | null
+          id?: string
+          name: string
+          required_domain_ids?: string[] | null
+          status?: string | null
+          target_date?: string | null
+        }
+        Update: {
+          blueprint_id?: string
+          completed_at?: string | null
+          created_at?: string | null
+          description?: string | null
+          display_order?: number | null
+          id?: string
+          name?: string
+          required_domain_ids?: string[] | null
+          status?: string | null
+          target_date?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "blueprint_milestones_blueprint_id_fkey"
+            columns: ["blueprint_id"]
+            isOneToOne: false
+            referencedRelation: "blueprints"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      blueprint_suppliers: {
+        Row: {
+          blueprint_id: string
+          contact_history: Json | null
+          created_at: string | null
+          domain_categories: string[] | null
+          id: string
+          notes: string | null
+          quotes: Json | null
+          role: string | null
+          status: string | null
+          supplier_id: string
+        }
+        Insert: {
+          blueprint_id: string
+          contact_history?: Json | null
+          created_at?: string | null
+          domain_categories?: string[] | null
+          id?: string
+          notes?: string | null
+          quotes?: Json | null
+          role?: string | null
+          status?: string | null
+          supplier_id: string
+        }
+        Update: {
+          blueprint_id?: string
+          contact_history?: Json | null
+          created_at?: string | null
+          domain_categories?: string[] | null
+          id?: string
+          notes?: string | null
+          quotes?: Json | null
+          role?: string | null
+          status?: string | null
+          supplier_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "blueprint_suppliers_blueprint_id_fkey"
+            columns: ["blueprint_id"]
+            isOneToOne: false
+            referencedRelation: "blueprints"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "blueprint_suppliers_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      blueprint_templates: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          description: string | null
+          estimated_domains: number | null
+          estimated_questions: number | null
+          fork_count: number | null
+          icon: string | null
+          id: string
+          is_system_template: boolean | null
+          metadata: Json | null
+          name: string
+          product_category: string
+          updated_at: string | null
+          use_count: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          estimated_domains?: number | null
+          estimated_questions?: number | null
+          fork_count?: number | null
+          icon?: string | null
+          id?: string
+          is_system_template?: boolean | null
+          metadata?: Json | null
+          name: string
+          product_category: string
+          updated_at?: string | null
+          use_count?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          estimated_domains?: number | null
+          estimated_questions?: number | null
+          fork_count?: number | null
+          icon?: string | null
+          id?: string
+          is_system_template?: boolean | null
+          metadata?: Json | null
+          name?: string
+          product_category?: string
+          updated_at?: string | null
+          use_count?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "blueprint_templates_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "buyer_stats"
+            referencedColumns: ["buyer_id"]
+          },
+          {
+            foreignKeyName: "blueprint_templates_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      blueprints: {
+        Row: {
+          ai_generated_context: Json | null
+          coverage_score: number | null
+          covered_domains: number | null
+          created_at: string | null
+          created_by: string | null
+          critical_gaps: number | null
+          description: string | null
+          foundry_id: string
+          id: string
+          name: string
+          project_stage: string | null
+          project_type: string | null
+          settings: Json | null
+          status: string | null
+          template_id: string | null
+          total_domains: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          ai_generated_context?: Json | null
+          coverage_score?: number | null
+          covered_domains?: number | null
+          created_at?: string | null
+          created_by?: string | null
+          critical_gaps?: number | null
+          description?: string | null
+          foundry_id: string
+          id?: string
+          name: string
+          project_stage?: string | null
+          project_type?: string | null
+          settings?: Json | null
+          status?: string | null
+          template_id?: string | null
+          total_domains?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          ai_generated_context?: Json | null
+          coverage_score?: number | null
+          covered_domains?: number | null
+          created_at?: string | null
+          created_by?: string | null
+          critical_gaps?: number | null
+          description?: string | null
+          foundry_id?: string
+          id?: string
+          name?: string
+          project_stage?: string | null
+          project_type?: string | null
+          settings?: Json | null
+          status?: string | null
+          template_id?: string | null
+          total_domains?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "blueprints_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "buyer_stats"
+            referencedColumns: ["buyer_id"]
+          },
+          {
+            foreignKeyName: "blueprints_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "blueprints_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "blueprints_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "blueprint_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       business_functions: {
         Row: {
           category: string
@@ -2117,6 +2569,87 @@ export type Database = {
           },
         ]
       }
+      knowledge_domains: {
+        Row: {
+          ai_summary: string | null
+          category: string | null
+          created_at: string | null
+          criticality: string | null
+          depth: number | null
+          description: string | null
+          display_order: number | null
+          id: string
+          key_questions: Json | null
+          learning_resources: Json | null
+          learning_time_estimate: string | null
+          marketplace_categories: string[] | null
+          name: string
+          parent_id: string | null
+          prerequisite_domain_ids: string[] | null
+          related_domain_ids: string[] | null
+          supplier_categories: string[] | null
+          template_id: string | null
+          typical_roles: string[] | null
+        }
+        Insert: {
+          ai_summary?: string | null
+          category?: string | null
+          created_at?: string | null
+          criticality?: string | null
+          depth?: number | null
+          description?: string | null
+          display_order?: number | null
+          id?: string
+          key_questions?: Json | null
+          learning_resources?: Json | null
+          learning_time_estimate?: string | null
+          marketplace_categories?: string[] | null
+          name: string
+          parent_id?: string | null
+          prerequisite_domain_ids?: string[] | null
+          related_domain_ids?: string[] | null
+          supplier_categories?: string[] | null
+          template_id?: string | null
+          typical_roles?: string[] | null
+        }
+        Update: {
+          ai_summary?: string | null
+          category?: string | null
+          created_at?: string | null
+          criticality?: string | null
+          depth?: number | null
+          description?: string | null
+          display_order?: number | null
+          id?: string
+          key_questions?: Json | null
+          learning_resources?: Json | null
+          learning_time_estimate?: string | null
+          marketplace_categories?: string[] | null
+          name?: string
+          parent_id?: string | null
+          prerequisite_domain_ids?: string[] | null
+          related_domain_ids?: string[] | null
+          supplier_categories?: string[] | null
+          template_id?: string | null
+          typical_roles?: string[] | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "knowledge_domains_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "knowledge_domains"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "knowledge_domains_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "blueprint_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       learning_modules: {
         Row: {
           content_data: Json | null
@@ -2550,6 +3083,70 @@ export type Database = {
           {
             foreignKeyName: "messages_sender_id_fkey"
             columns: ["sender_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      messaging_links: {
+        Row: {
+          created_at: string | null
+          foundry_id: string
+          id: string
+          platform: string
+          platform_user_id: string
+          platform_username: string | null
+          profile_id: string
+          updated_at: string | null
+          verification_code: string | null
+          verification_expires_at: string | null
+          verified_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          foundry_id: string
+          id?: string
+          platform: string
+          platform_user_id: string
+          platform_username?: string | null
+          profile_id: string
+          updated_at?: string | null
+          verification_code?: string | null
+          verification_expires_at?: string | null
+          verified_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          foundry_id?: string
+          id?: string
+          platform?: string
+          platform_user_id?: string
+          platform_username?: string | null
+          profile_id?: string
+          updated_at?: string | null
+          verification_code?: string | null
+          verification_expires_at?: string | null
+          verified_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "messaging_links_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "messaging_links_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "buyer_stats"
+            referencedColumns: ["buyer_id"]
+          },
+          {
+            foreignKeyName: "messaging_links_profile_id_fkey"
+            columns: ["profile_id"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
@@ -3450,6 +4047,89 @@ export type Database = {
             columns: ["pack_id"]
             isOneToOne: false
             referencedRelation: "objective_packs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pending_intents: {
+        Row: {
+          confirmation_message_id: string | null
+          created_at: string | null
+          expires_at: string | null
+          foundry_id: string
+          id: string
+          messaging_link_id: string | null
+          original_message: string
+          parsed_objective: Json
+          platform: string
+          platform_message_id: string | null
+          platform_user_id: string
+          profile_id: string
+          status: string | null
+          transcribed_text: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          confirmation_message_id?: string | null
+          created_at?: string | null
+          expires_at?: string | null
+          foundry_id: string
+          id?: string
+          messaging_link_id?: string | null
+          original_message: string
+          parsed_objective: Json
+          platform: string
+          platform_message_id?: string | null
+          platform_user_id: string
+          profile_id: string
+          status?: string | null
+          transcribed_text?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          confirmation_message_id?: string | null
+          created_at?: string | null
+          expires_at?: string | null
+          foundry_id?: string
+          id?: string
+          messaging_link_id?: string | null
+          original_message?: string
+          parsed_objective?: Json
+          platform?: string
+          platform_message_id?: string | null
+          platform_user_id?: string
+          profile_id?: string
+          status?: string | null
+          transcribed_text?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pending_intents_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pending_intents_messaging_link_id_fkey"
+            columns: ["messaging_link_id"]
+            isOneToOne: false
+            referencedRelation: "messaging_links"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pending_intents_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "buyer_stats"
+            referencedColumns: ["buyer_id"]
+          },
+          {
+            foreignKeyName: "pending_intents_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -4484,6 +5164,36 @@ export type Database = {
           },
         ]
       }
+      rate_limits: {
+        Row: {
+          count: number | null
+          created_at: string | null
+          id: string
+          key: string
+          updated_at: string | null
+          window_end: string
+          window_start: string | null
+        }
+        Insert: {
+          count?: number | null
+          created_at?: string | null
+          id?: string
+          key: string
+          updated_at?: string | null
+          window_end: string
+          window_start?: string | null
+        }
+        Update: {
+          count?: number | null
+          created_at?: string | null
+          id?: string
+          key?: string
+          updated_at?: string | null
+          window_end?: string
+          window_start?: string | null
+        }
+        Relationships: []
+      }
       recent_searches: {
         Row: {
           created_at: string | null
@@ -5008,6 +5718,51 @@ export type Database = {
           },
         ]
       }
+      security_audit_log: {
+        Row: {
+          action: string | null
+          created_at: string
+          details: Json | null
+          email: string | null
+          event_type: string
+          id: string
+          ip_address: string | null
+          resource: string | null
+          severity: string
+          success: boolean
+          user_agent: string | null
+          user_id: string | null
+        }
+        Insert: {
+          action?: string | null
+          created_at?: string
+          details?: Json | null
+          email?: string | null
+          event_type: string
+          id?: string
+          ip_address?: string | null
+          resource?: string | null
+          severity: string
+          success?: boolean
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          action?: string | null
+          created_at?: string
+          details?: Json | null
+          email?: string | null
+          event_type?: string
+          id?: string
+          ip_address?: string | null
+          resource?: string | null
+          severity?: string
+          success?: boolean
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       service_providers: {
         Row: {
           company_name: string
@@ -5191,6 +5946,7 @@ export type Database = {
           payload: Json
           processed: boolean | null
           processed_at: string | null
+          processing_started_at: string | null
           retry_count: number | null
           stripe_event_id: string
           updated_at: string | null
@@ -5203,6 +5959,7 @@ export type Database = {
           payload: Json
           processed?: boolean | null
           processed_at?: string | null
+          processing_started_at?: string | null
           retry_count?: number | null
           stripe_event_id: string
           updated_at?: string | null
@@ -5215,6 +5972,7 @@ export type Database = {
           payload?: Json
           processed?: boolean | null
           processed_at?: string | null
+          processing_started_at?: string | null
           retry_count?: number | null
           stripe_event_id?: string
           updated_at?: string | null
@@ -5286,6 +6044,167 @@ export type Database = {
             columns: ["retainer_id"]
             isOneToOne: false
             referencedRelation: "retainers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      supplier_reviews: {
+        Row: {
+          cons: string[] | null
+          content: string | null
+          created_at: string | null
+          foundry_id: string
+          id: string
+          order_value_range: string | null
+          project_type: string | null
+          pros: string[] | null
+          rating: number
+          reviewer_id: string
+          supplier_id: string
+          title: string | null
+          verified_purchase: boolean | null
+          would_recommend: boolean | null
+        }
+        Insert: {
+          cons?: string[] | null
+          content?: string | null
+          created_at?: string | null
+          foundry_id: string
+          id?: string
+          order_value_range?: string | null
+          project_type?: string | null
+          pros?: string[] | null
+          rating: number
+          reviewer_id: string
+          supplier_id: string
+          title?: string | null
+          verified_purchase?: boolean | null
+          would_recommend?: boolean | null
+        }
+        Update: {
+          cons?: string[] | null
+          content?: string | null
+          created_at?: string | null
+          foundry_id?: string
+          id?: string
+          order_value_range?: string | null
+          project_type?: string | null
+          pros?: string[] | null
+          rating?: number
+          reviewer_id?: string
+          supplier_id?: string
+          title?: string | null
+          verified_purchase?: boolean | null
+          would_recommend?: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "supplier_reviews_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_reviews_reviewer_id_fkey"
+            columns: ["reviewer_id"]
+            isOneToOne: false
+            referencedRelation: "buyer_stats"
+            referencedColumns: ["buyer_id"]
+          },
+          {
+            foreignKeyName: "supplier_reviews_reviewer_id_fkey"
+            columns: ["reviewer_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_reviews_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      suppliers: {
+        Row: {
+          capabilities: Json | null
+          community_rating: number | null
+          company_info: Json | null
+          contact: Json | null
+          created_at: string | null
+          description: string | null
+          domain_categories: string[] | null
+          id: string
+          logo_url: string | null
+          metadata: Json | null
+          name: string
+          review_count: number | null
+          supplier_type: string
+          updated_at: string | null
+          used_by_count: number | null
+          verification_status: string | null
+          verified_at: string | null
+          verified_by: string | null
+          website: string | null
+        }
+        Insert: {
+          capabilities?: Json | null
+          community_rating?: number | null
+          company_info?: Json | null
+          contact?: Json | null
+          created_at?: string | null
+          description?: string | null
+          domain_categories?: string[] | null
+          id?: string
+          logo_url?: string | null
+          metadata?: Json | null
+          name: string
+          review_count?: number | null
+          supplier_type: string
+          updated_at?: string | null
+          used_by_count?: number | null
+          verification_status?: string | null
+          verified_at?: string | null
+          verified_by?: string | null
+          website?: string | null
+        }
+        Update: {
+          capabilities?: Json | null
+          community_rating?: number | null
+          company_info?: Json | null
+          contact?: Json | null
+          created_at?: string | null
+          description?: string | null
+          domain_categories?: string[] | null
+          id?: string
+          logo_url?: string | null
+          metadata?: Json | null
+          name?: string
+          review_count?: number | null
+          supplier_type?: string
+          updated_at?: string | null
+          used_by_count?: number | null
+          verification_status?: string | null
+          verified_at?: string | null
+          verified_by?: string | null
+          website?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "suppliers_verified_by_fkey"
+            columns: ["verified_by"]
+            isOneToOne: false
+            referencedRelation: "buyer_stats"
+            referencedColumns: ["buyer_id"]
+          },
+          {
+            foreignKeyName: "suppliers_verified_by_fkey"
+            columns: ["verified_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -6000,6 +6919,15 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      calculate_blueprint_coverage: {
+        Args: { p_blueprint_id: string }
+        Returns: {
+          coverage_score: number
+          covered_domains: number
+          critical_gaps: number
+          total_domains: number
+        }[]
+      }
       calculate_otjt_progress: {
         Args: { enrollment_id: string }
         Returns: number
@@ -6013,6 +6941,26 @@ export type Database = {
         Args: { p_task_id: string; p_user_id: string }
         Returns: boolean
       }
+      check_rate_limit: {
+        Args: {
+          p_key: string
+          p_limit: number
+          p_now: string
+          p_window_start: string
+        }
+        Returns: Json
+      }
+      cleanup_expired_intents: { Args: never; Returns: number }
+      clone_blueprint_from_template: {
+        Args: {
+          p_created_by?: string
+          p_description?: string
+          p_foundry_id: string
+          p_name: string
+          p_template_id: string
+        }
+        Returns: string
+      }
       count_active_founders: {
         Args: { target_foundry_id: string }
         Returns: number
@@ -6024,6 +6972,17 @@ export type Database = {
           p_metadata?: Json
           p_title: string
           p_type: string
+          p_user_id: string
+        }
+        Returns: string
+      }
+      create_notification_safe: {
+        Args: {
+          p_action_url?: string
+          p_body: string
+          p_metadata?: Json
+          p_priority?: string
+          p_title: string
           p_user_id: string
         }
         Returns: string
@@ -6191,6 +7150,21 @@ export type Database = {
         Args: { search_query: string }
         Returns: undefined
       }
+      insert_security_audit_log: {
+        Args: {
+          p_action?: string
+          p_details?: Json
+          p_email?: string
+          p_event_type: string
+          p_ip_address?: string
+          p_resource?: string
+          p_severity?: string
+          p_success?: boolean
+          p_user_agent?: string
+          p_user_id?: string
+        }
+        Returns: string
+      }
       is_active_user: { Args: never; Returns: boolean }
       is_admin: { Args: never; Returns: boolean }
       is_otjt_on_track: { Args: { enrollment_id: string }; Returns: boolean }
@@ -6248,6 +7222,10 @@ export type Database = {
           user_id: string
           workload_score: number
         }[]
+      }
+      update_blueprint_metrics: {
+        Args: { p_blueprint_id: string }
+        Returns: undefined
       }
       update_trending_searches: { Args: never; Returns: undefined }
       upsert_presence: {

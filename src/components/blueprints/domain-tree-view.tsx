@@ -109,7 +109,7 @@ function DomainTreeItem({
         {/* Category badge (depth 0 only) */}
         {depth === 0 && category && categoryColors && (
           <Badge
-            variant="outline"
+            variant="secondary"
             className={cn('text-xs', categoryColors.text, categoryColors.bg, categoryColors.border)}
           >
             {category}

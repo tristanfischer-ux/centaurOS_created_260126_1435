@@ -159,7 +159,7 @@ export function BlueprintCard({
 
         {/* Quick action */}
         <Link href={`/blueprints/${blueprint.id}`}>
-          <Button variant="outline" size="sm" className="w-full">
+          <Button variant="secondary" size="sm" className="w-full">
             View Blueprint
           </Button>
         </Link>

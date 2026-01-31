@@ -8,6 +8,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { toast } from "sonner"
 import { deleteTaskAttachment } from "@/actions/tasks"
 import { createClient } from "@/lib/supabase/client"
+import { sanitizeImageSrc } from "@/lib/security/url-validation"
 
 interface Attachment {
     id: string
@@ -146,10 +147,11 @@ export function AttachmentList({ taskId, attachments, canDelete = false, onDelet
                     return (
                         <div key={file.id} className="flex items-center justify-between p-2 bg-muted border border-border rounded-md group hover:border transition-colors">
                             <div className="flex items-center gap-4 min-w-0 flex-1">
-                                {fileType === 'image' && fileUrl ? (
+                                {/* SECURITY: Sanitize signed URLs for defense-in-depth */}
+                                {fileType === 'image' && fileUrl && sanitizeImageSrc(fileUrl) ? (
                                     <div className="w-10 h-10 rounded overflow-hidden bg-muted flex-shrink-0">
                                         <img 
-                                            src={fileUrl} 
+                                            src={sanitizeImageSrc(fileUrl)!} 
                                             alt={file.file_name}
                                             loading="lazy"
                                             className="w-full h-full object-cover cursor-pointer"
@@ -279,9 +281,10 @@ export function AttachmentList({ taskId, attachments, canDelete = false, onDelet
                                     </Button>
                                 </div>
                             </DialogHeader>
-                            {getFileType(previewFile.file_name) === 'image' && fileUrls[previewFile.file_path] && (
+                            {/* SECURITY: Sanitize URLs before rendering */}
+                            {getFileType(previewFile.file_name) === 'image' && fileUrls[previewFile.file_path] && sanitizeImageSrc(fileUrls[previewFile.file_path]) && (
                                 <img 
-                                    src={fileUrls[previewFile.file_path]} 
+                                    src={sanitizeImageSrc(fileUrls[previewFile.file_path])!} 
                                     alt={previewFile.file_name}
                                     loading="lazy"
                                     className="w-full h-auto max-h-[80vh] object-contain rounded"
@@ -290,9 +293,9 @@ export function AttachmentList({ taskId, attachments, canDelete = false, onDelet
                                     }}
                                 />
                             )}
-                            {getFileType(previewFile.file_name) === 'pdf' && fileUrls[previewFile.file_path] && (
+                            {getFileType(previewFile.file_name) === 'pdf' && fileUrls[previewFile.file_path] && sanitizeImageSrc(fileUrls[previewFile.file_path]) && (
                                 <iframe 
-                                    src={fileUrls[previewFile.file_path]}
+                                    src={sanitizeImageSrc(fileUrls[previewFile.file_path])!}
                                     className="w-full h-[80vh] rounded border"
                                     title={previewFile.file_name}
                                     onError={() => {

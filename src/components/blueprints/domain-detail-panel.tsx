@@ -29,6 +29,7 @@ import {
   HelpCircle,
   ShoppingBag,
 } from 'lucide-react'
+import { sanitizeHref } from '@/lib/security/url-validation'
 
 interface DomainDetailPanelProps {
   coverage: DomainCoverageWithDetails
@@ -96,7 +97,7 @@ export function DomainDetailPanel({
         <div className="flex items-center gap-2 flex-wrap">
           {category && categoryColors && (
             <Badge
-              variant="outline"
+              variant="secondary"
               className={cn(categoryColors.text, categoryColors.bg, categoryColors.border)}
             >
               {category}
@@ -184,7 +185,7 @@ export function DomainDetailPanel({
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <Label className="text-base">Who Covers This</Label>
-            <Button variant="outline" size="sm" onClick={onAddExpertise}>
+            <Button variant="secondary" size="sm" onClick={onAddExpertise}>
               <Plus className="mr-2 h-4 w-4" />
               Add
             </Button>
@@ -227,25 +228,30 @@ export function DomainDetailPanel({
         )}
 
         {/* Learning Resources */}
+        {/* SECURITY: Sanitize resource URLs before rendering */}
         {domain.learning_resources && Object.keys(domain.learning_resources).length > 0 && (
           <div className="space-y-3">
             <Label className="text-base">Learning Resources</Label>
             <div className="space-y-2">
               {Object.entries(domain.learning_resources).map(([type, resources]) => (
                 <div key={type}>
-                  {Array.isArray(resources) && resources.map((resource, idx) => (
-                    <a
-                      key={idx}
-                      href={resource.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center gap-2 p-2 rounded-md hover:bg-muted text-sm"
-                    >
-                      <BookOpen className="h-4 w-4 text-muted-foreground" />
-                      <span className="flex-1">{resource.title}</span>
-                      <ExternalLink className="h-3 w-3 text-muted-foreground" />
-                    </a>
-                  ))}
+                  {Array.isArray(resources) && resources.map((resource, idx) => {
+                    const sanitizedUrl = sanitizeHref(resource.url)
+                    if (sanitizedUrl === '#') return null
+                    return (
+                      <a
+                        key={idx}
+                        href={sanitizedUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-2 p-2 rounded-md hover:bg-muted text-sm"
+                      >
+                        <BookOpen className="h-4 w-4 text-muted-foreground" />
+                        <span className="flex-1">{resource.title}</span>
+                        <ExternalLink className="h-3 w-3 text-muted-foreground" />
+                      </a>
+                    )
+                  })}
                 </div>
               ))}
             </div>
@@ -257,13 +263,13 @@ export function DomainDetailPanel({
           <div className="space-y-3">
             <Label className="text-base">Fill This Gap</Label>
             <div className="grid grid-cols-2 gap-2">
-              <Button variant="outline" size="sm" asChild>
+              <Button variant="secondary" size="sm" asChild>
                 <a href={`/marketplace?q=${encodeURIComponent(domain.name)}`}>
                   <ShoppingBag className="mr-2 h-4 w-4" />
                   Marketplace
                 </a>
               </Button>
-              <Button variant="outline" size="sm" asChild>
+              <Button variant="secondary" size="sm" asChild>
                 <a href={`/advisory/new?topic=${encodeURIComponent(domain.name)}`}>
                   <HelpCircle className="mr-2 h-4 w-4" />
                   Ask Advisory
@@ -314,7 +320,7 @@ function ExpertiseItem({
       {expertise.profile ? (
         <UserAvatar
           name={expertise.profile.full_name}
-          imageUrl={expertise.profile.avatar_url}
+          avatarUrl={expertise.profile.avatar_url}
           size="sm"
         />
       ) : (

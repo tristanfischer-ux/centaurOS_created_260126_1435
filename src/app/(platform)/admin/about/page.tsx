@@ -58,11 +58,11 @@ const categoryLabels: Record<FeatureCategory, string> = {
     strategic: 'Strategic Planning',
 }
 
-const statusColors: Record<FeatureStatus, 'success' | 'warning' | 'error' | 'info' | 'default'> = {
+const statusColors: Record<FeatureStatus, 'success' | 'warning' | 'error' | 'info' | 'pending'> = {
     stable: 'success',
     beta: 'warning',
     alpha: 'error',
-    hidden: 'default',
+    hidden: 'pending',
     deprecated: 'error',
 }
 

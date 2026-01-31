@@ -96,7 +96,7 @@ export async function getTemplateDomains(templateId: string): Promise<{
     return { data: null, error: sanitizeErrorMessage(error) }
   }
 
-  return { data: data as KnowledgeDomain[], error: null }
+  return { data: data as unknown as KnowledgeDomain[], error: null }
 }
 
 export async function getDomainTree(templateId: string): Promise<{
@@ -392,7 +392,7 @@ export async function getBlueprintCoverage(blueprintId: string): Promise<{
     return { data: null, error: sanitizeErrorMessage(error) }
   }
 
-  return { data: data as DomainCoverageWithDetails[], error: null }
+  return { data: data as unknown as DomainCoverageWithDetails[], error: null }
 }
 
 export async function updateDomainCoverage(
@@ -527,7 +527,7 @@ export async function addExpertise(input: AddExpertiseInput): Promise<{
   }
 
   revalidatePath('/blueprints')
-  return { data: data as Expertise, error: null }
+  return { data: data as unknown as Expertise, error: null }
 }
 
 export async function removeExpertise(expertiseId: string): Promise<{ error: string | null }> {
@@ -640,7 +640,7 @@ export async function getBlueprintSuppliers(blueprintId: string): Promise<{
     return { data: null, error: sanitizeErrorMessage(error) }
   }
 
-  return { data: data as BlueprintSupplier[], error: null }
+  return { data: data as unknown as BlueprintSupplier[], error: null }
 }
 
 export async function addBlueprintSupplier(input: AddSupplierInput): Promise<{
@@ -687,7 +687,7 @@ export async function addBlueprintSupplier(input: AddSupplierInput): Promise<{
   }
 
   revalidatePath('/blueprints')
-  return { data: data as BlueprintSupplier, error: null }
+  return { data: data as unknown as BlueprintSupplier, error: null }
 }
 
 export async function removeBlueprintSupplier(id: string): Promise<{ error: string | null }> {

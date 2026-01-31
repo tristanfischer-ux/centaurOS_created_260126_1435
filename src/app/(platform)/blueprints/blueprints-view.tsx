@@ -116,21 +116,22 @@ export function BlueprintsView({ blueprints, templates }: BlueprintsViewProps) {
           onDuplicate={handleDuplicate}
         />
       ) : (
-        <EmptyState
-          title="No blueprints yet"
-          description="Create your first blueprint to map the knowledge, expertise, and suppliers you need for your product."
-          icon={Map}
-          action={
-            <Button
-              onClick={() => setIsCreateOpen(true)}
-              className="bg-international-orange hover:bg-international-orange/90"
-            >
-              <Plus className="mr-2 h-4 w-4" />
-              Create Your First Blueprint
-            </Button>
-          }
-        >
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-8 max-w-2xl mx-auto">
+        <div className="space-y-8">
+          <EmptyState
+            title="No blueprints yet"
+            description="Create your first blueprint to map the knowledge, expertise, and suppliers you need for your product."
+            icon={<Map className="h-12 w-12" />}
+            action={
+              <Button
+                onClick={() => setIsCreateOpen(true)}
+                className="bg-international-orange hover:bg-international-orange/90"
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                Create Your First Blueprint
+              </Button>
+            }
+          />
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-2xl mx-auto">
             <FeatureCard
               icon={Map}
               title="Knowledge Domains"
@@ -147,7 +148,7 @@ export function BlueprintsView({ blueprints, templates }: BlueprintsViewProps) {
               description="See what you're missing"
             />
           </div>
-        </EmptyState>
+        </div>
       )}
 
       {/* Create dialog */}

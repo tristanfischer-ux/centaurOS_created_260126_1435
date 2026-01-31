@@ -148,7 +148,7 @@ export function CreateBlueprintDialog({
                   <Button
                     key={s.value}
                     type="button"
-                    variant={stage === s.value ? 'default' : 'outline'}
+                    variant={stage === s.value ? 'default' : 'secondary'}
                     size="sm"
                     onClick={() => setStage(s.value)}
                     className={cn(
