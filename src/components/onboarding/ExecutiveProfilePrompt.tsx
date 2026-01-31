@@ -160,7 +160,7 @@ export function ExecutiveProfilePrompt({
                   onClick={() => toggleExpertise(area)}
                   className={`px-3 py-1.5 text-xs font-medium rounded-full border transition-all ${
                     selectedExpertise.includes(area)
-                      ? 'bg-orange-600 text-white border-orange-600'
+                      ? 'bg-orange-600 text-primary-foreground border-orange-600'
                       : 'bg-background text-muted-foreground border hover:border-orange-500/50'
                   }`}
                 >
@@ -204,7 +204,7 @@ export function ExecutiveProfilePrompt({
                   onClick={() => setAvailability(hours)}
                   className={`flex-1 px-3 py-2 text-sm font-medium rounded border transition-all ${
                     availability === hours
-                      ? 'bg-orange-600 text-white border-orange-600'
+                      ? 'bg-orange-600 text-primary-foreground border-orange-600'
                       : 'bg-background text-muted-foreground border hover:border-orange-500/50'
                   }`}
                 >

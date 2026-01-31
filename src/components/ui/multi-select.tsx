@@ -76,7 +76,7 @@ export function MultiSelect({
                                 <Badge
                                     key={opt.value}
                                     variant="secondary"
-                                    className="bg-amber-100 text-amber-800 border-amber-200 hover:bg-amber-200 px-2 py-0.5 text-xs flex items-center gap-1"
+                                    className="bg-status-warning-light text-status-warning-dark border-status-warning hover:bg-status-warning-light/80 px-2 py-0.5 text-xs flex items-center gap-1"
                                 >
                                     {opt.icon}
                                     <span className="truncate max-w-[80px]">{opt.label}</span>
@@ -89,7 +89,7 @@ export function MultiSelect({
                         ) : (
                             <Badge
                                 variant="secondary"
-                                className="bg-amber-100 text-amber-800 border-amber-200 px-2 py-0.5 text-xs"
+                                className="bg-status-warning-light text-status-warning-dark border-status-warning px-2 py-0.5 text-xs"
                             >
                                 {selectedOptions.length} selected
                                 <X

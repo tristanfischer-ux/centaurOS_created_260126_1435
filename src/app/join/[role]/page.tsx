@@ -227,7 +227,7 @@ export default function JoinPage({ params }: { params: Promise<{ role: string }>
                     {/* Content */}
                     <div className="relative z-10 flex flex-col items-center px-4 sm:px-6 text-center pt-20 pb-8">
                         {/* Protocol Badge */}
-                        <div className="inline-flex items-center gap-2 mb-4 sm:mb-6 px-3 sm:px-4 py-2 border border-blue-500/30 bg-blue-500/10 backdrop-blur-sm">
+                        <div className="inline-flex items-center gap-2 mb-4 sm:mb-6 px-3 sm:px-4 py-2 border border-status-info/30 bg-status-info/10 backdrop-blur-sm">
                             <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
                             <span className="text-blue-400 text-xs font-mono uppercase tracking-widest">
                                 Induction Protocol: {config.title}
@@ -342,7 +342,7 @@ export default function JoinPage({ params }: { params: Promise<{ role: string }>
                                         id="name"
                                         name="name"
                                         placeholder="John Doe"
-                                        className="bg-background border focus:border-blue-500 focus:ring-blue-500 h-11 sm:h-12"
+                                        className="bg-background border focus:border-status-info focus:ring-status-info h-11 sm:h-12"
                                         required
                                     />
                                 </div>
@@ -354,7 +354,7 @@ export default function JoinPage({ params }: { params: Promise<{ role: string }>
                                         name="email"
                                         type="email"
                                         placeholder="you@example.com"
-                                        className="bg-background border focus:border-blue-500 focus:ring-blue-500 h-11 sm:h-12"
+                                        className="bg-background border focus:border-status-info focus:ring-status-info h-11 sm:h-12"
                                         required
                                     />
                                 </div>
@@ -371,7 +371,7 @@ export default function JoinPage({ params }: { params: Promise<{ role: string }>
                                             name={field.id}
                                             type={field.type || "text"}
                                             placeholder={field.placeholder}
-                                            className="bg-background border focus:border-blue-500 focus:ring-blue-500 h-11 sm:h-12"
+                                            className="bg-background border focus:border-status-info focus:ring-status-info h-11 sm:h-12"
                                             required={field.required}
                                         />
                                     </div>
@@ -385,7 +385,7 @@ export default function JoinPage({ params }: { params: Promise<{ role: string }>
                                             name="password"
                                             type="password"
                                             placeholder="Create a strong password"
-                                            className="bg-background border focus:border-blue-500 focus:ring-blue-500 h-11 sm:h-12"
+                                            className="bg-background border focus:border-status-info focus:ring-status-info h-11 sm:h-12"
                                             required
                                         />
                                     </div>

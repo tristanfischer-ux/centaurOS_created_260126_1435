@@ -164,7 +164,7 @@ export default function PricingPage() {
 
             {/* Capacity Warning */}
             {isAtCapacity && (
-                <Card className="border-amber-200 bg-amber-50">
+                <Card className="border-status-warning bg-status-warning-light">
                     <CardContent className="pt-6">
                         <div className="flex items-start gap-3">
                             <Pause className="h-5 w-5 text-amber-600 mt-0.5" />

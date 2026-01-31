@@ -51,7 +51,7 @@ export default async function SettingsPage() {
                 </CardContent>
             </Card>
 
-            <Card className="border-red-100 bg-red-50/50">
+            <Card className="border-destructive/20 bg-status-error-light/50">
                 <CardHeader>
                     <CardTitle className="text-red-900">Sign Out</CardTitle>
                     <CardDescription className="text-red-700">

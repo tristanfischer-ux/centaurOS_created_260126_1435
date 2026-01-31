@@ -316,7 +316,7 @@ export function PaymentForm({
  */
 export function PaymentSuccess({ amount, currency }: { amount: number; currency: string }) {
   return (
-    <Card className="border-green-200 bg-green-50">
+    <Card className="border-status-success bg-status-success-light">
       <CardContent className="pt-6">
         <div className="text-center space-y-3">
           <div className="flex justify-center">

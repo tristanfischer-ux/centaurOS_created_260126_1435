@@ -441,7 +441,7 @@ export function PricingForm({
             <div className="flex items-center justify-between">
                 <div>
                     {hasChanges && (
-                        <Badge variant="secondary" className="text-amber-600 border-amber-200">
+                        <Badge variant="secondary" className="text-status-warning-dark border-status-warning">
                             Unsaved changes
                         </Badge>
                     )}

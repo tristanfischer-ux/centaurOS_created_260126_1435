@@ -82,7 +82,7 @@ export function BookingIntentBanner({ intents }: BookingIntentBannerProps) {
                       <p className="text-sm text-orange-800">
                         You were interested in booking:
                       </p>
-                      <div className="mt-2 p-3 bg-white/60 rounded border border-orange-100">
+                      <div className="mt-2 p-3 bg-background/60 rounded border border-orange-100">
                         <div className="flex items-center gap-2 mb-1">
                           <Badge variant="outline" className="text-[10px] uppercase tracking-wider border-orange-200">
                             {intent.listing.subcategory || intent.listing.category}

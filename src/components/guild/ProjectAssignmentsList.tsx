@@ -132,7 +132,7 @@ export function ProjectAssignmentsList() {
                                             role="Apprentice"
                                             size="lg"
                                             showBorder
-                                            className="border-green-200"
+                                            className="border-status-success"
                                         />
                                         <div>
                                             <h4 className="font-medium text-foreground">{assignment.apprenticeName}</h4>
@@ -147,7 +147,7 @@ export function ProjectAssignmentsList() {
                                         </div>
                                     </div>
                                     <div className="flex items-center gap-2">
-                                        <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                                        <Badge variant="outline" className="bg-status-success-light text-status-success-dark border-status-success">
                                             Active
                                         </Badge>
                                         <DropdownMenu>
@@ -212,7 +212,7 @@ export function ProjectAssignmentsList() {
                                         className={
                                             assignment.status === 'completed'
                                                 ? 'bg-blue-50 text-blue-700 border'
-                                                : 'bg-red-50 text-red-700 border-red-200'
+                                                : 'bg-status-error-light text-destructive border-destructive'
                                         }
                                     >
                                         {assignment.status}

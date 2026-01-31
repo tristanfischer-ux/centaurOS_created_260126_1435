@@ -770,7 +770,7 @@ export function MarketplaceView({
 
                         {/* AI Filters Panel */}
                         {activeTab === 'AI' && showFilters && (
-                            <div className="bg-violet-50 rounded border border-violet-200 p-4 space-y-4 hidden md:block">
+                            <div className="bg-accent/10 rounded border border-accent/20 p-4 space-y-4 hidden md:block">
                                 <div className="flex items-center justify-between">
                                     <h3 className="font-medium text-sm">Filter AI Tools</h3>
                                     {hasActiveFilters && (
@@ -933,7 +933,7 @@ export function MarketplaceView({
 
                         {/* AI Search Explanation */}
                         {aiExplanation && (
-                            <div className="bg-violet-50 border border-violet-200 rounded-lg p-3 flex items-start justify-between gap-3">
+                            <div className="bg-accent/10 border border-accent/20 rounded-lg p-3 flex items-start justify-between gap-3">
                                 <div className="flex items-start gap-2">
                                     <Sparkles className="h-4 w-4 text-violet-600 mt-0.5 shrink-0" />
                                     <div>
@@ -1018,7 +1018,7 @@ export function MarketplaceView({
                             </button>
                             
                             {showCentaurMatcher && (
-                                <Card className="p-4 bg-gradient-to-r from-violet-50 to-indigo-50 border-violet-200">
+                                <Card className="p-4 bg-gradient-to-r from-accent/10 to-status-info-light/50 border-accent/20">
                                     <div className="flex flex-col gap-4">
                                         <div>
                                             <h3 className="font-medium text-violet-900">Find the Perfect AI Partner</h3>
@@ -1071,12 +1071,12 @@ export function MarketplaceView({
                                         
                                         {/* Centaur Suggestions */}
                                         {centaurSuggestions.length > 0 && (
-                                            <div className="space-y-3 pt-3 border-t border-violet-200">
+                                            <div className="space-y-3 pt-3 border-t border-accent/20">
                                                 <h4 className="text-sm font-medium text-violet-900">Recommended AI Partners</h4>
                                                 {centaurSuggestions.map((suggestion, idx) => {
                                                     const listing = initialListings.find(l => l.id === suggestion.listingId)
                                                     return (
-                                                        <div key={suggestion.listingId} className="bg-background rounded-lg p-3 border border-violet-100">
+                                                        <div key={suggestion.listingId} className="bg-background rounded-lg p-3 border border-accent/20">
                                                             <div className="flex items-start justify-between gap-3">
                                                                 <div className="flex-1">
                                                                     <div className="flex items-center gap-2">

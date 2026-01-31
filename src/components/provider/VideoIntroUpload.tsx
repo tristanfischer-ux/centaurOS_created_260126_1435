@@ -159,7 +159,7 @@ export function VideoIntroUpload({ currentVideoUrl, currentThumbnailUrl }: Video
                                 placeholder="https://youtube.com/watch?v=... or https://loom.com/share/..."
                                 className={cn(
                                     "pl-10",
-                                    videoUrl && !isValid && "border-red-500"
+                                    videoUrl && !isValid && "border-destructive"
                                 )}
                             />
                         </div>
@@ -197,7 +197,7 @@ export function VideoIntroUpload({ currentVideoUrl, currentThumbnailUrl }: Video
                 </Alert>
                 
                 {/* Tips */}
-                <div className="bg-blue-50 rounded-lg p-4 border border-blue-100">
+                <div className="bg-status-info-light rounded-lg p-4 border border-status-info">
                     <h4 className="font-medium text-blue-900 text-sm mb-2">Tips for a great intro video</h4>
                     <ul className="text-xs text-blue-800 space-y-1">
                         <li>• Keep it 60-90 seconds - attention spans are short!</li>

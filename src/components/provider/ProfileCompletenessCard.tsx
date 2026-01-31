@@ -165,7 +165,7 @@ export function ProfileCompletenessCard({ profile, caseStudyCount, portfolioCoun
     
     return (
         <Card className={cn(
-            requiredComplete ? 'border-green-200 bg-green-50/30' : 'border-amber-200 bg-amber-50/30'
+            requiredComplete ? 'border-status-success bg-status-success-light/30' : 'border-status-warning bg-status-warning-light/30'
         )}>
             <CardHeader className="pb-2">
                 <div className="flex items-center justify-between">

@@ -71,7 +71,7 @@ export default async function AvailabilityPage() {
             <div className="space-y-6">
                 <h1 className="text-3xl font-bold tracking-tight text-foreground">Availability Calendar</h1>
                 
-                <Card className="border-amber-100 bg-amber-50/50">
+                <Card className="border-status-warning/50 bg-status-warning-light/50">
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2 text-amber-900">
                             <AlertCircle className="h-5 w-5" />
@@ -186,7 +186,7 @@ export default async function AvailabilityPage() {
 
             {/* Out of Office Banner */}
             {profile.out_of_office && (
-                <Card className="border-amber-200 bg-amber-50">
+                <Card className="border-status-warning bg-status-warning-light">
                     <CardContent className="pt-6">
                         <div className="flex items-start gap-3">
                             <AlertCircle className="h-5 w-5 text-amber-600 mt-0.5" />
@@ -298,7 +298,7 @@ export default async function AvailabilityPage() {
                         </div>
                     </div>
 
-                    <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-100">
+                    <div className="mt-4 p-3 bg-status-info-light rounded-lg border border-status-info">
                         <div className="flex items-start gap-2">
                             <AlertCircle className="h-4 w-4 text-blue-600 mt-0.5" />
                             <p className="text-sm text-blue-700">

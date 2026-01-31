@@ -99,7 +99,7 @@ export function PortfolioManagementView({ items, error }: PortfolioManagementVie
 
             {/* Error State */}
             {error && (
-                <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-red-700">
+                <div className="rounded-lg border border-destructive bg-status-error-light p-4 text-destructive">
                     {error}
                 </div>
             )}
@@ -190,7 +190,7 @@ function PortfolioCard({ item, onEdit, onDelete, onToggleFeatured }: PortfolioCa
                             className="w-full h-full object-cover"
                         />
                         {item.image_urls.length > 1 && (
-                            <div className="absolute bottom-2 right-2 px-2 py-1 bg-black/60 text-white text-xs rounded">
+                            <div className="absolute bottom-2 right-2 px-2 py-1 bg-black/60 text-primary-foreground text-xs rounded">
                                 +{item.image_urls.length - 1}
                             </div>
                         )}
@@ -205,7 +205,7 @@ function PortfolioCard({ item, onEdit, onDelete, onToggleFeatured }: PortfolioCa
                 {item.is_featured && (
                     <Badge
                         variant="secondary"
-                        className="absolute top-2 left-2 bg-amber-50/90 text-amber-700 border-amber-200"
+                        className="absolute top-2 left-2 bg-status-warning-light/90 text-status-warning-dark border-status-warning"
                     >
                         <Star className="w-3 h-3 mr-1 fill-amber-500" />
                         Featured

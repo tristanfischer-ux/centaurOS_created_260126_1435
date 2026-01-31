@@ -239,7 +239,7 @@ export function ApprenticePoolBrowser() {
                                         avatarUrl={selectedApprentice?.avatarUrl}
                                         size="xl"
                                         showBorder
-                                        className="border-green-200"
+                                        className="border-status-success"
                                     />
                                 </div>
                                 <p className="text-foreground">

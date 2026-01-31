@@ -497,7 +497,7 @@ export default function CaseStudiesPage() {
             ) : (
                 <div className="space-y-4">
                     {caseStudies.map((cs) => (
-                        <Card key={cs.id} className={cn(cs.is_featured && 'border-amber-200 bg-amber-50/30')}>
+                        <Card key={cs.id} className={cn(cs.is_featured && 'border-status-warning bg-status-warning-light/30')}>
                             <CardHeader className="pb-2">
                                 <div className="flex items-start justify-between">
                                     <div>

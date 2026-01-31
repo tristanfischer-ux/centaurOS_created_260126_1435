@@ -92,7 +92,7 @@ export function CompareToDialog({ currentMember, allMembers }: CompareToDialogPr
                                     <button
                                         key={member.id}
                                         onClick={() => handleSelectMember(member)}
-                                        className="flex items-center gap-4 p-3 rounded-lg border border-slate-200 hover:border-blue-400 hover:bg-blue-50 transition-colors text-left"
+                                        className="flex items-center gap-4 p-3 rounded-lg border border-border hover:border-status-info hover:bg-status-info-light transition-colors text-left"
                                     >
                                         <Avatar className="h-10 w-10">
                                             <AvatarFallback className="bg-muted text-muted-foreground">

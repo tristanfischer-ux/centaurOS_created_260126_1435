@@ -90,14 +90,14 @@ export function CertificationsView({ certifications, error }: CertificationsView
 
             {/* Error State */}
             {error && (
-                <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-red-700">
+                <div className="rounded-lg border border-destructive bg-status-error-light p-4 text-destructive">
                     {error}
                 </div>
             )}
 
             {/* Expiry Warnings */}
             {expiringSoon.length > 0 && (
-                <Card className="border-amber-200 bg-amber-50">
+                <Card className="border-status-warning bg-status-warning-light">
                     <CardHeader className="pb-3">
                         <CardTitle className="text-lg flex items-center gap-2 text-amber-800">
                             <AlertTriangle className="w-5 h-5" />
@@ -176,7 +176,7 @@ export function CertificationsView({ certifications, error }: CertificationsView
                             Pending Verification ({pending.length})
                         </h2>
                     </div>
-                    <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 flex items-start gap-2">
+                    <div className="rounded-lg border border-status-info bg-status-info-light p-3 flex items-start gap-2">
                         <Info className="w-4 h-4 text-blue-600 mt-0.5 shrink-0" />
                         <p className="text-sm text-blue-800">
                             Add a verification URL to your certifications to request verification. 

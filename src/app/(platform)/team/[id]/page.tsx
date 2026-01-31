@@ -169,7 +169,7 @@ export default async function ProfilePage({ params }: { params: Promise<{ id: st
                                             <div className="font-medium text-foreground">{task.title}</div>
                                             <div className="text-sm text-muted-foreground truncate max-w-md">{task.description}</div>
                                         </div>
-                                        <Badge variant="secondary" className="bg-green-50 text-green-700 border-green-200">Completed</Badge>
+                                        <Badge variant="secondary" className="bg-status-success-light text-status-success-dark border-status-success">Completed</Badge>
                                     </div>
                                 ))
                             )}

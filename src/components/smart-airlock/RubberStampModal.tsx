@@ -55,7 +55,7 @@ export function RubberStampModal({ taskId, isOpen, onClose }: RubberStampModalPr
 
     return (
         <Dialog open={isOpen} onOpenChange={() => !isSubmitting && onClose()}>
-            <DialogContent className="sm:max-w-md bg-background border-red-100 text-foreground overflow-hidden relative shadow-brand-lg">
+            <DialogContent className="sm:max-w-md bg-background border-destructive text-foreground overflow-hidden relative shadow-brand-lg">
 
                 {/* STAMP ANIMATION OVERLAY */}
                 <AnimatePresence>
@@ -72,7 +72,7 @@ export function RubberStampModal({ taskId, isOpen, onClose }: RubberStampModalPr
                             }}
                             className="absolute inset-0 z-50 flex items-center justify-center pointer-events-none"
                         >
-                            <div className="border-8 border-red-600 rounded px-8 py-2 text-red-600 font-black text-6xl tracking-widest uppercase opacity-90 mix-blend-multiply shadow-[0_0_50px_rgba(220,38,38,0.2)] transform -rotate-12 bg-white/10 backdrop-blur-[2px]">
+                            <div className="border-8 border-destructive rounded px-8 py-2 text-destructive font-black text-6xl tracking-widest uppercase opacity-90 mix-blend-multiply shadow-[0_0_50px_rgba(220,38,38,0.2)] transform -rotate-12 bg-background/10 backdrop-blur-[2px]">
                                 CERTIFIED
                             </div>
                         </motion.div>
@@ -153,7 +153,7 @@ export function RubberStampModal({ taskId, isOpen, onClose }: RubberStampModalPr
                     <Button
                         onClick={handleApprove}
                         disabled={!allChecked || isSubmitting}
-                        className={`gap-2 font-mono uppercase tracking-wide transition-all duration-300 ${isStamped ? "bg-red-700 text-white scale-105" : "bg-red-600 hover:bg-red-700 text-white"
+                        className={`gap-2 font-mono uppercase tracking-wide transition-all duration-300 ${isStamped ? "bg-destructive/90 text-destructive-foreground scale-105" : "bg-destructive hover:bg-destructive/90 text-destructive-foreground"
                             }`}
                     >
                         {isStamped ? (

@@ -71,14 +71,14 @@ function getStatusConfig(status: ListingTransactionStatus) {
             return {
                 Icon: Zap,
                 label: 'Book Now',
-                className: 'bg-green-100 text-green-800 hover:bg-green-100 border-green-200',
+                className: 'bg-status-success-light text-status-success-dark hover:bg-status-success-light border-status-success',
                 description: 'This provider accepts direct bookings'
             }
         case 'invite_sent':
             return {
                 Icon: Mail,
                 label: 'Coming Soon',
-                className: 'bg-amber-100 text-amber-800 hover:bg-amber-100 border-amber-200',
+                className: 'bg-status-warning-light text-status-warning-dark hover:bg-status-warning-light border-status-warning',
                 description: 'This provider is setting up bookings'
             }
         case 'pending_signup':

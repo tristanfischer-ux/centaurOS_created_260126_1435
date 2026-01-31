@@ -353,20 +353,20 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
 
         if (isAIAgent) {
             accentColor = 'bg-indigo-500'
-            borderClass = 'border-indigo-200'
+            borderClass = 'border-status-info/30'
             ringClass = 'ring-muted border-muted'
             bgCheckClass = 'bg-muted0'
-            avatarBorderClass = 'border-2 border-indigo-300'
+            avatarBorderClass = 'border-2 border-status-info/50'
             avatarBgClass = 'bg-indigo-100 text-indigo-700 font-bold'
-            badgeClass = 'text-indigo-600 border-indigo-200 bg-indigo-50'
+            badgeClass = 'text-status-info border-status-info/30 bg-status-info/10'
         } else if (isFounder) {
             accentColor = 'bg-purple-500'
-            borderClass = 'border-purple-200'
+            borderClass = 'border-accent/30'
             ringClass = 'ring-muted border-muted'
             bgCheckClass = 'bg-muted0'
-            avatarBorderClass = 'border-2 border-purple-500'
+            avatarBorderClass = 'border-2 border-accent'
             avatarBgClass = 'bg-purple-100 text-purple-700 font-bold'
-            badgeClass = 'text-purple-600 border-purple-200 bg-purple-50'
+            badgeClass = 'text-accent border-accent/30 bg-accent/10'
         } else if (isExecutive) {
             accentColor = 'bg-status-warning'
             borderClass = 'border-status-warning-light'
@@ -446,7 +446,7 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                             )}
                             {isCentaur && (
                                 <div className="absolute -bottom-1 -right-1 bg-background rounded-full p-[1px] shadow-sm border border-muted">
-                                    <Avatar className="h-4 w-4 border border-indigo-200">
+                                    <Avatar className="h-4 w-4 border border-status-info/30">
                                         <AvatarFallback className="bg-indigo-100 text-indigo-700 text-[6px]">
                                             <Brain className="h-2 w-2" />
                                         </AvatarFallback>
@@ -753,9 +753,9 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
         let badgeClass = 'text-muted-foreground border bg-muted'
 
         if (isAIAgent) {
-            badgeClass = 'text-indigo-600 border-indigo-200 bg-indigo-50'
+            badgeClass = 'text-status-info border-status-info/30 bg-status-info/10'
         } else if (isFounder) {
-            badgeClass = 'text-purple-600 border-purple-200 bg-purple-50'
+            badgeClass = 'text-accent border-accent/30 bg-accent/10'
         } else if (isExecutive) {
             badgeClass = 'text-status-warning-dark border-status-warning-light bg-status-warning-light'
         }
@@ -1081,7 +1081,7 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
             {/* Neural Network (AI Agents) */}
             {aiAgents.length > 0 && (
                 <section className="space-y-4">
-                    <h2 className="text-xl font-semibold text-indigo-600 uppercase tracking-wider border-b border-indigo-200 pb-2 flex items-center gap-2">
+                    <h2 className="text-xl font-semibold text-status-info uppercase tracking-wider border-b border-status-info/30 pb-2 flex items-center gap-2">
                         <Brain className="h-5 w-5" />
                         Neural Network (AI Agents)
                     </h2>

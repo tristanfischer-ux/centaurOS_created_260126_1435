@@ -30,7 +30,7 @@ function ErrorMessage() {
     if (!error) return null
 
     return (
-        <div className="p-4 text-sm text-red-600 bg-red-50 border border-red-100 rounded-sm mb-6 flex items-center gap-3">
+        <div className="p-4 text-sm text-destructive bg-status-error-light border border-destructive rounded-sm mb-6 flex items-center gap-3">
             <span className="h-2 w-2 rounded-full bg-red-500 animate-pulse" />
             {error}
         </div>
@@ -81,7 +81,7 @@ function LoginForm() {
                             autoFocus
                             autoComplete="off"
                             required
-                            className="h-11 bg-background border focus:border-cyan-500 focus:ring-cyan-500/20 transition-all font-medium"
+                            className="h-11 bg-background border focus:border-international-orange focus:ring-international-orange/20 transition-all font-medium"
                         />
                     </div>
                     <div className="space-y-2">
@@ -92,7 +92,7 @@ function LoginForm() {
                             type="password"
                             autoComplete="current-password"
                             required
-                            className="h-11 bg-background border focus:border-cyan-500 focus:ring-cyan-500/20 transition-all font-medium font-mono tracking-widest"
+                            className="h-11 bg-background border focus:border-international-orange focus:ring-international-orange/20 transition-all font-medium font-mono tracking-widest"
                         />
                     </div>
                 </div>

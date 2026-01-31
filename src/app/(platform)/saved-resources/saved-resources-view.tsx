@@ -62,14 +62,14 @@ export function SavedResourcesView({ savedResources: initialResources, error }: 
     const categoryStyles: Record<string, { bg: string; text: string; border: string }> = {
         'People': { bg: 'bg-stone-50', text: 'text-stone-700', border: 'border-stone-200' },
         'Products': { bg: 'bg-muted', text: 'text-foreground', border: 'border-slate-200' },
-        'AI_Tools': { bg: 'bg-violet-50', text: 'text-violet-700', border: 'border-violet-200' },
+        'AI_Tools': { bg: 'bg-accent', text: 'text-accent-foreground', border: 'border-accent' },
     }
 
     if (error) {
         return (
             <div className="p-8">
                 <div className="max-w-4xl mx-auto">
-                    <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
+                    <div className="bg-status-error-light border border-destructive rounded-lg p-6 text-center">
                         <p className="text-red-600">Failed to load saved resources: {error}</p>
                     </div>
                 </div>
@@ -140,7 +140,7 @@ export function SavedResourcesView({ savedResources: initialResources, error }: 
                                                 size="sm"
                                                 onClick={() => handleRemove(resource.provider_id)}
                                                 disabled={removingId === resource.provider_id}
-                                                className="shrink-0 h-8 w-8 p-0 hover:bg-red-50 hover:text-red-600"
+                                                className="shrink-0 h-8 w-8 p-0 hover:bg-status-error-light hover:text-destructive"
                                             >
                                                 <BookmarkX className="h-4 w-4" />
                                             </Button>
@@ -167,7 +167,7 @@ export function SavedResourcesView({ savedResources: initialResources, error }: 
                                             )}
                                             {listing.rating_average && (
                                                 <div className="flex items-center gap-2 text-muted-foreground">
-                                                    <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
+                                                    <Star className="h-4 w-4 fill-status-warning text-status-warning" />
                                                     <span>{listing.rating_average.toFixed(1)} ({listing.total_reviews} reviews)</span>
                                                 </div>
                                             )}

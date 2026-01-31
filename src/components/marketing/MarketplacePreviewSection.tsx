@@ -41,14 +41,14 @@ export function MarketplacePreviewSection({ listings, onBookClick }: Marketplace
                 {listings.map((listing) => (
                     <Card 
                         key={listing.id} 
-                        className="bg-muted/50 border-white/10 hover:border-blue-500/30 transition-all duration-300 group"
+                        className="bg-muted/50 border-border hover:border-status-info/30 transition-all duration-300 group"
                     >
                         <CardContent className="p-4">
                             {/* Header */}
                             <div className="flex justify-between items-start mb-3">
                                 <Badge 
                                     variant="secondary" 
-                                    className="uppercase text-[10px] tracking-wider font-semibold border-blue-500/30 bg-blue-500/10 text-blue-400"
+                                    className="uppercase text-[10px] tracking-wider font-semibold border-status-info/30 bg-status-info/10 text-status-info"
                                 >
                                     {listing.subcategory}
                                 </Badge>

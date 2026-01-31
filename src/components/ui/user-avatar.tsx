@@ -23,12 +23,12 @@ export const ROLE_COLORS = {
   Apprentice: {
     bg: "bg-green-100",
     text: "text-green-700",
-    border: "border-green-200",
+    border: "border-border",
   },
   AI_Agent: {
     bg: "bg-purple-100",
     text: "text-purple-600",
-    border: "border-purple-200",
+    border: "border-border",
   },
   // Default for any other roles
   default: {

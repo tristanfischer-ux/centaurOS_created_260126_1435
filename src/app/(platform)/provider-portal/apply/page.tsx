@@ -205,7 +205,7 @@ export default function ProviderApplicationPage() {
                 </CardHeader>
                 <CardContent className="space-y-6">
                     {error && (
-                        <div className="flex items-center gap-2 p-4 rounded-lg bg-red-50 border border-red-200">
+                        <div className="flex items-center gap-2 p-4 rounded-lg bg-status-error-light border border-destructive">
                             <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0" />
                             <p className="text-sm text-red-700">{error}</p>
                         </div>
@@ -397,7 +397,7 @@ export default function ProviderApplicationPage() {
                                 </Select>
                             </div>
 
-                            <div className="p-4 rounded-lg bg-blue-50 border border-blue-100">
+                            <div className="p-4 rounded-lg bg-status-info-light border border-status-info">
                                 <p className="text-sm text-blue-800">
                                     <strong>What happens next?</strong>
                                 </p>

@@ -70,7 +70,7 @@ export function MarketplacePreviewCard({ listing, onJoinClick }: MarketplacePrev
                         className="object-cover group-hover:scale-105 transition-transform duration-300"
                     />
                     {listing.is_verified && (
-                        <div className="absolute top-2 right-2 bg-white/95 backdrop-blur-sm rounded-full p-1.5 shadow-sm">
+                        <div className="absolute top-2 right-2 bg-background/95 backdrop-blur-sm rounded-full p-1.5 shadow-sm">
                             <ShieldCheck className="w-4 h-4 text-emerald-600" />
                         </div>
                     )}

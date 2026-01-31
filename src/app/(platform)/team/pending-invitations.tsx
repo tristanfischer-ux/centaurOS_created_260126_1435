@@ -215,7 +215,7 @@ export function PendingInvitations() {
                                                             variant="outline" 
                                                             className={`text-xs ${
                                                                 invitation.status === 'accepted'
-                                                                    ? 'border-green-200 text-green-700 bg-green-50'
+                                                                    ? 'border-status-success text-status-success-dark bg-status-success-light'
                                                                     : 'border-orange-200 text-orange-700 bg-orange-50'
                                                             }`}
                                                         >

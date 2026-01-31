@@ -19,7 +19,7 @@ export default async function CertificationsPage() {
         return (
             <div className="space-y-6">
                 <h1 className="text-3xl font-bold tracking-tight">Certifications</h1>
-                <div className="rounded-lg border border-amber-200 bg-amber-50 p-6 text-center">
+                <div className="rounded-lg border border-status-warning bg-status-warning-light p-6 text-center">
                     <h2 className="text-lg font-semibold text-amber-900 mb-2">
                         Provider Profile Required
                     </h2>

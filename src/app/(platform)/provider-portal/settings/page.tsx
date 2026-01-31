@@ -140,13 +140,13 @@ export default function ProviderSettingsPage() {
 
             {/* Success/Error Messages */}
             {success && (
-                <div className="flex items-center gap-2 p-4 rounded-lg bg-green-50 border border-green-200">
+                <div className="flex items-center gap-2 p-4 rounded-lg bg-status-success-light border border-status-success">
                     <CheckCircle2 className="h-5 w-5 text-green-600" />
                     <p className="text-sm text-green-700">Settings updated successfully!</p>
                 </div>
             )}
             {error && (
-                <div className="flex items-center gap-2 p-4 rounded-lg bg-red-50 border border-red-200">
+                <div className="flex items-center gap-2 p-4 rounded-lg bg-status-error-light border border-destructive">
                     <AlertCircle className="h-5 w-5 text-red-600" />
                     <p className="text-sm text-red-700">{error}</p>
                 </div>

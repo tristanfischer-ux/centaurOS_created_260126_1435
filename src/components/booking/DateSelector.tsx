@@ -324,13 +324,13 @@ export function DateSelector({
                                     isCurrentMonth && !isPast && !isAvailable && "bg-muted text-muted-foreground cursor-not-allowed",
                                     isCurrentMonth && !isPast && isAvailable && "bg-background text-foreground border",
                                     // Hover state
-                                    isClickable && "hover:bg-emerald-50 hover:border-emerald-200 cursor-pointer",
+                                    isClickable && "hover:bg-status-success-light hover:border-status-success cursor-pointer",
                                     // Selection preview
-                                    isPreview && isAvailable && "bg-emerald-50 border-emerald-200",
+                                    isPreview && isAvailable && "bg-status-success-light border-status-success",
                                     // Selected range
-                                    isSelected && "bg-emerald-100 border-emerald-200",
+                                    isSelected && "bg-status-success-light border-status-success",
                                     // Start/End dates
-                                    (isStartDate || isEndDate || isSelectionStartDate) && "bg-emerald-500 text-white border-emerald-500",
+                                    (isStartDate || isEndDate || isSelectionStartDate) && "bg-status-success text-status-success-foreground border-status-success",
                                     // Today
                                     isSameDay(date, today) && isCurrentMonth && "ring-2 ring-amber-400 ring-offset-1"
                                 )}
@@ -349,7 +349,7 @@ export function DateSelector({
                         <div className="w-3 h-3 rounded bg-background border" /> Available
                     </span>
                     <span className="flex items-center gap-1">
-                        <div className="w-3 h-3 rounded bg-emerald-100 border border-emerald-200" /> Selected
+                        <div className="w-3 h-3 rounded bg-status-success-light border border-status-success" /> Selected
                     </span>
                     <span className="flex items-center gap-1">
                         <div className="w-3 h-3 rounded bg-muted border border-muted" /> Unavailable
@@ -358,7 +358,7 @@ export function DateSelector({
 
                 {/* Validation Message */}
                 {selectedDates.validationMessage && (
-                    <div className="mt-4 p-3 rounded-lg bg-amber-50 border border-amber-200">
+                    <div className="mt-4 p-3 rounded-lg bg-status-warning-light border border-status-warning">
                         <p className="text-sm text-amber-700 flex items-center gap-2">
                             <AlertCircle className="h-4 w-4" />
                             {selectedDates.validationMessage}

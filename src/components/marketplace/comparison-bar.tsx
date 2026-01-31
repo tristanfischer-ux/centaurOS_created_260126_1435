@@ -28,10 +28,10 @@ function getCategoryIcon(category: string) {
 // Get category color classes
 function getCategoryColors(category: string) {
     switch (category) {
-        case 'People': return 'bg-stone-100 text-stone-700 border-stone-200 dark:bg-stone-900 dark:text-stone-300 dark:border-stone-700'
-        case 'AI': return 'bg-violet-100 text-violet-700 border-violet-200 dark:bg-violet-900 dark:text-violet-300 dark:border-violet-700'
+        case 'People': return 'bg-secondary text-secondary-foreground border-border dark:bg-secondary dark:text-secondary-foreground dark:border-border'
+        case 'AI': return 'bg-accent text-accent-foreground border-accent dark:bg-accent dark:text-accent-foreground dark:border-accent'
         case 'Products': return 'bg-muted text-foreground border'
-        case 'Services': return 'bg-blue-100 text-blue-700 border dark:bg-blue-900 dark:text-blue-300 dark:border-blue-700'
+        case 'Services': return 'bg-status-info-light text-status-info-dark border dark:bg-status-info-dark dark:text-status-info-light dark:border-status-info'
         default: return 'bg-gray-100 text-gray-700 border-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-600'
     }
 }

@@ -167,10 +167,10 @@ export default function SelfServiceListingPage() {
             {/* Approval Status Banner */}
             {existingListing && (
                 <Alert className={cn(
-                    approvalStatus === 'approved' && 'border-green-200 bg-green-50',
-                    approvalStatus === 'pending' && 'border-amber-200 bg-amber-50',
-                    approvalStatus === 'rejected' && 'border-red-200 bg-red-50',
-                    approvalStatus === 'changes_requested' && 'border-blue-200 bg-blue-50'
+                    approvalStatus === 'approved' && 'border-status-success bg-status-success-light',
+                    approvalStatus === 'pending' && 'border-status-warning bg-status-warning-light',
+                    approvalStatus === 'rejected' && 'border-destructive bg-status-error-light',
+                    approvalStatus === 'changes_requested' && 'border-status-info bg-status-info-light'
                 )}>
                     <div className="flex items-center gap-2">
                         {approvalStatus === 'approved' && <CheckCircle2 className="h-4 w-4 text-green-600" />}
@@ -278,7 +278,7 @@ export default function SelfServiceListingPage() {
                         </div>
                         
                         {/* Tips */}
-                        <div className="bg-blue-50 rounded-lg p-4 border border-blue-100">
+                        <div className="bg-status-info-light rounded-lg p-4 border border-status-info">
                             <h4 className="font-medium text-blue-900 text-sm mb-2">Tips for a great listing</h4>
                             <ul className="text-xs text-blue-800 space-y-1">
                                 <li>• Use a clear, specific title that describes your offering</li>

@@ -186,7 +186,7 @@ async function PaymentsContent() {
                                 </p>
                             </div>
                         </div>
-                        <div className="flex items-start gap-2 p-4 rounded-lg bg-blue-50 border border-blue-100">
+                        <div className="flex items-start gap-2 p-4 rounded-lg bg-status-info-light border border-status-info">
                             <Info className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
                             <div>
                                 <p className="text-sm font-medium text-blue-900">
@@ -259,7 +259,7 @@ async function PaymentsContent() {
                 </CardHeader>
                 <CardContent>
                     <div className="space-y-4">
-                        <div className="p-4 rounded-lg bg-amber-50 border border-amber-100">
+                        <div className="p-4 rounded-lg bg-status-warning-light border border-status-warning">
                             <div className="flex items-start gap-2">
                                 <Info className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
                                 <div>

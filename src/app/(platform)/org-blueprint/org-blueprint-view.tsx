@@ -346,8 +346,8 @@ export function OrgBlueprintView({ functions: initialFunctions, summary: initial
                                 className={cn(
                                     "p-4 rounded-lg border-2 transition-all text-left",
                                     statusFilter === 'covered'
-                                        ? "border-green-500 bg-green-50"
-                                        : "border-transparent bg-green-50 hover:border-green-300"
+                                        ? "border-status-success bg-status-success-light"
+                                        : "border-transparent bg-status-success-light hover:border-status-success"
                                 )}
                                 whileHover={{ scale: 1.02 }}
                                 whileTap={{ scale: 0.98 }}
@@ -361,8 +361,8 @@ export function OrgBlueprintView({ functions: initialFunctions, summary: initial
                                 className={cn(
                                     "p-4 rounded-lg border-2 transition-all text-left",
                                     statusFilter === 'partial'
-                                        ? "border-yellow-500 bg-yellow-50"
-                                        : "border-transparent bg-yellow-50 hover:border-yellow-300"
+                                        ? "border-status-warning bg-status-warning-light"
+                                        : "border-transparent bg-status-warning-light hover:border-status-warning"
                                 )}
                                 whileHover={{ scale: 1.02 }}
                                 whileTap={{ scale: 0.98 }}
@@ -376,8 +376,8 @@ export function OrgBlueprintView({ functions: initialFunctions, summary: initial
                                 className={cn(
                                     "p-4 rounded-lg border-2 transition-all text-left",
                                     statusFilter === 'gap'
-                                        ? "border-red-500 bg-red-50"
-                                        : "border-transparent bg-red-50 hover:border-red-300"
+                                        ? "border-destructive bg-status-error-light"
+                                        : "border-transparent bg-status-error-light hover:border-destructive"
                                 )}
                                 whileHover={{ scale: 1.02 }}
                                 whileTap={{ scale: 0.98 }}
