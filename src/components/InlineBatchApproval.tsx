@@ -285,7 +285,7 @@ export function InlineBatchApproval({ onApprovalComplete }: InlineBatchApprovalP
 
             {/* Batch Reject Dialog */}
             <Dialog open={rejectDialogOpen} onOpenChange={setRejectDialogOpen}>
-                <DialogContent size="sm" className="bg-white">
+                <DialogContent size="sm" className="bg-background">
                     <DialogHeader>
                         <DialogTitle className="text-foreground">Reject Tasks</DialogTitle>
                         <DialogDescription>

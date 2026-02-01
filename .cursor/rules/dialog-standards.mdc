@@ -1,0 +1,177 @@
+# Dialog Standards
+
+All dialogs and modals MUST have solid, opaque backgrounds. Translucent dialogs make content unreadable and create poor UX.
+
+## Critical Rules
+
+### 1. NEVER Use Translucent/Transparent Backgrounds
+
+```tsx
+// ✅ CORRECT - Solid background (uses bg-background or bg-card)
+<DialogContent size="md">
+  <DialogHeader>
+    <DialogTitle>Dialog Title</DialogTitle>
+  </DialogHeader>
+  <div>Content</div>
+</DialogContent>
+
+// ❌ WRONG - Translucent background
+<DialogContent className="bg-background/80"> // Wrong - translucent
+<DialogContent className="bg-white/90"> // Wrong - translucent
+<DialogContent className="backdrop-blur-xl bg-background/50"> // Wrong - translucent
+```
+
+### 2. Dialog Content MUST Have Solid Background
+
+The `DialogContent` component already provides `bg-background` which is solid. **Do NOT override this with opacity values.**
+
+```tsx
+// ✅ CORRECT - Uses default solid background
+<DialogContent size="lg" className="max-h-[80vh]">
+  {/* Content */}
+</DialogContent>
+
+// ✅ CORRECT - Can add bg-card if needed for contrast
+<DialogContent className="bg-card">
+  {/* Content */}
+</DialogContent>
+
+// ❌ WRONG - Adding transparency
+<DialogContent className="bg-background/95"> // Wrong
+<DialogContent className="bg-opacity-90"> // Wrong
+<DialogContent style={{ opacity: 0.9 }}> // Wrong
+```
+
+### 3. Overlay Backdrop Opacity
+
+The dialog overlay (dark background behind dialog) CAN have transparency with blur, but the dialog content itself MUST be solid.
+
+```tsx
+// ✅ CORRECT - Overlay is translucent (already default in dialog.tsx)
+// bg-black/70 backdrop-blur-md
+
+// Dialog content is solid
+<DialogContent className="bg-background"> // Solid
+```
+
+### 4. Card Backgrounds in Dialogs
+
+Cards within dialogs should also be solid:
+
+```tsx
+// ✅ CORRECT - Solid card backgrounds
+<Card className="bg-violet-50 dark:bg-violet-950/30">
+  {/* The /30 opacity is acceptable for ACCENT backgrounds */}
+  {/* as long as the parent DialogContent is solid */}
+</Card>
+
+// ✅ CORRECT - Solid card
+<Card className="bg-card">
+  {/* Content */}
+</Card>
+
+// ❌ WRONG - Translucent card in dialog
+<Card className="bg-white/50"> // Too transparent
+```
+
+## Use `size` Prop, Not Custom Max-Width
+
+```tsx
+// ✅ CORRECT - Use size prop
+<DialogContent size="sm">   // 425px
+<DialogContent size="md">   // 600px
+<DialogContent size="lg">   // 800px
+
+// ❌ WRONG - Custom widths
+<DialogContent className="max-w-4xl"> // Use size prop instead
+<DialogContent className="sm:max-w-[900px]"> // Use size prop
+```
+
+**Exception:** If you need a width not covered by size variants (like 4xl), you can use custom width BUT still must ensure solid background:
+
+```tsx
+// ✅ ACCEPTABLE - Custom width for special cases
+<DialogContent className="max-w-4xl bg-background">
+  {/* Still has solid background */}
+</DialogContent>
+```
+
+## Dialog Stacking (z-index)
+
+Dialogs should use consistent z-index values:
+
+```tsx
+// Default dialog z-index (already in dialog.tsx)
+z-50 // Dialog content
+z-50 // Dialog overlay
+
+// If you need a dialog on top of another dialog
+<DialogContent className="z-[60]">
+```
+
+## Full Checklist
+
+Before committing any dialog:
+
+- [ ] Dialog content has solid background (no opacity < 100%)
+- [ ] No `bg-opacity-*` or `/XX` opacity modifiers on dialog content
+- [ ] Uses `size` prop when possible (sm/md/lg)
+- [ ] Cards within dialog have solid or acceptable dark-mode backgrounds
+- [ ] No inline styles setting opacity on dialog content
+- [ ] Overlay can have transparency (already default)
+- [ ] Content is readable against all backgrounds
+
+## Common Violations to Fix
+
+```tsx
+// ❌ VIOLATION 1: Custom width without solid background enforcement
+<DialogContent className="max-w-4xl max-h-[80vh] flex flex-col p-0">
+  
+// ✅ FIX: Explicitly ensure solid background
+<DialogContent size="lg" className="max-h-[80vh] flex flex-col p-0 gap-0 bg-background">
+
+// ❌ VIOLATION 2: Sheet with translucent background
+<SheetContent className="bg-white/90 backdrop-blur">
+
+// ✅ FIX: Use solid background
+<SheetContent className="bg-background">
+
+// ❌ VIOLATION 3: Popover with transparency
+<PopoverContent className="bg-popover/80">
+
+// ✅ FIX: Use solid background
+<PopoverContent className="bg-popover">
+```
+
+## Why This Matters
+
+1. **Readability**: Translucent dialogs make text hard to read
+2. **Accessibility**: Poor contrast for users with vision impairments
+3. **Professionalism**: Translucent dialogs look unfinished/buggy
+4. **Focus**: Solid backgrounds help users focus on dialog content
+5. **Consistency**: All dialogs should behave the same way
+
+## Related Components
+
+This rule applies to:
+
+- `Dialog` / `DialogContent`
+- `Sheet` / `SheetContent`
+- `Popover` / `PopoverContent`
+- `AlertDialog` / `AlertDialogContent`
+- `DropdownMenu` / `DropdownMenuContent` (already solid by default)
+- `HoverCard` / `HoverCardContent`
+- Any modal or overlay component
+
+## Testing
+
+To verify your dialog is solid:
+
+1. Open the dialog
+2. Check if you can see page content through the dialog
+3. If yes → dialog is translucent (bad)
+4. If no → dialog is solid (good)
+
+**Visual Test:**
+- Dialog content should completely obscure whatever is behind it
+- Only the overlay backdrop should show page content (dimmed/blurred)

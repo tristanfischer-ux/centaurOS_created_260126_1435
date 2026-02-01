@@ -140,8 +140,8 @@ export function NotificationCenter() {
           )}
         </button>
       </PopoverTrigger>
-      <PopoverContent className="w-96 p-0 bg-white border-foundry-200" align="end">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-foundry-200 bg-foundry-50">
+      <PopoverContent className="w-96 p-0 bg-popover" align="end">
+        <div className="flex items-center justify-between px-6 py-4 border-b bg-muted">
           <h3 className="text-lg font-semibold text-foundry-900">Notifications</h3>
           {unreadCount > 0 && (
             <Button 

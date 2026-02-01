@@ -291,7 +291,7 @@ export function DelegationManager({ members, currentUserId, userRole }: Delegati
 
             {/* Create Delegation Dialog */}
             <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
-                <DialogContent size="sm" className="bg-white">
+                <DialogContent size="sm" className="bg-background">
                     <DialogHeader>
                         <DialogTitle className="text-foreground">Create Delegation</DialogTitle>
                         <DialogDescription>
