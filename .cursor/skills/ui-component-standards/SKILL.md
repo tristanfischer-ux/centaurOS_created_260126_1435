@@ -129,7 +129,28 @@ bg-electric-blue
 
 ---
 
-## Dialog Size Guidelines
+## Dialog Standards
+
+### CRITICAL: Dialogs MUST Have Solid Backgrounds
+
+**NEVER use translucent backgrounds on dialogs.** This makes content unreadable.
+
+```tsx
+// ✅ CORRECT - Solid background
+<DialogContent size="md">
+  {/* bg-background is solid by default */}
+</DialogContent>
+
+// ✅ CORRECT - Explicit solid background
+<DialogContent className="bg-background">
+  {/* Explicitly solid */}
+</DialogContent>
+
+// ❌ WRONG - Translucent backgrounds
+<DialogContent className="bg-background/95"> // Wrong - translucent
+<DialogContent className="bg-white/90"> // Wrong - translucent
+<DialogContent className="backdrop-blur bg-background/50"> // Wrong
+```
 
 ### ALWAYS Use the `size` Prop
 
@@ -591,6 +612,7 @@ Before committing any UI code:
 ### Components
 - [ ] Status indicators use `StatusBadge` (not Badge with colors)
 - [ ] Cards use `Card` component (not custom divs)
+- [ ] Dialogs have solid backgrounds (no opacity < 100%)
 - [ ] Dialogs use `size` prop (not custom `max-w-[]`)
 - [ ] Icon-only buttons have `aria-label`
 
@@ -759,3 +781,4 @@ Use this skill when:
 - `.cursor/rules/form-consistency.mdc` - Form field patterns and validation
 - `.cursor/rules/component-patterns.mdc` - Component usage standards
 - `.cursor/rules/navigation-consistency.mdc` - Navigation active states and styling
+- `.cursor/rules/dialog-standards.mdc` - Dialog and modal background standards (MUST be solid)

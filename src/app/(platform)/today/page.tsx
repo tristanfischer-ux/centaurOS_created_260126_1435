@@ -344,12 +344,12 @@ export default async function TodayPage() {
                                 teams={teams}
                                 currentUserId={user.id}
                             >
-                                <Button variant="secondary" className="border border-emerald-300 text-emerald-700 hover:bg-emerald-100 bg-transparent">
+                                <Button variant="secondary" className="border border-emerald-300 text-emerald-700 hover:bg-emerald-100">
                                     <Plus className="h-4 w-4 mr-2" /> Create a Task
                                 </Button>
                             </CreateTaskDialog>
                             <CreateObjectiveDialog>
-                                <Button variant="secondary" className="border border-emerald-300 text-emerald-700 hover:bg-emerald-100 bg-transparent">
+                                <Button variant="secondary" className="border border-emerald-300 text-emerald-700 hover:bg-emerald-100">
                                     <Target className="h-4 w-4 mr-2" /> Set an Objective
                                 </Button>
                             </CreateObjectiveDialog>

@@ -21,7 +21,7 @@ export default async function CreateRFQPage() {
   return (
     <div className="h-[calc(100vh-4rem)]">
       {/* Back button - fixed at top */}
-      <div className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      <div className="border-b bg-background">
         <div className="container mx-auto py-3 px-4">
           <Button variant="ghost" size="sm" asChild>
             <Link href="/rfq">

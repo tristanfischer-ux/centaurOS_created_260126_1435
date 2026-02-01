@@ -120,7 +120,7 @@ export default async function BookingPage({ params }: BookingPageProps) {
     return (
         <div className="min-h-screen bg-gradient-to-b from-background to-muted/20">
             {/* Header */}
-            <div className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+            <div className="border-b bg-background">
                 <div className="container max-w-3xl mx-auto py-4 px-4">
                     {/* Breadcrumb Navigation */}
                     <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-sm">
