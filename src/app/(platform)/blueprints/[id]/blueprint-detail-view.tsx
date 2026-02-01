@@ -163,7 +163,7 @@ export function BlueprintDetailView({
             </Button>
           </Link>
           <Link href={`/blueprints/${blueprint.id}/settings`}>
-            <Button variant="ghost" size="icon">
+            <Button variant="ghost" size="icon" aria-label="Blueprint settings">
               <Settings className="h-4 w-4" />
             </Button>
           </Link>
@@ -428,7 +428,7 @@ export function BlueprintDetailView({
 
       {/* Domain detail panel (Sheet) */}
       <Sheet open={!!selectedDomain} onOpenChange={(open) => !open && setSelectedDomain(null)}>
-        <SheetContent side="right" className="w-[480px] p-0">
+        <SheetContent side="right" className="w-[480px] sm:max-w-[480px] overflow-y-auto">
           {selectedDomain && (
             <DomainDetailPanel
               coverage={selectedDomain}

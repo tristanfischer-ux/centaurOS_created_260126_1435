@@ -81,7 +81,6 @@ export function NextActionCard({ action, onAction, className }: NextActionCardPr
                   <Button
                     variant={idx === 0 ? 'default' : 'secondary'}
                     size="sm"
-                    className={idx === 0 ? 'bg-international-orange hover:bg-international-orange/90' : ''}
                   >
                     {act.action === 'marketplace' && <Users className="mr-2 h-4 w-4" />}
                     {act.action === 'advisory' && <HelpCircle className="mr-2 h-4 w-4" />}
@@ -132,7 +131,7 @@ export function NextMoveWidget({
     )}>
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Sparkles className="h-4 w-4 text-international-orange" />
+          <Sparkles className="h-4 w-4 text-accent" />
           <span className="text-sm font-medium">From: {blueprintName}</span>
         </div>
         {onDismiss && (
@@ -152,12 +151,12 @@ export function NextMoveWidget({
       <div className="flex items-center gap-2">
         {action.actions[0]?.url ? (
           <Link href={action.actions[0].url}>
-            <Button size="sm" className="bg-international-orange hover:bg-international-orange/90">
+            <Button size="sm">
               {action.actions[0].label}
             </Button>
           </Link>
         ) : (
-          <Button size="sm" className="bg-international-orange hover:bg-international-orange/90">
+          <Button size="sm">
             {action.actions[0]?.label || 'View'}
           </Button>
         )}

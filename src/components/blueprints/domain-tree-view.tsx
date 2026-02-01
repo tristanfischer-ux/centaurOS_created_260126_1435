@@ -1,12 +1,12 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { CoverageIndicator } from './coverage-indicator'
 import type { DomainCoverageWithDetails, CoverageStatus, DomainCategory } from '@/types/blueprints'
-import { DOMAIN_CATEGORY_COLORS } from '@/types/blueprints'
+import { DOMAIN_CATEGORY_COLORS, COVERAGE_STATUS_COLORS } from '@/types/blueprints'
 import {
   ChevronRight,
   ChevronDown,
@@ -15,6 +15,17 @@ import {
   CheckCircle2,
   CircleDashed,
 } from 'lucide-react'
+
+// Get status border color for visual hierarchy
+const getStatusBorderColor = (status: CoverageStatus): string => {
+  switch (status) {
+    case 'covered': return 'border-l-status-success'
+    case 'partial': return 'border-l-status-warning'
+    case 'gap': return 'border-l-destructive'
+    case 'not_needed': return 'border-l-muted'
+    default: return 'border-l-muted'
+  }
+}
 
 interface DomainTreeItemProps {
   coverage: DomainCoverageWithDetails
@@ -55,27 +66,43 @@ function DomainTreeItem({
     return null
   }
 
+  // Handle keyboard selection
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault()
+      onSelect?.(coverage)
+    }
+  }, [coverage, onSelect])
+
   return (
     <div className="select-none">
       <div
+        role="button"
+        tabIndex={0}
         className={cn(
-          'group flex items-center gap-2 rounded-md px-2 py-1.5 transition-colors cursor-pointer',
-          'hover:bg-muted',
-          selected === coverage.id && 'bg-muted ring-1 ring-international-orange'
+          'group flex items-center gap-2 rounded-md px-2 py-2 transition-all cursor-pointer',
+          'hover:bg-muted/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
+          // Add left border for depth 0 items based on status
+          depth === 0 && 'border-l-4',
+          depth === 0 && getStatusBorderColor(coverage.status),
+          // Selected state
+          selected === coverage.id && 'bg-accent/10 ring-1 ring-accent'
         )}
-        style={{ paddingLeft: `${depth * 16 + 8}px` }}
+        style={{ paddingLeft: `${depth * 20 + 8}px` }}
         onClick={() => onSelect?.(coverage)}
+        onKeyDown={handleKeyDown}
       >
         {/* Expand/collapse */}
         {hasChildren ? (
           <Button
             variant="ghost"
             size="icon"
-            className="h-5 w-5 p-0"
+            className="h-6 w-6 p-0 hover:bg-muted"
             onClick={(e) => {
               e.stopPropagation()
               setExpanded(!expanded)
             }}
+            aria-label={expanded ? 'Collapse' : 'Expand'}
           >
             {expanded ? (
               <ChevronDown className="h-4 w-4" />
@@ -84,7 +111,7 @@ function DomainTreeItem({
             )}
           </Button>
         ) : (
-          <div className="w-5" />
+          <div className="w-6" />
         )}
 
         {/* Status indicator */}
@@ -96,22 +123,21 @@ function DomainTreeItem({
             coverage.status === 'gap' && 'text-destructive',
             coverage.status === 'not_needed' && 'text-muted-foreground'
           )}
+          aria-hidden="true"
         />
 
         {/* Domain name */}
         <span className={cn(
-          'flex-1 truncate text-sm',
-          coverage.status === 'not_needed' && 'text-muted-foreground'
+          'flex-1 truncate text-sm font-medium',
+          coverage.status === 'not_needed' && 'text-muted-foreground font-normal',
+          depth > 0 && 'font-normal'
         )}>
           {domain.name}
         </span>
 
         {/* Category badge (depth 0 only) */}
-        {depth === 0 && category && categoryColors && (
-          <Badge
-            variant="secondary"
-            className={cn('text-xs', categoryColors.text, categoryColors.bg, categoryColors.border)}
-          >
+        {depth === 0 && category && (
+          <Badge variant="info" className="text-xs">
             {category}
           </Badge>
         )}
@@ -126,7 +152,7 @@ function DomainTreeItem({
         {/* Expertise count */}
         {expertiseCount > 0 && (
           <div className="flex items-center gap-1 text-xs text-muted-foreground">
-            <Users className="h-3 w-3" />
+            <Users className="h-3 w-3" aria-hidden="true" />
             <span>{expertiseCount}</span>
           </div>
         )}
@@ -134,7 +160,7 @@ function DomainTreeItem({
 
       {/* Children */}
       {expanded && hasChildren && (
-        <div>
+        <div className="ml-3 border-l border-muted">
           {childItems.map((child) => (
             <DomainTreeItem
               key={child.id}
@@ -256,7 +282,7 @@ export function DomainListView({ coverage, onSelect, className }: DomainListView
   const partial = coverage.filter(c => c.status === 'partial')
   const covered = coverage.filter(c => c.status === 'covered')
 
-  const renderGroup = (items: DomainCoverageWithDetails[], title: string) => {
+  const renderGroup = (items: DomainCoverageWithDetails[], title: string, borderColor: string) => {
     if (items.length === 0) return null
 
     return (
@@ -266,11 +292,23 @@ export function DomainListView({ coverage, onSelect, className }: DomainListView
           {items.map((item) => (
             <div
               key={item.id}
-              className="flex items-center gap-3 p-2 rounded-md hover:bg-muted cursor-pointer"
+              role="button"
+              tabIndex={0}
+              className={cn(
+                'flex items-center gap-3 p-3 rounded-md border-l-4 transition-all cursor-pointer',
+                'hover:bg-muted/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
+                borderColor
+              )}
               onClick={() => onSelect?.(item)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault()
+                  onSelect?.(item)
+                }
+              }}
             >
               <CoverageIndicator status={item.status} size="sm" showLabel={false} />
-              <span className="flex-1 text-sm">{item.domain?.name || item.domain_name}</span>
+              <span className="flex-1 text-sm font-medium">{item.domain?.name || item.domain_name}</span>
               {item.is_critical && item.status === 'gap' && (
                 <Badge variant="destructive" className="text-xs">Critical</Badge>
               )}
@@ -283,10 +321,10 @@ export function DomainListView({ coverage, onSelect, className }: DomainListView
 
   return (
     <div className={cn('space-y-6', className)}>
-      {renderGroup(gaps.filter(g => g.is_critical), 'Critical Gaps')}
-      {renderGroup(gaps.filter(g => !g.is_critical), 'Gaps')}
-      {renderGroup(partial, 'Partial Coverage')}
-      {renderGroup(covered, 'Covered')}
+      {renderGroup(gaps.filter(g => g.is_critical), 'Critical Gaps', 'border-l-destructive bg-status-error-light/30')}
+      {renderGroup(gaps.filter(g => !g.is_critical), 'Gaps', 'border-l-destructive')}
+      {renderGroup(partial, 'Partial Coverage', 'border-l-status-warning')}
+      {renderGroup(covered, 'Covered', 'border-l-status-success')}
     </div>
   )
 }

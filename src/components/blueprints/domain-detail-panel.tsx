@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import {
@@ -13,13 +14,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Separator } from '@/components/ui/separator'
+import { SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { UserAvatar } from '@/components/ui/user-avatar'
 import { CoverageIndicator } from './coverage-indicator'
 import type { DomainCoverageWithDetails, CoverageStatus, Expertise } from '@/types/blueprints'
 import { DOMAIN_CATEGORY_COLORS, DomainCategory } from '@/types/blueprints'
 import {
-  X,
   Users,
   Building2,
   BookOpen,
@@ -28,6 +28,9 @@ import {
   Check,
   HelpCircle,
   ShoppingBag,
+  Clock,
+  AlertTriangle,
+  X,
 } from 'lucide-react'
 import { sanitizeHref } from '@/lib/security/url-validation'
 
@@ -74,209 +77,226 @@ export function DomainDetailPanel({
   }
 
   return (
-    <div className={cn('flex flex-col h-full bg-background', className)}>
+    <div className={cn('flex flex-col h-full', className)}>
       {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b">
-        <div className="flex items-center gap-3">
-          <CoverageIndicator status={coverage.status} showIcon size="lg" showLabel={false} />
-          <div>
-            <h2 className="font-semibold text-lg">{domain.name}</h2>
-            {coverage.domain_path && coverage.domain_path !== domain.name && (
-              <p className="text-sm text-muted-foreground">{coverage.domain_path}</p>
-            )}
+      <SheetHeader className="space-y-1 pb-4 border-b">
+        <div className="flex items-start justify-between">
+          <div className="flex items-start gap-3 min-w-0 flex-1">
+            <CoverageIndicator status={coverage.status} showIcon size="lg" showLabel={false} />
+            <div className="min-w-0 flex-1">
+              <SheetTitle className="text-lg leading-tight">{domain.name}</SheetTitle>
+              {coverage.domain_path && coverage.domain_path !== domain.name && (
+                <p className="text-sm text-muted-foreground mt-0.5 truncate">
+                  {coverage.domain_path}
+                </p>
+              )}
+            </div>
           </div>
         </div>
-        <Button variant="ghost" size="icon" onClick={onClose}>
-          <X className="h-4 w-4" />
-        </Button>
-      </div>
 
-      {/* Content */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-6">
-        {/* Category & Criticality */}
-        <div className="flex items-center gap-2 flex-wrap">
+        {/* Category & metadata badges */}
+        <div className="flex items-center gap-2 flex-wrap pt-2">
           {category && categoryColors && (
-            <Badge
-              variant="secondary"
-              className={cn(categoryColors.text, categoryColors.bg, categoryColors.border)}
-            >
+            <Badge variant="info" className="text-xs">
               {category}
             </Badge>
           )}
-          {coverage.is_critical && (
-            <Badge variant="destructive">Critical</Badge>
-          )}
           {domain.learning_time_estimate && (
-            <Badge variant="secondary">~{domain.learning_time_estimate} to learn</Badge>
+            <Badge variant="secondary" className="text-xs">
+              <Clock className="mr-1 h-3 w-3" />
+              ~{domain.learning_time_estimate}
+            </Badge>
+          )}
+          {coverage.is_critical && (
+            <Badge variant="destructive" className="text-xs">
+              <AlertTriangle className="mr-1 h-3 w-3" />
+              Critical
+            </Badge>
           )}
         </div>
+      </SheetHeader>
 
+      {/* Content */}
+      <div className="flex-1 overflow-y-auto space-y-6 py-6">
         {/* Description */}
         {domain.description && (
-          <div>
-            <p className="text-muted-foreground">{domain.description}</p>
-          </div>
+          <p className="text-muted-foreground leading-relaxed">{domain.description}</p>
         )}
 
-        <Separator />
-
-        {/* Status Update */}
-        <div className="space-y-3">
-          <Label>Coverage Status</Label>
-          <Select value={status} onValueChange={(v) => handleStatusChange(v as CoverageStatus)}>
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="covered">
-                <div className="flex items-center gap-2">
-                  <div className="h-2 w-2 rounded-full bg-status-success" />
-                  Covered
-                </div>
-              </SelectItem>
-              <SelectItem value="partial">
-                <div className="flex items-center gap-2">
-                  <div className="h-2 w-2 rounded-full bg-status-warning" />
-                  Partial
-                </div>
-              </SelectItem>
-              <SelectItem value="gap">
-                <div className="flex items-center gap-2">
-                  <div className="h-2 w-2 rounded-full bg-destructive" />
-                  Gap
-                </div>
-              </SelectItem>
-              <SelectItem value="not_needed">
-                <div className="flex items-center gap-2">
-                  <div className="h-2 w-2 rounded-full bg-muted-foreground" />
-                  Not Needed
-                </div>
-              </SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
-        {/* Notes */}
-        <div className="space-y-3">
-          <Label>Notes</Label>
-          <Textarea
-            value={notes}
-            onChange={(e) => handleNotesChange(e.target.value)}
-            placeholder="Add notes about this domain..."
-            rows={3}
-          />
-        </div>
-
-        {/* Save button if changes */}
-        {hasChanges && (
-          <Button
-            onClick={handleSave}
-            disabled={isUpdating}
-            className="w-full bg-international-orange hover:bg-international-orange/90"
-          >
-            <Check className="mr-2 h-4 w-4" />
-            Save Changes
-          </Button>
+        {/* Actions for gaps - shown prominently at top */}
+        {coverage.status === 'gap' && (
+          <Card className="border-l-4 border-l-destructive bg-status-error-light/30">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base flex items-center gap-2">
+                <AlertTriangle className="h-4 w-4 text-destructive" />
+                Fill This Gap
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 gap-3">
+                <Button asChild>
+                  <a href={`/marketplace?q=${encodeURIComponent(domain.name)}`}>
+                    <ShoppingBag className="mr-2 h-4 w-4" />
+                    Marketplace
+                  </a>
+                </Button>
+                <Button variant="secondary" asChild>
+                  <a href={`/advisory/new?topic=${encodeURIComponent(domain.name)}`}>
+                    <HelpCircle className="mr-2 h-4 w-4" />
+                    Ask Advisory
+                  </a>
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
         )}
 
-        <Separator />
+        {/* Status & Notes Card */}
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base">Coverage Status</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Select value={status} onValueChange={(v) => handleStatusChange(v as CoverageStatus)}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="covered">
+                  <div className="flex items-center gap-2">
+                    <div className="h-2.5 w-2.5 rounded-full bg-status-success" />
+                    Covered
+                  </div>
+                </SelectItem>
+                <SelectItem value="partial">
+                  <div className="flex items-center gap-2">
+                    <div className="h-2.5 w-2.5 rounded-full bg-status-warning" />
+                    Partial
+                  </div>
+                </SelectItem>
+                <SelectItem value="gap">
+                  <div className="flex items-center gap-2">
+                    <div className="h-2.5 w-2.5 rounded-full bg-destructive" />
+                    Gap
+                  </div>
+                </SelectItem>
+                <SelectItem value="not_needed">
+                  <div className="flex items-center gap-2">
+                    <div className="h-2.5 w-2.5 rounded-full bg-muted-foreground" />
+                    Not Needed
+                  </div>
+                </SelectItem>
+              </SelectContent>
+            </Select>
+
+            <div className="space-y-2">
+              <Label htmlFor="domain-notes" className="text-sm font-medium">Notes</Label>
+              <Textarea
+                id="domain-notes"
+                value={notes}
+                onChange={(e) => handleNotesChange(e.target.value)}
+                placeholder="Add notes about this domain..."
+                rows={3}
+              />
+            </div>
+
+            {hasChanges && (
+              <Button
+                onClick={handleSave}
+                disabled={isUpdating}
+                className="w-full"
+              >
+                <Check className="mr-2 h-4 w-4" />
+                Save Changes
+              </Button>
+            )}
+          </CardContent>
+        </Card>
 
         {/* Expertise / Who Covers This */}
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <Label className="text-base">Who Covers This</Label>
-            <Button variant="secondary" size="sm" onClick={onAddExpertise}>
-              <Plus className="mr-2 h-4 w-4" />
-              Add
-            </Button>
-          </div>
-
-          {coverage.expertise && coverage.expertise.length > 0 ? (
-            <div className="space-y-2">
-              {coverage.expertise.map((exp) => (
-                <ExpertiseItem
-                  key={exp.id}
-                  expertise={exp}
-                  onRemove={() => onRemoveExpertise(exp.id)}
-                />
-              ))}
+        <Card>
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base">Who Covers This</CardTitle>
+              <Button variant="secondary" size="sm" onClick={onAddExpertise}>
+                <Plus className="mr-2 h-4 w-4" />
+                Add
+              </Button>
             </div>
-          ) : (
-            <p className="text-sm text-muted-foreground py-4 text-center">
-              No one assigned yet
-            </p>
-          )}
-        </div>
-
-        <Separator />
+          </CardHeader>
+          <CardContent>
+            {coverage.expertise && coverage.expertise.length > 0 ? (
+              <div className="space-y-2">
+                {coverage.expertise.map((exp) => (
+                  <ExpertiseItem
+                    key={exp.id}
+                    expertise={exp}
+                    onRemove={() => onRemoveExpertise(exp.id)}
+                  />
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground py-6 text-center">
+                No one assigned yet
+              </p>
+            )}
+          </CardContent>
+        </Card>
 
         {/* Key Questions */}
         {domain.key_questions && domain.key_questions.length > 0 && (
-          <div className="space-y-3">
-            <Label className="text-base">Key Questions</Label>
-            <div className="space-y-2">
-              {domain.key_questions.map((q, idx) => (
-                <div
-                  key={idx}
-                  className="p-3 rounded-md bg-muted text-sm"
-                >
-                  <p>{typeof q === 'string' ? q : q.question}</p>
-                </div>
-              ))}
-            </div>
-          </div>
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">Key Questions</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                {domain.key_questions.map((q, idx) => (
+                  <div
+                    key={idx}
+                    className="p-3 rounded-md bg-muted text-sm"
+                  >
+                    <p>{typeof q === 'string' ? q : q.question}</p>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
         )}
 
         {/* Learning Resources */}
         {/* SECURITY: Sanitize resource URLs before rendering */}
         {domain.learning_resources && Object.keys(domain.learning_resources).length > 0 && (
-          <div className="space-y-3">
-            <Label className="text-base">Learning Resources</Label>
-            <div className="space-y-2">
-              {Object.entries(domain.learning_resources).map(([type, resources]) => (
-                <div key={type}>
-                  {Array.isArray(resources) && resources.map((resource, idx) => {
-                    const sanitizedUrl = sanitizeHref(resource.url)
-                    if (sanitizedUrl === '#') return null
-                    return (
-                      <a
-                        key={idx}
-                        href={sanitizedUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center gap-2 p-2 rounded-md hover:bg-muted text-sm"
-                      >
-                        <BookOpen className="h-4 w-4 text-muted-foreground" />
-                        <span className="flex-1">{resource.title}</span>
-                        <ExternalLink className="h-3 w-3 text-muted-foreground" />
-                      </a>
-                    )
-                  })}
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Actions */}
-        {coverage.status === 'gap' && (
-          <div className="space-y-3">
-            <Label className="text-base">Fill This Gap</Label>
-            <div className="grid grid-cols-2 gap-2">
-              <Button variant="secondary" size="sm" asChild>
-                <a href={`/marketplace?q=${encodeURIComponent(domain.name)}`}>
-                  <ShoppingBag className="mr-2 h-4 w-4" />
-                  Marketplace
-                </a>
-              </Button>
-              <Button variant="secondary" size="sm" asChild>
-                <a href={`/advisory/new?topic=${encodeURIComponent(domain.name)}`}>
-                  <HelpCircle className="mr-2 h-4 w-4" />
-                  Ask Advisory
-                </a>
-              </Button>
-            </div>
-          </div>
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">Learning Resources</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-1">
+                {Object.entries(domain.learning_resources).map(([type, resources]) => (
+                  <div key={type}>
+                    {Array.isArray(resources) && resources.map((resource, idx) => {
+                      const sanitizedUrl = sanitizeHref(resource.url)
+                      if (sanitizedUrl === '#') return null
+                      return (
+                        <a
+                          key={idx}
+                          href={sanitizedUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-2 p-2 rounded-md hover:bg-muted text-sm transition-colors"
+                        >
+                          <BookOpen className="h-4 w-4 text-muted-foreground" />
+                          <span className="flex-1">{resource.title}</span>
+                          <ExternalLink className="h-3 w-3 text-muted-foreground" />
+                        </a>
+                      )
+                    })}
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
         )}
       </div>
     </div>
@@ -353,6 +373,7 @@ function ExpertiseItem({
         size="icon"
         className="h-8 w-8"
         onClick={onRemove}
+        aria-label="Remove expertise"
       >
         <X className="h-4 w-4" />
       </Button>

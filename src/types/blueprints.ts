@@ -52,15 +52,15 @@ export const PROJECT_STAGES: { value: ProjectStage; label: string; description: 
   { value: 'launched', label: 'Launched', description: 'Product in market' },
 ]
 
-// Domain categories with colors
+// Domain categories with colors - using semantic tokens and chart colors
 export const DOMAIN_CATEGORY_COLORS: Record<DomainCategory, { bg: string; text: string; border: string }> = {
-  Electronics: { bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-200' },
-  Mechanical: { bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-200' },
-  Software: { bg: 'bg-violet-50', text: 'text-violet-700', border: 'border-violet-200' },
-  Manufacturing: { bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200' },
-  Regulatory: { bg: 'bg-rose-50', text: 'text-rose-700', border: 'border-rose-200' },
-  Business: { bg: 'bg-sky-50', text: 'text-sky-700', border: 'border-sky-200' },
-  Operations: { bg: 'bg-slate-50', text: 'text-slate-700', border: 'border-slate-200' },
+  Electronics: { bg: 'bg-status-info-light', text: 'text-status-info', border: 'border-status-info/30' },
+  Mechanical: { bg: 'bg-status-warning-light', text: 'text-status-warning', border: 'border-status-warning/30' },
+  Software: { bg: 'bg-chart-5/10', text: 'text-chart-5', border: 'border-chart-5/30' },
+  Manufacturing: { bg: 'bg-status-success-light', text: 'text-status-success', border: 'border-status-success/30' },
+  Regulatory: { bg: 'bg-status-error-light', text: 'text-destructive', border: 'border-destructive/30' },
+  Business: { bg: 'bg-chart-2/10', text: 'text-chart-2', border: 'border-chart-2/30' },
+  Operations: { bg: 'bg-muted', text: 'text-muted-foreground', border: 'border-muted' },
 }
 
 // Coverage status colors
