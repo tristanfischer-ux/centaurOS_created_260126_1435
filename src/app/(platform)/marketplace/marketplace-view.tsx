@@ -12,9 +12,9 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useState, useMemo, useEffect, useCallback } from "react"
-import { Loader2, Store, Search, X, SlidersHorizontal, MapPin, Briefcase, GraduationCap, Bot, Factory, Zap, Shield, LayoutGrid, List, ShieldCheck, Clock, Sparkles, Users, ArrowRight, Bookmark, Star, Rows3, Square, LayoutList, Minus, AlignJustify } from "lucide-react"
+import { Loader2, Store, Search, X, SlidersHorizontal, MapPin, Briefcase, GraduationCap, Bot, Factory, Zap, Shield, LayoutGrid, List, ShieldCheck, Clock, Sparkles, Users, ArrowRight, Bookmark, Star, Rows3, Square, LayoutList, Minus, AlignJustify, UserCircle, Package, Wrench, CheckCircle2 } from "lucide-react"
 import { toast } from "sonner"
-import { Card } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { cn } from "@/lib/utils"
 import { useSearchParams, useRouter, usePathname } from "next/navigation"
 import { SearchBar, ActiveFilterBadges } from "@/components/search"
@@ -73,7 +73,7 @@ export function MarketplaceView({
 }: MarketplaceViewProps) {
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
     const [isComparisonOpen, setIsComparisonOpen] = useState(false)
-    const [activeTab, setActiveTab] = useState("People")
+    const [activeTab, setActiveTab] = useState<string>('People') // Default to People
     const [searchQuery, setSearchQuery] = useState('')
     const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('')
     const [showFilters, setShowFilters] = useState(false)
@@ -379,11 +379,72 @@ export function MarketplaceView({
         clearFilters()
     }, [])
 
-    // Get listings for current tab
-    const currentListings = useMemo(() => 
-        initialListings.filter(item => item.category === activeTab), 
-        [initialListings, activeTab]
-    )
+    // Category definitions for the hero cards
+    const categoryCards = [
+        {
+            id: 'People',
+            title: 'People',
+            icon: UserCircle,
+            color: 'bg-electric-blue',
+            lightColor: 'bg-status-info-light',
+            borderColor: 'border-electric-blue',
+            textColor: 'text-electric-blue',
+            categories: ['People'],
+            headline: 'Expert Talent On-Demand',
+            description: 'Access fractional executives, specialists, and apprentices who bring deep expertise without full-time commitment. From CTOs to CAD specialists, find the exact skills you need.',
+            benefits: [
+                'Fractional executives with 15+ years experience',
+                'Verified credentials and track records',
+                'Flexible engagement: hourly, daily, or retainer',
+                'Pre-vetted for quality and reliability'
+            ]
+        },
+        {
+            id: 'Products',
+            title: 'Physical Products',
+            icon: Package,
+            color: 'bg-international-orange',
+            lightColor: 'bg-orange-50',
+            borderColor: 'border-international-orange',
+            textColor: 'text-international-orange',
+            categories: ['Products'],
+            headline: 'Manufacturing Partners',
+            description: 'Connect with certified manufacturers and suppliers for physical products. From precision engineering to rapid prototyping, source quality components and finished goods.',
+            benefits: [
+                'ISO-certified manufacturing facilities',
+                'Prototyping to full production scale',
+                'Quality assurance and compliance',
+                'Transparent lead times and pricing'
+            ]
+        },
+        {
+            id: 'Services',
+            title: 'Services',
+            icon: Wrench,
+            color: 'bg-status-success',
+            lightColor: 'bg-status-success-light',
+            borderColor: 'border-status-success',
+            textColor: 'text-status-success',
+            categories: ['Services', 'AI'],
+            headline: 'Professional Services & AI Tools',
+            description: 'From consulting and legal services to cutting-edge AI tools, access the services that accelerate your business. Includes AI agents, automation tools, and software solutions.',
+            benefits: [
+                'Business consulting and advisory',
+                'AI tools and automation platforms',
+                'Legal, finance, and HR services',
+                'Integration support and training'
+            ]
+        }
+    ]
+
+    // Get listings for current tab (handles multi-category for Services)
+    const currentListings = useMemo(() => {
+        const categoryCard = categoryCards.find(c => c.id === activeTab)
+        if (categoryCard) {
+            return initialListings.filter(item => categoryCard.categories.includes(item.category))
+        }
+        return initialListings.filter(item => item.category === activeTab)
+    }, [initialListings, activeTab])
 
     // Extract unique values for filter options
     const subcategories = useMemo(() => 
@@ -409,14 +470,14 @@ export function MarketplaceView({
         return [...skills].sort()
     }, [currentListings, activeTab])
 
-    // AI-specific options
+    // Services/AI-specific options
     const aiTypes = useMemo(() => {
-        if (activeTab !== 'AI') return []
+        if (activeTab !== 'Services') return []
         return [...new Set(currentListings.map(p => p.attributes?.type).filter(Boolean))].sort()
     }, [currentListings, activeTab])
 
     const aiIntegrations = useMemo(() => {
-        if (activeTab !== 'AI') return []
+        if (activeTab !== 'Services') return []
         const integrations = new Set<string>()
         currentListings.forEach(p => {
             const items = p.attributes?.integrations || []
@@ -472,14 +533,14 @@ export function MarketplaceView({
         if (activeTab === 'People') {
             return baseFilters || skillFilter !== 'all' || minExperience !== 'all'
         }
-        if (activeTab === 'AI') {
+        if (activeTab === 'Services') {
             return baseFilters || aiTypeFilter !== 'all' || maxCostFilter !== 'all' || integrationFilter !== 'all'
         }
         if (activeTab === 'Products') {
             return baseFilters || certificationFilter !== 'all' || technologyFilter !== 'all'
         }
         return baseFilters
-    }, [activeTab, selectedSubcategories, locationFilter, searchQuery, skillFilter, minExperience, aiTypeFilter, maxCostFilter, integrationFilter, certificationFilter, technologyFilter])
+    }, [activeTab, selectedSubcategories, locationFilter, searchQuery, skillFilter, minExperience, aiTypeFilter, maxCostFilter, integrationFilter, technologyFilter])
 
     // Filter items
     const filteredItems = useMemo(() => {
@@ -522,8 +583,8 @@ export function MarketplaceView({
             }
         }
         
-        // AI-specific filters
-        if (activeTab === 'AI') {
+        // Services/AI-specific filters
+        if (activeTab === 'Services') {
             if (aiTypeFilter !== 'all') {
                 filtered = filtered.filter(item => item.attributes?.type === aiTypeFilter)
             }
@@ -563,9 +624,8 @@ export function MarketplaceView({
     const getSearchPlaceholder = () => {
         switch (activeTab) {
             case 'People': return "Search by name, skill, role..."
-            case 'AI': return "Search by name, function, integration..."
             case 'Products': return "Search by company, capability, material..."
-            case 'Services': return "Search services..."
+            case 'Services': return "Search services, AI tools, consulting..."
             default: return "Search listings..."
         }
     }
@@ -574,14 +634,29 @@ export function MarketplaceView({
         const count = filteredItems.length
         switch (activeTab) {
             case 'People': return `${count} ${count === 1 ? 'person' : 'people'}`
-            case 'AI': return `${count} AI ${count === 1 ? 'tool' : 'tools'}`
-            case 'Products': return `${count} ${count === 1 ? 'listing' : 'listings'}`
+            case 'Products': return `${count} ${count === 1 ? 'manufacturer' : 'manufacturers'}`
             case 'Services': return `${count} ${count === 1 ? 'service' : 'services'}`
             default: return `${count} items`
         }
     }
 
-    const showFiltersButton = ['People', 'AI', 'Products'].includes(activeTab)
+    const showFiltersButton = ['People', 'Products', 'Services'].includes(activeTab)
+    
+    // Get count for a category card (handles multi-category)
+    const getCategoryCount = (categoryId: string) => {
+        const card = categoryCards.find(c => c.id === categoryId)
+        if (!card) return 0
+        return initialListings.filter(item => card.categories.includes(item.category)).length
+    }
+    
+    // Handle category card click
+    const handleCategoryClick = (categoryId: string) => {
+        if (categoryId === activeTab) return // Already selected
+        setActiveTab(categoryId)
+        clearSelection()
+        clearFilters()
+        setShowFilters(false)
+    }
 
     return (
         <div className="space-y-6">
@@ -596,6 +671,60 @@ export function MarketplaceView({
                 />
             )}
 
+            {/* Compact Category Selector Cards - Always visible at top */}
+            <div className="grid grid-cols-3 gap-3 mb-6">
+                {categoryCards.map((category) => {
+                    const Icon = category.icon
+                    const count = getCategoryCount(category.id)
+                    const isActive = activeTab === category.id
+                    return (
+                        <button
+                            key={category.id}
+                            onClick={() => handleCategoryClick(category.id)}
+                            className={cn(
+                                "group relative flex items-center gap-3 p-3 rounded-lg border-2 transition-all duration-200 text-left",
+                                isActive 
+                                    ? cn(category.borderColor, "shadow-md", category.lightColor)
+                                    : "border-border bg-background hover:border-muted-foreground/30 hover:shadow-sm"
+                            )}
+                        >
+                            {/* Icon */}
+                            <div className={cn(
+                                "w-10 h-10 rounded-lg flex items-center justify-center shrink-0 transition-colors",
+                                isActive ? category.lightColor : "bg-muted"
+                            )}>
+                                <Icon className={cn(
+                                    "w-5 h-5 transition-colors",
+                                    isActive ? category.textColor : "text-muted-foreground"
+                                )} />
+                            </div>
+                            
+                            {/* Title + Count */}
+                            <div className="flex-1 min-w-0">
+                                <h3 className={cn(
+                                    "text-sm font-semibold truncate transition-colors",
+                                    isActive ? "text-foreground" : "text-muted-foreground group-hover:text-foreground"
+                                )}>
+                                    {category.title}
+                                </h3>
+                                <p className={cn(
+                                    "text-xs transition-colors",
+                                    isActive ? category.textColor : "text-muted-foreground"
+                                )}>
+                                    {count} available
+                                </p>
+                            </div>
+                            
+                            {/* Active indicator */}
+                            {isActive && (
+                                <div className={cn("absolute -bottom-px left-4 right-4 h-0.5 rounded-full", category.color)} />
+                            )}
+                        </button>
+                    )
+                })}
+            </div>
+
+            {/* Listings Section */}
             <div className="flex flex-col gap-6">
 
                 {/* AI Recommendations Panel */}
@@ -641,7 +770,7 @@ export function MarketplaceView({
                     </Card>
                 )}
 
-                <Tabs value={activeTab} onValueChange={(val) => { setActiveTab(val); clearSelection(); clearFilters(); setShowFilters(false); updateURL(searchQuery, val) }} className="w-full">
+                <div className="w-full">
                     <div className="flex flex-col gap-4 mb-6">
                         {/* Search and Filter Controls */}
                         <div className="flex flex-col sm:flex-row gap-3">
@@ -783,8 +912,8 @@ export function MarketplaceView({
                             </div>
                         )}
 
-                        {/* AI Filters Panel */}
-                        {activeTab === 'AI' && showFilters && (
+                        {/* AI/Services Filters Panel */}
+                        {activeTab === 'Services' && showFilters && (
                             <div className="bg-accent/10 rounded border border-accent/20 p-4 space-y-4 hidden md:block">
                                 <div className="flex items-center justify-between">
                                     <h3 className="font-medium text-sm">Filter AI Tools</h3>
@@ -968,27 +1097,29 @@ export function MarketplaceView({
                             </div>
                         )}
 
-                        {/* Tabs with counts - scrollable on ultra-narrow, grid on wider */}
-                        <div className="overflow-x-auto -mx-2 xs:mx-0 px-2 xs:px-0 pb-1">
-                            <TabsList className="inline-flex xs:grid w-auto xs:w-full max-w-lg xs:grid-cols-4 min-w-max xs:min-w-0">
-                                <TabsTrigger value="People" className="px-3 xs:px-4 gap-1.5">
-                                    People
-                                    <span className="text-[10px] opacity-60">({initialListings.filter(l => l.category === 'People').length})</span>
-                                </TabsTrigger>
-                                <TabsTrigger value="Products" className="px-3 xs:px-4 gap-1.5">
-                                    Products
-                                    <span className="text-[10px] opacity-60">({initialListings.filter(l => l.category === 'Products').length})</span>
-                                </TabsTrigger>
-                                <TabsTrigger value="Services" className="px-3 xs:px-4 gap-1.5">
-                                    Services
-                                    <span className="text-[10px] opacity-60">({initialListings.filter(l => l.category === 'Services').length})</span>
-                                </TabsTrigger>
-                                <TabsTrigger value="AI" className="px-3 xs:px-4 gap-1.5">
-                                    AI
-                                    <span className="text-[10px] opacity-60">({initialListings.filter(l => l.category === 'AI').length})</span>
-                                </TabsTrigger>
-                            </TabsList>
-                        </div>
+                        {/* Sub-category tabs for Services (shows AI and Services breakdown) */}
+                        {activeTab === 'Services' && (
+                            <div className="overflow-x-auto -mx-2 xs:mx-0 px-2 xs:px-0 pb-1">
+                                <Tabs defaultValue="all" className="w-full">
+                                    <TabsList className="inline-flex w-auto max-w-lg min-w-max">
+                                        <TabsTrigger value="all" className="px-3 xs:px-4 gap-1.5">
+                                            All Services
+                                            <span className="text-[10px] opacity-60">({getCategoryCount('Services')})</span>
+                                        </TabsTrigger>
+                                        <TabsTrigger value="services" className="px-3 xs:px-4 gap-1.5">
+                                            <Wrench className="w-3 h-3 mr-1" />
+                                            Consulting
+                                            <span className="text-[10px] opacity-60">({initialListings.filter(l => l.category === 'Services').length})</span>
+                                        </TabsTrigger>
+                                        <TabsTrigger value="ai" className="px-3 xs:px-4 gap-1.5">
+                                            <Bot className="w-3 h-3 mr-1" />
+                                            AI Tools
+                                            <span className="text-[10px] opacity-60">({initialListings.filter(l => l.category === 'AI').length})</span>
+                                        </TabsTrigger>
+                                    </TabsList>
+                                </Tabs>
+                            </div>
+                        )}
                     </div>
 
                     {/* Subcategory quick filters - multi-select pills */}
@@ -1020,8 +1151,8 @@ export function MarketplaceView({
                         </div>
                     )}
 
-                    {/* Centaur Matcher - only on AI tab */}
-                    {activeTab === 'AI' && (
+                    {/* Centaur Matcher - on Services tab (includes AI) */}
+                    {activeTab === 'Services' && (
                         <div className="mb-6">
                             <button
                                 onClick={() => setShowCentaurMatcher(!showCentaurMatcher)}
@@ -1340,7 +1471,7 @@ export function MarketplaceView({
                             />
                         </div>
                     )}
-                </Tabs>
+                </div>
             </div>
 
             <ComparisonBar

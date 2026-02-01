@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react"
 import { MarketplaceListing } from "@/actions/marketplace"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -137,10 +136,12 @@ export function ComparisonModal({ open, onOpenChange, items }: ComparisonModalPr
 
     return (
         <Dialog open={open} onOpenChange={handleOpenChange}>
-            <DialogContent size="xl" className="max-h-[85vh] flex flex-col p-0 gap-0 overflow-hidden">
+            <DialogContent size="xl" className="max-h-[85vh] flex flex-col p-0 gap-0">
                 <DialogHeader className="p-6 pb-4 border-b flex-shrink-0">
                     <div className="flex items-center justify-between">
-                        <DialogTitle className="text-xl font-semibold">Compare Listings</DialogTitle>
+                        <DialogTitle className="text-xl font-semibold">
+                            Compare Listings ({items.length} items)
+                        </DialogTitle>
                         <Button
                             variant="secondary"
                             size="sm"
@@ -163,8 +164,8 @@ export function ComparisonModal({ open, onOpenChange, items }: ComparisonModalPr
                     </div>
                 </DialogHeader>
 
-                <ScrollArea className="flex-1 overflow-auto">
-                    <div className="p-6 pt-4 min-w-max">
+                <div className="flex-1 overflow-auto">
+                    <div className="p-6 pt-4">
                         {/* AI Analysis Results */}
                         {aiAnalysis && (
                             <Card className="mb-6 p-4 bg-accent/10 border-accent/20">
@@ -292,9 +293,8 @@ export function ComparisonModal({ open, onOpenChange, items }: ComparisonModalPr
                         </div>
 
                         {/* Desktop: Table Layout */}
-                        <div className="hidden md:block overflow-x-auto pb-4 -mx-6">
-                            <div className="px-6 min-w-max">
-                            <table className="w-full border-collapse">
+                        <div className="hidden md:block overflow-x-auto pb-4">
+                            <table className="w-full border-collapse min-w-max">
                                 <thead>
                                     <tr>
                                         <th className="text-left text-sm font-medium text-muted-foreground py-3 pr-4 w-32 align-top sticky left-0 bg-background z-10">
@@ -355,11 +355,9 @@ export function ComparisonModal({ open, onOpenChange, items }: ComparisonModalPr
                                     </tr>
                                 </tbody>
                             </table>
-                            </div>
                         </div>
                     </div>
-                    <ScrollBar orientation="horizontal" />
-                </ScrollArea>
+                </div>
             </DialogContent>
         </Dialog>
     )
