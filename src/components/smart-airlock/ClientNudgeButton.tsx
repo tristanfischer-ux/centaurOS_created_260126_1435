@@ -42,7 +42,7 @@ export function ClientNudgeButton({ taskId, disabled, lastNudge }: ClientNudgeBu
             onClick={handleNudge}
             disabled={isLoading || isCoolingDown || hasNudged}
             className={cn(
-                "border-red-500/30 text-red-400 hover:bg-red-950/30 hover:text-red-300 transition-all",
+                "border-destructive/30 text-destructive hover:bg-destructive/10 hover:text-destructive transition-all",
                 (isCoolingDown || hasNudged) && "opacity-50 cursor-not-allowed"
             )}
         >

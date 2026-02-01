@@ -290,7 +290,7 @@ export function AskModal({ onSubmit, trigger }: AskModalProps) {
                                 <div className="flex items-center gap-2 mb-1">
                                     <Globe className={cn(
                                         "h-4 w-4",
-                                        visibility === "public" ? "text-blue-600" : "text-muted-foreground"
+                                        visibility === "public" ? "text-status-info" : "text-muted-foreground"
                                     )} />
                                     <span className="font-medium text-sm">Share with Network</span>
                                 </div>

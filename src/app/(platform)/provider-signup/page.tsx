@@ -88,19 +88,19 @@ async function SignupContent({ listingId }: { listingId?: string }) {
             
             {/* Migration Banner */}
             {listing && (
-                <Card className="mb-6 border bg-blue-50/50">
+                <Card className="mb-6 border bg-status-info-light/50">
                     <CardContent className="flex items-start gap-4 pt-6">
-                        <div className="p-2 rounded-lg bg-blue-100">
-                            <Store className="h-5 w-5 text-blue-600" />
+                        <div className="p-2 rounded-lg bg-status-info-light">
+                            <Store className="h-5 w-5 text-status-info" />
                         </div>
                         <div>
-                            <h3 className="font-semibold text-blue-900">
+                            <h3 className="font-semibold text-status-info-dark">
                                 Migrating: {listing.title}
                             </h3>
-                            <p className="text-sm text-blue-700 mt-1">
+                            <p className="text-sm text-status-info-dark mt-1">
                                 {listing.category} / {listing.subcategory}
                             </p>
-                            <p className="text-sm text-blue-600 mt-2">
+                            <p className="text-sm text-status-info mt-2">
                                 Your existing listing will be upgraded with booking and payment capabilities.
                             </p>
                         </div>

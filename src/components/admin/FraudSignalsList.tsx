@@ -145,7 +145,7 @@ export function FraudSignalsList({
       case "dispute_frequency":
         return <AlertTriangle className="h-4 w-4 text-orange-500" />
       case "manual_report":
-        return <User className="h-4 w-4 text-blue-500" />
+        return <User className="h-4 w-4 text-status-info" />
       default:
         return <Shield className="h-4 w-4 text-muted-foreground" />
     }

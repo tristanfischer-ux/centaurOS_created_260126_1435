@@ -117,7 +117,7 @@ export const TeamCard = memo(function TeamCard({
                     {/* Stats */}
                     <div className="flex gap-4 pt-4 border-t border-border">
                         <div className="flex items-center gap-2 text-sm">
-                            <Briefcase className="h-4 w-4 text-blue-500" />
+                            <Briefcase className="h-4 w-4 text-status-info" />
                             <span className="text-muted-foreground">{tasksCount} active tasks</span>
                         </div>
                     </div>

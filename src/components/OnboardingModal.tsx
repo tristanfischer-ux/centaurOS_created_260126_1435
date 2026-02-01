@@ -264,7 +264,7 @@ export function OnboardingModal({ userRole }: OnboardingModalProps) {
                   key={index}
                   className={cn(
                     "w-1.5 h-1.5 rounded-full transition-colors duration-300",
-                    index === currentStep ? "bg-slate-300" : "bg-muted"
+                    index === currentStep ? "bg-muted-foreground" : "bg-muted"
                   )}
                 />
               ))}

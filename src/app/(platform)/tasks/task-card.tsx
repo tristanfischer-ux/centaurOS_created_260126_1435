@@ -335,7 +335,7 @@ export const TaskCard = memo(function TaskCard(props: TaskCardProps) {
                                         </div>
                                     </div>
                                 </PopoverTrigger>
-                                <PopoverContent className="z-[100] w-[calc(100vw-2rem)] max-w-[240px] sm:w-[240px] overflow-y-auto max-h-[60vh] p-0 bg-background border shadow-lg" align="end" sideOffset={8} collisionPadding={16} onClick={(e) => e.stopPropagation()} onOpenAutoFocus={(e) => e.preventDefault()}>
+                                <PopoverContent className="z-[200] w-[calc(100vw-2rem)] max-w-[240px] sm:w-[240px] overflow-y-auto max-h-[60vh] p-0 bg-background border shadow-lg" align="end" sideOffset={8} collisionPadding={16} onClick={(e) => e.stopPropagation()} onOpenAutoFocus={(e) => e.preventDefault()}>
                                     <Command>
                                         <CommandInput placeholder="Assign to member..." />
                                         <CommandList>
@@ -404,7 +404,7 @@ export const TaskCard = memo(function TaskCard(props: TaskCardProps) {
                                 </span>
                             </div>
                         </PopoverTrigger>
-                        <PopoverContent className="z-[100] w-[calc(100vw-2rem)] max-w-[240px] sm:w-[240px] overflow-y-auto max-h-[60vh] p-0 bg-background border shadow-lg" align="start" sideOffset={8} collisionPadding={16} onClick={(e) => e.stopPropagation()} onOpenAutoFocus={(e) => e.preventDefault()}>
+                        <PopoverContent className="z-[200] w-[calc(100vw-2rem)] max-w-[240px] sm:w-[240px] overflow-y-auto max-h-[60vh] p-0 bg-background border shadow-lg" align="start" sideOffset={8} collisionPadding={16} onClick={(e) => e.stopPropagation()} onOpenAutoFocus={(e) => e.preventDefault()}>
                             <Command>
                                 <CommandInput placeholder="Assign to member..." />
                                 <CommandList>

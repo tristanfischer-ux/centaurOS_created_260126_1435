@@ -377,7 +377,7 @@ export function QuestionDetailView({
                         <h4 className="font-semibold text-foreground mb-1">Democratic Workflow</h4>
                         <p className="text-sm text-muted-foreground">
                             AI provides instant analysis, then human experts verify for accuracy. 
-                            Look for the <span className="inline-flex items-center gap-1 text-emerald-600 font-medium"><CheckCircle2 className="h-3.5 w-3.5" /> Verified</span> badge 
+                            Look for the <span className="inline-flex items-center gap-1 text-status-success font-medium"><CheckCircle2 className="h-3.5 w-3.5" /> Verified</span> badge 
                             for answers that have been confirmed by experienced professionals.
                         </p>
                     </div>

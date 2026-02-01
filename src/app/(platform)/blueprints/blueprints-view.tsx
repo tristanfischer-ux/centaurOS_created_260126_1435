@@ -149,7 +149,7 @@ export function BlueprintsView({ blueprints, templates }: BlueprintsViewProps) {
               <div className="absolute top-4 left-1/2 -translate-x-1/2 w-44 p-3 bg-background rounded-xl border-2 border shadow-sm hover:shadow-md transition-shadow cursor-pointer">
                 <div className="flex items-center justify-between mb-1">
                   <span className="text-[10px] font-bold uppercase text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">Electronics</span>
-                  <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                  <CheckCircle2 className="h-4 w-4 text-status-success" />
                 </div>
                 <div className="font-semibold text-sm">Avionics Bay</div>
                 <div className="text-[11px] text-muted-foreground mt-0.5">Flight computers, sensors</div>
@@ -172,7 +172,7 @@ export function BlueprintsView({ blueprints, templates }: BlueprintsViewProps) {
               <div className="absolute top-28 right-4 sm:right-8 w-40 p-3 bg-background rounded-xl border-2 border shadow-sm hover:shadow-md transition-shadow cursor-pointer">
                 <div className="flex items-center justify-between mb-1">
                   <span className="text-[10px] font-bold uppercase text-purple-600 bg-purple-50 px-1.5 py-0.5 rounded">Systems</span>
-                  <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                  <CheckCircle2 className="h-4 w-4 text-status-success" />
                 </div>
                 <div className="font-semibold text-sm">Communications</div>
                 <div className="text-[11px] text-muted-foreground mt-0.5">Telemetry, ground link</div>
@@ -197,7 +197,7 @@ export function BlueprintsView({ blueprints, templates }: BlueprintsViewProps) {
               <div className="absolute top-52 right-4 sm:right-16 w-40 p-3 bg-background rounded-xl border-2 border shadow-sm hover:shadow-md transition-shadow cursor-pointer">
                 <div className="flex items-center justify-between mb-1">
                   <span className="text-[10px] font-bold uppercase text-green-600 bg-green-50 px-1.5 py-0.5 rounded">Operations</span>
-                  <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                  <CheckCircle2 className="h-4 w-4 text-status-success" />
                 </div>
                 <div className="font-semibold text-sm">Ground Support</div>
                 <div className="text-[11px] text-muted-foreground mt-0.5">Launch pad, operations</div>

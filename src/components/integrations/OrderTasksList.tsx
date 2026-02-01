@@ -44,7 +44,7 @@ interface OrderTasksListProps {
 
 const statusConfig: Record<string, { icon: React.ElementType; color: string; label: string }> = {
   Pending: { icon: Circle, color: 'text-muted-foreground', label: 'Pending' },
-  Accepted: { icon: Clock, color: 'text-blue-500', label: 'Accepted' },
+  Accepted: { icon: Clock, color: 'text-status-info', label: 'Accepted' },
   In_Progress: { icon: Clock, color: 'text-amber-500', label: 'In Progress' },
   Completed: { icon: CheckCircle2, color: 'text-status-success', label: 'Completed' },
   Cancelled: { icon: XCircle, color: 'text-muted-foreground', label: 'Cancelled' },

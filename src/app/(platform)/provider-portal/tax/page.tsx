@@ -169,7 +169,7 @@ export default async function TaxSettingsPage() {
                   </div>
 
                   <div className="rounded-lg border p-4">
-                    <h4 className="font-medium text-blue-700 mb-2">
+                    <h4 className="font-medium text-status-info-dark mb-2">
                       UK to EU (B2B)
                     </h4>
                     <p className="text-sm text-muted-foreground">

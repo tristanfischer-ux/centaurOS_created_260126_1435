@@ -103,7 +103,7 @@ export function RFQWidget({ className }: RFQWidgetProps) {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className="p-2 rounded-lg bg-blue-100">
-              <FileSearch className="h-5 w-5 text-blue-600" />
+              <FileSearch className="h-5 w-5 text-status-info" />
             </div>
             <div>
               <CardTitle className="text-lg">RFQ Opportunities</CardTitle>
@@ -124,7 +124,7 @@ export function RFQWidget({ className }: RFQWidgetProps) {
           {/* Active Matches */}
           <div className="p-3 rounded-lg bg-background border border-slate-100">
             <div className="flex items-center gap-2 mb-1">
-              <FileSearch className="h-4 w-4 text-blue-600" />
+              <FileSearch className="h-4 w-4 text-status-info" />
               <span className="text-xs text-muted-foreground">Active Matches</span>
             </div>
             <p className="text-2xl font-bold text-foreground">

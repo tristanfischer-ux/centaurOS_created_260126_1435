@@ -132,14 +132,14 @@ export default function HelpPage() {
       </div>
 
       {/* Tips */}
-      <Card className="bg-blue-50 border">
+      <Card className="bg-status-info-light border">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-blue-900">
+          <CardTitle className="flex items-center gap-2 text-status-info-dark">
             <Mic className="h-5 w-5" />
             Pro Tip: Voice Input
           </CardTitle>
         </CardHeader>
-        <CardContent className="text-blue-800">
+        <CardContent className="text-status-info-dark">
           <p className="text-sm">
             When creating a task, click the microphone button and speak your task details.
             The AI will automatically extract the title, description, and even suggest an assignee!
