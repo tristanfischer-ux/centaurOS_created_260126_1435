@@ -17,7 +17,7 @@ COMMENT ON COLUMN knowledge_domains.primer IS 'AI-generated or human-written pri
 CREATE TABLE IF NOT EXISTS domain_familiarity (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   domain_id UUID NOT NULL REFERENCES knowledge_domains(id) ON DELETE CASCADE,
-  foundry_id UUID NOT NULL REFERENCES foundries(id) ON DELETE CASCADE,
+  foundry_id TEXT NOT NULL REFERENCES foundries(id) ON DELETE CASCADE,
   familiarity TEXT NOT NULL CHECK (familiarity IN ('expert', 'familiar', 'learning', 'unknown')) DEFAULT 'unknown',
   updated_by UUID REFERENCES profiles(id) ON DELETE SET NULL,
   updated_at TIMESTAMPTZ DEFAULT now(),
@@ -37,7 +37,7 @@ COMMENT ON TABLE domain_familiarity IS 'Tracks team-level familiarity with knowl
 CREATE TABLE IF NOT EXISTS domain_question_assignments (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   domain_id UUID NOT NULL REFERENCES knowledge_domains(id) ON DELETE CASCADE,
-  foundry_id UUID NOT NULL REFERENCES foundries(id) ON DELETE CASCADE,
+  foundry_id TEXT NOT NULL REFERENCES foundries(id) ON DELETE CASCADE,
   question_id TEXT NOT NULL,
   assigned_to UUID REFERENCES profiles(id) ON DELETE SET NULL,
   status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'in_progress', 'answered', 'skipped')),
@@ -169,7 +169,7 @@ USING (
 
 CREATE OR REPLACE FUNCTION upsert_domain_familiarity(
   p_domain_id UUID,
-  p_foundry_id UUID,
+  p_foundry_id TEXT,
   p_familiarity TEXT,
   p_notes TEXT DEFAULT NULL
 )
