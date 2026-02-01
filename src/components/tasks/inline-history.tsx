@@ -78,22 +78,22 @@ export function InlineHistory({ taskId, isOpen, onClose }: InlineHistoryProps) {
     if (!isOpen) return null
 
     return (
-        <div className="border-t border bg-background">
+        <div className="border-t bg-muted/30 overflow-hidden">
             {/* Header */}
-            <div className="flex items-center justify-between px-4 py-2 bg-muted">
+            <div className="flex items-center justify-between px-4 py-2.5 bg-muted/50 border-b">
                 <div>
                     <h4 className="text-xs font-semibold text-foreground uppercase tracking-wider">
                         Audit Log
                     </h4>
                     <p className="text-[10px] text-muted-foreground">Status changes & activity</p>
                 </div>
-                <Button variant="ghost" size="sm" onClick={onClose} className="h-6 w-6 p-0">
+                <Button variant="ghost" size="sm" onClick={onClose} className="h-7 w-7 p-0 hover:bg-background" aria-label="Close audit log">
                     <X className="h-4 w-4" />
                 </Button>
             </div>
 
             {/* Timeline */}
-            <div className="max-h-48 overflow-y-auto p-3">
+            <div className="max-h-40 overflow-y-auto p-3">
                 {loading ? (
                     <div className="flex items-center justify-center py-4 text-muted-foreground">
                         <Loader2 className="h-4 w-4 animate-spin mr-2" /> Loading...
@@ -101,10 +101,10 @@ export function InlineHistory({ taskId, isOpen, onClose }: InlineHistoryProps) {
                 ) : history.length === 0 ? (
                     <p className="text-center text-muted-foreground py-4 text-xs">No history yet</p>
                 ) : (
-                    <div className="relative border-l border ml-1 space-y-3">
+                    <div className="relative border-l border-muted-foreground/20 ml-1 space-y-2.5">
                         {history.map((item) => (
                             <div key={item.id} className="relative pl-4">
-                                <div className="absolute -left-[3px] top-1 h-1.5 w-1.5 rounded-full bg-muted-foreground/50" />
+                                <div className="absolute -left-[3px] top-1.5 h-1.5 w-1.5 rounded-full bg-muted-foreground/40" />
                                 <div className="flex items-center gap-2 flex-wrap">
                                     <span className="text-[10px] font-mono text-muted-foreground">
                                         {item.created_at && format(new Date(item.created_at), 'MMM d, HH:mm')}

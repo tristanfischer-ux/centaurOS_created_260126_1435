@@ -33,8 +33,8 @@ CREATE TABLE IF NOT EXISTS telegram_preferences (
 );
 
 -- Index for efficient lookup
-CREATE INDEX idx_telegram_prefs_profile ON telegram_preferences(profile_id);
-CREATE INDEX idx_telegram_prefs_briefing ON telegram_preferences(daily_briefing_enabled, daily_briefing_time) 
+CREATE INDEX IF NOT EXISTS idx_telegram_prefs_profile ON telegram_preferences(profile_id);
+CREATE INDEX IF NOT EXISTS idx_telegram_prefs_briefing ON telegram_preferences(daily_briefing_enabled, daily_briefing_time) 
     WHERE daily_briefing_enabled = true;
 
 -- RLS
@@ -75,9 +75,9 @@ CREATE TABLE IF NOT EXISTS telegram_ideas (
 );
 
 -- Indexes
-CREATE INDEX idx_telegram_ideas_profile ON telegram_ideas(profile_id);
-CREATE INDEX idx_telegram_ideas_status ON telegram_ideas(profile_id, status) WHERE status = 'inbox';
-CREATE INDEX idx_telegram_ideas_created ON telegram_ideas(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_telegram_ideas_profile ON telegram_ideas(profile_id);
+CREATE INDEX IF NOT EXISTS idx_telegram_ideas_status ON telegram_ideas(profile_id, status) WHERE status = 'inbox';
+CREATE INDEX IF NOT EXISTS idx_telegram_ideas_created ON telegram_ideas(created_at DESC);
 
 -- RLS
 ALTER TABLE telegram_ideas ENABLE ROW LEVEL SECURITY;
@@ -137,10 +137,10 @@ CREATE TABLE IF NOT EXISTS telegram_decisions (
 );
 
 -- Indexes
-CREATE INDEX idx_telegram_decisions_profile ON telegram_decisions(profile_id);
-CREATE INDEX idx_telegram_decisions_pending ON telegram_decisions(profile_id, status) WHERE status = 'pending';
-CREATE INDEX idx_telegram_decisions_priority ON telegram_decisions(priority, created_at) WHERE status = 'pending';
-CREATE INDEX idx_telegram_decisions_reference ON telegram_decisions(reference_type, reference_id);
+CREATE INDEX IF NOT EXISTS idx_telegram_decisions_profile ON telegram_decisions(profile_id);
+CREATE INDEX IF NOT EXISTS idx_telegram_decisions_pending ON telegram_decisions(profile_id, status) WHERE status = 'pending';
+CREATE INDEX IF NOT EXISTS idx_telegram_decisions_priority ON telegram_decisions(priority, created_at) WHERE status = 'pending';
+CREATE INDEX IF NOT EXISTS idx_telegram_decisions_reference ON telegram_decisions(reference_type, reference_id);
 
 -- RLS
 ALTER TABLE telegram_decisions ENABLE ROW LEVEL SECURITY;
@@ -171,9 +171,9 @@ CREATE TABLE IF NOT EXISTS telegram_notification_log (
 );
 
 -- Index for deduplication
-CREATE INDEX idx_telegram_notif_log_dedup ON telegram_notification_log(notification_id) 
+CREATE INDEX IF NOT EXISTS idx_telegram_notif_log_dedup ON telegram_notification_log(notification_id) 
     WHERE notification_id IS NOT NULL;
-CREATE INDEX idx_telegram_notif_log_profile ON telegram_notification_log(profile_id, sent_at DESC);
+CREATE INDEX IF NOT EXISTS idx_telegram_notif_log_profile ON telegram_notification_log(profile_id, sent_at DESC);
 
 -- RLS
 ALTER TABLE telegram_notification_log ENABLE ROW LEVEL SECURITY;

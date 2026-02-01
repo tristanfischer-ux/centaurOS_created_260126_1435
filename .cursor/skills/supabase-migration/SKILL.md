@@ -1,6 +1,6 @@
 ---
 name: supabase-migration
-description: Create and apply database migrations to Supabase, verify they succeeded, and fix any migration errors. Use when modifying database schema, adding tables, updating RLS policies, creating migrations, or when the user mentions database, schema, migration, Supabase, tables, or SQL.
+description: Create and apply database migrations to Supabase, verify they succeeded, and fix any migration errors. Use when modifying database schema, adding tables, updating RLS policies, creating migrations, or when the user mentions database, schema, migration, Supabase, tables, or SQL. ALSO use when data isn't appearing, queries return empty, new features don't work (check if migration was applied), or when investigating "column not found" or "relation does not exist" errors.
 ---
 
 # Supabase Migration Skill
@@ -50,10 +50,16 @@ Create a new migration in `supabase/migrations/`:
 20260130143000_add_user_preferences.sql
 ```
 
-Use this bash to get a timestamp:
+**IMPORTANT: Check for timestamp collisions before creating:**
 ```bash
-date +%Y%m%d%H%M%S
+# Generate timestamp
+TIMESTAMP=$(date +%Y%m%d%H%M%S)
+
+# Check if any file already uses this timestamp
+ls supabase/migrations/ | grep "^${TIMESTAMP}" && echo "COLLISION! Use different timestamp" || echo "Safe to use: ${TIMESTAMP}"
 ```
+
+If collision detected, increment the timestamp (e.g., `20260201300000` → `20260201310000`).
 
 ## Step 2: Write Migration SQL
 

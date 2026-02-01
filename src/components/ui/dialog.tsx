@@ -58,20 +58,21 @@ const DialogContent = React.forwardRef<
   DialogContentProps
 >(({ className, size, children, ...props }, ref) => (
   <DialogPortal>
-    <DialogOverlay className="flex items-center justify-center" />
-    <div className="fixed inset-0 z-[100] flex items-center justify-center pointer-events-none">
-      <DialogPrimitive.Content
-        ref={ref}
-        className={cn(dialogContentVariants({ size, className }), "pointer-events-auto z-[100]")}
-        {...props}
-      >
-        {children}
-        <DialogPrimitive.Close className="absolute right-3 top-3 rounded-full p-1.5 h-8 w-8 flex items-center justify-center opacity-70 ring-offset-background transition-opacity hover:opacity-100 hover:bg-muted focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none">
-          <X className="h-4 w-4" />
-          <span className="sr-only">Close</span>
-        </DialogPrimitive.Close>
-      </DialogPrimitive.Content>
-    </div>
+    <DialogOverlay />
+    <DialogPrimitive.Content
+      ref={ref}
+      className={cn(
+        "fixed left-[50%] top-[50%] translate-x-[-50%] translate-y-[-50%]",
+        dialogContentVariants({ size, className })
+      )}
+      {...props}
+    >
+      {children}
+      <DialogPrimitive.Close className="absolute right-3 top-3 rounded-full p-1.5 h-8 w-8 flex items-center justify-center opacity-70 ring-offset-background transition-opacity hover:opacity-100 hover:bg-muted focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none">
+        <X className="h-4 w-4" />
+        <span className="sr-only">Close</span>
+      </DialogPrimitive.Close>
+    </DialogPrimitive.Content>
   </DialogPortal>
 ))
 DialogContent.displayName = DialogPrimitive.Content.displayName

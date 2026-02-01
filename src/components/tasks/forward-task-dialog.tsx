@@ -97,7 +97,7 @@ export function ForwardTaskDialog({
               <SelectTrigger className="bg-background">
                 <SelectValue placeholder="Select person..." />
               </SelectTrigger>
-              <SelectContent className="bg-background shadow-lg z-50">
+              <SelectContent className="bg-background shadow-lg">
                 {sortedMembers.map((member) => (
                   <SelectItem key={member.id} value={member.id}>
                     <div className="flex items-center gap-3">

@@ -2,6 +2,7 @@
 'use client'
 
 import { useState, useEffect, useTransition } from 'react'
+import { toast } from 'sonner'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -137,12 +138,15 @@ export function OTJTApprovalPanel({ open, onOpenChange }: OTJTApprovalPanelProps
     startTransition(async () => {
       const result = await approveOTJTLog(logId)
       if (result.success) {
+        toast.success('Log approved')
         setLogs(logs.filter(l => l.id !== logId))
         setSelectedLogs(prev => {
           const newSet = new Set(prev)
           newSet.delete(logId)
           return newSet
         })
+      } else {
+        toast.error(result.error || 'Failed to approve log')
       }
     })
   }
@@ -153,8 +157,11 @@ export function OTJTApprovalPanel({ open, onOpenChange }: OTJTApprovalPanelProps
     startTransition(async () => {
       const result = await bulkApproveOTJTLogs(Array.from(selectedLogs))
       if (result.success) {
+        toast.success(`${selectedLogs.size} logs approved`)
         setLogs(logs.filter(l => !selectedLogs.has(l.id)))
         setSelectedLogs(new Set())
+      } else {
+        toast.error(result.error || 'Failed to approve logs')
       }
     })
   }
@@ -165,10 +172,13 @@ export function OTJTApprovalPanel({ open, onOpenChange }: OTJTApprovalPanelProps
     startTransition(async () => {
       const result = await rejectOTJTLog(actionLog.id, actionReason)
       if (result.success) {
+        toast.success('Log rejected')
         setLogs(logs.filter(l => l.id !== actionLog.id))
         setActionLog(null)
         setActionType(null)
         setActionReason('')
+      } else {
+        toast.error(result.error || 'Failed to reject log')
       }
     })
   }
@@ -179,10 +189,13 @@ export function OTJTApprovalPanel({ open, onOpenChange }: OTJTApprovalPanelProps
     startTransition(async () => {
       const result = await queryOTJTLog(actionLog.id, actionReason)
       if (result.success) {
+        toast.success('Query sent to apprentice')
         setLogs(logs.filter(l => l.id !== actionLog.id))
         setActionLog(null)
         setActionType(null)
         setActionReason('')
+      } else {
+        toast.error(result.error || 'Failed to send query')
       }
     })
   }

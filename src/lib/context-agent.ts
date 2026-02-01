@@ -1,6 +1,7 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
+import { getFoundryIdCached } from '@/lib/supabase/foundry-context'
 
 export interface TaskContext {
     taskId: string
@@ -49,6 +50,10 @@ export async function getTaskContext(taskId: string): Promise<{
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return { context: null, error: 'Unauthorized' }
 
+    // Security: Get user's foundry for isolation
+    const foundryId = await getFoundryIdCached()
+    if (!foundryId) return { context: null, error: 'No foundry context' }
+
     const { data: task, error } = await supabase
         .from('tasks')
         .select(`
@@ -65,6 +70,7 @@ export async function getTaskContext(taskId: string): Promise<{
             objective:objectives!objective_id(id, title)
         `)
         .eq('id', taskId)
+        .eq('foundry_id', foundryId)
         .single()
 
     if (error) return { context: null, error: error.message }
@@ -117,7 +123,11 @@ export async function generateHandoffSummary(taskId: string): Promise<{
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return { summary: null, error: 'Unauthorized' }
 
-    // Get task with full details
+    // Security: Get user's foundry for isolation
+    const foundryId = await getFoundryIdCached()
+    if (!foundryId) return { summary: null, error: 'No foundry context' }
+
+    // Get task with full details (filtered by foundry)
     const { data: task, error: taskError } = await supabase
         .from('tasks')
         .select(`
@@ -135,6 +145,7 @@ export async function generateHandoffSummary(taskId: string): Promise<{
             objective:objectives!objective_id(id, title, description)
         `)
         .eq('id', taskId)
+        .eq('foundry_id', foundryId)
         .single()
 
     if (taskError) return { summary: null, error: taskError.message }
@@ -251,7 +262,11 @@ export async function generateCatchUpSummary(taskId: string): Promise<{
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return { summary: '', error: 'Unauthorized' }
 
-    // Get task
+    // Security: Get user's foundry for isolation
+    const foundryId = await getFoundryIdCached()
+    if (!foundryId) return { summary: '', error: 'No foundry context' }
+
+    // Get task (filtered by foundry)
     const { data: task } = await supabase
         .from('tasks')
         .select(`
@@ -261,6 +276,7 @@ export async function generateCatchUpSummary(taskId: string): Promise<{
             assignee:profiles!assignee_id(full_name)
         `)
         .eq('id', taskId)
+        .eq('foundry_id', foundryId)
         .single()
 
     if (!task) return { summary: '', error: 'Task not found' }

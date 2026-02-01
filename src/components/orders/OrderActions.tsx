@@ -97,48 +97,35 @@ export function OrderActions({
       switch (action) {
         case "accept":
           result = await acceptOrder(orderId)
-          if (result.success) toast.success("Order accepted")
           break
 
         case "decline":
           result = await declineOrder(orderId, reason || "")
-          if (result.success) toast.success("Order declined")
           break
 
         case "start":
           result = await startOrder(orderId)
-          if (result.success) toast.success("Work started")
           break
 
         case "complete":
           result = await completeOrder(orderId)
-          if (result.success) toast.success("Order marked as complete")
           break
 
         case "approve_completion":
           result = await approveCompletion(orderId)
-          if (result.success) toast.success("Order approved and completed")
           break
 
         case "cancel":
           result = await cancelOrder(orderId, reason || "")
-          if (result.success) toast.success("Order cancelled")
           break
 
         case "dispute":
-          const disputeResult = await openDispute(orderId, reason || "")
-          if (disputeResult.success) {
-            toast.success("Dispute opened")
-          } else {
-            toast.error(disputeResult.error || "Failed to open dispute")
-          }
-          result = disputeResult
+          result = await openDispute(orderId, reason || "")
           break
 
         case "resume_work":
           // Resume work transitions disputed -> in_progress
           result = await startOrder(orderId)
-          if (result.success) toast.success("Work resumed")
           break
 
         case "view_details":
@@ -160,7 +147,19 @@ export function OrderActions({
 
       if (result?.error) {
         toast.error(result.error)
-      } else {
+      } else if (result?.success) {
+        // Show success message based on action
+        const successMessages: Record<string, string> = {
+          accept: "Order accepted",
+          decline: "Order declined",
+          start: "Work started",
+          complete: "Order marked as complete",
+          approve_completion: "Order approved and completed",
+          cancel: "Order cancelled",
+          dispute: "Dispute opened",
+          resume_work: "Work resumed",
+        }
+        toast.success(successMessages[action] || "Action completed")
         onActionComplete?.()
         router.refresh()
       }

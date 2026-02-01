@@ -323,6 +323,10 @@ export async function deleteReadNotifications(): Promise<{ count: number; error:
 
 /**
  * Notify task assignee when task is assigned
+ * 
+ * NOTE: Task assignment notifications are primarily created by a database trigger
+ * (notify_task_assigned) which fires on INSERT/UPDATE of tasks.assignee_id.
+ * This function exists for cases where you need to create a notification manually.
  */
 export async function notifyTaskAssigned(data: {
     taskId: string
@@ -333,18 +337,22 @@ export async function notifyTaskAssigned(data: {
     return createNotification({
         userId: data.assigneeId,
         type: 'task_assigned',
-        title: 'New Task Assigned',
-        message: `${data.assignedByName} assigned you to "${data.taskTitle}"`,
+        title: `${data.assignedByName} assigned you: ${data.taskTitle}`,
+        message: 'Click to view task details and take action',
         link: `/tasks?taskId=${data.taskId}`,
         metadata: {
             task_id: data.taskId,
-            assigned_by: data.assignedByName
+            assigner_name: data.assignedByName
         }
     })
 }
 
 /**
  * Notify task creator when task is completed
+ * 
+ * NOTE: Task completion notifications are primarily created by a database trigger
+ * (notify_task_completed) which fires on UPDATE of tasks.status to 'Completed'.
+ * This function exists for cases where you need to create a notification manually.
  */
 export async function notifyTaskCompleted(data: {
     taskId: string
@@ -355,12 +363,12 @@ export async function notifyTaskCompleted(data: {
     return createNotification({
         userId: data.creatorId,
         type: 'task_completed',
-        title: 'Task Completed',
-        message: `${data.completedByName} completed "${data.taskTitle}"`,
+        title: `${data.completedByName} completed: ${data.taskTitle}`,
+        message: 'Click to review the completed work',
         link: `/tasks?taskId=${data.taskId}`,
         metadata: {
             task_id: data.taskId,
-            completed_by: data.completedByName
+            completer_name: data.completedByName
         }
     })
 }

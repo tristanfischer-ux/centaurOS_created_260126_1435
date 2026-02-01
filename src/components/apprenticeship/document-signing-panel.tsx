@@ -2,6 +2,7 @@
 'use client'
 
 import { useState, useEffect, useTransition } from 'react'
+import { toast } from 'sonner'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -124,9 +125,12 @@ export function DocumentSigningPanel({ enrollmentId, open, onOpenChange, userRol
     startTransition(async () => {
       const result = await signDocument(selectedDocument.id)
       if (result.success) {
+        toast.success('Document signed successfully')
         await loadDocuments()
         setSignDialogOpen(false)
         setSelectedDocument(null)
+      } else {
+        toast.error(result.error || 'Failed to sign document')
       }
     })
   }

@@ -52,7 +52,7 @@ export function DatePickerWithShortcuts({
                     {date ? format(date, "PPP") : <span>{placeholder}</span>}
                 </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-auto p-0 z-[100]">
+            <PopoverContent className="w-auto p-0">
                 {/* Quick Date Shortcuts */}
                 <div className="flex gap-1 p-2 border-b border-border">
                     <Button

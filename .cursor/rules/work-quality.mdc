@@ -1,0 +1,108 @@
+---
+description: Core principles for code quality - simplicity, thoroughness, minimal impact, and elegance
+alwaysApply: true
+---
+
+# Work Quality Standards
+
+These principles apply to ALL code changes, regardless of scope.
+
+## Core Principles
+
+### 1. Simplicity First
+
+Make every change as simple as possible. Impact minimal code.
+
+```tsx
+// ✅ CORRECT - Minimal, focused change
+const isActive = status === 'active'
+
+// ❌ WRONG - Over-engineered
+const isActive = ['active', 'enabled', 'on'].some(s => 
+  status?.toLowerCase?.()?.trim?.() === s
+)
+```
+
+**Ask:** "What is the simplest solution that solves the problem?"
+
+### 2. No Laziness
+
+Find root causes. No temporary fixes. Senior developer standards.
+
+```tsx
+// ✅ CORRECT - Root cause fix
+// User wasn't being fetched because RLS policy was wrong
+// Fixed the policy in migration
+
+// ❌ WRONG - Workaround
+// Added try-catch that silently ignores the error
+try {
+  const user = await getUser()
+} catch {
+  // TODO: fix later
+  return null
+}
+```
+
+**Ask:** "Am I fixing the symptom or the cause?"
+
+### 3. Minimal Impact
+
+Changes should only touch what's necessary. Avoid introducing bugs.
+
+- Don't refactor unrelated code in the same commit
+- Don't "improve" working code while fixing a bug
+- Don't add features while implementing other features
+
+**Ask:** "Does every changed line serve the stated goal?"
+
+### 4. Demand Elegance (Balanced)
+
+For non-trivial changes: pause and ask "is there a more elegant way?"
+
+```tsx
+// Before (hacky)
+if (status === 'a' || status === 'b' || status === 'c') {
+  // special handling
+}
+
+// After (elegant)
+const SPECIAL_STATUSES = ['a', 'b', 'c'] as const
+if (SPECIAL_STATUSES.includes(status)) {
+  // special handling
+}
+```
+
+**Skip this for:**
+- Simple, obvious fixes
+- One-line changes
+- Emergency hotfixes
+
+**Apply this for:**
+- New features
+- Complex logic
+- Code that will be read often
+
+**Ask:** "Knowing everything I know now, is this the solution I would design from scratch?"
+
+## Quality Checklist
+
+Before marking any task complete:
+
+- [ ] Does the change solve the stated problem?
+- [ ] Is this the simplest solution?
+- [ ] Did I fix the root cause, not just the symptom?
+- [ ] Did I only change what was necessary?
+- [ ] Would a staff engineer approve this?
+- [ ] For non-trivial changes: is this elegant?
+
+## Anti-Patterns to Avoid
+
+| Anti-Pattern | Why It's Bad | Better Approach |
+|--------------|--------------|-----------------|
+| Shotgun debugging | Wastes time, introduces bugs | Understand before changing |
+| Copy-paste coding | Duplicates bugs, hard to maintain | Extract shared logic |
+| Silent error handling | Hides bugs | Log errors, handle gracefully |
+| "While I'm here" refactoring | Scope creep, harder to review | Separate commits |
+| Premature optimization | Complexity without benefit | Profile first, optimize second |
+| TODO comments as fixes | Never get fixed | Fix it or file an issue |

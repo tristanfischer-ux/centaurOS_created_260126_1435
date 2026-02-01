@@ -165,7 +165,7 @@ export function MentionInput({
         aria-label="Mention suggestions"
         aria-live="polite"
         aria-atomic="false"
-        className="fixed bg-background border-2 border rounded-lg shadow-xl z-[100] overflow-hidden"
+        className="fixed bg-background border-2 border rounded-lg shadow-xl z-[200] overflow-hidden"
         style={{
           top: dropdownPosition.top - 4,
           left: dropdownPosition.left,
@@ -179,7 +179,7 @@ export function MentionInput({
         <div aria-live="polite" className="sr-only">
           {suggestions.length} suggestion{suggestions.length !== 1 ? 's' : ''} available
         </div>
-        <div className="max-h-[200px] overflow-y-auto bg-white">
+        <div className="max-h-[200px] overflow-y-auto bg-background">
           {suggestions.map((profile, index) => (
             <button
               key={profile.id}

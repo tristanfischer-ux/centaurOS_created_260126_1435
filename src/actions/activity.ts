@@ -340,7 +340,7 @@ export async function getActivityUnreadCount(): Promise<{
     const { data: conversations } = await (supabase as AnySupabaseClient)
       .from('conversation_participants')
       .select('conversation_id, last_read_at')
-      .eq('user_id', user.id)
+      .eq('profile_id', user.id)
 
     let messageCount = 0
     if (conversations && conversations.length > 0) {
@@ -506,7 +506,7 @@ export async function getActivityFeed(options?: {
     const { data: myConversations } = await (supabase as AnySupabaseClient)
       .from('conversation_participants')
       .select('conversation_id, last_read_at')
-      .eq('user_id', user.id) as { data: Array<{ conversation_id: string; last_read_at: string | null }> | null }
+      .eq('profile_id', user.id) as { data: Array<{ conversation_id: string; last_read_at: string | null }> | null }
 
     const conversationMap = new Map<string, string | null>(
       myConversations?.map(c => [c.conversation_id, c.last_read_at] as [string, string | null]) || []

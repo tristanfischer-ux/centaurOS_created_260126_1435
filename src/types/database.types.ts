@@ -1,3 +1,4 @@
+Initialising login role...
 export type Json =
   | string
   | number
@@ -11,6 +12,31 @@ export type Database = {
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
     PostgrestVersion: "14.1"
+  }
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
   }
   public: {
     Tables: {
@@ -1752,38 +1778,111 @@ export type Database = {
         }
         Relationships: []
       }
+      conversation_participants: {
+        Row: {
+          conversation_id: string
+          id: string
+          is_muted: boolean | null
+          joined_at: string | null
+          last_read_at: string | null
+          profile_id: string
+        }
+        Insert: {
+          conversation_id: string
+          id?: string
+          is_muted?: boolean | null
+          joined_at?: string | null
+          last_read_at?: string | null
+          profile_id: string
+        }
+        Update: {
+          conversation_id?: string
+          id?: string
+          is_muted?: boolean | null
+          joined_at?: string | null
+          last_read_at?: string | null
+          profile_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversation_participants_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversation_participants_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "buyer_stats"
+            referencedColumns: ["buyer_id"]
+          },
+          {
+            foreignKeyName: "conversation_participants_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       conversations: {
         Row: {
           buyer_id: string
+          conversation_type:
+            | Database["public"]["Enums"]["conversation_type"]
+            | null
           created_at: string | null
+          creator_id: string | null
           id: string
+          is_group: boolean | null
           listing_id: string | null
+          objective_id: string | null
           order_id: string | null
           rfq_id: string | null
           seller_id: string
           status: string | null
+          task_id: string | null
+          title: string | null
           updated_at: string | null
         }
         Insert: {
           buyer_id: string
+          conversation_type?:
+            | Database["public"]["Enums"]["conversation_type"]
+            | null
           created_at?: string | null
+          creator_id?: string | null
           id?: string
+          is_group?: boolean | null
           listing_id?: string | null
+          objective_id?: string | null
           order_id?: string | null
           rfq_id?: string | null
           seller_id: string
           status?: string | null
+          task_id?: string | null
+          title?: string | null
           updated_at?: string | null
         }
         Update: {
           buyer_id?: string
+          conversation_type?:
+            | Database["public"]["Enums"]["conversation_type"]
+            | null
           created_at?: string | null
+          creator_id?: string | null
           id?: string
+          is_group?: boolean | null
           listing_id?: string | null
+          objective_id?: string | null
           order_id?: string | null
           rfq_id?: string | null
           seller_id?: string
           status?: string | null
+          task_id?: string | null
+          title?: string | null
           updated_at?: string | null
         }
         Relationships: [
@@ -1802,6 +1901,20 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "conversations_creator_id_fkey"
+            columns: ["creator_id"]
+            isOneToOne: false
+            referencedRelation: "buyer_stats"
+            referencedColumns: ["buyer_id"]
+          },
+          {
+            foreignKeyName: "conversations_creator_id_fkey"
+            columns: ["creator_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "conversations_listing_id_fkey"
             columns: ["listing_id"]
             isOneToOne: false
@@ -1814,6 +1927,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "supplier_search_ranking"
             referencedColumns: ["listing_id"]
+          },
+          {
+            foreignKeyName: "conversations_objective_id_fkey"
+            columns: ["objective_id"]
+            isOneToOne: false
+            referencedRelation: "objectives"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "conversations_order_id_fkey"
@@ -1841,6 +1961,13 @@ export type Database = {
             columns: ["seller_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversations_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
             referencedColumns: ["id"]
           },
         ]
@@ -3671,6 +3798,101 @@ export type Database = {
           },
           {
             foreignKeyName: "notifications_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      objective_comment_reads: {
+        Row: {
+          comment_id: string
+          foundry_id: string
+          read_at: string | null
+          user_id: string
+        }
+        Insert: {
+          comment_id: string
+          foundry_id: string
+          read_at?: string | null
+          user_id: string
+        }
+        Update: {
+          comment_id?: string
+          foundry_id?: string
+          read_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "objective_comment_reads_comment_id_fkey"
+            columns: ["comment_id"]
+            isOneToOne: false
+            referencedRelation: "objective_comments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "objective_comment_reads_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "buyer_stats"
+            referencedColumns: ["buyer_id"]
+          },
+          {
+            foreignKeyName: "objective_comment_reads_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      objective_comments: {
+        Row: {
+          content: string
+          created_at: string | null
+          foundry_id: string
+          id: string
+          is_system_log: boolean | null
+          objective_id: string
+          user_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string | null
+          foundry_id: string
+          id?: string
+          is_system_log?: boolean | null
+          objective_id: string
+          user_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string | null
+          foundry_id?: string
+          id?: string
+          is_system_log?: boolean | null
+          objective_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "objective_comments_objective_id_fkey"
+            columns: ["objective_id"]
+            isOneToOne: false
+            referencedRelation: "objectives"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "objective_comments_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "buyer_stats"
+            referencedColumns: ["buyer_id"]
+          },
+          {
+            foreignKeyName: "objective_comments_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
@@ -6868,6 +7090,49 @@ export type Database = {
           },
         ]
       }
+      task_comment_reads: {
+        Row: {
+          comment_id: string
+          foundry_id: string
+          read_at: string | null
+          user_id: string
+        }
+        Insert: {
+          comment_id: string
+          foundry_id: string
+          read_at?: string | null
+          user_id: string
+        }
+        Update: {
+          comment_id?: string
+          foundry_id?: string
+          read_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "task_comment_reads_comment_id_fkey"
+            columns: ["comment_id"]
+            isOneToOne: false
+            referencedRelation: "task_comments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "task_comment_reads_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "buyer_stats"
+            referencedColumns: ["buyer_id"]
+          },
+          {
+            foreignKeyName: "task_comment_reads_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       task_comments: {
         Row: {
           content: string
@@ -7298,6 +7563,299 @@ export type Database = {
         }
         Relationships: []
       }
+      telegram_decisions: {
+        Row: {
+          created_at: string | null
+          decided_at: string | null
+          decision_note: string | null
+          decision_type: string
+          description: string | null
+          expires_at: string | null
+          foundry_id: string
+          id: string
+          metadata: Json | null
+          priority: string | null
+          profile_id: string
+          reference_id: string
+          reference_type: string
+          status: string | null
+          telegram_chat_id: string | null
+          telegram_message_id: string | null
+          title: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          decided_at?: string | null
+          decision_note?: string | null
+          decision_type: string
+          description?: string | null
+          expires_at?: string | null
+          foundry_id: string
+          id?: string
+          metadata?: Json | null
+          priority?: string | null
+          profile_id: string
+          reference_id: string
+          reference_type: string
+          status?: string | null
+          telegram_chat_id?: string | null
+          telegram_message_id?: string | null
+          title: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          decided_at?: string | null
+          decision_note?: string | null
+          decision_type?: string
+          description?: string | null
+          expires_at?: string | null
+          foundry_id?: string
+          id?: string
+          metadata?: Json | null
+          priority?: string | null
+          profile_id?: string
+          reference_id?: string
+          reference_type?: string
+          status?: string | null
+          telegram_chat_id?: string | null
+          telegram_message_id?: string | null
+          title?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "telegram_decisions_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "telegram_decisions_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "buyer_stats"
+            referencedColumns: ["buyer_id"]
+          },
+          {
+            foreignKeyName: "telegram_decisions_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      telegram_ideas: {
+        Row: {
+          content: string
+          created_at: string | null
+          foundry_id: string
+          id: string
+          original_audio_url: string | null
+          profile_id: string
+          promoted_to_objective_id: string | null
+          status: string | null
+          telegram_message_id: string | null
+          transcribed_from_voice: boolean | null
+          updated_at: string | null
+        }
+        Insert: {
+          content: string
+          created_at?: string | null
+          foundry_id: string
+          id?: string
+          original_audio_url?: string | null
+          profile_id: string
+          promoted_to_objective_id?: string | null
+          status?: string | null
+          telegram_message_id?: string | null
+          transcribed_from_voice?: boolean | null
+          updated_at?: string | null
+        }
+        Update: {
+          content?: string
+          created_at?: string | null
+          foundry_id?: string
+          id?: string
+          original_audio_url?: string | null
+          profile_id?: string
+          promoted_to_objective_id?: string | null
+          status?: string | null
+          telegram_message_id?: string | null
+          transcribed_from_voice?: boolean | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "telegram_ideas_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "telegram_ideas_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "buyer_stats"
+            referencedColumns: ["buyer_id"]
+          },
+          {
+            foreignKeyName: "telegram_ideas_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "telegram_ideas_promoted_to_objective_id_fkey"
+            columns: ["promoted_to_objective_id"]
+            isOneToOne: false
+            referencedRelation: "objectives"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      telegram_notification_log: {
+        Row: {
+          delivered: boolean | null
+          error_message: string | null
+          id: string
+          notification_id: string | null
+          notification_type: string
+          profile_id: string
+          sent_at: string | null
+          telegram_chat_id: string
+          telegram_message_id: string | null
+        }
+        Insert: {
+          delivered?: boolean | null
+          error_message?: string | null
+          id?: string
+          notification_id?: string | null
+          notification_type: string
+          profile_id: string
+          sent_at?: string | null
+          telegram_chat_id: string
+          telegram_message_id?: string | null
+        }
+        Update: {
+          delivered?: boolean | null
+          error_message?: string | null
+          id?: string
+          notification_id?: string | null
+          notification_type?: string
+          profile_id?: string
+          sent_at?: string | null
+          telegram_chat_id?: string
+          telegram_message_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "telegram_notification_log_notification_id_fkey"
+            columns: ["notification_id"]
+            isOneToOne: false
+            referencedRelation: "notifications"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "telegram_notification_log_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "buyer_stats"
+            referencedColumns: ["buyer_id"]
+          },
+          {
+            foreignKeyName: "telegram_notification_log_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      telegram_preferences: {
+        Row: {
+          created_at: string | null
+          daily_briefing_enabled: boolean | null
+          daily_briefing_time: string | null
+          id: string
+          messaging_link_id: string | null
+          muted_until: string | null
+          notifications_enabled: boolean | null
+          notify_approvals: boolean | null
+          notify_mentions: boolean | null
+          notify_orders: boolean | null
+          notify_rfq: boolean | null
+          notify_task_assigned: boolean | null
+          notify_task_completed: boolean | null
+          profile_id: string
+          timezone: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          daily_briefing_enabled?: boolean | null
+          daily_briefing_time?: string | null
+          id?: string
+          messaging_link_id?: string | null
+          muted_until?: string | null
+          notifications_enabled?: boolean | null
+          notify_approvals?: boolean | null
+          notify_mentions?: boolean | null
+          notify_orders?: boolean | null
+          notify_rfq?: boolean | null
+          notify_task_assigned?: boolean | null
+          notify_task_completed?: boolean | null
+          profile_id: string
+          timezone?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          daily_briefing_enabled?: boolean | null
+          daily_briefing_time?: string | null
+          id?: string
+          messaging_link_id?: string | null
+          muted_until?: string | null
+          notifications_enabled?: boolean | null
+          notify_approvals?: boolean | null
+          notify_mentions?: boolean | null
+          notify_orders?: boolean | null
+          notify_rfq?: boolean | null
+          notify_task_assigned?: boolean | null
+          notify_task_completed?: boolean | null
+          profile_id?: string
+          timezone?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "telegram_preferences_messaging_link_id_fkey"
+            columns: ["messaging_link_id"]
+            isOneToOne: false
+            referencedRelation: "messaging_links"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "telegram_preferences_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: true
+            referencedRelation: "buyer_stats"
+            referencedColumns: ["buyer_id"]
+          },
+          {
+            foreignKeyName: "telegram_preferences_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       timesheet_entries: {
         Row: {
           approved_at: string | null
@@ -7672,6 +8230,19 @@ export type Database = {
         }
         Returns: string
       }
+      create_telegram_decision: {
+        Args: {
+          p_decision_type: string
+          p_description: string
+          p_metadata?: Json
+          p_priority?: string
+          p_profile_id: string
+          p_reference_id: string
+          p_reference_type: string
+          p_title: string
+        }
+        Returns: string
+      }
       escalate_task: {
         Args: { p_reason?: string; p_task_id: string }
         Returns: {
@@ -7758,6 +8329,7 @@ export type Database = {
           spend: number
         }[]
       }
+      get_daily_briefing: { Args: { p_profile_id: string }; Returns: Json }
       get_domain_tasks: {
         Args: { p_domain_id: string }
         Returns: {
@@ -7864,6 +8436,10 @@ export type Database = {
           task_title: string
         }[]
       }
+      get_pending_decisions_count: {
+        Args: { p_profile_id: string }
+        Returns: number
+      }
       get_platform_fee_percent: {
         Args: { p_order_type?: string; p_role?: string }
         Returns: number
@@ -7890,6 +8466,8 @@ export type Database = {
           task_title: string
         }[]
       }
+      get_unread_message_count: { Args: { user_id: string }; Returns: number }
+      get_user_foundry_id: { Args: never; Returns: string }
       get_weekly_otjt_target: {
         Args: { enrollment_id: string }
         Returns: number
@@ -7928,6 +8506,10 @@ export type Database = {
       is_active_user: { Args: never; Returns: boolean }
       is_admin: { Args: never; Returns: boolean }
       is_otjt_on_track: { Args: { enrollment_id: string }; Returns: boolean }
+      mark_conversation_read: {
+        Args: { conv_id: string; user_id: string }
+        Returns: undefined
+      }
       refresh_all_analytics: { Args: never; Returns: undefined }
       refresh_buyer_stats: { Args: never; Returns: undefined }
       refresh_platform_stats: { Args: never; Returns: undefined }
@@ -8052,6 +8634,12 @@ export type Database = {
         | "support"
         | "finance"
         | "readonly"
+      conversation_type:
+        | "direct"
+        | "task"
+        | "objective"
+        | "expert"
+        | "marketplace"
       data_request_status: "pending" | "processing" | "completed" | "denied"
       data_request_type: "access" | "deletion" | "export"
       dispute_status:
@@ -8247,6 +8835,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {
       admin_role: [
@@ -8255,6 +8846,13 @@ export const Constants = {
         "support",
         "finance",
         "readonly",
+      ],
+      conversation_type: [
+        "direct",
+        "task",
+        "objective",
+        "expert",
+        "marketplace",
       ],
       data_request_status: ["pending", "processing", "completed", "denied"],
       data_request_type: ["access", "deletion", "export"],

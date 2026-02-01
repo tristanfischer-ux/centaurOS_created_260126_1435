@@ -7,6 +7,29 @@ description: Systematic approach to debugging and fixing bugs in CentaurOS. Use 
 
 This skill provides a systematic approach to identifying, fixing, and verifying bug fixes in CentaurOS.
 
+## Autonomous Execution Principle
+
+**When given a bug report: just fix it.** Don't ask for hand-holding.
+
+- If you can read the error, you can fix the error
+- Point at logs, errors, failing tests - then resolve them
+- Zero context switching required from the user
+- Go fix failing CI tests without being told how
+
+**DO:**
+- Read the error message
+- Identify the file and line
+- Understand the root cause
+- Implement the fix
+- Verify it works
+- Report success
+
+**DON'T:**
+- Ask "what should I do?"
+- Ask for permission to look at files
+- Wait for instructions on each step
+- Present options without a recommendation
+
 ## Bug Fix Process
 
 ```
@@ -321,6 +344,16 @@ After fixing, consider:
 - [ ] Should there be error handling?
 - [ ] Is this documented?
 
+## Capture the Lesson
+
+After fixing a bug, document what you learned:
+
+1. **Update `tasks/lessons.md`** if the bug reveals a pattern to avoid
+2. **Consider a rule** if the same type of bug could happen elsewhere
+3. **Add a regression test** to prevent the bug from returning
+
+See [self-improvement-loop](../self-improvement-loop/SKILL.md) for the lessons.md format.
+
 ## See Also
 
 - [references/common-errors.md](references/common-errors.md) - Catalog of common errors
@@ -397,3 +430,4 @@ Use this skill when:
 - [code-quality](../code-quality/SKILL.md) - Run quality checks after fixing bugs
 - [e2e-testing](../e2e-testing/SKILL.md) - Write regression tests for fixed bugs
 - [feature-implementation-guide](../feature-implementation-guide/SKILL.md) - Reference patterns when bug reveals missing implementation
+- [self-improvement-loop](../self-improvement-loop/SKILL.md) - Capture lessons learned from bugs

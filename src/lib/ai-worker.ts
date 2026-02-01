@@ -74,11 +74,11 @@ Do not say "I will do this". DO IT.`
 
         const aiResponse = completion.choices[0].message.content || "I have analyzed the task."
 
-// 4. Update Task (The "Handshake")
+// 4. Update Task (The "Handshake") - include foundry_id for defense in depth
 const { error: updateError } = await supabase.from('tasks').update({
     status: 'Amended_Pending_Approval',
     amendment_notes: aiResponse,
-}).eq('id', taskId)
+}).eq('id', taskId).eq('foundry_id', task.foundry_id)
 
 if (updateError) {
     console.error('Failed to update task:', updateError)

@@ -239,30 +239,18 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
         )
     }
 
-    // Individual card expansion state - each card expands/collapses independently
-    const [expandedCardIds, setExpandedCardIds] = useState<Set<string>>(new Set())
+    // Single card expansion state - only one card can be expanded at a time for cleaner UX
+    const [expandedCardId, setExpandedCardId] = useState<string | null>(null)
 
     const toggleCardExpanded = useCallback((taskId: string) => {
-        setExpandedCardIds(prev => {
-            const next = new Set(prev)
-            if (next.has(taskId)) next.delete(taskId)
-            else next.add(taskId)
-            return next
-        })
+        setExpandedCardId(prev => prev === taskId ? null : taskId)
     }, [])
 
-    const toggleAllExpanded = () => {
-        setExpandedCardIds(prev => {
-            // If any cards are expanded, collapse all. Otherwise expand all.
-            if (prev.size > 0) {
-                return new Set()
-            } else {
-                return new Set(sortedTasks.map(t => t.id))
-            }
-        })
+    const collapseAll = () => {
+        setExpandedCardId(null)
     }
 
-    const allExpanded = expandedCardIds.size === sortedTasks.length && sortedTasks.length > 0
+    const hasExpandedCard = expandedCardId !== null
 
     // Selection Handlers
     const toggleSelectionMode = () => {
@@ -441,14 +429,14 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                                     </Button>
                                 </>
                             )}
-                            {viewMode === 'grid' && sortedTasks.length > 0 && (
+                            {viewMode === 'grid' && hasExpandedCard && (
                                 <Button
                                     variant="ghost"
                                     size="sm"
-                                    onClick={toggleAllExpanded}
+                                    onClick={collapseAll}
                                     className="text-xs text-muted-foreground hover:text-foreground mr-2"
                                 >
-                                    {allExpanded ? 'Collapse All' : 'Expand All'}
+                                    Collapse
                                 </Button>
                             )}
                             <div className="bg-muted p-1 rounded-lg flex items-center mr-2">
@@ -527,7 +515,7 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                                     {filtersOpen && (
                                         <div className="p-4 border rounded-lg bg-muted space-y-4">
                                             <div className="flex flex-wrap items-center gap-3">
-                                                <div className="flex items-center gap-2 pr-4 border-r border-slate-200">
+                                                <div className="flex items-center gap-2 pr-4 border-r">
                                                     <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Status:</span>
                                                     {['Pending', 'Accepted', 'Completed', 'Rejected'].map(status => (
                                                         <Badge
@@ -551,7 +539,7 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                                                         value={assigneeFilter}
                                                         onValueChange={(val) => setAssigneeFilter(val as string)}
                                                     >
-                                                        <SelectTrigger className="h-8 w-[180px] text-xs bg-background border-slate-200">
+                                                        <SelectTrigger className="h-8 w-[180px] text-xs bg-background">
                                                             <SelectValue placeholder="All Assignees" />
                                                         </SelectTrigger>
                                                         <SelectContent>
@@ -567,7 +555,7 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                                                         value={sortBy}
                                                         onValueChange={(val) => setSortBy(val as 'due_date_asc' | 'due_date_desc' | 'created_desc')}
                                                     >
-                                                        <SelectTrigger className="h-8 w-[160px] text-xs bg-background border-slate-200">
+                                                        <SelectTrigger className="h-8 w-[160px] text-xs bg-background">
                                                             <SelectValue placeholder="Sort by" />
                                                         </SelectTrigger>
                                                         <SelectContent>
@@ -626,7 +614,7 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                                     currentUserId={currentUserId}
                                     userRole={currentUserRole}
                                     members={members}
-                                    expanded={expandedCardIds.has(task.id)}
+                                    expanded={expandedCardId === task.id}
                                     onToggle={() => toggleCardExpanded(task.id)}
                                     isSelectionMode={isSelectionMode}
                                     isSelected={selectedTaskIds.has(task.id)}
@@ -692,8 +680,8 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                             if (objectiveTasks.length === 0) return null
 
                             return (
-                                <div key={objective.id} className="border border-slate-200 rounded-lg overflow-hidden bg-white">
-                                    <div className="bg-muted px-4 py-3 border-b border-slate-200 flex justify-between items-center">
+                                <div key={objective.id} className="border rounded-lg overflow-hidden bg-background">
+                                    <div className="bg-muted px-4 py-3 border-b flex justify-between items-center">
                                         <h3 className="font-semibold text-foreground flex items-center gap-2">
                                             {isSelectionMode && (
                                                 <Checkbox
@@ -710,7 +698,7 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                                                     aria-label={`Select all tasks in ${objective.title}`}
                                                 />
                                             )}
-                                            <div className="bg-blue-600 w-2 h-2 rounded-full" />
+                                            <div className="bg-electric-blue w-2 h-2 rounded-full" />
                                             {objective.title}
                                             <Badge variant="secondary" className="ml-2 bg-background text-muted-foreground font-normal">
                                                 {objectiveTasks.length} Tasks
@@ -722,8 +710,8 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                                             <div
                                                 key={task.id}
                                                 className={cn(
-                                                    "pl-5 pr-7 py-4 border-b border-slate-100 last:border-0 hover:bg-muted active:bg-muted flex items-center justify-between group gap-4 relative cursor-pointer transition-colors duration-200",
-                                                    isSelectionMode && selectedTaskIds.has(task.id) && "bg-blue-50 hover:bg-blue-100"
+                                                    "pl-5 pr-7 py-4 border-b last:border-0 hover:bg-muted active:bg-muted flex items-center justify-between group gap-4 relative cursor-pointer transition-colors duration-200",
+                                                    isSelectionMode && selectedTaskIds.has(task.id) && "bg-electric-blue-light/20 hover:bg-electric-blue-light/30"
                                                 )}
                                                 onClick={() => {
                                                     if (isSelectionMode) {
@@ -749,8 +737,8 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                                                     </div>
                                                 )}
                                                 <div className={cn(
-                                                    "absolute left-0 top-0 bottom-0 w-1 bg-transparent group-hover:bg-blue-500 transition-colors duration-200",
-                                                    isSelectionMode && selectedTaskIds.has(task.id) && "bg-blue-500"
+                                                    "absolute left-0 top-0 bottom-0 w-1 bg-transparent group-hover:bg-electric-blue transition-colors duration-200",
+                                                    isSelectionMode && selectedTaskIds.has(task.id) && "bg-electric-blue"
                                                 )} />
                                                 <div className="flex-1 min-w-0">
                                                     <div className="flex items-center gap-2 mb-1">
@@ -772,7 +760,7 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                                                                     size="xs"
                                                                     className="border border-white"
                                                                 />
-                                                                <span className={cn("truncate", task.assignee.role === "AI_Agent" && "text-purple-700 font-medium")}>{task.assignee.full_name}</span>
+                                                                <span className={cn("truncate", task.assignee.role === "AI_Agent" && "text-accent font-medium")}>{task.assignee.full_name}</span>
                                                             </>
                                                         ) : (
                                                             <span className="text-muted-foreground italic">Unassigned</span>
@@ -790,8 +778,8 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                         })}
 
                         {orphanedTasks.length > 0 && (
-                            <div className="border border-slate-200 rounded-lg overflow-hidden bg-white">
-                                <div className="bg-muted px-4 py-3 border-b border-slate-200">
+                            <div className="border rounded-lg overflow-hidden bg-background">
+                                <div className="bg-muted px-4 py-3 border-b">
                                     <h3 className="font-semibold text-muted-foreground flex items-center gap-2">
                                         {isSelectionMode && (
                                             <Checkbox
@@ -817,8 +805,8 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                                         <div
                                             key={task.id}
                                             className={cn(
-                                                "px-5 py-4 border-b border-slate-100 last:border-0 hover:bg-muted active:bg-muted flex items-center justify-between group gap-4 cursor-pointer transition-colors duration-200",
-                                                isSelectionMode && selectedTaskIds.has(task.id) && "bg-blue-50 hover:bg-blue-100"
+                                                "px-5 py-4 border-b last:border-0 hover:bg-muted active:bg-muted flex items-center justify-between group gap-4 cursor-pointer transition-colors duration-200",
+                                                isSelectionMode && selectedTaskIds.has(task.id) && "bg-electric-blue-light/20 hover:bg-electric-blue-light/30"
                                             )}
                                             onClick={() => {
                                                 if (isSelectionMode) {
@@ -868,7 +856,7 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                                                                     {task.assignee.role === "AI_Agent" ? <Bot className="w-3 h-3" /> : getInitials(task.assignee.full_name)}
                                                                 </AvatarFallback>
                                                             </Avatar>
-                                                            <span className={cn("truncate", task.assignee.role === "AI_Agent" && "text-purple-700 font-medium")}>{task.assignee.full_name}</span>
+                                                            <span className={cn("truncate", task.assignee.role === "AI_Agent" && "text-accent font-medium")}>{task.assignee.full_name}</span>
                                                         </>
                                                     ) : (
                                                         <span className="text-muted-foreground italic">Unassigned</span>

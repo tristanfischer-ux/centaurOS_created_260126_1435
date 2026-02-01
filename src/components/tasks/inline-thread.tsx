@@ -136,22 +136,22 @@ export function InlineThread({ taskId, isOpen, onClose, members }: InlineThreadP
     if (!isOpen) return null
 
     return (
-        <div className="border-t border bg-background">
+        <div className="border-t bg-muted/30 overflow-hidden">
             {/* Header */}
-            <div className="flex items-center justify-between px-4 py-2 bg-muted">
+            <div className="flex items-center justify-between px-4 py-2.5 bg-muted/50 border-b">
                 <div>
                     <h4 className="text-xs font-semibold text-foreground uppercase tracking-wider">
-                        Notes
+                        Notes & Attachments
                     </h4>
-                    <p className="text-[10px] text-muted-foreground">{comments.length} {comments.length === 1 ? 'note' : 'notes'}</p>
+                    <p className="text-[10px] text-muted-foreground">{comments.length} {comments.length === 1 ? 'note' : 'notes'}, {attachments.length} {attachments.length === 1 ? 'file' : 'files'}</p>
                 </div>
-                <Button variant="ghost" size="sm" onClick={onClose} className="h-6 w-6 p-0">
+                <Button variant="ghost" size="sm" onClick={onClose} className="h-7 w-7 p-0 hover:bg-background" aria-label="Close notes">
                     <X className="h-4 w-4" />
                 </Button>
             </div>
 
             {/* Comments and Attachments */}
-            <div className="max-h-48 overflow-y-auto p-3 space-y-3">
+            <div className="max-h-40 overflow-y-auto p-3 space-y-3">
                 {isLoading ? (
                     <div className="flex items-center justify-center py-4 text-muted-foreground">
                         <Loader2 className="h-4 w-4 animate-spin mr-2" /> Loading...
@@ -160,7 +160,7 @@ export function InlineThread({ taskId, isOpen, onClose, members }: InlineThreadP
                     <>
                         {/* Attachments Section */}
                         {attachments.length > 0 && (
-                            <div className="pb-3 border-b border-slate-100">
+                            <div className="pb-3 border-b">
                                 <AttachmentList
                                     taskId={taskId}
                                     attachments={attachments}
@@ -176,7 +176,7 @@ export function InlineThread({ taskId, isOpen, onClose, members }: InlineThreadP
                         ) : (
                             comments.map((comment) => (
                                 <div key={comment.id} className="flex gap-2 text-xs">
-                                                <div className="h-6 w-6 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 bg-electric-blue-light text-electric-blue">
+                                    <div className="h-6 w-6 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 bg-electric-blue-light text-electric-blue">
                                         {comment.user?.full_name?.substring(0, 2).toUpperCase()}
                                     </div>
                                     <div className="flex-1 min-w-0">
@@ -206,7 +206,7 @@ export function InlineThread({ taskId, isOpen, onClose, members }: InlineThreadP
             </div>
 
             {/* Input area */}
-            <div className="p-3 border-t border-slate-100 space-y-2 relative overflow-hidden">
+            <div className="p-3 border-t space-y-2 relative overflow-hidden">
                 <div
                     className={cn(
                         "border border-dashed rounded p-2 text-center transition-colors text-xs relative",

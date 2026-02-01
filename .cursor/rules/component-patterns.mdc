@@ -374,3 +374,24 @@ Before committing any component usage:
 - [ ] EmptyState used for zero-data views
 - [ ] Skeleton used for loading states
 - [ ] Sheet used for side panels, Dialog for centered modals
+- [ ] **Z-index NOT overridden on UI primitives** (see `z-index-hierarchy.mdc`)
+- [ ] **No `!bg-white`** - use `bg-background` instead
+- [ ] **Run `./scripts/check-design-tokens.sh`** before committing
+
+## Z-Index Rules
+
+**CRITICAL:** Never override z-index on these components:
+
+```tsx
+// ❌ WRONG - Breaks z-index hierarchy
+<PopoverContent className="z-50">
+<SelectContent className="z-50">
+<DropdownMenuContent className="z-50">
+
+// ✅ CORRECT - Let components manage their own z-index
+<PopoverContent>
+<SelectContent>
+<DropdownMenuContent>
+```
+
+See `.cursor/rules/z-index-hierarchy.mdc` for the full z-index scale.

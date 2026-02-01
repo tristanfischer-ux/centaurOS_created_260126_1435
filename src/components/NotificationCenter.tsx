@@ -164,46 +164,51 @@ export function NotificationCenter() {
             </div>
           ) : (
             <div className="divide-y divide-foundry-200">
-              {notifications.map(notification => (
-                <div
-                  key={notification.id}
-                  className={cn(
-                    'p-6 hover:bg-foundry-50 cursor-pointer transition-colors space-y-3',
-                    !notification.is_read && 'bg-electric-blue/5 border-l-4 border-l-electric-blue'
-                  )}
-                  onClick={() => markAsRead(notification.id)}
-                >
-                  <div className="flex gap-4">
-                    <span className="text-2xl flex-shrink-0">{getIcon(notification.type)}</span>
-                    <div className="flex-1 min-w-0 space-y-2">
-                      <p className={cn(
-                        'text-base leading-relaxed text-foundry-900',
-                        !notification.is_read && 'font-semibold'
-                      )}>
-                        {notification.title}
-                      </p>
-                      {notification.message && (
-                        <p className="text-sm text-foundry-600 leading-relaxed">
-                          {notification.message}
-                        </p>
-                      )}
-                      <p className="text-xs text-foundry-500">
-                        {formatDistanceToNow(new Date(notification.created_at), { addSuffix: true })}
-                      </p>
-                    </div>
-                    {/* SECURITY: Sanitize notification link URL */}
-                    {notification.link && sanitizeHref(notification.link) !== '#' && (
-                      <Link 
-                        href={sanitizeHref(notification.link)} 
-                        onClick={(e) => e.stopPropagation()}
-                        className="flex-shrink-0"
-                      >
-                        <ExternalLink className="h-4 w-4 text-electric-blue hover:text-electric-blue/80 transition-colors" />
-                      </Link>
+              {notifications.map(notification => {
+                const hasValidLink = notification.link && sanitizeHref(notification.link) !== '#'
+                const NotificationWrapper = hasValidLink ? Link : 'div'
+                const wrapperProps = hasValidLink 
+                  ? { href: sanitizeHref(notification.link), onClick: () => markAsRead(notification.id) }
+                  : { onClick: () => markAsRead(notification.id) }
+                
+                return (
+                  <NotificationWrapper
+                    key={notification.id}
+                    {...wrapperProps}
+                    className={cn(
+                      'block p-6 hover:bg-muted cursor-pointer transition-colors',
+                      !notification.is_read && 'bg-status-info-light/30 border-l-4 border-l-electric-blue'
                     )}
-                  </div>
-                </div>
-              ))}
+                  >
+                    <div className="flex gap-4">
+                      <span className="text-2xl flex-shrink-0">{getIcon(notification.type)}</span>
+                      <div className="flex-1 min-w-0 space-y-1.5">
+                        <p className={cn(
+                          'text-sm leading-relaxed text-foreground',
+                          !notification.is_read && 'font-semibold'
+                        )}>
+                          {notification.title}
+                        </p>
+                        {notification.message && (
+                          <p className="text-xs text-muted-foreground leading-relaxed">
+                            {notification.message}
+                          </p>
+                        )}
+                        <div className="flex items-center gap-3 pt-1">
+                          <p className="text-xs text-muted-foreground">
+                            {formatDistanceToNow(new Date(notification.created_at), { addSuffix: true })}
+                          </p>
+                          {hasValidLink && (
+                            <span className="text-xs text-electric-blue font-medium flex items-center gap-1">
+                              View <ExternalLink className="h-3 w-3" />
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </NotificationWrapper>
+                )
+              })}
             </div>
           )}
         </ScrollArea>

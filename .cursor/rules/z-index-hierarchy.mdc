@@ -1,0 +1,166 @@
+# Z-Index Hierarchy Standards
+
+**ALWAYS RUN BEFORE COMMITTING UI CHANGES:**
+```bash
+./scripts/check-design-tokens.sh
+```
+
+**CRITICAL:** All overlay components must follow this strict z-index hierarchy to prevent layering conflicts.
+
+## The Problem This Solves
+
+Z-index conflicts cause:
+- Dialogs appearing behind content
+- Popovers/dropdowns appearing behind modals
+- Multiple overlays competing for visibility
+- Content bleeding through backdrops
+
+## Z-Index Scale
+
+Use this consistent scale across all components:
+
+| Z-Index | Component | Usage |
+|---------|-----------|-------|
+| `z-40` | Sticky headers, floating buttons | Layout-level sticky elements |
+| `z-50` | Sheet, Dialog, Drawer overlays & content | Modal overlays (same level for overlay + content) |
+| `z-[200]` | Popover, Select, Combobox, Command | Dropdowns that may appear inside modals |
+| `z-[300]` | Tooltip | Always on top for contextual help |
+
+## Component Implementations
+
+### Dialog (Modal)
+
+```tsx
+// Overlay: z-50
+<DialogOverlay className="fixed inset-0 z-50 bg-black/80" />
+
+// Content: z-50 (same as overlay - both in Portal)
+<DialogContent className="fixed z-50 ..." />
+```
+
+**CRITICAL:** Do NOT use `z-[100]` or create wrapper divs with different z-index. Keep overlay and content at same level.
+
+### Sheet (Side Panel)
+
+```tsx
+// Overlay: z-50
+<SheetOverlay className="fixed inset-0 z-50 bg-black/50" />
+
+// Content: z-50
+<SheetContent className="fixed z-50 ..." />
+```
+
+### Popover / Select / Combobox
+
+```tsx
+// Content: z-[200] - higher than Dialog so it appears above
+<PopoverContent className="z-[200] ..." />
+<SelectContent className="z-[200] ..." />
+<CommandList className="z-[200] ..." />
+```
+
+**Why z-[200]?** These components often appear INSIDE dialogs (e.g., a select dropdown in a form modal). They must be higher than the dialog's z-50.
+
+### Tooltip
+
+```tsx
+// Content: z-[300] - highest level
+<TooltipContent className="z-[300] ..." />
+```
+
+**Why z-[300]?** Tooltips provide contextual help and should always be visible, even on top of popovers.
+
+## Forbidden Patterns
+
+❌ **NEVER do these:**
+
+```tsx
+// DON'T: Mix z-index levels in same component
+<div className="z-[100]">
+  <DialogContent className="z-50" /> // Conflict!
+</div>
+
+// DON'T: Use arbitrary z-index values
+<div className="z-[999]" /> // Creates unpredictable stacking
+<div className="z-[60]" />  // Not in the scale
+
+// DON'T: Forget z-index on Popovers inside Dialogs
+<Dialog>
+  <Popover>
+    <PopoverContent className="z-50" /> // Will appear BEHIND dialog!
+  </Popover>
+</Dialog>
+```
+
+✅ **DO:**
+
+```tsx
+// Use consistent scale
+<Dialog>
+  <DialogOverlay className="z-50" />
+  <DialogContent className="z-50">
+    <Popover>
+      <PopoverContent className="z-[200]" /> // Correctly above dialog
+    </Popover>
+  </DialogContent>
+</Dialog>
+```
+
+## Testing Overlay Stacking
+
+When adding or modifying overlay components, test these scenarios:
+
+1. **Dialog alone** - Opens with backdrop, blocks interaction with page
+2. **Popover inside Dialog** - Dropdown appears above dialog content
+3. **Sheet + Dialog** - If both open, newer one should be on top
+4. **Tooltip on Popover item** - Tooltip visible on dropdown items
+5. **Multiple nested modals** - Each level properly stacked
+
+## Quick Reference
+
+| Scenario | What Should Be On Top |
+|----------|----------------------|
+| Dialog open | Dialog overlay covers page |
+| Select in Dialog | Select dropdown above dialog |
+| Tooltip on Select item | Tooltip above dropdown |
+| Sheet + Dialog | Last opened is on top |
+
+## Debugging Z-Index Issues
+
+If overlays aren't stacking correctly:
+
+1. **Check Portal usage** - Radix components use Portals, rendering at body level
+2. **Check stacking context** - Parents with `transform`, `opacity < 1`, or `position: fixed` create new contexts
+3. **Check z-index values** - Ensure they match this hierarchy
+4. **Check DOM order** - Later elements render on top at same z-index
+
+## Files That Define Z-Index
+
+When editing these files, ensure z-index follows this standard:
+
+**Modal overlays (z-50):**
+- `src/components/ui/dialog.tsx` - z-50
+- `src/components/ui/sheet.tsx` - z-50
+- `src/components/ui/alert-dialog.tsx` - z-50
+- `src/components/ui/drawer.tsx` - z-50
+
+**Dropdowns/Popovers (z-[200]):**
+- `src/components/ui/popover.tsx` - z-[200]
+- `src/components/ui/select.tsx` - z-[200]
+- `src/components/ui/dropdown-menu.tsx` - z-[200]
+- `src/components/ui/hover-card.tsx` - z-[200]
+- `src/components/ui/mention-input.tsx` - z-[200]
+
+**Always on top (z-[300]):**
+- `src/components/ui/tooltip.tsx` - z-[300]
+
+**CRITICAL:** When using UI primitives in your components, do NOT override z-index:
+```tsx
+// ❌ WRONG - Overrides the component's z-index
+<PopoverContent className="z-50">  
+<SelectContent className="z-50">
+
+// ✅ CORRECT - Let the component handle z-index
+<PopoverContent>
+<SelectContent>
+```

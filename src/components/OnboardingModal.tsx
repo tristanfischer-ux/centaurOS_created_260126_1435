@@ -152,9 +152,12 @@ export function OnboardingModal({ userRole }: OnboardingModalProps) {
         const result = await createSampleData()
         if (result.success) {
           toast.success('Your foundry is ready with sample objectives and tasks!')
+        } else {
+          toast.error(result.error || 'Failed to create sample data')
         }
       } catch (error) {
         console.error('Failed to create sample data:', error)
+        toast.error('Failed to create sample data')
       } finally {
         setIsCreatingSampleData(false)
       }
@@ -167,9 +170,12 @@ export function OnboardingModal({ userRole }: OnboardingModalProps) {
         const result = await createApprenticeTrainingTasks()
         if (result.success) {
           toast.success('Your Digital Body is ready! Training tasks have been assigned.')
+        } else {
+          toast.error(result.error || 'Failed to create training tasks')
         }
       } catch (error) {
         console.error('Failed to create training tasks:', error)
+        toast.error('Failed to create training tasks')
       } finally {
         setIsCreatingSampleData(false)
       }

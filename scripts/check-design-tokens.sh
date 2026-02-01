@@ -8,6 +8,9 @@
 set -e
 
 TARGET="${1:-src/}"
+
+# Files with documented exceptions (role colors, star ratings, etc.)
+EXCEPTION_FILES="user-avatar.tsx"
 VIOLATIONS=0
 WARNINGS=0
 
@@ -28,12 +31,24 @@ check_pattern() {
     local message="$2"
     local suggestion="$3"
     local severity="${4:-error}"  # error or warning
+    local exclude_exceptions="${5:-true}"  # exclude documented exception files
     
+    local count
     # Use ripgrep if available, otherwise grep
     if command -v rg &> /dev/null; then
-        local count=$(rg -c "$pattern" "$TARGET" --type tsx --type ts 2>/dev/null | awk -F: '{sum += $2} END {print sum+0}')
+        if [ "$exclude_exceptions" = "true" ]; then
+            # Exclude documented exception files (user-avatar.tsx for role colors)
+            count=$(rg -c "$pattern" "$TARGET" --type tsx --type ts --glob '!**/user-avatar.tsx' 2>/dev/null | awk -F: '{sum += $2} END {print sum+0}')
+        else
+            count=$(rg -c "$pattern" "$TARGET" --type tsx --type ts 2>/dev/null | awk -F: '{sum += $2} END {print sum+0}')
+        fi
     else
-        local count=$(grep -r -E "$pattern" "$TARGET" --include="*.tsx" --include="*.ts" 2>/dev/null | wc -l | tr -d ' ')
+        if [ "$exclude_exceptions" = "true" ]; then
+            # Exclude documented exception files (user-avatar.tsx for role colors)
+            count=$(grep -r -E "$pattern" "$TARGET" --include="*.tsx" --include="*.ts" 2>/dev/null | grep -v "user-avatar.tsx" | wc -l | tr -d ' ')
+        else
+            count=$(grep -r -E "$pattern" "$TARGET" --include="*.tsx" --include="*.ts" 2>/dev/null | wc -l | tr -d ' ')
+        fi
     fi
     
     if [ "$count" -gt 0 ]; then
@@ -130,6 +145,44 @@ check_pattern 'defaultTheme.*system' \
 check_pattern 'enableSystem.*true' \
     "ThemeProvider with system preference enabled" \
     "Use enableSystem={false} in src/app/layout.tsx"
+
+# === CRITICAL: Z-Index Hierarchy ===
+check_pattern 'z-\[100\]' \
+    "Invalid z-index z-[100] (not in hierarchy)" \
+    "Use z-50 for modals, z-[200] for dropdowns, z-[300] for tooltips"
+
+check_pattern 'z-\[999' \
+    "Invalid z-index z-[999+] (creates unpredictable stacking)" \
+    "Use z-50 for modals, z-[200] for dropdowns, z-[300] for tooltips"
+
+check_pattern 'z-\[60\]' \
+    "Non-standard z-index z-[60]" \
+    "Use z-50 for modals, z-[200] for dropdowns (z-[60] only OK for MobileZoomControl)" \
+    "warning"
+
+# === CRITICAL: Z-Index Overrides (consumers overriding UI primitives) ===
+check_pattern 'PopoverContent.*z-50' \
+    "Z-index override on PopoverContent (breaks hierarchy)" \
+    "Remove z-50 - PopoverContent uses z-[200] by default"
+
+check_pattern 'SelectContent.*z-50' \
+    "Z-index override on SelectContent (breaks hierarchy)" \
+    "Remove z-50 - SelectContent uses z-[200] by default"
+
+check_pattern 'DropdownMenuContent.*z-50' \
+    "Z-index override on DropdownMenuContent (breaks hierarchy)" \
+    "Remove z-50 - DropdownMenuContent uses z-[200] by default"
+
+# === CRITICAL: Hardcoded !bg-white (should use semantic tokens) ===
+check_pattern '!bg-white' \
+    "Hardcoded !bg-white with important flag" \
+    "Use bg-background (semantic token)"
+
+# === CRITICAL: Weak Overlay Opacity ===
+check_pattern 'bg-black/20' \
+    "Weak overlay opacity (content bleeds through)" \
+    "Use bg-black/50 for sheets, bg-black/80 for dialogs" \
+    "warning"
 
 # === Summary ===
 echo "================================"

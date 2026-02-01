@@ -145,7 +145,7 @@ export function DailyPrioritizer({ tasks, maxTasks = 5, compact = false }: Daily
                             : "bg-foundry-50/50 border hover:border-foundry-300"
                     )}>
                         {/* Priority rank indicator */}
-                        <div className={cn("flex items-start", compact ? "gap-2" : "gap-3")}>
+                        <div className={cn("flex items-start w-full", compact ? "gap-2" : "gap-3")}>
                             <div className={cn(
                                 "flex-shrink-0 rounded-full flex items-center justify-center font-bold",
                                 compact ? "w-5 h-5 text-[10px]" : "w-6 h-6 text-xs",
@@ -158,13 +158,16 @@ export function DailyPrioritizer({ tasks, maxTasks = 5, compact = false }: Daily
                                 {index + 1}
                             </div>
                             
-                            <div className="flex-1 min-w-0">
+                            <div className="flex-1 min-w-0 overflow-hidden">
                                 {/* Task title */}
-                                <p className={cn(
-                                    "font-medium group-hover:underline decoration-foundry-300 underline-offset-2",
-                                    compact ? "text-xs line-clamp-1" : "text-sm line-clamp-2",
+                                <p 
+                                  className={cn(
+                                    "font-medium group-hover:underline decoration-foundry-300 underline-offset-2 break-words",
+                                    compact ? "text-xs truncate" : "text-sm line-clamp-2",
                                     index === 0 ? "text-international-orange-dark" : "text-foreground"
-                                )}>
+                                  )}
+                                  title={task.title}
+                                >
                                     {task.title}
                                 </p>
 

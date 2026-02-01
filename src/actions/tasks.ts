@@ -279,11 +279,16 @@ export async function acceptTask(taskId: string) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return { error: 'Unauthorized' }
 
-    // Verify user is the assignee
+    // Security: Get user's foundry
+    const foundry_id = await getFoundryIdCached()
+    if (!foundry_id) return { error: 'User not in a foundry' }
+
+    // Verify user is the assignee and task belongs to their foundry
     const { data: task, error: fetchError } = await supabase
         .from('tasks')
-        .select('assignee_id')
+        .select('assignee_id, foundry_id')
         .eq('id', taskId)
+        .eq('foundry_id', foundry_id)
         .single()
 
     if (fetchError || !task) return { error: 'Task not found' }
@@ -295,6 +300,7 @@ export async function acceptTask(taskId: string) {
     const { error } = await supabase.from('tasks')
         .update({ status: 'Accepted' })
         .eq('id', taskId)
+        .eq('foundry_id', foundry_id)
 
     if (error) return { error: sanitizeErrorMessage(error) }
 
@@ -591,11 +597,16 @@ export async function completeTask(taskId: string) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return { error: 'Unauthorized' }
 
-    // Fetch Risk Level
+    // Security: Get user's foundry
+    const foundry_id = await getFoundryIdCached()
+    if (!foundry_id) return { error: 'User not in a foundry' }
+
+    // Fetch Risk Level - only from user's foundry
     const { data: task, error: fetchError } = await supabase
         .from('tasks')
         .select('risk_level, status')
         .eq('id', taskId)
+        .eq('foundry_id', foundry_id)
         .single()
 
     if (fetchError || !task) return { error: 'Task not found' }
@@ -621,6 +632,7 @@ export async function completeTask(taskId: string) {
     const { error } = await supabase.from('tasks')
         .update(updates)
         .eq('id', taskId)
+        .eq('foundry_id', foundry_id)
 
     if (error) return { error: sanitizeErrorMessage(error) }
 
@@ -648,8 +660,16 @@ export async function approveTask(taskId: string) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return { error: 'Unauthorized' }
 
-    // Fetch task and user profile checks
-    const { data: task } = await supabase.from('tasks').select('risk_level, status').eq('id', taskId).single()
+    // Security: Get user's foundry
+    const foundry_id = await getFoundryIdCached()
+    if (!foundry_id) return { error: 'User not in a foundry' }
+
+    // Fetch task (from user's foundry only) and user profile checks
+    const { data: task } = await supabase.from('tasks')
+        .select('risk_level, status')
+        .eq('id', taskId)
+        .eq('foundry_id', foundry_id)
+        .single()
     const { data: approver } = await supabase.from('profiles').select('role').eq('id', user.id).single()
 
     if (!task) return { error: 'Task not found' }
@@ -668,7 +688,7 @@ export async function approveTask(taskId: string) {
         }
     }
 
-    // Release Logic
+    // Release Logic - only update in user's foundry
     const { error } = await supabase.from('tasks')
         .update({
             status: 'Completed',
@@ -676,6 +696,7 @@ export async function approveTask(taskId: string) {
             end_date: new Date().toISOString()
         })
         .eq('id', taskId)
+        .eq('foundry_id', foundry_id)
 
     if (error) return { error: sanitizeErrorMessage(error) }
 
@@ -741,13 +762,17 @@ export async function batchApproveTasks(taskIds: string[]) {
 
     if (!taskIds || taskIds.length === 0) return { error: 'No tasks provided' }
 
+    // Security: Get user's foundry and verify tasks belong to it
+    const foundry_id = await getFoundryIdCached()
+    if (!foundry_id) return { error: 'User not in a foundry' }
+
     // Check if user is Executive or Founder
     const { data: approver } = await supabase.from('profiles').select('role').eq('id', user.id).single()
     if (!approver || (approver.role !== 'Executive' && approver.role !== 'Founder')) {
         return { error: 'Only Executives and Founders can batch approve tasks' }
     }
 
-    // Update all tasks at once
+    // Update only tasks in user's foundry (defense in depth with RLS)
     const { error } = await supabase.from('tasks')
         .update({
             status: 'Completed',
@@ -755,6 +780,7 @@ export async function batchApproveTasks(taskIds: string[]) {
             end_date: new Date().toISOString()
         })
         .in('id', taskIds)
+        .eq('foundry_id', foundry_id)
 
     if (error) return { error: sanitizeErrorMessage(error) }
 
@@ -786,19 +812,24 @@ export async function batchRejectTasks(taskIds: string[], reason: string) {
     if (!taskIds || taskIds.length === 0) return { error: 'No tasks provided' }
     if (!reason?.trim()) return { error: 'Rejection reason is required' }
 
+    // Security: Get user's foundry and verify tasks belong to it
+    const foundry_id = await getFoundryIdCached()
+    if (!foundry_id) return { error: 'User not in a foundry' }
+
     // Check if user is Executive or Founder
     const { data: approver } = await supabase.from('profiles').select('role').eq('id', user.id).single()
     if (!approver || (approver.role !== 'Executive' && approver.role !== 'Founder')) {
         return { error: 'Only Executives and Founders can batch reject tasks' }
     }
 
-    // Update all tasks at once - send back to Pending status
+    // Update only tasks in user's foundry (defense in depth with RLS)
     const { error } = await supabase.from('tasks')
         .update({
             status: 'Pending',
             rejection_reason: reason.trim()
         })
         .in('id', taskIds)
+        .eq('foundry_id', foundry_id)
 
     if (error) return { error: sanitizeErrorMessage(error) }
 

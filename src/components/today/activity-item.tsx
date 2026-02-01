@@ -3,6 +3,7 @@
 import { useState, useTransition } from 'react'
 import Link from 'next/link'
 import { formatDistanceToNow } from 'date-fns'
+import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { UserAvatar } from '@/components/ui/user-avatar'
 import { Badge } from '@/components/ui/badge'
@@ -87,7 +88,10 @@ export function ActivityItem({ item, onReply }: ActivityItemProps) {
       if (result.success) {
         setReplyContent('')
         setIsReplying(false)
+        toast.success('Reply sent')
         onReply?.()
+      } else {
+        toast.error(result.error || 'Failed to send reply')
       }
     })
   }

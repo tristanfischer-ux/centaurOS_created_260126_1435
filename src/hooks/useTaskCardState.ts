@@ -26,13 +26,30 @@ export function useTaskCardState({ taskId, expanded }: UseTaskCardStateProps) {
   // Dialog states
   const [rejectOpen, setRejectOpen] = useState(false)
   const [forwardOpen, setForwardOpen] = useState(false)
-  const [showThread, setShowThread] = useState(false)
+  const [showThread, setShowThreadInternal] = useState(false)
   const [editOpen, setEditOpen] = useState(false)
-  const [showHistory, setShowHistory] = useState(false)
+  const [showHistory, setShowHistoryInternal] = useState(false)
   const [rubberStampOpen, setRubberStampOpen] = useState(false)
   const [fullViewOpen, setFullViewOpen] = useState(false)
   const [assigneePopoverOpen, setAssigneePopoverOpen] = useState(false)
   const [assigneePopoverOpen2, setAssigneePopoverOpen2] = useState(false)
+
+  // Wrapper setters to ensure only one inline panel is open at a time
+  const setShowThread = useCallback((value: boolean | ((prev: boolean) => boolean)) => {
+    const newValue = typeof value === 'function' ? value(showThread) : value
+    if (newValue) {
+      setShowHistoryInternal(false) // Close history when opening thread
+    }
+    setShowThreadInternal(newValue)
+  }, [showThread])
+
+  const setShowHistory = useCallback((value: boolean | ((prev: boolean) => boolean)) => {
+    const newValue = typeof value === 'function' ? value(showHistory) : value
+    if (newValue) {
+      setShowThreadInternal(false) // Close thread when opening history
+    }
+    setShowHistoryInternal(newValue)
+  }, [showHistory])
 
   // Forward dialog attachment states
   const [forwardAttachments, setForwardAttachments] = useState<TaskAttachment[]>([])
@@ -43,8 +60,8 @@ export function useTaskCardState({ taskId, expanded }: UseTaskCardStateProps) {
   // Close inline panels when card collapses
   useEffect(() => {
     if (!expanded) {
-      setShowThread(false)
-      setShowHistory(false)
+      setShowThreadInternal(false)
+      setShowHistoryInternal(false)
     }
   }, [expanded])
 

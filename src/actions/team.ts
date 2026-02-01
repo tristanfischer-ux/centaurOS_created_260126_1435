@@ -523,27 +523,30 @@ export async function deleteMember(memberId: string) {
         return { error: 'Cannot delete your own profile' }
     }
 
-    // 2. Reassign Objectives created by the member
+    // 2. Reassign Objectives created by the member (foundry filter for defense-in-depth)
     const { error: objError } = await supabase
         .from('objectives')
         .update({ creator_id: currentProfile.id })
         .eq('creator_id', memberId)
+        .eq('foundry_id', foundry_id)
 
     if (objError) return { error: sanitizeErrorMessage(objError) }
 
-    // 3. Reassign Tasks created by the member
+    // 3. Reassign Tasks created by the member (foundry filter for defense-in-depth)
     const { error: taskError } = await supabase
         .from('tasks')
         .update({ creator_id: currentProfile.id })
         .eq('creator_id', memberId)
+        .eq('foundry_id', foundry_id)
 
     if (taskError) return { error: sanitizeErrorMessage(taskError) }
 
-    // 4. Unassign Tasks assigned TO the member
+    // 4. Unassign Tasks assigned TO the member (foundry filter for defense-in-depth)
     const { error: unassignError } = await supabase
         .from('tasks')
         .update({ assignee_id: null })
         .eq('assignee_id', memberId)
+        .eq('foundry_id', foundry_id)
 
     if (unassignError) return { error: sanitizeErrorMessage(unassignError) }
 

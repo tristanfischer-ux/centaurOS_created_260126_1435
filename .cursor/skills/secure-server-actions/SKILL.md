@@ -136,14 +136,96 @@ if (error) {
 }
 ```
 
+## CRITICAL: UPDATE/DELETE Queries Need foundry_id Too
+
+A common mistake is only checking foundry_id on SELECT but not on UPDATE/DELETE:
+
+```typescript
+// ❌ WRONG - foundry_id only on SELECT, missing on UPDATE
+export async function updateTask(taskId: string, title: string) {
+  const foundryId = await getFoundryIdCached()
+  
+  // Verifies foundry on SELECT...
+  const { data: task } = await supabase.from('tasks')
+    .select('id').eq('id', taskId).eq('foundry_id', foundryId).single()
+  
+  if (!task) return { error: 'Not found' }
+  
+  // ...but UPDATE has no foundry filter! Race condition possible
+  await supabase.from('tasks').update({ title }).eq('id', taskId)
+}
+
+// ✅ CORRECT - foundry_id on BOTH SELECT and UPDATE
+export async function updateTask(taskId: string, title: string) {
+  const foundryId = await getFoundryIdCached()
+  
+  const { data: task } = await supabase.from('tasks')
+    .select('id').eq('id', taskId).eq('foundry_id', foundryId).single()
+  
+  if (!task) return { error: 'Not found' }
+  
+  // Defense-in-depth: foundry filter on UPDATE too
+  await supabase.from('tasks')
+    .update({ title })
+    .eq('id', taskId)
+    .eq('foundry_id', foundryId)
+}
+```
+
+### Batch Operations Are High Risk
+
+Batch operations that use `.in('id', ids)` are especially dangerous:
+
+```typescript
+// ❌ WRONG - Could update tasks from other foundries
+export async function batchApproveTasks(taskIds: string[]) {
+  await supabase.from('tasks')
+    .update({ status: 'Completed' })
+    .in('id', taskIds)  // No foundry filter!
+}
+
+// ✅ CORRECT - Always add foundry filter to batch operations
+export async function batchApproveTasks(taskIds: string[]) {
+  const foundryId = await getFoundryIdCached()
+  if (!foundryId) return { error: 'No foundry context' }
+  
+  await supabase.from('tasks')
+    .update({ status: 'Completed' })
+    .in('id', taskIds)
+    .eq('foundry_id', foundryId)  // Critical: limits to user's foundry
+}
+```
+
+### Helper Functions for Complex Authorization
+
+For tasks with complex ownership (creator, assignee, team members), use a helper:
+
+```typescript
+// In src/actions/tasks.ts - use canModifyTask helper
+const authCheck = await canModifyTask(supabase, taskId, user.id, foundry_id)
+if (!authCheck.allowed) {
+  return { error: authCheck.error || 'Unauthorized' }
+}
+```
+
+This helper verifies:
+1. Task exists
+2. Task belongs to user's foundry
+3. User is creator, assignee, or team member
+
+**Always use existing helpers rather than writing ad-hoc checks.**
+
 ## Checklist Before Committing
 
 - [ ] Authentication: `getUser()` called and user verified
 - [ ] Foundry isolation: `getFoundryIdCached()` called for shared resources
 - [ ] Ownership check: Resource verified before read/update/delete
+- [ ] **UPDATE/DELETE has foundry_id filter** (not just SELECT)
+- [ ] **Batch operations have foundry_id filter**
 - [ ] Generic errors: No information disclosure about existence
 - [ ] Error sanitization: `sanitizeErrorMessage()` used for DB errors
 - [ ] No email exposure: Remove `email` from select queries going to client
+- [ ] **Used existing helper functions** (e.g., `canModifyTask`) where available
 
 ## Common Vulnerabilities to Avoid
 
