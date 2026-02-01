@@ -76,20 +76,20 @@ ADD COLUMN IF NOT EXISTS metadata JSONB DEFAULT '{}';
 -- Add comment documenting schema
 COMMENT ON COLUMN tasks.metadata IS 'Extensible metadata. Schema: {blueprint_id?: uuid, domain_id?: uuid, artifact_type?: string, provenance?: object}';
 
--- Add GIN index for JSONB queries (CONCURRENTLY to avoid lock)
-CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_tasks_metadata_gin 
+-- Add GIN index for JSONB queries
+CREATE INDEX IF NOT EXISTS idx_tasks_metadata_gin 
 ON tasks USING GIN (metadata);
 
 -- Add specific indexes for common queries
-CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_tasks_blueprint_id 
+CREATE INDEX IF NOT EXISTS idx_tasks_blueprint_id 
 ON tasks ((metadata->>'blueprint_id')) 
 WHERE metadata->>'blueprint_id' IS NOT NULL;
 
-CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_tasks_domain_id 
+CREATE INDEX IF NOT EXISTS idx_tasks_domain_id 
 ON tasks ((metadata->>'domain_id')) 
 WHERE metadata->>'domain_id' IS NOT NULL;
 
-CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_tasks_artifact_type 
+CREATE INDEX IF NOT EXISTS idx_tasks_artifact_type 
 ON tasks ((metadata->>'artifact_type')) 
 WHERE metadata->>'artifact_type' IS NOT NULL;
 

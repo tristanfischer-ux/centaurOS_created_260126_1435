@@ -12,33 +12,53 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.1"
   }
-  graphql_public: {
-    Tables: {
-      [_ in never]: never
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      graphql: {
-        Args: {
-          extensions?: Json
-          operationName?: string
-          query?: string
-          variables?: Json
-        }
-        Returns: Json
-      }
-    }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
-  }
   public: {
     Tables: {
+      account_balances: {
+        Row: {
+          balance_amount: number | null
+          created_at: string | null
+          currency: string | null
+          id: string
+          last_topped_up_at: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          balance_amount?: number | null
+          created_at?: string | null
+          currency?: string | null
+          id?: string
+          last_topped_up_at?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          balance_amount?: number | null
+          created_at?: string | null
+          currency?: string | null
+          id?: string
+          last_topped_up_at?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "account_balances_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "buyer_stats"
+            referencedColumns: ["buyer_id"]
+          },
+          {
+            foreignKeyName: "account_balances_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       admin_audit_log: {
         Row: {
           action: string
@@ -922,6 +942,120 @@ export type Database = {
           },
         ]
       }
+      balance_transactions: {
+        Row: {
+          amount: number
+          balance_after: number
+          balance_before: number
+          created_at: string | null
+          description: string | null
+          id: string
+          reference_id: string | null
+          reference_type: string | null
+          stripe_payment_intent_id: string | null
+          transaction_type: string
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          balance_after: number
+          balance_before: number
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          reference_id?: string | null
+          reference_type?: string | null
+          stripe_payment_intent_id?: string | null
+          transaction_type: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          balance_after?: number
+          balance_before?: number
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          reference_id?: string | null
+          reference_type?: string | null
+          stripe_payment_intent_id?: string | null
+          transaction_type?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "balance_transactions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "buyer_stats"
+            referencedColumns: ["buyer_id"]
+          },
+          {
+            foreignKeyName: "balance_transactions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      bank_transfer_requests: {
+        Row: {
+          amount: number
+          bank_transfer_instructions: Json | null
+          completed_at: string | null
+          created_at: string | null
+          currency: string | null
+          expires_at: string | null
+          id: string
+          reference_number: string | null
+          status: string | null
+          stripe_payment_intent_id: string | null
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          bank_transfer_instructions?: Json | null
+          completed_at?: string | null
+          created_at?: string | null
+          currency?: string | null
+          expires_at?: string | null
+          id?: string
+          reference_number?: string | null
+          status?: string | null
+          stripe_payment_intent_id?: string | null
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          bank_transfer_instructions?: Json | null
+          completed_at?: string | null
+          created_at?: string | null
+          currency?: string | null
+          expires_at?: string | null
+          id?: string
+          reference_number?: string | null
+          status?: string | null
+          stripe_payment_intent_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bank_transfer_requests_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "buyer_stats"
+            referencedColumns: ["buyer_id"]
+          },
+          {
+            foreignKeyName: "bank_transfer_requests_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       blueprint_domain_coverage: {
         Row: {
           blockers: string[] | null
@@ -930,6 +1064,7 @@ export type Database = {
           domain_id: string
           domain_name: string | null
           domain_path: string | null
+          foundry_id: string
           id: string
           is_critical: boolean | null
           notes: string | null
@@ -945,6 +1080,7 @@ export type Database = {
           domain_id: string
           domain_name?: string | null
           domain_path?: string | null
+          foundry_id: string
           id?: string
           is_critical?: boolean | null
           notes?: string | null
@@ -960,6 +1096,7 @@ export type Database = {
           domain_id?: string
           domain_name?: string | null
           domain_path?: string | null
+          foundry_id?: string
           id?: string
           is_critical?: boolean | null
           notes?: string | null
@@ -981,6 +1118,13 @@ export type Database = {
             columns: ["domain_id"]
             isOneToOne: false
             referencedRelation: "knowledge_domains"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "blueprint_domain_coverage_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
             referencedColumns: ["id"]
           },
         ]
@@ -1701,6 +1845,33 @@ export type Database = {
           },
         ]
       }
+      currency_exchange_rates: {
+        Row: {
+          base_currency: string
+          expires_at: string | null
+          fetched_at: string | null
+          id: string
+          rate: number
+          target_currency: string
+        }
+        Insert: {
+          base_currency: string
+          expires_at?: string | null
+          fetched_at?: string | null
+          id?: string
+          rate: number
+          target_currency: string
+        }
+        Update: {
+          base_currency?: string
+          expires_at?: string | null
+          fetched_at?: string | null
+          id?: string
+          rate?: number
+          target_currency?: string
+        }
+        Relationships: []
+      }
       data_requests: {
         Row: {
           completed_at: string | null
@@ -2123,6 +2294,92 @@ export type Database = {
             columns: ["order_id"]
             isOneToOne: false
             referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      failed_payments: {
+        Row: {
+          amount: number
+          created_at: string | null
+          currency: string | null
+          failure_code: string | null
+          failure_message: string | null
+          id: string
+          last_retry_at: string | null
+          max_retries: number | null
+          next_retry_at: string | null
+          order_id: string | null
+          resolved_at: string | null
+          retry_count: number | null
+          status: string | null
+          stripe_payment_intent_id: string | null
+          timesheet_id: string | null
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string | null
+          currency?: string | null
+          failure_code?: string | null
+          failure_message?: string | null
+          id?: string
+          last_retry_at?: string | null
+          max_retries?: number | null
+          next_retry_at?: string | null
+          order_id?: string | null
+          resolved_at?: string | null
+          retry_count?: number | null
+          status?: string | null
+          stripe_payment_intent_id?: string | null
+          timesheet_id?: string | null
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string | null
+          currency?: string | null
+          failure_code?: string | null
+          failure_message?: string | null
+          id?: string
+          last_retry_at?: string | null
+          max_retries?: number | null
+          next_retry_at?: string | null
+          order_id?: string | null
+          resolved_at?: string | null
+          retry_count?: number | null
+          status?: string | null
+          stripe_payment_intent_id?: string | null
+          timesheet_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "failed_payments_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "failed_payments_timesheet_id_fkey"
+            columns: ["timesheet_id"]
+            isOneToOne: false
+            referencedRelation: "timesheet_entries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "failed_payments_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "buyer_stats"
+            referencedColumns: ["buyer_id"]
+          },
+          {
+            foreignKeyName: "failed_payments_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -3459,6 +3716,7 @@ export type Database = {
       }
       objectives: {
         Row: {
+          blueprint_id: string | null
           created_at: string | null
           creator_id: string
           description: string | null
@@ -3472,6 +3730,7 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          blueprint_id?: string | null
           created_at?: string | null
           creator_id: string
           description?: string | null
@@ -3485,6 +3744,7 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          blueprint_id?: string | null
           created_at?: string | null
           creator_id?: string
           description?: string | null
@@ -3498,6 +3758,13 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "objectives_blueprint_id_fkey"
+            columns: ["blueprint_id"]
+            isOneToOne: false
+            referencedRelation: "blueprints"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "objectives_creator_id_fkey"
             columns: ["creator_id"]
@@ -4051,6 +4318,122 @@ export type Database = {
           },
         ]
       }
+      payout_preferences: {
+        Row: {
+          created_at: string | null
+          id: string
+          instant_payout_enabled: boolean | null
+          minimum_payout_amount: number | null
+          payout_schedule: string | null
+          preferred_payout_day: number | null
+          provider_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          instant_payout_enabled?: boolean | null
+          minimum_payout_amount?: number | null
+          payout_schedule?: string | null
+          preferred_payout_day?: number | null
+          provider_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          instant_payout_enabled?: boolean | null
+          minimum_payout_amount?: number | null
+          payout_schedule?: string | null
+          preferred_payout_day?: number | null
+          provider_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payout_preferences_provider_id_fkey"
+            columns: ["provider_id"]
+            isOneToOne: true
+            referencedRelation: "provider_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payout_preferences_provider_id_fkey"
+            columns: ["provider_id"]
+            isOneToOne: true
+            referencedRelation: "provider_stats"
+            referencedColumns: ["provider_id"]
+          },
+          {
+            foreignKeyName: "payout_preferences_provider_id_fkey"
+            columns: ["provider_id"]
+            isOneToOne: true
+            referencedRelation: "supplier_search_ranking"
+            referencedColumns: ["provider_id"]
+          },
+        ]
+      }
+      payout_requests: {
+        Row: {
+          amount: number
+          completed_at: string | null
+          currency: string | null
+          failure_reason: string | null
+          id: string
+          processed_at: string | null
+          provider_id: string
+          requested_at: string | null
+          status: string | null
+          stripe_payout_id: string | null
+        }
+        Insert: {
+          amount: number
+          completed_at?: string | null
+          currency?: string | null
+          failure_reason?: string | null
+          id?: string
+          processed_at?: string | null
+          provider_id: string
+          requested_at?: string | null
+          status?: string | null
+          stripe_payout_id?: string | null
+        }
+        Update: {
+          amount?: number
+          completed_at?: string | null
+          currency?: string | null
+          failure_reason?: string | null
+          id?: string
+          processed_at?: string | null
+          provider_id?: string
+          requested_at?: string | null
+          status?: string | null
+          stripe_payout_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payout_requests_provider_id_fkey"
+            columns: ["provider_id"]
+            isOneToOne: false
+            referencedRelation: "provider_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payout_requests_provider_id_fkey"
+            columns: ["provider_id"]
+            isOneToOne: false
+            referencedRelation: "provider_stats"
+            referencedColumns: ["provider_id"]
+          },
+          {
+            foreignKeyName: "payout_requests_provider_id_fkey"
+            columns: ["provider_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_search_ranking"
+            referencedColumns: ["provider_id"]
+          },
+        ]
+      }
       pending_intents: {
         Row: {
           confirmation_message_id: string | null
@@ -4134,6 +4517,127 @@ export type Database = {
           },
         ]
       }
+      pitch_prep_requests: {
+        Row: {
+          additional_files: string[] | null
+          amount_seeking: string | null
+          company_name: string
+          company_website: string | null
+          competitive_landscape: string | null
+          created_at: string
+          financial_model_url: string | null
+          founder_count: number | null
+          founding_date: string | null
+          foundry_id: string
+          has_revenue: boolean
+          headquarters: string | null
+          id: string
+          key_team_members: Json | null
+          legal_structure: Database["public"]["Enums"]["legal_structure"] | null
+          matched_provider_id: string | null
+          pitch_deck_url: string | null
+          problem_solved: string | null
+          product_description: string
+          services_requested: string[]
+          specific_questions: string | null
+          stage: Database["public"]["Enums"]["funding_stage"]
+          status: Database["public"]["Enums"]["pitch_prep_status"]
+          target_investor_types: string[] | null
+          target_market: string | null
+          team_size: number | null
+          timeline: string | null
+          traction_summary: string | null
+          updated_at: string
+          use_of_funds: string | null
+          user_id: string
+        }
+        Insert: {
+          additional_files?: string[] | null
+          amount_seeking?: string | null
+          company_name: string
+          company_website?: string | null
+          competitive_landscape?: string | null
+          created_at?: string
+          financial_model_url?: string | null
+          founder_count?: number | null
+          founding_date?: string | null
+          foundry_id: string
+          has_revenue?: boolean
+          headquarters?: string | null
+          id?: string
+          key_team_members?: Json | null
+          legal_structure?:
+            | Database["public"]["Enums"]["legal_structure"]
+            | null
+          matched_provider_id?: string | null
+          pitch_deck_url?: string | null
+          problem_solved?: string | null
+          product_description: string
+          services_requested?: string[]
+          specific_questions?: string | null
+          stage: Database["public"]["Enums"]["funding_stage"]
+          status?: Database["public"]["Enums"]["pitch_prep_status"]
+          target_investor_types?: string[] | null
+          target_market?: string | null
+          team_size?: number | null
+          timeline?: string | null
+          traction_summary?: string | null
+          updated_at?: string
+          use_of_funds?: string | null
+          user_id: string
+        }
+        Update: {
+          additional_files?: string[] | null
+          amount_seeking?: string | null
+          company_name?: string
+          company_website?: string | null
+          competitive_landscape?: string | null
+          created_at?: string
+          financial_model_url?: string | null
+          founder_count?: number | null
+          founding_date?: string | null
+          foundry_id?: string
+          has_revenue?: boolean
+          headquarters?: string | null
+          id?: string
+          key_team_members?: Json | null
+          legal_structure?:
+            | Database["public"]["Enums"]["legal_structure"]
+            | null
+          matched_provider_id?: string | null
+          pitch_deck_url?: string | null
+          problem_solved?: string | null
+          product_description?: string
+          services_requested?: string[]
+          specific_questions?: string | null
+          stage?: Database["public"]["Enums"]["funding_stage"]
+          status?: Database["public"]["Enums"]["pitch_prep_status"]
+          target_investor_types?: string[] | null
+          target_market?: string | null
+          team_size?: number | null
+          timeline?: string | null
+          traction_summary?: string | null
+          updated_at?: string
+          use_of_funds?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pitch_prep_requests_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pitch_prep_requests_matched_provider_id_fkey"
+            columns: ["matched_provider_id"]
+            isOneToOne: false
+            referencedRelation: "service_providers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       platform_discounts: {
         Row: {
           created_at: string | null
@@ -4188,6 +4692,42 @@ export type Database = {
             referencedColumns: ["provider_id"]
           },
         ]
+      }
+      platform_fee_config: {
+        Row: {
+          created_at: string | null
+          effective_from: string | null
+          effective_until: string | null
+          fee_percent: number
+          id: string
+          max_fee_amount: number | null
+          min_fee_amount: number | null
+          order_type: string
+          role: string
+        }
+        Insert: {
+          created_at?: string | null
+          effective_from?: string | null
+          effective_until?: string | null
+          fee_percent: number
+          id?: string
+          max_fee_amount?: number | null
+          min_fee_amount?: number | null
+          order_type: string
+          role: string
+        }
+        Update: {
+          created_at?: string | null
+          effective_from?: string | null
+          effective_until?: string | null
+          fee_percent?: number
+          id?: string
+          max_fee_amount?: number | null
+          min_fee_amount?: number | null
+          order_type?: string
+          role?: string
+        }
+        Relationships: []
       }
       platform_metrics: {
         Row: {
@@ -4453,9 +4993,11 @@ export type Database = {
           onboarding_data: Json
           paired_ai_id: string | null
           phone_number: string | null
+          preferred_currency: string | null
           role: Database["public"]["Enums"]["member_role"]
           skills: string[] | null
           stripe_account_id: string | null
+          stripe_customer_id: string | null
           updated_at: string | null
           years_experience: number | null
         }
@@ -4481,9 +5023,11 @@ export type Database = {
           onboarding_data?: Json
           paired_ai_id?: string | null
           phone_number?: string | null
+          preferred_currency?: string | null
           role?: Database["public"]["Enums"]["member_role"]
           skills?: string[] | null
           stripe_account_id?: string | null
+          stripe_customer_id?: string | null
           updated_at?: string | null
           years_experience?: number | null
         }
@@ -4509,9 +5053,11 @@ export type Database = {
           onboarding_data?: Json
           paired_ai_id?: string | null
           phone_number?: string | null
+          preferred_currency?: string | null
           role?: Database["public"]["Enums"]["member_role"]
           skills?: string[] | null
           stripe_account_id?: string | null
+          stripe_customer_id?: string | null
           updated_at?: string | null
           years_experience?: number | null
         }
@@ -5664,6 +6210,66 @@ export type Database = {
           },
         ]
       }
+      saved_payment_methods: {
+        Row: {
+          billing_email: string | null
+          billing_name: string | null
+          card_brand: string | null
+          card_exp_month: number | null
+          card_exp_year: number | null
+          card_last_four: string | null
+          created_at: string | null
+          id: string
+          is_default: boolean | null
+          stripe_payment_method_id: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          billing_email?: string | null
+          billing_name?: string | null
+          card_brand?: string | null
+          card_exp_month?: number | null
+          card_exp_year?: number | null
+          card_last_four?: string | null
+          created_at?: string | null
+          id?: string
+          is_default?: boolean | null
+          stripe_payment_method_id: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          billing_email?: string | null
+          billing_name?: string | null
+          card_brand?: string | null
+          card_exp_month?: number | null
+          card_exp_year?: number | null
+          card_last_four?: string | null
+          created_at?: string | null
+          id?: string
+          is_default?: boolean | null
+          stripe_payment_method_id?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "saved_payment_methods_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "buyer_stats"
+            referencedColumns: ["buyer_id"]
+          },
+          {
+            foreignKeyName: "saved_payment_methods_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       saved_searches: {
         Row: {
           alert_frequency: string | null
@@ -6472,6 +7078,7 @@ export type Database = {
           foundry_id: string
           id: string
           last_nudge_at: string | null
+          metadata: Json | null
           nudge_count: number | null
           objective_id: string | null
           progress: number | null
@@ -6497,6 +7104,7 @@ export type Database = {
           foundry_id: string
           id?: string
           last_nudge_at?: string | null
+          metadata?: Json | null
           nudge_count?: number | null
           objective_id?: string | null
           progress?: number | null
@@ -6522,6 +7130,7 @@ export type Database = {
           foundry_id?: string
           id?: string
           last_nudge_at?: string | null
+          metadata?: Json | null
           nudge_count?: number | null
           objective_id?: string | null
           progress?: number | null
@@ -6781,6 +7390,66 @@ export type Database = {
           },
         ]
       }
+      user_subscriptions: {
+        Row: {
+          cancel_at_period_end: boolean | null
+          created_at: string | null
+          current_period_end: string
+          current_period_start: string
+          id: string
+          status: string
+          stripe_customer_id: string
+          stripe_subscription_id: string
+          tier: string
+          trial_end: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          cancel_at_period_end?: boolean | null
+          created_at?: string | null
+          current_period_end: string
+          current_period_start: string
+          id?: string
+          status: string
+          stripe_customer_id: string
+          stripe_subscription_id: string
+          tier: string
+          trial_end?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          cancel_at_period_end?: boolean | null
+          created_at?: string | null
+          current_period_end?: string
+          current_period_start?: string
+          id?: string
+          status?: string
+          stripe_customer_id?: string
+          stripe_subscription_id?: string
+          tier?: string
+          trial_end?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_subscriptions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "buyer_stats"
+            referencedColumns: ["buyer_id"]
+          },
+          {
+            foreignKeyName: "user_subscriptions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       buyer_stats: {
@@ -6919,6 +7588,22 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      adjust_account_balance: {
+        Args: {
+          p_amount: number
+          p_description?: string
+          p_reference_id?: string
+          p_reference_type?: string
+          p_stripe_payment_intent_id?: string
+          p_transaction_type: string
+          p_user_id: string
+        }
+        Returns: {
+          error_message: string
+          new_balance: number
+          success: boolean
+        }[]
+      }
       calculate_blueprint_coverage: {
         Args: { p_blueprint_id: string }
         Returns: {
@@ -7004,6 +7689,7 @@ export type Database = {
           foundry_id: string
           id: string
           last_nudge_at: string | null
+          metadata: Json | null
           nudge_count: number | null
           objective_id: string | null
           progress: number | null
@@ -7029,6 +7715,41 @@ export type Database = {
         Args: { full_name: string; user_id: string }
         Returns: string
       }
+      get_blueprint_tasks: {
+        Args: { p_blueprint_id: string }
+        Returns: {
+          amendment_notes: string | null
+          approval_escalated: boolean | null
+          approval_requested_at: string | null
+          assignee_id: string | null
+          client_visible: boolean | null
+          created_at: string | null
+          creator_id: string
+          description: string | null
+          end_date: string | null
+          escalation_reason: string | null
+          forwarding_history: Json | null
+          foundry_id: string
+          id: string
+          last_nudge_at: string | null
+          metadata: Json | null
+          nudge_count: number | null
+          objective_id: string | null
+          progress: number | null
+          risk_level: Database["public"]["Enums"]["risk_level"]
+          start_date: string | null
+          status: Database["public"]["Enums"]["task_status"] | null
+          task_number: number
+          title: string
+          updated_at: string | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "tasks"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       get_buyer_spend: {
         Args: { p_buyer_id: string; p_end_date: string; p_start_date: string }
         Returns: {
@@ -7036,6 +7757,41 @@ export type Database = {
           order_count: number
           spend: number
         }[]
+      }
+      get_domain_tasks: {
+        Args: { p_domain_id: string }
+        Returns: {
+          amendment_notes: string | null
+          approval_escalated: boolean | null
+          approval_requested_at: string | null
+          assignee_id: string | null
+          client_visible: boolean | null
+          created_at: string | null
+          creator_id: string
+          description: string | null
+          end_date: string | null
+          escalation_reason: string | null
+          forwarding_history: Json | null
+          foundry_id: string
+          id: string
+          last_nudge_at: string | null
+          metadata: Json | null
+          nudge_count: number | null
+          objective_id: string | null
+          progress: number | null
+          risk_level: Database["public"]["Enums"]["risk_level"]
+          start_date: string | null
+          status: Database["public"]["Enums"]["task_status"] | null
+          task_number: number
+          title: string
+          updated_at: string | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "tasks"
+          isOneToOne: false
+          isSetofReturn: true
+        }
       }
       get_escrow_balance_atomic: {
         Args: { p_order_id: string }
@@ -7108,6 +7864,10 @@ export type Database = {
           task_title: string
         }[]
       }
+      get_platform_fee_percent: {
+        Args: { p_order_type?: string; p_role?: string }
+        Returns: number
+      }
       get_provider_earnings: {
         Args: {
           p_end_date: string
@@ -7173,6 +7933,10 @@ export type Database = {
       refresh_platform_stats: { Args: never; Returns: undefined }
       refresh_provider_stats: { Args: never; Returns: undefined }
       refresh_search_ranking: { Args: never; Returns: undefined }
+      schedule_payment_retry: {
+        Args: { p_failed_payment_id: string }
+        Returns: string
+      }
       submit_standup: {
         Args: {
           p_blocker_severity?: string
@@ -7303,6 +8067,14 @@ export type Database = {
         | "partial_release"
         | "released"
         | "refunded"
+      funding_stage:
+        | "Pre-Seed"
+        | "Seed"
+        | "Series A"
+        | "Series B+"
+        | "Growth"
+        | "Bridge"
+      legal_structure: "Ltd" | "Inc" | "LLC" | "GmbH" | "PLC" | "Other"
       marketplace_category: "People" | "Products" | "Services" | "AI"
       member_role: "Executive" | "Apprentice" | "AI_Agent" | "Founder"
       notification_channel: "push" | "email" | "sms" | "in_app"
@@ -7316,6 +8088,14 @@ export type Database = {
         | "disputed"
         | "cancelled"
       order_type: "people_booking" | "product_rfq" | "service" | "trial"
+      pitch_prep_status:
+        | "draft"
+        | "submitted"
+        | "in_review"
+        | "matched"
+        | "in_progress"
+        | "completed"
+        | "cancelled"
       presence_status: "online" | "away" | "focus" | "offline"
       provider_type:
         | "Legal"
@@ -7467,9 +8247,6 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
-  graphql_public: {
-    Enums: {},
-  },
   public: {
     Enums: {
       admin_role: [
@@ -7496,6 +8273,15 @@ export const Constants = {
         "released",
         "refunded",
       ],
+      funding_stage: [
+        "Pre-Seed",
+        "Seed",
+        "Series A",
+        "Series B+",
+        "Growth",
+        "Bridge",
+      ],
+      legal_structure: ["Ltd", "Inc", "LLC", "GmbH", "PLC", "Other"],
       marketplace_category: ["People", "Products", "Services", "AI"],
       member_role: ["Executive", "Apprentice", "AI_Agent", "Founder"],
       notification_channel: ["push", "email", "sms", "in_app"],
@@ -7510,6 +8296,15 @@ export const Constants = {
         "cancelled",
       ],
       order_type: ["people_booking", "product_rfq", "service", "trial"],
+      pitch_prep_status: [
+        "draft",
+        "submitted",
+        "in_review",
+        "matched",
+        "in_progress",
+        "completed",
+        "cancelled",
+      ],
       presence_status: ["online", "away", "focus", "offline"],
       provider_type: [
         "Legal",
