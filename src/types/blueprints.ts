@@ -193,6 +193,7 @@ export interface DomainCoverage {
   id: string
   blueprint_id: string
   domain_id: string
+  foundry_id: string // Added for direct RLS
   domain_path: string | null
   domain_name: string | null
   status: CoverageStatus
@@ -555,4 +556,27 @@ export interface DomainTreeViewNode {
   questions_answered: number
   children: DomainTreeViewNode[]
   expanded?: boolean
+}
+
+// ============================================================================
+// OBJECTIVE (Blueprint Integration)
+// ============================================================================
+
+/**
+ * Objective with optional blueprint link
+ * Used for grouping initiatives under a blueprint
+ */
+export interface Objective {
+  id: string
+  title: string
+  description: string | null
+  status: string
+  progress: number
+  parent_objective_id: string | null
+  creator_id: string
+  foundry_id: string
+  blueprint_id: string | null // Link to blueprint for project grouping
+  created_at: string
+  updated_at: string
+  extended_description?: string | null
 }
