@@ -57,13 +57,14 @@ const DEFAULT_LAYOUT: LayoutConfig = {
 // ═══════════════════════════════════════════════════════════════════════════
 
 // SVG paths for different template types (centered at x=550)
+// Keys MUST match the `product_category` values in blueprint_templates table
 const TEMPLATE_SILHOUETTES: Record<string, { path: string; viewBox: string }> = {
-  // Rocket - existing
+  // Rocket - for rockets template
   'rockets': {
     path: `M 550 20 C 570 20, 600 50, 610 110 L 620 190 L 625 270 L 630 390 L 635 490 L 670 530 L 690 610 L 650 610 L 645 690 L 600 690 L 600 640 L 550 670 L 500 640 L 500 690 L 455 690 L 450 610 L 410 610 L 430 530 L 465 490 L 470 390 L 475 270 L 480 190 L 490 110 C 500 50, 530 20, 550 20 Z`,
     viewBox: '0 0 1100 750',
   },
-  // Satellite - orbital spacecraft
+  // Satellite - orbital spacecraft with solar panels
   'satellites': {
     path: `M 450 350 L 450 300 L 350 300 L 350 250 L 300 250 L 300 450 L 350 450 L 350 400 L 450 400 L 450 350 M 550 280 L 750 280 L 750 420 L 550 420 Z M 750 320 L 850 280 L 850 420 L 750 380 Z`,
     viewBox: '0 0 1100 750',
@@ -78,7 +79,7 @@ const TEMPLATE_SILHOUETTES: Record<string, { path: string; viewBox: string }> = 
     path: `M 400 200 C 400 100, 700 100, 700 200 L 700 550 C 700 650, 400 650, 400 550 Z M 400 375 L 700 375`,
     viewBox: '0 0 1100 750',
   },
-  // Robot arm - Robotics
+  // Robot arm - Robotics & Automation
   'robotics': {
     path: `M 500 600 L 600 600 L 600 500 L 650 500 L 650 350 L 600 350 L 600 250 L 700 250 L 700 150 L 750 150 L 750 100 L 850 100 L 850 200 L 750 200 L 750 300 L 650 300 L 650 400 L 550 400 L 550 550 L 500 550 Z`,
     viewBox: '0 0 1100 750',
@@ -88,17 +89,17 @@ const TEMPLATE_SILHOUETTES: Record<string, { path: string; viewBox: string }> = 
     path: `M 350 150 L 750 150 L 750 600 L 350 600 Z M 400 200 L 500 200 L 500 300 L 400 300 Z M 550 200 L 700 200 L 700 250 L 550 250 Z M 400 350 L 700 350 L 700 400 L 400 400 Z M 550 450 L 700 450 L 700 550 L 550 550 Z`,
     viewBox: '0 0 1100 750',
   },
-  // Cloud - SaaS
+  // Cloud - SaaS Platform
   'saas': {
     path: `M 350 400 C 250 400, 250 300, 350 280 C 350 200, 450 150, 550 200 C 650 120, 800 180, 800 300 C 900 300, 900 400, 800 400 Z`,
     viewBox: '0 0 1100 750',
   },
-  // Phone - Mobile App
-  'mobile-app': {
+  // Phone - Mobile Application (key is 'mobile' to match DB)
+  'mobile': {
     path: `M 450 80 L 650 80 C 680 80, 700 100, 700 130 L 700 620 C 700 650, 680 670, 650 670 L 450 670 C 420 670, 400 650, 400 620 L 400 130 C 400 100, 420 80, 450 80 Z M 520 110 L 580 110 M 550 630 L 550 630`,
     viewBox: '0 0 1100 750',
   },
-  // Generic fallback - hexagon grid
+  // Generic fallback - abstract tech shape
   'default': {
     path: `M 550 150 L 650 200 L 650 300 L 550 350 L 450 300 L 450 200 Z M 550 400 L 650 450 L 650 550 L 550 600 L 450 550 L 450 450 Z`,
     viewBox: '0 0 1100 750',

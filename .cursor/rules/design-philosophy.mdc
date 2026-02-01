@@ -59,6 +59,8 @@ If the UI appears dark (dark dialogs, dark cards, dark backgrounds), check that:
 1. `defaultTheme="light"` is set
 2. `enableSystem={false}` is set
 3. No `.dark` class is being added to `<html>` or `<body>`
+4. ThemeToggle component is NOT exposed to users (removed from Sidebar)
+5. Sonner toaster uses `theme="light"` directly (not from useTheme)
 
 ## What to Avoid
 

@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { LayoutDashboard, Users, CheckSquare, Clock, Store, Target, MessageCircleQuestion, ShieldAlert, FileText, Sun, Bookmark, Settings, HelpCircle, GraduationCap, ShoppingCart, Briefcase, Map } from "lucide-react"
 import { NotificationCenter } from "@/components/NotificationCenter"
-import { ThemeToggle } from "@/components/ThemeToggle"
+// ThemeToggle removed - CentaurOS enforces light mode per design philosophy
 import { FocusModeToggle } from "@/components/FocusModeToggle"
 import { ZoomControl } from "@/components/ZoomControl"
 import { useZoomContext } from "@/components/ZoomProvider"
@@ -74,7 +74,6 @@ export function Sidebar({ foundryName, foundryId, userName, userRole, isAdmin }:
                     </Link>
                     <div className="flex items-center gap-0.5">
                         <FocusModeToggle compact />
-                        <ThemeToggle />
                         <NotificationCenter />
                     </div>
                 </div>
