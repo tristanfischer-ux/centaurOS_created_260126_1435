@@ -237,7 +237,7 @@ export function FeatureTip({
     return (
         <div className="relative">
             {children}
-            <div className={`absolute top-full ${alignmentClass} mt-2 z-50 w-72 p-4 bg-card border-2 border-international-orange rounded-lg shadow-xl backdrop-blur-sm animate-in fade-in-50 slide-in-from-top-2`}>
+            <div className={`absolute top-full ${alignmentClass} mt-2 z-50 w-72 p-4 bg-card border-2 border-international-orange rounded-lg shadow-xl animate-in fade-in-50 slide-in-from-top-2`}>
                 <div className="flex items-start justify-between gap-2">
                     <div>
                         <p className="font-semibold text-sm text-foreground">{title}</p>

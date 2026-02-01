@@ -95,7 +95,7 @@ export default function MarketingPage() {
         {/* Content */}
         <div className="relative z-10 max-w-5xl mx-auto px-6 text-center pt-8 md:pt-0">
           {/* System Online Badge */}
-          <div className="inline-flex items-center gap-2 mb-6 md:mb-8 px-4 py-2 border border-slate-200 bg-background/80 backdrop-blur-sm">
+          <div className="inline-flex items-center gap-2 mb-6 md:mb-8 px-4 py-2 border border-slate-200 bg-card">
             <span className="w-2 h-2 rounded-full bg-electric-blue" />
             <span className="text-electric-blue text-xs font-mono uppercase tracking-widest">
               System Online

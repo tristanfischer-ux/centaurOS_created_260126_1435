@@ -167,7 +167,7 @@ export default function InvitePage({ params }: { params: Promise<{ token: string
             </h1>
             
             {/* Company Card */}
-            <div className="bg-card/50 backdrop-blur-sm border border-muted rounded-lg p-6 max-w-md">
+            <div className="bg-card border border-muted rounded-lg p-6 max-w-md">
               <div className="flex items-center gap-4 mb-4">
                 <div className="w-12 h-12 rounded-lg bg-electric-blue/20 flex items-center justify-center">
                   <Building2 className="w-6 h-6 text-electric-blue" />

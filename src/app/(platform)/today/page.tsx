@@ -226,7 +226,7 @@ export default async function TodayPage() {
             {isAllClear ? (
                 <Card className="bg-gradient-to-br from-status-success-light to-status-success-light/50 border-status-success-light">
                     <CardContent className="py-12 text-center">
-                        <div className="inline-flex p-4 bg-background/80 rounded-full mb-4">
+                        <div className="inline-flex p-4 bg-muted rounded-full mb-4">
                             <Sparkles className="h-8 w-8 text-status-success" />
                         </div>
                         <h3 className="text-xl font-display font-semibold text-status-success-dark mb-2">

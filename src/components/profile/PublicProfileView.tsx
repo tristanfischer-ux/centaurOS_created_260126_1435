@@ -250,7 +250,7 @@ export function PublicProfileView({ profile }: PublicProfileViewProps) {
                                             </div>
                                         )}
                                         <div className="absolute inset-0 flex items-center justify-center">
-                                            <div className="w-16 h-16 rounded-full bg-background/90 flex items-center justify-center group-hover:scale-110 transition-transform">
+                                            <div className="w-16 h-16 rounded-full bg-background shadow-lg flex items-center justify-center group-hover:scale-110 transition-transform">
                                                 <Play className="w-8 h-8 text-foreground ml-1" />
                                             </div>
                                         </div>

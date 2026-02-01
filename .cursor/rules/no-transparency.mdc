@@ -1,0 +1,115 @@
+# No Transparency Patterns
+
+CentaurOS enforces opaque backgrounds on interactive UI elements. Transparent/translucent backgrounds cause visual issues where content shows through elements that should be solid.
+
+## FORBIDDEN Patterns
+
+**NEVER use these patterns on interactive elements:**
+
+```tsx
+// ❌ FORBIDDEN - Opacity modifiers on backgrounds
+bg-background/80
+bg-background/90
+bg-background/95
+bg-card/50
+bg-card/80
+bg-white/80
+bg-white/90
+
+// ❌ FORBIDDEN - Backdrop blur (creates glass effect)
+backdrop-blur-sm
+backdrop-blur-md
+backdrop-blur
+
+// ❌ FORBIDDEN - Combined patterns
+"bg-background/80 backdrop-blur-sm"
+"bg-card/50 backdrop-blur-sm"
+```
+
+## CORRECT Alternatives
+
+| Instead of... | Use... |
+|----|----|
+| `bg-background/80` | `bg-background` or `bg-card` |
+| `bg-background/90` | `bg-background` or `bg-card` |
+| `bg-card/50` | `bg-card` |
+| `bg-white/80` | `bg-background` or `bg-card` |
+| `bg-white/90` | `bg-background` with `shadow-lg` |
+| `backdrop-blur-sm` | Remove entirely, use `shadow-lg` for depth |
+
+## When Transparency IS Allowed
+
+These specific cases may use transparency:
+
+1. **Modal overlays** (the dark backdrop behind modals):
+   ```tsx
+   // ✅ OK - Dark overlay behind modal
+   <div className="fixed inset-0 bg-black/80">
+   ```
+
+2. **Loading overlays** (content is intentionally obscured):
+   ```tsx
+   // ✅ OK - Loading state with intentional obscuring
+   <div className="absolute inset-0 bg-background/80">
+   ```
+
+3. **Skeleton loaders on dark backgrounds** (marketing sections):
+   ```tsx
+   // ✅ OK - Skeleton on dark marketing section
+   <div className="bg-white/5 animate-pulse">
+   ```
+
+4. **Decorative visual effects** (stamps, ribbons):
+   ```tsx
+   // ✅ OK - Visual stamp effect
+   <div className="opacity-90 mix-blend-multiply">
+   ```
+
+## Elements That MUST Be Opaque
+
+These elements must NEVER have transparent backgrounds:
+
+- **Dialogs/Modals** - Use `bg-background`
+- **Popovers** - Use `bg-background` or `bg-card`
+- **Dropdowns** - Use `bg-background` or `bg-card`
+- **Select menus** - Use `bg-background`
+- **Search suggestions** - Use `bg-card`
+- **Tooltips** - Use `bg-card` or `bg-foreground`
+- **Floating controls** - Use `bg-card` with `shadow-lg`
+- **Navigation headers** - Use `bg-background` (marketing exception: glass effect OK)
+- **Form tooltips/hints** - Use `bg-card`
+- **Badges on images** - Use `bg-card` with `shadow-sm`
+
+## Quick Reference
+
+```tsx
+// ✅ CORRECT - Search dropdown
+<div className="bg-card border rounded-lg shadow-xl">
+
+// ✅ CORRECT - Floating control panel
+<div className="bg-card p-2 rounded-lg shadow-lg border">
+
+// ✅ CORRECT - Video play button
+<div className="bg-background shadow-lg rounded-full">
+
+// ✅ CORRECT - Modal overlay
+<div className="fixed inset-0 bg-black/80">
+
+// ❌ WRONG - Transparent search dropdown
+<div className="bg-card/50 backdrop-blur-sm">
+
+// ❌ WRONG - Glass effect on controls
+<div className="bg-background/95 backdrop-blur-sm">
+```
+
+## Pre-Commit Check
+
+Run this grep before committing to catch violations:
+
+```bash
+# Check for forbidden transparency patterns
+rg "bg-(background|card|white)/[0-9]" --type tsx --type ts src/
+rg "backdrop-blur" --type tsx --type ts src/
+```
+
+Exceptions must be commented explaining why transparency is intentional.

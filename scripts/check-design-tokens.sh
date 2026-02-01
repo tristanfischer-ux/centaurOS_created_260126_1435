@@ -184,6 +184,24 @@ check_pattern 'bg-black/20' \
     "Use bg-black/50 for sheets, bg-black/80 for dialogs" \
     "warning"
 
+# === CRITICAL: Transparency Patterns (UI elements showing through) ===
+check_pattern 'bg-background/[0-9]' \
+    "Transparent background (bg-background/XX)" \
+    "Use solid bg-background or bg-card (see no-transparency.mdc)"
+
+check_pattern 'bg-card/[0-9]' \
+    "Transparent card background (bg-card/XX)" \
+    "Use solid bg-card"
+
+check_pattern 'bg-white/[789][0-9]' \
+    "Semi-transparent white (bg-white/70-99)" \
+    "Use solid bg-background or bg-card with shadow-lg"
+
+check_pattern 'backdrop-blur' \
+    "Backdrop blur effect (creates glass/transparency)" \
+    "Remove backdrop-blur, use solid bg-card with shadow-lg instead" \
+    "warning"
+
 # === Summary ===
 echo "================================"
 if [ $VIOLATIONS -gt 0 ]; then

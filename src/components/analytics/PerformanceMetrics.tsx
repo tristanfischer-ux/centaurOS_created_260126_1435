@@ -128,7 +128,7 @@ function MetricCard({ metric, showComparison }: MetricCardProps) {
     <div className={cn("p-4 rounded-lg border", styles.bg)}>
       <div className="flex items-start justify-between">
         <div className="flex items-center gap-2">
-          <div className={cn("p-1.5 rounded-md bg-white/80", styles.icon)}>
+          <div className={cn("p-1.5 rounded-md bg-muted", styles.icon)}>
             <Icon className="h-4 w-4" />
           </div>
           <span className="text-sm font-medium text-muted-foreground">

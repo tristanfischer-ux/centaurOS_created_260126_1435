@@ -227,7 +227,7 @@ export default function JoinPage({ params }: { params: Promise<{ role: string }>
                     {/* Content */}
                     <div className="relative z-10 flex flex-col items-center px-4 sm:px-6 text-center pt-20 pb-8">
                         {/* Protocol Badge */}
-                        <div className="inline-flex items-center gap-2 mb-4 sm:mb-6 px-3 sm:px-4 py-2 border border-status-info/30 bg-status-info/10 backdrop-blur-sm">
+                        <div className="inline-flex items-center gap-2 mb-4 sm:mb-6 px-3 sm:px-4 py-2 border border-status-info/30 bg-status-info-light">
                             <span className="w-2 h-2 rounded-full bg-status-info animate-pulse" />
                             <span className="text-status-info text-xs font-mono uppercase tracking-widest">
                                 Induction Protocol: {config.title}

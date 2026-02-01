@@ -154,7 +154,7 @@ export function BlueprintCanvas({
   return (
     <div className={cn("relative overflow-hidden rounded-xl border bg-muted/50", className)}>
       {/* Canvas Toolbar */}
-      <div className="absolute top-4 left-4 z-20 flex flex-col gap-1.5 bg-background/95 backdrop-blur-sm p-2 rounded-lg shadow-lg border">
+      <div className="absolute top-4 left-4 z-20 flex flex-col gap-1.5 bg-card p-2 rounded-lg shadow-lg border">
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger asChild>
@@ -207,7 +207,7 @@ export function BlueprintCanvas({
       </div>
 
       {/* Legend - positioned to not be cut off */}
-      <div className="absolute top-4 right-4 z-20 bg-background/95 backdrop-blur-sm p-3 rounded-lg shadow-lg border min-w-[140px]">
+      <div className="absolute top-4 right-4 z-20 bg-card p-3 rounded-lg shadow-lg border min-w-[140px]">
         <div className="text-xs font-semibold text-muted-foreground mb-2">Status Legend</div>
         <div className="space-y-1.5">
           {Object.entries(STATUS_COLORS).map(([status, colors]) => (
@@ -221,7 +221,7 @@ export function BlueprintCanvas({
 
       {/* Hint for first-time users */}
       <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20">
-        <div className="flex items-center gap-2 bg-background/90 backdrop-blur-sm px-3 py-1.5 rounded-full shadow-sm border text-xs text-muted-foreground">
+        <div className="flex items-center gap-2 bg-card px-3 py-1.5 rounded-full shadow-sm border text-xs text-muted-foreground">
           <Move className="h-3 w-3" />
           <span>Drag to pan • Scroll to zoom • Click nodes to explore</span>
         </div>
