@@ -32,6 +32,41 @@ This skill ensures consistent, accessible UI components in CentaurOS. **ALWAYS c
 
 **NEVER use:** `text-slate-*`, `text-gray-*`, `text-red-*`, `bg-white`, `bg-slate-*`, `dark:*` variants
 
+### Common Violations Found in Codebase Audit
+
+Based on a comprehensive audit, these patterns are the **MOST FREQUENTLY VIOLATED**:
+
+```tsx
+// ❌ #1 MOST COMMON: Success/verification icons
+<CheckCircle2 className="text-green-600" />  // WRONG
+<CheckCircle2 className="text-status-success" />  // CORRECT
+
+// ❌ #2: Status badges with hardcoded colors  
+<Badge className="bg-green-100 text-green-800">Complete</Badge>  // WRONG
+<StatusBadge status="success">Complete</StatusBadge>  // CORRECT
+
+// ❌ #3: Required field asterisks
+<span className="text-red-500">*</span>  // WRONG
+<span className="text-destructive" aria-label="required">*</span>  // CORRECT
+
+// ❌ #4: Info/scheduling colors
+<div className="bg-blue-50 text-blue-800">Info</div>  // WRONG
+<div className="bg-status-info-light text-status-info-dark">Info</div>  // CORRECT
+
+// ❌ #5: White backgrounds
+<Card className="!bg-white">  // WRONG
+<Card className="bg-background">  // CORRECT
+```
+
+**Full mapping for dark variants:**
+| Hardcoded | Semantic Token |
+|-----------|----------------|
+| `text-green-700`, `text-green-800` | `text-status-success-dark` |
+| `text-emerald-700`, `text-emerald-800` | `text-status-success-dark` |
+| `text-blue-700`, `text-blue-800` | `text-status-info-dark` |
+| `text-amber-700`, `text-amber-800` | `text-status-warning-dark` |
+| `text-red-700`, `text-red-800` | `text-status-error-dark` or `text-destructive` |
+
 ---
 
 ## Form Accessibility Requirements

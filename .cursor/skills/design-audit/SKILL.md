@@ -104,6 +104,19 @@ Use this template:
 
 ## Common Inconsistency Patterns
 
+### Real-World Audit Results (February 2026)
+
+A comprehensive audit of 72 pages and 100+ components found **~300 issues**:
+
+| Category | Instances | Priority |
+|----------|-----------|----------|
+| Hardcoded green/emerald colors | 40+ | P0 |
+| Hardcoded blue colors | 37+ | P0 |
+| Hardcoded amber/warning colors | 69+ | P1 |
+| Hardcoded red/error colors | 18+ | P0 |
+| Hardcoded white backgrounds | 20+ | P1 |
+| Missing ARIA attributes | 30+ | P0 |
+
 ### 1. Color Inconsistencies
 
 **What to find:**
@@ -116,6 +129,11 @@ rg "bg-white|bg-slate-50|bg-slate-100" src/
 
 # Hardcoded status colors
 rg "bg-green-|bg-red-|bg-amber-|bg-blue-" src/
+
+# MOST COMMON violations found:
+rg "text-green-600|text-green-700|text-emerald-600" src/  # Success indicators
+rg "text-amber-600|text-amber-500" src/  # Warning indicators
+rg "bg-green-100|bg-emerald-50" src/  # Success backgrounds
 ```
 
 **Standard replacements:**
