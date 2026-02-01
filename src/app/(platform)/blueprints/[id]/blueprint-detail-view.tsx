@@ -498,9 +498,9 @@ function SummaryCard({
           </div>
           <div>
             <p className="text-sm text-muted-foreground">{label}</p>
-            <p className={cn('text-2xl font-bold', color && colorClasses[color])}>
+            <div className={cn('text-2xl font-bold', color && colorClasses[color])}>
               {value}
-            </p>
+            </div>
           </div>
         </div>
       </CardContent>
