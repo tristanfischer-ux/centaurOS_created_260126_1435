@@ -130,7 +130,7 @@ export function CertificationForm({ certification, trigger, onSuccess }: Certifi
                         {/* Certification Name */}
                         <div className="grid gap-2">
                             <Label htmlFor="certName">
-                                Certification Name <span className="text-red-500">*</span>
+                                Certification Name <span className="text-destructive" aria-label="required">*</span>
                             </Label>
                             <Input
                                 id="certName"
@@ -144,7 +144,7 @@ export function CertificationForm({ certification, trigger, onSuccess }: Certifi
                         {/* Issuing Body */}
                         <div className="grid gap-2">
                             <Label htmlFor="issuingBody">
-                                Issuing Body <span className="text-red-500">*</span>
+                                Issuing Body <span className="text-destructive" aria-label="required">*</span>
                             </Label>
                             <Input
                                 id="issuingBody"

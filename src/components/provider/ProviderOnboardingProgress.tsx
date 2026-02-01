@@ -40,7 +40,7 @@ export function ProviderOnboardingProgress({
                     <CardTitle className="text-lg">Profile Completion</CardTitle>
                     <span className={cn(
                         "text-2xl font-bold",
-                        percent === 100 ? "text-green-600" : "text-amber-600"
+                        percent === 100 ? "text-status-success" : "text-status-warning"
                     )}>
                         {percent}%
                     </span>
@@ -65,9 +65,9 @@ export function ProviderOnboardingProgress({
                             )}
                         >
                             {step.completed ? (
-                                <CheckCircle2 className="h-4 w-4 text-green-600 flex-shrink-0" />
+                                <CheckCircle2 className="h-4 w-4 text-status-success flex-shrink-0" />
                             ) : step.required ? (
-                                <AlertCircle className="h-4 w-4 text-amber-500 flex-shrink-0" />
+                                <AlertCircle className="h-4 w-4 text-status-warning flex-shrink-0" />
                             ) : (
                                 <Circle className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                             )}
@@ -75,7 +75,7 @@ export function ProviderOnboardingProgress({
                                 {step.label}
                             </span>
                             {!step.completed && step.required && (
-                                <span className="text-xs text-amber-600 font-medium">Required</span>
+                                <span className="text-xs text-status-warning font-medium">Required</span>
                             )}
                         </div>
                     ))}

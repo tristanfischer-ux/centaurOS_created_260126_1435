@@ -157,7 +157,7 @@ export function EditTaskDialog({ open, onOpenChange, task, members }: EditTaskDi
                     {/* Basic Info */}
                     <div className="space-y-4">
                         <div className="space-y-2">
-                            <Label>Task Title <span className="text-red-500">*</span></Label>
+                            <Label>Task Title <span className="text-destructive" aria-label="required">*</span></Label>
                             <Input
                                 value={title}
                                 onChange={(e) => setTitle(e.target.value)}

@@ -8,7 +8,7 @@ export default async function ApplicationsPage() {
     if (error) {
         return (
             <div className="text-center py-12">
-                <p className="text-red-600">{error}</p>
+                <p className="text-destructive">{error}</p>
             </div>
         )
     }

@@ -66,7 +66,7 @@ export function VerifyButton({
         // Show status indicator for non-executives
         if (currentStatus === "verified") {
             return (
-                <div className={cn("flex items-center gap-1.5 text-emerald-600 text-sm font-medium", className)}>
+                <div className={cn("flex items-center gap-1.5 text-status-success text-sm font-medium", className)}>
                     <ShieldCheck className="h-4 w-4" />
                     <span>Verified</span>
                 </div>
@@ -74,7 +74,7 @@ export function VerifyButton({
         }
         if (currentStatus === "endorsed") {
             return (
-                <div className={cn("flex items-center gap-1.5 text-amber-600 text-sm font-medium", className)}>
+                <div className={cn("flex items-center gap-1.5 text-status-warning text-sm font-medium", className)}>
                     <Shield className="h-4 w-4" />
                     <span>Endorsed</span>
                 </div>
@@ -119,7 +119,7 @@ export function VerifyButton({
                 initial={{ scale: 0.95, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
                 className={cn(
-                    "flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-100 text-emerald-700 text-sm font-medium",
+                    "flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-status-success-light text-status-success-dark text-sm font-medium",
                     className
                 )}
             >
@@ -137,7 +137,7 @@ export function VerifyButton({
                     size="sm"
                     className={cn(
                         "gap-1.5",
-                        currentStatus === "endorsed" && "border-amber-300 text-amber-700 hover:bg-amber-50",
+                        currentStatus === "endorsed" && "border-status-warning text-status-warning-dark hover:bg-status-warning-light",
                         className
                     )}
                 >
@@ -148,7 +148,7 @@ export function VerifyButton({
             <DialogContent size="sm">
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
-                        <CheckCircle2 className="h-5 w-5 text-emerald-600" />
+                        <CheckCircle2 className="h-5 w-5 text-status-success" />
                         Verify Answer
                     </DialogTitle>
                     <DialogDescription>
@@ -166,7 +166,7 @@ export function VerifyButton({
                                 onClick={() => setSelectedAction("endorse")}
                                 className={cn(
                                     "flex-1",
-                                    selectedAction === "endorse" && "bg-amber-600 hover:bg-amber-700"
+                                    selectedAction === "endorse" && "bg-status-warning hover:bg-status-warning/90"
                                 )}
                             >
                                 <Shield className="h-4 w-4 mr-1.5" />
@@ -178,7 +178,7 @@ export function VerifyButton({
                                 onClick={() => setSelectedAction("verify")}
                                 className={cn(
                                     "flex-1",
-                                    selectedAction === "verify" && "bg-emerald-600 hover:bg-emerald-700"
+                                    selectedAction === "verify" && "bg-status-success hover:bg-status-success/90"
                                 )}
                             >
                                 <CheckCircle2 className="h-4 w-4 mr-1.5" />
@@ -199,9 +199,9 @@ export function VerifyButton({
                         />
                     </div>
 
-                    <div className="p-3 bg-blue-50 rounded-lg text-sm text-blue-800">
+                    <div className="p-3 bg-status-info-light rounded-lg text-sm text-status-info-dark">
                         <p className="font-medium mb-1">Democratic Workflow</p>
-                        <p className="text-blue-600 text-xs">
+                        <p className="text-status-info text-xs">
                             {selectedAction === "verify" 
                                 ? "Verifying confirms this AI answer is accurate and can be trusted by others."
                                 : "Endorsing indicates this answer looks good but may need additional review."}
@@ -225,8 +225,8 @@ export function VerifyButton({
                                 disabled={isSubmitting}
                                 className={cn(
                                     selectedAction === "verify" 
-                                        ? "bg-emerald-600 hover:bg-emerald-700" 
-                                        : "bg-amber-600 hover:bg-amber-700"
+                                        ? "bg-status-success hover:bg-status-success/90" 
+                                        : "bg-status-warning hover:bg-status-warning/90"
                                 )}
                             >
                                 {isSubmitting ? (

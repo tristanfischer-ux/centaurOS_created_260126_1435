@@ -70,7 +70,7 @@ export function SavedResourcesView({ savedResources: initialResources, error }: 
             <div className="p-8">
                 <div className="max-w-4xl mx-auto">
                     <div className="bg-status-error-light border border-destructive rounded-lg p-6 text-center">
-                        <p className="text-red-600">Failed to load saved resources: {error}</p>
+                        <p className="text-destructive">Failed to load saved resources: {error}</p>
                     </div>
                 </div>
             </div>

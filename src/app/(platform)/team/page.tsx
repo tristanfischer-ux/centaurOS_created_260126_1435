@@ -20,7 +20,7 @@ export default async function TeamPage() {
     const foundry_id = currentUserProfile?.foundry_id || user.app_metadata?.foundry_id
 
     if (!foundry_id) {
-        return <div className="p-8 text-red-500">Error: No Foundry associated with your account.</div>
+        return <div className="p-8 text-destructive">Error: No Foundry associated with your account.</div>
     }
 
     // Fetch all tasks for task metrics

@@ -88,7 +88,7 @@ export function CreateTeamDialog({ members }: { members: Member[] }) {
                 </DialogHeader>
                 <form onSubmit={handleCreate} className="space-y-4 py-4">
                     <div className="space-y-2">
-                        <Label htmlFor="name">Team Name <span className="text-red-500">*</span></Label>
+                        <Label htmlFor="name">Team Name <span className="text-destructive" aria-label="required">*</span></Label>
                         <Input
                             id="name"
                             value={name}

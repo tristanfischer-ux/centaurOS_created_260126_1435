@@ -94,11 +94,11 @@ export function NeedsAttentionSummary({
               className="flex items-center justify-between p-2 rounded-md hover:bg-muted transition-colors group"
             >
               <div className="flex items-center gap-2">
-                <AlertCircle className="h-4 w-4 text-red-600" />
+                <AlertCircle className="h-4 w-4 text-destructive" />
                 <span className="text-sm">Blockers reported</span>
               </div>
               <div className="flex items-center gap-1">
-                <Badge variant="outline" className="border-red-600 text-red-600">
+                <Badge variant="outline" className="border-destructive text-destructive">
                   {blockersCount}
                 </Badge>
                 <ChevronRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />

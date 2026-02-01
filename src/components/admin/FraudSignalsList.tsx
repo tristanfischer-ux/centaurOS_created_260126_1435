@@ -141,7 +141,7 @@ export function FraudSignalsList({
       case "velocity_violation":
         return <AlertTriangle className="h-4 w-4 text-amber-500" />
       case "payment_failure":
-        return <X className="h-4 w-4 text-red-500" />
+        return <X className="h-4 w-4 text-destructive" />
       case "dispute_frequency":
         return <AlertTriangle className="h-4 w-4 text-orange-500" />
       case "manual_report":

@@ -14,9 +14,9 @@ const badgeVariants = cva(
           "bg-secondary text-secondary-foreground hover:bg-secondary/80",
         destructive:
           "bg-destructive text-destructive-foreground hover:bg-destructive/80",
-        // Updated warning to use International Orange
+        // Updated warning to use semantic tokens
         warning:
-          "bg-orange-100 text-international-orange hover:bg-orange-200",
+          "bg-status-warning-light text-status-warning-dark hover:bg-status-warning-light/80",
         success:
           "bg-status-success-light text-status-success-dark hover:bg-status-success-light/80",
         info:

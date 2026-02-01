@@ -17,25 +17,25 @@ const founderSteps = [
     title: 'Welcome, Founder',
     description: 'Your command center for building at software speed. We\'ve prepared your foundry and are ready to help you scale.',
     icon: LayoutDashboard,
-    color: 'text-orange-600'
+    color: 'text-international-orange'
   },
   {
     title: 'Define Your Strategy',
     description: 'Set strategic Objectives that cascade into actionable tasks. Your team will align around your vision automatically.',
     icon: Target,
-    color: 'text-orange-600'
+    color: 'text-international-orange'
   },
   {
     title: 'Build Your Team',
     description: 'Access fractional Executives and AI-amplified Apprentices from the Marketplace. Scale up or down on demand.',
     icon: Users,
-    color: 'text-orange-600'
+    color: 'text-international-orange'
   },
   {
     title: 'Your Foundry is Ready',
     description: 'We\'ve created your first objective and sample tasks to get you started. Build atoms at the speed of bits.',
     icon: CheckCircle2,
-    color: 'text-orange-600'
+    color: 'text-international-orange'
   }
 ]
 
@@ -44,25 +44,25 @@ const executiveSteps = [
     title: 'Welcome to the Cadre',
     description: 'Deploy your expertise across multiple ventures. No politics, no bureaucracy—just high-impact work.',
     icon: LayoutDashboard,
-    color: 'text-orange-600'
+    color: 'text-international-orange'
   },
   {
     title: 'Your Portfolio Awaits',
     description: 'Work with multiple startups simultaneously. Each engagement is tracked, and your impact is measured.',
     icon: Target,
-    color: 'text-orange-600'
+    color: 'text-international-orange'
   },
   {
     title: 'AI-Amplified Teams',
     description: 'Lead teams of Apprentices with 10x output. The Marketplace connects you with the tools you need.',
     icon: Sparkles,
-    color: 'text-orange-600'
+    color: 'text-international-orange'
   },
   {
     title: 'Ready to Execute',
     description: 'Your dashboard shows pending approvals and team status. Start building with the founders who need you.',
     icon: CheckCircle2,
-    color: 'text-orange-600'
+    color: 'text-international-orange'
   }
 ]
 
@@ -71,25 +71,25 @@ const apprenticeSteps = [
     title: 'Welcome to the Guild',
     description: 'You\'re not junior—you\'re a Founder-in-Training. Your Digital Body awaits.',
     icon: GraduationCap,
-    color: 'text-orange-600'
+    color: 'text-international-orange'
   },
   {
     title: 'Your Digital Body',
     description: 'The Centaur OS gives you a 10x multiplier on your output. AI tools and workflows designed for builders.',
     icon: Sparkles,
-    color: 'text-orange-600'
+    color: 'text-international-orange'
   },
   {
     title: 'Learn by Doing',
     description: 'Ship real work in your first month. Direct mentorship from Executives who\'ve built before.',
     icon: Target,
-    color: 'text-orange-600'
+    color: 'text-international-orange'
   },
   {
     title: 'Your Training Begins',
     description: 'We\'ve assigned your first tasks. Complete them to progress on the Founder track.',
     icon: CheckCircle2,
-    color: 'text-orange-600'
+    color: 'text-international-orange'
   }
 ]
 
@@ -98,25 +98,25 @@ const defaultSteps = [
     title: 'Welcome to the Foundry',
     description: 'Your central command for high-velocity creation. CentaurOS combines human ingenuity with AI precision.',
     icon: LayoutDashboard,
-    color: 'text-orange-600'
+    color: 'text-international-orange'
   },
   {
     title: 'Define Your Mission',
     description: 'Set strategic Objectives that cascade into actionable tasks. Orchestrate your vision from the top down.',
     icon: Target,
-    color: 'text-orange-600'
+    color: 'text-international-orange'
   },
   {
     title: 'Hybrid Execution',
     description: 'Assign tasks to human experts or autonomous AI agents. The work happens where it needs to happen.',
     icon: Zap,
-    color: 'text-orange-600'
+    color: 'text-international-orange'
   },
   {
     title: 'The Renaissance is Here',
     description: 'You are now ready to build atoms at the speed of bits. Enter the Foundry and begin.',
     icon: CheckCircle2,
-    color: 'text-orange-600'
+    color: 'text-international-orange'
   }
 ]
 
@@ -152,12 +152,9 @@ export function OnboardingModal({ userRole }: OnboardingModalProps) {
         const result = await createSampleData()
         if (result.success) {
           toast.success('Your foundry is ready with sample objectives and tasks!')
-        } else {
-          toast.error(result.error || 'Failed to create sample data')
         }
       } catch (error) {
         console.error('Failed to create sample data:', error)
-        toast.error('Failed to create sample data')
       } finally {
         setIsCreatingSampleData(false)
       }
@@ -170,12 +167,9 @@ export function OnboardingModal({ userRole }: OnboardingModalProps) {
         const result = await createApprenticeTrainingTasks()
         if (result.success) {
           toast.success('Your Digital Body is ready! Training tasks have been assigned.')
-        } else {
-          toast.error(result.error || 'Failed to create training tasks')
         }
       } catch (error) {
         console.error('Failed to create training tasks:', error)
-        toast.error('Failed to create training tasks')
       } finally {
         setIsCreatingSampleData(false)
       }
@@ -206,7 +200,7 @@ export function OnboardingModal({ userRole }: OnboardingModalProps) {
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent size="sm" className="p-0 overflow-hidden bg-background border-none shadow-brand-lg">
+      <DialogContent className="sm:max-w-[480px] p-0 overflow-hidden bg-background border-none shadow-brand-lg">
         {/* Accessibility: Hidden title for screen readers */}
         <VisuallyHidden>
           <DialogTitle>{step.title}</DialogTitle>
@@ -221,7 +215,7 @@ export function OnboardingModal({ userRole }: OnboardingModalProps) {
           {/* Progress Indicator - Line Style */}
           <div className="absolute top-0 left-0 right-0 h-1 bg-muted">
             <div
-              className="h-full bg-orange-600 transition-all duration-500 ease-in-out"
+              className="h-full bg-international-orange transition-all duration-500 ease-in-out"
               style={{ width: `${((currentStep + 1) / steps.length) * 100}%` }}
             />
           </div>
@@ -229,7 +223,7 @@ export function OnboardingModal({ userRole }: OnboardingModalProps) {
           {/* Content */}
           <div className="pt-16 pb-10 px-10 text-center relative z-10 font-sans">
             <div className={cn(
-              'w-20 h-20 rounded-full mx-auto mb-8 flex items-center justify-center bg-muted border border-muted shadow-sm',
+              'w-20 h-20 rounded-full mx-auto mb-8 flex items-center justify-center bg-muted border border-slate-100 shadow-sm',
               step.color
             )}>
               <Icon className="w-8 h-8" strokeWidth={1.5} />
@@ -255,8 +249,8 @@ export function OnboardingModal({ userRole }: OnboardingModalProps) {
               <Button
                 onClick={handleNext}
                 className={cn(
-                  "min-w-[140px] h-11 text-xs uppercase tracking-widest font-semibold bg-foreground text-background hover:bg-orange-600 transition-colors duration-300 shadow-lg",
-                  currentStep === steps.length - 1 && "bg-orange-600 hover:bg-orange-500"
+                  "min-w-[140px] h-11 text-xs uppercase tracking-widest font-semibold bg-foreground text-background hover:bg-international-orange transition-colors duration-300 shadow-lg",
+                  currentStep === steps.length - 1 && "bg-international-orange hover:bg-international-orange/90"
                 )}
               >
                 {currentStep === steps.length - 1 ? 'Enter Foundry' : 'Next Step'}
@@ -270,7 +264,7 @@ export function OnboardingModal({ userRole }: OnboardingModalProps) {
                   key={index}
                   className={cn(
                     "w-1.5 h-1.5 rounded-full transition-colors duration-300",
-                    index === currentStep ? "bg-muted-foreground" : "bg-muted"
+                    index === currentStep ? "bg-slate-300" : "bg-muted"
                   )}
                 />
               ))}

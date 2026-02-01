@@ -30,16 +30,16 @@ export function StatsCard({
             value: 'text-foreground'
         },
         success: {
-            icon: 'text-green-600',
-            value: 'text-green-600'
+            icon: 'text-status-success',
+            value: 'text-status-success'
         },
         warning: {
             icon: 'text-amber-600',
             value: 'text-amber-600'
         },
         danger: {
-            icon: 'text-red-600',
-            value: 'text-red-600'
+            icon: 'text-destructive',
+            value: 'text-destructive'
         }
     }
     
@@ -52,9 +52,9 @@ export function StatsCard({
         : Minus
     
     const trendColor = trend?.direction === 'up'
-        ? 'text-green-600'
+        ? 'text-status-success'
         : trend?.direction === 'down'
-        ? 'text-red-600'
+        ? 'text-destructive'
         : 'text-muted-foreground'
     
     return (

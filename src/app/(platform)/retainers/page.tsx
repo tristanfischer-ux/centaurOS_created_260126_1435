@@ -128,7 +128,7 @@ export default async function RetainersPage() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-muted mb-8">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-3 mb-1">
-            <div className="h-8 w-1 bg-orange-600 rounded-full shadow-[0_0_8px_rgba(234,88,12,0.6)]" />
+            <div className="h-8 w-1 bg-international-orange rounded-full shadow-[0_0_8px_rgba(234,88,12,0.6)]" />
             <h1 className="text-2xl sm:text-3xl font-display font-semibold text-foreground tracking-tight">Retainers</h1>
           </div>
           <p className="text-muted-foreground mt-1 text-sm font-medium pl-4">
@@ -163,8 +163,8 @@ export default async function RetainersPage() {
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-amber-100 rounded-lg">
-                <Clock className="h-6 w-6 text-amber-600" />
+              <div className="p-2 bg-status-warning-light rounded-lg">
+                <Clock className="h-6 w-6 text-status-warning" />
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Pending Approval</p>

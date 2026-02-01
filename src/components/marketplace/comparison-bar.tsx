@@ -58,7 +58,7 @@ export function ComparisonBar({ selectedItems, onClear, onCompare, onRemove }: C
 
     return (
         <div className="fixed bottom-20 md:bottom-8 left-1/2 -translate-x-1/2 z-[200] animate-in slide-in-from-bottom-10 fade-in duration-300 w-full max-w-4xl px-4 pointer-events-none">
-            <Card className="shadow-xl !bg-white border-t-2 border-t-international-orange pointer-events-auto">
+            <Card className="shadow-xl bg-background border-t-2 border-t-international-orange pointer-events-auto">
                 {/* Header row */}
                 <div className="flex items-center justify-between px-4 py-2 border-b border-border/50">
                     <div className="flex items-center gap-2">
@@ -106,7 +106,7 @@ export function ComparisonBar({ selectedItems, onClear, onCompare, onRemove }: C
                                     )}
                                 >
                                     {/* Category icon */}
-                                    <div className="flex-shrink-0 w-8 h-8 rounded-md !bg-white flex items-center justify-center">
+                                    <div className="flex-shrink-0 w-8 h-8 rounded-md bg-background flex items-center justify-center">
                                         <CategoryIcon className="w-4 h-4" />
                                     </div>
                                     
@@ -133,7 +133,7 @@ export function ComparisonBar({ selectedItems, onClear, onCompare, onRemove }: C
                                     <button
                                         onClick={() => onRemove(item.id)}
                                         aria-label={`Remove ${item.title} from comparison`}
-                                        className="flex-shrink-0 w-6 h-6 rounded-full !bg-white hover:!bg-destructive hover:text-white flex items-center justify-center transition-colors"
+                                        className="flex-shrink-0 w-6 h-6 rounded-full bg-background hover:bg-destructive hover:text-white flex items-center justify-center transition-colors"
                                     >
                                         <X className="w-3.5 h-3.5" />
                                     </button>
