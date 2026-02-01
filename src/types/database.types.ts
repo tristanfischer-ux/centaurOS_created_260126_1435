@@ -1,4 +1,3 @@
-Initialising login role...
 export type Json =
   | string
   | number
@@ -2380,6 +2379,150 @@ export type Database = {
           },
         ]
       }
+      domain_familiarity: {
+        Row: {
+          domain_id: string
+          familiarity: string
+          foundry_id: string
+          id: string
+          notes: string | null
+          updated_at: string | null
+          updated_by: string | null
+        }
+        Insert: {
+          domain_id: string
+          familiarity?: string
+          foundry_id: string
+          id?: string
+          notes?: string | null
+          updated_at?: string | null
+          updated_by?: string | null
+        }
+        Update: {
+          domain_id?: string
+          familiarity?: string
+          foundry_id?: string
+          id?: string
+          notes?: string | null
+          updated_at?: string | null
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "domain_familiarity_domain_id_fkey"
+            columns: ["domain_id"]
+            isOneToOne: false
+            referencedRelation: "knowledge_domains"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "domain_familiarity_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "domain_familiarity_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "buyer_stats"
+            referencedColumns: ["buyer_id"]
+          },
+          {
+            foreignKeyName: "domain_familiarity_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      domain_question_assignments: {
+        Row: {
+          answer: string | null
+          assigned_by: string | null
+          assigned_to: string | null
+          created_at: string | null
+          domain_id: string
+          foundry_id: string
+          id: string
+          notes: string | null
+          question_id: string
+          status: string
+          updated_at: string | null
+        }
+        Insert: {
+          answer?: string | null
+          assigned_by?: string | null
+          assigned_to?: string | null
+          created_at?: string | null
+          domain_id: string
+          foundry_id: string
+          id?: string
+          notes?: string | null
+          question_id: string
+          status?: string
+          updated_at?: string | null
+        }
+        Update: {
+          answer?: string | null
+          assigned_by?: string | null
+          assigned_to?: string | null
+          created_at?: string | null
+          domain_id?: string
+          foundry_id?: string
+          id?: string
+          notes?: string | null
+          question_id?: string
+          status?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "domain_question_assignments_assigned_by_fkey"
+            columns: ["assigned_by"]
+            isOneToOne: false
+            referencedRelation: "buyer_stats"
+            referencedColumns: ["buyer_id"]
+          },
+          {
+            foreignKeyName: "domain_question_assignments_assigned_by_fkey"
+            columns: ["assigned_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "domain_question_assignments_assigned_to_fkey"
+            columns: ["assigned_to"]
+            isOneToOne: false
+            referencedRelation: "buyer_stats"
+            referencedColumns: ["buyer_id"]
+          },
+          {
+            foreignKeyName: "domain_question_assignments_assigned_to_fkey"
+            columns: ["assigned_to"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "domain_question_assignments_domain_id_fkey"
+            columns: ["domain_id"]
+            isOneToOne: false
+            referencedRelation: "knowledge_domains"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "domain_question_assignments_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       escrow_transactions: {
         Row: {
           amount: number
@@ -2970,6 +3113,7 @@ export type Database = {
           name: string
           parent_id: string | null
           prerequisite_domain_ids: string[] | null
+          primer: Json | null
           related_domain_ids: string[] | null
           supplier_categories: string[] | null
           template_id: string | null
@@ -2991,6 +3135,7 @@ export type Database = {
           name: string
           parent_id?: string | null
           prerequisite_domain_ids?: string[] | null
+          primer?: Json | null
           related_domain_ids?: string[] | null
           supplier_categories?: string[] | null
           template_id?: string | null
@@ -3012,6 +3157,7 @@ export type Database = {
           name?: string
           parent_id?: string | null
           prerequisite_domain_ids?: string[] | null
+          primer?: Json | null
           related_domain_ids?: string[] | null
           supplier_categories?: string[] | null
           template_id?: string | null
@@ -8574,6 +8720,29 @@ export type Database = {
         Returns: undefined
       }
       update_trending_searches: { Args: never; Returns: undefined }
+      upsert_domain_familiarity: {
+        Args: {
+          p_domain_id: string
+          p_familiarity: string
+          p_foundry_id: string
+          p_notes?: string
+        }
+        Returns: {
+          domain_id: string
+          familiarity: string
+          foundry_id: string
+          id: string
+          notes: string | null
+          updated_at: string | null
+          updated_by: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "domain_familiarity"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       upsert_presence: {
         Args: {
           p_current_task_id?: string

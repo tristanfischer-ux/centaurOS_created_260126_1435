@@ -1238,9 +1238,7 @@ export async function getDomainFamiliarity(domainId: string): Promise<{
     return { data: null, error: 'No foundry context' }
   }
 
-  // domain_familiarity table exists but types need regeneration
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data, error } = await (supabase as any)
+  const { data, error } = await supabase
     .from('domain_familiarity')
     .select(`
       *,
@@ -1255,7 +1253,13 @@ export async function getDomainFamiliarity(domainId: string): Promise<{
     return { data: null, error: sanitizeErrorMessage(error) }
   }
 
-  return { data: data as DomainFamiliarity | null, error: null }
+  return { 
+    data: data ? {
+      ...data,
+      updater: data.updater as DomainFamiliarity['updater']
+    } as DomainFamiliarity : null, 
+    error: null 
+  }
 }
 
 /**
@@ -1284,9 +1288,7 @@ export async function getFoundryFamiliarities(templateId: string): Promise<{
 
   const domainIds = domains.map(d => d.id)
 
-  // domain_familiarity table exists but types need regeneration
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data, error } = await (supabase as any)
+  const { data, error } = await supabase
     .from('domain_familiarity')
     .select(`
       *,
@@ -1302,8 +1304,11 @@ export async function getFoundryFamiliarities(templateId: string): Promise<{
 
   // Create a map of domain_id to familiarity
   const familiarityMap = new Map<string, DomainFamiliarity>()
-  for (const item of (data || []) as Array<{ domain_id: string }>) {
-    familiarityMap.set(item.domain_id, item as DomainFamiliarity)
+  for (const item of (data || [])) {
+    familiarityMap.set(item.domain_id, {
+      ...item,
+      updater: item.updater as DomainFamiliarity['updater']
+    } as DomainFamiliarity)
   }
 
   return { data: familiarityMap, error: null }
@@ -1329,9 +1334,7 @@ export async function setDomainFamiliarity(input: SetDomainFamiliarityInput): Pr
   }
 
   // Use the RPC function for atomic upsert
-  // upsert_domain_familiarity RPC exists but types need regeneration
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data, error } = await (supabase as any)
+  const { data, error } = await supabase
     .rpc('upsert_domain_familiarity', {
       p_domain_id: input.domain_id,
       p_foundry_id: input.foundry_id,
@@ -1345,7 +1348,8 @@ export async function setDomainFamiliarity(input: SetDomainFamiliarityInput): Pr
   }
 
   revalidatePath('/blueprints')
-  return { data: data as unknown as DomainFamiliarity, error: null }
+  // RPC returns the row directly
+  return { data: data as DomainFamiliarity, error: null }
 }
 
 /**

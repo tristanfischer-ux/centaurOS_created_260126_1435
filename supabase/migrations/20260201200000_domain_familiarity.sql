@@ -64,10 +64,7 @@ CREATE POLICY "domain_familiarity_select_policy"
 ON domain_familiarity FOR SELECT
 TO authenticated
 USING (
-  foundry_id IN (
-    SELECT foundry_id FROM foundry_members 
-    WHERE profile_id = auth.uid()
-  )
+  public.is_active_user() AND foundry_id = public.get_my_foundry_id()
 );
 
 -- Members can insert familiarity for their foundry
@@ -75,10 +72,7 @@ CREATE POLICY "domain_familiarity_insert_policy"
 ON domain_familiarity FOR INSERT
 TO authenticated
 WITH CHECK (
-  foundry_id IN (
-    SELECT foundry_id FROM foundry_members 
-    WHERE profile_id = auth.uid()
-  )
+  public.is_active_user() AND foundry_id = public.get_my_foundry_id()
 );
 
 -- Members can update familiarity for their foundry
@@ -86,27 +80,22 @@ CREATE POLICY "domain_familiarity_update_policy"
 ON domain_familiarity FOR UPDATE
 TO authenticated
 USING (
-  foundry_id IN (
-    SELECT foundry_id FROM foundry_members 
-    WHERE profile_id = auth.uid()
-  )
+  public.is_active_user() AND foundry_id = public.get_my_foundry_id()
 )
 WITH CHECK (
-  foundry_id IN (
-    SELECT foundry_id FROM foundry_members 
-    WHERE profile_id = auth.uid()
-  )
+  public.is_active_user() AND foundry_id = public.get_my_foundry_id()
 );
 
--- Members can delete familiarity for their foundry (admins/managers)
+-- Founders/Executives can delete familiarity for their foundry
 CREATE POLICY "domain_familiarity_delete_policy"
 ON domain_familiarity FOR DELETE
 TO authenticated
 USING (
-  foundry_id IN (
-    SELECT fm.foundry_id FROM foundry_members fm
-    WHERE fm.profile_id = auth.uid()
-    AND fm.role IN ('admin', 'manager')
+  public.is_active_user() 
+  AND foundry_id = public.get_my_foundry_id()
+  AND EXISTS (
+    SELECT 1 FROM profiles 
+    WHERE id = auth.uid() AND role IN ('Founder', 'Executive')
   )
 );
 
@@ -121,10 +110,7 @@ CREATE POLICY "domain_question_assignments_select_policy"
 ON domain_question_assignments FOR SELECT
 TO authenticated
 USING (
-  foundry_id IN (
-    SELECT foundry_id FROM foundry_members 
-    WHERE profile_id = auth.uid()
-  )
+  public.is_active_user() AND foundry_id = public.get_my_foundry_id()
 );
 
 -- Members can insert assignments for their foundry
@@ -132,34 +118,35 @@ CREATE POLICY "domain_question_assignments_insert_policy"
 ON domain_question_assignments FOR INSERT
 TO authenticated
 WITH CHECK (
-  foundry_id IN (
-    SELECT foundry_id FROM foundry_members 
-    WHERE profile_id = auth.uid()
-  )
+  public.is_active_user() AND foundry_id = public.get_my_foundry_id()
 );
 
--- Assignee or admins can update assignments
+-- Assignee or Founders/Executives can update assignments
 CREATE POLICY "domain_question_assignments_update_policy"
 ON domain_question_assignments FOR UPDATE
 TO authenticated
 USING (
-  assigned_to = auth.uid()
-  OR foundry_id IN (
-    SELECT fm.foundry_id FROM foundry_members fm
-    WHERE fm.profile_id = auth.uid()
-    AND fm.role IN ('admin', 'manager')
+  public.is_active_user() 
+  AND foundry_id = public.get_my_foundry_id()
+  AND (
+    assigned_to = auth.uid()
+    OR EXISTS (
+      SELECT 1 FROM profiles 
+      WHERE id = auth.uid() AND role IN ('Founder', 'Executive')
+    )
   )
 );
 
--- Admins can delete assignments
+-- Founders/Executives can delete assignments
 CREATE POLICY "domain_question_assignments_delete_policy"
 ON domain_question_assignments FOR DELETE
 TO authenticated
 USING (
-  foundry_id IN (
-    SELECT fm.foundry_id FROM foundry_members fm
-    WHERE fm.profile_id = auth.uid()
-    AND fm.role IN ('admin', 'manager')
+  public.is_active_user() 
+  AND foundry_id = public.get_my_foundry_id()
+  AND EXISTS (
+    SELECT 1 FROM profiles 
+    WHERE id = auth.uid() AND role IN ('Founder', 'Executive')
   )
 );
 
@@ -180,12 +167,14 @@ SET search_path = public
 AS $$
 DECLARE
   v_result domain_familiarity;
+  v_user_foundry_id TEXT;
 BEGIN
-  -- Verify user is member of foundry
-  IF NOT EXISTS (
-    SELECT 1 FROM foundry_members 
-    WHERE foundry_id = p_foundry_id AND profile_id = auth.uid()
-  ) THEN
+  -- Verify user is member of foundry using profiles table
+  SELECT foundry_id INTO v_user_foundry_id 
+  FROM profiles 
+  WHERE id = auth.uid();
+
+  IF v_user_foundry_id IS NULL OR v_user_foundry_id != p_foundry_id THEN
     RAISE EXCEPTION 'Not authorized to update familiarity for this foundry';
   END IF;
 
