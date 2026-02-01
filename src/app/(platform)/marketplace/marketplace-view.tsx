@@ -385,10 +385,13 @@ export function MarketplaceView({
             id: 'People',
             title: 'People',
             icon: UserCircle,
-            color: 'bg-electric-blue',
-            lightColor: 'bg-status-info-light',
-            borderColor: 'border-electric-blue',
-            textColor: 'text-electric-blue',
+            color: 'bg-blue-500',
+            hoverColor: 'hover:border-blue-400 hover:bg-blue-50',
+            lightColor: 'bg-blue-50',
+            borderColor: 'border-blue-500',
+            textColor: 'text-blue-600',
+            iconBg: 'bg-blue-100',
+            buttonBg: 'bg-blue-500 hover:bg-blue-600',
             categories: ['People'],
             headline: 'Expert Talent On-Demand',
             description: 'Access fractional executives, specialists, and apprentices who bring deep expertise without full-time commitment. From CTOs to CAD specialists, find the exact skills you need.',
@@ -403,10 +406,13 @@ export function MarketplaceView({
             id: 'Products',
             title: 'Physical Products',
             icon: Package,
-            color: 'bg-international-orange',
+            color: 'bg-orange-500',
+            hoverColor: 'hover:border-orange-400 hover:bg-orange-50',
             lightColor: 'bg-orange-50',
-            borderColor: 'border-international-orange',
-            textColor: 'text-international-orange',
+            borderColor: 'border-orange-500',
+            textColor: 'text-orange-600',
+            iconBg: 'bg-orange-100',
+            buttonBg: 'bg-orange-500 hover:bg-orange-600',
             categories: ['Products'],
             headline: 'Manufacturing Partners',
             description: 'Connect with certified manufacturers and suppliers for physical products. From precision engineering to rapid prototyping, source quality components and finished goods.',
@@ -421,10 +427,13 @@ export function MarketplaceView({
             id: 'Services',
             title: 'Services',
             icon: Wrench,
-            color: 'bg-status-success',
-            lightColor: 'bg-status-success-light',
-            borderColor: 'border-status-success',
-            textColor: 'text-status-success',
+            color: 'bg-emerald-500',
+            hoverColor: 'hover:border-emerald-400 hover:bg-emerald-50',
+            lightColor: 'bg-emerald-50',
+            borderColor: 'border-emerald-500',
+            textColor: 'text-emerald-600',
+            iconBg: 'bg-emerald-100',
+            buttonBg: 'bg-emerald-500 hover:bg-emerald-600',
             categories: ['Services', 'AI'],
             headline: 'Professional Services & AI Tools',
             description: 'From consulting and legal services to cutting-edge AI tools, access the services that accelerate your business. Includes AI agents, automation tools, and software solutions.',
@@ -671,57 +680,181 @@ export function MarketplaceView({
                 />
             )}
 
-            {/* Compact Category Selector Cards - Always visible at top */}
-            <div className="grid grid-cols-3 gap-3 mb-6">
-                {categoryCards.map((category) => {
-                    const Icon = category.icon
-                    const count = getCategoryCount(category.id)
-                    const isActive = activeTab === category.id
-                    return (
-                        <button
-                            key={category.id}
-                            onClick={() => handleCategoryClick(category.id)}
-                            className={cn(
-                                "group relative flex items-center gap-3 p-3 rounded-lg border-2 transition-all duration-200 text-left",
-                                isActive 
-                                    ? cn(category.borderColor, "shadow-md", category.lightColor)
-                                    : "border-border bg-background hover:border-muted-foreground/30 hover:shadow-sm"
-                            )}
-                        >
-                            {/* Icon */}
+            {/* Hero Category Cards - Rich detail about each category */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                {/* People Card */}
+                <div 
+                    onClick={() => handleCategoryClick('People')}
+                    className={cn(
+                        "group cursor-pointer transition-all duration-200 overflow-hidden rounded-xl border-2 bg-background",
+                        activeTab === 'People'
+                            ? "border-blue-500 shadow-lg bg-blue-50"
+                            : "border-border shadow-sm hover:border-blue-400 hover:bg-blue-50 hover:shadow-lg hover:-translate-y-1"
+                    )}
+                >
+                    <div className="h-2 bg-blue-500" />
+                    <div className="p-5 space-y-4">
+                        <div className="flex items-start justify-between">
                             <div className={cn(
-                                "w-10 h-10 rounded-lg flex items-center justify-center shrink-0 transition-colors",
-                                isActive ? category.lightColor : "bg-muted"
+                                "w-12 h-12 rounded-xl flex items-center justify-center transition-all duration-200",
+                                activeTab === 'People' ? "bg-blue-100" : "bg-muted group-hover:bg-blue-100 group-hover:scale-110"
                             )}>
-                                <Icon className={cn(
-                                    "w-5 h-5 transition-colors",
-                                    isActive ? category.textColor : "text-muted-foreground"
+                                <UserCircle className={cn(
+                                    "w-6 h-6 transition-colors duration-200",
+                                    activeTab === 'People' ? "text-blue-600" : "text-muted-foreground group-hover:text-blue-600"
                                 )} />
                             </div>
-                            
-                            {/* Title + Count */}
-                            <div className="flex-1 min-w-0">
-                                <h3 className={cn(
-                                    "text-sm font-semibold truncate transition-colors",
-                                    isActive ? "text-foreground" : "text-muted-foreground group-hover:text-foreground"
-                                )}>
-                                    {category.title}
-                                </h3>
-                                <p className={cn(
-                                    "text-xs transition-colors",
-                                    isActive ? category.textColor : "text-muted-foreground"
-                                )}>
-                                    {count} available
-                                </p>
-                            </div>
-                            
-                            {/* Active indicator */}
-                            {isActive && (
-                                <div className={cn("absolute -bottom-px left-4 right-4 h-0.5 rounded-full", category.color)} />
-                            )}
+                            <Badge variant="secondary" className={cn("text-xs font-semibold", activeTab === 'People' && "bg-blue-100 text-blue-600")}>
+                                {getCategoryCount('People')} available
+                            </Badge>
+                        </div>
+                        <div>
+                            <h3 className="text-lg font-bold text-foreground mb-1">People</h3>
+                            <p className={cn(
+                                "text-sm font-semibold transition-colors",
+                                activeTab === 'People' ? "text-blue-600" : "text-muted-foreground group-hover:text-blue-600"
+                            )}>
+                                Expert Talent On-Demand
+                            </p>
+                        </div>
+                        <p className="text-sm text-muted-foreground leading-relaxed">
+                            Access fractional executives, specialists, and apprentices who bring deep expertise without full-time commitment. From CTOs to CAD specialists, find the exact skills you need.
+                        </p>
+                        <ul className="space-y-2">
+                            {['Fractional executives with 15+ years experience', 'Verified credentials and track records', 'Flexible engagement: hourly, daily, or retainer', 'Pre-vetted for quality and reliability'].map((benefit, idx) => (
+                                <li key={idx} className="flex items-start gap-2 text-sm">
+                                    <CheckCircle2 className={cn("w-4 h-4 mt-0.5 shrink-0", activeTab === 'People' ? "text-blue-600" : "text-emerald-500")} />
+                                    <span className="text-muted-foreground">{benefit}</span>
+                                </li>
+                            ))}
+                        </ul>
+                        <button className={cn(
+                            "w-full flex items-center justify-between px-4 py-2.5 rounded-lg font-medium text-sm transition-all duration-200",
+                            activeTab === 'People'
+                                ? "bg-blue-500 hover:bg-blue-600 text-white shadow-md"
+                                : "bg-muted text-muted-foreground group-hover:bg-blue-500 group-hover:text-white"
+                        )}>
+                            {activeTab === 'People' ? 'Browsing People' : 'Explore People'}
+                            <ArrowRight className="w-4 h-4 transition-transform duration-200 group-hover:translate-x-1" />
                         </button>
-                    )
-                })}
+                    </div>
+                </div>
+
+                {/* Products Card */}
+                <div 
+                    onClick={() => handleCategoryClick('Products')}
+                    className={cn(
+                        "group cursor-pointer transition-all duration-200 overflow-hidden rounded-xl border-2 bg-background",
+                        activeTab === 'Products'
+                            ? "border-orange-500 shadow-lg bg-orange-50"
+                            : "border-border shadow-sm hover:border-orange-400 hover:bg-orange-50 hover:shadow-lg hover:-translate-y-1"
+                    )}
+                >
+                    <div className="h-2 bg-orange-500" />
+                    <div className="p-5 space-y-4">
+                        <div className="flex items-start justify-between">
+                            <div className={cn(
+                                "w-12 h-12 rounded-xl flex items-center justify-center transition-all duration-200",
+                                activeTab === 'Products' ? "bg-orange-100" : "bg-muted group-hover:bg-orange-100 group-hover:scale-110"
+                            )}>
+                                <Package className={cn(
+                                    "w-6 h-6 transition-colors duration-200",
+                                    activeTab === 'Products' ? "text-orange-600" : "text-muted-foreground group-hover:text-orange-600"
+                                )} />
+                            </div>
+                            <Badge variant="secondary" className={cn("text-xs font-semibold", activeTab === 'Products' && "bg-orange-100 text-orange-600")}>
+                                {getCategoryCount('Products')} available
+                            </Badge>
+                        </div>
+                        <div>
+                            <h3 className="text-lg font-bold text-foreground mb-1">Physical Products</h3>
+                            <p className={cn(
+                                "text-sm font-semibold transition-colors",
+                                activeTab === 'Products' ? "text-orange-600" : "text-muted-foreground group-hover:text-orange-600"
+                            )}>
+                                Manufacturing Partners
+                            </p>
+                        </div>
+                        <p className="text-sm text-muted-foreground leading-relaxed">
+                            Connect with certified manufacturers and suppliers for physical products. From precision engineering to rapid prototyping, source quality components and finished goods.
+                        </p>
+                        <ul className="space-y-2">
+                            {['ISO-certified manufacturing facilities', 'Prototyping to full production scale', 'Quality assurance and compliance', 'Transparent lead times and pricing'].map((benefit, idx) => (
+                                <li key={idx} className="flex items-start gap-2 text-sm">
+                                    <CheckCircle2 className={cn("w-4 h-4 mt-0.5 shrink-0", activeTab === 'Products' ? "text-orange-600" : "text-emerald-500")} />
+                                    <span className="text-muted-foreground">{benefit}</span>
+                                </li>
+                            ))}
+                        </ul>
+                        <button className={cn(
+                            "w-full flex items-center justify-between px-4 py-2.5 rounded-lg font-medium text-sm transition-all duration-200",
+                            activeTab === 'Products'
+                                ? "bg-orange-500 hover:bg-orange-600 text-white shadow-md"
+                                : "bg-muted text-muted-foreground group-hover:bg-orange-500 group-hover:text-white"
+                        )}>
+                            {activeTab === 'Products' ? 'Browsing Products' : 'Explore Products'}
+                            <ArrowRight className="w-4 h-4 transition-transform duration-200 group-hover:translate-x-1" />
+                        </button>
+                    </div>
+                </div>
+
+                {/* Services Card */}
+                <div 
+                    onClick={() => handleCategoryClick('Services')}
+                    className={cn(
+                        "group cursor-pointer transition-all duration-200 overflow-hidden rounded-xl border-2 bg-background",
+                        activeTab === 'Services'
+                            ? "border-emerald-500 shadow-lg bg-emerald-50"
+                            : "border-border shadow-sm hover:border-emerald-400 hover:bg-emerald-50 hover:shadow-lg hover:-translate-y-1"
+                    )}
+                >
+                    <div className="h-2 bg-emerald-500" />
+                    <div className="p-5 space-y-4">
+                        <div className="flex items-start justify-between">
+                            <div className={cn(
+                                "w-12 h-12 rounded-xl flex items-center justify-center transition-all duration-200",
+                                activeTab === 'Services' ? "bg-emerald-100" : "bg-muted group-hover:bg-emerald-100 group-hover:scale-110"
+                            )}>
+                                <Wrench className={cn(
+                                    "w-6 h-6 transition-colors duration-200",
+                                    activeTab === 'Services' ? "text-emerald-600" : "text-muted-foreground group-hover:text-emerald-600"
+                                )} />
+                            </div>
+                            <Badge variant="secondary" className={cn("text-xs font-semibold", activeTab === 'Services' && "bg-emerald-100 text-emerald-600")}>
+                                {getCategoryCount('Services')} available
+                            </Badge>
+                        </div>
+                        <div>
+                            <h3 className="text-lg font-bold text-foreground mb-1">Services</h3>
+                            <p className={cn(
+                                "text-sm font-semibold transition-colors",
+                                activeTab === 'Services' ? "text-emerald-600" : "text-muted-foreground group-hover:text-emerald-600"
+                            )}>
+                                Professional Services & AI Tools
+                            </p>
+                        </div>
+                        <p className="text-sm text-muted-foreground leading-relaxed">
+                            From consulting and legal services to cutting-edge AI tools, access the services that accelerate your business. Includes AI agents, automation tools, and software solutions.
+                        </p>
+                        <ul className="space-y-2">
+                            {['Business consulting and advisory', 'AI tools and automation platforms', 'Legal, finance, and HR services', 'Integration support and training'].map((benefit, idx) => (
+                                <li key={idx} className="flex items-start gap-2 text-sm">
+                                    <CheckCircle2 className={cn("w-4 h-4 mt-0.5 shrink-0", activeTab === 'Services' ? "text-emerald-600" : "text-emerald-500")} />
+                                    <span className="text-muted-foreground">{benefit}</span>
+                                </li>
+                            ))}
+                        </ul>
+                        <button className={cn(
+                            "w-full flex items-center justify-between px-4 py-2.5 rounded-lg font-medium text-sm transition-all duration-200",
+                            activeTab === 'Services'
+                                ? "bg-emerald-500 hover:bg-emerald-600 text-white shadow-md"
+                                : "bg-muted text-muted-foreground group-hover:bg-emerald-500 group-hover:text-white"
+                        )}>
+                            {activeTab === 'Services' ? 'Browsing Services' : 'Explore Services'}
+                            <ArrowRight className="w-4 h-4 transition-transform duration-200 group-hover:translate-x-1" />
+                        </button>
+                    </div>
+                </div>
             </div>
 
             {/* Listings Section */}
