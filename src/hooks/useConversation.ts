@@ -258,7 +258,7 @@ export function useConversation(
 }
 
 // Hook for conversation list with realtime updates
-export function useConversationList() {
+export function useConversationList(userId?: string) {
   const [conversations, setConversations] = useState<ConversationWithParticipants[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -272,8 +272,16 @@ export function useConversationList() {
     setError(null)
 
     try {
-      const { getConversations } = await import('@/actions/messaging')
-      const result = await getConversations(status)
+      // Try enhanced conversations first, fall back to legacy
+      const { getEnhancedConversations, getConversations } = await import('@/actions/messaging')
+      
+      let result
+      try {
+        result = await getEnhancedConversations({ status })
+      } catch {
+        // Fall back to legacy if enhanced fails
+        result = await getConversations(status)
+      }
       
       if (!result.success) {
         setError(result.error || 'Failed to load conversations')
@@ -299,7 +307,7 @@ export function useConversationList() {
 
       // Subscribe to conversation updates
       channelRef.current = supabase
-        .channel('conversation-list')
+        .channel(`conversation-list-${user.id}`)
         .on(
           'postgres_changes',
           {
@@ -327,6 +335,20 @@ export function useConversationList() {
             }
           }
         )
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'conversation_participants'
+          },
+          async () => {
+            // Refresh when participant data changes
+            if (mounted) {
+              await fetchConversations()
+            }
+          }
+        )
         .subscribe((status) => {
           setIsConnected(status === 'SUBSCRIBED')
         })
@@ -340,7 +362,7 @@ export function useConversationList() {
         supabase.removeChannel(channelRef.current)
       }
     }
-  }, [fetchConversations, supabase])
+  }, [fetchConversations, supabase, userId])
 
   return {
     conversations,

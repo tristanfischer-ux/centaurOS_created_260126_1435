@@ -12,8 +12,9 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "@/components/ui/table"
-import { Check, X, GitCompare, Users, MoreHorizontal, Pencil, Trash2, Loader2, AlertTriangle, Mail, Phone, LayoutGrid, List, ChevronUp, ChevronDown, User, Calendar, Clock, CheckCircle2, Sparkles, Repeat } from "lucide-react"
+import { Check, X, GitCompare, Users, MoreHorizontal, Pencil, Trash2, Loader2, AlertTriangle, Mail, Phone, LayoutGrid, List, ChevronUp, ChevronDown, User, Calendar, Clock, CheckCircle2, Sparkles, Repeat, MessageSquare } from "lucide-react"
 import { createTeam, addTeamMember, deleteMember } from "@/actions/team"
+import { startDirectMessage } from "@/actions/messaging"
 import { deleteTeam, updateTeamName } from "@/actions/teams"
 import Link from "next/link"
 import { CreateTeamDialog } from "./create-team-dialog"
@@ -498,6 +499,21 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                                     >
                                         <User className="mr-2 h-4 w-4" /> View Profile
                                     </DropdownMenuItem>
+                                    {member.role !== 'AI_Agent' && (
+                                        <DropdownMenuItem
+                                            onClick={async (e) => {
+                                                e.stopPropagation()
+                                                const result = await startDirectMessage(member.id)
+                                                if (result.success) {
+                                                    toast.success(`Started conversation with ${member.full_name}`)
+                                                } else {
+                                                    toast.error(result.error || 'Failed to start conversation')
+                                                }
+                                            }}
+                                        >
+                                            <MessageSquare className="mr-2 h-4 w-4" /> Message
+                                        </DropdownMenuItem>
+                                    )}
                                     <DropdownMenuItem
                                         className="text-destructive focus:text-destructive focus:bg-destructive/10"
                                         onClick={(e) => {
@@ -853,6 +869,20 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                             <DropdownMenuItem asChild>
                                 <Link href={`/team/${member.id}`}>View Profile</Link>
                             </DropdownMenuItem>
+                            {member.role !== 'AI_Agent' && (
+                                <DropdownMenuItem
+                                    onClick={async () => {
+                                        const result = await startDirectMessage(member.id)
+                                        if (result.success) {
+                                            toast.success(`Started conversation with ${member.full_name}`)
+                                        } else {
+                                            toast.error(result.error || 'Failed to start conversation')
+                                        }
+                                    }}
+                                >
+                                    <MessageSquare className="mr-2 h-4 w-4" /> Message
+                                </DropdownMenuItem>
+                            )}
                             <DropdownMenuItem
                                 className="text-destructive focus:text-destructive focus:bg-destructive/10"
                                 onClick={() => setMemberToDelete(member.id)}

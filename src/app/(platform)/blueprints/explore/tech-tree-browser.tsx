@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { DomainActionPanel } from '@/components/blueprints/domain-action-panel'
+import { ExpertReviewDialog } from '@/components/blueprints/expert-review-dialog'
 import type { BlueprintTemplate, DomainTreeNode, DomainCategory } from '@/types/blueprints'
 import { DOMAIN_CATEGORY_COLORS } from '@/types/blueprints'
 import {
@@ -34,6 +35,7 @@ interface TemplateWithTree {
 
 interface TechTreeBrowserProps {
   templatesWithTrees: TemplateWithTree[]
+  foundryId?: string
 }
 
 // Icon mapping for templates
@@ -61,7 +63,7 @@ function countDomains(nodes: DomainTreeNode[]): number {
   return count
 }
 
-export function TechTreeBrowser({ templatesWithTrees }: TechTreeBrowserProps) {
+export function TechTreeBrowser({ templatesWithTrees, foundryId }: TechTreeBrowserProps) {
   const [expandedTemplates, setExpandedTemplates] = useState<Set<string>>(new Set())
   const [expandedDomains, setExpandedDomains] = useState<Set<string>>(new Set())
   const [selectedDomain, setSelectedDomain] = useState<{
@@ -70,6 +72,7 @@ export function TechTreeBrowser({ templatesWithTrees }: TechTreeBrowserProps) {
     path: string
   } | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
+  const [expertReviewDomain, setExpertReviewDomain] = useState<DomainTreeNode | null>(null)
 
   const toggleTemplate = (templateId: string) => {
     setExpandedTemplates((prev) => {
@@ -258,7 +261,20 @@ export function TechTreeBrowser({ templatesWithTrees }: TechTreeBrowserProps) {
         path={selectedDomain?.path || ''}
         open={!!selectedDomain}
         onOpenChange={(open) => !open && setSelectedDomain(null)}
+        foundryId={foundryId}
+        onExpertReviewClick={(domain) => {
+          setExpertReviewDomain(domain)
+        }}
       />
+
+      {/* Expert Review Dialog - will be implemented separately */}
+      {expertReviewDomain && (
+        <ExpertReviewDialog
+          domain={expertReviewDomain}
+          open={!!expertReviewDomain}
+          onOpenChange={(open) => !open && setExpertReviewDomain(null)}
+        />
+      )}
     </div>
   )
 }

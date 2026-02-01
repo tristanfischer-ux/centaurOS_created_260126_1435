@@ -1,6 +1,8 @@
 'use client'
 
+import { useState } from "react"
 import { MarketplaceListing } from "@/actions/marketplace"
+import { contactExpert } from "@/actions/messaging"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
@@ -29,12 +31,15 @@ import {
     CheckCircle2,
     Star,
     Calendar,
+    MessageSquare,
+    Loader2,
 } from "lucide-react"
 import Link from "next/link"
 import { typography } from "@/lib/design-system"
 import { ProviderTrustSection } from "@/components/marketplace/ProviderTrustSection"
 import type { PortfolioItem, Certification, ProviderBadge } from "@/actions/trust-signals"
 import type { RatingsSummary, ProviderRating } from "@/actions/ratings"
+import { toast } from "sonner"
 
 interface TrustSignalsData {
     portfolio: PortfolioItem[]
@@ -64,6 +69,32 @@ const categoryBadgeStyles = {
 export function MarketplaceListingDetail({ listing, trustSignals, ratings }: MarketplaceListingDetailProps) {
     const attrs = listing.attributes || {}
     const category = listing.category
+    const [isContacting, setIsContacting] = useState(false)
+
+    // Handle contacting the expert/provider
+    const handleContact = async () => {
+        // Get the provider ID from the listing - could be created_by_provider_id or from attributes
+        const providerId = listing.created_by_provider_id || (attrs.provider_id as string)
+        
+        if (!providerId) {
+            toast.error('Unable to contact this provider')
+            return
+        }
+
+        setIsContacting(true)
+        try {
+            const result = await contactExpert(providerId, listing.id)
+            if (result.success) {
+                toast.success('Conversation started! Check the Messages sidebar.')
+            } else {
+                toast.error(result.error || 'Failed to start conversation')
+            }
+        } catch (error) {
+            toast.error('Failed to contact expert')
+        } finally {
+            setIsContacting(false)
+        }
+    }
 
     return (
         <div className="max-w-5xl mx-auto">
@@ -132,8 +163,23 @@ export function MarketplaceListingDetail({ listing, trustSignals, ratings }: Mar
                             Book Consultation
                         </Link>
                     </Button>
-                    <Button variant="default">
-                        Contact
+                    <Button 
+                        variant="default"
+                        onClick={handleContact}
+                        disabled={isContacting}
+                        className="bg-international-orange hover:bg-international-orange-hover"
+                    >
+                        {isContacting ? (
+                            <>
+                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                Connecting...
+                            </>
+                        ) : (
+                            <>
+                                <MessageSquare className="h-4 w-4 mr-2" />
+                                Message Expert
+                            </>
+                        )}
                     </Button>
                 </div>
             </div>

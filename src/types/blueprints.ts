@@ -42,6 +42,10 @@ export type SupplierStatus = 'evaluating' | 'active' | 'backup' | 'inactive'
 
 export type MilestoneStatus = 'upcoming' | 'in_progress' | 'complete' | 'blocked'
 
+export type FamiliarityLevel = 'expert' | 'familiar' | 'learning' | 'unknown'
+
+export type QuestionAssignmentStatus = 'pending' | 'in_progress' | 'answered' | 'skipped'
+
 // Project stages with display info
 export const PROJECT_STAGES: { value: ProjectStage; label: string; description: string }[] = [
   { value: 'concept', label: 'Concept', description: 'Early research and feasibility' },
@@ -70,6 +74,63 @@ export const COVERAGE_STATUS_COLORS: Record<CoverageStatus, { bg: string; text: 
   gap: { bg: 'bg-status-error-light', text: 'text-destructive', border: 'border-destructive', dot: 'bg-destructive' },
   not_needed: { bg: 'bg-muted', text: 'text-muted-foreground', border: 'border-muted', dot: 'bg-muted-foreground' },
 }
+
+// Familiarity levels with display info and colors
+export const FAMILIARITY_LEVELS: { 
+  value: FamiliarityLevel
+  label: string
+  description: string
+  icon: string
+  bg: string
+  text: string
+  recommendedAction: string
+  actionExplanation: string
+}[] = [
+  { 
+    value: 'expert', 
+    label: 'Expert', 
+    description: 'Deep knowledge, can make decisions',
+    icon: 'star',
+    bg: 'bg-status-success-light',
+    text: 'text-status-success',
+    recommendedAction: 'document',
+    actionExplanation: 'Record your decisions for this domain'
+  },
+  { 
+    value: 'familiar', 
+    label: 'Familiar', 
+    description: 'Understand basics, may need guidance',
+    icon: 'check-circle',
+    bg: 'bg-status-info-light',
+    text: 'text-status-info',
+    recommendedAction: 'objective',
+    actionExplanation: 'You understand the basics - start tracking progress'
+  },
+  { 
+    value: 'learning', 
+    label: 'Learning', 
+    description: 'Actively studying this area',
+    icon: 'book-open',
+    bg: 'bg-status-warning-light',
+    text: 'text-status-warning',
+    recommendedAction: 'study',
+    actionExplanation: 'Build foundational knowledge with these resources'
+  },
+  { 
+    value: 'unknown', 
+    label: 'Unknown', 
+    description: 'Not yet assessed',
+    icon: 'help-circle',
+    bg: 'bg-muted',
+    text: 'text-muted-foreground',
+    recommendedAction: 'expert',
+    actionExplanation: 'Your team is unfamiliar - get guidance before committing'
+  },
+]
+
+// Get familiarity config by value
+export const getFamiliarityConfig = (level: FamiliarityLevel) => 
+  FAMILIARITY_LEVELS.find(f => f.value === level) || FAMILIARITY_LEVELS[3]
 
 // ============================================================================
 // BLUEPRINT TEMPLATES
@@ -110,6 +171,64 @@ export interface LearningResource {
   description?: string
 }
 
+/**
+ * Domain primer content - AI-generated or human-written overview of a domain
+ */
+export interface DomainPrimer {
+  overview: string
+  key_concepts: string[]
+  decision_points: string[]
+  terminology?: Record<string, string>
+  gotchas?: string[]
+  ai_generated?: boolean
+  last_updated?: string
+  contributed_by?: string
+}
+
+/**
+ * Domain familiarity tracking - team-level knowledge assessment
+ */
+export interface DomainFamiliarity {
+  id: string
+  domain_id: string
+  foundry_id: string
+  familiarity: FamiliarityLevel
+  updated_by: string | null
+  updated_at: string
+  notes: string | null
+  
+  // Joined data (optional)
+  updater?: {
+    id: string
+    full_name: string
+    avatar_url?: string
+  }
+}
+
+/**
+ * Question assignment for team members
+ */
+export interface DomainQuestionAssignment {
+  id: string
+  domain_id: string
+  foundry_id: string
+  question_id: string
+  assigned_to: string | null
+  status: QuestionAssignmentStatus
+  answer: string | null
+  notes: string | null
+  assigned_by: string | null
+  created_at: string
+  updated_at: string
+  
+  // Joined data
+  assignee?: {
+    id: string
+    full_name: string
+    avatar_url?: string
+  }
+}
+
 export interface KnowledgeDomain {
   id: string
   template_id: string
@@ -135,16 +254,19 @@ export interface KnowledgeDomain {
   criticality: DomainCriticality
   learning_time_estimate: string | null
   ai_summary: string | null
+  primer: DomainPrimer | null
   created_at: string
   
   // Computed fields (not in DB)
   children?: KnowledgeDomain[]
+  familiarity?: DomainFamiliarity | null
 }
 
 // Hierarchical domain tree node
 export interface DomainTreeNode extends KnowledgeDomain {
   children: DomainTreeNode[]
   path: string // "Electronics > Power Systems > Battery Management"
+  familiarity?: DomainFamiliarity | null
 }
 
 // ============================================================================
@@ -502,6 +624,27 @@ export interface CreateMilestoneInput {
   required_domain_ids?: string[]
 }
 
+export interface SetDomainFamiliarityInput {
+  domain_id: string
+  foundry_id: string
+  familiarity: FamiliarityLevel
+  notes?: string
+}
+
+export interface AssignQuestionInput {
+  domain_id: string
+  foundry_id: string
+  question_id: string
+  assigned_to: string
+  notes?: string
+}
+
+export interface AnswerQuestionInput {
+  assignment_id: string
+  answer: string
+  notes?: string
+}
+
 // ============================================================================
 // VIEW MODELS
 // ============================================================================
@@ -579,4 +722,39 @@ export interface Objective {
   created_at: string
   updated_at: string
   extended_description?: string | null
+}
+
+// ============================================================================
+// EXPERT REVIEW PACKET
+// ============================================================================
+
+/**
+ * Expert review packet - generated when requesting expert help on a domain
+ */
+export interface ExpertReviewPacket {
+  domain: {
+    id: string
+    name: string
+    path: string
+    category: DomainCategory | null
+    criticality: DomainCriticality
+  }
+  team_familiarity: FamiliarityLevel
+  primer_overview: string | null
+  unanswered_questions: {
+    id: string
+    question: string
+    context?: string
+    difficulty?: string
+  }[]
+  project_context?: {
+    blueprint_name?: string
+    project_stage?: ProjectStage
+    project_type?: ProjectType
+  }
+  requested_by: {
+    name: string
+    foundry_name: string
+  }
+  generated_at: string
 }

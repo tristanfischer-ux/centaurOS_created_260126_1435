@@ -9,6 +9,7 @@ import { OfflineIndicator } from "@/components/OfflineIndicator";
 import { OnboardingModal } from "@/components/OnboardingModal";
 import { ExecutiveProfilePrompt, VerificationSuccessToast } from "@/components/onboarding";
 import { FloatingAdminBox } from "@/components/admin/FloatingAdminBox";
+import { MessagingSidebarWrapper } from "@/components/messaging/MessagingSidebarWrapper";
 import { Suspense } from "react";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { PresenceProvider } from "@/components/PresenceProvider";
@@ -93,6 +94,7 @@ export default async function PlatformLayout({
                                 </ErrorBoundary>
                             </main>
                         </ZoomableContent>
+                        <MessagingSidebarWrapper userId={user.id} />
                         <MobileNav />
                         <PWARegister />
                         <DragDropPolyfill />

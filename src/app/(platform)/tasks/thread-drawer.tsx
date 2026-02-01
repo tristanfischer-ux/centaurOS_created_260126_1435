@@ -16,6 +16,7 @@ import { Markdown } from "@/components/ui/markdown"
 import { MentionInput } from "@/components/ui/mention-input"
 import { MentionText } from "@/components/ui/mention-text"
 import { addTaskComment, acceptTask, rejectTask, completeTask, forwardTask, triggerAIWorker } from "@/actions/tasks"
+import { startTaskDiscussion } from "@/actions/messaging"
 import { uploadTaskAttachment } from "@/actions/attachments"
 import { toast } from "sonner"
 import { useRouter } from "next/navigation"
@@ -36,6 +37,7 @@ interface ThreadDrawerProps {
     onOpenChange: (open: boolean) => void
     taskId: string
     taskTitle: string
+    taskNumber?: number
     taskStatus?: string
     taskDescription?: string
     assigneeName?: string
@@ -61,6 +63,7 @@ export function ThreadDrawer({
     onOpenChange,
     taskId,
     taskTitle,
+    taskNumber,
     taskStatus = 'Pending',
     taskDescription,
     assigneeName,
@@ -86,11 +89,29 @@ export function ThreadDrawer({
     const [rejectDialogOpen, setRejectDialogOpen] = useState(false)
     const [rejectReason, setRejectReason] = useState('')
     const [isDragging, setIsDragging] = useState(false)
+    const [isStartingDiscussion, setIsStartingDiscussion] = useState(false)
     const fileInputRef = useRef<HTMLInputElement>(null)
     const supabase = useMemo(() => createClient(), [])
 
     // Check if assignee is AI
     const isAIAssignee = assigneeRole === 'AI_Agent'
+
+    // Handle starting a task discussion
+    const handleStartDiscussion = async () => {
+        setIsStartingDiscussion(true)
+        try {
+            const result = await startTaskDiscussion(taskId)
+            if (result.success) {
+                toast.success('Discussion channel created! Check the Messages sidebar.')
+            } else {
+                toast.error(result.error || 'Failed to start discussion')
+            }
+        } catch (error) {
+            toast.error('Failed to start discussion')
+        } finally {
+            setIsStartingDiscussion(false)
+        }
+    }
 
     useEffect(() => {
         const fetchComments = async () => {
@@ -355,7 +376,7 @@ export function ThreadDrawer({
 
                     {/* Forward/Reassign Section */}
                     {!showForward ? (
-                        <div className="flex gap-2 pt-2 border-t border-border">
+                        <div className="flex flex-wrap gap-2 pt-2 border-t border-border">
                             <Button
                                 size="sm"
                                 variant="secondary"
@@ -363,6 +384,18 @@ export function ThreadDrawer({
                                 disabled={isActionLoading}
                             >
                                 <Forward className="h-4 w-4 mr-1" /> Reassign
+                            </Button>
+
+                            {/* Start Discussion button */}
+                            <Button
+                                size="sm"
+                                variant="secondary"
+                                onClick={handleStartDiscussion}
+                                disabled={isStartingDiscussion || isActionLoading}
+                                className="border-electric-blue/30 text-electric-blue hover:bg-electric-blue/10"
+                            >
+                                <MessageSquare className="h-4 w-4 mr-1" />
+                                {isStartingDiscussion ? 'Starting...' : 'Discuss'}
                             </Button>
 
                             {/* Trigger AI Worker button - only show for AI assignees */}

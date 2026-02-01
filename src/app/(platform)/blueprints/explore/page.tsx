@@ -1,5 +1,6 @@
 import { Suspense } from 'react'
 import { getBlueprintTemplates, getDomainTree } from '@/actions/blueprints'
+import { getFoundryIdCached } from '@/lib/supabase/foundry-context'
 import { TechTreeBrowser } from './tech-tree-browser'
 import { Skeleton } from '@/components/ui/skeleton'
 import type { BlueprintTemplate, DomainTreeNode } from '@/types/blueprints'
@@ -59,11 +60,17 @@ function LoadingSkeleton() {
 }
 
 export default async function ExploreTechTreesPage() {
-  const templatesWithTrees = await getTemplatesWithTrees()
+  const [templatesWithTrees, foundryId] = await Promise.all([
+    getTemplatesWithTrees(),
+    getFoundryIdCached(),
+  ])
 
   return (
     <Suspense fallback={<LoadingSkeleton />}>
-      <TechTreeBrowser templatesWithTrees={templatesWithTrees} />
+      <TechTreeBrowser 
+        templatesWithTrees={templatesWithTrees} 
+        foundryId={foundryId || undefined}
+      />
     </Suspense>
   )
 }

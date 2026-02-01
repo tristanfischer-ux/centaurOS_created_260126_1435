@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
-import { LayoutDashboard, Users, CheckSquare, Clock, Store, Settings, Target, HelpCircle, MoreHorizontal, MessageCircleQuestion, Sun, GraduationCap, Bookmark } from "lucide-react"
+import { LayoutDashboard, Users, CheckSquare, Clock, Store, Settings, Target, HelpCircle, MoreHorizontal, MessageCircleQuestion, Sun, GraduationCap, Bookmark, MessageSquare } from "lucide-react"
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -35,6 +35,7 @@ const mainNavigation = [
 
 // Items in the "More" dropdown
 const moreNavigation = [
+    { name: "Messages", href: "/messages", icon: MessageSquare },
     { name: "Timeline", href: "/timeline", icon: Clock, showOnFoldOuter: true },
     { name: "Saved Resources", href: "/saved-resources", icon: Bookmark },
     { name: "Advisory", href: "/advisory", icon: MessageCircleQuestion },

@@ -3,7 +3,7 @@
 import { MarketplaceListing } from "@/actions/marketplace"
 import { ComparisonBar } from "@/components/marketplace/comparison-bar"
 import { ComparisonModal } from "@/components/marketplace/comparison-modal"
-import { MarketCard } from "@/components/marketplace/market-card"
+import { MarketCard, CardSize } from "@/components/marketplace/market-card"
 import { MarketplaceOnboardingModal } from "@/components/onboarding/MarketplaceOnboardingModal"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { EmptyState } from "@/components/ui/empty-state"
@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useState, useMemo, useEffect, useCallback } from "react"
-import { Loader2, Store, Search, X, SlidersHorizontal, MapPin, Briefcase, GraduationCap, Bot, Factory, Zap, Shield, LayoutGrid, List, ShieldCheck, Clock, Sparkles, Users, ArrowRight, Bookmark, Star } from "lucide-react"
+import { Loader2, Store, Search, X, SlidersHorizontal, MapPin, Briefcase, GraduationCap, Bot, Factory, Zap, Shield, LayoutGrid, List, ShieldCheck, Clock, Sparkles, Users, ArrowRight, Bookmark, Star, Rows3, Square, LayoutList, Minus, AlignJustify } from "lucide-react"
 import { toast } from "sonner"
 import { Card } from "@/components/ui/card"
 import { cn } from "@/lib/utils"
@@ -78,6 +78,21 @@ export function MarketplaceView({
     const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('')
     const [showFilters, setShowFilters] = useState(false)
     const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
+    
+    // Card size state - tracks individual card sizes and default size
+    const [defaultCardSize, setDefaultCardSize] = useState<CardSize>('medium')
+    const [cardSizes, setCardSizes] = useState<Record<string, CardSize>>({})
+    
+    // Handle individual card size changes
+    const handleCardSizeChange = useCallback((id: string, size: CardSize) => {
+        setCardSizes(prev => ({ ...prev, [id]: size }))
+    }, [])
+    
+    // Set all cards to a specific size
+    const setAllCardsSize = useCallback((size: CardSize) => {
+        setDefaultCardSize(size)
+        setCardSizes({}) // Clear individual overrides
+    }, [])
     
     // Universal filters - subcategory is multi-select
     const [selectedSubcategories, setSelectedSubcategories] = useState<Set<string>>(new Set())
@@ -1125,13 +1140,57 @@ export function MarketplaceView({
                             Showing {getResultsLabel()}
                             {hasActiveFilters && ' (filtered)'}
                         </p>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-3">
+                            {/* Card size controls - only show in grid view */}
+                            {viewMode === 'grid' && (
+                                <div className="bg-muted p-1 rounded-md flex items-center" title="Card detail level">
+                                    <Button
+                                        variant={defaultCardSize === 'small' ? 'default' : 'ghost'}
+                                        size="sm"
+                                        onClick={() => setAllCardsSize('small')}
+                                        className={cn(
+                                            "h-8 w-8 p-0",
+                                            defaultCardSize === 'small' && 'shadow-sm'
+                                        )}
+                                        title="Compact cards"
+                                    >
+                                        <Minus className="h-4 w-4" />
+                                    </Button>
+                                    <Button
+                                        variant={defaultCardSize === 'medium' ? 'default' : 'ghost'}
+                                        size="sm"
+                                        onClick={() => setAllCardsSize('medium')}
+                                        className={cn(
+                                            "h-8 w-8 p-0",
+                                            defaultCardSize === 'medium' && 'shadow-sm'
+                                        )}
+                                        title="Standard cards"
+                                    >
+                                        <Square className="h-4 w-4" />
+                                    </Button>
+                                    <Button
+                                        variant={defaultCardSize === 'full' ? 'default' : 'ghost'}
+                                        size="sm"
+                                        onClick={() => setAllCardsSize('full')}
+                                        className={cn(
+                                            "h-8 w-8 p-0",
+                                            defaultCardSize === 'full' && 'shadow-sm'
+                                        )}
+                                        title="Detailed cards"
+                                    >
+                                        <AlignJustify className="h-4 w-4" />
+                                    </Button>
+                                </div>
+                            )}
+                            
+                            {/* View mode toggle */}
                             <div className="bg-muted p-1 rounded-md flex items-center">
                                 <Button
                                     variant={viewMode === 'grid' ? 'default' : 'ghost'}
                                     size="sm"
                                     onClick={() => setViewMode('grid')}
                                     className={viewMode === 'grid' ? 'shadow-sm h-8 w-8 p-0' : 'h-8 w-8 p-0'}
+                                    title="Grid view"
                                 >
                                     <LayoutGrid className="h-4 w-4" />
                                 </Button>
@@ -1140,6 +1199,7 @@ export function MarketplaceView({
                                     size="sm"
                                     onClick={() => setViewMode('list')}
                                     className={viewMode === 'list' ? 'shadow-sm h-8 w-8 p-0' : 'h-8 w-8 p-0'}
+                                    title="List view"
                                 >
                                     <List className="h-4 w-4" />
                                 </Button>

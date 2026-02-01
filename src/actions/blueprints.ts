@@ -28,6 +28,10 @@ import type {
   AssessmentQuestion,
   AssessmentAnswer,
   DomainCategory,
+  DomainFamiliarity,
+  FamiliarityLevel,
+  SetDomainFamiliarityInput,
+  ExpertReviewPacket,
 } from '@/types/blueprints'
 
 // ============================================================================
@@ -1211,4 +1215,279 @@ export async function getTeamExpertise(): Promise<{
   }
 
   return { data: Array.from(profileMap.values()), error: null }
+}
+
+// ============================================================================
+// DOMAIN FAMILIARITY
+// ============================================================================
+
+/**
+ * Get familiarity for a specific domain and foundry
+ */
+export async function getDomainFamiliarity(domainId: string): Promise<{
+  data: DomainFamiliarity | null
+  error: string | null
+}> {
+  const supabase = await createClient()
+  const foundryId = await getFoundryIdCached()
+
+  if (!foundryId) {
+    return { data: null, error: 'No foundry context' }
+  }
+
+  const { data, error } = await supabase
+    .from('domain_familiarity')
+    .select(`
+      *,
+      updater:profiles!domain_familiarity_updated_by_fkey(id, full_name, avatar_url)
+    `)
+    .eq('domain_id', domainId)
+    .eq('foundry_id', foundryId)
+    .maybeSingle()
+
+  if (error) {
+    console.error('Error fetching domain familiarity:', error)
+    return { data: null, error: sanitizeErrorMessage(error) }
+  }
+
+  return { data: data as DomainFamiliarity | null, error: null }
+}
+
+/**
+ * Get all familiarities for a foundry (for a specific template)
+ */
+export async function getFoundryFamiliarities(templateId: string): Promise<{
+  data: Map<string, DomainFamiliarity> | null
+  error: string | null
+}> {
+  const supabase = await createClient()
+  const foundryId = await getFoundryIdCached()
+
+  if (!foundryId) {
+    return { data: null, error: 'No foundry context' }
+  }
+
+  // Get all domains for this template
+  const { data: domains } = await supabase
+    .from('knowledge_domains')
+    .select('id')
+    .eq('template_id', templateId)
+
+  if (!domains || domains.length === 0) {
+    return { data: new Map(), error: null }
+  }
+
+  const domainIds = domains.map(d => d.id)
+
+  const { data, error } = await supabase
+    .from('domain_familiarity')
+    .select(`
+      *,
+      updater:profiles!domain_familiarity_updated_by_fkey(id, full_name, avatar_url)
+    `)
+    .eq('foundry_id', foundryId)
+    .in('domain_id', domainIds)
+
+  if (error) {
+    console.error('Error fetching foundry familiarities:', error)
+    return { data: null, error: sanitizeErrorMessage(error) }
+  }
+
+  // Create a map of domain_id to familiarity
+  const familiarityMap = new Map<string, DomainFamiliarity>()
+  for (const item of data || []) {
+    familiarityMap.set(item.domain_id, item as DomainFamiliarity)
+  }
+
+  return { data: familiarityMap, error: null }
+}
+
+/**
+ * Set familiarity for a domain
+ */
+export async function setDomainFamiliarity(input: SetDomainFamiliarityInput): Promise<{
+  data: DomainFamiliarity | null
+  error: string | null
+}> {
+  const supabase = await createClient()
+  const foundryId = await getFoundryIdCached()
+
+  if (!foundryId) {
+    return { data: null, error: 'No foundry context' }
+  }
+
+  // Verify the foundry_id matches
+  if (input.foundry_id !== foundryId) {
+    return { data: null, error: 'Not authorized to set familiarity for this foundry' }
+  }
+
+  // Use the RPC function for atomic upsert
+  const { data, error } = await supabase
+    .rpc('upsert_domain_familiarity', {
+      p_domain_id: input.domain_id,
+      p_foundry_id: input.foundry_id,
+      p_familiarity: input.familiarity,
+      p_notes: input.notes || null,
+    })
+
+  if (error) {
+    console.error('Error setting domain familiarity:', error)
+    return { data: null, error: sanitizeErrorMessage(error) }
+  }
+
+  revalidatePath('/blueprints')
+  return { data: data as DomainFamiliarity, error: null }
+}
+
+/**
+ * Get domain tree with familiarity data for a template
+ */
+export async function getDomainTreeWithFamiliarity(templateId: string): Promise<{
+  data: DomainTreeNode[] | null
+  error: string | null
+}> {
+  // Get the domain tree
+  const { data: tree, error: treeError } = await getDomainTree(templateId)
+  if (treeError || !tree) {
+    return { data: null, error: treeError }
+  }
+
+  // Get all familiarities for this template
+  const { data: familiarityMap, error: famError } = await getFoundryFamiliarities(templateId)
+  if (famError) {
+    // Return tree without familiarity data on error
+    return { data: tree, error: null }
+  }
+
+  // Recursively add familiarity to nodes
+  function addFamiliarity(nodes: DomainTreeNode[]): DomainTreeNode[] {
+    return nodes.map(node => ({
+      ...node,
+      familiarity: familiarityMap?.get(node.id) || null,
+      children: addFamiliarity(node.children),
+    }))
+  }
+
+  return { data: addFamiliarity(tree), error: null }
+}
+
+/**
+ * Generate an expert review packet for a domain
+ */
+export async function generateExpertReviewPacket(
+  domainId: string,
+  options?: {
+    blueprintId?: string
+  }
+): Promise<{
+  data: ExpertReviewPacket | null
+  error: string | null
+}> {
+  const supabase = await createClient()
+  const foundryId = await getFoundryIdCached()
+
+  if (!foundryId) {
+    return { data: null, error: 'No foundry context' }
+  }
+
+  // Get domain details
+  const { data: domain, error: domainError } = await supabase
+    .from('knowledge_domains')
+    .select('*')
+    .eq('id', domainId)
+    .single()
+
+  if (domainError || !domain) {
+    return { data: null, error: 'Domain not found' }
+  }
+
+  // Get familiarity
+  const { data: familiarity } = await getDomainFamiliarity(domainId)
+
+  // Get foundry and user info
+  const { data: foundry } = await supabase
+    .from('foundries')
+    .select('name')
+    .eq('id', foundryId)
+    .single()
+
+  const { data: { user } } = await supabase.auth.getUser()
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('full_name')
+    .eq('id', user?.id || '')
+    .single()
+
+  // Get blueprint context if provided
+  let projectContext: ExpertReviewPacket['project_context'] | undefined
+  if (options?.blueprintId) {
+    const { data: blueprint } = await supabase
+      .from('blueprints')
+      .select('name, project_stage, project_type')
+      .eq('id', options.blueprintId)
+      .single()
+
+    if (blueprint) {
+      projectContext = {
+        blueprint_name: blueprint.name,
+        project_stage: blueprint.project_stage,
+        project_type: blueprint.project_type,
+      }
+    }
+  }
+
+  // Build the domain path (reconstruct from parent chain)
+  let path = domain.name
+  if (domain.parent_id) {
+    const { data: parentDomains } = await supabase
+      .from('knowledge_domains')
+      .select('id, name, parent_id')
+      .eq('template_id', domain.template_id)
+
+    if (parentDomains) {
+      const domainMap = new Map(parentDomains.map(d => [d.id, d]))
+      const pathParts: string[] = [domain.name]
+      let currentId = domain.parent_id
+
+      while (currentId) {
+        const parent = domainMap.get(currentId)
+        if (parent) {
+          pathParts.unshift(parent.name)
+          currentId = parent.parent_id
+        } else {
+          break
+        }
+      }
+      path = pathParts.join(' > ')
+    }
+  }
+
+  // Get key questions
+  const keyQuestions = (domain.key_questions as any[] || []).map((q: any) => ({
+    id: q.id || '',
+    question: q.question || '',
+    context: q.context,
+    difficulty: q.difficulty,
+  }))
+
+  const packet: ExpertReviewPacket = {
+    domain: {
+      id: domain.id,
+      name: domain.name,
+      path,
+      category: domain.category as DomainCategory | null,
+      criticality: domain.criticality,
+    },
+    team_familiarity: familiarity?.familiarity || 'unknown',
+    primer_overview: domain.primer?.overview || domain.description || null,
+    unanswered_questions: keyQuestions,
+    project_context: projectContext,
+    requested_by: {
+      name: profile?.full_name || 'Unknown User',
+      foundry_name: foundry?.name || 'Unknown Organization',
+    },
+    generated_at: new Date().toISOString(),
+  }
+
+  return { data: packet, error: null }
 }
