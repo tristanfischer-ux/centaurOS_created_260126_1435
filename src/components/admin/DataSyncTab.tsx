@@ -244,7 +244,7 @@ export function DataSyncTab({ foundryId, isFounder }: DataSyncTabProps) {
                 </div>
             ) : (
                 <div className="space-y-4">
-                    <div className="p-3 rounded-lg border border-foundry-200 bg-white">
+                    <div className="p-3 rounded-lg border border-foundry-200 bg-background">
                         <div className="flex items-center justify-between mb-2">
                             <span className="text-xs font-medium text-foundry-700">Connected Sheet</span>
                             {/* SECURITY: Validate sheet_id format before building URL */}

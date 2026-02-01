@@ -343,14 +343,14 @@ export function usePresence(options: UsePresenceOptions = {}) {
 export function getPresenceColor(status: PresenceStatus): string {
   switch (status) {
     case 'online':
-      return 'bg-green-500'
+      return 'bg-status-success'
     case 'away':
-      return 'bg-yellow-500'
+      return 'bg-status-warning'
     case 'focus':
-      return 'bg-purple-500'
+      return 'bg-chart-5'
     case 'offline':
     default:
-      return 'bg-gray-400'
+      return 'bg-muted-foreground'
   }
 }
 

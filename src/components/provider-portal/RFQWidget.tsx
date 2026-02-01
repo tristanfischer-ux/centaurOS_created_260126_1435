@@ -136,8 +136,8 @@ export function RFQWidget({ className }: RFQWidgetProps) {
           <div className={cn(
             "p-3 rounded-lg border",
             hasUrgentRFQs 
-              ? "bg-amber-50 border-amber-200" 
-              : "bg-background border-slate-100"
+              ? "bg-status-warning-light border-status-warning" 
+              : "bg-background border"
           )}>
             <div className="flex items-center gap-2 mb-1">
               <Zap className={cn(
@@ -195,7 +195,7 @@ export function RFQWidget({ className }: RFQWidgetProps) {
                     </p>
                   </div>
                   {rfq.urgency === 'urgent' && (
-                    <Badge variant="secondary" className="ml-2 bg-amber-50 text-amber-700 border-amber-200 text-xs">
+                    <Badge variant="secondary" className="ml-2 bg-status-warning-light text-status-warning-dark border-status-warning text-xs">
                       <Zap className="w-3 h-3" />
                     </Badge>
                   )}
@@ -229,7 +229,7 @@ export function RFQWidget({ className }: RFQWidgetProps) {
           {hasUrgentRFQs && (
             <Button
               variant="secondary"
-              className="border-amber-200 bg-amber-50 hover:bg-amber-100 text-amber-700"
+              className="border-status-warning bg-status-warning-light hover:bg-status-warning-light/80 text-status-warning-dark"
               onClick={() => router.push('/rfq?tab=available&urgency=urgent')}
             >
               <Zap className="w-4 h-4" />

@@ -369,7 +369,7 @@ Thank you!`
           )}
         </Button>
       </div>
-      <div className="text-xs text-muted-foreground bg-white p-2 rounded border max-h-32 overflow-y-auto whitespace-pre-wrap font-mono">
+      <div className="text-xs text-muted-foreground bg-background p-2 rounded border max-h-32 overflow-y-auto whitespace-pre-wrap font-mono">
         {inquiry}
       </div>
       <p className="text-[10px] text-muted-foreground">
@@ -416,7 +416,7 @@ export function KnowledgeSidebar({
         exit={{ x: '100%', opacity: 0 }}
         transition={{ type: 'spring', damping: 25, stiffness: 200 }}
         className={cn(
-          "w-[420px] bg-white border-l shadow-2xl flex flex-col h-full",
+          "w-[420px] bg-background border-l shadow-2xl flex flex-col h-full",
           className
         )}
       >
@@ -518,7 +518,7 @@ export function KnowledgeSidebar({
                     </span>
                   </div>
                   
-                  <div className="border rounded-lg bg-white">
+                  <div className="border rounded-lg bg-background">
                     {skills.map(skill => (
                       <SkillTreeNode 
                         key={skill.id} 

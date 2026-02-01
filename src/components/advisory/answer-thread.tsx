@@ -237,7 +237,7 @@ export function AnswerThread({
                     <motion.div
                         initial={{ opacity: 0, height: 0 }}
                         animate={{ opacity: 1, height: "auto" }}
-                        className="mt-4 p-3 bg-emerald-50 rounded-lg border border-emerald-200"
+                        className="mt-4 p-3 bg-status-success-light rounded-lg border border-status-success"
                     >
                         <div className="flex items-center gap-2 mb-1">
                             <User className="h-3.5 w-3.5 text-status-success" />
@@ -347,7 +347,7 @@ export function AnswerThread({
                                     value={newComment}
                                     onChange={(e) => setNewComment(e.target.value)}
                                     placeholder="Add a comment..."
-                                    className="min-h-[60px] resize-none text-sm bg-white"
+                                    className="min-h-[60px] resize-none text-sm bg-background"
                                     onKeyDown={(e) => {
                                         if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
                                             handleSubmitComment()

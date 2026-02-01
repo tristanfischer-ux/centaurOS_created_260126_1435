@@ -219,7 +219,7 @@ export function ComparisonModal({ open, onOpenChange, items }: ComparisonModalPr
                                     <div className="flex items-center gap-2 mb-2">
                                         <Trophy className="h-4 w-4 text-amber-500" />
                                         <span className="text-sm font-medium text-foreground">Recommended</span>
-                                        <Badge className="bg-amber-100 text-amber-800 border-0">
+                                        <Badge className="bg-status-warning-light text-status-warning-dark border-0">
                                             {aiAnalysis.winnerTitle}
                                         </Badge>
                                     </div>

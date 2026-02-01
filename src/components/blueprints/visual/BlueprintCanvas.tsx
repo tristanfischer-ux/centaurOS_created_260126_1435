@@ -385,7 +385,7 @@ export function BlueprintCanvas({
                       onMouseLeave={() => setHoveredNode(null)}
                       className={cn(
                         "w-[200px] p-3 rounded-xl border-2 shadow-sm cursor-pointer",
-                        "bg-white transition-all duration-200",
+                        "bg-background transition-all duration-200",
                         "hover:shadow-lg hover:scale-[1.03]",
                         isSelected && "ring-4 ring-international-orange/20 border-international-orange shadow-lg scale-[1.02]",
                         !isSelected && statusColors.border,

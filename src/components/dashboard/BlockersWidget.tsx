@@ -99,7 +99,7 @@ export function BlockersWidget({ userRole }: BlockersWidgetProps) {
                                         'p-3 rounded-lg border transition-colors',
                                         isCritical 
                                             ? 'border-status-warning bg-status-warning-light' 
-                                            : 'border bg-white'
+                                            : 'border bg-background'
                                     )}
                                 >
                                     <div className="flex items-start gap-3">

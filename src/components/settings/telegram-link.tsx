@@ -158,7 +158,7 @@ export function TelegramLink({ initialLink, botUsername }: TelegramLinkProps) {
                     // Verification code state
                     <div className="space-y-6">
                         <div className="flex flex-col items-center gap-4">
-                            <div className="p-4 bg-white rounded-xl border shadow-sm">
+                            <div className="p-4 bg-background rounded-xl border shadow-sm">
                                 <QRCodeSVG
                                     value={telegramDeepLink}
                                     size={180}

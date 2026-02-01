@@ -162,7 +162,7 @@ export const MarketCard = memo(function MarketCard({
     return (
         <Card 
             className={cn(
-                "group relative flex flex-col border hover:border-orange-300 hover:shadow-md transition-all duration-200 overflow-hidden bg-white cursor-pointer",
+                "group relative flex flex-col border hover:border-orange-300 hover:shadow-md transition-all duration-200 overflow-hidden bg-background cursor-pointer",
                 isSelected && "ring-2 ring-orange-500 border-orange-500",
                 currentSize === 'full' && "col-span-1 md:col-span-2"
             )}

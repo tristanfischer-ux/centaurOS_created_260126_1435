@@ -155,7 +155,7 @@ export function FocusModeToggle({ compact = false, showLabel = true, className }
                                         onChange={(e) => setCustomMinutes(e.target.value)}
                                         min={15}
                                         max={480}
-                                        className="w-24 bg-white"
+                                        className="w-24 bg-background"
                                     />
                                     <span className="text-sm text-muted-foreground">minutes</span>
                                 </div>
@@ -297,7 +297,7 @@ export function UrgentOverrideButton({
                             value={message}
                             onChange={(e) => setMessage(e.target.value)}
                             placeholder="What's urgent?"
-                            className="mt-2 bg-white"
+                            className="mt-2 bg-background"
                             onKeyDown={(e) => e.key === 'Enter' && handleSend()}
                         />
                     </div>

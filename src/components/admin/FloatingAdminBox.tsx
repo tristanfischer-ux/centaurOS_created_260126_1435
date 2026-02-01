@@ -38,7 +38,7 @@ export function FloatingAdminBox({ foundryId, isFounder, hasAdminAccess }: Float
             {!isExpanded && (
                 <button
                     onClick={() => setIsExpanded(true)}
-                    className="fixed bottom-4 left-4 z-50 flex items-center gap-2 bg-white border border-foundry-200 rounded-full px-4 py-3 shadow-lg hover:shadow-xl transition-all hover:bg-foundry-50 group"
+                    className="fixed bottom-4 left-4 z-50 flex items-center gap-2 bg-background border border-foundry-200 rounded-full px-4 py-3 shadow-lg hover:shadow-xl transition-all hover:bg-foundry-50 group"
                     aria-label="Open admin panel"
                 >
                     <Settings className="h-5 w-5 text-foundry-600 group-hover:text-international-orange transition-colors" />
@@ -49,7 +49,7 @@ export function FloatingAdminBox({ foundryId, isFounder, hasAdminAccess }: Float
             
             {/* Expanded state - full panel */}
             {isExpanded && (
-                <Card className="fixed bottom-4 left-4 z-50 w-[420px] max-h-[600px] bg-white border-foundry-200 shadow-2xl overflow-hidden flex flex-col">
+                <Card className="fixed bottom-4 left-4 z-50 w-[420px] max-h-[600px] bg-background border-foundry-200 shadow-2xl overflow-hidden flex flex-col">
                     {/* Header */}
                     <div className="flex items-center justify-between p-4 border-b border-foundry-100 bg-foundry-50">
                         <div className="flex items-center gap-2">

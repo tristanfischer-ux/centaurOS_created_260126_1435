@@ -12,12 +12,12 @@ interface ActionItem {
 const ACTION_ITEMS: ActionItem[] = [
     {
         label: "Decisions Pending",
-        color: "bg-amber-500",
+        color: "bg-status-warning",
         icon: Inbox,
     },
     {
         label: "Blockers & Overdue",
-        color: "bg-red-500",
+        color: "bg-destructive",
         icon: AlertTriangle,
     },
     {

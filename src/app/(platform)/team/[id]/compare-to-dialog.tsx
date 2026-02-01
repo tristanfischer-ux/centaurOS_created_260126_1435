@@ -139,7 +139,7 @@ export function CompareToDialog({ currentMember, allMembers }: CompareToDialogPr
                                         const maxVal = Math.max(...numericValues)
 
                                         return (
-                                            <tr key={row.label} className={idx % 2 === 0 ? 'bg-muted' : 'bg-white'}>
+                                            <tr key={row.label} className={idx % 2 === 0 ? 'bg-muted' : 'bg-background'}>
                                                 <td className="py-3 px-4 text-muted-foreground font-medium text-sm">{row.label}</td>
                                                 {members.map((member, i) => {
                                                     const value = values[i]

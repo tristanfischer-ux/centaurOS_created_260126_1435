@@ -145,7 +145,7 @@ function PortfolioGridCard({ item, showFeaturedHighlight, onClick }: PortfolioGr
                                             className={cn(
                                                 'w-1.5 h-1.5 rounded-full transition-colors',
                                                 index === currentImageIndex
-                                                    ? 'bg-white'
+                                                    ? 'bg-background'
                                                     : 'bg-white/50 hover:bg-white/75'
                                             )}
                                         />
