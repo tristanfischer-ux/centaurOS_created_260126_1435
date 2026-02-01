@@ -53,7 +53,7 @@ export function MarketplacePreviewSection({ listings, onBookClick }: Marketplace
                                     {listing.subcategory}
                                 </Badge>
                                 {listing.is_verified && (
-                                    <ShieldCheck className="w-4 h-4 text-emerald-400" aria-label="Verified" />
+                                    <ShieldCheck className="w-4 h-4 text-status-success" aria-label="Verified" />
                                 )}
                             </div>
 

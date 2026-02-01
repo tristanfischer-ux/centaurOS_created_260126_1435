@@ -95,7 +95,7 @@ export const MarketplaceResultsList = memo(function MarketplaceResultsList({
                                                 {item.subcategory}
                                             </Badge>
                                             {item.is_verified && (
-                                                <ShieldCheck className="w-4 h-4 text-emerald-600" aria-label="Verified" />
+                                                <ShieldCheck className="w-4 h-4 text-status-success" aria-label="Verified" />
                                             )}
                                         </div>
                                         <h3 className="font-semibold text-foreground truncate">{item.title}</h3>

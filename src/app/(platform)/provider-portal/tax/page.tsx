@@ -159,7 +159,7 @@ export default async function TaxSettingsPage() {
               <CardContent className="space-y-4">
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="rounded-lg border p-4">
-                    <h4 className="font-medium text-green-700 mb-2">
+                    <h4 className="font-medium text-status-success-dark mb-2">
                       UK to UK
                     </h4>
                     <p className="text-sm text-muted-foreground">

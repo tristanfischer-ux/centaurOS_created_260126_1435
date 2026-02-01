@@ -111,7 +111,7 @@ export function RFQWidget({ className }: RFQWidgetProps) {
             </div>
           </div>
           {hasNewMatches && (
-            <Badge variant="secondary" className="animate-pulse bg-green-100 text-green-700">
+            <Badge variant="secondary" className="animate-pulse bg-status-success-light text-status-success-dark">
               New
             </Badge>
           )}
@@ -157,7 +157,7 @@ export function RFQWidget({ className }: RFQWidgetProps) {
           {/* Win Rate */}
           <div className="p-3 rounded-lg bg-background border border-slate-100">
             <div className="flex items-center gap-2 mb-1">
-              <Trophy className="h-4 w-4 text-green-600" />
+              <Trophy className="h-4 w-4 text-status-success" />
               <span className="text-xs text-muted-foreground">Win Rate</span>
             </div>
             <p className="text-2xl font-bold text-foreground">

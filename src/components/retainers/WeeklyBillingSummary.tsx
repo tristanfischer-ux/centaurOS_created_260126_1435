@@ -188,11 +188,11 @@ export function WeeklyBillingSummary({
             <div className="flex items-center gap-1 mt-1">
               <TrendingUp className={cn(
                 'h-4 w-4',
-                utilization >= 100 ? 'text-emerald-600' : 'text-amber-600'
+                utilization >= 100 ? 'text-status-success' : 'text-status-warning'
               )} />
               <span className={cn(
                 'font-medium',
-                utilization >= 100 ? 'text-emerald-600' : 'text-amber-600'
+                utilization >= 100 ? 'text-status-success' : 'text-status-warning'
               )}>
                 {utilization.toFixed(0)}% utilization
               </span>

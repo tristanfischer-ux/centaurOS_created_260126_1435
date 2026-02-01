@@ -74,7 +74,7 @@ export const PersonCard = memo(function PersonCard({
                             <span className="text-muted-foreground">{tasksCount} active</span>
                         </div>
                         <div className="flex items-center gap-2 text-sm">
-                            <Award className="h-4 w-4 text-green-500" />
+                            <Award className="h-4 w-4 text-status-success" />
                             <span className="text-muted-foreground">{completedCount} done</span>
                         </div>
                     </div>

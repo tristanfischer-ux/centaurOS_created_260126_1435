@@ -238,8 +238,8 @@ export function BuyerDashboard({
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-emerald-50">
-                <PiggyBank className="h-5 w-5 text-emerald-600" />
+              <div className="p-2 rounded-lg bg-status-success-light">
+                <PiggyBank className="h-5 w-5 text-status-success" />
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Total Savings</p>

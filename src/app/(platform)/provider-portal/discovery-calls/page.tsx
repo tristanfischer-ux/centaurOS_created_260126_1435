@@ -454,8 +454,8 @@ export default function DiscoveryCallsPage() {
                                             </div>
                                             <div className="flex items-center gap-2">
                                                 <Badge variant="secondary" className={cn(
-                                                    call.status === 'confirmed' && 'bg-green-100 text-green-800',
-                                                    call.status === 'scheduled' && 'bg-blue-100 text-blue-800'
+                                                    call.status === 'confirmed' && 'bg-status-success-light text-status-success-dark',
+                                                    call.status === 'scheduled' && 'bg-status-info-light text-status-info-dark'
                                                 )}>
                                                     {call.status as string}
                                                 </Badge>
@@ -523,9 +523,9 @@ export default function DiscoveryCallsPage() {
                                                 </div>
                                             </div>
                                             <Badge variant="secondary" className={cn(
-                                                call.status === 'completed' && 'bg-green-100 text-green-800',
-                                                call.status === 'cancelled' && 'bg-red-100 text-red-800',
-                                                call.status === 'no_show' && 'bg-amber-100 text-amber-800'
+                                                call.status === 'completed' && 'bg-status-success-light text-status-success-dark',
+                                                call.status === 'cancelled' && 'bg-status-error-light text-status-error-dark',
+                                                call.status === 'no_show' && 'bg-status-warning-light text-status-warning-dark'
                                             )}>
                                                 {call.status as string}
                                             </Badge>

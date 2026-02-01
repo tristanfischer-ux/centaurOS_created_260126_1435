@@ -46,7 +46,7 @@ const statusConfig: Record<string, { icon: React.ElementType; color: string; lab
   Pending: { icon: Circle, color: 'text-muted-foreground', label: 'Pending' },
   Accepted: { icon: Clock, color: 'text-blue-500', label: 'Accepted' },
   In_Progress: { icon: Clock, color: 'text-amber-500', label: 'In Progress' },
-  Completed: { icon: CheckCircle2, color: 'text-green-500', label: 'Completed' },
+  Completed: { icon: CheckCircle2, color: 'text-status-success', label: 'Completed' },
   Cancelled: { icon: XCircle, color: 'text-muted-foreground', label: 'Cancelled' },
 }
 

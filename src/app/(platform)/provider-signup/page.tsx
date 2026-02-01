@@ -116,8 +116,8 @@ async function SignupContent({ listingId }: { listingId?: string }) {
                 <CardContent>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="flex items-start gap-3">
-                            <div className="p-2 rounded-lg bg-green-50">
-                                <CreditCard className="h-4 w-4 text-green-600" />
+                            <div className="p-2 rounded-lg bg-status-success-light">
+                                <CreditCard className="h-4 w-4 text-status-success" />
                             </div>
                             <div>
                                 <p className="font-medium text-sm">Secure Payments</p>
@@ -127,8 +127,8 @@ async function SignupContent({ listingId }: { listingId?: string }) {
                             </div>
                         </div>
                         <div className="flex items-start gap-3">
-                            <div className="p-2 rounded-lg bg-blue-50">
-                                <Calendar className="h-4 w-4 text-blue-600" />
+                            <div className="p-2 rounded-lg bg-status-info-light">
+                                <Calendar className="h-4 w-4 text-status-info" />
                             </div>
                             <div>
                                 <p className="font-medium text-sm">Easy Scheduling</p>
@@ -138,8 +138,8 @@ async function SignupContent({ listingId }: { listingId?: string }) {
                             </div>
                         </div>
                         <div className="flex items-start gap-3">
-                            <div className="p-2 rounded-lg bg-amber-50">
-                                <Star className="h-4 w-4 text-amber-600" />
+                            <div className="p-2 rounded-lg bg-status-warning-light">
+                                <Star className="h-4 w-4 text-status-warning" />
                             </div>
                             <div>
                                 <p className="font-medium text-sm">Build Reputation</p>
@@ -149,8 +149,8 @@ async function SignupContent({ listingId }: { listingId?: string }) {
                             </div>
                         </div>
                         <div className="flex items-start gap-3">
-                            <div className="p-2 rounded-lg bg-purple-50">
-                                <Shield className="h-4 w-4 text-purple-600" />
+                            <div className="p-2 rounded-lg bg-muted">
+                                <Shield className="h-4 w-4 text-muted-foreground" />
                             </div>
                             <div>
                                 <p className="font-medium text-sm">Dispute Protection</p>
@@ -256,7 +256,7 @@ function StepItem({
             <div className={`
                 flex items-center justify-center w-8 h-8 rounded-full flex-shrink-0
                 ${completed 
-                    ? 'bg-green-100 text-green-600' 
+                    ? 'bg-status-success-light text-status-success' 
                     : 'bg-muted text-muted-foreground'
                 }
             `}>
@@ -267,7 +267,7 @@ function StepItem({
                 )}
             </div>
             <div className="flex-1 min-w-0">
-                <p className={`font-medium ${completed ? 'text-green-700' : ''}`}>
+                <p className={`font-medium ${completed ? 'text-status-success-dark' : ''}`}>
                     {title}
                 </p>
                 <p className="text-sm text-muted-foreground">
@@ -275,7 +275,7 @@ function StepItem({
                 </p>
             </div>
             {completed && (
-                <Badge variant="secondary" className="bg-green-100 text-green-700">
+                <Badge variant="secondary" className="bg-status-success-light text-status-success-dark">
                     Complete
                 </Badge>
             )}

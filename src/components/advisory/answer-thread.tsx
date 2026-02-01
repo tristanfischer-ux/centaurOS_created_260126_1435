@@ -240,17 +240,17 @@ export function AnswerThread({
                         className="mt-4 p-3 bg-emerald-50 rounded-lg border border-emerald-200"
                     >
                         <div className="flex items-center gap-2 mb-1">
-                            <User className="h-3.5 w-3.5 text-emerald-600" />
-                            <span className="text-xs font-semibold text-emerald-700">
+                            <User className="h-3.5 w-3.5 text-status-success" />
+                            <span className="text-xs font-semibold text-status-success-dark">
                                 Verified by {answer.verified_by.full_name}
                             </span>
                             {answer.verified_at && (
-                                <span className="text-xs text-emerald-600">
+                                <span className="text-xs text-status-success">
                                     {formatDistanceToNow(new Date(answer.verified_at), { addSuffix: true })}
                                 </span>
                             )}
                         </div>
-                        <p className="text-sm text-emerald-800">{answer.verification_note}</p>
+                        <p className="text-sm text-status-success-dark">{answer.verification_note}</p>
                     </motion.div>
                 )}
             </div>
@@ -266,7 +266,7 @@ export function AnswerThread({
                             disabled={isVoting}
                             className={cn(
                                 "h-8 gap-1.5",
-                                localVote === "up" && "text-emerald-600 bg-emerald-50"
+                                localVote === "up" && "text-status-success bg-status-success-light"
                             )}
                         >
                             <ThumbsUp className={cn("h-4 w-4", localVote === "up" && "fill-current")} />

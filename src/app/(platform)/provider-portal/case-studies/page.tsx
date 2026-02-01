@@ -594,7 +594,7 @@ export default function CaseStudiesPage() {
                                     <div className="flex flex-wrap gap-2 pt-2 border-t">
                                         {cs.metrics.map((metric, i) => (
                                             <div key={i} className="flex items-center gap-1 text-sm bg-muted rounded-md px-2 py-1">
-                                                <TrendingUp className="h-3 w-3 text-green-600" />
+                                                <TrendingUp className="h-3 w-3 text-status-success" />
                                                 <span className="font-medium">{metric.value}</span>
                                                 <span className="text-muted-foreground">{metric.label}</span>
                                             </div>

@@ -30,7 +30,7 @@ export function NeedsAttentionSummary({
     return (
       <Card className={cn("border-green-200 bg-green-50/30", className)}>
         <CardContent className="py-4">
-          <div className="flex items-center gap-2 text-green-700">
+          <div className="flex items-center gap-2 text-status-success-dark">
             <ShieldCheck className="h-4 w-4" />
             <span className="text-sm font-medium">All clear - nothing urgent</span>
           </div>

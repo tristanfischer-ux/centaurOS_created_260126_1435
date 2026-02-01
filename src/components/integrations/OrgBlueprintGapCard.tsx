@@ -195,7 +195,7 @@ export function OrgBlueprintGapCard({
                         {listing.title}
                       </span>
                       {listing.isVerified && (
-                        <CheckCircle2 className="h-3.5 w-3.5 text-green-500 flex-shrink-0" />
+                        <CheckCircle2 className="h-3.5 w-3.5 text-status-success flex-shrink-0" />
                       )}
                     </div>
                     <div className="flex items-center gap-2 mt-0.5">

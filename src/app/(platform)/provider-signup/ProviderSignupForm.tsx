@@ -135,15 +135,15 @@ export function ProviderSignupForm({ listingId, listing, migrationRecord }: Prov
                         <h4 className="font-medium">Why connect Stripe?</h4>
                         <ul className="text-sm text-muted-foreground space-y-2">
                             <li className="flex items-start gap-2">
-                                <span className="text-green-600">✓</span>
+                                <span className="text-status-success">✓</span>
                                 Receive secure payments directly to your bank account
                             </li>
                             <li className="flex items-start gap-2">
-                                <span className="text-green-600">✓</span>
+                                <span className="text-status-success">✓</span>
                                 Automatic invoicing and tax documentation
                             </li>
                             <li className="flex items-start gap-2">
-                                <span className="text-green-600">✓</span>
+                                <span className="text-status-success">✓</span>
                                 Fast payouts (typically 2-7 business days)
                             </li>
                         </ul>

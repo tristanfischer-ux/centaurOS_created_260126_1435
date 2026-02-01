@@ -72,7 +72,7 @@ export function MarketplacePreviewCard({ listing, onJoinClick }: MarketplacePrev
                     />
                     {listing.is_verified && (
                         <div className="absolute top-2 right-2 bg-background/95 backdrop-blur-sm rounded-full p-1.5 shadow-sm">
-                            <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                            <ShieldCheck className="w-4 h-4 text-status-success" />
                         </div>
                     )}
                 </div>
