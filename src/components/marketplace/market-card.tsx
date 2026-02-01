@@ -124,7 +124,7 @@ export const MarketCard = memo(function MarketCard({
                     isSelected 
                         ? "bg-orange-500 text-white shadow-md" 
                         : isHovered 
-                            ? "bg-white/90 text-muted-foreground shadow-md border opacity-100"
+                            ? "bg-background text-muted-foreground shadow-md border opacity-100"
                             : "opacity-0"
                 )}
                 title={isSelected ? "Remove from comparison" : "Add to comparison"}

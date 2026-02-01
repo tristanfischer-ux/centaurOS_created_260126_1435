@@ -57,10 +57,10 @@ const DialogContent = React.forwardRef<
 >(({ className, size, children, ...props }, ref) => (
   <DialogPortal>
     <DialogOverlay className="flex items-center justify-center" />
-    <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center pointer-events-none">
       <DialogPrimitive.Content
         ref={ref}
-        className={cn(dialogContentVariants({ size, className }), "pointer-events-auto")}
+        className={cn(dialogContentVariants({ size, className }), "pointer-events-auto !z-[100]")}
         {...props}
       >
         {children}

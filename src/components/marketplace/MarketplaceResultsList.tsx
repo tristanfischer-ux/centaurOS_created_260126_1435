@@ -78,7 +78,7 @@ export const MarketplaceResultsList = memo(function MarketplaceResultsList({
                                 "absolute top-4 right-4 z-10 w-8 h-8 rounded-full flex items-center justify-center transition-all duration-200",
                                 selectedIds.has(item.id)
                                     ? "bg-orange-500 text-white shadow-md"
-                                    : "bg-white/90 text-muted-foreground shadow-md border opacity-0 group-hover:opacity-100"
+                                    : "bg-background text-muted-foreground shadow-md border opacity-0 group-hover:opacity-100"
                             )}
                             title={selectedIds.has(item.id) ? "Remove from comparison" : "Add to comparison"}
                         >
