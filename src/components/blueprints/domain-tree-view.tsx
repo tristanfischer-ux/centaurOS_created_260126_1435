@@ -19,7 +19,7 @@ import {
 interface DomainTreeItemProps {
   coverage: DomainCoverageWithDetails
   depth: number
-  children?: DomainCoverageWithDetails[]
+  childItems?: DomainCoverageWithDetails[]
   onSelect?: (coverage: DomainCoverageWithDetails) => void
   selected?: string
   showAllDomains?: boolean
@@ -28,13 +28,13 @@ interface DomainTreeItemProps {
 function DomainTreeItem({
   coverage,
   depth,
-  children = [],
+  childItems = [],
   onSelect,
   selected,
   showAllDomains = false,
 }: DomainTreeItemProps) {
   const [expanded, setExpanded] = useState(depth < 2)
-  const hasChildren = children.length > 0
+  const hasChildren = childItems.length > 0
   const domain = coverage.domain!
 
   const category = domain.category as DomainCategory | null
@@ -135,12 +135,12 @@ function DomainTreeItem({
       {/* Children */}
       {expanded && hasChildren && (
         <div>
-          {children.map((child) => (
+          {childItems.map((child) => (
             <DomainTreeItem
               key={child.id}
               coverage={child}
               depth={depth + 1}
-              children={[]} // Would need to pass nested children
+              childItems={[]} // Would need to pass nested children
               onSelect={onSelect}
               selected={selected}
               showAllDomains={showAllDomains}
@@ -233,7 +233,7 @@ export function DomainTreeView({
           key={item.id}
           coverage={item}
           depth={0}
-          children={childrenMap.get(item.domain!.id) || []}
+          childItems={childrenMap.get(item.domain!.id) || []}
           onSelect={onSelect}
           selected={selected}
           showAllDomains={showAllDomains}
