@@ -8,7 +8,7 @@ import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "@/lib/utils"
 
 const dialogContentVariants = cva(
-  "z-50 grid w-[calc(100vw-2rem)] max-h-[90dvh] gap-4 !bg-white dark:!bg-slate-900 text-foreground p-6 shadow-2xl duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 border border-border rounded-lg overflow-y-auto",
+  "z-50 grid w-[calc(100vw-2rem)] max-h-[90dvh] gap-4 bg-background text-foreground p-6 shadow-2xl duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 border rounded-lg overflow-y-auto",
   {
     variants: {
       size: {
@@ -16,6 +16,8 @@ const dialogContentVariants = cva(
         sm: "sm:max-w-[425px]",
         md: "sm:max-w-[600px]",
         lg: "sm:max-w-[800px]",
+        xl: "sm:max-w-[1200px]",
+        full: "sm:max-w-[95vw]",
       },
     },
     defaultVariants: {
@@ -60,7 +62,7 @@ const DialogContent = React.forwardRef<
     <div className="fixed inset-0 z-[100] flex items-center justify-center pointer-events-none">
       <DialogPrimitive.Content
         ref={ref}
-        className={cn(dialogContentVariants({ size, className }), "pointer-events-auto !z-[100]")}
+        className={cn(dialogContentVariants({ size, className }), "pointer-events-auto z-[100]")}
         {...props}
       >
         {children}
