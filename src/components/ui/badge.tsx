@@ -16,15 +16,15 @@ const badgeVariants = cva(
           "bg-destructive text-destructive-foreground hover:bg-destructive/80",
         // Updated warning to use International Orange
         warning:
-          "bg-orange-100 text-international-orange hover:bg-orange-200 dark:bg-orange-950 dark:text-orange-400",
+          "bg-orange-100 text-international-orange hover:bg-orange-200",
         success:
-          "bg-status-success-light text-status-success-dark hover:bg-status-success-light/80 dark:bg-status-success/20 dark:text-status-success",
+          "bg-status-success-light text-status-success-dark hover:bg-status-success-light/80",
         info:
-          "bg-status-info-light text-status-info-dark hover:bg-status-info-light/80 dark:bg-status-info/20 dark:text-status-info",
+          "bg-status-info-light text-status-info-dark hover:bg-status-info-light/80",
         outline: "text-foreground bg-muted/50",
         // System status badge - Industrial style
         system:
-          "!bg-slate-100 dark:!bg-slate-800 text-muted-foreground dark:text-muted-foreground font-mono uppercase tracking-widest rounded-full",
+          "!bg-slate-100 text-muted-foreground font-mono uppercase tracking-widest rounded-full",
         // Brand badge - Orange accent
         brand:
           "bg-international-orange/10 text-international-orange font-mono uppercase tracking-wider",

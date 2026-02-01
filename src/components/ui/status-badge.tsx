@@ -7,10 +7,10 @@ const statusBadgeVariants = cva(
   {
     variants: {
       status: {
-        success: "bg-status-success-light text-status-success-dark dark:bg-status-success-dark dark:text-status-success-light",
-        warning: "bg-status-warning-light text-status-warning-dark dark:bg-status-warning-dark dark:text-status-warning-light",
-        error: "bg-status-error-light text-status-error-dark dark:bg-status-error-dark dark:text-status-error-light",
-        info: "bg-status-info-light text-status-info-dark dark:bg-status-info-dark dark:text-status-info-light",
+        success: "bg-status-success-light text-status-success-dark",
+        warning: "bg-status-warning-light text-status-warning-dark",
+        error: "bg-status-error-light text-status-error-dark",
+        info: "bg-status-info-light text-status-info-dark",
         pending: "bg-muted text-muted-foreground",
         active: "bg-primary/10 text-primary",
       },

@@ -114,10 +114,10 @@ export const STATUS_COLORS: Record<CoverageStatus, {
     label: 'Covered',
   },
   not_needed: {
-    bg: 'bg-slate-50',
-    text: 'text-slate-500',
-    border: 'border-slate-200',
-    icon: 'text-slate-400',
+    bg: 'bg-muted',
+    text: 'text-muted-foreground',
+    border: 'border',
+    icon: 'text-muted-foreground',
     label: 'Not Needed',
   },
 }

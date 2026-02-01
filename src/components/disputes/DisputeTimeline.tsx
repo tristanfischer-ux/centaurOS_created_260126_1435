@@ -102,15 +102,15 @@ export function DisputeTimeline({
   const getEventIconColor = (eventType: string) => {
     switch (eventType) {
       case "dispute_created":
-        return "text-status-warning bg-status-warning-light dark:bg-amber-950/20"
+        return "text-status-warning bg-status-warning-light"
       case "resolved":
-        return "text-status-success bg-status-success-light dark:bg-emerald-950/20"
+        return "text-status-success bg-status-success-light"
       case "cancelled":
         return "text-muted-foreground bg-muted"
       case "evidence_added":
-        return "text-status-info bg-status-info-light dark:bg-blue-950/20"
+        return "text-status-info bg-status-info-light"
       case "escalated":
-        return "text-destructive bg-status-error-light dark:bg-red-950/20"
+        return "text-destructive bg-status-error-light"
       default:
         return "text-muted-foreground bg-muted"
     }
@@ -138,18 +138,18 @@ export function DisputeTimeline({
       <CardContent>
         {/* Resolution Summary (if resolved) */}
         {status === "resolved" && resolution && (
-          <div className="mb-6 p-4 rounded-lg bg-status-success-light dark:bg-emerald-950/20 border border-status-success dark:border-emerald-800">
+          <div className="mb-6 p-4 rounded-lg bg-status-success-light border border-status-success">
             <div className="flex items-start gap-3">
               <CheckCircle className="h-5 w-5 text-status-success mt-0.5" />
               <div>
-                <h4 className="font-medium text-status-success-dark dark:text-emerald-400">
+                <h4 className="font-medium text-status-success-dark">
                   Resolution
                 </h4>
-                <p className="text-sm text-status-success dark:text-emerald-500 mt-1">
+                <p className="text-sm text-status-success mt-1">
                   {resolution}
                 </p>
                 {resolutionAmount !== undefined && resolutionAmount !== null && (
-                  <p className="text-sm font-medium text-status-success-dark dark:text-emerald-400 mt-2">
+                  <p className="text-sm font-medium text-status-success-dark mt-2">
                     Amount: £{resolutionAmount.toLocaleString()}
                   </p>
                 )}

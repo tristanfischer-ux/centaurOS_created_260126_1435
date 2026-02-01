@@ -228,8 +228,8 @@ export default function JoinPage({ params }: { params: Promise<{ role: string }>
                     <div className="relative z-10 flex flex-col items-center px-4 sm:px-6 text-center pt-20 pb-8">
                         {/* Protocol Badge */}
                         <div className="inline-flex items-center gap-2 mb-4 sm:mb-6 px-3 sm:px-4 py-2 border border-status-info/30 bg-status-info/10 backdrop-blur-sm">
-                            <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
-                            <span className="text-blue-400 text-xs font-mono uppercase tracking-widest">
+                            <span className="w-2 h-2 rounded-full bg-status-info animate-pulse" />
+                            <span className="text-status-info text-xs font-mono uppercase tracking-widest">
                                 Induction Protocol: {config.title}
                             </span>
                         </div>
@@ -259,8 +259,8 @@ export default function JoinPage({ params }: { params: Promise<{ role: string }>
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 sm:gap-8 md:gap-12 max-w-3xl mx-auto">
                                 {config.benefits.map((benefit, index) => (
                                     <div key={index} className="flex items-start gap-3 justify-center sm:justify-start">
-                                        <div className="mt-0.5 w-5 h-5 rounded-full bg-blue-500/20 flex items-center justify-center shrink-0">
-                                            <Check className="w-3 h-3 text-blue-400" />
+                                        <div className="mt-0.5 w-5 h-5 rounded-full bg-status-info/20 flex items-center justify-center shrink-0">
+                                            <Check className="w-3 h-3 text-status-info" />
                                         </div>
                                         <span className="text-white/80 text-sm">{benefit}</span>
                                     </div>
@@ -299,7 +299,7 @@ export default function JoinPage({ params }: { params: Promise<{ role: string }>
                                 <ArrowLeft className="w-4 h-4" />
                                 Back
                             </button>
-                            <span className="text-xs font-mono text-blue-400 tracking-widest mb-3 sm:mb-4 block uppercase">
+                            <span className="text-xs font-mono text-status-info tracking-widest mb-3 sm:mb-4 block uppercase">
                                 {config.isApplication ? "Application" : "Induction"}: {config.title}
                             </span>
                             <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-4 sm:mb-6 leading-tight">
@@ -393,7 +393,7 @@ export default function JoinPage({ params }: { params: Promise<{ role: string }>
 
                                 <Button 
                                     type="submit"
-                                    className="w-full bg-accent hover:bg-blue-600 text-white font-bold tracking-widest uppercase py-5 sm:py-6 h-auto text-sm transition-colors"
+                                    className="w-full bg-accent hover:bg-accent/90 text-white font-bold tracking-widest uppercase py-5 sm:py-6 h-auto text-sm transition-colors"
                                 >
                                     {config.ctaText}
                                 </Button>

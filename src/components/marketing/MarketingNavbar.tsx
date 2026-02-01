@@ -20,7 +20,7 @@ export function MarketingNavbar() {
             className={cn(
                 "fixed top-0 left-0 right-0 z-50 transition-all duration-500",
                 scrolled
-                    ? "bg-white/90 backdrop-blur-md py-4 border-b border shadow-sm"
+                    ? "bg-background/90 backdrop-blur-md py-4 border-b border shadow-sm"
                     : "bg-transparent py-6"
             )}
         >

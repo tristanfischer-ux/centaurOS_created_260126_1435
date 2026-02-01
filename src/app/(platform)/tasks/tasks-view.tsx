@@ -519,7 +519,7 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                                         <Filter className="w-4 h-4 mr-2" />
                                         Filters
                                         {activeFilterCount > 0 && (
-                                            <Badge className="ml-2 bg-amber-600 text-white">{activeFilterCount}</Badge>
+                                            <Badge className="ml-2 bg-status-warning text-white">{activeFilterCount}</Badge>
                                         )}
                                         <ChevronDown className={cn("w-4 h-4 ml-2 transition-transform", filtersOpen && "rotate-180")} />
                                     </Button>

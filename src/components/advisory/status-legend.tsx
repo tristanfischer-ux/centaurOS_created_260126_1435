@@ -12,12 +12,12 @@ interface StatusItem {
 const STATUS_ITEMS: StatusItem[] = [
     {
         label: "Verified",
-        color: "bg-emerald-500",
+        color: "bg-status-success",
         icon: CheckCircle2,
     },
     {
         label: "Endorsed",
-        color: "bg-amber-500",
+        color: "bg-status-warning",
         icon: Shield,
     },
     {

@@ -25,42 +25,42 @@ export const STATUS_COLORS: Record<TaskStatus, {
   Accepted: {
     bg: 'bg-status-info-light',
     text: 'text-status-info-dark',
-    badge: 'bg-status-info-light text-status-info-dark dark:bg-status-info-dark dark:text-status-info-light',
+    badge: 'bg-status-info-light text-status-info-dark',
     bar: 'bg-status-info',
     hex: '#3b82f6'
   },
   Completed: {
     bg: 'bg-status-success-light',
     text: 'text-status-success-dark',
-    badge: 'bg-status-success-light text-status-success-dark dark:bg-status-success-dark dark:text-status-success-light',
+    badge: 'bg-status-success-light text-status-success-dark',
     bar: 'bg-status-success',
     hex: '#22c55e'
   },
   Rejected: {
     bg: 'bg-status-error-light',
     text: 'text-status-error-dark',
-    badge: 'bg-status-error-light text-status-error-dark dark:bg-status-error-dark dark:text-status-error-light',
+    badge: 'bg-status-error-light text-status-error-dark',
     bar: 'bg-status-error',
     hex: '#ef4444'
   },
   Amended_Pending_Approval: {
     bg: 'bg-status-warning-light',
     text: 'text-status-warning-dark',
-    badge: 'bg-status-warning-light text-status-warning-dark dark:bg-status-warning-dark dark:text-status-warning-light',
+    badge: 'bg-status-warning-light text-status-warning-dark',
     bar: 'bg-status-warning',
     hex: '#f97316'
   },
   Pending_Executive_Approval: {
     bg: 'bg-status-warning-light',
     text: 'text-status-warning-dark',
-    badge: 'bg-status-warning-light text-status-warning-dark dark:bg-status-warning-dark dark:text-status-warning-light',
+    badge: 'bg-status-warning-light text-status-warning-dark',
     bar: 'bg-status-warning',
     hex: '#f97316'
   },
   Pending_Peer_Review: {
     bg: 'bg-status-info-light',
     text: 'text-status-info-dark',
-    badge: 'bg-status-info-light text-status-info-dark dark:bg-status-info-dark dark:text-status-info-light',
+    badge: 'bg-status-info-light text-status-info-dark',
     bar: 'bg-status-info',
     hex: '#3b82f6'
   }

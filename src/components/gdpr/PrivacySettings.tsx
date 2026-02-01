@@ -160,7 +160,7 @@ export function PrivacySettings({ initialRequests = [] }: PrivacySettingsProps) 
         <Card className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => setShowForm(true)}>
           <CardHeader className="pb-2">
             <div className="flex items-center gap-2">
-              <div className="p-2 rounded-lg bg-blue-100 text-electric-blue dark:bg-blue-950">
+              <div className="p-2 rounded-lg bg-blue-100 text-electric-blue">
                 <Eye className="h-5 w-5" />
               </div>
               <CardTitle className="text-base">Access My Data</CardTitle>
@@ -179,7 +179,7 @@ export function PrivacySettings({ initialRequests = [] }: PrivacySettingsProps) 
         <Card className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => setShowForm(true)}>
           <CardHeader className="pb-2">
             <div className="flex items-center gap-2">
-              <div className="p-2 rounded-lg bg-status-success-light text-status-success dark:bg-green-950">
+              <div className="p-2 rounded-lg bg-status-success-light text-status-success">
                 <Download className="h-5 w-5" />
               </div>
               <CardTitle className="text-base">Export My Data</CardTitle>
@@ -198,7 +198,7 @@ export function PrivacySettings({ initialRequests = [] }: PrivacySettingsProps) 
         <Card className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => setShowForm(true)}>
           <CardHeader className="pb-2">
             <div className="flex items-center gap-2">
-              <div className="p-2 rounded-lg bg-orange-100 text-international-orange dark:bg-orange-950">
+              <div className="p-2 rounded-lg bg-orange-100 text-international-orange">
                 <Trash2 className="h-5 w-5" />
               </div>
               <CardTitle className="text-base">Delete My Account</CardTitle>

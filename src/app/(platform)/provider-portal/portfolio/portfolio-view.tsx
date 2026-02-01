@@ -156,7 +156,7 @@ export function PortfolioManagementView({ items, error }: PortfolioManagementVie
                         <AlertDialogAction
                             onClick={handleDelete}
                             disabled={isDeleting}
-                            className="bg-red-600 hover:bg-red-700"
+                            className="bg-destructive hover:bg-destructive/90"
                         >
                             {isDeleting ? 'Deleting...' : 'Delete'}
                         </AlertDialogAction>
@@ -240,7 +240,7 @@ function PortfolioCard({ item, onEdit, onDelete, onToggleFeatured }: PortfolioCa
                             </DropdownMenuItem>
                             <DropdownMenuItem
                                 onClick={onDelete}
-                                className="text-red-600 focus:text-red-600"
+                                className="text-destructive focus:text-destructive"
                             >
                                 <Trash2 className="w-4 h-4 mr-2" />
                                 Delete

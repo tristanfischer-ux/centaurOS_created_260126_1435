@@ -31,7 +31,7 @@ export default function SettingsLoading() {
             </Card>
 
             {/* Sign Out Card */}
-            <Card className="border-red-100 bg-red-50/50">
+            <Card className="border-destructive/20 bg-destructive/5">
                 <CardHeader>
                     <Skeleton className="h-6 w-24" />
                     <Skeleton className="h-4 w-80 mt-2" />

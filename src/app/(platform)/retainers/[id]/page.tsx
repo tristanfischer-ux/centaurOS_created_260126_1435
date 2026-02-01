@@ -50,10 +50,10 @@ const STATUS_CONFIG: Record<RetainerStatus, {
   variant: 'default' | 'secondary' | 'destructive' | 'outline'
   color: string
 }> = {
-  pending: { label: 'Pending Approval', variant: 'secondary', color: 'bg-amber-500' },
-  active: { label: 'Active', variant: 'default', color: 'bg-emerald-500' },
-  paused: { label: 'Paused', variant: 'secondary', color: 'bg-gray-400' },
-  cancelled: { label: 'Cancelled', variant: 'destructive', color: 'bg-red-500' },
+  pending: { label: 'Pending Approval', variant: 'secondary', color: 'bg-status-warning' },
+  active: { label: 'Active', variant: 'default', color: 'bg-status-success' },
+  paused: { label: 'Paused', variant: 'secondary', color: 'bg-muted-foreground' },
+  cancelled: { label: 'Cancelled', variant: 'destructive', color: 'bg-destructive' },
 }
 
 // ==========================================

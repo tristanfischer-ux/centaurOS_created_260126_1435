@@ -54,12 +54,12 @@ const verificationConfig: Record<VerificationStatus, { label: string; color: str
     },
     endorsed: {
         label: "Endorsed",
-        color: "bg-amber-100 text-amber-700",
+        color: "bg-status-warning-light text-status-warning-dark",
         icon: Shield,
     },
     verified: {
         label: "Verified",
-        color: "bg-emerald-100 text-emerald-700",
+        color: "bg-status-success-light text-status-success-dark",
         icon: CheckCircle2,
     },
 }
@@ -79,8 +79,8 @@ export function QuestionCard({ question, className }: QuestionCardProps) {
             >
                 <Card className={cn(
                     "p-4 cursor-pointer hover:shadow-lg transition-all duration-200 border-l-4",
-                    question.verification_status === "verified" && "border-l-emerald-500",
-                    question.verification_status === "endorsed" && "border-l-amber-500",
+                    question.verification_status === "verified" && "border-l-status-success",
+                    question.verification_status === "endorsed" && "border-l-status-warning",
                     question.verification_status === "unverified" && "border-l-slate-300",
                     className
                 )}>

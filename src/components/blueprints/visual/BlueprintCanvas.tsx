@@ -152,9 +152,9 @@ export function BlueprintCanvas({
   }
 
   return (
-    <div className={cn("relative overflow-hidden rounded-xl border bg-slate-50/50", className)}>
+    <div className={cn("relative overflow-hidden rounded-xl border bg-muted/50", className)}>
       {/* Canvas Toolbar */}
-      <div className="absolute top-4 left-4 z-20 flex flex-col gap-1.5 bg-white/95 backdrop-blur-sm p-2 rounded-lg shadow-lg border border-slate-200">
+      <div className="absolute top-4 left-4 z-20 flex flex-col gap-1.5 bg-background/95 backdrop-blur-sm p-2 rounded-lg shadow-lg border">
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger asChild>
@@ -170,7 +170,7 @@ export function BlueprintCanvas({
             <TooltipContent side="right">Zoom In</TooltipContent>
           </Tooltip>
           
-          <div className="text-center text-xs font-mono text-slate-500 py-1">
+          <div className="text-center text-xs font-mono text-muted-foreground py-1">
             {Math.round(scale * 100)}%
           </div>
           
@@ -188,7 +188,7 @@ export function BlueprintCanvas({
             <TooltipContent side="right">Zoom Out</TooltipContent>
           </Tooltip>
           
-          <div className="h-px bg-slate-200 my-1" />
+          <div className="h-px bg-border my-1" />
           
           <Tooltip>
             <TooltipTrigger asChild>
@@ -207,13 +207,13 @@ export function BlueprintCanvas({
       </div>
 
       {/* Legend - positioned to not be cut off */}
-      <div className="absolute top-4 right-4 z-20 bg-white/95 backdrop-blur-sm p-3 rounded-lg shadow-lg border border-slate-200 min-w-[140px]">
-        <div className="text-xs font-semibold text-slate-600 mb-2">Status Legend</div>
+      <div className="absolute top-4 right-4 z-20 bg-background/95 backdrop-blur-sm p-3 rounded-lg shadow-lg border min-w-[140px]">
+        <div className="text-xs font-semibold text-muted-foreground mb-2">Status Legend</div>
         <div className="space-y-1.5">
           {Object.entries(STATUS_COLORS).map(([status, colors]) => (
             <div key={status} className="flex items-center gap-2 text-xs whitespace-nowrap">
               <div className={cn("w-2.5 h-2.5 rounded-full flex-shrink-0", colors.bg, "ring-1", colors.border)} />
-              <span className="text-slate-600">{colors.label}</span>
+              <span className="text-muted-foreground">{colors.label}</span>
             </div>
           ))}
         </div>
@@ -221,7 +221,7 @@ export function BlueprintCanvas({
 
       {/* Hint for first-time users */}
       <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20">
-        <div className="flex items-center gap-2 bg-white/90 backdrop-blur-sm px-3 py-1.5 rounded-full shadow-sm border border-slate-200 text-xs text-slate-500">
+        <div className="flex items-center gap-2 bg-background/90 backdrop-blur-sm px-3 py-1.5 rounded-full shadow-sm border text-xs text-muted-foreground">
           <Move className="h-3 w-3" />
           <span>Drag to pan • Scroll to zoom • Click nodes to explore</span>
         </div>
@@ -408,13 +408,13 @@ export function BlueprintCanvas({
                       </div>
                       
                       {/* Title */}
-                      <div className="font-semibold text-sm text-slate-900 leading-tight">
+                      <div className="font-semibold text-sm text-foreground leading-tight">
                         {node.title}
                       </div>
                       
                       {/* Description preview */}
                       {node.description && (
-                        <div className="text-xs text-slate-500 mt-1 line-clamp-1">
+                        <div className="text-xs text-muted-foreground mt-1 line-clamp-1">
                           {node.description}
                         </div>
                       )}

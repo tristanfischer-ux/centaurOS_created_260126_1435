@@ -134,7 +134,7 @@ export function DisputeForm({
     <Card>
       <CardHeader>
         <div className="flex items-start gap-3">
-          <div className="p-2 rounded-full bg-status-warning-light dark:bg-amber-950/20">
+          <div className="p-2 rounded-full bg-status-warning-light">
             <AlertTriangle className="h-5 w-5 text-status-warning" />
           </div>
           <div>
@@ -147,8 +147,8 @@ export function DisputeForm({
       </CardHeader>
       <CardContent className="space-y-6">
         {/* Warning Banner */}
-        <div className="p-4 rounded-lg bg-status-warning-light dark:bg-amber-950/20 border border-status-warning dark:border-amber-800">
-          <p className="text-sm text-status-warning-dark dark:text-amber-400">
+        <div className="p-4 rounded-lg bg-status-warning-light border border-status-warning">
+          <p className="text-sm text-status-warning-dark">
             <strong>Before opening a dispute:</strong> We recommend first
             contacting the seller to resolve the issue directly. Disputes can take
             time to resolve and may affect your relationship with the seller.

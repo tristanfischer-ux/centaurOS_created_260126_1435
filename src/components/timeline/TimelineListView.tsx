@@ -161,7 +161,7 @@ function MiniTimelineBar({ task, windowStart, windowEnd, stableNow }: {
         <div className="relative w-full h-7 bg-muted rounded-md overflow-hidden">
             {/* Today marker */}
             <div
-                className="absolute top-0 bottom-0 w-0.5 bg-amber-400 z-10"
+                className="absolute top-0 bottom-0 w-0.5 bg-status-warning z-10"
                 style={{ left: `${todayPercent}%` }}
             />
 
@@ -340,7 +340,7 @@ export function TimelineListView({ tasks, members, currentUserId }: TimelineList
             {/* Timeline Header */}
             <div className="bg-card rounded-xl p-3 sticky top-0 z-30 shadow-md">
                 <div className="flex items-center gap-2 mb-2">
-                    <Calendar className="h-4 w-4 text-amber-500" />
+                    <Calendar className="h-4 w-4 text-status-warning" />
                     <span className="text-xs font-medium text-muted-foreground">2 Week Timeline</span>
                 </div>
                 <div className="relative h-6 bg-muted rounded-md flex">
@@ -348,13 +348,13 @@ export function TimelineListView({ tasks, members, currentUserId }: TimelineList
                         // Create stable key using index since labels (day numbers) can repeat across months
                         const markerKey = `day-${idx}`
                         return (
-                            <div
-                                key={markerKey}
-                                className={`flex-1 text-center text-xs ${marker.isToday
-                                    ? 'text-amber-600 font-bold'
-                                    : 'text-muted-foreground'
-                                    }`}
-                            >
+                                    <div
+                                        key={markerKey}
+                                        className={`flex-1 text-center text-xs ${marker.isToday
+                                            ? 'text-status-warning font-bold'
+                                            : 'text-muted-foreground'
+                                            }`}
+                                    >
                                 {idx % 2 === 0 && marker.label}
                             </div>
                         )
@@ -375,8 +375,8 @@ export function TimelineListView({ tasks, members, currentUserId }: TimelineList
                             className="w-full flex items-center justify-between p-4 hover:bg-muted transition-colors duration-200"
                         >
                             <div className="flex items-center gap-4">
-                                <div className="h-10 w-10 rounded-full bg-amber-100 flex items-center justify-center">
-                                    <Calendar className="h-5 w-5 text-amber-600" />
+                                <div className="h-10 w-10 rounded-full bg-status-warning-light flex items-center justify-center">
+                                    <Calendar className="h-5 w-5 text-status-warning" />
                                 </div>
                                 <div className="text-left">
                                 <div className="font-semibold text-foreground">{dateKey}</div>
@@ -521,7 +521,7 @@ export function TimelineListView({ tasks, members, currentUserId }: TimelineList
                                                     <div className="ml-11 mb-2 text-sm text-muted-foreground flex flex-wrap gap-4">
                                                         {task.objectives && (
                                                             <span className="flex items-center gap-1">
-                                                                <Target className="h-3 w-3 text-amber-500" />
+                                                                <Target className="h-3 w-3 text-status-warning" />
                                                                 <span className="truncate max-w-[140px]">{task.objectives.title}</span>
                                                             </span>
                                                         )}

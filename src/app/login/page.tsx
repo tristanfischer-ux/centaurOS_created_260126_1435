@@ -31,7 +31,7 @@ function ErrorMessage() {
 
     return (
         <div className="p-4 text-sm text-destructive bg-status-error-light border border-destructive rounded-sm mb-6 flex items-center gap-3">
-            <span className="h-2 w-2 rounded-full bg-red-500 animate-pulse" />
+            <span className="h-2 w-2 rounded-full bg-destructive animate-pulse" />
             {error}
         </div>
     )
@@ -111,7 +111,7 @@ function LoginForm() {
 
 export default function LoginPage() {
     return (
-        <div className="min-h-screen flex w-full bg-white">
+        <div className="min-h-screen flex w-full bg-background">
             {/* Left Side - Hero Image */}
             <div className="hidden lg:flex w-1/2 relative bg-muted overflow-hidden">
                 <Image
@@ -145,7 +145,7 @@ export default function LoginPage() {
             </div>
 
             {/* Right Side - Login Form */}
-            <div className="w-full lg:w-1/2 flex items-center justify-center p-8 lg:p-12 relative bg-white">
+            <div className="w-full lg:w-1/2 flex items-center justify-center p-8 lg:p-12 relative bg-background">
                 {/* Background Pattern for Right Side */}
                 <div
                     className="absolute inset-0 opacity-[0.03] pointer-events-none bg-[radial-gradient(#ea580c_1px,transparent_1px)] bg-[length:32px_32px]"

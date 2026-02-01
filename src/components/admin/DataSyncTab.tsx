@@ -302,12 +302,12 @@ export function DataSyncTab({ foundryId, isFounder }: DataSyncTabProps) {
                     </div>
                     
                     {config?.sync_errors && config.sync_errors.length > 0 && (
-                        <div className="p-2 rounded-lg bg-amber-50 border border-amber-200">
-                            <div className="flex items-center gap-1 text-xs font-medium text-amber-700 mb-1">
+                        <div className="p-2 rounded-lg bg-status-warning-light border border-status-warning">
+                            <div className="flex items-center gap-1 text-xs font-medium text-status-warning mb-1">
                                 <AlertCircle className="h-3 w-3" />
                                 Recent Sync Issues
                             </div>
-                            <ul className="text-xs text-amber-600 space-y-1">
+                            <ul className="text-xs text-status-warning space-y-1">
                                 {config.sync_errors.slice(0, 3).map((err, i) => (
                                     <li key={i}>{err}</li>
                                 ))}

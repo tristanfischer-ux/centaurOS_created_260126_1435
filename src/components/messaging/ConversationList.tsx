@@ -204,7 +204,7 @@ export function ConversationList({
                     isSelected 
                       ? 'bg-muted' 
                       : 'hover:bg-muted/50',
-                    hasUnread && !isSelected && 'bg-orange-50/50 dark:bg-orange-950/20'
+                    hasUnread && !isSelected && 'bg-orange-50/50'
                   )}
                 >
                   {/* Avatar */}

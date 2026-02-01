@@ -119,9 +119,9 @@ export function MigrationTable({ records, showActions = [] }: MigrationTableProp
             <Badge 
                 variant={config.variant}
                 className={cn(
-                    status === 'completed' && 'bg-green-100 text-green-800',
-                    status === 'invited' && 'bg-amber-100 text-amber-800',
-                    status === 'in_progress' && 'bg-blue-100 text-blue-800'
+                    status === 'completed' && 'bg-status-success-light text-status-success',
+                    status === 'invited' && 'bg-status-warning-light text-status-warning',
+                    status === 'in_progress' && 'bg-status-info-light text-status-info'
                 )}
             >
                 {config.label}
@@ -246,7 +246,7 @@ export function MigrationTable({ records, showActions = [] }: MigrationTableProp
                                                             listingId: record.listing_id,
                                                             title: record.listing?.title || ''
                                                         })}
-                                                        className="text-red-600"
+                                                        className="text-destructive"
                                                     >
                                                         <Archive className="h-4 w-4 mr-2" />
                                                         Archive
@@ -296,7 +296,7 @@ export function MigrationTable({ records, showActions = [] }: MigrationTableProp
                                     handleAction(confirmDialog.action, confirmDialog.listingId)
                                 }
                             }}
-                            className={confirmDialog.action === 'archive' ? 'bg-red-600 hover:bg-red-700' : ''}
+                            className={confirmDialog.action === 'archive' ? 'bg-destructive hover:bg-destructive/90' : ''}
                         >
                             {confirmDialog.action === 'archive' ? 'Archive' : 'Continue'}
                         </AlertDialogAction>

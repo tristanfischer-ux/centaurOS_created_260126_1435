@@ -119,8 +119,8 @@ async function CallbackContent({
         <div className="max-w-md mx-auto py-12">
             <Card>
                 <CardContent className="pt-12 pb-8 text-center">
-                    <div className="w-20 h-20 mx-auto bg-amber-100 rounded-full flex items-center justify-center mb-6">
-                        <AlertCircle className="h-10 w-10 text-amber-600" />
+                    <div className="w-20 h-20 mx-auto bg-status-warning-light rounded-full flex items-center justify-center mb-6">
+                        <AlertCircle className="h-10 w-10 text-status-warning" />
                     </div>
                     <h1 className="text-2xl font-bold mb-2">Almost There!</h1>
                     <p className="text-muted-foreground mb-6">

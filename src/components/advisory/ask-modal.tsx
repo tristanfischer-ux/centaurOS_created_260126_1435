@@ -330,13 +330,13 @@ export function AskModal({ onSubmit, trigger }: AskModalProps) {
                                 initial={{ opacity: 0, height: 0 }}
                                 animate={{ opacity: 1, height: "auto" }}
                                 exit={{ opacity: 0, height: 0 }}
-                                className="p-3 bg-blue-50 rounded-lg text-sm text-blue-800 overflow-hidden"
+                                className="p-3 bg-status-info-light rounded-lg text-sm text-status-info-dark overflow-hidden"
                             >
                                 <p className="font-medium mb-1 flex items-center gap-1.5">
                                     <Sparkles className="h-3.5 w-3.5" />
                                     Democratic Workflow
                                 </p>
-                                <p className="text-xs text-blue-600">
+                                <p className="text-xs text-status-info">
                                     AI answers first, then human experts verify. This ensures you get fast insights 
                                     that are vetted for accuracy by experienced professionals.
                                 </p>

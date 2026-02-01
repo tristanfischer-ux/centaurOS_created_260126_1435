@@ -40,7 +40,7 @@ export function TaskFeed({ taskId, comments, currentUserId }: { taskId: string, 
                         if (isSystem) {
                             return (
                                 <div key={comment.id} className="flex justify-center my-2">
-                                    <span className="text-[10px] text-gray-500 bg-foundry-800 px-2 py-1 rounded-full uppercase tracking-wider">
+                                    <span className="text-[10px] text-muted-foreground bg-foundry-800 px-2 py-1 rounded-full uppercase tracking-wider">
                                         {comment.content}
                                     </span>
                                 </div>
@@ -58,7 +58,7 @@ export function TaskFeed({ taskId, comments, currentUserId }: { taskId: string, 
                                     <div className={`p-3 rounded-lg text-sm ${isMe ? 'bg-accent text-foundry-950' : 'bg-foundry-800 text-gray-200'}`}>
                                         {comment.content}
                                     </div>
-                                    <span className="text-[10px] text-gray-600 mt-1">
+                                    <span className="text-[10px] text-muted-foreground mt-1">
                                         {new Date(comment.created_at!).toLocaleTimeString()}
                                     </span>
                                 </div>
@@ -66,7 +66,7 @@ export function TaskFeed({ taskId, comments, currentUserId }: { taskId: string, 
                         )
                     })}
                     {comments.length === 0 && (
-                        <div className="text-center text-gray-500 text-sm py-4">No activity yet.</div>
+                        <div className="text-center text-muted-foreground text-sm py-4">No activity yet.</div>
                     )}
                 </div>
             </ScrollArea>

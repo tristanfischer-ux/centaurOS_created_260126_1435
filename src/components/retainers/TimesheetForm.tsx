@@ -222,7 +222,7 @@ export function TimesheetForm({
               value={progress}
               className={cn(
                 'h-3',
-                progress > 100 && '[&>div]:bg-amber-500'
+                progress > 100 && '[&>div]:bg-status-warning'
               )}
             />
             {hoursLogged > maxHours && (

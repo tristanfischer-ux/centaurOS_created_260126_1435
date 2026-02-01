@@ -95,10 +95,10 @@ export default async function TalentPage() {
                             </div>
                         </CardContent>
                     </Card>
-                    <Card className="bg-gradient-to-br from-green-50 to-background border-green-100">
+                    <Card className="bg-gradient-to-br from-status-success-light to-background border-status-success/30">
                         <CardContent className="pt-6">
                             <div className="flex items-start gap-3">
-                                <div className="h-10 w-10 rounded-lg bg-green-100 flex items-center justify-center shrink-0">
+                                <div className="h-10 w-10 rounded-lg bg-status-success-light flex items-center justify-center shrink-0">
                                     <Award className="h-5 w-5 text-status-success" />
                                 </div>
                                 <div>

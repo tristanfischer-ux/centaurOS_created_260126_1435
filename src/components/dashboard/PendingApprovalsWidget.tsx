@@ -76,7 +76,7 @@ export function PendingApprovalsWidget({ userRole }: PendingApprovalsWidgetProps
                 <div className="flex items-center justify-between">
                     <div>
                         <CardTitle className="text-base flex items-center gap-2">
-                            <ClipboardCheck className="h-4 w-4 text-amber-500" />
+                            <ClipboardCheck className="h-4 w-4 text-status-warning" />
                             Pending Approvals
                         </CardTitle>
                         <CardDescription>Tasks awaiting your review</CardDescription>

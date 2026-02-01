@@ -168,16 +168,16 @@ export interface AssessmentAnswer {
 
 // Color mappings for categories (for UI)
 export const CATEGORY_COLORS: Record<FunctionCategory, string> = {
-    'Operations': 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
-    'Finance': 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
-    'Legal': 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200',
-    'HR': 'bg-pink-100 text-pink-800 dark:bg-pink-900 dark:text-pink-200',
-    'Marketing': 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200',
-    'Sales': 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200',
-    'Product': 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200',
-    'Engineering': 'bg-sky-100 text-sky-800 dark:bg-sky-900 dark:text-sky-200',
-    'Customer Success': 'bg-teal-100 text-teal-800 dark:bg-teal-900 dark:text-teal-200',
-    'Administration': 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200',
+    'Operations': 'bg-blue-100 text-blue-800',
+    'Finance': 'bg-green-100 text-green-800',
+    'Legal': 'bg-purple-100 text-purple-800',
+    'HR': 'bg-pink-100 text-pink-800',
+    'Marketing': 'bg-orange-100 text-orange-800',
+    'Sales': 'bg-yellow-100 text-yellow-800',
+    'Product': 'bg-indigo-100 text-indigo-800',
+    'Engineering': 'bg-sky-100 text-sky-800',
+    'Customer Success': 'bg-teal-100 text-teal-800',
+    'Administration': 'bg-gray-100 text-gray-800',
 }
 
 // Color mappings for coverage status (for UI)

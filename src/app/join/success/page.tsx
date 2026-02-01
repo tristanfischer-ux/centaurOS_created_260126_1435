@@ -124,11 +124,11 @@ export default async function SuccessPage({
     <div className="min-h-screen bg-gradient-to-b from-slate-900 via-slate-800 to-white text-white flex flex-col items-center justify-center px-4 sm:px-6">
       <div className="max-w-lg w-full text-center">
         {/* Success Icon */}
-        <div className="mb-6 sm:mb-8 inline-flex items-center justify-center w-16 sm:w-20 h-16 sm:h-20 rounded-full bg-blue-500/20 border border-blue-500/30">
+        <div className="mb-6 sm:mb-8 inline-flex items-center justify-center w-16 sm:w-20 h-16 sm:h-20 rounded-full bg-status-info/20 border border-status-info/30">
           {isApplication ? (
-            <Clock className="w-8 sm:w-10 h-8 sm:h-10 text-blue-400" />
+            <Clock className="w-8 sm:w-10 h-8 sm:h-10 text-status-info" />
           ) : (
-            <Mail className="w-8 sm:w-10 h-8 sm:h-10 text-blue-400" />
+            <Mail className="w-8 sm:w-10 h-8 sm:h-10 text-status-info" />
           )}
         </div>
 
@@ -156,8 +156,8 @@ export default async function SuccessPage({
                     className="flex items-center gap-3 text-white/70 text-sm animate-fade-in"
                     style={{ animationDelay: `${index * 200}ms` }}
                   >
-                    <div className="w-6 h-6 rounded-full bg-blue-500/20 flex items-center justify-center">
-                      <Icon className="w-3 h-3 text-blue-400" />
+                    <div className="w-6 h-6 rounded-full bg-status-info/20 flex items-center justify-center">
+                      <Icon className="w-3 h-3 text-status-info" />
                     </div>
                     <span>{item.label}</span>
                     <div className="ml-auto">
@@ -177,7 +177,7 @@ export default async function SuccessPage({
               What happens next
             </h3>
             <div className="flex items-center gap-2 text-white/80 text-sm sm:text-base">
-              <Check className="w-4 h-4 text-blue-400 shrink-0" />
+              <Check className="w-4 h-4 text-status-info shrink-0" />
               <span>{config.nextStep}</span>
             </div>
           </div>

@@ -326,15 +326,15 @@ export default async function TodayPage() {
 
             {/* All Clear State */}
             {hasNoItems && (
-                <Card className="bg-gradient-to-br from-emerald-50 to-teal-50 border-emerald-200">
+                <Card className="bg-gradient-to-br from-status-success-light to-status-success-light/50 border-status-success-light">
                     <CardContent className="py-12 text-center">
                         <div className="inline-flex p-4 bg-background/80 rounded-full mb-4">
-                            <Sparkles className="h-8 w-8 text-emerald-500" />
+                            <Sparkles className="h-8 w-8 text-status-success" />
                         </div>
-                        <h3 className="text-xl font-display font-semibold text-emerald-900 mb-2">
+                        <h3 className="text-xl font-display font-semibold text-status-success-dark mb-2">
                             All clear!
                         </h3>
-                        <p className="text-emerald-700 max-w-md mx-auto mb-6">
+                        <p className="text-status-success max-w-md mx-auto mb-6">
                             No pending decisions, blockers, or overdue items. You're in great shape!
                         </p>
                         <div className="flex justify-center gap-3">
@@ -344,12 +344,12 @@ export default async function TodayPage() {
                                 teams={teams}
                                 currentUserId={user.id}
                             >
-                                <Button variant="secondary" className="border border-emerald-300 text-emerald-700 hover:bg-emerald-100">
+                                <Button variant="secondary" className="border border-status-success-light text-status-success hover:bg-status-success-light">
                                     <Plus className="h-4 w-4 mr-2" /> Create a Task
                                 </Button>
                             </CreateTaskDialog>
                             <CreateObjectiveDialog>
-                                <Button variant="secondary" className="border border-emerald-300 text-emerald-700 hover:bg-emerald-100">
+                                <Button variant="secondary" className="border border-status-success-light text-status-success hover:bg-status-success-light">
                                     <Target className="h-4 w-4 mr-2" /> Set an Objective
                                 </Button>
                             </CreateObjectiveDialog>
@@ -409,8 +409,8 @@ export default async function TodayPage() {
                                                 </div>
                                                 <Badge className={cn(
                                                     "ml-2 capitalize text-xs",
-                                                    task.risk_level === 'High' ? "bg-red-100 text-destructive border-red-200" :
-                                                    task.risk_level === 'Medium' ? "bg-amber-100 text-status-warning-dark border-amber-200" :
+                                                    task.risk_level === 'High' ? "bg-status-error-light text-destructive border-status-error-light" :
+                                                    task.risk_level === 'Medium' ? "bg-status-warning-light text-status-warning-dark border-status-warning-light" :
                                                     "bg-foundry-100 text-foundry-600 border"
                                                 )}>
                                                     {task.risk_level || 'Low'} Risk
@@ -434,7 +434,7 @@ export default async function TodayPage() {
                                             <CardTitle className="font-display text-lg text-foreground">
                                                 Blockers Reported
                                             </CardTitle>
-                                            <Badge variant="secondary" className="bg-red-100 text-destructive border-red-200">
+                                            <Badge variant="secondary" className="bg-status-error-light text-destructive border-status-error-light">
                                                 {blockers.length}
                                             </Badge>
                                         </div>
@@ -466,8 +466,8 @@ export default async function TodayPage() {
                                                         {standup.blocker_severity && (
                                                             <Badge variant="outline" className={cn(
                                                                 "text-[10px] capitalize",
-                                                                standup.blocker_severity === 'critical' ? "border-red-400 text-destructive" :
-                                                                standup.blocker_severity === 'high' ? "border-orange-400 text-orange-600" :
+                                                                standup.blocker_severity === 'critical' ? "border-destructive text-destructive" :
+                                                                standup.blocker_severity === 'high' ? "border-status-warning text-status-warning" :
                                                                 "border-foundry-300 text-muted-foreground"
                                                             )}>
                                                                 {standup.blocker_severity}
@@ -497,7 +497,7 @@ export default async function TodayPage() {
                                             <CardTitle className="font-display text-lg text-foreground">
                                                 Overdue Items
                                             </CardTitle>
-                                            <Badge variant="secondary" className="bg-red-100 text-destructive border-red-200">
+                                            <Badge variant="secondary" className="bg-status-error-light text-destructive border-status-error-light">
                                                 {overdueTasks.length}
                                             </Badge>
                                         </div>
@@ -530,7 +530,7 @@ export default async function TodayPage() {
                                                         )}
                                                     </div>
                                                 </div>
-                                                <Badge className="bg-red-100 text-destructive border-red-200 capitalize text-xs">
+                                                <Badge className="bg-status-error-light text-destructive border-status-error-light capitalize text-xs">
                                                     {formatStatus(task.status)}
                                                 </Badge>
                                             </div>
@@ -552,7 +552,7 @@ export default async function TodayPage() {
                                             <CardTitle className="font-display text-lg text-foreground">
                                                 Mentions
                                             </CardTitle>
-                                            <Badge variant="secondary" className="bg-blue-100 text-status-info-dark border">
+                                            <Badge variant="secondary" className="bg-status-info-light text-status-info-dark border-status-info-light">
                                                 {mentions.length}
                                             </Badge>
                                         </div>
@@ -610,15 +610,15 @@ export default async function TodayPage() {
                         {!(isExecutiveOrFounder && pendingDecisions.length > 0) && 
                          !(isExecutiveOrFounder && blockers.length > 0) && 
                          overdueTasks.length === 0 && (
-                            <Card className="bg-gradient-to-br from-blue-50 to-cyan-50 border">
+                            <Card className="bg-gradient-to-br from-status-info-light to-status-info-light/50 border-status-info-light">
                                 <CardContent className="py-12 text-center">
                                     <div className="inline-flex p-4 bg-background/80 rounded-full mb-4">
-                                        <CheckCircle2 className="h-8 w-8 text-blue-500" />
+                                        <CheckCircle2 className="h-8 w-8 text-status-info" />
                                     </div>
-                                    <h3 className="text-xl font-display font-semibold text-blue-900 mb-2">
+                                    <h3 className="text-xl font-display font-semibold text-status-info-dark mb-2">
                                         All on track
                                     </h3>
-                                    <p className="text-status-info-dark max-w-md mx-auto mb-6">
+                                    <p className="text-status-info max-w-md mx-auto mb-6">
                                         No urgent items need your attention right now. Check your focus tasks on the right, or explore these quick actions.
                                     </p>
                                     <div className="flex flex-wrap justify-center gap-3">

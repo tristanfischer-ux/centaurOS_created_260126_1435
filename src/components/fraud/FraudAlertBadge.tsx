@@ -85,14 +85,14 @@ export function FraudAlertBadge({
   const getBackgroundColor = () => {
     switch (riskLevel) {
       case "critical":
-        return "bg-status-error-light dark:bg-destructive/10 border-destructive dark:border-destructive"
+        return "bg-status-error-light border-destructive"
       case "high":
-        return "bg-orange-100 dark:bg-orange-950/30 border-orange-300 dark:border-orange-800"
+        return "bg-orange-100 border-orange-300"
       case "medium":
-        return "bg-status-warning-light dark:bg-status-warning/10 border-status-warning dark:border-status-warning"
+        return "bg-status-warning-light border-status-warning"
       case "low":
       default:
-        return "bg-status-success-light dark:bg-status-success/10 border-status-success dark:border-status-success"
+        return "bg-status-success-light border-status-success"
     }
   }
 
@@ -282,11 +282,11 @@ export function FraudAlertBanner({
   const getBackgroundColor = () => {
     switch (riskLevel) {
       case "critical":
-        return "bg-status-error-light dark:bg-destructive/10 border-destructive dark:border-destructive"
+        return "bg-status-error-light border-destructive"
       case "high":
-        return "bg-orange-50 dark:bg-orange-950/20 border-orange-200 dark:border-orange-800"
+        return "bg-orange-50 border-orange-200"
       case "medium":
-        return "bg-status-warning-light dark:bg-status-warning/10 border-status-warning dark:border-status-warning"
+        return "bg-status-warning-light border-status-warning"
       default:
         return ""
     }

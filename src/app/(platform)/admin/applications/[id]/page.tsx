@@ -289,9 +289,9 @@ export default function ApplicationDetailPage({
                     </CardHeader>
                     <CardContent className="space-y-6">
                         {/* Approve Section */}
-                        <div className="space-y-4 p-4 border rounded-lg bg-green-50/50 dark:bg-green-950/20">
+                        <div className="space-y-4 p-4 border rounded-lg bg-status-success-light/50">
                             <div className="flex items-center gap-2">
-                                <CheckCircle2 className="h-5 w-5 text-green-600" />
+                                <CheckCircle2 className="h-5 w-5 text-status-success" />
                                 <h3 className="font-semibold">Approve Application</h3>
                             </div>
                             
@@ -343,9 +343,9 @@ export default function ApplicationDetailPage({
                         </div>
                         
                         {/* Reject Section */}
-                        <div className="space-y-4 p-4 border rounded-lg bg-red-50/50 dark:bg-red-950/20">
+                        <div className="space-y-4 p-4 border rounded-lg bg-status-error-light/50">
                             <div className="flex items-center gap-2">
-                                <XCircle className="h-5 w-5 text-red-600" />
+                                <XCircle className="h-5 w-5 text-destructive" />
                                 <h3 className="font-semibold">Reject Application</h3>
                             </div>
                             

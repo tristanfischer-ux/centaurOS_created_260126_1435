@@ -236,8 +236,8 @@ export function DataRequestForm({
                   <div
                     className={`p-2 rounded-lg ${
                       reqType.variant === "warning"
-                        ? "bg-orange-100 text-international-orange dark:bg-orange-950"
-                        : "bg-blue-100 text-electric-blue dark:bg-blue-950"
+                        ? "bg-orange-100 text-international-orange"
+                        : "bg-blue-100 text-electric-blue"
                     }`}
                   >
                     <Icon className="h-5 w-5" />
@@ -265,7 +265,7 @@ export function DataRequestForm({
         {/* Reason Input (for deletion) */}
         {selectedType === "deletion" && (
           <div className="space-y-2">
-            <Alert variant="destructive" className="bg-orange-50 dark:bg-orange-950/20 border-international-orange/50">
+            <Alert variant="destructive" className="bg-orange-50 border-international-orange/50">
               <AlertTriangle className="h-4 w-4 text-international-orange" />
               <AlertTitle className="text-international-orange">Important: Account Deletion</AlertTitle>
               <AlertDescription className="text-international-orange/80">

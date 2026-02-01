@@ -58,7 +58,7 @@ export function UserRiskCard({
       case "critical":
         return <ShieldAlert className="h-5 w-5 text-destructive" />
       case "high":
-        return <AlertTriangle className="h-5 w-5 text-orange-500" />
+        return <AlertTriangle className="h-5 w-5 text-status-warning" />
       case "medium":
         return <Shield className="h-5 w-5 text-status-warning" />
       default:
@@ -71,7 +71,7 @@ export function UserRiskCard({
       case "critical":
         return "text-destructive"
       case "high":
-        return "text-orange-500"
+        return "text-status-warning"
       case "medium":
         return "text-status-warning"
       default:
@@ -84,7 +84,7 @@ export function UserRiskCard({
       case "critical":
         return "bg-destructive"
       case "high":
-        return "bg-orange-500"
+        return "bg-status-warning"
       case "medium":
         return "bg-status-warning"
       default:
@@ -109,8 +109,8 @@ export function UserRiskCard({
       <div
         className={cn(
           "flex items-center justify-between p-4 rounded-lg border",
-          riskLevel === "critical" && "border-destructive bg-status-error-light dark:border-destructive dark:bg-destructive/10",
-          riskLevel === "high" && "border-orange-200 bg-orange-50 dark:border-orange-800 dark:bg-orange-950/20"
+          riskLevel === "critical" && "border-destructive bg-status-error-light",
+          riskLevel === "high" && "border-status-warning bg-status-warning-light"
         )}
       >
         <div className="flex items-center gap-3">
@@ -146,9 +146,9 @@ export function UserRiskCard({
     <Card
       className={cn(
         riskLevel === "critical" &&
-          "border-destructive dark:border-destructive",
+          "border-destructive",
         riskLevel === "high" &&
-          "border-orange-200 dark:border-orange-800"
+          "border-status-warning"
       )}
     >
       <CardHeader>
@@ -280,7 +280,7 @@ export function HighRiskUsersSummary({
           onClick={() => onViewUser(user.userId)}
         >
           <div className="flex items-center gap-3">
-            <AlertTriangle className="h-4 w-4 text-amber-500" />
+            <AlertTriangle className="h-4 w-4 text-status-warning" />
             <div>
               <p className="font-medium text-sm">
                 {user.userName || "Unknown User"}

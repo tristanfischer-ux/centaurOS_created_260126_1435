@@ -179,11 +179,11 @@ export function TimesheetApprovalCard({
               value={Math.min(100, progress)}
               className={cn(
                 'h-3',
-                progress > 100 && '[&>div]:bg-amber-500'
+                progress > 100 && '[&>div]:bg-status-warning'
               )}
             />
             {hoursLogged > retainer.weekly_hours && (
-              <p className="text-xs text-amber-600">
+              <p className="text-xs text-status-warning">
                 {hoursLogged - retainer.weekly_hours} hours over commitment
               </p>
             )}
@@ -236,19 +236,19 @@ export function TimesheetApprovalCard({
           )}
 
           {success && (
-            <Alert className="border-emerald-200 bg-emerald-50">
-              <CheckCircle className="h-4 w-4 text-emerald-600" />
-              <AlertTitle className="text-emerald-800">Success</AlertTitle>
-              <AlertDescription className="text-emerald-700">{success}</AlertDescription>
+            <Alert className="border-status-success bg-status-success-light">
+              <CheckCircle className="h-4 w-4 text-status-success" />
+              <AlertTitle className="text-status-success-dark">Success</AlertTitle>
+              <AlertDescription className="text-status-success-dark">{success}</AlertDescription>
             </Alert>
           )}
 
           {/* Status Messages */}
           {status === 'approved' && (
-            <Alert className="border-emerald-200 bg-emerald-50">
-              <CheckCircle className="h-4 w-4 text-emerald-600" />
-              <AlertTitle className="text-emerald-800">Approved</AlertTitle>
-              <AlertDescription className="text-emerald-700">
+            <Alert className="border-status-success bg-status-success-light">
+              <CheckCircle className="h-4 w-4 text-status-success" />
+              <AlertTitle className="text-status-success-dark">Approved</AlertTitle>
+              <AlertDescription className="text-status-success-dark">
                 This timesheet has been approved and will be processed for payment.
               </AlertDescription>
             </Alert>

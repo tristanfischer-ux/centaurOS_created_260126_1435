@@ -151,8 +151,8 @@ export function CompareToDialog({ currentMember, allMembers }: CompareToDialogPr
                                                         <td
                                                             key={member.id}
                                                             className={`py-3 px-6 text-center font-medium
-                                                                ${isBest ? 'text-green-600 bg-green-50' : ''}
-                                                                ${isWorst ? 'text-red-600 bg-red-50' : ''}
+                                                                ${isBest ? 'text-status-success bg-status-success-light' : ''}
+                                                                ${isWorst ? 'text-destructive bg-status-error-light' : ''}
                                                                 ${!isBest && !isWorst ? 'text-foreground' : ''}
                                                             `}
                                                         >

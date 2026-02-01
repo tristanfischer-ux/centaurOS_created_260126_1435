@@ -25,14 +25,14 @@ function getCategoryIcon(category: string) {
     }
 }
 
-// Get category color classes - ALL SOLID backgrounds, no transparency
+// Get category color classes - ALL SOLID backgrounds, light-mode only
 function getCategoryColors(category: string) {
     switch (category) {
-        case 'People': return '!bg-slate-100 dark:!bg-slate-800 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700'
-        case 'AI': return '!bg-violet-100 dark:!bg-violet-900 text-violet-700 dark:text-violet-200 border-violet-200 dark:border-violet-700'
-        case 'Products': return '!bg-stone-100 dark:!bg-stone-800 text-stone-700 dark:text-stone-200 border-stone-200 dark:border-stone-700'
-        case 'Services': return '!bg-blue-100 dark:!bg-blue-900 text-blue-700 dark:text-blue-200 border-blue-200 dark:border-blue-700'
-        default: return '!bg-gray-100 dark:!bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-600'
+        case 'People': return '!bg-slate-100 text-slate-700 border-slate-200'
+        case 'AI': return '!bg-accent/10 text-accent border-accent/20'
+        case 'Products': return '!bg-stone-100 text-stone-700 border-stone-200'
+        case 'Services': return '!bg-status-info-light text-status-info-dark border-status-info/20'
+        default: return '!bg-muted text-muted-foreground border-border'
     }
 }
 
@@ -57,7 +57,7 @@ export function ComparisonBar({ selectedItems, onClear, onCompare, onRemove }: C
 
     return (
         <div className="fixed bottom-20 md:bottom-8 left-1/2 -translate-x-1/2 z-[200] animate-in slide-in-from-bottom-10 fade-in duration-300 w-full max-w-4xl px-4 pointer-events-none">
-            <Card className="shadow-xl !bg-white dark:!bg-slate-900 border-t-2 border-t-international-orange pointer-events-auto">
+            <Card className="shadow-xl !bg-white border-t-2 border-t-international-orange pointer-events-auto">
                 {/* Header row */}
                 <div className="flex items-center justify-between px-4 py-2 border-b border-border/50">
                     <div className="flex items-center gap-2">
@@ -105,7 +105,7 @@ export function ComparisonBar({ selectedItems, onClear, onCompare, onRemove }: C
                                     )}
                                 >
                                     {/* Category icon */}
-                                    <div className="flex-shrink-0 w-8 h-8 rounded-md !bg-white dark:!bg-slate-700 flex items-center justify-center">
+                                    <div className="flex-shrink-0 w-8 h-8 rounded-md !bg-white flex items-center justify-center">
                                         <CategoryIcon className="w-4 h-4" />
                                     </div>
                                     
@@ -132,7 +132,7 @@ export function ComparisonBar({ selectedItems, onClear, onCompare, onRemove }: C
                                     <button
                                         onClick={() => onRemove(item.id)}
                                         aria-label={`Remove ${item.title} from comparison`}
-                                        className="flex-shrink-0 w-6 h-6 rounded-full !bg-white dark:!bg-slate-700 hover:!bg-red-500 hover:text-white flex items-center justify-center transition-colors"
+                                        className="flex-shrink-0 w-6 h-6 rounded-full !bg-white hover:!bg-destructive hover:text-white flex items-center justify-center transition-colors"
                                     >
                                         <X className="w-3.5 h-3.5" />
                                     </button>

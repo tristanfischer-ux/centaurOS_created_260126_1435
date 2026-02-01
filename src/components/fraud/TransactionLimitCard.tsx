@@ -52,9 +52,9 @@ export function TransactionLimitCard({
   }
 
   const getProgressColor = (percent: number) => {
-    if (percent >= 90) return "bg-red-500"
-    if (percent >= 70) return "bg-amber-500"
-    return "bg-emerald-500"
+    if (percent >= 90) return "bg-status-error"
+    if (percent >= 70) return "bg-status-warning"
+    return "bg-status-success"
   }
 
   const getTierBadgeVariant = (tier: string): "default" | "secondary" | "secondary" | "destructive" => {
@@ -121,7 +121,7 @@ export function TransactionLimitCard({
         {showUpgradeInfo && nextTier && daysUntilNextTier !== null && daysUntilNextTier > 0 && (
           <div className="mt-4 p-3 rounded-lg bg-muted/50 border">
             <div className="flex items-start gap-2">
-              <TrendingUp className="h-4 w-4 text-emerald-500 mt-0.5" />
+              <TrendingUp className="h-4 w-4 text-status-success mt-0.5" />
               <div className="text-sm">
                 <p className="font-medium">Limit Increase Coming</p>
                 <p className="text-muted-foreground">
@@ -136,14 +136,14 @@ export function TransactionLimitCard({
 
         {/* Trusted Account Banner */}
         {tier === "trusted" && (
-          <div className="mt-4 p-3 rounded-lg bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800">
+          <div className="mt-4 p-3 rounded-lg bg-status-success-light border border-status-success">
             <div className="flex items-start gap-2">
-              <CheckCircle className="h-4 w-4 text-emerald-600 mt-0.5" />
+              <CheckCircle className="h-4 w-4 text-status-success mt-0.5" />
               <div className="text-sm">
-                <p className="font-medium text-emerald-700 dark:text-emerald-400">
+                <p className="font-medium text-status-success-dark">
                   Trusted Account
                 </p>
-                <p className="text-emerald-600 dark:text-emerald-500">
+                <p className="text-status-success">
                   You have the highest transaction limits available
                 </p>
               </div>
@@ -211,7 +211,7 @@ function LimitProgressRow({
         )}
 
         {isUnlimited && (
-          <div className="flex items-center gap-1 text-xs text-emerald-600">
+          <div className="flex items-center gap-1 text-xs text-status-success">
             <CheckCircle className="h-3 w-3" />
             <span>Unlimited</span>
           </div>

@@ -72,7 +72,7 @@ const categoryBadgeStyles: Record<string, string> = {
     'People': 'bg-stone-100 text-stone-700',
     'Products': 'bg-muted text-foreground',
     'Services': 'bg-status-info-light text-status-info-dark',
-    'AI': 'bg-violet-50 text-violet-700'
+    'AI': 'bg-accent/10 text-accent'
 }
 
 export function ComparisonModal({ open, onOpenChange, items }: ComparisonModalProps) {
@@ -167,51 +167,51 @@ export function ComparisonModal({ open, onOpenChange, items }: ComparisonModalPr
                     <div className="p-6 pt-4 min-w-max">
                         {/* AI Analysis Results */}
                         {aiAnalysis && (
-                            <Card className="mb-6 p-4 bg-violet-50 dark:bg-violet-950/30 border-violet-200 dark:border-violet-800">
+                            <Card className="mb-6 p-4 bg-accent/10 border-accent/20">
                                 <div className="flex items-start justify-between mb-4">
                                     <div className="flex items-center gap-2">
-                                        <Sparkles className="h-5 w-5 text-violet-600 dark:text-violet-400" />
-                                        <h3 className="font-semibold text-violet-900 dark:text-violet-100">AI Analysis</h3>
+                                        <Sparkles className="h-5 w-5 text-accent" />
+                                        <h3 className="font-semibold text-foreground">AI Analysis</h3>
                                     </div>
                                     <Button
                                         variant="ghost"
                                         size="sm"
                                         onClick={() => setAiAnalysis(null)}
-                                        className="h-7 px-2 text-violet-600 hover:text-violet-800 hover:bg-violet-100 dark:text-violet-400 dark:hover:bg-violet-900/50"
+                                        className="h-7 px-2 text-accent hover:text-accent hover:bg-accent/10"
                                     >
                                         <X className="h-4 w-4" />
                                     </Button>
                                 </div>
 
                                 {/* Winner Section */}
-                                <div className="mb-4 p-3 bg-background dark:bg-violet-900/40 rounded-lg border border-violet-200 dark:border-violet-700">
+                                <div className="mb-4 p-3 bg-background rounded-lg border border-accent/20">
                                     <div className="flex items-center gap-2 mb-2">
                                         <Trophy className="h-4 w-4 text-amber-500" />
-                                        <span className="text-sm font-medium text-violet-900 dark:text-violet-100">Recommended</span>
-                                        <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-200 border-0">
+                                        <span className="text-sm font-medium text-foreground">Recommended</span>
+                                        <Badge className="bg-amber-100 text-amber-800 border-0">
                                             {aiAnalysis.winner.title}
                                         </Badge>
                                     </div>
-                                    <p className="text-sm text-violet-700 dark:text-violet-300">{aiAnalysis.winner.reason}</p>
+                                    <p className="text-sm text-muted-foreground">{aiAnalysis.winner.reason}</p>
                                 </div>
 
                                 {/* Reasoning */}
                                 <div className="mb-4">
-                                    <h4 className="text-sm font-medium text-violet-900 dark:text-violet-100 mb-2">Analysis</h4>
-                                    <p className="text-sm text-violet-700 dark:text-violet-300 leading-relaxed">{aiAnalysis.reasoning}</p>
+                                    <h4 className="text-sm font-medium text-foreground mb-2">Analysis</h4>
+                                    <p className="text-sm text-muted-foreground leading-relaxed">{aiAnalysis.reasoning}</p>
                                 </div>
 
                                 {/* Trade-offs */}
                                 {aiAnalysis.tradeoffs && aiAnalysis.tradeoffs.length > 0 && (
                                     <div className="mb-4">
-                                        <h4 className="text-sm font-medium text-violet-900 dark:text-violet-100 mb-2 flex items-center gap-1.5">
+                                        <h4 className="text-sm font-medium text-foreground mb-2 flex items-center gap-1.5">
                                             <AlertCircle className="h-4 w-4" />
                                             Trade-offs to Consider
                                         </h4>
                                         <ul className="space-y-1.5">
                                             {aiAnalysis.tradeoffs.map((tradeoff, index) => (
-                                                <li key={index} className="text-sm text-violet-700 dark:text-violet-300 flex items-start gap-2">
-                                                    <span className="text-violet-400 mt-1">•</span>
+                                                <li key={index} className="text-sm text-muted-foreground flex items-start gap-2">
+                                                    <span className="text-accent mt-1">•</span>
                                                     <span>{tradeoff}</span>
                                                 </li>
                                             ))}
@@ -220,8 +220,8 @@ export function ComparisonModal({ open, onOpenChange, items }: ComparisonModalPr
                                 )}
 
                                 {/* Summary */}
-                                <div className="pt-3 border-t border-violet-200 dark:border-violet-700">
-                                    <p className="text-sm text-violet-600 dark:text-violet-400 italic">{aiAnalysis.summary}</p>
+                                <div className="pt-3 border-t border-accent/20">
+                                    <p className="text-sm text-accent italic">{aiAnalysis.summary}</p>
                                 </div>
                             </Card>
                         )}
@@ -266,7 +266,7 @@ export function ComparisonModal({ open, onOpenChange, items }: ComparisonModalPr
                                                                 key={key} 
                                                                 className={cn(
                                                                     "flex justify-between items-start py-1 px-2 rounded-md",
-                                                                    isBest && "bg-emerald-50 dark:bg-emerald-950/30"
+                                                                    isBest && "bg-status-success-light"
                                                                 )}
                                                             >
                                                                 <dt className="text-muted-foreground capitalize pr-4 flex-shrink-0">
@@ -397,14 +397,14 @@ function SectionGroup({ sectionName, sectionKeys, items, bestValues }: SectionGr
                             const value = item.attributes[key]
                             const isBest = bestValues[key]?.itemId === item.id
                             
-                            return (
-                                <td 
-                                    key={`${item.id}-${key}`} 
-                                    className={cn(
-                                        "text-sm py-3 px-4 align-top transition-colors",
-                                        isBest && "bg-emerald-50 dark:bg-emerald-950/30"
-                                    )}
-                                >
+                                            return (
+                                                <td 
+                                                    key={`${item.id}-${key}`} 
+                                                    className={cn(
+                                                        "text-sm py-3 px-4 align-top transition-colors",
+                                                        isBest && "bg-status-success-light"
+                                                    )}
+                                                >
                                     <div className="flex items-center gap-1.5">
                                         {renderValue(value, key, items, item.id, bestValues)}
                                     </div>
@@ -593,13 +593,13 @@ function renderValue(
     
     return (
         <span className="inline-flex items-center gap-1.5">
-            <span className={cn(isBest && "font-semibold text-emerald-700 dark:text-emerald-400")}>
+            <span className={cn(isBest && "font-semibold text-status-success")}>
                 {String(value)}
             </span>
             {isComparable && isBest && (
                 bestInfo.direction === 'higher' 
-                    ? <TrendingUp className="w-3.5 h-3.5 text-emerald-500" />
-                    : <TrendingDown className="w-3.5 h-3.5 text-emerald-500" />
+                    ? <TrendingUp className="w-3.5 h-3.5 text-status-success" />
+                    : <TrendingDown className="w-3.5 h-3.5 text-status-success" />
             )}
         </span>
     )

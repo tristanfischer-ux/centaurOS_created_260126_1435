@@ -63,10 +63,10 @@ interface QuestionDetailViewProps {
 }
 
 const categoryColors: Record<string, string> = {
-    Finance: "bg-emerald-100 text-emerald-800",
+    Finance: "bg-status-success-light text-status-success-dark",
     Legal: "bg-purple-100 text-purple-800",
-    Sales: "bg-blue-100 text-blue-800",
-    Operations: "bg-amber-100 text-amber-800",
+    Sales: "bg-status-info-light text-status-info-dark",
+    Operations: "bg-status-warning-light text-status-warning-dark",
     HR: "bg-pink-100 text-pink-800",
     Technology: "bg-sky-100 text-sky-800",
     Strategy: "bg-indigo-100 text-indigo-800",
@@ -81,12 +81,12 @@ const verificationConfig: Record<VerificationStatus, { label: string; color: str
     },
     endorsed: {
         label: "Endorsed",
-        color: "bg-amber-100 text-amber-700",
+        color: "bg-status-warning-light text-status-warning-dark",
         icon: Shield,
     },
     verified: {
         label: "Verified",
-        color: "bg-emerald-100 text-emerald-700",
+        color: "bg-status-success-light text-status-success-dark",
         icon: CheckCircle2,
     },
 }
@@ -243,7 +243,7 @@ export function QuestionDetailView({
                                 onClick={handleUpvote}
                                 className={cn(
                                     "gap-1.5",
-                                    isUpvoted && "text-emerald-600 bg-emerald-50"
+                                    isUpvoted && "text-status-success bg-status-success-light"
                                 )}
                             >
                                 <ThumbsUp className={cn("h-4 w-4", isUpvoted && "fill-current")} />
@@ -367,7 +367,7 @@ export function QuestionDetailView({
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ delay: 0.4 }}
-                className="p-4 bg-gradient-to-r from-blue-50 to-violet-50 rounded-lg border border-blue-100"
+                className="p-4 bg-gradient-to-r from-status-info-light to-violet-50 rounded-lg border border-status-info-light"
             >
                 <div className="flex items-start gap-3">
                     <div className="h-10 w-10 rounded-full bg-gradient-to-br from-blue-500 to-violet-500 flex items-center justify-center shrink-0">

@@ -210,7 +210,7 @@ export function StandupWidget({ userRole, compact = false }: StandupWidgetProps)
                     )}
                     
                     {stats && (
-                        <div className="mt-3 pt-3 border-t border-slate-100">
+                        <div className="mt-3 pt-3 border-t">
                             <div className="flex items-center justify-between text-xs text-muted-foreground">
                                 <span>{stats.submittedToday}/{stats.totalMembers} submitted</span>
                                 <span>{stats.participationRate}%</span>
@@ -258,7 +258,7 @@ export function StandupWidget({ userRole, compact = false }: StandupWidgetProps)
                                 value={completed}
                                 onChange={(e) => setCompleted(e.target.value)}
                                 placeholder="Yesterday I completed..."
-                                className="min-h-[80px] bg-background border-slate-200"
+                                className="min-h-[80px] bg-background border"
                             />
                         </div>
                         
@@ -272,7 +272,7 @@ export function StandupWidget({ userRole, compact = false }: StandupWidgetProps)
                                 value={planned}
                                 onChange={(e) => setPlanned(e.target.value)}
                                 placeholder="Today I plan to..."
-                                className="min-h-[80px] bg-background border-slate-200"
+                                className="min-h-[80px] bg-background border"
                             />
                         </div>
                         
@@ -286,7 +286,7 @@ export function StandupWidget({ userRole, compact = false }: StandupWidgetProps)
                                 value={blockers}
                                 onChange={(e) => setBlockers(e.target.value)}
                                 placeholder="I'm blocked by... (or leave empty)"
-                                className="min-h-[60px] bg-background border-slate-200"
+                                className="min-h-[60px] bg-background border"
                             />
                             {blockers && (
                                 <label className="flex items-center gap-2 text-sm">
@@ -294,7 +294,7 @@ export function StandupWidget({ userRole, compact = false }: StandupWidgetProps)
                                         type="checkbox"
                                         checked={needsHelp}
                                         onChange={(e) => setNeedsHelp(e.target.checked)}
-                                        className="rounded border-slate-300"
+                                        className="rounded border"
                                     />
                                     <span className="text-muted-foreground">I need help unblocking this</span>
                                 </label>
@@ -315,7 +315,7 @@ export function StandupWidget({ userRole, compact = false }: StandupWidgetProps)
                                                 'flex-1 py-2 px-3 rounded-lg border transition-all',
                                                 mood === option.value
                                                     ? option.color + ' border-2'
-                                                    : 'border hover:border-slate-300 bg-white'
+                                                    : 'border hover:border-muted-foreground/30 bg-background'
                                             )}
                                         >
                                             <Icon className={cn(
@@ -467,7 +467,7 @@ export function StandupWidget({ userRole, compact = false }: StandupWidgetProps)
                                             {teamStandups.map((standup) => {
                                                 const user = standup.user as { full_name: string | null; role: string | null } | undefined
                                                 return (
-                                                    <div key={standup.id} className="p-3 bg-background rounded-lg border border-slate-200">
+                                                    <div key={standup.id} className="p-3 bg-background rounded-lg border">
                                                         <div className="flex items-center gap-2 mb-2">
                                                             <UserAvatar 
                                                                 name={user?.full_name} 

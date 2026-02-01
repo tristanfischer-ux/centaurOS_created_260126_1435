@@ -71,20 +71,20 @@ function SkillTreeNode({
   const statusConfig = {
     mastered: { 
       icon: CheckCircle2, 
-      color: 'text-emerald-500', 
-      bg: 'bg-emerald-500',
+      color: 'text-status-success', 
+      bg: 'bg-status-success',
       label: 'Mastered' 
     },
     learning: { 
       icon: BookOpen, 
-      color: 'text-blue-500', 
-      bg: 'bg-blue-500',
+      color: 'text-status-info', 
+      bg: 'bg-status-info',
       label: 'Learning' 
     },
     unknown: { 
       icon: HelpCircle, 
-      color: 'text-slate-400', 
-      bg: 'bg-slate-400',
+      color: 'text-muted-foreground', 
+      bg: 'bg-muted-foreground',
       label: 'Unknown' 
     },
     needs_expert: { 
@@ -103,7 +103,7 @@ function SkillTreeNode({
       <div 
         className={cn(
           "flex items-center gap-2 py-1.5 px-2 rounded-lg transition-colors",
-          "hover:bg-slate-50 cursor-pointer group",
+          "hover:bg-muted cursor-pointer group",
           skill.status === 'needs_expert' && "bg-orange-50/50"
         )}
         style={{ paddingLeft: `${depth * 16 + 8}px` }}
@@ -111,12 +111,12 @@ function SkillTreeNode({
         {hasChildren ? (
           <button
             onClick={() => setIsExpanded(!isExpanded)}
-            className="p-0.5 hover:bg-slate-200 rounded"
+            className="p-0.5 hover:bg-muted rounded"
           >
             {isExpanded ? (
-              <ChevronDown className="h-3 w-3 text-slate-400" />
+              <ChevronDown className="h-3 w-3 text-muted-foreground" />
             ) : (
-              <ChevronRight className="h-3 w-3 text-slate-400" />
+              <ChevronRight className="h-3 w-3 text-muted-foreground" />
             )}
           </button>
         ) : (
@@ -127,7 +127,7 @@ function SkillTreeNode({
         
         <span className={cn(
           "text-sm flex-1",
-          skill.status === 'mastered' ? 'text-slate-600' : 'text-slate-900 font-medium'
+          skill.status === 'mastered' ? 'text-muted-foreground' : 'text-foreground font-medium'
         )}>
           {skill.name}
         </span>
@@ -162,7 +162,7 @@ function SkillTreeNode({
           style={{ paddingLeft: `${depth * 16 + 40}px` }}
         >
           {skill.questions.map((q, i) => (
-            <div key={i} className="flex items-start gap-2 text-xs text-slate-500 py-0.5">
+            <div key={i} className="flex items-start gap-2 text-xs text-muted-foreground py-0.5">
               <Lightbulb className="h-3 w-3 mt-0.5 text-amber-400 flex-shrink-0" />
               <span>{q}</span>
             </div>
@@ -198,34 +198,34 @@ function SkillTreeNode({
 // Expert card component
 function ExpertCard({ expert }: { expert: ExpertMatch }) {
   return (
-    <div className="p-3 border border-slate-200 rounded-lg hover:border-slate-300 hover:shadow-sm transition-all group">
+    <div className="p-3 border rounded-lg hover:shadow-sm transition-all group">
       <div className="flex items-start gap-3">
         <Avatar className="h-10 w-10 border">
           <AvatarImage src={expert.avatar} />
-          <AvatarFallback className="bg-slate-100 text-sm">
+          <AvatarFallback className="bg-muted text-sm">
             {expert.name.split(' ').map(n => n[0]).join('')}
           </AvatarFallback>
         </Avatar>
         
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
-            <span className="font-semibold text-sm text-slate-900">{expert.name}</span>
+            <span className="font-semibold text-sm text-foreground">{expert.name}</span>
             {expert.availability === 'available' && (
-              <span className="w-2 h-2 bg-emerald-500 rounded-full" />
+              <span className="w-2 h-2 bg-status-success rounded-full" />
             )}
           </div>
-          <div className="text-xs text-slate-500 truncate">{expert.title}</div>
+          <div className="text-xs text-muted-foreground truncate">{expert.title}</div>
           
           <div className="flex items-center gap-3 mt-1.5">
             {expert.rating && (
               <div className="flex items-center gap-1 text-xs">
                 <Star className="h-3 w-3 text-amber-400 fill-amber-400" />
                 <span className="font-medium">{expert.rating}</span>
-                <span className="text-slate-400">({expert.reviewCount})</span>
+                <span className="text-muted-foreground">({expert.reviewCount})</span>
               </div>
             )}
             {expert.hourlyRate && (
-              <span className="text-xs text-slate-500">
+              <span className="text-xs text-muted-foreground">
                 ${expert.hourlyRate}/hr
               </span>
             )}
@@ -236,7 +236,7 @@ function ExpertCard({ expert }: { expert: ExpertMatch }) {
               <Badge 
                 key={skill} 
                 variant="secondary" 
-                className="text-[10px] px-1.5 py-0 bg-blue-50 text-blue-700"
+                className="text-[10px] px-1.5 py-0 bg-status-info-light text-status-info-dark"
               >
                 {skill}
               </Badge>
@@ -261,12 +261,12 @@ function ExpertCard({ expert }: { expert: ExpertMatch }) {
 // Supplier card component
 function SupplierCard({ supplier }: { supplier: SupplierMatch }) {
   return (
-    <div className="p-3 border border-slate-200 rounded-lg hover:border-slate-300 hover:shadow-sm transition-all">
+    <div className="p-3 border rounded-lg hover:shadow-sm transition-all">
       <div className="flex items-start justify-between">
         <div>
-          <div className="font-semibold text-sm text-slate-900">{supplier.name}</div>
+          <div className="font-semibold text-sm text-foreground">{supplier.name}</div>
           {supplier.location && (
-            <div className="flex items-center gap-1 text-xs text-slate-500 mt-0.5">
+            <div className="flex items-center gap-1 text-xs text-muted-foreground mt-0.5">
               <MapPin className="h-3 w-3" />
               {supplier.location}
             </div>
@@ -280,15 +280,15 @@ function SupplierCard({ supplier }: { supplier: SupplierMatch }) {
         )}
       </div>
       
-      <div className="flex items-center gap-4 mt-2 text-xs text-slate-600">
+      <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
         {supplier.leadTime && (
           <div className="flex items-center gap-1">
-            <Clock className="h-3 w-3 text-slate-400" />
+            <Clock className="h-3 w-3 text-muted-foreground" />
             {supplier.leadTime}
           </div>
         )}
         {supplier.priceRange && (
-          <div className="font-medium text-slate-700">
+          <div className="font-medium text-foreground">
             {supplier.priceRange}
           </div>
         )}
@@ -344,9 +344,9 @@ Thank you!`
   }
 
   return (
-    <div className="bg-slate-50 rounded-lg p-3 space-y-2">
+    <div className="bg-muted rounded-lg p-3 space-y-2">
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
+        <div className="flex items-center gap-2 text-sm font-medium text-foreground">
           <Sparkles className="h-4 w-4 text-international-orange" />
           Smart Inquiry
         </div>
@@ -369,10 +369,10 @@ Thank you!`
           )}
         </Button>
       </div>
-      <div className="text-xs text-slate-500 bg-white p-2 rounded border max-h-32 overflow-y-auto whitespace-pre-wrap font-mono">
+      <div className="text-xs text-muted-foreground bg-white p-2 rounded border max-h-32 overflow-y-auto whitespace-pre-wrap font-mono">
         {inquiry}
       </div>
-      <p className="text-[10px] text-slate-400">
+      <p className="text-[10px] text-muted-foreground">
         Pre-filled message based on your knowledge gaps. Edit before sending.
       </p>
     </div>
@@ -416,12 +416,12 @@ export function KnowledgeSidebar({
         exit={{ x: '100%', opacity: 0 }}
         transition={{ type: 'spring', damping: 25, stiffness: 200 }}
         className={cn(
-          "w-[420px] bg-white border-l border-slate-200 shadow-2xl flex flex-col h-full",
+          "w-[420px] bg-white border-l shadow-2xl flex flex-col h-full",
           className
         )}
       >
         {/* Header */}
-        <div className="p-4 border-b border-slate-100 bg-gradient-to-r from-slate-50 to-white">
+        <div className="p-4 border-b bg-gradient-to-r from-muted to-white">
           <div className="flex items-start justify-between">
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-1">
@@ -438,11 +438,11 @@ export function KnowledgeSidebar({
                   {statusColors.label}
                 </Badge>
               </div>
-              <h2 className="font-display text-lg font-bold text-slate-900">
+              <h2 className="font-display text-lg font-bold text-foreground">
                 {node.title}
               </h2>
               {node.description && (
-                <p className="text-sm text-slate-500 mt-1">
+                <p className="text-sm text-muted-foreground mt-1">
                   {node.description}
                 </p>
               )}
@@ -512,8 +512,8 @@ export function KnowledgeSidebar({
               {skills.length > 0 ? (
                 <>
                   <div className="flex items-center justify-between">
-                    <h3 className="text-sm font-semibold text-slate-700">Skills Tree</h3>
-                    <span className="text-xs text-slate-500">
+                    <h3 className="text-sm font-semibold text-foreground">Skills Tree</h3>
+                    <span className="text-xs text-muted-foreground">
                       Click to expand • Hover for actions
                     </span>
                   </div>
@@ -543,7 +543,7 @@ export function KnowledgeSidebar({
                   )}
                 </>
               ) : (
-                <div className="text-center py-8 text-slate-500">
+                <div className="text-center py-8 text-muted-foreground">
                   <BookOpen className="h-8 w-8 mx-auto mb-2 opacity-50" />
                   <p className="text-sm">No skills tree available yet.</p>
                   <p className="text-xs mt-1">Click "Assess Knowledge" to build one.</p>
@@ -561,7 +561,7 @@ export function KnowledgeSidebar({
               )}
               
               <div className="flex items-center justify-between">
-                <h3 className="text-sm font-semibold text-slate-700">
+                <h3 className="text-sm font-semibold text-foreground">
                   Recommended Experts
                 </h3>
                 <Button variant="link" size="sm" className="text-xs h-auto p-0">
@@ -580,7 +580,7 @@ export function KnowledgeSidebar({
             {/* Suppliers Tab */}
             <TabsContent value="suppliers" className="m-0 p-4 space-y-4">
               <div className="flex items-center justify-between">
-                <h3 className="text-sm font-semibold text-slate-700">
+                <h3 className="text-sm font-semibold text-foreground">
                   Component Suppliers
                 </h3>
                 <Button variant="link" size="sm" className="text-xs h-auto p-0">
@@ -598,7 +598,7 @@ export function KnowledgeSidebar({
               <Separator />
               
               <div className="text-center py-2">
-                <p className="text-xs text-slate-500 mb-2">
+                <p className="text-xs text-muted-foreground mb-2">
                   Need custom components?
                 </p>
                 <Button variant="outline" size="sm">

@@ -211,12 +211,12 @@ export function UserManagementTab({ foundryId, isFounder }: UserManagementTabPro
             
             {/* Error/Success messages */}
             {error && (
-                <div className="p-2 text-xs bg-red-50 text-red-700 rounded-md">
+                <div className="p-2 text-xs bg-status-error-light text-destructive rounded-md">
                     {error}
                 </div>
             )}
             {success && (
-                <div className="p-2 text-xs bg-green-50 text-green-700 rounded-md">
+                <div className="p-2 text-xs bg-status-success-light text-status-success rounded-md">
                     {success}
                 </div>
             )}
@@ -275,7 +275,7 @@ export function UserManagementTab({ foundryId, isFounder }: UserManagementTabPro
                                             {isAdminUser(member.id) ? (
                                                 <DropdownMenuItem
                                                     onClick={() => handleRevokeAdmin(member.id)}
-                                                    className="text-amber-600"
+                                                    className="text-status-warning"
                                                 >
                                                     <ShieldOff className="h-4 w-4 mr-2" />
                                                     Revoke Admin
@@ -291,7 +291,7 @@ export function UserManagementTab({ foundryId, isFounder }: UserManagementTabPro
                                             <DropdownMenuSeparator />
                                             <DropdownMenuItem
                                                 onClick={() => handleOffboard(member)}
-                                                className="text-red-600"
+                                                className="text-destructive"
                                             >
                                                 <UserMinus className="h-4 w-4 mr-2" />
                                                 Offboard User

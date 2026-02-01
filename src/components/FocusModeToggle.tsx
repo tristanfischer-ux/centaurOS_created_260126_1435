@@ -181,7 +181,7 @@ export function FocusModeToggle({ compact = false, showLabel = true, className }
                                 <span className="text-purple-800">Notifications will be muted</span>
                             </div>
                             <div className="flex items-center gap-2 text-sm">
-                                <Zap className="h-4 w-4 text-amber-500" />
+                                <Zap className="h-4 w-4 text-status-warning" />
                                 <span className="text-purple-800">Urgent messages can still break through</span>
                             </div>
                         </div>
@@ -273,7 +273,7 @@ export function UrgentOverrideButton({
                 variant="secondary"
                 size="sm"
                 onClick={() => setShowDialog(true)}
-                className="text-amber-600 border-amber-200 hover:bg-amber-50"
+                className="text-status-warning border-status-warning hover:bg-status-warning-light"
             >
                 <Zap className="h-3 w-3 mr-1" />
                 Urgent
@@ -283,7 +283,7 @@ export function UrgentOverrideButton({
                 <DialogContent size="sm" className="bg-background">
                     <DialogHeader>
                         <DialogTitle className="flex items-center gap-2 text-foreground">
-                            <Zap className="h-5 w-5 text-amber-500" />
+                            <Zap className="h-5 w-5 text-status-warning" />
                             Send Urgent Message
                         </DialogTitle>
                         <DialogDescription>
@@ -309,7 +309,7 @@ export function UrgentOverrideButton({
                         <Button 
                             onClick={handleSend}
                             disabled={isLoading || !message.trim()}
-                            className="bg-amber-500 hover:bg-amber-600 text-white"
+                            className="bg-status-warning hover:bg-status-warning/90 text-white"
                         >
                             <Zap className="h-4 w-4 mr-2" />
                             Send Urgent

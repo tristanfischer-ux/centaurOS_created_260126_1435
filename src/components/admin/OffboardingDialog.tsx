@@ -163,7 +163,7 @@ export function OffboardingDialog({
             <DialogContent>
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
-                        <UserMinus className="h-5 w-5 text-red-500" />
+                        <UserMinus className="h-5 w-5 text-destructive" />
                         Offboard {member.full_name || member.email}
                     </DialogTitle>
                     <DialogDescription>
@@ -181,12 +181,12 @@ export function OffboardingDialog({
                 ) : step === 'review' ? (
                     <div className="space-y-4 py-4">
                         {tasks.length > 0 && (
-                            <div className="p-3 bg-amber-50 rounded-lg border border-amber-200">
-                                <div className="flex items-center gap-2 text-amber-700 mb-2">
+                            <div className="p-3 bg-status-warning-light rounded-lg border border-status-warning">
+                                <div className="flex items-center gap-2 text-status-warning mb-2">
                                     <AlertTriangle className="h-4 w-4" />
                                     <span className="text-sm font-medium">Tasks to handle</span>
                                 </div>
-                                <p className="text-xs text-amber-600">
+                                <p className="text-xs text-status-warning">
                                     This user has {tasks.length} task{tasks.length !== 1 ? 's' : ''} that will need attention.
                                 </p>
                             </div>
@@ -297,31 +297,31 @@ export function OffboardingDialog({
                     </div>
                 ) : step === 'confirm' ? (
                     <div className="space-y-4 py-4">
-                        <div className="p-4 bg-red-50 rounded-lg border border-red-200">
-                            <div className="flex items-center gap-2 text-red-700 mb-2">
+                        <div className="p-4 bg-status-error-light rounded-lg border border-destructive">
+                            <div className="flex items-center gap-2 text-destructive mb-2">
                                 <AlertTriangle className="h-5 w-5" />
                                 <span className="font-medium">Confirm Offboarding</span>
                             </div>
-                            <p className="text-sm text-red-600">
+                            <p className="text-sm text-destructive">
                                 You are about to {action === 'reassign_delete' ? 'permanently remove' : action === 'soft_delete' ? 'deactivate' : 'anonymize'}{' '}
                                 <strong>{member.full_name || member.email}</strong>.
                             </p>
                             {action === 'reassign_delete' && (
-                                <p className="text-sm text-red-600 mt-2">
+                                <p className="text-sm text-destructive mt-2">
                                     This action cannot be undone.
                                 </p>
                             )}
                         </div>
                         
                         {error && (
-                            <div className="p-3 text-sm bg-red-50 text-red-700 rounded-md">
+                            <div className="p-3 text-sm bg-status-error-light text-destructive rounded-md">
                                 {error}
                             </div>
                         )}
                     </div>
                 ) : step === 'complete' ? (
                     <div className="flex flex-col items-center justify-center py-8">
-                        <CheckCircle2 className="h-12 w-12 text-green-500 mb-4" />
+                        <CheckCircle2 className="h-12 w-12 text-status-success mb-4" />
                         <p className="text-lg font-medium text-foundry-900">Offboarding Complete</p>
                         <p className="text-sm text-foundry-500 mt-1">
                             {member.full_name || member.email} has been removed.

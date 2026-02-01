@@ -210,7 +210,7 @@ export function FunctionCard({ businessFunction, onUpdate }: FunctionCardProps) 
                                 </DropdownMenuItem>
                                 <DropdownMenuSeparator />
                                 <DropdownMenuItem onClick={() => handleStatusChange('not_needed')}>
-                                    <MinusCircle className="h-4 w-4 mr-2 text-gray-400" />
+                                    <MinusCircle className="h-4 w-4 mr-2 text-muted-foreground" />
                                     Not Needed
                                 </DropdownMenuItem>
                             </DropdownMenuContent>

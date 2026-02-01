@@ -112,24 +112,24 @@ export function StripeAccountStatus({
         },
         incomplete: {
             icon: AlertCircle,
-            color: 'text-amber-500',
-            bgColor: 'bg-amber-50',
+            color: 'text-status-warning',
+            bgColor: 'bg-status-warning-light',
             badge: 'Setup Incomplete',
             badgeVariant: 'secondary' as const,
             description: 'Complete your Stripe onboarding to receive payments'
         },
         restricted: {
             icon: AlertCircle,
-            color: 'text-orange-500',
-            bgColor: 'bg-orange-50',
+            color: 'text-status-warning',
+            bgColor: 'bg-status-warning-light',
             badge: 'Restricted',
             badgeVariant: 'secondary' as const,
             description: 'Some features are restricted. Additional verification may be needed.'
         },
         active: {
             icon: CheckCircle2,
-            color: 'text-green-600',
-            bgColor: 'bg-green-50',
+            color: 'text-status-success',
+            bgColor: 'bg-status-success-light',
             badge: 'Active',
             badgeVariant: 'default' as const,
             description: 'Your account is ready to receive payments'
