@@ -1,129 +1,145 @@
 import type { Archetype, BlueprintNode, SkillNode } from '../types'
 
-// Rocket subsystem nodes with realistic positioning
+// Rocket subsystem nodes - IMPROVED LAYOUT
+// Layout: Central spine (physical systems) + Left zone (compliance) + Right zone (support)
+// Canvas: 1100w x 750h, rocket silhouette centered at x=550
+
 export const ROCKET_NODES: BlueprintNode[] = [
-  // === PHYSICAL SYSTEMS ===
+  // ═══════════════════════════════════════════════════════════════════════════
+  // CENTRAL SPINE - Physical Systems (following rocket shape top-to-bottom)
+  // ═══════════════════════════════════════════════════════════════════════════
   
-  // Nose/Payload Section
+  // Top: Payload Section (nose cone area)
   {
     id: 'payload',
     title: 'Payload Bay',
     description: 'Cargo and payload integration systems',
     type: 'component',
     category: 'Mechanical',
-    x: 400,
-    y: 80,
+    x: 440,      // Center spine
+    y: 30,       // Top of rocket
     status: 'partial',
-    connections: ['avionics', 'fuselage'],
+    connections: ['avionics'],
   },
   
-  // Avionics & Guidance
+  // Upper: Avionics Bay
   {
     id: 'avionics',
     title: 'Avionics Bay',
     description: 'Flight computers, sensors, and navigation',
     type: 'system',
     category: 'Electronics',
-    x: 400,
-    y: 180,
+    x: 440,      // Center spine
+    y: 150,      // Below payload
     status: 'covered',
-    connections: ['guidance', 'comms', 'fuselage'],
+    connections: ['fuselage'],
   },
+  
+  // Upper-Left Branch: Guidance (connects to avionics)
   {
     id: 'guidance',
     title: 'Guidance System',
     description: 'Navigation, IMU, and flight control',
     type: 'component',
     category: 'Electronics',
-    x: 220,
-    y: 160,
+    x: 220,      // Left branch
+    y: 130,      // Same level as avionics
     status: 'partial',
-    connections: [],
+    connections: ['avionics'],
   },
+  
+  // Upper-Right Branch: Communications (connects to avionics)
   {
     id: 'comms',
     title: 'Communications',
     description: 'Telemetry, tracking, and command systems',
     type: 'component',
     category: 'Electronics',
-    x: 580,
-    y: 160,
+    x: 660,      // Right branch
+    y: 130,      // Same level as avionics
     status: 'covered',
-    connections: [],
+    connections: ['avionics'],
   },
   
-  // Main Structure
+  // Middle: Airframe Structure
   {
     id: 'fuselage',
     title: 'Airframe Structure',
     description: 'Primary structural components and materials',
     type: 'system',
     category: 'Mechanical',
-    x: 400,
-    y: 320,
+    x: 440,      // Center spine
+    y: 290,      // Mid-body
     status: 'partial',
-    connections: ['fuel-tank', 'recovery'],
+    connections: ['fuel-tank'],
   },
   
-  // Propulsion
-  {
-    id: 'fuel-tank',
-    title: 'Propellant Tanks',
-    description: 'Cryogenic fuel and oxidizer storage',
-    type: 'component',
-    category: 'Mechanical',
-    x: 400,
-    y: 450,
-    status: 'partial',
-    connections: ['engine', 'pressurization'],
-  },
-  {
-    id: 'pressurization',
-    title: 'Pressurization System',
-    description: 'Tank pressurization and feed systems',
-    type: 'component',
-    category: 'Mechanical',
-    x: 580,
-    y: 430,
-    status: 'gap',
-    connections: [],
-  },
-  {
-    id: 'engine',
-    title: 'Rocket Engine',
-    description: 'Main propulsion system and thrust vectoring',
-    type: 'system',
-    category: 'Mechanical',
-    x: 400,
-    y: 580,
-    status: 'gap',
-    connections: [],
-  },
-  
-  // Recovery
+  // Middle-Left Branch: Recovery System
   {
     id: 'recovery',
     title: 'Recovery System',
     description: 'Parachutes, landing systems, and reusability',
     type: 'system',
     category: 'Mechanical',
-    x: 220,
-    y: 380,
+    x: 220,      // Left branch
+    y: 310,      // Same level as fuselage
     status: 'partial',
+    connections: ['fuselage'],
+  },
+  
+  // Lower: Propellant Tanks
+  {
+    id: 'fuel-tank',
+    title: 'Propellant Tanks',
+    description: 'Cryogenic fuel and oxidizer storage',
+    type: 'component',
+    category: 'Mechanical',
+    x: 440,      // Center spine
+    y: 430,      // Lower body
+    status: 'partial',
+    connections: ['engine'],
+  },
+  
+  // Lower-Right Branch: Pressurization
+  {
+    id: 'pressurization',
+    title: 'Pressurization System',
+    description: 'Tank pressurization and feed systems',
+    type: 'component',
+    category: 'Mechanical',
+    x: 660,      // Right branch
+    y: 450,      // Same level as tanks
+    status: 'gap',
+    connections: ['fuel-tank'],
+  },
+  
+  // Bottom: Rocket Engine
+  {
+    id: 'engine',
+    title: 'Rocket Engine',
+    description: 'Main propulsion system and thrust vectoring',
+    type: 'system',
+    category: 'Mechanical',
+    x: 440,      // Center spine
+    y: 570,      // Bottom of rocket
+    status: 'gap',
     connections: [],
   },
   
-  // === COMPLIANCE & REGULATORY ===
+  // ═══════════════════════════════════════════════════════════════════════════
+  // LEFT ZONE - Compliance & Regulatory (visually separated)
+  // ═══════════════════════════════════════════════════════════════════════════
+  
   {
     id: 'faa-license',
     title: 'FAA Launch License',
     description: 'Part 450 launch operator license requirements',
     type: 'compliance',
     category: 'Regulatory',
-    x: 80,
-    y: 100,
+    x: 20,       // Far left zone
+    y: 50,       // Top of compliance zone
     status: 'gap',
-    connections: ['avionics', 'safety'],
+    connections: ['payload'],
   },
   {
     id: 'safety',
@@ -131,21 +147,26 @@ export const ROCKET_NODES: BlueprintNode[] = [
     description: 'Flight termination and safety analysis',
     type: 'compliance',
     category: 'Regulatory',
-    x: 80,
-    y: 220,
+    x: 20,       // Far left zone
+    y: 200,      // Below FAA
     status: 'gap',
     connections: ['recovery'],
   },
+  
+  // ═══════════════════════════════════════════════════════════════════════════
+  // RIGHT ZONE - Additional Compliance (visually separated)
+  // ═══════════════════════════════════════════════════════════════════════════
+  
   {
     id: 'environmental',
     title: 'Environmental Review',
     description: 'NEPA compliance and environmental assessment',
     type: 'compliance',
     category: 'Regulatory',
-    x: 720,
-    y: 100,
+    x: 860,      // Far right zone
+    y: 50,       // Top of right zone
     status: 'partial',
-    connections: ['engine'],
+    connections: ['payload'],
   },
   {
     id: 'itar',
@@ -153,54 +174,54 @@ export const ROCKET_NODES: BlueprintNode[] = [
     description: 'Export control and technology transfer',
     type: 'compliance',
     category: 'Regulatory',
-    x: 720,
-    y: 220,
+    x: 860,      // Far right zone
+    y: 200,      // Below environmental
     status: 'covered',
-    connections: ['guidance', 'avionics'],
+    connections: ['guidance'],
   },
 ]
 
-// Beautiful rocket silhouette SVG path
+// Beautiful rocket silhouette SVG path - Centered at x=550 for new layout
 export const ROCKET_SILHOUETTE = `
-  M 400 30
-  C 420 30, 450 60, 460 120
-  L 470 200
-  L 475 280
-  L 480 400
-  L 485 500
-  L 520 540
-  L 540 620
-  L 500 620
-  L 495 700
-  L 450 700
-  L 450 650
-  L 400 680
-  L 350 650
-  L 350 700
-  L 305 700
-  L 300 620
-  L 260 620
-  L 280 540
-  L 315 500
-  L 320 400
-  L 325 280
-  L 330 200
-  L 340 120
-  C 350 60, 380 30, 400 30
+  M 550 20
+  C 570 20, 600 50, 610 110
+  L 620 190
+  L 625 270
+  L 630 390
+  L 635 490
+  L 670 530
+  L 690 610
+  L 650 610
+  L 645 690
+  L 600 690
+  L 600 640
+  L 550 670
+  L 500 640
+  L 500 690
+  L 455 690
+  L 450 610
+  L 410 610
+  L 430 530
+  L 465 490
+  L 470 390
+  L 475 270
+  L 480 190
+  L 490 110
+  C 500 50, 530 20, 550 20
   Z
 `
 
-// Fins path (decorative)
+// Fins path (decorative) - adjusted for new center
 export const ROCKET_FINS = `
-  M 280 540 L 220 620 L 260 620 Z
-  M 520 540 L 580 620 L 540 620 Z
+  M 430 530 L 370 610 L 410 610 Z
+  M 670 530 L 730 610 L 690 610 Z
 `
 
-// Engine nozzle detail
+// Engine nozzle detail - adjusted for new center
 export const ROCKET_NOZZLE = `
-  M 350 700 
-  Q 375 750, 400 760 
-  Q 425 750, 450 700
+  M 500 690 
+  Q 525 740, 550 750 
+  Q 575 740, 600 690
 `
 
 export const ROCKET_ARCHETYPE: Archetype = {
@@ -209,9 +230,10 @@ export const ROCKET_ARCHETYPE: Archetype = {
   description: 'A complete launch vehicle blueprint covering propulsion, avionics, structures, and regulatory requirements.',
   nodes: ROCKET_NODES,
   silhouette: ROCKET_SILHOUETTE,
-  silhouetteViewBox: '0 0 800 800',
-  defaultZoom: 0.9,
-  centerOffset: { x: 100, y: 50 },
+  silhouetteViewBox: '0 0 1100 750',
+  silhouetteTransform: 'translate(0, 0)',
+  defaultZoom: 0.85,
+  centerOffset: { x: 0, y: 20 },
 }
 
 // Skills tree for Rocket Engine domain

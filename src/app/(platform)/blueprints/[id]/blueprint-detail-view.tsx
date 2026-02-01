@@ -322,7 +322,11 @@ export function BlueprintDetailView({
           {viewMode === 'visual' ? (
             <VisualBlueprintView
               blueprintId={blueprint.id}
-              templateId={blueprint.template_id || 'rocket'}
+              templateSlug={blueprint.template?.product_category || 'rocket'}
+              templateName={blueprint.template?.name || blueprint.name}
+              // Extract domains from coverage data for auto-layout
+              domains={coverage.map(c => c.domain).filter(Boolean)}
+              coverage={coverage}
               onCreateObjective={(title, description) => {
                 toast.info('Creating objective: ' + title)
                 // TODO: Implement objective creation

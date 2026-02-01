@@ -1,37 +1,69 @@
 'use client'
 
-import React, { useState, useCallback } from 'react'
+import React, { useState, useCallback, useMemo } from 'react'
 import { motion } from 'framer-motion'
 import { BlueprintCanvas } from './BlueprintCanvas'
 import { KnowledgeSidebar } from './KnowledgeSidebar'
 import type { BlueprintNode, Archetype } from './types'
 import { ROCKET_ARCHETYPE } from './data/rocket-archetype'
+import { generateArchetype } from './auto-layout'
+import type { KnowledgeDomain, DomainCoverageWithDetails } from '@/types/blueprints'
 import { cn } from '@/lib/utils'
 
 interface VisualBlueprintViewProps {
   blueprintId?: string
   templateId?: string
+  templateSlug?: string
+  templateName?: string
+  /** If provided, auto-generates the visual layout from these domains */
+  domains?: KnowledgeDomain[]
+  /** Coverage data to show status on nodes */
+  coverage?: DomainCoverageWithDetails[]
   className?: string
   onCreateObjective?: (title: string, description: string) => void
 }
 
-// Map template IDs to archetypes
-const ARCHETYPES: Record<string, Archetype> = {
-  'rocket': ROCKET_ARCHETYPE,
-  'hardware-startup': ROCKET_ARCHETYPE, // Default to rocket for now
-  'default': ROCKET_ARCHETYPE,
+// Pre-built archetypes for specific templates (hand-crafted layouts)
+const STATIC_ARCHETYPES: Record<string, Archetype> = {
+  'rockets': ROCKET_ARCHETYPE,
+  'rocket': ROCKET_ARCHETYPE, // Alias
 }
 
 export function VisualBlueprintView({
   blueprintId,
-  templateId = 'rocket',
+  templateId,
+  templateSlug,
+  templateName = 'Blueprint',
+  domains,
+  coverage = [],
   className,
   onCreateObjective,
 }: VisualBlueprintViewProps) {
   const [selectedNode, setSelectedNode] = useState<BlueprintNode | null>(null)
   
-  // Get the archetype based on template
-  const archetype = ARCHETYPES[templateId] || ARCHETYPES['default']
+  // Determine which slug to use
+  const slug = templateSlug || templateId || 'default'
+  
+  // Get or generate the archetype
+  const archetype = useMemo(() => {
+    // 1. Check for a pre-built static archetype first
+    if (STATIC_ARCHETYPES[slug]) {
+      return STATIC_ARCHETYPES[slug]
+    }
+    
+    // 2. If domains are provided, auto-generate the layout
+    if (domains && domains.length > 0) {
+      return generateArchetype({
+        templateSlug: slug,
+        templateName,
+        domains,
+        coverage,
+      })
+    }
+    
+    // 3. Fall back to rocket as default demo
+    return ROCKET_ARCHETYPE
+  }, [slug, templateName, domains, coverage])
   
   const handleNodeSelect = useCallback((node: BlueprintNode) => {
     setSelectedNode(node)

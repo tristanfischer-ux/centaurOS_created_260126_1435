@@ -127,16 +127,26 @@ export function BlueprintCanvas({
     setPosition(archetype.centerOffset || { x: 0, y: 0 })
   }
 
-  // Get connection line path
+  // Get connection line path - improved for horizontal branches
   const getConnectionPath = (source: BlueprintNode, target: BlueprintNode) => {
     const sourceX = source.x + 100 // Center of node
-    const sourceY = source.y + 35
+    const sourceY = source.y + 45  // Slightly lower (mid-height of node)
     const targetX = target.x + 100
-    const targetY = target.y + 35
+    const targetY = target.y + 45
     
-    // Calculate control points for a smooth curve
+    // Calculate horizontal distance to determine curve style
+    const dx = Math.abs(targetX - sourceX)
+    const dy = Math.abs(targetY - sourceY)
+    
+    // If horizontal distance is large (side branches), use horizontal-first curve
+    if (dx > 150) {
+      const midX = (sourceX + targetX) / 2
+      return `M ${sourceX} ${sourceY} 
+              C ${midX} ${sourceY}, ${midX} ${targetY}, ${targetX} ${targetY}`
+    }
+    
+    // For vertical connections (central spine), use vertical curve
     const midY = (sourceY + targetY) / 2
-    
     return `M ${sourceX} ${sourceY} 
             C ${sourceX} ${midY}, ${targetX} ${midY}, ${targetX} ${targetY}`
   }
@@ -196,13 +206,13 @@ export function BlueprintCanvas({
         </TooltipProvider>
       </div>
 
-      {/* Legend */}
-      <div className="absolute top-4 right-4 z-20 bg-white/95 backdrop-blur-sm p-3 rounded-lg shadow-lg border border-slate-200">
-        <div className="text-xs font-semibold text-slate-600 mb-2">Status</div>
+      {/* Legend - positioned to not be cut off */}
+      <div className="absolute top-4 right-4 z-20 bg-white/95 backdrop-blur-sm p-3 rounded-lg shadow-lg border border-slate-200 min-w-[140px]">
+        <div className="text-xs font-semibold text-slate-600 mb-2">Status Legend</div>
         <div className="space-y-1.5">
           {Object.entries(STATUS_COLORS).map(([status, colors]) => (
-            <div key={status} className="flex items-center gap-2 text-xs">
-              <div className={cn("w-2.5 h-2.5 rounded-full", colors.bg, "ring-1", colors.border)} />
+            <div key={status} className="flex items-center gap-2 text-xs whitespace-nowrap">
+              <div className={cn("w-2.5 h-2.5 rounded-full flex-shrink-0", colors.bg, "ring-1", colors.border)} />
               <span className="text-slate-600">{colors.label}</span>
             </div>
           ))}
@@ -241,13 +251,62 @@ export function BlueprintCanvas({
           }}
         >
           <svg 
-            width="900" 
-            height="850" 
+            width="1100" 
+            height="750" 
             className="pointer-events-none overflow-visible"
-            viewBox={archetype.silhouetteViewBox || "0 0 900 850"}
+            viewBox={archetype.silhouetteViewBox || "0 0 1100 750"}
           >
+            {/* ═══ VISUAL ZONES ═══ */}
+            
+            {/* Left Zone: Compliance & Regulatory */}
+            <g className="zone-compliance">
+              <rect 
+                x="5" y="20" width="220" height="380" 
+                rx="12"
+                fill="#fef2f2"
+                stroke="#fecaca"
+                strokeWidth="1"
+                strokeDasharray="4,2"
+                opacity="0.6"
+              />
+              <text x="115" y="415" textAnchor="middle" className="fill-rose-400 text-[11px] font-medium">
+                REGULATORY
+              </text>
+            </g>
+            
+            {/* Center Zone: Physical Systems */}
+            <g className="zone-physical">
+              <rect 
+                x="195" y="10" width="510" height="710" 
+                rx="16"
+                fill="#f8fafc"
+                stroke="#e2e8f0"
+                strokeWidth="1"
+                opacity="0.5"
+              />
+              <text x="450" y="735" textAnchor="middle" className="fill-slate-400 text-[11px] font-medium">
+                PHYSICAL SYSTEMS
+              </text>
+            </g>
+            
+            {/* Right Zone: Additional Compliance */}
+            <g className="zone-support">
+              <rect 
+                x="875" y="20" width="220" height="380" 
+                rx="12"
+                fill="#f0fdf4"
+                stroke="#bbf7d0"
+                strokeWidth="1"
+                strokeDasharray="4,2"
+                opacity="0.6"
+              />
+              <text x="985" y="415" textAnchor="middle" className="fill-emerald-400 text-[11px] font-medium">
+                COMPLIANCE
+              </text>
+            </g>
+            
             {/* Decorative Rocket Silhouette */}
-            <g className="opacity-[0.08]" transform={archetype.silhouetteTransform}>
+            <g className="opacity-[0.06]" transform={archetype.silhouetteTransform}>
               <path 
                 d={archetype.silhouette}
                 fill="#334155"
@@ -256,7 +315,7 @@ export function BlueprintCanvas({
               />
             </g>
 
-            {/* Connection Lines */}
+            {/* Connection Lines - improved visibility */}
             <g className="connections">
               {archetype.nodes.map(node => 
                 node.connections.map(targetId => {
@@ -269,20 +328,24 @@ export function BlueprintCanvas({
                     selectedNodeId === node.id ||
                     selectedNodeId === targetId
                   
+                  // Check if this is a cross-zone connection (compliance to physical)
+                  const isCrossZone = node.type === 'compliance' || target.type === 'compliance'
+                  
                   return (
                     <motion.path 
                       key={`${node.id}-${targetId}`}
                       d={getConnectionPath(node, target)}
                       fill="none"
-                      stroke={isHighlighted ? "#f97316" : "#94a3b8"}
-                      strokeWidth={isHighlighted ? 2 : 1.5}
-                      strokeDasharray={isHighlighted ? "0" : "6,4"}
+                      stroke={isHighlighted ? "#f97316" : isCrossZone ? "#94a3b8" : "#64748b"}
+                      strokeWidth={isHighlighted ? 3 : 2}
+                      strokeDasharray={isCrossZone ? "8,4" : "0"}
+                      strokeLinecap="round"
                       initial={{ pathLength: 0, opacity: 0 }}
                       animate={{ 
                         pathLength: 1, 
-                        opacity: isHighlighted ? 1 : 0.5,
+                        opacity: isHighlighted ? 1 : isCrossZone ? 0.4 : 0.6,
                       }}
-                      transition={{ duration: 0.8, ease: "easeOut" }}
+                      transition={{ duration: 0.6, ease: "easeOut" }}
                     />
                   )
                 })

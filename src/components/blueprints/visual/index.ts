@@ -17,5 +17,13 @@ export type {
 
 export { STATUS_COLORS, NODE_TYPE_STYLES } from './types'
 
-// Archetype Data
+// Auto-Layout System
+export { 
+  generateArchetype, 
+  getAvailableSilhouettes, 
+  hasCustomSilhouette,
+} from './auto-layout'
+export type { GenerateArchetypeOptions } from './auto-layout'
+
+// Pre-built Archetype Data
 export { ROCKET_ARCHETYPE, ROCKET_NODES, ENGINE_SKILLS } from './data/rocket-archetype'

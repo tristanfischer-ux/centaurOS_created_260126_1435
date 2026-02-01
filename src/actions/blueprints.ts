@@ -39,12 +39,20 @@ export async function getBlueprintTemplates(): Promise<{
   error: string | null 
 }> {
   const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
 
-  const { data, error } = await supabase
+  // Build the filter - always include system templates, and user's custom templates if logged in
+  let query = supabase
     .from('blueprint_templates')
     .select('*')
-    .or('is_system_template.eq.true,created_by.eq.' + (await supabase.auth.getUser()).data.user?.id)
-    .order('use_count', { ascending: false })
+  
+  if (user?.id) {
+    query = query.or(`is_system_template.eq.true,created_by.eq.${user.id}`)
+  } else {
+    query = query.eq('is_system_template', true)
+  }
+
+  const { data, error } = await query.order('use_count', { ascending: false })
 
   if (error) {
     console.error('Error fetching blueprint templates:', error)

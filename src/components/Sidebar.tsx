@@ -169,7 +169,7 @@ export function Sidebar({ foundryName, foundryId, userName, userRole, isAdmin }:
                     )
                 })()}
 
-                {/* Admin Panel Link - Only visible to admins */}
+                {/* System Admin Link - Only visible to admins */}
                 {isAdmin && (
                     <>
                         <div className="my-4 border-t border-slate-100" />
@@ -189,7 +189,7 @@ export function Sidebar({ foundryName, foundryId, userName, userRole, isAdmin }:
                                 )}
                                 aria-hidden="true"
                             />
-                            Admin Panel
+                            System Admin
                         </Link>
                     </>
                 )}

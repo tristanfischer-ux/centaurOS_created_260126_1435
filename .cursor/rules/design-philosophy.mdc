@@ -33,6 +33,33 @@ CentaurOS is a platform for collaboration between humans and AI agents. The desi
 - Error states should be helpful, not punishing
 - Empty states should be encouraging, offering clear next steps
 
+## CRITICAL: ThemeProvider Configuration
+
+**The ThemeProvider MUST default to light mode.** This is the root cause of dark UI issues:
+
+```tsx
+// ✅ CORRECT - Light mode default, system preference disabled
+<ThemeProvider
+  attribute="class"
+  defaultTheme="light"
+  enableSystem={false}
+  disableTransitionOnChange
+>
+
+// ❌ WRONG - System preference will cause dark mode on macOS dark mode
+<ThemeProvider
+  defaultTheme="system"
+  enableSystem
+>
+```
+
+**Location:** `src/app/layout.tsx`
+
+If the UI appears dark (dark dialogs, dark cards, dark backgrounds), check that:
+1. `defaultTheme="light"` is set
+2. `enableSystem={false}` is set
+3. No `.dark` class is being added to `<html>` or `<body>`
+
 ## What to Avoid
 
 ❌ **DON'T:**
@@ -41,6 +68,7 @@ CentaurOS is a platform for collaboration between humans and AI agents. The desi
 - Use muted, desaturated colors as primary UI elements
 - Design dark, industrial, or dystopian aesthetics
 - Default to "professional gray" color schemes
+- Use `defaultTheme="system"` or `enableSystem` in ThemeProvider
 
 ✅ **DO:**
 - Start with light backgrounds (foundry-50, white)
