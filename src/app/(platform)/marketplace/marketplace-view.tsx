@@ -1212,13 +1212,20 @@ export function MarketplaceView({
                             <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
                         </div>
                     ) : viewMode === 'grid' ? (
-                        <div className="grid grid-cols-1 fold:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 xs:gap-5 fold:gap-5 lg:gap-6 animate-fade-in">
+                        <div className={cn(
+                            "grid gap-4 xs:gap-5 fold:gap-5 lg:gap-6 animate-fade-in",
+                            defaultCardSize === 'full' 
+                                ? "grid-cols-1 lg:grid-cols-2" 
+                                : "grid-cols-1 fold:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+                        )}>
                             {filteredItems.map(item => (
                                 <MarketCard
                                     key={item.id}
                                     listing={item}
                                     isSelected={selectedIds.has(item.id)}
                                     onToggleSelect={toggleSelect}
+                                    size={cardSizes[item.id] || defaultCardSize}
+                                    onSizeChange={handleCardSizeChange}
                                 />
                             ))}
                         </div>
