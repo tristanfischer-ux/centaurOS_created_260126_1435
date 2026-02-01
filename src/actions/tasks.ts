@@ -9,6 +9,7 @@ import { createTaskSchema, updateTaskDatesSchema, addCommentSchema, validate } f
 import { getFoundryIdCached } from '@/lib/supabase/foundry-context'
 import { withRetry } from '@/lib/retry'
 import { sanitizeFileName, sanitizeErrorMessage } from '@/lib/security/sanitize'
+import { syncTaskCommentToMessages } from '@/lib/messaging/comment-sync'
 
 // Nudge cooldown duration (1 hour)
 const NUDGE_COOLDOWN_MS = 60 * 60 * 1000
@@ -86,6 +87,19 @@ async function logSystemEvent(taskId: string, message: string, userId: string) {
         content: message,
         is_system_log: true
     })
+
+    // Also sync system events to messages (so status changes appear in unified inbox)
+    try {
+        await syncTaskCommentToMessages(supabase, {
+            taskId,
+            userId,
+            content: message,
+            isSystemLog: true
+        })
+    } catch (syncError) {
+        // Don't fail if sync fails
+        console.error('Failed to sync system event to messages:', syncError)
+    }
 }
 
 export async function createTask(formData: FormData) {
@@ -588,7 +602,22 @@ export async function addTaskComment(taskId: string, content: string) {
 
     if (error) return { error: sanitizeErrorMessage(error) }
 
+    // Sync comment to messages so it appears in the unified inbox
+    try {
+        await syncTaskCommentToMessages(supabase, {
+            taskId,
+            userId: user.id,
+            content: validatedContent,
+            isSystemLog: false
+        })
+    } catch (syncError) {
+        // Don't fail the main operation if sync fails
+        console.error('Failed to sync task comment to messages:', syncError)
+    }
+
     revalidatePath('/tasks')
+    revalidatePath('/messages')
+    revalidatePath('/today')
     return { success: true }
 }
 

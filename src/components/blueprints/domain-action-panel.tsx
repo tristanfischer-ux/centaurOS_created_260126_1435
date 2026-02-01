@@ -120,13 +120,17 @@ export function DomainActionPanel({
   const keyConceptsList = primer?.key_concepts || []
   const decisionPoints = primer?.decision_points || []
 
-  // Handle familiarity change
+  // Handle familiarity change with optimistic update and rollback
   const handleFamiliarityChange = (value: FamiliarityLevel) => {
     if (!foundryId) {
       toast.error('Please sign in to track familiarity')
       return
     }
 
+    // Store previous value for rollback
+    const previousValue = familiarity
+    
+    // Optimistic update
     setFamiliarity(value)
     
     startTransition(async () => {
@@ -137,7 +141,9 @@ export function DomainActionPanel({
       })
 
       if (error) {
-        toast.error('Failed to save familiarity')
+        // Revert to previous value on error
+        setFamiliarity(previousValue)
+        toast.error('Failed to save familiarity. Please try again.')
         return
       }
 
@@ -233,71 +239,67 @@ export function DomainActionPanel({
         </SheetHeader>
 
         <div className="mt-6 space-y-6">
-          {/* Section 1: Quick Overview */}
-          <section className="space-y-3">
+          {/* Section 1: Quick Overview - Show key info upfront */}
+          <section className="space-y-4">
             <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
               <Lightbulb className="h-4 w-4 text-international-orange" />
               Quick Overview
             </h3>
             
+            {/* Main overview text */}
             {overview ? (
               <p className="text-sm text-muted-foreground leading-relaxed">
                 {overview}
               </p>
             ) : (
-              <p className="text-sm text-muted-foreground italic">
-                No overview available for this domain yet.
-              </p>
+              <div className="rounded-md border border-dashed border-muted-foreground/30 p-4 bg-muted/30">
+                <p className="text-sm text-muted-foreground">
+                  No detailed overview available yet for this domain.
+                </p>
+                <p className="text-xs text-muted-foreground mt-2">
+                  Consider getting an expert review to learn more about this area.
+                </p>
+              </div>
             )}
 
-            {/* Expandable primer details */}
-            {(keyConceptsList.length > 0 || decisionPoints.length > 0) && (
-              <Collapsible open={showPrimer} onOpenChange={setShowPrimer}>
-                <CollapsibleTrigger asChild>
-                  <Button variant="ghost" size="sm" className="gap-2 text-xs h-8 px-2">
-                    {showPrimer ? (
-                      <ChevronDown className="h-3 w-3" />
-                    ) : (
-                      <ChevronRight className="h-3 w-3" />
-                    )}
-                    Learn More
-                    {primer?.ai_generated && (
-                      <Badge variant="secondary" className="text-[10px] h-4 px-1">
-                        <Sparkles className="h-2.5 w-2.5 mr-0.5" />
-                        AI
-                      </Badge>
-                    )}
-                  </Button>
-                </CollapsibleTrigger>
-                <CollapsibleContent className="space-y-4 pt-2">
-                  {keyConceptsList.length > 0 && (
-                    <div>
-                      <p className="text-xs font-medium text-foreground mb-2">Key Concepts</p>
-                      <ul className="space-y-1">
-                        {keyConceptsList.map((concept, i) => (
-                          <li key={i} className="text-xs text-muted-foreground flex items-start gap-2">
-                            <span className="text-electric-blue">•</span>
-                            {concept}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                  {decisionPoints.length > 0 && (
-                    <div>
-                      <p className="text-xs font-medium text-foreground mb-2">Decision Points</p>
-                      <ul className="space-y-1">
-                        {decisionPoints.map((point, i) => (
-                          <li key={i} className="text-xs text-muted-foreground flex items-start gap-2">
-                            <span className="text-status-warning">→</span>
-                            {point}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                </CollapsibleContent>
-              </Collapsible>
+            {/* Key Decisions - Show upfront, these are most actionable */}
+            {decisionPoints.length > 0 && (
+              <div className="rounded-md border bg-status-warning-light/30 border-status-warning/20 p-3">
+                <p className="text-xs font-semibold text-foreground mb-2 flex items-center gap-1.5">
+                  <AlertTriangle className="h-3.5 w-3.5 text-status-warning" />
+                  Key Decisions You&apos;ll Need to Make
+                </p>
+                <ul className="space-y-1.5">
+                  {decisionPoints.slice(0, 4).map((point, i) => (
+                    <li key={i} className="text-xs text-muted-foreground flex items-start gap-2">
+                      <span className="text-status-warning font-bold shrink-0">{i + 1}.</span>
+                      <span>{point}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {/* Key Concepts - Compact display */}
+            {keyConceptsList.length > 0 && (
+              <div>
+                <p className="text-xs font-medium text-muted-foreground mb-2">Related Concepts</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {keyConceptsList.slice(0, 6).map((concept, i) => (
+                    <Badge key={i} variant="secondary" className="text-xs font-normal">
+                      {concept}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* AI generated indicator */}
+            {primer?.ai_generated && (
+              <p className="text-[10px] text-muted-foreground flex items-center gap-1">
+                <Sparkles className="h-3 w-3" />
+                Overview generated from domain data
+              </p>
             )}
           </section>
 

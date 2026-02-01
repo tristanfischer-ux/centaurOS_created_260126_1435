@@ -10,11 +10,8 @@ import { Check, X, TrendingUp, TrendingDown, Minus, Sparkles, Loader2, Trophy, A
 import { cn } from "@/lib/utils"
 
 interface AIAnalysisResult {
-    winner: {
-        id: string
-        title: string
-        reason: string
-    }
+    winner: string  // The winning item's ID
+    winnerTitle: string  // The winning item's title
     reasoning: string
     tradeoffs: string[]
     summary: string
@@ -82,18 +79,23 @@ export function ComparisonModal({ open, onOpenChange, items }: ComparisonModalPr
     // Clear analysis when items change or modal closes
     useEffect(() => {
         setAiAnalysis(null)
+        setAnalysisError(null)
     }, [items])
 
     // Clear analysis when modal closes
     const handleOpenChange = (newOpen: boolean) => {
         if (!newOpen) {
             setAiAnalysis(null)
+            setAnalysisError(null)
         }
         onOpenChange(newOpen)
     }
 
+    const [analysisError, setAnalysisError] = useState<string | null>(null)
+
     async function analyzeWithAI() {
         setIsAnalyzing(true)
+        setAnalysisError(null)
         try {
             const response = await fetch('/api/marketplace/compare', {
                 method: 'POST',
@@ -101,9 +103,16 @@ export function ComparisonModal({ open, onOpenChange, items }: ComparisonModalPr
                 body: JSON.stringify({ items })
             })
             const data = await response.json()
+            
+            if (!response.ok || data.error) {
+                setAnalysisError(data.error || 'Failed to analyze. Please try again.')
+                return
+            }
+            
             setAiAnalysis(data)
         } catch (error) {
             console.error('AI analysis failed:', error)
+            setAnalysisError('Failed to connect to AI service. Please try again.')
         } finally {
             setIsAnalyzing(false)
         }
@@ -167,6 +176,26 @@ export function ComparisonModal({ open, onOpenChange, items }: ComparisonModalPr
 
                 <div className="flex-1 overflow-auto">
                     <div className="p-6 pt-4">
+                        {/* AI Analysis Error */}
+                        {analysisError && (
+                            <Card className="mb-6 p-4 bg-status-error-light border-destructive/20">
+                                <div className="flex items-start justify-between">
+                                    <div className="flex items-center gap-2">
+                                        <AlertCircle className="h-5 w-5 text-destructive" />
+                                        <p className="text-sm text-destructive">{analysisError}</p>
+                                    </div>
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => setAnalysisError(null)}
+                                        className="h-7 px-2 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                    >
+                                        <X className="h-4 w-4" />
+                                    </Button>
+                                </div>
+                            </Card>
+                        )}
+
                         {/* AI Analysis Results */}
                         {aiAnalysis && (
                             <Card className="mb-6 p-4 bg-accent/10 border-accent/20">
@@ -191,15 +220,15 @@ export function ComparisonModal({ open, onOpenChange, items }: ComparisonModalPr
                                         <Trophy className="h-4 w-4 text-amber-500" />
                                         <span className="text-sm font-medium text-foreground">Recommended</span>
                                         <Badge className="bg-amber-100 text-amber-800 border-0">
-                                            {aiAnalysis.winner.title}
+                                            {aiAnalysis.winnerTitle}
                                         </Badge>
                                     </div>
-                                    <p className="text-sm text-muted-foreground">{aiAnalysis.winner.reason}</p>
+                                    <p className="text-sm font-medium text-foreground">{aiAnalysis.summary}</p>
                                 </div>
 
-                                {/* Reasoning */}
+                                {/* Detailed Reasoning */}
                                 <div className="mb-4">
-                                    <h4 className="text-sm font-medium text-foreground mb-2">Analysis</h4>
+                                    <h4 className="text-sm font-medium text-foreground mb-2">Why This Choice?</h4>
                                     <p className="text-sm text-muted-foreground leading-relaxed">{aiAnalysis.reasoning}</p>
                                 </div>
 

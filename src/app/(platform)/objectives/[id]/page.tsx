@@ -3,6 +3,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { UserAvatar } from '@/components/ui/user-avatar'
 import { Markdown } from '@/components/ui/markdown'
+import { ObjectiveComments } from '@/components/objectives/objective-comments'
 import Link from 'next/link'
 import { ChevronRight, FileText } from 'lucide-react'
 
@@ -71,6 +72,16 @@ export default async function ObjectiveDetailPage({ params }: { params: Promise<
                     </CardContent>
                 </Card>
             )}
+
+            {/* Notes & Comments Section */}
+            <Card>
+                <CardContent className="pt-6">
+                    <ObjectiveComments 
+                        objectiveId={id} 
+                        objectiveTitle={objective.title} 
+                    />
+                </CardContent>
+            </Card>
 
             {/* Tasks Section */}
             <div className="pt-8 mt-4">

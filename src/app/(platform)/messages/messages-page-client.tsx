@@ -34,9 +34,22 @@ function getConversationDisplayName(
   conv: ConversationWithParticipants,
   currentUserId: string
 ): string {
+  // For task conversations, show task title/number
+  if (conv.conversation_type === 'task' && conv.task) {
+    return `#${conv.task.task_number}: ${conv.task.title}`
+  }
+  
+  // For objective conversations, show objective title
+  if (conv.conversation_type === 'objective' && conv.objective) {
+    return conv.objective.title
+  }
+  
+  // Fall back to title if set
   if (conv.title) {
     return conv.title
   }
+  
+  // For DMs, show other participant's name
   const otherParticipant = conv.buyer?.id === currentUserId ? conv.seller : conv.buyer
   return otherParticipant?.full_name || otherParticipant?.email || 'Unknown'
 }
@@ -261,6 +274,21 @@ export function MessagesPageClient({ userId }: MessagesPageClientProps) {
   )
 }
 
+function getConversationTypeLabel(type: ConversationType | undefined): string {
+  switch (type) {
+    case 'task':
+      return 'Task'
+    case 'objective':
+      return 'Objective'
+    case 'expert':
+    case 'marketplace':
+      return 'Expert'
+    case 'direct':
+    default:
+      return ''
+  }
+}
+
 function ConversationListItem({
   conversation,
   currentUserId,
@@ -274,6 +302,7 @@ function ConversationListItem({
   const Icon = getConversationIcon(conversation.conversation_type)
   const isChannel = conversation.conversation_type === 'task' || conversation.conversation_type === 'objective'
   const otherParticipant = conversation.buyer?.id === currentUserId ? conversation.seller : conversation.buyer
+  const typeLabel = getConversationTypeLabel(conversation.conversation_type)
 
   return (
     <button
@@ -281,8 +310,18 @@ function ConversationListItem({
       className="w-full flex items-center gap-4 p-4 rounded-lg border bg-card hover:bg-muted transition-colors text-left"
     >
       {isChannel ? (
-        <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
-          <Icon className="h-5 w-5 text-muted-foreground" />
+        <div className={cn(
+          "h-10 w-10 rounded-lg flex items-center justify-center flex-shrink-0",
+          conversation.conversation_type === 'task' 
+            ? "bg-status-info-light" 
+            : "bg-status-success-light"
+        )}>
+          <Icon className={cn(
+            "h-5 w-5",
+            conversation.conversation_type === 'task' 
+              ? "text-status-info" 
+              : "text-status-success"
+          )} />
         </div>
       ) : (
         <UserAvatar
@@ -293,15 +332,22 @@ function ConversationListItem({
       )}
       <div className="flex-1 min-w-0">
         <div className="flex items-center justify-between gap-2">
-          <span className={cn(
-            'text-sm truncate',
-            conversation.unread_count && conversation.unread_count > 0 
-              ? 'font-semibold text-foreground' 
-              : 'font-medium text-foreground'
-          )}>
-            {isChannel ? '#' : '@'} {displayName}
-          </span>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 min-w-0">
+            {isChannel && typeLabel && (
+              <Badge variant="secondary" className="text-xs shrink-0">
+                {typeLabel}
+              </Badge>
+            )}
+            <span className={cn(
+              'text-sm truncate',
+              conversation.unread_count && conversation.unread_count > 0 
+                ? 'font-semibold text-foreground' 
+                : 'font-medium text-foreground'
+            )}>
+              {!isChannel && '@'} {displayName}
+            </span>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
             {conversation.last_message && (
               <span className="text-xs text-muted-foreground">
                 {formatDistanceToNow(new Date(conversation.last_message.created_at), { addSuffix: true })}

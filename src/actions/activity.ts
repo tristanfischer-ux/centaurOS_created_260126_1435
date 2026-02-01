@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { getFoundryIdCached } from '@/lib/supabase/foundry-context'
 import { z } from 'zod'
+import { syncObjectiveCommentToMessages, syncTaskCommentToMessages } from '@/lib/messaging/comment-sync'
 
 // Simple content validation schema
 const contentSchema = z.object({
@@ -70,8 +71,21 @@ export async function replyToActivity(
           console.error('Failed to add task comment:', error)
           return { success: false, error: 'Failed to add comment' }
         }
+
+        // Sync to messages for unified inbox
+        try {
+          await syncTaskCommentToMessages(supabase, {
+            taskId: sourceId,
+            userId: user.id,
+            content: content.trim(),
+            isSystemLog: false
+          })
+        } catch (syncError) {
+          console.error('Failed to sync task reply to messages:', syncError)
+        }
         
         revalidatePath('/tasks')
+        revalidatePath('/messages')
         revalidatePath('/today')
         return { success: true }
       }
@@ -90,8 +104,21 @@ export async function replyToActivity(
           console.error('Failed to add objective comment:', error)
           return { success: false, error: 'Failed to add comment' }
         }
+
+        // Sync to messages for unified inbox
+        try {
+          await syncObjectiveCommentToMessages(supabase, {
+            objectiveId: sourceId,
+            userId: user.id,
+            content: content.trim(),
+            isSystemLog: false
+          })
+        } catch (syncError) {
+          console.error('Failed to sync objective reply to messages:', syncError)
+        }
         
         revalidatePath('/objectives')
+        revalidatePath('/messages')
         revalidatePath('/today')
         return { success: true }
       }
@@ -433,7 +460,21 @@ export async function addObjectiveComment(
       return { success: false, error: 'Failed to add comment' }
     }
 
+    // Sync comment to messages so it appears in the unified inbox
+    try {
+      await syncObjectiveCommentToMessages(supabase, {
+        objectiveId,
+        userId: user.id,
+        content: content.trim(),
+        isSystemLog: false
+      })
+    } catch (syncError) {
+      // Don't fail the main operation if sync fails
+      console.error('Failed to sync objective comment to messages:', syncError)
+    }
+
     revalidatePath('/objectives')
+    revalidatePath('/messages')
     revalidatePath('/today')
 
     return { success: true, commentId: comment?.id }
