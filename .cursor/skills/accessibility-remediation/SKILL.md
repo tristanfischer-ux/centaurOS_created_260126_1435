@@ -462,3 +462,124 @@ rg "window\.confirm" src/ --count-matches
 | Add sr-only | `<span className="sr-only">Text</span>` |
 | Add touch target | `className="min-h-[44px] min-w-[44px]"` |
 | Make div focusable | `role="button" tabIndex={0} onKeyDown={...}` |
+
+---
+
+## When to Use This Skill
+
+Use this skill when:
+
+1. **Design audit reveals a11y issues** - After running design-audit and finding accessibility gaps
+2. **WCAG compliance required** - When legal or business requirements mandate accessibility standards
+3. **User reports accessibility problems** - When users with disabilities report barriers
+4. **Automated testing flags issues** - When axe, Lighthouse, or CI tools report violations
+5. **Adding new interactive elements** - When creating clickable components that need keyboard/screen reader support
+6. **Fixing detail page navigation** - When users get lost due to missing breadcrumbs
+
+---
+
+## When NOT to Use
+
+| Instead of this skill... | Use this skill... |
+|--------------------------|-------------------|
+| Finding a11y issues (before fixing) | [design-audit](../design-audit/SKILL.md) |
+| Writing new accessible components | [ui-component-standards](../ui-component-standards/SKILL.md) |
+| Building accessible forms | [multi-step-form](../multi-step-form/SKILL.md) |
+| General code quality issues | [code-quality](../code-quality/SKILL.md) |
+| Security vulnerabilities | [security-review](../security-review/SKILL.md) |
+
+---
+
+## Quick Reference
+
+| Issue | Detection | Fix |
+|-------|-----------|-----|
+| Missing breadcrumbs | `find src/app -path "*[id]*" -name "page.tsx"` | Add `<nav aria-label="Breadcrumb">` with links |
+| window.confirm | `rg "window\\.confirm" src/` | Replace with `<AlertDialog>` component |
+| Div onClick no keyboard | `rg "<div[^>]*onClick" \| rg -v "onKeyDown"` | Add `role="button" tabIndex={0} onKeyDown` |
+| Small touch targets | `rg "p-1\|p-2" src/components` | Add `min-h-[44px] min-w-[44px]` |
+| Missing aria-label | `rg 'size="icon">' \| rg -v "aria-label"` | Add `aria-label="Description"` |
+| No sr-only text | `rg "rounded-full bg-" \| rg -v "sr-only"` | Add `<span className="sr-only">Status</span>` |
+| Missing autoFocus | Compare Dialog count to autoFocus count | Add `autoFocus` to first input or primary button |
+
+---
+
+## Troubleshooting
+
+### Issue: Keyboard handler doesn't fire on Space key
+
+**Cause:** Space key default behavior (scrolling) not prevented.
+
+**Fix:** Add `e.preventDefault()` in the keydown handler:
+```tsx
+onKeyDown={(e) => {
+  if (e.key === 'Enter' || e.key === ' ') {
+    e.preventDefault()  // ← Required for Space key
+    handleClick()
+  }
+}}
+```
+
+---
+
+### Issue: Screen reader announces button twice
+
+**Cause:** Both visible text and aria-label present, or icon not hidden.
+
+**Fix:** Use `aria-hidden="true"` on icons next to text:
+```tsx
+// ❌ Screen reader: "Delete Delete button"
+<button aria-label="Delete">
+  <Trash2 /> Delete
+</button>
+
+// ✅ Screen reader: "Delete button"
+<button>
+  <Trash2 aria-hidden="true" /> Delete
+</button>
+```
+
+---
+
+### Issue: Focus trap in modal
+
+**Cause:** Focus escapes modal to elements behind it.
+
+**Fix:** Use Dialog/AlertDialog from shadcn/ui which handles focus trapping automatically:
+```tsx
+// shadcn Dialog already manages focus
+<Dialog open={isOpen} onOpenChange={setIsOpen}>
+  <DialogContent>
+    {/* Focus is trapped here */}
+  </DialogContent>
+</Dialog>
+```
+
+---
+
+### Issue: Touch target visually too large
+
+**Cause:** Adding `min-h-[44px]` makes element appear bigger.
+
+**Fix:** Use negative margin to extend tap area without visual change:
+```tsx
+// ✅ Visual size unchanged, tap area extended
+<button className="p-3 -m-1">
+  <X className="h-4 w-4" />
+</button>
+```
+
+---
+
+## Related Skills
+
+- [design-audit](../design-audit/SKILL.md) - Run audit first to identify a11y issues to remediate
+- [ui-component-standards](../ui-component-standards/SKILL.md) - Reference for correct accessible component patterns
+- [multi-step-form](../multi-step-form/SKILL.md) - Accessible form wizard patterns
+- [feature-implementation-guide](../feature-implementation-guide/SKILL.md) - Ensure new features follow a11y standards
+
+### Related Cursor Rules
+
+- `.cursor/rules/form-consistency.mdc` - Form accessibility requirements (aria-invalid, aria-describedby)
+- `.cursor/rules/component-patterns.mdc` - Component accessibility (aria-label on icon buttons)
+- `.cursor/rules/navigation-consistency.mdc` - Navigation accessibility (breadcrumbs on detail pages)

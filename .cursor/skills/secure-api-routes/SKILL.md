@@ -224,3 +224,65 @@ export async function POST(req: NextRequest) {
 | Path traversal | User controls file path | Sanitize, check for `..` |
 | Insecure random | `Math.random()` for codes | Use `crypto.getRandomValues()` |
 | Error exposure | `return { error: err.message }` | Generic error message |
+
+## When to Use This Skill
+
+Use this skill when:
+
+1. **Creating new API routes** in `src/app/api/` - every new endpoint needs the security template
+2. **Adding file upload functionality** - requires size, type, and filename validation
+3. **Implementing webhook endpoints** - needs signature verification before processing
+4. **Building AI/expensive endpoints** - requires tight rate limiting to prevent abuse
+5. **Accepting any user input via POST/PUT** - all input must be validated with Zod schemas
+
+## When NOT to Use
+
+| Scenario | Use Instead |
+|----------|-------------|
+| Creating Server Actions in `src/actions/` | [secure-server-actions](../secure-server-actions/SKILL.md) |
+| Writing database migrations or RLS policies | [secure-database](../secure-database/SKILL.md) |
+| Building frontend components with user URLs | [secure-frontend](../secure-frontend/SKILL.md) |
+| Doing a full security audit of existing code | [security-review](../security-review/SKILL.md) |
+| Implementing a complete new feature | [feature-implementation-guide](../feature-implementation-guide/SKILL.md) first, then this |
+
+## Quick Reference
+
+| Decision | Answer | Notes |
+|----------|--------|-------|
+| Do I need rate limiting? | **Yes, always** | Adjust limits based on endpoint cost |
+| What rate limit for AI endpoints? | `limit: 5-10, window: 60` | Per user, tight limits |
+| What rate limit for auth endpoints? | `limit: 5, window: 900` | Per IP, prevent brute force |
+| What rate limit for general endpoints? | `limit: 60, window: 60` | Per user, reasonable limits |
+| How to validate UUIDs? | `z.string().uuid()` | Always validate resource IDs |
+| Max string length for user input? | 1000-2000 chars typical | Adjust based on field purpose |
+| Should I use `Math.random()`? | **Never for security** | Use `crypto.getRandomValues()` |
+| How to handle webhook signatures? | Verify **before** parsing body | Use raw body for signature check |
+
+## Troubleshooting
+
+### Issue: Rate limiter returning errors
+**Cause:** Redis/rate limit service not configured or unreachable  
+**Fix:** Check that `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` are set in `.env`. Verify the rate limit key format includes user ID or IP.
+
+### Issue: Zod validation passing but data malformed
+**Cause:** Schema doesn't match actual expected structure  
+**Fix:** Add `.strict()` to Zod schema to reject unknown properties. Use `.transform()` to normalize data after validation.
+
+### Issue: Webhook signature verification failing
+**Cause:** Reading body as JSON before verifying signature  
+**Fix:** Read body as text with `req.text()` first, verify signature, then parse as JSON. The raw body must match what the sender signed.
+
+### Issue: File uploads bypassing size limits
+**Cause:** Checking `file.size` after upload completes  
+**Fix:** Use Next.js config to set `bodyParser.sizeLimit`, plus server-side `file.size` check as defense in depth.
+
+### Issue: CORS errors on API endpoints
+**Cause:** Missing CORS headers for cross-origin requests  
+**Fix:** Add appropriate CORS headers or use Next.js middleware. Only allow necessary origins.
+
+## Related Skills
+
+- [security-review](../security-review/SKILL.md) - Comprehensive security audit checklist covering all security domains
+- [secure-server-actions](../secure-server-actions/SKILL.md) - Security patterns for Server Actions (use instead of API routes when possible)
+- [secure-database](../secure-database/SKILL.md) - RLS policies that complement API-level security
+- [feature-implementation-guide](../feature-implementation-guide/SKILL.md) - Full feature implementation including API security integration

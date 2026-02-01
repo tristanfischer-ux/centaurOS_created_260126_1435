@@ -409,3 +409,111 @@ Before completing audit:
 3. **Migration Commands** (optional)
    - Search/replace patterns
    - Prioritized file list
+
+---
+
+## When to Use This Skill
+
+Use this skill when:
+
+1. **Starting a design consistency initiative** - When leadership requests a design quality assessment
+2. **Before major refactoring** - To quantify current technical debt before planning fixes
+3. **After multiple contributors** - When codebase has accumulated inconsistencies from different developers
+4. **Periodic health checks** - Quarterly or milestone-based design system compliance reviews
+5. **Pre-release audits** - Before major releases to ensure consistent user experience
+6. **Onboarding new team members** - To document current state and standards
+
+---
+
+## When NOT to Use
+
+| Instead of this skill... | Use this skill... |
+|--------------------------|-------------------|
+| Writing new UI components | [ui-component-standards](../ui-component-standards/SKILL.md) |
+| Fixing specific a11y issues | [accessibility-remediation](../accessibility-remediation/SKILL.md) |
+| Creating forms or wizards | [multi-step-form](../multi-step-form/SKILL.md) |
+| Implementing status workflows | [status-workflow](../status-workflow/SKILL.md) |
+| Debugging runtime errors | [bug-fix-workflow](../bug-fix-workflow/SKILL.md) |
+
+---
+
+## Quick Reference
+
+| Audit Category | Detection Command | Target |
+|----------------|-------------------|--------|
+| Hardcoded text colors | `rg "text-slate-\|text-gray-" src/` | 0 instances |
+| Hardcoded status colors | `rg "text-red-\|text-green-\|text-amber-" src/` | 0 instances |
+| Custom card divs | `rg 'className=".*rounded.*border.*p-[0-9]' src/` | 0 instances |
+| Custom dialog widths | `rg "sm:max-w-\\[\|max-w-[0-9]" src/` | 0 instances |
+| Missing breadcrumbs | Compare `[id]` routes to breadcrumb usage | 100% coverage |
+| Div onClick without keyboard | `rg "<div[^>]*onClick" src/ \| rg -v "onKeyDown"` | 0 instances |
+| Icon buttons without aria-label | `rg 'size="icon">' src/ \| rg -v "aria-label"` | 0 instances |
+| window.confirm usage | `rg "window\\.confirm" src/` | 0 instances |
+
+---
+
+## Troubleshooting
+
+### Issue: Audit counts don't match between runs
+
+**Cause:** File changes or different grep patterns.
+
+**Fix:** Use consistent commands and document exact patterns:
+```bash
+# Always use the same pattern - save in audit script
+rg "text-slate-[0-9]+" src/ --count-matches 2>/dev/null | wc -l
+```
+
+---
+
+### Issue: Too many issues to fix at once
+
+**Cause:** Attempting to fix all categories simultaneously.
+
+**Fix:** Prioritize by severity and create phased plan:
+1. Phase 1: Critical (breaks functionality/a11y)
+2. Phase 2: Inconsistent (multiple patterns)
+3. Phase 3: Minor (style preferences)
+
+---
+
+### Issue: Issues keep recurring after fixes
+
+**Cause:** No enforcement mechanism for standards.
+
+**Fix:** Create Cursor rules to prevent recurrence:
+```markdown
+# .cursor/rules/color-consistency.mdc
+Always use semantic tokens, never hardcoded colors.
+```
+
+---
+
+### Issue: Can't find specific file patterns
+
+**Cause:** Patterns don't match codebase conventions.
+
+**Fix:** Adjust patterns based on actual file structure:
+```bash
+# If tsx extension needed
+rg "text-slate-" src/ --type tsx
+
+# If glob needed
+rg "text-slate-" --glob "*.tsx" src/
+```
+
+---
+
+## Related Skills
+
+- [ui-component-standards](../ui-component-standards/SKILL.md) - Standards to enforce after audit identifies gaps
+- [accessibility-remediation](../accessibility-remediation/SKILL.md) - Systematic fixes for a11y issues found in Phase 2 audit
+- [code-quality](../code-quality/SKILL.md) - Linting and type checking to complement design audit
+- [comprehensive-code-review](../comprehensive-code-review/SKILL.md) - Deep code review including design patterns
+
+### Related Cursor Rules
+
+- `.cursor/rules/color-consistency.mdc` - Prevents hardcoded colors (addresses audit findings)
+- `.cursor/rules/form-consistency.mdc` - Enforces form patterns (addresses validation audit)
+- `.cursor/rules/component-patterns.mdc` - Enforces component usage (addresses Card/Dialog audit)
+- `.cursor/rules/navigation-consistency.mdc` - Enforces nav patterns (addresses active state audit)

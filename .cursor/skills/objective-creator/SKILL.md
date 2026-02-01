@@ -1,11 +1,11 @@
 ---
 name: objective-creator
-description: Transform raw information (ideas, goals, projects) into structured CentaurOS objectives with detailed tasks, start/due dates, and add them to Tristan Fischer's account at Centaur Dynamics. Use when Tristan wants to create an objective, add a goal, plan a project, turn an idea into tasks, or mentions objective, goal, project plan, or task breakdown.
+description: Transform raw information (ideas, goals, projects) into structured CentaurOS objectives with detailed tasks, start/due dates, and add them to the authenticated user's account. Use when the user wants to create an objective, add a goal, plan a project, turn an idea into tasks, or mentions objective, goal, project plan, or task breakdown.
 ---
 
 # Objective Creator
 
-Transform any information into a structured CentaurOS objective with actionable tasks, and add it directly to Tristan Fischer's account at Centaur Dynamics (Tristan.fischer@centaurdynamics.io).
+Transform any information into a structured CentaurOS objective with actionable tasks, and add it directly to the authenticated user's account.
 
 ## When to Use
 
@@ -245,21 +245,21 @@ Implement and deploy an automated invoice generation system that creates and sen
 
 ## User Context
 
-**This skill is configured for Tristan Fischer's account.**
+This skill uses the authenticated user's context from the current session.
 
-| Field | Value |
-|-------|-------|
-| **Name** | Tristan Fischer |
-| **Email** | Tristan.fischer@centaurdynamics.io |
-| **Role** | Founder |
-| **Organization** | Centaur Dynamics |
+| Field | Source |
+|-------|--------|
+| **User** | Authenticated session user |
+| **Email** | `user.email` from Supabase auth |
+| **Role** | `user.user_metadata.role` from profile |
+| **Organization** | Foundry lookup via `user.user_metadata.foundry_id` |
 
 All objectives and tasks created through this skill are:
-- Owned by Tristan (creator_id = Tristan's profile ID)
-- Assigned to Tristan by default (unless another team member is specified)
-- Under the Centaur Dynamics foundry (foundry_id from authenticated session)
+- Owned by the authenticated user (creator_id = current user's profile ID)
+- Assigned to the user by default (unless another team member is specified)
+- Under the user's foundry (foundry_id from authenticated session)
 
-When Tristan says "add this as an objective" or "turn this into tasks", create it directly under his account - no need to ask for confirmation of which user or organization.
+When the user says "add this as an objective" or "turn this into tasks", create it directly under their account using the authenticated session context.
 
 ## Quick Reference: CentaurOS Schema
 
@@ -275,3 +275,61 @@ When Tristan says "add this as an objective" or "turn this into tasks", create i
 ## Additional Resources
 
 - For detailed examples of different input types, see [references/examples.md](references/examples.md)
+
+---
+
+## When to Use This Skill
+
+- User shares an idea, goal, or project they want to track in CentaurOS
+- User asks to "add this as an objective" or "turn this into tasks"
+- User provides business requirements, initiatives, or plans needing structure
+- User mentions creating goals, OKRs, milestones, or project plans
+- Converting meeting notes or brainstorms into actionable task lists
+
+---
+
+## When NOT to Use
+
+| Instead Use | When |
+|-------------|------|
+| `status-workflow` | Managing status transitions on existing tasks |
+| `feature-implementation-guide` | Building the feature itself (not planning) |
+| Direct task creation | Single small task, not a full objective |
+| Todo list | Personal quick notes, not formal objectives |
+| `strategic-assessment` | Evaluating strategy before creating objectives |
+
+---
+
+## Quick Reference
+
+| Item | Value/Pattern |
+|------|---------------|
+| **Objective Title Limit** | 200 characters max |
+| **Description Limit** | 10,000 characters max |
+| **Task Title Limit** | 500 characters max |
+| **Typical Task Count** | 3-8 tasks per objective |
+| **Default Task Duration** | 3-5 days (simple), 7-14 days (complex) |
+| **Risk Levels** | `Low`, `Medium`, `High` |
+| **Date Format** | ISO 8601 (YYYY-MM-DD) |
+| **Server Action** | `createObjectiveFromInput` in `src/actions/objective-from-input.ts` |
+| **Helper Function** | `calculateTaskDates` for dependency-aware scheduling |
+
+---
+
+## Troubleshooting
+
+| Problem | Cause | Solution |
+|---------|-------|----------|
+| Objective not created | Missing auth session | Ensure user is logged in, check `getUser()` |
+| Tasks have wrong dates | Dependency miscalculation | Review `dependsOn` array indices |
+| "Unauthorized" error | RLS policy blocking | Verify foundry_id matches user's foundry |
+| Server action fails | Invalid field values | Check title/description length limits |
+| Assignee not found | Invalid profile ID | Validate assignee exists in same foundry |
+| Dates in past | Start date before today | Use `new Date()` as minimum start |
+
+---
+
+## Related Skills
+
+- **`feature-implementation-guide`** - After creating objective, use this to implement features
+- **`status-workflow`** - Understand task status transitions for proper objective planning

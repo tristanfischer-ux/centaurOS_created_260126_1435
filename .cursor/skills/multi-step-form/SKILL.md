@@ -443,3 +443,137 @@ Before committing a multi-step form:
 3. **Don't block backwards navigation** - Users should revisit completed steps
 4. **Don't forget loading states** - Show spinner during submission
 5. **Don't skip the review step** - Let users verify before submitting
+
+---
+
+## When to Use This Skill
+
+Use this skill when:
+
+1. **Building onboarding flows** - User registration, company setup, profile completion wizards
+2. **Complex data collection** - Forms with 5+ logical sections that would overwhelm in one page
+3. **Conditional workflows** - Forms where later steps depend on earlier answers
+4. **High-stakes submissions** - RFQs, applications, orders that need review before submit
+5. **Progressive disclosure** - When showing all fields at once would confuse users
+6. **Draft/resume functionality** - When users should be able to save and continue later
+
+---
+
+## When NOT to Use
+
+| Instead of this skill... | Use this skill... |
+|--------------------------|-------------------|
+| Simple 3-5 field forms | Standard single-page form with `.cursor/rules/form-consistency.mdc` |
+| Status tracking with transitions | [status-workflow](../status-workflow/SKILL.md) |
+| Form field styling/accessibility | [ui-component-standards](../ui-component-standards/SKILL.md) |
+| Finding form accessibility issues | [design-audit](../design-audit/SKILL.md) |
+| Database schema for form data | [feature-implementation-guide](../feature-implementation-guide/SKILL.md) |
+
+---
+
+## Quick Reference
+
+| Component | Pattern | Example |
+|-----------|---------|---------|
+| Steps config | Array with id, title, icon | `{ id: 'company', title: 'Company', icon: Building2 }` |
+| State management | Centralized with generic updater | `updateField('name', value)` |
+| Step validation | Switch on current step | `validateStep(currentStep)` |
+| Navigation | `goToNextStep()` / `goToPrevStep()` | Validates before advancing |
+| Progress indicator | Map steps with active/completed states | `isActive`, `isCompleted` classes |
+| Error display | Alert component below progress | `<Alert variant="destructive">` |
+| Loading state | useTransition + spinner | `{isPending && <Loader2 />}` |
+| Review step | Separate component showing all data | `<ReviewStep formData={formData} />` |
+| Draft save | localStorage with useEffect | `localStorage.setItem('draft', JSON.stringify(data))` |
+| Conditional steps | Filter steps array dynamically | `STEPS.filter(s => shouldShow(s))` |
+
+---
+
+## Troubleshooting
+
+### Issue: Form state resets when navigating between steps
+
+**Cause:** State not centralized, or step components recreating state.
+
+**Fix:** Keep all form data in parent component, pass down via props:
+```tsx
+// ❌ State in step component (resets on unmount)
+function CompanyStep() {
+  const [name, setName] = useState('')
+}
+
+// ✅ State in parent (persists across steps)
+function MultiStepForm() {
+  const [formData, setFormData] = useState({ name: '' })
+  return <CompanyStep data={formData} onChange={updateField} />
+}
+```
+
+---
+
+### Issue: Validation runs on all steps instead of current
+
+**Cause:** Validating entire formData instead of current step fields.
+
+**Fix:** Switch on current step to validate only relevant fields:
+```tsx
+const validateStep = (step: FormStep) => {
+  switch (step) {
+    case 'company':
+      return !!formData.company_name  // Only company fields
+    case 'product':
+      return !!formData.product_description  // Only product fields
+    default:
+      return true
+  }
+}
+```
+
+---
+
+### Issue: Users can't return to previous steps
+
+**Cause:** Navigation blocks backward movement or resets form.
+
+**Fix:** Always allow clicking completed steps:
+```tsx
+<button
+  onClick={() => {
+    if (index <= currentStepIndex) {  // Allow current and previous
+      setCurrentStep(step.id)
+    }
+  }}
+  disabled={index > currentStepIndex}  // Only disable future steps
+>
+```
+
+---
+
+### Issue: Draft not loading on page refresh
+
+**Cause:** localStorage read happens after initial render.
+
+**Fix:** Initialize state from localStorage:
+```tsx
+const [formData, setFormData] = useState(() => {
+  if (typeof window !== 'undefined') {
+    const saved = localStorage.getItem('form-draft')
+    return saved ? JSON.parse(saved) : initialState
+  }
+  return initialState
+})
+```
+
+---
+
+## Related Skills
+
+- [ui-component-standards](../ui-component-standards/SKILL.md) - Form field accessibility, input patterns, error styling
+- [status-workflow](../status-workflow/SKILL.md) - If form submissions need status tracking after submit
+- [accessibility-remediation](../accessibility-remediation/SKILL.md) - Ensure form is keyboard/screen reader accessible
+- [feature-implementation-guide](../feature-implementation-guide/SKILL.md) - Full feature pattern including API and database
+
+### Related Cursor Rules
+
+- `.cursor/rules/form-consistency.mdc` - Form field structure, validation, error handling patterns
+- `.cursor/rules/component-patterns.mdc` - Card, Dialog, Button patterns used in forms
+- `.cursor/rules/color-consistency.mdc` - Error colors (text-destructive) and status indicators

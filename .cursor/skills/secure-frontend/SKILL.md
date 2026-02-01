@@ -186,3 +186,65 @@ sanitizeVideoEmbedUrl('https://evil.com/video')         // null
 | Protocol-relative | `href="//evil.com"` | Check for `//` prefix |
 | Event handlers | `<img src=x onerror="alert(1)">` | Use React, not innerHTML |
 | Malicious embed | `<iframe src="evil.com">` | `sanitizeVideoEmbedUrl()` |
+
+## When to Use This Skill
+
+Use this skill when:
+
+1. **Displaying user-provided URLs** - any `href` or `src` from user data needs sanitization
+2. **Rendering external links** - social profiles, portfolio links, verification URLs
+3. **Building components that show user content** - profiles, bios, comments, markdown
+4. **Embedding videos or external media** - YouTube, Vimeo, Loom embeds
+5. **Handling file downloads** - document links, resume downloads, attachment URLs
+
+## When NOT to Use
+
+| Scenario | Use Instead |
+|----------|-------------|
+| Creating API routes that accept input | [secure-api-routes](../secure-api-routes/SKILL.md) |
+| Writing Server Actions | [secure-server-actions](../secure-server-actions/SKILL.md) |
+| Creating database tables or RLS policies | [secure-database](../secure-database/SKILL.md) |
+| Comprehensive security review | [security-review](../security-review/SKILL.md) |
+| Building UI components without user URLs | [ui-component-standards](../ui-component-standards/SKILL.md) |
+
+## Quick Reference
+
+| Decision | Answer | Notes |
+|----------|--------|-------|
+| User URL in `href`? | Use `sanitizeHref()` | Returns `#` if invalid |
+| User image in `src`? | Use `sanitizeImageSrc()` | Returns `null` if invalid |
+| User video embed? | Use `sanitizeVideoEmbedUrl()` | Only allows YouTube/Vimeo/Loom |
+| External link? | Add `target="_blank" rel="noopener noreferrer"` | Always for external links |
+| Render user markdown? | Use `<Markdown>` component | Already sanitizes internally |
+| Render raw HTML? | Use `DOMPurify.sanitize()` | Avoid if possible |
+| Email in component props? | **Never** | Don't expose to client |
+| Console.log user data? | **Never in production** | Remove debug logs |
+
+## Troubleshooting
+
+### Issue: Links render but clicking does nothing
+**Cause:** `sanitizeHref()` returned `#` because URL was invalid  
+**Fix:** Use conditional rendering pattern: `{url && sanitizeHref(url) !== '#' && <a href={sanitizeHref(url)}>...}` to hide invalid links entirely.
+
+### Issue: Images not loading despite valid URL
+**Cause:** `sanitizeImageSrc()` blocking due to private IP or unsupported protocol  
+**Fix:** Verify the URL uses `https://` and points to a public domain. Private IPs (localhost, 192.168.x.x) are blocked to prevent SSRF.
+
+### Issue: Video embed not rendering
+**Cause:** URL not from allowed platforms (YouTube, Vimeo, Loom)  
+**Fix:** Only these platforms are allowed. If you need to support another platform, update the allowlist in `sanitizeVideoEmbedUrl()` after security review.
+
+### Issue: User content showing broken HTML
+**Cause:** HTML being escaped or sanitized incorrectly  
+**Fix:** Use the `<Markdown>` component for markdown content, or `DOMPurify.sanitize()` for trusted HTML. Never use `dangerouslySetInnerHTML` without sanitization.
+
+### Issue: TypeScript errors with sanitization functions
+**Cause:** Return type is `string | null` for some functions  
+**Fix:** Use non-null assertion after conditional check: `sanitizeImageSrc(url)!` or handle the null case explicitly.
+
+## Related Skills
+
+- [security-review](../security-review/SKILL.md) - Full security checklist including frontend XSS checks
+- [secure-api-routes](../secure-api-routes/SKILL.md) - Server-side input validation before data reaches frontend
+- [secure-server-actions](../secure-server-actions/SKILL.md) - Ensure data is sanitized at the source
+- [ui-component-standards](../ui-component-standards/SKILL.md) - General UI component patterns and accessibility

@@ -405,3 +405,85 @@ npx playwright test --list
 
 - [Playwright Documentation](https://playwright.dev/docs/intro)
 - [references/test-patterns.md](references/test-patterns.md) - Additional test patterns
+
+---
+
+## When to Use This Skill
+
+Use this skill when:
+
+1. **Testing user workflows** - End-to-end verification of feature functionality
+2. **Writing new E2E tests** - Adding test coverage for features
+3. **Debugging failing tests** - Investigating why tests fail
+4. **Verifying bug fixes** - Regression testing after fixes
+5. **Pre-deployment validation** - Running full test suite before releases
+
+## When NOT to Use
+
+| Situation | Use Instead |
+|-----------|-------------|
+| Unit testing utility functions | [code-quality](../code-quality/SKILL.md) (unit testing section) |
+| Investigating specific bugs | [bug-fix-workflow](../bug-fix-workflow/SKILL.md) |
+| Code quality checks | [code-quality](../code-quality/SKILL.md) |
+| Security testing | [security-review](../security-review/SKILL.md) |
+| Accessibility testing | [accessibility-remediation](../accessibility-remediation/SKILL.md) |
+
+## Quick Reference
+
+| Task | Command |
+|------|---------|
+| **Run all E2E tests** | `npm run test:e2e` |
+| **Run with UI debugger** | `npm run test:e2e:ui` |
+| **Run single file** | `npx playwright test e2e/filename.spec.ts` |
+| **Run by test name** | `npx playwright test -g "test name pattern"` |
+| **Run headed (visible browser)** | `npx playwright test --headed` |
+| **Debug mode (step through)** | `npx playwright test --debug` |
+| **View last report** | `npx playwright show-report` |
+| **View trace** | `npx playwright show-trace test-results/test-name/trace.zip` |
+| **Update snapshots** | `npx playwright test --update-snapshots` |
+| **List tests (no run)** | `npx playwright test --list` |
+
+## Troubleshooting
+
+### Issue: Tests time out waiting for element
+
+**Cause:** Element not rendered, wrong selector, or slow page load
+
+**Fix:**
+1. Use more specific locators: `page.getByRole('button', { name: 'Submit' })`
+2. Increase timeout: `await expect(element).toBeVisible({ timeout: 10000 })`
+3. Wait for network: `await page.goto('/page', { waitUntil: 'networkidle' })`
+4. Debug with: `npx playwright test --debug`
+
+### Issue: Tests pass locally but fail in CI
+
+**Cause:** Timing differences, missing test data, or environment config
+
+**Fix:**
+1. Add retries in config: `retries: process.env.CI ? 2 : 0`
+2. Use explicit waits instead of timing assumptions
+3. Ensure test data is seeded in CI environment
+4. Check for timezone/locale-dependent assertions
+5. Review CI logs and test artifacts (screenshots, traces)
+
+### Issue: "strict mode violation" - multiple elements matched
+
+**Cause:** Selector matches more than one element
+
+**Fix:**
+```typescript
+// Instead of generic selector
+await page.getByText('Submit').click() // Might match multiple
+
+// Use more specific
+await page.getByRole('button', { name: 'Submit' }).click()
+// Or scope to container
+await page.getByTestId('form').getByRole('button', { name: 'Submit' }).click()
+```
+
+## Related Skills
+
+- [bug-fix-workflow](../bug-fix-workflow/SKILL.md) - Debug issues found by E2E tests
+- [code-quality](../code-quality/SKILL.md) - Unit testing and code quality checks
+- [feature-implementation-guide](../feature-implementation-guide/SKILL.md) - Add tests as part of feature implementation
+- [accessibility-remediation](../accessibility-remediation/SKILL.md) - Write accessibility-focused tests

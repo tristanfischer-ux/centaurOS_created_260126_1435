@@ -513,6 +513,185 @@ async function handleTelegramMessage(message: TelegramMessage) {
 
 ---
 
+## 11. Common Patterns Summary
+
+| Pattern | Use Case | Implementation |
+|---------|----------|----------------|
+| **Processing Indicator** | Long-running operations (AI, DB) | Send "⏳ Processing..." → Delete when done |
+| **Confirmation Keyboard** | User must approve action | Inline keyboard with ✅/❌ buttons |
+| **Account Linking** | Connect Telegram to CentaurOS user | Verification code flow via `/start CODE` |
+| **Rate Limiting** | Prevent spam/abuse | Track messages per chat in memory map |
+| **Graceful Errors** | Always return 200 to Telegram | Catch all, log, return `{ ok: true }` |
+| **Edit vs New** | Update existing message | Use `editMessage` for status updates |
+| **Parse Mode** | Formatted messages | Use HTML for `<b>`, `<i>`, `<code>` |
+
+---
+
+## 12. Testing
+
+### Local Development with ngrok
+
+```bash
+# Expose local server
+ngrok http 3000
+
+# Set webhook to ngrok URL
+curl -X POST "https://api.telegram.org/bot<TOKEN>/setWebhook" \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://abc123.ngrok.io/api/telegram/webhook"}'
+```
+
+### Test Bot Commands
+
+```bash
+# Get webhook info
+curl "https://api.telegram.org/bot<TOKEN>/getWebhookInfo"
+
+# Get bot info
+curl "https://api.telegram.org/bot<TOKEN>/getMe"
+
+# Send test message (to yourself)
+curl -X POST "https://api.telegram.org/bot<TOKEN>/sendMessage" \
+  -H "Content-Type: application/json" \
+  -d '{"chat_id": YOUR_CHAT_ID, "text": "Test message from curl"}'
+
+# Delete webhook (for polling mode)
+curl -X POST "https://api.telegram.org/bot<TOKEN>/deleteWebhook"
+```
+
+### Get Your Chat ID
+
+1. Start a conversation with your bot
+2. Send any message
+3. Check webhook logs or call:
+
+```bash
+curl "https://api.telegram.org/bot<TOKEN>/getUpdates"
+# Your chat ID is in: result[0].message.chat.id
+```
+
+### Test Webhook Manually
+
+```bash
+# Simulate a text message
+curl -X POST "http://localhost:3000/api/telegram/webhook" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "update_id": 123456,
+    "message": {
+      "message_id": 1,
+      "from": {"id": 123, "is_bot": false, "first_name": "Test"},
+      "chat": {"id": 123, "type": "private"},
+      "date": 1706745600,
+      "text": "/start"
+    }
+  }'
+
+# Simulate a callback query (button press)
+curl -X POST "http://localhost:3000/api/telegram/webhook" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "update_id": 123457,
+    "callback_query": {
+      "id": "callback123",
+      "from": {"id": 123, "is_bot": false, "first_name": "Test"},
+      "message": {"message_id": 1, "chat": {"id": 123, "type": "private"}},
+      "chat_instance": "instance123",
+      "data": "confirm:intent-uuid"
+    }
+  }'
+```
+
+---
+
+## 13. Error Handling Patterns
+
+### Always Return 200 to Telegram
+
+```typescript
+// ❌ WRONG - Telegram will retry failed webhooks
+export async function POST(request: NextRequest) {
+  const update = await request.json()
+  await processUpdate(update) // Throws on error
+  return NextResponse.json({ ok: true })
+}
+
+// ✅ CORRECT - Always return 200, handle errors internally
+export async function POST(request: NextRequest) {
+  try {
+    const update = await request.json()
+    await processUpdate(update)
+  } catch (error) {
+    console.error('Telegram webhook error:', error)
+    // Log to monitoring, but don't fail the request
+  }
+  return NextResponse.json({ ok: true }) // ALWAYS return 200
+}
+```
+
+### Telegram API Error Codes
+
+| Error Code | Description | Action |
+|------------|-------------|--------|
+| `400` | Bad Request (malformed JSON) | Check request body format |
+| `401` | Unauthorized (bad token) | Verify `TELEGRAM_BOT_TOKEN` |
+| `403` | Forbidden (bot blocked) | User blocked bot, skip sending |
+| `404` | Not Found (invalid method) | Check API method name |
+| `409` | Conflict (webhook vs polling) | Delete webhook or stop polling |
+| `429` | Too Many Requests | Implement exponential backoff |
+
+### Handle Blocked Users
+
+```typescript
+async function safeSendMessage(options: SendMessageOptions): Promise<boolean> {
+  try {
+    await sendMessage(options)
+    return true
+  } catch (error) {
+    if (error.message?.includes('bot was blocked')) {
+      // User blocked the bot - mark in database
+      await markUserBlockedBot(options.chat_id)
+      return false
+    }
+    if (error.message?.includes('chat not found')) {
+      // Chat was deleted
+      await removeInvalidChatId(options.chat_id)
+      return false
+    }
+    throw error // Re-throw unexpected errors
+  }
+}
+```
+
+### Retry Logic for API Calls
+
+```typescript
+async function telegramRequestWithRetry<T>(
+  method: string,
+  body?: Record<string, unknown>,
+  maxRetries = 3
+): Promise<T> {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      return await telegramRequest<T>(method, body)
+    } catch (error) {
+      const isRateLimited = error.message?.includes('429')
+      const isTemporary = error.message?.includes('temporarily unavailable')
+      
+      if ((isRateLimited || isTemporary) && attempt < maxRetries) {
+        const delay = Math.pow(2, attempt) * 1000 // Exponential backoff
+        await new Promise(resolve => setTimeout(resolve, delay))
+        continue
+      }
+      throw error
+    }
+  }
+  throw new Error('Max retries exceeded')
+}
+```
+
+---
+
 ## Checklist
 
 Before deploying Telegram integration:
@@ -525,3 +704,62 @@ Before deploying Telegram integration:
 - [ ] Account linking flow tested
 - [ ] Callback query acknowledged (answerCallbackQuery)
 - [ ] Processing indicators for long operations
+
+---
+
+## When to Use This Skill
+
+- Implementing a Telegram bot for CentaurOS notifications
+- Adding voice message support with speech-to-text
+- Creating interactive bot commands with inline keyboards
+- Linking Telegram accounts to CentaurOS profiles
+- Building conversational AI interfaces via Telegram
+
+---
+
+## When NOT to Use
+
+| Instead Use | When |
+|-------------|------|
+| `secure-api-routes` | Webhook endpoint security (rate limiting, validation) |
+| `stripe-integration` | Payment flows (Telegram is for notifications only) |
+| `feature-implementation-guide` | Creating full features that include Telegram |
+| Built-in notifications | Simple email/in-app notifications without chat interface |
+
+---
+
+## Quick Reference
+
+| Item | Value/Pattern |
+|------|---------------|
+| **API Base URL** | `https://api.telegram.org/bot{TOKEN}/{method}` |
+| **File Download URL** | `https://api.telegram.org/file/bot{TOKEN}/{file_path}` |
+| **Webhook Required** | HTTPS with valid certificate |
+| **Message Limit** | 4096 characters per message |
+| **Rate Limit** | ~30 messages/second to different chats |
+| **Bot Token Format** | `123456789:ABC-DEF1234ghIkl-zyx57W2v1u123ew11` |
+| **Chat ID Type** | `number` (positive for users, negative for groups) |
+| **Inline Keyboard Max** | 100 buttons per message |
+| **Parse Modes** | `HTML`, `Markdown`, `MarkdownV2` |
+
+---
+
+## Troubleshooting
+
+| Problem | Cause | Solution |
+|---------|-------|----------|
+| Webhook not receiving updates | Wrong URL or HTTPS issue | Check `getWebhookInfo`, verify SSL |
+| Bot not responding | Code error returns non-200 | Always return 200, check server logs |
+| "Unauthorized" error | Invalid bot token | Verify token from BotFather |
+| Messages not sending | User blocked bot | Catch 403 errors, mark user in DB |
+| Duplicate messages | Missing idempotency | Track processed `update_id` in DB |
+| Buttons not working | Missing `answerCallbackQuery` | Always call `answerCallbackQuery` first |
+| Voice messages fail | Missing ffmpeg/file handler | Check file download and transcription |
+| Rate limited (429) | Too many API calls | Implement exponential backoff |
+
+---
+
+## Related Skills
+
+- **`secure-api-routes`** - Webhook security patterns (rate limiting, input validation)
+- **`stripe-integration`** - Similar integration pattern (webhooks, event handling, idempotency)

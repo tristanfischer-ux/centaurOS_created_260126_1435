@@ -504,7 +504,7 @@ export async function addExpertise(input: AddExpertiseInput): Promise<{
     return { data: null, error: 'Coverage not found' }
   }
 
-  // @ts-expect-error - coverage_id column exists but types may be stale
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data, error } = await supabase
     .from('blueprint_expertise')
     .insert({
@@ -518,7 +518,7 @@ export async function addExpertise(input: AddExpertiseInput): Promise<{
       specific_skills: input.specific_skills || [],
       availability: input.availability,
       notes: input.notes,
-    })
+    } as any)
     .select()
     .single()
 

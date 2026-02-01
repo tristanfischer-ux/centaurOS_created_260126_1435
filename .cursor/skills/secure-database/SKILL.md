@@ -202,3 +202,68 @@ SELECT * FROM resources WHERE id = 'some-id';
 | Public by default | `USING (true)` | Restrict to owner/foundry |
 | Missing storage policy | Direct public URLs | Use signed URLs + policies |
 | Mutable audit logs | UPDATE/DELETE allowed | Add prevention triggers |
+
+## When to Use This Skill
+
+Use this skill when:
+
+1. **Creating new database tables** - every table needs RLS enabled with appropriate policies
+2. **Adding or modifying RLS policies** - need to understand the correct patterns for foundry vs user isolation
+3. **Writing database migrations** - migrations must include security considerations
+4. **Setting up storage buckets** - storage needs access policies and signed URL patterns
+5. **Debugging "permission denied" errors** - often caused by missing or incorrect RLS policies
+
+## When NOT to Use
+
+| Scenario | Use Instead |
+|----------|-------------|
+| Creating API routes that query the database | [secure-api-routes](../secure-api-routes/SKILL.md) |
+| Writing Server Actions with database operations | [secure-server-actions](../secure-server-actions/SKILL.md) |
+| Displaying user-provided URLs in frontend | [secure-frontend](../secure-frontend/SKILL.md) |
+| Reviewing code for all security issues | [security-review](../security-review/SKILL.md) |
+| Applying migrations to Supabase | [supabase-migration](../supabase-migration/SKILL.md) for the process |
+
+## Quick Reference
+
+| Decision | Answer | Notes |
+|----------|--------|-------|
+| Enable RLS on new table? | **Yes, always** | Use both `ENABLE` and `FORCE` |
+| Foundry-scoped or user-scoped? | Foundry for shared resources, user for personal | Check existing similar tables |
+| How to get user's foundry ID? | `get_my_foundry_id()` | Never use direct subquery |
+| Public URL or signed URL? | **Signed for private data** | 1 hour expiry is typical |
+| Audit table policies? | INSERT only, add triggers | Prevent UPDATE/DELETE |
+| Need DELETE policy? | Only if deletions are allowed | Many tables are soft-delete |
+| What if policy causes recursion? | Use SECURITY DEFINER helper | Set `search_path = public` |
+
+## Troubleshooting
+
+### Issue: "infinite recursion detected in policy"
+**Cause:** RLS policy has a subquery that triggers the same table's policies  
+**Fix:** Replace the subquery with a `SECURITY DEFINER` helper function like `get_my_foundry_id()`. Example:
+```sql
+-- Wrong: USING (foundry_id = (SELECT foundry_id FROM profiles WHERE id = auth.uid()))
+-- Right: USING (foundry_id = get_my_foundry_id())
+```
+
+### Issue: Users get empty results despite data existing
+**Cause:** RLS enabled but no policies created, or policies don't match user's context  
+**Fix:** Check that SELECT policy exists with correct USING clause. Verify the user has a profile with `foundry_id` set if using foundry isolation.
+
+### Issue: Storage files accessible without authentication
+**Cause:** Bucket is public or missing storage policies  
+**Fix:** Create storage policies on `storage.objects` table. Use signed URLs with expiration for private files instead of public URLs.
+
+### Issue: Unable to update/delete audit records (intentional)
+**Cause:** Immutability triggers preventing modification  
+**Fix:** This is by design. If you need to fix audit data, use a service role connection that bypasses RLS (admin only).
+
+### Issue: Migration applies but RLS blocks all access
+**Cause:** `ENABLE ROW LEVEL SECURITY` without corresponding policies  
+**Fix:** Always include CREATE POLICY statements in the same migration that enables RLS.
+
+## Related Skills
+
+- [security-review](../security-review/SKILL.md) - Comprehensive security checklist including database security section
+- [secure-server-actions](../secure-server-actions/SKILL.md) - Server-side ownership checks that complement RLS
+- [secure-api-routes](../secure-api-routes/SKILL.md) - API-level security that works with database policies
+- [supabase-migration](../supabase-migration/SKILL.md) - Process for creating and applying migrations safely

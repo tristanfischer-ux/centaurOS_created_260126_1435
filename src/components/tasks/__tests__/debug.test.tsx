@@ -1,4 +1,4 @@
-import { TaskCard } from '@/app/tasks/task-card'
+import { TaskCard } from '@/app/(platform)/tasks/task-card'
 
 jest.mock('@/actions/tasks', () => ({}))
 

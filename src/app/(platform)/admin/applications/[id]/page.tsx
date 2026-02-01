@@ -155,7 +155,7 @@ export default function ApplicationDetailPage({
                 </Link>
                 <ChevronRight className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
                 <span className="text-foreground font-medium truncate max-w-[200px]">
-                    {application.profile?.full_name || 'Application'}
+                    {application.user?.full_name || 'Application'}
                 </span>
             </nav>
             

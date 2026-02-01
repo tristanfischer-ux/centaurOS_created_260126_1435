@@ -154,3 +154,95 @@ if (error) {
 | Existence oracle | Different errors for "not found" vs "unauthorized" | Use single generic message |
 | Email exposure | `select('*, profile:profiles(email)')` | Remove email from select |
 | Parent bypass | Delete child without verifying parent ownership | Verify parent chain |
+
+## When to Use This Skill
+
+Use this skill when:
+
+1. **Creating new Server Actions** in `src/actions/` - every action needs auth and ownership checks
+2. **Implementing CRUD operations** - create, read, update, delete all need security verification
+3. **Accessing resources by ID** - any `.eq('id', someId)` pattern requires ownership verification
+4. **Building features that modify data** - mutations are high-risk and need extra scrutiny
+5. **Working with nested resources** - child resources need parent chain verification
+
+## When NOT to Use
+
+| Scenario | Use Instead |
+|----------|-------------|
+| Creating API routes in `src/app/api/` | [secure-api-routes](../secure-api-routes/SKILL.md) |
+| Writing database migrations or RLS | [secure-database](../secure-database/SKILL.md) |
+| Building frontend with user URLs | [secure-frontend](../secure-frontend/SKILL.md) |
+| Comprehensive pre-commit review | [security-review](../security-review/SKILL.md) |
+| Implementing complete features | [feature-implementation-guide](../feature-implementation-guide/SKILL.md) first |
+
+## Quick Reference
+
+| Decision | Answer | Notes |
+|----------|--------|-------|
+| First check in every action? | `getUser()` authentication | Return early if no user |
+| Second check for shared resources? | `getFoundryIdCached()` | Get foundry context |
+| How to verify ownership? | Add `.eq('foundry_id', foundryId)` | Or `user_id` for personal resources |
+| Error for "not found"? | `{ error: 'Resource not found' }` | Same message for unauthorized |
+| Error for "not authenticated"? | `{ error: 'Not authenticated' }` | Check auth first |
+| Include email in SELECT? | **Never** | Exclude from client-facing queries |
+| Nested resource ownership? | Verify via parent chain | Follow relationship to foundry |
+| How to sanitize DB errors? | `sanitizeErrorMessage(error)` | Never expose raw errors |
+
+## Troubleshooting
+
+### Issue: Users accessing other users' resources (IDOR)
+**Cause:** Missing `.eq('foundry_id', foundryId)` or `.eq('user_id', user.id)` filter  
+**Fix:** Add ownership filter to every query that uses an ID parameter. Pattern:
+```typescript
+const { data } = await supabase.from('table')
+  .select('*')
+  .eq('id', resourceId)
+  .eq('foundry_id', foundryId)  // Add this
+  .single()
+```
+
+### Issue: Action works but reveals resource existence
+**Cause:** Different error messages for "not found" vs "unauthorized"  
+**Fix:** Use single generic message for both cases:
+```typescript
+if (!resource || resource.foundry_id !== foundryId) {
+  return { error: 'Resource not found' }  // Same message for both
+}
+```
+
+### Issue: Nested resource deletion bypasses parent check
+**Cause:** Child resource deleted without verifying parent ownership  
+**Fix:** Query through relationships to verify the chain. Example for blueprint expertise:
+```typescript
+const { data } = await supabase
+  .from('blueprint_expertise')
+  .select('coverage:blueprint_domain_coverage(blueprint:blueprints(foundry_id))')
+  .eq('id', expertiseId)
+  .single()
+// Then verify the foundry_id from the nested result
+```
+
+### Issue: Database error details exposed to client
+**Cause:** Returning raw Supabase error object  
+**Fix:** Use `sanitizeErrorMessage(error)` to return generic message while logging full error server-side:
+```typescript
+if (error) {
+  console.error('DB error:', error)  // Log full error
+  return { error: sanitizeErrorMessage(error) }  // Generic to client
+}
+```
+
+### Issue: Email addresses appearing in client responses
+**Cause:** SELECT query includes email field or joins to profiles with email  
+**Fix:** Explicitly list fields in SELECT, excluding sensitive data:
+```typescript
+// Wrong: .select('*, profile:profiles(*)')
+// Right: .select('id, name, profile:profiles(id, full_name, avatar_url)')
+```
+
+## Related Skills
+
+- [security-review](../security-review/SKILL.md) - Comprehensive security checklist for all code changes
+- [secure-api-routes](../secure-api-routes/SKILL.md) - Security for API routes (use when Server Actions aren't appropriate)
+- [secure-database](../secure-database/SKILL.md) - RLS policies provide defense-in-depth with server action checks
+- [feature-implementation-guide](../feature-implementation-guide/SKILL.md) - Full feature implementation including security patterns

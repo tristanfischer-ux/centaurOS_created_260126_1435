@@ -447,3 +447,142 @@ Before implementing a status workflow:
 - [ ] Disable buttons during transitions
 - [ ] Show loading state during updates
 - [ ] Display status timeline (optional)
+
+---
+
+## When to Use This Skill
+
+Use this skill when:
+
+1. **Building approval workflows** - Content, requests, or documents that need review/approval cycles
+2. **Order/transaction lifecycles** - E-commerce orders, service requests, or billing with multiple states
+3. **Project/task management** - Items that move through defined phases (draft → active → done)
+4. **Compliance tracking** - Auditable processes where state changes must be logged
+5. **Multi-party handoffs** - Workflows where ownership transfers between roles/teams
+6. **SLA tracking** - Processes with timestamps for measuring response/completion times
+
+---
+
+## When NOT to Use
+
+| Instead of this skill... | Use this skill... |
+|--------------------------|-------------------|
+| Multi-step form with validation | [multi-step-form](../multi-step-form/SKILL.md) |
+| Simple boolean flags (active/inactive) | Standard boolean column, no state machine |
+| UI status badge styling | [ui-component-standards](../ui-component-standards/SKILL.md) |
+| Finding status display inconsistencies | [design-audit](../design-audit/SKILL.md) |
+| General feature architecture | [feature-implementation-guide](../feature-implementation-guide/SKILL.md) |
+
+---
+
+## Quick Reference
+
+| Component | Pattern | Example |
+|-----------|---------|---------|
+| Status type | Union type | `type Status = 'draft' \| 'submitted' \| 'approved'` |
+| Status array | const with satisfies | `['draft', 'submitted'] as const satisfies readonly Status[]` |
+| Status config | Record with label, color, description | `{ draft: { label: 'Draft', color: 'default' } }` |
+| Valid transitions | Record mapping current → allowed next | `{ draft: ['submitted'], submitted: ['approved', 'rejected'] }` |
+| Database column | TEXT with CHECK constraint | `status TEXT CHECK (status IN ('draft', 'submitted'))` |
+| History table | Separate table with trigger | `feature_status_history` with from_status, to_status |
+| Server action | Validate transition before update | `if (!isValidTransition(current, next)) return error` |
+| UI badge | StatusBadge component | `<StatusBadge status={config.color}>` |
+| Action buttons | Map available transitions | `getAvailableTransitions(status).map(...)` |
+| Timeline | Map statuses with completed/current | `STATUSES.map((s, i) => isCompleted(i))` |
+
+---
+
+## Troubleshooting
+
+### Issue: Invalid status transition allowed
+
+**Cause:** Transition validation not enforced in server action.
+
+**Fix:** Always validate before updating:
+```tsx
+export async function updateStatus(id: string, newStatus: Status) {
+  const { data } = await supabase.from('items').select('status').eq('id', id).single()
+  
+  // ✅ Validate transition
+  if (!isValidTransition(data.status, newStatus)) {
+    return { error: `Cannot transition from ${data.status} to ${newStatus}` }
+  }
+  
+  // Now safe to update
+  await supabase.from('items').update({ status: newStatus }).eq('id', id)
+}
+```
+
+---
+
+### Issue: Status history not being recorded
+
+**Cause:** Trigger not created, or trigger uses wrong function.
+
+**Fix:** Verify trigger exists and logs OLD vs NEW:
+```sql
+-- Check trigger exists
+SELECT * FROM pg_trigger WHERE tgname = 'trigger_log_status_change';
+
+-- Trigger must compare OLD.status to NEW.status
+IF OLD.status IS DISTINCT FROM NEW.status THEN
+  INSERT INTO history (from_status, to_status) VALUES (OLD.status, NEW.status);
+END IF;
+```
+
+---
+
+### Issue: Timestamps not set on status change
+
+**Cause:** Server action doesn't set corresponding timestamp column.
+
+**Fix:** Map status to timestamp in update:
+```tsx
+const updates: Record<string, unknown> = { status: newStatus }
+
+switch (newStatus) {
+  case 'submitted':
+    updates.submitted_at = new Date().toISOString()
+    break
+  case 'approved':
+    updates.approved_at = new Date().toISOString()
+    break
+  case 'completed':
+    updates.completed_at = new Date().toISOString()
+    break
+}
+
+await supabase.from('items').update(updates).eq('id', id)
+```
+
+---
+
+### Issue: UI shows wrong available actions
+
+**Cause:** Actions not filtered by `getAvailableTransitions()`.
+
+**Fix:** Always derive actions from transition map:
+```tsx
+const availableTransitions = getAvailableTransitions(currentStatus)
+
+// Only show buttons for valid next states
+{availableTransitions.map((nextStatus) => (
+  <Button onClick={() => handleTransition(nextStatus)}>
+    {STATUS_CONFIG[nextStatus].label}
+  </Button>
+))}
+```
+
+---
+
+## Related Skills
+
+- [multi-step-form](../multi-step-form/SKILL.md) - If status workflow starts with a multi-step submission form
+- [ui-component-standards](../ui-component-standards/SKILL.md) - StatusBadge styling and color tokens
+- [feature-implementation-guide](../feature-implementation-guide/SKILL.md) - Full feature architecture including database and API
+- [supabase-migration](../supabase-migration/SKILL.md) - Creating database tables, triggers, and migrations
+
+### Related Cursor Rules
+
+- `.cursor/rules/color-consistency.mdc` - Status colors must use semantic tokens
+- `.cursor/rules/component-patterns.mdc` - StatusBadge vs Badge usage patterns

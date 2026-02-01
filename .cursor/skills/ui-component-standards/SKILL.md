@@ -635,3 +635,127 @@ border-red-500 → border-destructive
 border-green-500 → border-status-success
 border-amber-500 → border-status-warning
 ```
+
+---
+
+## When to Use This Skill
+
+Use this skill when:
+
+1. **Creating new UI components** - Before writing any component with colors, forms, dialogs, buttons, or interactive elements
+2. **Reviewing existing components** - When auditing or fixing design consistency issues in React/TSX files
+3. **Styling with colors** - Any time you need to apply text colors, backgrounds, borders, or status indicators
+4. **Building forms** - When creating inputs, labels, validation, and error states
+5. **Adding navigation** - When implementing nav items, active states, breadcrumbs, or tab interfaces
+6. **Accessibility compliance** - When adding ARIA attributes, keyboard support, touch targets, or screen reader text
+
+---
+
+## When NOT to Use
+
+| Instead of this skill... | Use this skill... |
+|--------------------------|-------------------|
+| Auditing entire codebase for design issues | [design-audit](../design-audit/SKILL.md) |
+| Fixing accessibility violations found in audit | [accessibility-remediation](../accessibility-remediation/SKILL.md) |
+| Creating multi-step wizard forms | [multi-step-form](../multi-step-form/SKILL.md) |
+| Implementing status state machines | [status-workflow](../status-workflow/SKILL.md) |
+| Database schema or API design | [feature-implementation-guide](../feature-implementation-guide/SKILL.md) |
+
+---
+
+## Quick Reference
+
+| Task | Pattern | Example |
+|------|---------|---------|
+| Primary text | `text-foreground` | `<p className="text-foreground">` |
+| Secondary text | `text-muted-foreground` | `<span className="text-muted-foreground">` |
+| Error styling | `text-destructive` + `border-destructive` | `className={cn(error && "border-destructive")}` |
+| Success status | `<StatusBadge status="success">` | `<StatusBadge status="success">Active</StatusBadge>` |
+| Icon button | `aria-label` required | `<Button size="icon" aria-label="Close">` |
+| Touch target | `min-h-[44px] min-w-[44px]` | `<button className="min-h-[44px]">` |
+| Dialog size | Use `size` prop | `<DialogContent size="md">` |
+| Active nav | `text-international-orange` | `className={isActive ? "text-international-orange" : ""}` |
+| Form error | `aria-invalid` + `role="alert"` | `<Input aria-invalid={!!error} />` |
+| Clickable div | Add `role`, `tabIndex`, `onKeyDown` | `<div role="button" tabIndex={0} onKeyDown={...}>` |
+
+---
+
+## Troubleshooting
+
+### Issue: Dark mode colors look wrong
+
+**Cause:** Using hardcoded colors instead of semantic tokens.
+
+**Fix:** Replace hardcoded values with semantic tokens:
+```tsx
+// ❌ Breaks in dark mode
+<div className="bg-white text-slate-900">
+
+// ✅ Works in dark mode
+<div className="bg-background text-foreground">
+```
+
+---
+
+### Issue: Form validation not announced to screen readers
+
+**Cause:** Missing ARIA attributes on form fields and error messages.
+
+**Fix:** Add complete accessibility pattern:
+```tsx
+<Input
+  aria-invalid={!!error}
+  aria-describedby={error ? "field-error" : undefined}
+/>
+{error && (
+  <p id="field-error" role="alert" className="text-destructive">
+    {error}
+  </p>
+)}
+```
+
+---
+
+### Issue: Icon buttons not accessible via keyboard
+
+**Cause:** Missing `aria-label` on icon-only buttons.
+
+**Fix:** Add descriptive aria-label:
+```tsx
+// ❌ Screen readers say "button"
+<Button size="icon"><X /></Button>
+
+// ✅ Screen readers say "Close"
+<Button size="icon" aria-label="Close"><X /></Button>
+```
+
+---
+
+### Issue: Status badges using wrong colors
+
+**Cause:** Using `Badge` with hardcoded colors instead of `StatusBadge`.
+
+**Fix:** Use StatusBadge component with semantic status:
+```tsx
+// ❌ Hardcoded colors
+<Badge className="bg-green-100 text-green-800">Active</Badge>
+
+// ✅ Semantic status
+<StatusBadge status="success">Active</StatusBadge>
+```
+
+---
+
+## Related Skills
+
+- [design-audit](../design-audit/SKILL.md) - Systematic audit to find UI inconsistencies across codebase
+- [accessibility-remediation](../accessibility-remediation/SKILL.md) - Fix accessibility violations found during audit
+- [multi-step-form](../multi-step-form/SKILL.md) - Patterns for wizard forms that use these UI standards
+- [feature-implementation-guide](../feature-implementation-guide/SKILL.md) - Full feature implementation including UI components
+
+### Related Cursor Rules
+
+- `.cursor/rules/color-consistency.mdc` - Color token enforcement rules
+- `.cursor/rules/form-consistency.mdc` - Form field patterns and validation
+- `.cursor/rules/component-patterns.mdc` - Component usage standards
+- `.cursor/rules/navigation-consistency.mdc` - Navigation active states and styling

@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { headers } from "next/headers";
 import OpenAI from "openai";
 import { z } from "zod";
 import { Json } from "@/types/database.types";
 import { createClient } from "@/lib/supabase/server";
-import { rateLimit, getClientIP } from "@/lib/security/rate-limit";
+import { rateLimit } from "@/lib/security/rate-limit";
 
 // SECURITY: Zod schema for input validation
 const MarketplaceListingSchema = z.object({
@@ -13,7 +12,7 @@ const MarketplaceListingSchema = z.object({
     subcategory: z.string(),
     title: z.string().min(1).max(500),
     description: z.string().max(5000).nullable(),
-    attributes: z.record(z.unknown()).nullable(),
+    attributes: z.record(z.string(), z.unknown()).nullable(),
 });
 
 const CompareRequestSchema = z.object({
@@ -85,8 +84,6 @@ export async function POST(req: NextRequest) {
         }
 
         // SECURITY: Rate limit to prevent OpenAI cost abuse (5 requests per minute per user)
-        const headersList = await headers()
-        const clientIP = getClientIP(headersList)
         const rateLimitResult = await rateLimit('api', `compare:${user.id}`, { limit: 5, window: 60 })
         if (!rateLimitResult.success) {
             return NextResponse.json(

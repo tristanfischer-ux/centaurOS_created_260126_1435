@@ -466,3 +466,88 @@ npx supabase db query "
   ORDER BY ordinal_position;
 "
 ```
+
+---
+
+## When to Use This Skill
+
+Use this skill when:
+
+1. **Adding new database tables** - New features requiring data storage
+2. **Modifying existing tables** - Adding columns, changing types, or constraints
+3. **Creating RLS policies** - Access control for new or existing tables
+4. **Adding database functions** - Stored procedures, triggers, or RPC functions
+5. **Schema troubleshooting** - Migration errors or RLS issues
+
+## When NOT to Use
+
+| Situation | Use Instead |
+|-----------|-------------|
+| Fixing bugs not related to schema | [bug-fix-workflow](../bug-fix-workflow/SKILL.md) |
+| Full feature implementation | [feature-implementation-guide](../feature-implementation-guide/SKILL.md) |
+| Security audit of RLS policies | [secure-database](../secure-database/SKILL.md) |
+| TypeScript type issues | [code-quality](../code-quality/SKILL.md) |
+| Deploying to production | [vercel-deploy](../vercel-deploy/SKILL.md) |
+
+## Quick Reference
+
+| Task | Command/Action |
+|------|----------------|
+| **Create migration file** | `date +%Y%m%d%H%M%S` → create `supabase/migrations/{timestamp}_name.sql` |
+| **Push migrations** | `npx supabase db push` |
+| **List pending migrations** | `npx supabase migration list` |
+| **Regenerate TS types** | `npx supabase gen types typescript --linked > src/types/database.types.ts` |
+| **Run arbitrary SQL** | `npx supabase db query "SELECT ..."` |
+| **Check project link** | `npx supabase status` |
+| **Re-link project** | `npx supabase link --project-ref YOUR_REF` |
+| **View table schema** | `npx supabase db query "SELECT column_name, data_type FROM information_schema.columns WHERE table_name = 'table'"` |
+
+## Troubleshooting
+
+### Issue: "relation already exists" error
+
+**Cause:** Table or object created in a previous migration run
+
+**Fix:**
+```sql
+-- Use IF NOT EXISTS for tables
+CREATE TABLE IF NOT EXISTS public.my_table (...);
+
+-- For policies, drop first
+DROP POLICY IF EXISTS "policy_name" ON public.my_table;
+CREATE POLICY "policy_name" ON public.my_table ...;
+```
+
+### Issue: RLS blocking all queries (empty results)
+
+**Cause:** RLS enabled but no policy allows access
+
+**Fix:**
+1. Check existing policies: `SELECT * FROM pg_policies WHERE tablename = 'table_name';`
+2. Verify user has `foundry_id` in metadata matching the row
+3. Add appropriate policy:
+```sql
+CREATE POLICY "allow_access" ON public.my_table
+  FOR ALL USING (foundry_id = (SELECT foundry_id FROM public.profiles WHERE id = auth.uid()));
+```
+4. For server actions, ensure service role policy exists
+
+### Issue: TypeScript errors after migration
+
+**Cause:** Database types out of sync with new schema
+
+**Fix:**
+```bash
+# Always run after schema changes
+npx supabase gen types typescript --linked > src/types/database.types.ts
+
+# Then check for type errors
+npx tsc --noEmit
+```
+
+## Related Skills
+
+- [secure-database](../secure-database/SKILL.md) - Security checklist for RLS policies and database operations
+- [feature-implementation-guide](../feature-implementation-guide/SKILL.md) - Full workflow for implementing features with database changes
+- [bug-fix-workflow](../bug-fix-workflow/SKILL.md) - Debug RLS and database-related bugs
+- [vercel-deploy](../vercel-deploy/SKILL.md) - Deploy migrations to production

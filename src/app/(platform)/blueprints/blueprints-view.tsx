@@ -90,10 +90,7 @@ export function BlueprintsView({ blueprints, templates }: BlueprintsViewProps) {
           </p>
         </div>
 
-        <Button
-          onClick={() => setIsCreateOpen(true)}
-          className="bg-international-orange hover:bg-international-orange/90"
-        >
+        <Button onClick={() => setIsCreateOpen(true)}>
           <Plus className="mr-2 h-4 w-4" />
           New Blueprint
         </Button>
@@ -136,10 +133,7 @@ export function BlueprintsView({ blueprints, templates }: BlueprintsViewProps) {
             description="Create your first blueprint to map the knowledge, expertise, and suppliers you need for your product."
             icon={<Map className="h-12 w-12" />}
             action={
-              <Button
-                onClick={() => setIsCreateOpen(true)}
-                className="bg-international-orange hover:bg-international-orange/90"
-              >
+              <Button onClick={() => setIsCreateOpen(true)}>
                 <Plus className="mr-2 h-4 w-4" />
                 Create Your First Blueprint
               </Button>

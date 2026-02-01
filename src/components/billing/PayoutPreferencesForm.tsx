@@ -33,7 +33,6 @@ export function PayoutPreferencesForm({
   className,
   availableBalance = 0,
 }: PayoutPreferencesFormProps) {
-  const { toast } = useToast()
   const [preferences, setPreferences] = useState<PayoutPreferences | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)

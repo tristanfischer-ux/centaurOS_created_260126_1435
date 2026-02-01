@@ -13,6 +13,13 @@ import { Sheet, SheetContent } from '@/components/ui/sheet'
 import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import {
   CoverageBar,
   CoverageScore,
   DomainTreeView,
@@ -241,18 +248,22 @@ export function BlueprintDetailView({
           <div className="flex items-center gap-4">
             {/* Status filter */}
             <div className="flex items-center gap-2">
-              <Filter className="h-4 w-4 text-muted-foreground" />
-              <select
+              <Filter className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+              <Select
                 value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value as CoverageStatus | 'all')}
-                className="text-sm border rounded-md px-2 py-1"
+                onValueChange={(value) => setStatusFilter(value as CoverageStatus | 'all')}
               >
-                <option value="all">All</option>
-                <option value="gap">Gaps</option>
-                <option value="partial">Partial</option>
-                <option value="covered">Covered</option>
-                <option value="not_needed">Not Needed</option>
-              </select>
+                <SelectTrigger className="w-[140px] h-9">
+                  <SelectValue placeholder="Filter status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Domains</SelectItem>
+                  <SelectItem value="gap">Gaps Only</SelectItem>
+                  <SelectItem value="partial">Partial</SelectItem>
+                  <SelectItem value="covered">Covered</SelectItem>
+                  <SelectItem value="not_needed">Not Needed</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
             {/* View mode toggle */}

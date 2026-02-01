@@ -1,5 +1,5 @@
 import { render, screen } from '@testing-library/react'
-import { TaskCard } from '@/components/tasks/task-card'
+import { TaskCard } from '@/app/(platform)/tasks/task-card'
 import '@testing-library/jest-dom'
 
 // Mock server actions
@@ -27,29 +27,35 @@ const mockTask = {
     updated_at: null
 }
 
+const defaultProps = {
+    members: [],
+    expanded: false,
+    onToggle: jest.fn(),
+}
+
 describe('TaskCard', () => {
     it('renders task title', () => {
-        // @ts-expect-error mock data
-        render(<TaskCard task={mockTask} currentUserId="user-2" />)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        render(<TaskCard task={mockTask as any} currentUserId="user-2" {...defaultProps} />)
         expect(screen.getByText('Test Task')).toBeInTheDocument()
     })
 
     it('shows Accept button for assignee', () => {
-        // @ts-expect-error mock data
-        render(<TaskCard task={mockTask} currentUserId="user-1" />)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        render(<TaskCard task={mockTask as any} currentUserId="user-1" {...defaultProps} />)
         expect(screen.getByText('Accept')).toBeInTheDocument()
     })
 
     it('hides Accept button for non-assignee', () => {
-        // @ts-expect-error mock data
-        render(<TaskCard task={mockTask} currentUserId="user-2" />)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        render(<TaskCard task={mockTask as any} currentUserId="user-2" {...defaultProps} />)
         expect(screen.queryByText('Accept')).not.toBeInTheDocument()
     })
 
     it('shows Amendment Notes when status is Amended_Pending_Approval', () => {
         const amendedTask = { ...mockTask, status: 'Amended_Pending_Approval', amendment_notes: 'Proposed changes' }
-        // @ts-expect-error mock data
-        render(<TaskCard task={amendedTask} currentUserId="user-1" />)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        render(<TaskCard task={amendedTask as any} currentUserId="user-1" {...defaultProps} />)
         expect(screen.getByText('Amendment Proposed:')).toBeInTheDocument()
         expect(screen.getByText('Proposed changes')).toBeInTheDocument()
     })

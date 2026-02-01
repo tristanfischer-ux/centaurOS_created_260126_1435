@@ -30,7 +30,6 @@ const CURRENCIES: { value: SupportedCurrency; label: string; symbol: string }[] 
 ]
 
 export function CurrencySelector({ className, compact = false }: CurrencySelectorProps) {
-  const { toast } = useToast()
   const [currency, setCurrency] = useState<SupportedCurrency>('GBP')
   const [isLoading, setIsLoading] = useState(true)
   const [isUpdating, setIsUpdating] = useState(false)
