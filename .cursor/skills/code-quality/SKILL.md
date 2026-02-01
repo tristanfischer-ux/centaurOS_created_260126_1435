@@ -13,20 +13,30 @@ Run these checks before committing:
 
 ```bash
 # Full quality check (run all in sequence)
-npm run lint && npx tsc --noEmit && npm run test && npm run build
+./scripts/check-design-tokens.sh && npm run lint && npx tsc --noEmit && npm run build
 ```
 
-### UI Standards Check (for UI changes)
+### Design Token Check (MANDATORY for UI changes)
 
-When modifying UI code, also verify:
+**Always run before committing UI code:**
 
 ```bash
-# Check for hardcoded status colors (should return 0 matches in your changed files)
-rg "text-red-|text-green-|text-amber-|text-blue-" src/path/to/your/file.tsx
-rg "bg-red-|bg-green-|bg-amber-|bg-blue-" src/path/to/your/file.tsx
+# Run design token enforcement script
+./scripts/check-design-tokens.sh
+
+# Or check specific path
+./scripts/check-design-tokens.sh src/components/my-component.tsx
 ```
 
-See the **ui-component-standards** skill for the complete color token mapping.
+This script checks for:
+- Hardcoded text colors (`text-slate-*`, `text-gray-*`, `text-red-*`, etc.)
+- Hardcoded backgrounds (`bg-white`, `bg-slate-*`, `bg-red-*`, etc.)
+- Dead `dark:` variants (app enforces light mode)
+- ThemeProvider misconfiguration
+
+**If the script fails, fix ALL violations before committing.**
+
+See `.cursor/rules/color-consistency.mdc` for the complete token mappings.
 
 ## Linting
 
@@ -331,6 +341,7 @@ npm run build -- --analyze
 
 ```bash
 # .husky/pre-commit
+./scripts/check-design-tokens.sh
 npm run lint
 npx tsc --noEmit
 ```
@@ -407,6 +418,7 @@ Use this skill when:
 
 | Quality Check | Command | When to Run |
 |---------------|---------|-------------|
+| **Design tokens** | `./scripts/check-design-tokens.sh` | Before every UI commit |
 | **Lint errors** | `npm run lint` | Before every commit |
 | **Type errors** | `npx tsc --noEmit` | Before every commit |
 | **Unit tests** | `npm run test` | Before every commit |
@@ -414,7 +426,7 @@ Use this skill when:
 | **Auto-fix lint** | `npx eslint --fix src/` | After completing feature |
 | **Find unused exports** | `npx ts-prune` | During cleanup |
 | **Circular deps** | `npx madge --circular src/` | When architecture issues suspected |
-| **Full quality** | `npm run lint && npx tsc --noEmit && npm run test && npm run build` | Before deployment |
+| **Full quality** | `./scripts/check-design-tokens.sh && npm run lint && npx tsc --noEmit && npm run build` | Before deployment |
 
 ## Troubleshooting
 

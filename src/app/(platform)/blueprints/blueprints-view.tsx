@@ -105,13 +105,21 @@ export function BlueprintsView({ blueprints, templates }: BlueprintsViewProps) {
           </p>
         </div>
 
-        <Button
-          onClick={() => setIsCreateOpen(true)}
-          className="bg-international-orange hover:bg-international-orange/90"
-        >
-          <Plus className="mr-2 h-4 w-4" />
-          New Blueprint
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button asChild variant="outline">
+            <Link href="/blueprints/explore">
+              <Layers className="mr-2 h-4 w-4" />
+              Explore Tech Trees
+            </Link>
+          </Button>
+          <Button
+            onClick={() => setIsCreateOpen(true)}
+            className="bg-international-orange hover:bg-international-orange/90"
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            New Blueprint
+          </Button>
+        </div>
       </div>
 
       {/* HERO: Visual Technology Tree Preview - Always Visible */}
@@ -483,6 +491,7 @@ export function BlueprintsView({ blueprints, templates }: BlueprintsViewProps) {
             title="Knowledge Tree"
             description="Drill into any domain to see branching areas of knowledge. See what you know and what you need to learn."
             color="blue"
+            href="/blueprints/explore"
           />
           <MagicCard
             icon={Users}
@@ -666,11 +675,13 @@ function MagicCard({
   title,
   description,
   color,
+  href,
 }: {
   icon: React.ElementType
   title: string
   description: string
   color: 'blue' | 'purple' | 'emerald' | 'orange'
+  href?: string
 }) {
   const colorMap = {
     blue: 'bg-blue-50 text-blue-600 border-blue-100',
@@ -679,17 +690,28 @@ function MagicCard({
     orange: 'bg-orange-50 text-international-orange border-orange-100',
   }
 
-  return (
-    <div className="flex gap-4 p-5 rounded-xl border bg-card hover:shadow-md transition-shadow">
+  const content = (
+    <div className="flex gap-4 p-5 rounded-xl border bg-card hover:shadow-md transition-shadow cursor-pointer">
       <div className={`flex-shrink-0 h-12 w-12 rounded-lg flex items-center justify-center ${colorMap[color]}`}>
         <Icon className="h-6 w-6" />
       </div>
-      <div>
+      <div className="flex-1">
         <h4 className="font-semibold text-foreground mb-1">{title}</h4>
         <p className="text-sm text-muted-foreground leading-relaxed">{description}</p>
+        {href && (
+          <span className="text-xs text-electric-blue mt-2 inline-flex items-center gap-1">
+            Explore <ArrowRight className="h-3 w-3" />
+          </span>
+        )}
       </div>
     </div>
   )
+
+  if (href) {
+    return <Link href={href}>{content}</Link>
+  }
+
+  return content
 }
 
 // Template card for "Available Templates" section

@@ -10,10 +10,10 @@ CentaurOS is a platform for collaboration between humans and AI agents. The desi
 ## Core Principles
 
 ### 1. Light-First Design
-- **Default to light backgrounds** (foundry-50, foundry-100, white)
-- Use dark text on light backgrounds for primary content
+- **Default to light backgrounds** using semantic tokens (`bg-background`, `bg-muted`, `bg-card`)
+- Use dark text on light backgrounds (`text-foreground`, `text-muted-foreground`)
 - Dark mode should be an **opt-in alternative**, not the default aesthetic
-- Avoid heavy grays (foundry-800, foundry-900) as primary backgrounds
+- Avoid heavy grays as primary backgrounds - use semantic tokens instead
 
 ### 2. Bright Color Palette
 - **International Orange** (#ff4500): Primary brand color, use for CTAs and highlights
@@ -73,21 +73,21 @@ If the UI appears dark (dark dialogs, dark cards, dark backgrounds), check that:
 - Use `defaultTheme="system"` or `enableSystem` in ThemeProvider
 
 ✅ **DO:**
-- Start with light backgrounds (foundry-50, white)
-- Use vibrant brand colors (international-orange, electric-blue)
+- Start with light backgrounds using semantic tokens (`bg-background`, `bg-muted`)
+- Use vibrant brand colors (`bg-international-orange`, `text-electric-blue`)
 - Create spacious, easy-to-scan layouts
-- Embrace brightness and color
+- Use semantic text colors (`text-foreground`, `text-muted-foreground`)
 - Design for optimism and human-AI collaboration
 
 ## Example Patterns
 
 ### Card Component (Good)
 ```tsx
-<Card className="bg-white border-foundry-200 p-8 space-y-6">
-  <h2 className="text-2xl font-display text-foundry-900">
+<Card className="bg-background border p-8 space-y-6">
+  <h2 className="text-2xl font-display text-foreground">
     Welcome to CentaurOS
   </h2>
-  <p className="text-foundry-600 text-lg leading-relaxed">
+  <p className="text-muted-foreground text-lg leading-relaxed">
     Collaborate with AI agents to accomplish amazing things.
   </p>
 </Card>
@@ -95,9 +95,9 @@ If the UI appears dark (dark dialogs, dark cards, dark backgrounds), check that:
 
 ### Card Component (Bad - Too Dark)
 ```tsx
-{/* ❌ Don't do this */}
-<Card className="bg-foundry-800 border-foundry-700 p-4 space-y-2">
-  <h2 className="text-lg text-foundry-100">...</h2>
+{/* ❌ Don't do this - hardcoded dark colors */}
+<Card className="bg-slate-800 border-slate-700 p-4 space-y-2">
+  <h2 className="text-lg text-slate-100">...</h2>
 </Card>
 ```
 
@@ -129,4 +129,8 @@ When in doubt, ask yourself:
 - **Is there enough whitespace?**
 - **Would this inspire collaboration?**
 
-If the answer to any is "no," lighten it up! 🌟
+If the answer to any is "no," lighten it up!
+
+## Color Token Reference
+
+**IMPORTANT:** For all color usage, refer to `.cursor/rules/color-consistency.mdc` which is the single source of truth for semantic color tokens. Never use hardcoded colors like `text-slate-*`, `bg-white`, or `text-red-*`.

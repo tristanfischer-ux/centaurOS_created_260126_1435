@@ -27,18 +27,37 @@ Feature Implementation Progress:
 - [ ] 4. Implement service layer logic
 - [ ] 5. Create server actions
 - [ ] 6. Build UI components
-- [ ] 7. UI Standards compliance check ← NEW
+- [ ] 7. Design token compliance check ← MANDATORY
 - [ ] 8. Add to appropriate route
 - [ ] 9. Test functionality
 ```
 
-### Step 7: UI Standards Compliance
+### Step 7: Design Token Compliance (MANDATORY)
 
-**IMPORTANT:** Before committing UI code, verify:
+**STOP. Before proceeding to Step 8, you MUST run:**
+
+```bash
+./scripts/check-design-tokens.sh
+```
+
+If this script fails, fix ALL violations before committing. This is not optional.
+
+**Common violations and fixes:**
+
+| Violation | Fix |
+|-----------|-----|
+| `text-slate-*` or `text-gray-*` | Use `text-foreground` or `text-muted-foreground` |
+| `text-red-*` | Use `text-destructive` |
+| `text-green-*` or `text-emerald-*` | Use `text-status-success` |
+| `text-amber-*` | Use `text-status-warning` |
+| `text-blue-*` | Use `text-status-info` |
+| `bg-white` | Use `bg-background` |
+| `bg-slate-*` | Use `bg-muted` or `bg-secondary` |
+| `dark:*` variants | Remove entirely (light mode only) |
+
+**Additional UI checklist:**
 
 ```
-UI Compliance Checklist:
-- [ ] No hardcoded status colors (text-red/green/amber/blue-*)
 - [ ] Forms have proper ARIA attributes (aria-required, aria-invalid, aria-describedby)
 - [ ] Error messages use text-destructive and role="alert"
 - [ ] Dialogs use size prop (not custom max-w-[])
@@ -47,7 +66,8 @@ UI Compliance Checklist:
 - [ ] Cards use Card component (not custom divs)
 ```
 
-See the **ui-component-standards** skill for complete reference.
+See `.cursor/rules/color-consistency.mdc` for complete token mappings.
+See the **ui-component-standards** skill for accessibility patterns.
 
 ## Step-by-Step Workflow
 

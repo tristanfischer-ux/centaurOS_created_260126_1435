@@ -23,6 +23,36 @@ alwaysApply: true
 <span className="text-red-500">  // Wrong
 ```
 
+## FORBIDDEN PATTERNS
+
+**CRITICAL: These patterns must NEVER appear in new code.** Run `./scripts/check-design-tokens.sh` before committing.
+
+| Pattern | Violation | Use Instead |
+|---------|-----------|-------------|
+| `text-slate-[0-9]` | Hardcoded gray text | `text-foreground` or `text-muted-foreground` |
+| `text-gray-[0-9]` | Hardcoded gray text | `text-foreground` or `text-muted-foreground` |
+| `text-red-[0-9]` | Hardcoded error color | `text-destructive` |
+| `text-green-[0-9]` | Hardcoded success color | `text-status-success` |
+| `text-emerald-[0-9]` | Hardcoded success color | `text-status-success` |
+| `text-amber-[0-9]` | Hardcoded warning color | `text-status-warning` |
+| `text-blue-[0-9]` | Hardcoded info color | `text-status-info` |
+| `bg-white` (not `bg-white/`) | Hardcoded white | `bg-background` |
+| `bg-slate-[0-9]` | Hardcoded gray bg | `bg-muted` or `bg-secondary` |
+| `bg-red-[0-9]` | Hardcoded error bg | `bg-status-error-light` or `bg-destructive` |
+| `bg-green-[0-9]` | Hardcoded success bg | `bg-status-success-light` |
+| `bg-emerald-[0-9]` | Hardcoded success bg | `bg-status-success-light` |
+| `bg-amber-[0-9]` | Hardcoded warning bg | `bg-status-warning-light` |
+| `bg-blue-[0-9]` | Hardcoded info bg | `bg-status-info-light` |
+| `dark:` | Dead code (light mode only) | Remove entirely |
+| `defaultTheme.*system` | Wrong theme config | `defaultTheme="light"` |
+| `enableSystem.*true` | Wrong theme config | `enableSystem={false}` |
+
+**Exceptions:**
+- `bg-white/[opacity]` (e.g., `bg-white/90`) for overlays is allowed
+- `border-slate-100` for ultra-light dividers in page headers
+- Star ratings can use `text-amber-400` / `fill-amber-400`
+- SVG fill colors in visual diagrams
+
 ## 1. Text Colors
 
 | Use Case | Token | Example |
@@ -266,13 +296,20 @@ chart-1, chart-2, chart-3, chart-4, chart-5, chart-6
 
 ## Quick Checklist
 
-Before committing any component with colors:
+**Before committing any component with colors, run:**
+
+```bash
+./scripts/check-design-tokens.sh
+```
+
+Manual verification:
 
 - [ ] No hardcoded text colors (`text-slate-*`, `text-gray-*`, etc.)
 - [ ] No hardcoded background colors (`bg-slate-*`, `bg-white`, etc.)
+- [ ] No hardcoded status colors (`text-red-*`, `bg-green-*`, etc.)
+- [ ] No `dark:` variants (app enforces light mode)
 - [ ] Status indicators use `StatusBadge` or semantic status tokens
 - [ ] User avatars use `UserAvatar` component
 - [ ] Cards use `border` without color class
 - [ ] Errors use `text-destructive` and `border-destructive`
 - [ ] Brand colors used sparingly (CTAs, highlights only)
-- [ ] Dark mode will work automatically (no manual dark: variants)

@@ -7,84 +7,30 @@ description: Standards for UI components including semantic color tokens, access
 
 This skill ensures consistent, accessible UI components in CentaurOS. **ALWAYS consult this before writing UI code.**
 
-## Quick Reference: Color Token Mapping
+## Color Token Reference
 
-### 🚨 CRITICAL: Never Use Hardcoded Status Colors
+**IMPORTANT:** For all color usage, see `.cursor/rules/color-consistency.mdc` which is the single source of truth.
 
-| ❌ DON'T USE | ✅ USE INSTEAD | Purpose |
-|--------------|----------------|---------|
-| `text-red-*` | `text-destructive` | Errors, danger |
-| `text-green-*` | `text-status-success` | Success states |
-| `text-amber-*` | `text-status-warning` | Warnings |
-| `text-blue-*` | `text-status-info` | Information |
-| `bg-red-*` | `bg-status-error-light` | Error backgrounds |
-| `bg-green-*` | `bg-status-success-light` | Success backgrounds |
-| `bg-amber-*` | `bg-status-warning-light` | Warning backgrounds |
-| `bg-blue-*` | `bg-status-info-light` | Info backgrounds |
-| `border-red-*` | `border-destructive` | Error borders |
-| `border-green-*` | `border-status-success` | Success borders |
-| `border-amber-*` | `border-status-warning` | Warning borders |
+**Before committing UI code, run:**
 
-### Text Colors
-
-| ❌ DON'T USE | ✅ USE INSTEAD | Purpose |
-|--------------|----------------|---------|
-| `text-slate-900` | `text-foreground` | Primary text |
-| `text-slate-600/500/400` | `text-muted-foreground` | Secondary text |
-| `text-gray-*` | `text-muted-foreground` | Secondary text |
-| `text-white` (on dark) | `text-*-foreground` | Text on colored bg |
-
-### Background Colors
-
-| ❌ DON'T USE | ✅ USE INSTEAD | Purpose |
-|--------------|----------------|---------|
-| `bg-white` | `bg-background` | Page background |
-| `bg-slate-50` | `bg-muted` | Secondary surface |
-| `bg-slate-100` | `bg-secondary` | Subtle backgrounds |
-
-### Extended Status Tokens
-
-```tsx
-// Success variations
-text-status-success       // Icon/text color
-text-status-success-dark  // Darker text (on light bg)
-bg-status-success         // Solid background
-bg-status-success-light   // Light background
-border-status-success     // Border color
-
-// Warning variations
-text-status-warning
-text-status-warning-dark
-bg-status-warning
-bg-status-warning-light
-border-status-warning
-
-// Error variations (use destructive)
-text-destructive
-bg-destructive
-bg-status-error-light
-border-destructive
-
-// Info variations
-text-status-info
-text-status-info-dark
-bg-status-info
-bg-status-info-light
-border-status-info
+```bash
+./scripts/check-design-tokens.sh
 ```
 
-### Brand Colors (Use Sparingly)
+### Quick Summary (See color-consistency.mdc for full details)
 
-```tsx
-// Primary CTA and active states
-bg-international-orange
-text-international-orange
-hover:bg-international-orange-hover
+| Pattern | Semantic Token |
+|---------|----------------|
+| Gray text | `text-foreground` or `text-muted-foreground` |
+| Error/danger | `text-destructive`, `bg-status-error-light` |
+| Success | `text-status-success`, `bg-status-success-light` |
+| Warning | `text-status-warning`, `bg-status-warning-light` |
+| Info | `text-status-info`, `bg-status-info-light` |
+| Page background | `bg-background` |
+| Card/muted surface | `bg-muted`, `bg-card` |
+| Borders | `border` (no color class), `border-destructive` for errors |
 
-// Secondary accent
-text-electric-blue
-bg-electric-blue
-```
+**NEVER use:** `text-slate-*`, `text-gray-*`, `text-red-*`, `bg-white`, `bg-slate-*`, `dark:*` variants
 
 ---
 
@@ -595,13 +541,15 @@ Provide text alternatives for visual-only information.
 
 ## Pre-Commit Checklist
 
-Before committing any UI code:
+**Before committing any UI code, run:**
 
-### Colors
-- [ ] No `text-red-*`, `text-green-*`, `text-amber-*`, `text-blue-*` for status
-- [ ] No `bg-red-*`, `bg-green-*`, `bg-amber-*`, `bg-blue-*` for status
-- [ ] No `text-slate-*` or `text-gray-*` (use semantic tokens)
-- [ ] No `bg-white` (use `bg-background`)
+```bash
+./scripts/check-design-tokens.sh
+```
+
+This automatically checks for color violations. If it fails, fix all issues before committing.
+
+### Manual Verification
 
 ### Forms
 - [ ] All Labels have `htmlFor` matching Input `id`
@@ -633,30 +581,23 @@ Before committing any UI code:
 
 ## Quick Migration Commands
 
-If you find hardcoded colors in existing code, use these replacements:
+If you find hardcoded colors in existing code, see `.cursor/rules/color-consistency.mdc` for the complete migration strategy.
 
-```bash
-# Text colors
-text-red-500 → text-destructive
-text-red-600 → text-destructive
-text-green-500 → text-status-success
-text-green-600 → text-status-success
-text-amber-500 → text-status-warning
-text-amber-600 → text-status-warning
-text-blue-500 → text-status-info
-text-blue-600 → text-status-info
+**Quick reference:**
 
-# Background colors
-bg-red-100 → bg-status-error-light
-bg-green-100 → bg-status-success-light
-bg-amber-100 → bg-status-warning-light
-bg-blue-100 → bg-status-info-light
-
-# Border colors
-border-red-500 → border-destructive
-border-green-500 → border-status-success
-border-amber-500 → border-status-warning
-```
+| Hardcoded | Semantic Token |
+|-----------|----------------|
+| `text-slate-900` | `text-foreground` |
+| `text-slate-600/500/400` | `text-muted-foreground` |
+| `text-red-*` | `text-destructive` |
+| `text-green-*` | `text-status-success` |
+| `text-amber-*` | `text-status-warning` |
+| `text-blue-*` | `text-status-info` |
+| `bg-white` | `bg-background` |
+| `bg-slate-*` | `bg-muted` or `bg-secondary` |
+| `bg-red-*` | `bg-status-error-light` |
+| `bg-green-*` | `bg-status-success-light` |
+| `dark:*` | Remove entirely |
 
 ---
 
@@ -777,8 +718,15 @@ Use this skill when:
 
 ### Related Cursor Rules
 
-- `.cursor/rules/color-consistency.mdc` - Color token enforcement rules
+- `.cursor/rules/color-consistency.mdc` - **SINGLE SOURCE OF TRUTH** for all color token mappings
+- `.cursor/rules/design-philosophy.mdc` - Core design principles (bright, airy, optimistic)
 - `.cursor/rules/form-consistency.mdc` - Form field patterns and validation
 - `.cursor/rules/component-patterns.mdc` - Component usage standards
 - `.cursor/rules/navigation-consistency.mdc` - Navigation active states and styling
-- `.cursor/rules/dialog-standards.mdc` - Dialog and modal background standards (MUST be solid)
+
+### Enforcement Script
+
+```bash
+# Run before committing UI code
+./scripts/check-design-tokens.sh
+```
