@@ -28,10 +28,13 @@ import type {
   AssessmentQuestion,
   AssessmentAnswer,
   DomainCategory,
+  DomainCriticality,
   DomainFamiliarity,
   FamiliarityLevel,
   SetDomainFamiliarityInput,
   ExpertReviewPacket,
+  ProjectStage,
+  ProjectType,
 } from '@/types/blueprints'
 
 // ============================================================================
@@ -1235,7 +1238,9 @@ export async function getDomainFamiliarity(domainId: string): Promise<{
     return { data: null, error: 'No foundry context' }
   }
 
-  const { data, error } = await supabase
+  // domain_familiarity table exists but types need regeneration
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (supabase as any)
     .from('domain_familiarity')
     .select(`
       *,
@@ -1279,7 +1284,9 @@ export async function getFoundryFamiliarities(templateId: string): Promise<{
 
   const domainIds = domains.map(d => d.id)
 
-  const { data, error } = await supabase
+  // domain_familiarity table exists but types need regeneration
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (supabase as any)
     .from('domain_familiarity')
     .select(`
       *,
@@ -1295,7 +1302,7 @@ export async function getFoundryFamiliarities(templateId: string): Promise<{
 
   // Create a map of domain_id to familiarity
   const familiarityMap = new Map<string, DomainFamiliarity>()
-  for (const item of data || []) {
+  for (const item of (data || []) as Array<{ domain_id: string }>) {
     familiarityMap.set(item.domain_id, item as DomainFamiliarity)
   }
 
@@ -1322,7 +1329,9 @@ export async function setDomainFamiliarity(input: SetDomainFamiliarityInput): Pr
   }
 
   // Use the RPC function for atomic upsert
-  const { data, error } = await supabase
+  // upsert_domain_familiarity RPC exists but types need regeneration
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (supabase as any)
     .rpc('upsert_domain_familiarity', {
       p_domain_id: input.domain_id,
       p_foundry_id: input.foundry_id,
@@ -1336,7 +1345,7 @@ export async function setDomainFamiliarity(input: SetDomainFamiliarityInput): Pr
   }
 
   revalidatePath('/blueprints')
-  return { data: data as DomainFamiliarity, error: null }
+  return { data: data as unknown as DomainFamiliarity, error: null }
 }
 
 /**
@@ -1430,8 +1439,8 @@ export async function generateExpertReviewPacket(
     if (blueprint) {
       projectContext = {
         blueprint_name: blueprint.name,
-        project_stage: blueprint.project_stage,
-        project_type: blueprint.project_type,
+        project_stage: blueprint.project_stage as ProjectStage | null,
+        project_type: blueprint.project_type as ProjectType | null,
       }
     }
   }
@@ -1476,10 +1485,10 @@ export async function generateExpertReviewPacket(
       name: domain.name,
       path,
       category: domain.category as DomainCategory | null,
-      criticality: domain.criticality,
+      criticality: domain.criticality as DomainCriticality | null,
     },
     team_familiarity: familiarity?.familiarity || 'unknown',
-    primer_overview: domain.primer?.overview || domain.description || null,
+    primer_overview: (domain as { primer?: { overview?: string } }).primer?.overview || domain.description || null,
     unanswered_questions: keyQuestions,
     project_context: projectContext,
     requested_by: {

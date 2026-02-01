@@ -39,11 +39,12 @@ function getAITypeIcon(subcategory: string) {
 }
 
 export function MarketplacePreviewCard({ listing, onJoinClick }: MarketplacePreviewCardProps) {
+    // Badge styles matching the category color scheme
     const categoryBadgeStyles: Record<string, string> = {
-        'People': 'bg-stone-100 text-stone-700',
-        'Products': 'bg-muted text-foreground',
-        'Services': 'bg-blue-50 text-blue-700',
-        'AI': 'bg-violet-50 text-violet-700'
+        'People': 'bg-orange-100 text-orange-700',      // Orange - warm, human
+        'Products': 'bg-slate-100 text-slate-700',      // Slate - industrial
+        'Services': 'bg-blue-100 text-blue-700',        // Blue - tech, digital
+        'AI': 'bg-violet-50 text-violet-700'            // Violet - AI distinction
     }
 
     const attrs = listing.attributes || {}

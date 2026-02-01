@@ -38,11 +38,12 @@ interface ListingDetailDrawerProps {
     listing: MarketplaceListing | null
 }
 
+// Badge styles matching the category color scheme
 const categoryBadgeStyles = {
-    'People': 'bg-stone-100 text-stone-700',
-    'Products': 'bg-muted text-foreground',
-    'Services': 'bg-status-info-light text-status-info-dark',
-    'AI': 'bg-violet-50 text-violet-700'
+    'People': 'bg-orange-100 text-orange-700',      // Orange - warm, human
+    'Products': 'bg-slate-100 text-slate-700',      // Slate - industrial
+    'Services': 'bg-blue-100 text-blue-700',        // Blue - tech, digital
+    'AI': 'bg-violet-50 text-violet-700'            // Violet - AI distinction
 }
 
 export function ListingDetailDrawer({ open, onOpenChange, listing }: ListingDetailDrawerProps) {
@@ -237,7 +238,7 @@ function PeopleSection({ attrs }: { attrs: Record<string, any> }) {
                     </h4>
                     <div className="flex flex-wrap gap-2">
                         {(attrs.skills || attrs.expertise || []).map((skill: string, i: number) => (
-                            <span key={i} className="text-xs px-2.5 py-1 rounded-full bg-stone-100 text-stone-700">
+                            <span key={i} className="text-xs px-2.5 py-1 rounded-full bg-orange-50 text-orange-700">
                                 {skill}
                             </span>
                         ))}

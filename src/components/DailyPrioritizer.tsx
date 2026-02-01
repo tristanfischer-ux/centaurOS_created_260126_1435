@@ -119,9 +119,10 @@ function prioritizeTasks(tasks: Task[], maxTasks: number): PrioritizedTask[] {
 interface DailyPrioritizerProps {
     tasks: Task[]
     maxTasks?: number
+    compact?: boolean
 }
 
-export function DailyPrioritizer({ tasks, maxTasks = 5 }: DailyPrioritizerProps) {
+export function DailyPrioritizer({ tasks, maxTasks = 5, compact = false }: DailyPrioritizerProps) {
     const prioritizedTasks = prioritizeTasks(tasks, maxTasks)
 
     if (prioritizedTasks.length === 0) {
@@ -133,19 +134,21 @@ export function DailyPrioritizer({ tasks, maxTasks = 5 }: DailyPrioritizerProps)
     }
 
     return (
-        <div className="space-y-3">
+        <div className={cn("space-y-3", compact && "space-y-2")}>
             {prioritizedTasks.map((task, index) => (
                 <Link key={task.id} href="/tasks" className="block">
                     <div className={cn(
-                        "p-3 rounded-lg border transition-all group hover:shadow-sm",
+                        "rounded-lg border transition-all group hover:shadow-sm",
+                        compact ? "p-2" : "p-3",
                         index === 0 
                             ? "bg-international-orange/5 border-international-orange/30 hover:border-international-orange/50" 
                             : "bg-foundry-50/50 border hover:border-foundry-300"
                     )}>
                         {/* Priority rank indicator */}
-                        <div className="flex items-start gap-3">
+                        <div className={cn("flex items-start", compact ? "gap-2" : "gap-3")}>
                             <div className={cn(
-                                "flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold",
+                                "flex-shrink-0 rounded-full flex items-center justify-center font-bold",
+                                compact ? "w-5 h-5 text-[10px]" : "w-6 h-6 text-xs",
                                 index === 0 
                                     ? "bg-international-orange text-white" 
                                     : index === 1 
@@ -158,14 +161,15 @@ export function DailyPrioritizer({ tasks, maxTasks = 5 }: DailyPrioritizerProps)
                             <div className="flex-1 min-w-0">
                                 {/* Task title */}
                                 <p className={cn(
-                                    "text-sm font-medium line-clamp-2 group-hover:underline decoration-foundry-300 underline-offset-2",
+                                    "font-medium group-hover:underline decoration-foundry-300 underline-offset-2",
+                                    compact ? "text-xs line-clamp-1" : "text-sm line-clamp-2",
                                     index === 0 ? "text-international-orange-dark" : "text-foreground"
                                 )}>
                                     {task.title}
                                 </p>
 
-                                {/* Objective */}
-                                {task.objective?.title && (
+                                {/* Objective - hide in compact mode */}
+                                {!compact && task.objective?.title && (
                                     <p className="text-xs text-muted-foreground mt-1 flex items-center">
                                         <Target className="h-3 w-3 mr-1 text-foundry-400" />
                                         {task.objective.title}
@@ -174,8 +178,8 @@ export function DailyPrioritizer({ tasks, maxTasks = 5 }: DailyPrioritizerProps)
 
                                 {/* Priority reasons */}
                                 {task.reasons.length > 0 && (
-                                    <div className="flex flex-wrap gap-1.5 mt-2">
-                                        {task.reasons.map((reason, i) => {
+                                    <div className={cn("flex flex-wrap gap-1", compact ? "mt-1" : "gap-1.5 mt-2")}>
+                                        {task.reasons.slice(0, compact ? 1 : undefined).map((reason, i) => {
                                             const isOverdue = reason.startsWith('OVERDUE')
                                             const isDueToday = reason === 'Due today'
                                             const isDueTomorrow = reason === 'Due tomorrow'
@@ -187,7 +191,8 @@ export function DailyPrioritizer({ tasks, maxTasks = 5 }: DailyPrioritizerProps)
                                                     key={i}
                                                     variant="secondary"
                                                     className={cn(
-                                                        "text-[10px] font-medium px-1.5 py-0",
+                                                        "font-medium py-0",
+                                                        compact ? "text-[9px] px-1" : "text-[10px] px-1.5",
                                                         isOverdue 
                                                             ? "bg-status-error-light text-destructive border-destructive" 
                                                             : isDueToday
@@ -201,9 +206,9 @@ export function DailyPrioritizer({ tasks, maxTasks = 5 }: DailyPrioritizerProps)
                                                                             : "bg-foundry-100 text-foundry-600 border"
                                                     )}
                                                 >
-                                                    {isOverdue && <AlertTriangle className="h-2.5 w-2.5 mr-0.5" />}
-                                                    {(isDueToday || isDueTomorrow) && <Clock className="h-2.5 w-2.5 mr-0.5" />}
-                                                    {isStale && <RefreshCw className="h-2.5 w-2.5 mr-0.5" />}
+                                                    {!compact && isOverdue && <AlertTriangle className="h-2.5 w-2.5 mr-0.5" />}
+                                                    {!compact && (isDueToday || isDueTomorrow) && <Clock className="h-2.5 w-2.5 mr-0.5" />}
+                                                    {!compact && isStale && <RefreshCw className="h-2.5 w-2.5 mr-0.5" />}
                                                     {reason}
                                                 </Badge>
                                             )
@@ -219,7 +224,10 @@ export function DailyPrioritizer({ tasks, maxTasks = 5 }: DailyPrioritizerProps)
             {/* Show more hint if there are more tasks */}
             {tasks.length > maxTasks && (
                 <Link href="/tasks" className="block">
-                    <p className="text-xs text-center text-foundry-400 hover:text-foundry-600 py-2">
+                    <p className={cn(
+                        "text-center text-foundry-400 hover:text-foundry-600",
+                        compact ? "text-[10px] py-1" : "text-xs py-2"
+                    )}>
                         +{tasks.length - maxTasks} more tasks
                     </p>
                 </Link>

@@ -380,18 +380,22 @@ export function MarketplaceView({
     }, [])
 
     // Category definitions for the hero cards
+    // Color scheme rationale:
+    // - People: International Orange (primary brand, warm, human)
+    // - Products: Slate (industrial, manufacturing, physical)
+    // - Services: Electric Blue (secondary brand, tech, digital)
     const categoryCards = [
         {
             id: 'People',
             title: 'People',
             icon: UserCircle,
-            color: 'bg-blue-500',
-            hoverColor: 'hover:border-blue-400 hover:bg-blue-50',
-            lightColor: 'bg-blue-50',
-            borderColor: 'border-blue-500',
-            textColor: 'text-blue-600',
-            iconBg: 'bg-blue-100',
-            buttonBg: 'bg-blue-500 hover:bg-blue-600',
+            color: 'bg-orange-500',
+            hoverColor: 'hover:border-orange-400 hover:bg-orange-50',
+            lightColor: 'bg-orange-50',
+            borderColor: 'border-orange-500',
+            textColor: 'text-orange-600',
+            iconBg: 'bg-orange-100',
+            buttonBg: 'bg-orange-500 hover:bg-orange-600',
             categories: ['People'],
             headline: 'Expert Talent On-Demand',
             description: 'Access fractional executives, specialists, and apprentices who bring deep expertise without full-time commitment. From CTOs to CAD specialists, find the exact skills you need.',
@@ -406,13 +410,13 @@ export function MarketplaceView({
             id: 'Products',
             title: 'Physical Products',
             icon: Package,
-            color: 'bg-orange-500',
-            hoverColor: 'hover:border-orange-400 hover:bg-orange-50',
-            lightColor: 'bg-orange-50',
-            borderColor: 'border-orange-500',
-            textColor: 'text-orange-600',
-            iconBg: 'bg-orange-100',
-            buttonBg: 'bg-orange-500 hover:bg-orange-600',
+            color: 'bg-slate-500',
+            hoverColor: 'hover:border-slate-400 hover:bg-slate-50',
+            lightColor: 'bg-slate-50',
+            borderColor: 'border-slate-500',
+            textColor: 'text-slate-600',
+            iconBg: 'bg-slate-100',
+            buttonBg: 'bg-slate-500 hover:bg-slate-600',
             categories: ['Products'],
             headline: 'Manufacturing Partners',
             description: 'Connect with certified manufacturers and suppliers for physical products. From precision engineering to rapid prototyping, source quality components and finished goods.',
@@ -427,13 +431,13 @@ export function MarketplaceView({
             id: 'Services',
             title: 'Services',
             icon: Wrench,
-            color: 'bg-emerald-500',
-            hoverColor: 'hover:border-emerald-400 hover:bg-emerald-50',
-            lightColor: 'bg-emerald-50',
-            borderColor: 'border-emerald-500',
-            textColor: 'text-emerald-600',
-            iconBg: 'bg-emerald-100',
-            buttonBg: 'bg-emerald-500 hover:bg-emerald-600',
+            color: 'bg-blue-500',
+            hoverColor: 'hover:border-blue-400 hover:bg-blue-50',
+            lightColor: 'bg-blue-50',
+            borderColor: 'border-blue-500',
+            textColor: 'text-blue-600',
+            iconBg: 'bg-blue-100',
+            buttonBg: 'bg-blue-500 hover:bg-blue-600',
             categories: ['Services', 'AI'],
             headline: 'Professional Services & AI Tools',
             description: 'From consulting and legal services to cutting-edge AI tools, access the services that accelerate your business. Includes AI agents, automation tools, and software solutions.',
@@ -682,29 +686,29 @@ export function MarketplaceView({
 
             {/* Hero Category Cards - Rich detail about each category */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                {/* People Card */}
+                {/* People Card - International Orange (warm, human) */}
                 <div 
                     onClick={() => handleCategoryClick('People')}
                     className={cn(
                         "group cursor-pointer transition-all duration-200 overflow-hidden rounded-xl border-2 bg-background",
                         activeTab === 'People'
-                            ? "border-blue-500 shadow-lg bg-blue-50"
-                            : "border-border shadow-sm hover:border-blue-400 hover:bg-blue-50 hover:shadow-lg hover:-translate-y-1"
+                            ? "border-orange-500 shadow-lg bg-orange-50"
+                            : "border-border shadow-sm hover:border-orange-400 hover:bg-orange-50 hover:shadow-lg hover:-translate-y-1"
                     )}
                 >
-                    <div className="h-2 bg-blue-500" />
+                    <div className="h-2 bg-orange-500" />
                     <div className="p-5 space-y-4">
                         <div className="flex items-start justify-between">
                             <div className={cn(
                                 "w-12 h-12 rounded-xl flex items-center justify-center transition-all duration-200",
-                                activeTab === 'People' ? "bg-blue-100" : "bg-muted group-hover:bg-blue-100 group-hover:scale-110"
+                                activeTab === 'People' ? "bg-orange-100" : "bg-muted group-hover:bg-orange-100 group-hover:scale-110"
                             )}>
                                 <UserCircle className={cn(
                                     "w-6 h-6 transition-colors duration-200",
-                                    activeTab === 'People' ? "text-blue-600" : "text-muted-foreground group-hover:text-blue-600"
+                                    activeTab === 'People' ? "text-orange-600" : "text-muted-foreground group-hover:text-orange-600"
                                 )} />
                             </div>
-                            <Badge variant="secondary" className={cn("text-xs font-semibold", activeTab === 'People' && "bg-blue-100 text-blue-600")}>
+                            <Badge variant="secondary" className={cn("text-xs font-semibold", activeTab === 'People' && "bg-orange-100 text-orange-600")}>
                                 {getCategoryCount('People')} available
                             </Badge>
                         </div>
@@ -712,7 +716,7 @@ export function MarketplaceView({
                             <h3 className="text-lg font-bold text-foreground mb-1">People</h3>
                             <p className={cn(
                                 "text-sm font-semibold transition-colors",
-                                activeTab === 'People' ? "text-blue-600" : "text-muted-foreground group-hover:text-blue-600"
+                                activeTab === 'People' ? "text-orange-600" : "text-muted-foreground group-hover:text-orange-600"
                             )}>
                                 Expert Talent On-Demand
                             </p>
@@ -723,7 +727,7 @@ export function MarketplaceView({
                         <ul className="space-y-2">
                             {['Fractional executives with 15+ years experience', 'Verified credentials and track records', 'Flexible engagement: hourly, daily, or retainer', 'Pre-vetted for quality and reliability'].map((benefit, idx) => (
                                 <li key={idx} className="flex items-start gap-2 text-sm">
-                                    <CheckCircle2 className={cn("w-4 h-4 mt-0.5 shrink-0", activeTab === 'People' ? "text-blue-600" : "text-emerald-500")} />
+                                    <CheckCircle2 className={cn("w-4 h-4 mt-0.5 shrink-0", activeTab === 'People' ? "text-orange-600" : "text-status-success")} />
                                     <span className="text-muted-foreground">{benefit}</span>
                                 </li>
                             ))}
@@ -731,8 +735,8 @@ export function MarketplaceView({
                         <button className={cn(
                             "w-full flex items-center justify-between px-4 py-2.5 rounded-lg font-medium text-sm transition-all duration-200",
                             activeTab === 'People'
-                                ? "bg-blue-500 hover:bg-blue-600 text-white shadow-md"
-                                : "bg-muted text-muted-foreground group-hover:bg-blue-500 group-hover:text-white"
+                                ? "bg-orange-500 hover:bg-orange-600 text-white shadow-md"
+                                : "bg-muted text-muted-foreground group-hover:bg-orange-500 group-hover:text-white"
                         )}>
                             {activeTab === 'People' ? 'Browsing People' : 'Explore People'}
                             <ArrowRight className="w-4 h-4 transition-transform duration-200 group-hover:translate-x-1" />
@@ -740,29 +744,29 @@ export function MarketplaceView({
                     </div>
                 </div>
 
-                {/* Products Card */}
+                {/* Products Card - Slate (industrial, manufacturing) */}
                 <div 
                     onClick={() => handleCategoryClick('Products')}
                     className={cn(
                         "group cursor-pointer transition-all duration-200 overflow-hidden rounded-xl border-2 bg-background",
                         activeTab === 'Products'
-                            ? "border-orange-500 shadow-lg bg-orange-50"
-                            : "border-border shadow-sm hover:border-orange-400 hover:bg-orange-50 hover:shadow-lg hover:-translate-y-1"
+                            ? "border-slate-500 shadow-lg bg-slate-50"
+                            : "border-border shadow-sm hover:border-slate-400 hover:bg-slate-50 hover:shadow-lg hover:-translate-y-1"
                     )}
                 >
-                    <div className="h-2 bg-orange-500" />
+                    <div className="h-2 bg-slate-500" />
                     <div className="p-5 space-y-4">
                         <div className="flex items-start justify-between">
                             <div className={cn(
                                 "w-12 h-12 rounded-xl flex items-center justify-center transition-all duration-200",
-                                activeTab === 'Products' ? "bg-orange-100" : "bg-muted group-hover:bg-orange-100 group-hover:scale-110"
+                                activeTab === 'Products' ? "bg-slate-100" : "bg-muted group-hover:bg-slate-100 group-hover:scale-110"
                             )}>
                                 <Package className={cn(
                                     "w-6 h-6 transition-colors duration-200",
-                                    activeTab === 'Products' ? "text-orange-600" : "text-muted-foreground group-hover:text-orange-600"
+                                    activeTab === 'Products' ? "text-slate-600" : "text-muted-foreground group-hover:text-slate-600"
                                 )} />
                             </div>
-                            <Badge variant="secondary" className={cn("text-xs font-semibold", activeTab === 'Products' && "bg-orange-100 text-orange-600")}>
+                            <Badge variant="secondary" className={cn("text-xs font-semibold", activeTab === 'Products' && "bg-slate-100 text-slate-600")}>
                                 {getCategoryCount('Products')} available
                             </Badge>
                         </div>
@@ -770,7 +774,7 @@ export function MarketplaceView({
                             <h3 className="text-lg font-bold text-foreground mb-1">Physical Products</h3>
                             <p className={cn(
                                 "text-sm font-semibold transition-colors",
-                                activeTab === 'Products' ? "text-orange-600" : "text-muted-foreground group-hover:text-orange-600"
+                                activeTab === 'Products' ? "text-slate-600" : "text-muted-foreground group-hover:text-slate-600"
                             )}>
                                 Manufacturing Partners
                             </p>
@@ -781,7 +785,7 @@ export function MarketplaceView({
                         <ul className="space-y-2">
                             {['ISO-certified manufacturing facilities', 'Prototyping to full production scale', 'Quality assurance and compliance', 'Transparent lead times and pricing'].map((benefit, idx) => (
                                 <li key={idx} className="flex items-start gap-2 text-sm">
-                                    <CheckCircle2 className={cn("w-4 h-4 mt-0.5 shrink-0", activeTab === 'Products' ? "text-orange-600" : "text-emerald-500")} />
+                                    <CheckCircle2 className={cn("w-4 h-4 mt-0.5 shrink-0", activeTab === 'Products' ? "text-slate-600" : "text-status-success")} />
                                     <span className="text-muted-foreground">{benefit}</span>
                                 </li>
                             ))}
@@ -789,8 +793,8 @@ export function MarketplaceView({
                         <button className={cn(
                             "w-full flex items-center justify-between px-4 py-2.5 rounded-lg font-medium text-sm transition-all duration-200",
                             activeTab === 'Products'
-                                ? "bg-orange-500 hover:bg-orange-600 text-white shadow-md"
-                                : "bg-muted text-muted-foreground group-hover:bg-orange-500 group-hover:text-white"
+                                ? "bg-slate-500 hover:bg-slate-600 text-white shadow-md"
+                                : "bg-muted text-muted-foreground group-hover:bg-slate-500 group-hover:text-white"
                         )}>
                             {activeTab === 'Products' ? 'Browsing Products' : 'Explore Products'}
                             <ArrowRight className="w-4 h-4 transition-transform duration-200 group-hover:translate-x-1" />
@@ -798,29 +802,29 @@ export function MarketplaceView({
                     </div>
                 </div>
 
-                {/* Services Card */}
+                {/* Services Card - Electric Blue (tech, digital, professional) */}
                 <div 
                     onClick={() => handleCategoryClick('Services')}
                     className={cn(
                         "group cursor-pointer transition-all duration-200 overflow-hidden rounded-xl border-2 bg-background",
                         activeTab === 'Services'
-                            ? "border-emerald-500 shadow-lg bg-emerald-50"
-                            : "border-border shadow-sm hover:border-emerald-400 hover:bg-emerald-50 hover:shadow-lg hover:-translate-y-1"
+                            ? "border-blue-500 shadow-lg bg-blue-50"
+                            : "border-border shadow-sm hover:border-blue-400 hover:bg-blue-50 hover:shadow-lg hover:-translate-y-1"
                     )}
                 >
-                    <div className="h-2 bg-emerald-500" />
+                    <div className="h-2 bg-blue-500" />
                     <div className="p-5 space-y-4">
                         <div className="flex items-start justify-between">
                             <div className={cn(
                                 "w-12 h-12 rounded-xl flex items-center justify-center transition-all duration-200",
-                                activeTab === 'Services' ? "bg-emerald-100" : "bg-muted group-hover:bg-emerald-100 group-hover:scale-110"
+                                activeTab === 'Services' ? "bg-blue-100" : "bg-muted group-hover:bg-blue-100 group-hover:scale-110"
                             )}>
                                 <Wrench className={cn(
                                     "w-6 h-6 transition-colors duration-200",
-                                    activeTab === 'Services' ? "text-emerald-600" : "text-muted-foreground group-hover:text-emerald-600"
+                                    activeTab === 'Services' ? "text-blue-600" : "text-muted-foreground group-hover:text-blue-600"
                                 )} />
                             </div>
-                            <Badge variant="secondary" className={cn("text-xs font-semibold", activeTab === 'Services' && "bg-emerald-100 text-emerald-600")}>
+                            <Badge variant="secondary" className={cn("text-xs font-semibold", activeTab === 'Services' && "bg-blue-100 text-blue-600")}>
                                 {getCategoryCount('Services')} available
                             </Badge>
                         </div>
@@ -828,7 +832,7 @@ export function MarketplaceView({
                             <h3 className="text-lg font-bold text-foreground mb-1">Services</h3>
                             <p className={cn(
                                 "text-sm font-semibold transition-colors",
-                                activeTab === 'Services' ? "text-emerald-600" : "text-muted-foreground group-hover:text-emerald-600"
+                                activeTab === 'Services' ? "text-blue-600" : "text-muted-foreground group-hover:text-blue-600"
                             )}>
                                 Professional Services & AI Tools
                             </p>
@@ -839,7 +843,7 @@ export function MarketplaceView({
                         <ul className="space-y-2">
                             {['Business consulting and advisory', 'AI tools and automation platforms', 'Legal, finance, and HR services', 'Integration support and training'].map((benefit, idx) => (
                                 <li key={idx} className="flex items-start gap-2 text-sm">
-                                    <CheckCircle2 className={cn("w-4 h-4 mt-0.5 shrink-0", activeTab === 'Services' ? "text-emerald-600" : "text-emerald-500")} />
+                                    <CheckCircle2 className={cn("w-4 h-4 mt-0.5 shrink-0", activeTab === 'Services' ? "text-blue-600" : "text-status-success")} />
                                     <span className="text-muted-foreground">{benefit}</span>
                                 </li>
                             ))}
@@ -847,8 +851,8 @@ export function MarketplaceView({
                         <button className={cn(
                             "w-full flex items-center justify-between px-4 py-2.5 rounded-lg font-medium text-sm transition-all duration-200",
                             activeTab === 'Services'
-                                ? "bg-emerald-500 hover:bg-emerald-600 text-white shadow-md"
-                                : "bg-muted text-muted-foreground group-hover:bg-emerald-500 group-hover:text-white"
+                                ? "bg-blue-500 hover:bg-blue-600 text-white shadow-md"
+                                : "bg-muted text-muted-foreground group-hover:bg-blue-500 group-hover:text-white"
                         )}>
                             {activeTab === 'Services' ? 'Browsing Services' : 'Explore Services'}
                             <ArrowRight className="w-4 h-4 transition-transform duration-200 group-hover:translate-x-1" />

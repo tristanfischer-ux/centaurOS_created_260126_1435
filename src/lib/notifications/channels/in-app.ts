@@ -3,6 +3,7 @@
  * 
  * Creates notifications in the existing notifications table in Supabase.
  * Integrates with the existing notification system from src/actions/notifications.ts
+ * Also bridges notifications to Telegram for linked users.
  */
 
 import { createClient } from '@/lib/supabase/server'
@@ -12,6 +13,7 @@ import type { Json } from '@/types/database.types'
 /**
  * Create an in-app notification
  * Uses the notifications table via direct insert or RPC
+ * Also pushes to Telegram if user has it linked
  */
 export async function createInAppNotification(
     options: InAppNotificationOptions
@@ -20,10 +22,11 @@ export async function createInAppNotification(
 
     try {
         const supabase = await createClient()
+        let notificationId: string | undefined
 
         // Try using the create_notification RPC function first (if available)
         // This handles foundry_id automatically
-        const { data: notificationId, error: rpcError } = await supabase.rpc('create_notification', {
+        const { data: rpcNotificationId, error: rpcError } = await supabase.rpc('create_notification', {
             p_user_id: userId,
             p_type: type,
             p_title: title,
@@ -32,32 +35,39 @@ export async function createInAppNotification(
             p_metadata: metadata as Json | undefined
         })
 
-        if (!rpcError && notificationId) {
-            return { success: true }
+        if (!rpcError && rpcNotificationId) {
+            notificationId = rpcNotificationId as string
+        } else {
+            // Fallback to direct insert if RPC fails
+            if (rpcError) {
+                console.warn('RPC create_notification failed, using direct insert:', rpcError.message)
+            }
+
+            // Build insert data
+            const { data: inserted, error: insertError } = await supabase
+                .from('notifications')
+                .insert({
+                    user_id: userId,
+                    foundry_id: foundryId,
+                    type,
+                    title,
+                    message,
+                    link,
+                    is_read: false
+                })
+                .select('id')
+                .single()
+
+            if (insertError) {
+                console.error('Error creating in-app notification:', insertError)
+                return { success: false, error: insertError.message }
+            }
+
+            notificationId = inserted?.id
         }
 
-        // Fallback to direct insert if RPC fails
-        if (rpcError) {
-            console.warn('RPC create_notification failed, using direct insert:', rpcError.message)
-        }
-
-        // Build insert data
-        const { error: insertError } = await supabase
-            .from('notifications')
-            .insert({
-                user_id: userId,
-                foundry_id: foundryId,
-                type,
-                title,
-                message,
-                link,
-                is_read: false
-            })
-
-        if (insertError) {
-            console.error('Error creating in-app notification:', insertError)
-            return { success: false, error: insertError.message }
-        }
+        // Push to Telegram asynchronously (don't block on this)
+        pushToTelegramAsync(userId, notificationId, type, title, message, link)
 
         return { success: true }
 
@@ -67,6 +77,36 @@ export async function createInAppNotification(
             success: false, 
             error: err instanceof Error ? err.message : 'Failed to create notification' 
         }
+    }
+}
+
+/**
+ * Push notification to Telegram asynchronously
+ * This runs in the background and doesn't block the main notification creation
+ */
+async function pushToTelegramAsync(
+    userId: string,
+    notificationId: string | undefined,
+    type: string,
+    title: string,
+    message?: string,
+    link?: string
+) {
+    try {
+        // Dynamic import to avoid circular dependencies
+        const { pushNotificationToTelegram } = await import('@/lib/telegram/notification-bridge')
+        
+        await pushNotificationToTelegram({
+            id: notificationId,
+            user_id: userId,
+            type,
+            title,
+            message,
+            link,
+        })
+    } catch (error) {
+        // Log but don't fail - Telegram is optional
+        console.warn('Failed to push notification to Telegram:', error)
     }
 }
 

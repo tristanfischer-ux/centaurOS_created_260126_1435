@@ -21,6 +21,22 @@ import {
     sendErrorMessage,
     sendObjectiveCreatedMessage,
     escapeHtml,
+    // New exports for expanded features
+    formatDailyBriefing,
+    formatTasksList,
+    createTasksListKeyboard,
+    createTaskActionKeyboard,
+    formatDecision,
+    createDecisionKeyboard,
+    formatDecisionsQueue,
+    createIdeaKeyboard,
+    formatIdeaCaptured,
+    formatIdeasList,
+    createSettingsKeyboard,
+    deleteMessage,
+    DailyBriefingData,
+    TaskForDisplay,
+    DecisionForDisplay,
 } from '@/lib/telegram/bot'
 import {
     transcribeVoice,
@@ -31,6 +47,18 @@ import {
 } from '@/lib/telegram/ai-processor'
 import { createObjectiveFromInput } from '@/actions/objective-from-input'
 import { calculateTaskDates } from '@/lib/objective-utils'
+
+/**
+ * Helper to extract objective title from Supabase join result
+ * Handles both array and single object returns from the query
+ */
+function getObjectiveTitle(objectives: unknown): string | undefined {
+    if (!objectives) return undefined
+    if (Array.isArray(objectives)) {
+        return (objectives[0] as { title?: string })?.title
+    }
+    return (objectives as { title?: string })?.title
+}
 
 // Use service role for webhook operations (bypasses RLS)
 function getAdminClient() {
@@ -137,6 +165,73 @@ async function handleMessage(message: TelegramMessage) {
             chat_id: chatId,
             text: `⚠️ Your Telegram isn't linked to CentaurOS yet.\n\nUse /start to get linking instructions, or enter your verification code with:\n/link YOUR_CODE`,
         })
+        return
+    }
+
+    // ===========================================
+    // Command Handlers (for linked users)
+    // ===========================================
+
+    // /today - Daily briefing
+    if (message.text === '/today' || message.text === '/briefing') {
+        await handleTodayCommand(chatId, link.profile_id)
+        return
+    }
+
+    // /tasks - List today's tasks
+    if (message.text === '/tasks') {
+        await handleTasksCommand(chatId, link.profile_id)
+        return
+    }
+
+    // /done [task-id or number] - Mark task complete
+    if (message.text?.startsWith('/done')) {
+        const taskRef = message.text.replace('/done', '').trim()
+        await handleDoneCommand(chatId, link.profile_id, taskRef)
+        return
+    }
+
+    // /idea [text] - Quick capture idea
+    if (message.text?.startsWith('/idea')) {
+        const ideaText = message.text.replace('/idea', '').trim()
+        await handleIdeaCommand(chatId, link.profile_id, link.foundry_id, ideaText, message.message_id.toString())
+        return
+    }
+
+    // /ideas - List ideas in inbox
+    if (message.text === '/ideas') {
+        await handleIdeasListCommand(chatId, link.profile_id)
+        return
+    }
+
+    // /decisions - Show decision queue
+    if (message.text === '/decisions') {
+        await handleDecisionsCommand(chatId, link.profile_id)
+        return
+    }
+
+    // /mute [duration] - Mute notifications
+    if (message.text?.startsWith('/mute')) {
+        const duration = message.text.replace('/mute', '').trim()
+        await handleMuteCommand(chatId, link.profile_id, duration)
+        return
+    }
+
+    // /unmute - Unmute notifications
+    if (message.text === '/unmute') {
+        await handleUnmuteCommand(chatId, link.profile_id)
+        return
+    }
+
+    // /settings - Show settings
+    if (message.text === '/settings') {
+        await handleSettingsCommand(chatId, link.profile_id)
+        return
+    }
+
+    // /help - Show help
+    if (message.text === '/help') {
+        await handleHelpCommand(chatId)
         return
     }
 
@@ -293,7 +388,17 @@ async function handleCallbackQuery(query: TelegramCallbackQuery) {
     }
     
     // SECURITY: Validate action against allowed values
-    const allowedActions = ['confirm', 'reject', 'edit_obj', 'edit_tasks', 'edit_task', 'back']
+    const allowedActions = [
+        'confirm', 'reject', 'edit_obj', 'edit_tasks', 'edit_task', 'back',
+        // Task actions
+        'task_done', 'task_view', 'task_snooze', 'tasks_refresh',
+        // Decision actions
+        'decision_approve', 'decision_reject', 'decision_defer', 'decision_view', 'decisions_next',
+        // Idea actions
+        'idea_promote', 'idea_dismiss', 'idea_keep',
+        // Settings actions
+        'settings_toggle', 'settings_briefing_time',
+    ]
     if (!allowedActions.includes(action)) {
         await answerCallbackQuery(query.id, 'Invalid action')
         return
@@ -336,6 +441,70 @@ async function handleCallbackQuery(query: TelegramCallbackQuery) {
 
         case 'back':
             await handleBack(query, chatId, messageId, intentId, objective)
+            break
+
+        // ===========================================
+        // Task Actions
+        // ===========================================
+        case 'task_done':
+            await handleTaskDoneCallback(query, chatId, messageId, intentId)
+            break
+
+        case 'task_view':
+            await handleTaskViewCallback(query, chatId, messageId, intentId)
+            break
+
+        case 'task_snooze':
+            await handleTaskSnoozeCallback(query, chatId, messageId, intentId, parseInt(extra))
+            break
+
+        case 'tasks_refresh':
+            await handleTasksRefreshCallback(query, chatId, messageId)
+            break
+
+        // ===========================================
+        // Decision Actions
+        // ===========================================
+        case 'decision_approve':
+            await handleDecisionCallback(query, chatId, messageId, intentId, 'approved')
+            break
+
+        case 'decision_reject':
+            await handleDecisionCallback(query, chatId, messageId, intentId, 'rejected')
+            break
+
+        case 'decision_defer':
+            await handleDecisionCallback(query, chatId, messageId, intentId, 'deferred')
+            break
+
+        case 'decision_view':
+            await handleDecisionViewCallback(query, chatId, messageId, intentId)
+            break
+
+        case 'decisions_next':
+            await handleDecisionsNextCallback(query, chatId, messageId)
+            break
+
+        // ===========================================
+        // Idea Actions
+        // ===========================================
+        case 'idea_promote':
+            await handleIdeaPromoteCallback(query, chatId, messageId, intentId)
+            break
+
+        case 'idea_dismiss':
+            await handleIdeaDismissCallback(query, chatId, messageId, intentId)
+            break
+
+        case 'idea_keep':
+            await answerCallbackQuery(query.id, '📥 Kept in inbox')
+            break
+
+        // ===========================================
+        // Settings Actions
+        // ===========================================
+        case 'settings_toggle':
+            await handleSettingsToggleCallback(query, chatId, messageId, intentId)
             break
 
         default:
@@ -764,6 +933,1040 @@ function generateVerificationCode(): string {
         code += chars[array[i] % chars.length]
     }
     return code
+}
+
+// ===========================================
+// Command Handlers
+// ===========================================
+
+/**
+ * Handle /today command - Daily briefing
+ */
+async function handleTodayCommand(chatId: number, profileId: string) {
+    const supabase = getAdminClient()
+
+    try {
+        // Get user name
+        const { data: profile } = await supabase
+            .from('profiles')
+            .select('full_name')
+            .eq('id', profileId)
+            .single()
+
+        // Get briefing data using the function
+        const { data: briefingData } = await supabase
+            .rpc('get_daily_briefing', { p_profile_id: profileId })
+
+        if (!briefingData) {
+            // Fallback: calculate manually
+            const [tasksToday, tasksOverdue, decisions, notifications, objectives, ideas] = await Promise.all([
+                supabase.from('tasks').select('id', { count: 'exact', head: true })
+                    .eq('assignee_id', profileId)
+                    .gte('end_date', new Date().toISOString().split('T')[0])
+                    .lte('end_date', new Date().toISOString().split('T')[0])
+                    .not('status', 'in', '("Completed","Cancelled")'),
+                supabase.from('tasks').select('id', { count: 'exact', head: true })
+                    .eq('assignee_id', profileId)
+                    .lt('end_date', new Date().toISOString().split('T')[0])
+                    .not('status', 'in', '("Completed","Cancelled")'),
+                supabase.from('telegram_decisions').select('id', { count: 'exact', head: true })
+                    .eq('profile_id', profileId)
+                    .eq('status', 'pending'),
+                supabase.from('notifications').select('id', { count: 'exact', head: true })
+                    .eq('user_id', profileId)
+                    .eq('is_read', false),
+                supabase.from('objectives').select('id', { count: 'exact', head: true })
+                    .eq('creator_id', profileId)
+                    .eq('status', 'In Progress'),
+                supabase.from('telegram_ideas').select('id', { count: 'exact', head: true })
+                    .eq('profile_id', profileId)
+                    .eq('status', 'inbox'),
+            ])
+
+            const data: DailyBriefingData = {
+                tasks_due_today: tasksToday.count || 0,
+                tasks_overdue: tasksOverdue.count || 0,
+                pending_decisions: decisions.count || 0,
+                unread_notifications: notifications.count || 0,
+                active_objectives: objectives.count || 0,
+                ideas_in_inbox: ideas.count || 0,
+            }
+
+            const message = formatDailyBriefing(data, profile?.full_name || 'there')
+            await sendMessage({ chat_id: chatId, text: message, parse_mode: 'HTML' })
+            return
+        }
+
+        const message = formatDailyBriefing(briefingData as DailyBriefingData, profile?.full_name || 'there')
+        await sendMessage({ chat_id: chatId, text: message, parse_mode: 'HTML' })
+    } catch (error) {
+        console.error('Today command error:', error)
+        await sendErrorMessage(chatId, 'Could not fetch your daily briefing. Please try again.')
+    }
+}
+
+/**
+ * Handle /tasks command - List tasks
+ */
+async function handleTasksCommand(chatId: number, profileId: string) {
+    const supabase = getAdminClient()
+
+    try {
+        const today = new Date().toISOString().split('T')[0]
+        
+        const { data: tasks, error } = await supabase
+            .from('tasks')
+            .select(`
+                id,
+                title,
+                status,
+                end_date,
+                risk_level,
+                objectives(title)
+            `)
+            .eq('assignee_id', profileId)
+            .not('status', 'in', '("Completed","Cancelled")')
+            .order('end_date', { ascending: true, nullsFirst: false })
+            .limit(10)
+
+        if (error) throw error
+
+        const tasksForDisplay: TaskForDisplay[] = (tasks || []).map(t => ({
+            id: t.id,
+            title: t.title,
+            status: t.status,
+            end_date: t.end_date,
+            risk_level: t.risk_level,
+            objective_title: getObjectiveTitle(t.objectives),
+        }))
+
+        const message = formatTasksList(tasksForDisplay, "Your Tasks")
+        const keyboard = createTasksListKeyboard(tasksForDisplay)
+
+        await sendMessage({
+            chat_id: chatId,
+            text: message,
+            parse_mode: 'HTML',
+            reply_markup: keyboard,
+        })
+    } catch (error) {
+        console.error('Tasks command error:', error)
+        await sendErrorMessage(chatId, 'Could not fetch your tasks. Please try again.')
+    }
+}
+
+/**
+ * Handle /done command - Mark task complete
+ */
+async function handleDoneCommand(chatId: number, profileId: string, taskRef: string) {
+    const supabase = getAdminClient()
+
+    try {
+        if (!taskRef) {
+            await sendMessage({
+                chat_id: chatId,
+                text: '❓ <b>Usage:</b> /done [task-id]\n\nOr use /tasks to see your tasks with quick-complete buttons.',
+                parse_mode: 'HTML',
+            })
+            return
+        }
+
+        // Try to find task by ID or partial match
+        let taskId = taskRef
+        
+        // If it looks like a UUID, use directly
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+        if (!uuidRegex.test(taskRef)) {
+            // Try to find by title match
+            const { data: matchingTasks } = await supabase
+                .from('tasks')
+                .select('id, title')
+                .eq('assignee_id', profileId)
+                .not('status', 'in', '("Completed","Cancelled")')
+                .ilike('title', `%${taskRef}%`)
+                .limit(1)
+
+            if (!matchingTasks || matchingTasks.length === 0) {
+                await sendMessage({
+                    chat_id: chatId,
+                    text: `❌ No task found matching "${escapeHtml(taskRef)}"\n\nUse /tasks to see your task list.`,
+                    parse_mode: 'HTML',
+                })
+                return
+            }
+            taskId = matchingTasks[0].id
+        }
+
+        // Update task status
+        const { data: updatedTask, error } = await supabase
+            .from('tasks')
+            .update({ status: 'Completed' })
+            .eq('id', taskId)
+            .eq('assignee_id', profileId) // Security: only update own tasks
+            .select('title')
+            .single()
+
+        if (error || !updatedTask) {
+            await sendMessage({
+                chat_id: chatId,
+                text: '❌ Could not complete task. Make sure you have permission.',
+                parse_mode: 'HTML',
+            })
+            return
+        }
+
+        await sendMessage({
+            chat_id: chatId,
+            text: `✅ <b>Task Completed!</b>\n\n"${escapeHtml(updatedTask.title)}"\n\n🎉 Nice work!`,
+            parse_mode: 'HTML',
+        })
+    } catch (error) {
+        console.error('Done command error:', error)
+        await sendErrorMessage(chatId, 'Could not complete task. Please try again.')
+    }
+}
+
+/**
+ * Handle /idea command - Quick capture
+ */
+async function handleIdeaCommand(
+    chatId: number,
+    profileId: string,
+    foundryId: string,
+    ideaText: string,
+    messageId: string
+) {
+    const supabase = getAdminClient()
+
+    try {
+        if (!ideaText) {
+            await sendMessage({
+                chat_id: chatId,
+                text: '💡 <b>Quick Idea Capture</b>\n\nUsage: /idea [your idea]\n\nExample: /idea Build a mobile app for the platform',
+                parse_mode: 'HTML',
+            })
+            return
+        }
+
+        // Save the idea
+        const { data: idea, error } = await supabase
+            .from('telegram_ideas')
+            .insert({
+                profile_id: profileId,
+                foundry_id: foundryId,
+                content: ideaText,
+                telegram_message_id: messageId,
+            })
+            .select('id')
+            .single()
+
+        if (error || !idea) {
+            throw new Error('Failed to save idea')
+        }
+
+        const message = formatIdeaCaptured(ideaText)
+        const keyboard = createIdeaKeyboard(idea.id)
+
+        await sendMessage({
+            chat_id: chatId,
+            text: message,
+            parse_mode: 'HTML',
+            reply_markup: keyboard,
+        })
+    } catch (error) {
+        console.error('Idea command error:', error)
+        await sendErrorMessage(chatId, 'Could not save your idea. Please try again.')
+    }
+}
+
+/**
+ * Handle /ideas command - List ideas
+ */
+async function handleIdeasListCommand(chatId: number, profileId: string) {
+    const supabase = getAdminClient()
+
+    try {
+        const { data: ideas, error } = await supabase
+            .from('telegram_ideas')
+            .select('id, content, created_at')
+            .eq('profile_id', profileId)
+            .eq('status', 'inbox')
+            .order('created_at', { ascending: false })
+            .limit(20)
+
+        if (error) throw error
+
+        const message = formatIdeasList(ideas || [])
+
+        await sendMessage({
+            chat_id: chatId,
+            text: message,
+            parse_mode: 'HTML',
+        })
+    } catch (error) {
+        console.error('Ideas list error:', error)
+        await sendErrorMessage(chatId, 'Could not fetch your ideas. Please try again.')
+    }
+}
+
+/**
+ * Handle /decisions command - Show decision queue
+ */
+async function handleDecisionsCommand(chatId: number, profileId: string) {
+    const supabase = getAdminClient()
+
+    try {
+        const { data: decisions, error, count } = await supabase
+            .from('telegram_decisions')
+            .select('*', { count: 'exact' })
+            .eq('profile_id', profileId)
+            .eq('status', 'pending')
+            .order('priority', { ascending: false })
+            .order('created_at', { ascending: true })
+            .limit(10)
+
+        if (error) throw error
+
+        if (!decisions || decisions.length === 0) {
+            await sendMessage({
+                chat_id: chatId,
+                text: '⚡ <b>Decision Queue</b>\n\n✨ No pending decisions! You\'re all caught up.',
+                parse_mode: 'HTML',
+            })
+            return
+        }
+
+        // Show the first decision
+        const firstDecision = decisions[0] as DecisionForDisplay
+        const message = formatDecision(firstDecision)
+        const keyboard = createDecisionKeyboard(firstDecision.id, firstDecision.reference_type)
+
+        await sendMessage({
+            chat_id: chatId,
+            text: `⚡ <b>Decision Queue</b> (${count || decisions.length} pending)\n\n${message}`,
+            parse_mode: 'HTML',
+            reply_markup: keyboard,
+        })
+    } catch (error) {
+        console.error('Decisions command error:', error)
+        await sendErrorMessage(chatId, 'Could not fetch decisions. Please try again.')
+    }
+}
+
+/**
+ * Handle /mute command
+ */
+async function handleMuteCommand(chatId: number, profileId: string, duration: string) {
+    const supabase = getAdminClient()
+
+    try {
+        // Parse duration (e.g., "2h", "1d", "30m")
+        let muteUntil: Date
+        const now = new Date()
+
+        if (!duration || duration === '') {
+            // Default: 2 hours
+            muteUntil = new Date(now.getTime() + 2 * 60 * 60 * 1000)
+        } else if (duration.endsWith('h')) {
+            const hours = parseInt(duration)
+            muteUntil = new Date(now.getTime() + hours * 60 * 60 * 1000)
+        } else if (duration.endsWith('d')) {
+            const days = parseInt(duration)
+            muteUntil = new Date(now.getTime() + days * 24 * 60 * 60 * 1000)
+        } else if (duration.endsWith('m')) {
+            const minutes = parseInt(duration)
+            muteUntil = new Date(now.getTime() + minutes * 60 * 1000)
+        } else {
+            await sendMessage({
+                chat_id: chatId,
+                text: '❓ <b>Mute Notifications</b>\n\nUsage: /mute [duration]\n\nExamples:\n• /mute 2h (2 hours)\n• /mute 1d (1 day)\n• /mute 30m (30 minutes)',
+                parse_mode: 'HTML',
+            })
+            return
+        }
+
+        // Update or insert preferences
+        await supabase
+            .from('telegram_preferences')
+            .upsert({
+                profile_id: profileId,
+                muted_until: muteUntil.toISOString(),
+            }, {
+                onConflict: 'profile_id',
+            })
+
+        const formattedTime = muteUntil.toLocaleTimeString('en-GB', {
+            hour: '2-digit',
+            minute: '2-digit',
+        })
+
+        await sendMessage({
+            chat_id: chatId,
+            text: `🔕 <b>Notifications Muted</b>\n\nYou won't receive Telegram notifications until ${formattedTime}.\n\nUse /unmute to turn them back on.`,
+            parse_mode: 'HTML',
+        })
+    } catch (error) {
+        console.error('Mute command error:', error)
+        await sendErrorMessage(chatId, 'Could not mute notifications. Please try again.')
+    }
+}
+
+/**
+ * Handle /unmute command
+ */
+async function handleUnmuteCommand(chatId: number, profileId: string) {
+    const supabase = getAdminClient()
+
+    try {
+        await supabase
+            .from('telegram_preferences')
+            .upsert({
+                profile_id: profileId,
+                muted_until: null,
+            }, {
+                onConflict: 'profile_id',
+            })
+
+        await sendMessage({
+            chat_id: chatId,
+            text: '🔔 <b>Notifications Unmuted</b>\n\nYou\'ll now receive Telegram notifications again.',
+            parse_mode: 'HTML',
+        })
+    } catch (error) {
+        console.error('Unmute command error:', error)
+        await sendErrorMessage(chatId, 'Could not unmute notifications. Please try again.')
+    }
+}
+
+/**
+ * Handle /settings command
+ */
+async function handleSettingsCommand(chatId: number, profileId: string) {
+    const supabase = getAdminClient()
+
+    try {
+        // Get or create preferences
+        let { data: prefs } = await supabase
+            .from('telegram_preferences')
+            .select('*')
+            .eq('profile_id', profileId)
+            .single()
+
+        if (!prefs) {
+            // Create default preferences
+            const { data: newPrefs } = await supabase
+                .from('telegram_preferences')
+                .insert({ profile_id: profileId })
+                .select()
+                .single()
+            prefs = newPrefs
+        }
+
+        const keyboard = createSettingsKeyboard({
+            notifications_enabled: prefs?.notifications_enabled ?? true,
+            daily_briefing_enabled: prefs?.daily_briefing_enabled ?? true,
+        })
+
+        await sendMessage({
+            chat_id: chatId,
+            text: '⚙️ <b>Telegram Settings</b>\n\nConfigure your notification preferences:',
+            parse_mode: 'HTML',
+            reply_markup: keyboard,
+        })
+    } catch (error) {
+        console.error('Settings command error:', error)
+        await sendErrorMessage(chatId, 'Could not load settings. Please try again.')
+    }
+}
+
+/**
+ * Handle /help command
+ */
+async function handleHelpCommand(chatId: number) {
+    const helpText = `🤖 <b>CentaurOS Telegram Bot</b>
+
+<b>📋 Task Management</b>
+/tasks - View your task list
+/done [task] - Mark a task complete
+/today - Get your daily briefing
+
+<b>💡 Ideas</b>
+/idea [text] - Capture a quick idea
+/ideas - View your ideas inbox
+
+<b>⚡ Decisions</b>
+/decisions - Review pending approvals
+
+<b>🔔 Notifications</b>
+/mute [2h/1d] - Pause notifications
+/unmute - Resume notifications
+/settings - Configure preferences
+
+<b>📝 Create Objectives</b>
+Just send me a message describing your goal, project, or objective - I'll turn it into a structured plan with tasks!
+
+<b>🎤 Voice Messages</b>
+Send a voice note and I'll transcribe it and create an objective from it.
+
+<i>Need more help? Visit CentaurOS → Help</i>`
+
+    await sendMessage({
+        chat_id: chatId,
+        text: helpText,
+        parse_mode: 'HTML',
+    })
+}
+
+// ===========================================
+// Callback Handlers for Tasks
+// ===========================================
+
+async function handleTaskDoneCallback(
+    query: TelegramCallbackQuery,
+    chatId: number,
+    messageId: number,
+    taskId: string
+) {
+    const supabase = getAdminClient()
+
+    try {
+        // Get user from messaging link
+        const { data: link } = await supabase
+            .from('messaging_links')
+            .select('profile_id')
+            .eq('platform', 'telegram')
+            .eq('platform_user_id', query.from.id.toString())
+            .single()
+
+        if (!link) {
+            await answerCallbackQuery(query.id, 'Account not linked')
+            return
+        }
+
+        const { data: task, error } = await supabase
+            .from('tasks')
+            .update({ status: 'Completed' })
+            .eq('id', taskId)
+            .eq('assignee_id', link.profile_id)
+            .select('title')
+            .single()
+
+        if (error || !task) {
+            await answerCallbackQuery(query.id, 'Could not complete task')
+            return
+        }
+
+        await answerCallbackQuery(query.id, '✅ Task completed!')
+
+        // Refresh the tasks list
+        await handleTasksRefreshCallback(query, chatId, messageId)
+    } catch (error) {
+        console.error('Task done callback error:', error)
+        await answerCallbackQuery(query.id, 'Error completing task')
+    }
+}
+
+async function handleTaskViewCallback(
+    query: TelegramCallbackQuery,
+    chatId: number,
+    messageId: number,
+    taskId: string
+) {
+    const supabase = getAdminClient()
+
+    try {
+        const { data: task } = await supabase
+            .from('tasks')
+            .select(`
+                id, title, description, status, end_date, risk_level,
+                objectives(title)
+            `)
+            .eq('id', taskId)
+            .single()
+
+        if (!task) {
+            await answerCallbackQuery(query.id, 'Task not found')
+            return
+        }
+
+        await answerCallbackQuery(query.id)
+
+        const riskEmoji = task.risk_level === 'High' ? '🔴' : task.risk_level === 'Medium' ? '🟡' : '🟢'
+        let message = `📋 <b>${escapeHtml(task.title)}</b>\n\n`
+        
+        if (task.description) {
+            message += `${escapeHtml(task.description)}\n\n`
+        }
+
+        message += `Status: ${task.status}\n`
+        message += `${riskEmoji} Risk: ${task.risk_level}\n`
+        
+        if (task.end_date) {
+            message += `📅 Due: ${new Date(task.end_date).toLocaleDateString('en-GB')}\n`
+        }
+
+        const objectiveTitle = getObjectiveTitle(task.objectives)
+        if (objectiveTitle) {
+            message += `🎯 Objective: ${escapeHtml(objectiveTitle)}`
+        }
+
+        const keyboard = createTaskActionKeyboard(taskId, task.status)
+
+        await editMessage({
+            chat_id: chatId,
+            message_id: messageId,
+            text: message,
+            parse_mode: 'HTML',
+            reply_markup: keyboard,
+        })
+    } catch (error) {
+        console.error('Task view callback error:', error)
+        await answerCallbackQuery(query.id, 'Error loading task')
+    }
+}
+
+async function handleTaskSnoozeCallback(
+    query: TelegramCallbackQuery,
+    chatId: number,
+    messageId: number,
+    taskId: string,
+    days: number
+) {
+    const supabase = getAdminClient()
+
+    try {
+        const { data: link } = await supabase
+            .from('messaging_links')
+            .select('profile_id')
+            .eq('platform', 'telegram')
+            .eq('platform_user_id', query.from.id.toString())
+            .single()
+
+        if (!link) {
+            await answerCallbackQuery(query.id, 'Account not linked')
+            return
+        }
+
+        // Get current end_date and add days
+        const { data: task } = await supabase
+            .from('tasks')
+            .select('end_date')
+            .eq('id', taskId)
+            .single()
+
+        const currentDate = task?.end_date ? new Date(task.end_date) : new Date()
+        const newDate = new Date(currentDate)
+        newDate.setDate(newDate.getDate() + days)
+
+        await supabase
+            .from('tasks')
+            .update({ end_date: newDate.toISOString().split('T')[0] })
+            .eq('id', taskId)
+            .eq('assignee_id', link.profile_id)
+
+        await answerCallbackQuery(query.id, `⏰ Snoozed ${days} day${days > 1 ? 's' : ''}`)
+
+        // Refresh tasks
+        await handleTasksRefreshCallback(query, chatId, messageId)
+    } catch (error) {
+        console.error('Task snooze callback error:', error)
+        await answerCallbackQuery(query.id, 'Error snoozing task')
+    }
+}
+
+async function handleTasksRefreshCallback(
+    query: TelegramCallbackQuery,
+    chatId: number,
+    messageId: number
+) {
+    const supabase = getAdminClient()
+
+    try {
+        const { data: link } = await supabase
+            .from('messaging_links')
+            .select('profile_id')
+            .eq('platform', 'telegram')
+            .eq('platform_user_id', query.from.id.toString())
+            .single()
+
+        if (!link) {
+            await answerCallbackQuery(query.id, 'Account not linked')
+            return
+        }
+
+        await answerCallbackQuery(query.id, '🔄 Refreshing...')
+
+        const { data: tasks } = await supabase
+            .from('tasks')
+            .select(`
+                id, title, status, end_date, risk_level,
+                objectives(title)
+            `)
+            .eq('assignee_id', link.profile_id)
+            .not('status', 'in', '("Completed","Cancelled")')
+            .order('end_date', { ascending: true, nullsFirst: false })
+            .limit(10)
+
+        const tasksForDisplay: TaskForDisplay[] = (tasks || []).map(t => ({
+            id: t.id,
+            title: t.title,
+            status: t.status,
+            end_date: t.end_date,
+            risk_level: t.risk_level,
+            objective_title: getObjectiveTitle(t.objectives),
+        }))
+
+        const message = formatTasksList(tasksForDisplay, "Your Tasks")
+        const keyboard = createTasksListKeyboard(tasksForDisplay)
+
+        await editMessage({
+            chat_id: chatId,
+            message_id: messageId,
+            text: message,
+            parse_mode: 'HTML',
+            reply_markup: keyboard,
+        })
+    } catch (error) {
+        console.error('Tasks refresh callback error:', error)
+        await answerCallbackQuery(query.id, 'Error refreshing')
+    }
+}
+
+// ===========================================
+// Callback Handlers for Decisions
+// ===========================================
+
+async function handleDecisionCallback(
+    query: TelegramCallbackQuery,
+    chatId: number,
+    messageId: number,
+    decisionId: string,
+    status: 'approved' | 'rejected' | 'deferred'
+) {
+    const supabase = getAdminClient()
+
+    try {
+        const { data: link } = await supabase
+            .from('messaging_links')
+            .select('profile_id')
+            .eq('platform', 'telegram')
+            .eq('platform_user_id', query.from.id.toString())
+            .single()
+
+        if (!link) {
+            await answerCallbackQuery(query.id, 'Account not linked')
+            return
+        }
+
+        const { data: decision, error } = await supabase
+            .from('telegram_decisions')
+            .update({
+                status,
+                decided_at: new Date().toISOString(),
+            })
+            .eq('id', decisionId)
+            .eq('profile_id', link.profile_id)
+            .select('title, reference_type, reference_id')
+            .single()
+
+        if (error || !decision) {
+            await answerCallbackQuery(query.id, 'Could not update decision')
+            return
+        }
+
+        // If approved/rejected, update the referenced item
+        if (status === 'approved' && decision.reference_type === 'task') {
+            await supabase
+                .from('tasks')
+                .update({ status: 'Completed' })
+                .eq('id', decision.reference_id)
+        }
+
+        const statusEmoji = status === 'approved' ? '✅' : status === 'rejected' ? '❌' : '⏳'
+        await answerCallbackQuery(query.id, `${statusEmoji} ${status.charAt(0).toUpperCase() + status.slice(1)}`)
+
+        // Show next decision or completion message
+        await handleDecisionsNextCallback(query, chatId, messageId)
+    } catch (error) {
+        console.error('Decision callback error:', error)
+        await answerCallbackQuery(query.id, 'Error processing decision')
+    }
+}
+
+async function handleDecisionViewCallback(
+    query: TelegramCallbackQuery,
+    chatId: number,
+    messageId: number,
+    decisionId: string
+) {
+    await answerCallbackQuery(query.id)
+    
+    // Open in app
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://centaur-os.com'
+    await sendMessage({
+        chat_id: chatId,
+        text: `👁 <b>View in App</b>\n\nOpen CentaurOS to see full details:\n${appUrl}/decisions/${decisionId}`,
+        parse_mode: 'HTML',
+    })
+}
+
+async function handleDecisionsNextCallback(
+    query: TelegramCallbackQuery,
+    chatId: number,
+    messageId: number
+) {
+    const supabase = getAdminClient()
+
+    try {
+        const { data: link } = await supabase
+            .from('messaging_links')
+            .select('profile_id')
+            .eq('platform', 'telegram')
+            .eq('platform_user_id', query.from.id.toString())
+            .single()
+
+        if (!link) {
+            await answerCallbackQuery(query.id, 'Account not linked')
+            return
+        }
+
+        const { data: decisions, count } = await supabase
+            .from('telegram_decisions')
+            .select('*', { count: 'exact' })
+            .eq('profile_id', link.profile_id)
+            .eq('status', 'pending')
+            .order('priority', { ascending: false })
+            .order('created_at', { ascending: true })
+            .limit(1)
+
+        if (!decisions || decisions.length === 0) {
+            await editMessage({
+                chat_id: chatId,
+                message_id: messageId,
+                text: '⚡ <b>Decision Queue</b>\n\n✨ All done! No more pending decisions.',
+                parse_mode: 'HTML',
+            })
+            return
+        }
+
+        const decision = decisions[0] as DecisionForDisplay
+        const message = formatDecision(decision)
+        const keyboard = createDecisionKeyboard(decision.id, decision.reference_type)
+
+        await editMessage({
+            chat_id: chatId,
+            message_id: messageId,
+            text: `⚡ <b>Decision Queue</b> (${count} remaining)\n\n${message}`,
+            parse_mode: 'HTML',
+            reply_markup: keyboard,
+        })
+    } catch (error) {
+        console.error('Decisions next callback error:', error)
+        await answerCallbackQuery(query.id, 'Error loading next decision')
+    }
+}
+
+// ===========================================
+// Callback Handlers for Ideas
+// ===========================================
+
+async function handleIdeaPromoteCallback(
+    query: TelegramCallbackQuery,
+    chatId: number,
+    messageId: number,
+    ideaId: string
+) {
+    const supabase = getAdminClient()
+
+    try {
+        const { data: link } = await supabase
+            .from('messaging_links')
+            .select('profile_id, foundry_id')
+            .eq('platform', 'telegram')
+            .eq('platform_user_id', query.from.id.toString())
+            .single()
+
+        if (!link) {
+            await answerCallbackQuery(query.id, 'Account not linked')
+            return
+        }
+
+        // Get the idea
+        const { data: idea } = await supabase
+            .from('telegram_ideas')
+            .select('content')
+            .eq('id', ideaId)
+            .eq('profile_id', link.profile_id)
+            .single()
+
+        if (!idea) {
+            await answerCallbackQuery(query.id, 'Idea not found')
+            return
+        }
+
+        await answerCallbackQuery(query.id, '🚀 Processing...')
+
+        // Update idea status
+        await supabase
+            .from('telegram_ideas')
+            .update({ status: 'promoted' })
+            .eq('id', ideaId)
+
+        // Store as pending intent for objective creation
+        const { parseTextToObjective } = await import('@/lib/telegram/ai-processor')
+        const objective = await parseTextToObjective(idea.content)
+
+        const { data: intent } = await supabase
+            .from('pending_intents')
+            .insert({
+                profile_id: link.profile_id,
+                foundry_id: link.foundry_id,
+                platform: 'telegram',
+                platform_user_id: query.from.id.toString(),
+                original_message: idea.content,
+                parsed_objective: objective,
+                status: 'pending',
+            })
+            .select('id')
+            .single()
+
+        if (!intent) {
+            await sendErrorMessage(chatId, 'Could not process idea')
+            return
+        }
+
+        // Send confirmation message
+        const confirmationText = formatObjectiveMessage(objective, new Date())
+        const keyboard = createConfirmationKeyboard(intent.id)
+
+        await editMessage({
+            chat_id: chatId,
+            message_id: messageId,
+            text: '🚀 <b>Idea Promoted!</b>\n\n' + confirmationText + '\n\n<i>Review and confirm to create this objective:</i>',
+            parse_mode: 'HTML',
+            reply_markup: keyboard,
+        })
+    } catch (error) {
+        console.error('Idea promote callback error:', error)
+        await answerCallbackQuery(query.id, 'Error promoting idea')
+    }
+}
+
+async function handleIdeaDismissCallback(
+    query: TelegramCallbackQuery,
+    chatId: number,
+    messageId: number,
+    ideaId: string
+) {
+    const supabase = getAdminClient()
+
+    try {
+        const { data: link } = await supabase
+            .from('messaging_links')
+            .select('profile_id')
+            .eq('platform', 'telegram')
+            .eq('platform_user_id', query.from.id.toString())
+            .single()
+
+        if (!link) {
+            await answerCallbackQuery(query.id, 'Account not linked')
+            return
+        }
+
+        await supabase
+            .from('telegram_ideas')
+            .update({ status: 'dismissed' })
+            .eq('id', ideaId)
+            .eq('profile_id', link.profile_id)
+
+        await answerCallbackQuery(query.id, '🗑 Idea dismissed')
+
+        await editMessage({
+            chat_id: chatId,
+            message_id: messageId,
+            text: '🗑 <b>Idea Dismissed</b>\n\n<i>Use /idea to capture a new thought</i>',
+            parse_mode: 'HTML',
+        })
+    } catch (error) {
+        console.error('Idea dismiss callback error:', error)
+        await answerCallbackQuery(query.id, 'Error dismissing idea')
+    }
+}
+
+// ===========================================
+// Callback Handlers for Settings
+// ===========================================
+
+async function handleSettingsToggleCallback(
+    query: TelegramCallbackQuery,
+    chatId: number,
+    messageId: number,
+    setting: string
+) {
+    const supabase = getAdminClient()
+
+    try {
+        const { data: link } = await supabase
+            .from('messaging_links')
+            .select('profile_id')
+            .eq('platform', 'telegram')
+            .eq('platform_user_id', query.from.id.toString())
+            .single()
+
+        if (!link) {
+            await answerCallbackQuery(query.id, 'Account not linked')
+            return
+        }
+
+        // Get current prefs
+        const { data: currentPrefs } = await supabase
+            .from('telegram_preferences')
+            .select('*')
+            .eq('profile_id', link.profile_id)
+            .single()
+
+        const updates: Record<string, boolean> = {}
+        
+        if (setting === 'notifications') {
+            updates.notifications_enabled = !(currentPrefs?.notifications_enabled ?? true)
+        } else if (setting === 'briefing') {
+            updates.daily_briefing_enabled = !(currentPrefs?.daily_briefing_enabled ?? true)
+        }
+
+        await supabase
+            .from('telegram_preferences')
+            .upsert({
+                profile_id: link.profile_id,
+                ...updates,
+            }, {
+                onConflict: 'profile_id',
+            })
+
+        await answerCallbackQuery(query.id, 'Updated!')
+
+        // Refresh settings display
+        const { data: newPrefs } = await supabase
+            .from('telegram_preferences')
+            .select('*')
+            .eq('profile_id', link.profile_id)
+            .single()
+
+        const keyboard = createSettingsKeyboard({
+            notifications_enabled: newPrefs?.notifications_enabled ?? true,
+            daily_briefing_enabled: newPrefs?.daily_briefing_enabled ?? true,
+        })
+
+        await editMessage({
+            chat_id: chatId,
+            message_id: messageId,
+            text: '⚙️ <b>Telegram Settings</b>\n\nConfigure your notification preferences:',
+            parse_mode: 'HTML',
+            reply_markup: keyboard,
+        })
+    } catch (error) {
+        console.error('Settings toggle callback error:', error)
+        await answerCallbackQuery(query.id, 'Error updating settings')
+    }
 }
 
 // GET endpoint for webhook verification (Telegram doesn't use this, but good to have)

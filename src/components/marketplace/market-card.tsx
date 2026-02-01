@@ -46,6 +46,11 @@ function getInitials(title: string): string {
 }
 
 // Get gradient colors based on category
+// Color scheme rationale:
+// - People: Orange (International Orange - primary brand, warm, human)
+// - Products: Slate (industrial, manufacturing, physical)
+// - Services: Blue (Electric Blue - secondary brand, tech, digital)
+// - AI: Violet (AI distinction within Services)
 function getAvatarGradient(category: string, title: string): string {
     // Use title to generate consistent but varied gradients within category
     const hash = title.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0)
@@ -53,29 +58,33 @@ function getAvatarGradient(category: string, title: string): string {
     
     switch (category) {
         case 'People':
+            // Orange tones - warm, human, primary brand
             return variant === 0 
-                ? 'from-stone-400 to-stone-600' 
+                ? 'from-orange-400 to-orange-600' 
                 : variant === 1 
-                ? 'from-amber-400 to-amber-600'
-                : 'from-orange-400 to-orange-600'
+                ? 'from-amber-400 to-orange-500'
+                : 'from-orange-500 to-amber-600'
         case 'Products':
+            // Slate tones - industrial, manufacturing
             return variant === 0 
                 ? 'from-slate-400 to-slate-600' 
                 : variant === 1 
-                ? 'from-zinc-400 to-zinc-600'
-                : 'from-gray-400 to-gray-600'
+                ? 'from-slate-500 to-slate-700'
+                : 'from-zinc-400 to-slate-600'
         case 'Services':
+            // Blue tones - tech, digital, secondary brand
             return variant === 0 
                 ? 'from-blue-400 to-blue-600' 
                 : variant === 1 
-                ? 'from-sky-400 to-sky-600'
-                : 'from-cyan-400 to-cyan-600'
+                ? 'from-sky-400 to-blue-500'
+                : 'from-blue-500 to-sky-600'
         case 'AI':
+            // Violet tones - AI distinction
             return variant === 0 
                 ? 'from-violet-400 to-violet-600' 
                 : variant === 1 
-                ? 'from-purple-400 to-purple-600'
-                : 'from-indigo-400 to-indigo-600'
+                ? 'from-purple-400 to-violet-500'
+                : 'from-indigo-400 to-violet-600'
         default:
             return 'from-gray-400 to-gray-600'
     }
@@ -101,11 +110,12 @@ export const MarketCard = memo(function MarketCard({
         }
     }, [listing.id, onSizeChange])
 
+    // Badge styles matching the category color scheme
     const categoryBadgeStyles: Record<string, string> = {
-        'People': 'bg-stone-100 text-stone-700',
-        'Products': 'bg-muted text-foreground',
-        'Services': 'bg-status-info-light text-status-info-dark',
-        'AI': 'bg-violet-50 text-violet-700'
+        'People': 'bg-orange-100 text-orange-700',      // Orange - warm, human
+        'Products': 'bg-slate-100 text-slate-700',      // Slate - industrial
+        'Services': 'bg-blue-100 text-blue-700',        // Blue - tech, digital
+        'AI': 'bg-violet-50 text-violet-700'            // Violet - AI distinction
     }
 
     const attrs = listing.attributes || {}

@@ -565,7 +565,7 @@ export async function startObjectiveDiscussion(
     // Get objective details
     const { data: objective, error: objError } = await supabase
       .from('objectives')
-      .select('id, title, owner_id')
+      .select('id, title, creator_id')
       .eq('id', objectiveId)
       .single()
 
@@ -582,7 +582,7 @@ export async function startObjectiveDiscussion(
     // Build participant list
     const participantIds = new Set<string>()
     participantIds.add(user.id)
-    if (objective.owner_id) participantIds.add(objective.owner_id)
+    if (objective.creator_id) participantIds.add(objective.creator_id)
     taskAssignees?.forEach(t => {
       if (t.assignee_id) participantIds.add(t.assignee_id)
       if (t.creator_id) participantIds.add(t.creator_id)

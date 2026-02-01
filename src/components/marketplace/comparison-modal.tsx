@@ -67,11 +67,12 @@ const HIGHER_IS_BETTER = ['years_experience', 'accuracy', 'projects_completed', 
 // Numeric attributes where lower is better
 const LOWER_IS_BETTER = ['cost', 'latency', 'setup_time', 'lead_time', 'price']
 
+// Badge styles matching the category color scheme
 const categoryBadgeStyles: Record<string, string> = {
-    'People': 'bg-stone-100 text-stone-700',
-    'Products': 'bg-muted text-foreground',
-    'Services': 'bg-status-info-light text-status-info-dark',
-    'AI': 'bg-accent/10 text-accent'
+    'People': 'bg-orange-100 text-orange-700',      // Orange - warm, human
+    'Products': 'bg-slate-100 text-slate-700',      // Slate - industrial
+    'Services': 'bg-blue-100 text-blue-700',        // Blue - tech, digital
+    'AI': 'bg-violet-50 text-violet-700'            // Violet - AI distinction
 }
 
 export function ComparisonModal({ open, onOpenChange, items }: ComparisonModalProps) {

@@ -25,13 +25,14 @@ function getCategoryIcon(category: string) {
     }
 }
 
-// Get category color classes - ALL SOLID backgrounds, light-mode only
+// Get category color classes - consistent color scheme
+// People: Orange (warm, human), Products: Slate (industrial), Services: Blue (tech), AI: Violet
 function getCategoryColors(category: string) {
     switch (category) {
-        case 'People': return '!bg-slate-100 text-slate-700 border-slate-200'
-        case 'AI': return '!bg-accent/10 text-accent border-accent/20'
-        case 'Products': return '!bg-stone-100 text-stone-700 border-stone-200'
-        case 'Services': return '!bg-status-info-light text-status-info-dark border-status-info/20'
+        case 'People': return '!bg-orange-100 text-orange-700 border-orange-200'
+        case 'Products': return '!bg-slate-100 text-slate-700 border-slate-200'
+        case 'Services': return '!bg-blue-100 text-blue-700 border-blue-200'
+        case 'AI': return '!bg-violet-50 text-violet-700 border-violet-200'
         default: return '!bg-muted text-muted-foreground border-border'
     }
 }

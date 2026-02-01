@@ -59,11 +59,12 @@ interface MarketplaceListingDetailProps {
     ratings?: RatingsData | null
 }
 
+// Badge styles matching the category color scheme
 const categoryBadgeStyles = {
-    'People': 'bg-secondary text-secondary-foreground',
-    'Products': 'bg-muted text-muted-foreground',
-    'Services': 'bg-status-info-light text-status-info-dark',
-    'AI': 'bg-accent text-accent-foreground'
+    'People': 'bg-orange-100 text-orange-700',      // Orange - warm, human
+    'Products': 'bg-slate-100 text-slate-700',      // Slate - industrial
+    'Services': 'bg-blue-100 text-blue-700',        // Blue - tech, digital
+    'AI': 'bg-violet-50 text-violet-700'            // Violet - AI distinction
 }
 
 export function MarketplaceListingDetail({ listing, trustSignals, ratings }: MarketplaceListingDetailProps) {
@@ -73,8 +74,8 @@ export function MarketplaceListingDetail({ listing, trustSignals, ratings }: Mar
 
     // Handle contacting the expert/provider
     const handleContact = async () => {
-        // Get the provider ID from the listing - could be created_by_provider_id or from attributes
-        const providerId = listing.created_by_provider_id || (attrs.provider_id as string)
+        // Get the provider ID from the listing attributes
+        const providerId = attrs.provider_id as string
         
         if (!providerId) {
             toast.error('Unable to contact this provider')
