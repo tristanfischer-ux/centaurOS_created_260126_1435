@@ -91,10 +91,47 @@ Cards within dialogs should also be solid:
 
 ```tsx
 // ✅ ACCEPTABLE - Custom width for special cases
-<DialogContent className="max-w-4xl bg-background">
-  {/* Still has solid background */}
+<DialogContent className="max-w-4xl !bg-background">
+  {/* Explicit solid background with !important */}
 </DialogContent>
 ```
+
+## Wide Dialogs with Horizontal Scrolling
+
+For comparison tables or wide content that needs horizontal scrolling:
+
+```tsx
+// ✅ CORRECT - Responsive wide dialog
+<DialogContent className="max-w-[95vw] lg:max-w-7xl max-h-[80vh] flex flex-col p-0 !bg-background">
+  <DialogHeader className="border-b flex-shrink-0">
+    <DialogTitle>Compare Items</DialogTitle>
+  </DialogHeader>
+  
+  <ScrollArea className="flex-1">
+    <div className="p-6 min-w-max">
+      <table className="w-full">
+        <thead>
+          <tr>
+            {/* Sticky first column */}
+            <th className="sticky left-0 bg-background z-10">Attribute</th>
+            <th>Item 1</th>
+            <th>Item 2</th>
+            <th>Item 3</th>
+          </tr>
+        </thead>
+      </table>
+    </div>
+    <ScrollBar orientation="horizontal" />
+  </ScrollArea>
+</DialogContent>
+```
+
+**Key patterns:**
+- Use `max-w-[95vw]` for responsive width (prevents breaking mobile)
+- Use `lg:max-w-7xl` for wide desktop dialogs
+- Wrap content in `min-w-max` to allow table to grow
+- Make first column `sticky left-0 bg-background z-10`
+- Include horizontal ScrollBar
 
 ## Dialog Stacking (z-index)
 
@@ -175,3 +212,36 @@ To verify your dialog is solid:
 **Visual Test:**
 - Dialog content should completely obscure whatever is behind it
 - Only the overlay backdrop should show page content (dimmed/blurred)
+
+## Why These Regressions Keep Happening
+
+**Root Causes:**
+
+1. **CSS Variable Opacity Issues**: Tailwind CSS variables like `bg-popover`, `bg-background`, `bg-card` sometimes don't compile to solid colors in production builds. This appears to be a Next.js + Tailwind compilation edge case.
+
+2. **Pattern Copying**: When developers copy code from one component to another, they propagate translucent backgrounds (`bg-white/90`, `backdrop-blur-sm`).
+
+3. **"Frosted Glass" Aesthetic**: The translucent look seems modern, but it makes content unreadable and is poor UX.
+
+4. **Missing Testing**: Visual regressions aren't caught until manual testing in production.
+
+**Prevention Strategy:**
+
+1. **Always use `!important` for overlay backgrounds**: `!bg-white` not `bg-background`
+2. **Check before committing**: Look for `/` in any bg-* class (indicates opacity)
+3. **Test in production**: Check deployed site with hard refresh, not just localhost
+4. **Audit regularly**: Search codebase for `bg-.*\/[0-9]` patterns
+
+## Automated Check
+
+Before committing dialogs, run:
+
+```bash
+# Find translucent backgrounds in UI components
+grep -r "bg-.*\/[0-9]" src/components/ui/ --include="*.tsx"
+
+# Find backdrop-blur without solid backgrounds
+grep -r "backdrop-blur" src/components/ui/ --include="*.tsx"
+```
+
+If results found → fix before committing.

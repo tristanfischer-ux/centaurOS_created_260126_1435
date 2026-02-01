@@ -137,7 +137,7 @@ export function ComparisonModal({ open, onOpenChange, items }: ComparisonModalPr
 
     return (
         <Dialog open={open} onOpenChange={handleOpenChange}>
-            <DialogContent className="max-w-4xl max-h-[80vh] flex flex-col p-0 gap-0 overflow-hidden !bg-background">
+            <DialogContent className="max-w-[95vw] lg:max-w-7xl max-h-[80vh] flex flex-col p-0 gap-0 overflow-hidden !bg-background">
                 <DialogHeader className="p-6 pb-4 border-b border-border flex-shrink-0">
                     <div className="flex items-center justify-between">
                         <DialogTitle className="text-xl font-semibold">Compare Listings</DialogTitle>
@@ -164,7 +164,7 @@ export function ComparisonModal({ open, onOpenChange, items }: ComparisonModalPr
                 </DialogHeader>
 
                 <ScrollArea className="flex-1 overflow-auto">
-                    <div className="p-6 pt-4">
+                    <div className="p-6 pt-4 min-w-max">
                         {/* AI Analysis Results */}
                         {aiAnalysis && (
                             <Card className="mb-6 p-4 bg-violet-50 dark:bg-violet-950/30 border-violet-200 dark:border-violet-800">
@@ -292,15 +292,16 @@ export function ComparisonModal({ open, onOpenChange, items }: ComparisonModalPr
                         </div>
 
                         {/* Desktop: Table Layout */}
-                        <div className="hidden md:block overflow-x-auto">
+                        <div className="hidden md:block overflow-x-auto pb-4 -mx-6">
+                            <div className="px-6 min-w-max">
                             <table className="w-full border-collapse">
                                 <thead>
                                     <tr>
-                                        <th className="text-left text-sm font-medium text-muted-foreground py-3 pr-4 w-40 align-top">
+                                        <th className="text-left text-sm font-medium text-muted-foreground py-3 pr-4 w-32 align-top sticky left-0 bg-background z-10">
                                             Attribute
                                         </th>
                                         {items.map(item => (
-                                            <th key={item.id} className="text-left py-3 px-4 min-w-[180px] align-top">
+                                            <th key={item.id} className="text-left py-3 px-4 min-w-[200px] max-w-[250px] align-top">
                                                 <div className="font-bold text-base leading-tight">{item.title}</div>
                                                 <Badge 
                                                     variant="secondary" 
@@ -343,7 +344,7 @@ export function ComparisonModal({ open, onOpenChange, items }: ComparisonModalPr
                                         </td>
                                     </tr>
                                     <tr>
-                                        <td className="text-sm font-medium text-muted-foreground py-3 pr-4 align-top">
+                                        <td className="text-sm font-medium text-muted-foreground py-3 pr-4 align-top sticky left-0 bg-background z-10">
                                             Description
                                         </td>
                                         {items.map(item => (
@@ -354,6 +355,7 @@ export function ComparisonModal({ open, onOpenChange, items }: ComparisonModalPr
                                     </tr>
                                 </tbody>
                             </table>
+                            </div>
                         </div>
                     </div>
                     <ScrollBar orientation="horizontal" />
@@ -388,7 +390,7 @@ function SectionGroup({ sectionName, sectionKeys, items, bestValues }: SectionGr
                 
                 return (
                     <tr key={key} className="border-t border-border/50">
-                        <td className="text-sm font-medium text-muted-foreground capitalize py-3 pr-4 align-top">
+                        <td className="text-sm font-medium text-muted-foreground capitalize py-3 pr-4 align-top sticky left-0 bg-background z-10">
                             {formatAttributeName(key)}
                         </td>
                         {items.map(item => {
