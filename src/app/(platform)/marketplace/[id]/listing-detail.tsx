@@ -22,7 +22,7 @@ import {
     Package,
     Wrench,
     Users,
-    ArrowLeft,
+    ChevronRight,
     Brain,
     Cpu,
     BarChart3,
@@ -31,7 +31,6 @@ import {
     Calendar,
 } from "lucide-react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
 import { typography } from "@/lib/design-system"
 import { ProviderTrustSection } from "@/components/marketplace/ProviderTrustSection"
 import type { PortfolioItem, Certification, ProviderBadge } from "@/actions/trust-signals"
@@ -63,24 +62,35 @@ const categoryBadgeStyles = {
 }
 
 export function MarketplaceListingDetail({ listing, trustSignals, ratings }: MarketplaceListingDetailProps) {
-    const router = useRouter()
     const attrs = listing.attributes || {}
     const category = listing.category
 
     return (
         <div className="max-w-5xl mx-auto">
-            {/* Back button */}
-            <div className="mb-6">
-                <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => router.back()}
-                    className="gap-2"
+            {/* Breadcrumb Navigation */}
+            <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-sm mb-6">
+                <Link 
+                    href="/marketplace" 
+                    className="text-muted-foreground hover:text-foreground transition-colors"
                 >
-                    <ArrowLeft className="h-4 w-4" />
-                    Back to Marketplace
-                </Button>
-            </div>
+                    Marketplace
+                </Link>
+                <ChevronRight className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                {category && (
+                    <>
+                        <Link 
+                            href={`/marketplace?category=${encodeURIComponent(category)}`}
+                            className="text-muted-foreground hover:text-foreground transition-colors"
+                        >
+                            {category}
+                        </Link>
+                        <ChevronRight className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                    </>
+                )}
+                <span className="text-foreground font-medium truncate max-w-[200px]">
+                    {listing.title}
+                </span>
+            </nav>
 
             {/* Header */}
             <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 pb-6 border-b border-slate-100 mb-8">

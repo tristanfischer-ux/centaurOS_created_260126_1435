@@ -4,6 +4,16 @@ import { useState, useMemo, useEffect, useCallback } from "react"
 import { FileIcon, X, Loader2, Paperclip, FileText, Eye, Download } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { toast } from "sonner"
 import { deleteTaskAttachment } from "@/actions/tasks"
@@ -30,6 +40,7 @@ export function AttachmentList({ taskId, attachments, canDelete = false, onDelet
     const [previewFile, setPreviewFile] = useState<Attachment | null>(null)
     const [fileUrls, setFileUrls] = useState<Record<string, string>>({})
     const [downloadingId, setDownloadingId] = useState<string | null>(null)
+    const [deleteConfirm, setDeleteConfirm] = useState<{ id: string, path: string } | null>(null)
     const supabase = useMemo(() => createClient(), [])
 
     // Helper to get file type
@@ -114,10 +125,17 @@ export function AttachmentList({ taskId, attachments, canDelete = false, onDelet
         })
     }, [attachments, getFileUrl])
 
-    const handleDelete = async (fileId: string, filePath: string) => {
-        if (!confirm("Are you sure you want to delete this attachment?")) return
+    const handleDeleteClick = (fileId: string, filePath: string) => {
+        setDeleteConfirm({ id: fileId, path: filePath })
+    }
 
+    const handleDeleteConfirm = async () => {
+        if (!deleteConfirm) return
+        
+        const { id: fileId, path: filePath } = deleteConfirm
+        setDeleteConfirm(null)
         setDeletingId(fileId)
+        
         const res = await deleteTaskAttachment(fileId, filePath, taskId)
         setDeletingId(null)
 
@@ -231,7 +249,8 @@ export function AttachmentList({ taskId, attachments, canDelete = false, onDelet
                                                     variant="ghost"
                                                     className="min-h-[44px] min-w-[44px] h-9 w-9 text-muted-foreground hover:text-destructive hover:bg-status-error-light"
                                                     disabled={deletingId === file.id}
-                                                    onClick={() => handleDelete(file.id, file.file_path)}
+                                                    onClick={() => handleDeleteClick(file.id, file.file_path)}
+                                                    aria-label="Delete attachment"
                                                 >
                                                     {deletingId === file.id ? (
                                                         <Loader2 className="h-3 w-3 animate-spin" />
@@ -326,6 +345,27 @@ export function AttachmentList({ taskId, attachments, canDelete = false, onDelet
                     )}
                 </DialogContent>
             </Dialog>
+
+            {/* Delete Confirmation Dialog */}
+            <AlertDialog open={!!deleteConfirm} onOpenChange={(open) => !open && setDeleteConfirm(null)}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Delete Attachment?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Are you sure you want to delete this attachment? This action cannot be undone.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={handleDeleteConfirm}
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        >
+                            Delete
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </>
     )
 }

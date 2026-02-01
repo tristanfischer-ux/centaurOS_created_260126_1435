@@ -21,7 +21,7 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
 import { 
-  ArrowLeft,
+  ChevronRight,
   Building2,
   Users,
   Target,
@@ -71,16 +71,23 @@ export function PitchPrepDetailView({ request }: PitchPrepDetailViewProps) {
 
   return (
     <div className="space-y-6">
+      {/* Breadcrumb Navigation */}
+      <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-sm">
+        <Link 
+          href="/pitch-prep" 
+          className="text-muted-foreground hover:text-foreground transition-colors"
+        >
+          Pitch Prep
+        </Link>
+        <ChevronRight className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+        <span className="text-foreground font-medium truncate max-w-[200px]">
+          {request.company_name}
+        </span>
+      </nav>
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-slate-100">
         <div className="min-w-0 flex-1">
-          <Link 
-            href="/pitch-prep" 
-            className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground mb-2"
-          >
-            <ArrowLeft className="h-4 w-4 mr-1" />
-            Back to Pitch Prep
-          </Link>
           <div className={typography.pageHeader}>
             <div className={typography.pageHeaderAccent} />
             <h1 className={typography.h1}>{request.company_name}</h1>

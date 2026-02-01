@@ -17,6 +17,16 @@ import {
 } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import {
   cancelDataRequest,
   downloadDataExport,
 } from "@/actions/gdpr"
@@ -94,15 +104,15 @@ export function DataRequestStatusCard({
   const [loading, setLoading] = useState(false)
   const [downloading, setDownloading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false)
 
   const typeConfig = TYPE_CONFIG[request.request_type]
   const statusConfig = STATUS_CONFIG[request.status]
   const TypeIcon = typeConfig.icon
   const StatusIcon = statusConfig.icon
 
-  const handleCancel = async () => {
-    if (!confirm("Are you sure you want to cancel this request?")) return
-
+  const handleCancelConfirm = async () => {
+    setShowCancelConfirm(false)
     setLoading(true)
     setError(null)
 
@@ -304,7 +314,7 @@ export function DataRequestStatusCard({
           <Button
             variant="secondary"
             size="sm"
-            onClick={handleCancel}
+            onClick={() => setShowCancelConfirm(true)}
             disabled={loading}
           >
             {loading ? (
@@ -336,6 +346,24 @@ export function DataRequestStatusCard({
             </Button>
           )}
       </CardFooter>
+
+      {/* Cancel Confirmation Dialog */}
+      <AlertDialog open={showCancelConfirm} onOpenChange={setShowCancelConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Cancel Data Request?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to cancel this data request? You can submit a new request later if needed.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep Request</AlertDialogCancel>
+            <AlertDialogAction onClick={handleCancelConfirm}>
+              Cancel Request
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   )
 }

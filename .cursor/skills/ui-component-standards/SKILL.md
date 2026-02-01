@@ -1,6 +1,6 @@
 ---
 name: ui-component-standards
-description: Standards for UI components including semantic color tokens, accessibility requirements, and component usage patterns. Use when creating UI components, styling elements, using colors, creating forms, working with dialogs, or when the user mentions colors, styling, UI, form, dialog, badge, accessibility, or ARIA.
+description: Standards for UI components including semantic color tokens, accessibility requirements, and component usage patterns. Use when creating UI components, styling elements, using colors, creating forms, working with dialogs, breadcrumbs, touch targets, or when the user mentions colors, styling, UI, form, dialog, badge, accessibility, ARIA, breadcrumb, touch target, or keyboard navigation.
 ---
 
 # UI Component Standards
@@ -299,6 +299,279 @@ import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/componen
 
 ---
 
+## Breadcrumb Navigation (REQUIRED for Detail Pages)
+
+### ALL Routes with `[id]` MUST Have Breadcrumbs
+
+Detail pages (any route containing `[id]`) must include breadcrumb navigation for wayfinding.
+
+```tsx
+import Link from 'next/link'
+import { ChevronRight } from 'lucide-react'
+
+// ✅ REQUIRED - Breadcrumb for detail pages
+<nav aria-label="Breadcrumb" className="flex items-center gap-2 text-sm mb-6">
+  <Link 
+    href="/team" 
+    className="text-muted-foreground hover:text-foreground transition-colors"
+  >
+    Team
+  </Link>
+  <ChevronRight className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+  <span className="text-foreground font-medium">{profile.full_name}</span>
+</nav>
+
+// For nested routes (2+ levels deep)
+<nav aria-label="Breadcrumb" className="flex items-center gap-2 text-sm mb-6">
+  <Link href="/retainers" className="text-muted-foreground hover:text-foreground">
+    Retainers
+  </Link>
+  <ChevronRight className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+  <Link href={`/retainers/${retainerId}`} className="text-muted-foreground hover:text-foreground">
+    {retainerName}
+  </Link>
+  <ChevronRight className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+  <span className="text-foreground font-medium">Timesheet</span>
+</nav>
+```
+
+### Pages That MUST Have Breadcrumbs
+
+- `/team/[id]` - Team member detail
+- `/objectives/[id]` - Objective detail
+- `/advisory/[id]` - Advisory question detail
+- `/orders/[id]` - Order detail
+- `/marketplace/[id]` - Listing detail
+- `/rfq/[id]` - RFQ detail
+- `/retainers/[id]` - Retainer detail
+- Any nested `[id]` route
+
+---
+
+## Touch Targets (44px Minimum)
+
+### ALL Interactive Elements MUST Have 44x44px Touch Target
+
+This is a WCAG accessibility requirement for mobile usability.
+
+```tsx
+// ✅ CORRECT - Button component already has min-h-[44px]
+<Button>Click me</Button>
+
+// ✅ CORRECT - Icon button with proper size
+<Button variant="ghost" size="icon" aria-label="Delete">
+  <Trash2 className="h-4 w-4" />
+</Button>
+
+// ✅ CORRECT - Custom interactive element
+<button className="min-h-[44px] min-w-[44px] p-2 ...">
+  <MoreVertical className="h-4 w-4" />
+</button>
+
+// ✅ CORRECT - Extend tap area with negative margin
+<button className="p-3 -m-1">
+  <X className="h-4 w-4" />
+</button>
+
+// ❌ WRONG - Too small for touch
+<button className="p-1">
+  <X className="h-4 w-4" />
+</button>
+```
+
+### Elements That Need Touch Target Verification
+
+- Table row action buttons
+- Card action buttons
+- Icon-only buttons
+- Mobile navigation items
+- Dropdown triggers
+- Custom clickable elements
+
+---
+
+## AlertDialog Pattern (NEVER use window.confirm)
+
+### Replace ALL `window.confirm()` with AlertDialog
+
+Native browser dialogs break the user experience and cannot be styled.
+
+```tsx
+// ❌ WRONG - Never use window.confirm()
+const handleDelete = () => {
+  if (window.confirm("Are you sure you want to delete?")) {
+    deleteItem()
+  }
+}
+
+// ✅ CORRECT - Use AlertDialog component
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+
+const [showDeleteDialog, setShowDeleteDialog] = useState(false)
+
+<Button variant="destructive" onClick={() => setShowDeleteDialog(true)}>
+  Delete
+</Button>
+
+<AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+  <AlertDialogContent>
+    <AlertDialogHeader>
+      <AlertDialogTitle>Delete item?</AlertDialogTitle>
+      <AlertDialogDescription>
+        This action cannot be undone. This will permanently delete the item.
+      </AlertDialogDescription>
+    </AlertDialogHeader>
+    <AlertDialogFooter>
+      <AlertDialogCancel>Cancel</AlertDialogCancel>
+      <AlertDialogAction onClick={handleDelete}>Delete</AlertDialogAction>
+    </AlertDialogFooter>
+  </AlertDialogContent>
+</AlertDialog>
+```
+
+---
+
+## Keyboard Accessibility
+
+### NEVER Use `<div onClick>` Without Keyboard Support
+
+Clickable divs without keyboard support exclude keyboard-only users.
+
+```tsx
+// ❌ WRONG - Div with click only (keyboard users can't activate)
+<div onClick={handleClick} className="cursor-pointer">
+  Click me
+</div>
+
+// ✅ CORRECT - Use actual button element (PREFERRED)
+<button onClick={handleClick} className="...">
+  Click me
+</button>
+
+// ✅ CORRECT - If div is necessary, add full keyboard support
+<div
+  role="button"
+  tabIndex={0}
+  onClick={handleClick}
+  onKeyDown={(e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault()
+      handleClick()
+    }
+  }}
+  className="cursor-pointer"
+>
+  Click me
+</div>
+```
+
+### Required Attributes for Interactive Divs
+
+| Attribute | Required | Purpose |
+|-----------|----------|---------|
+| `role="button"` | Yes | Announces as button to screen readers |
+| `tabIndex={0}` | Yes | Makes element focusable |
+| `onClick` | Yes | Mouse interaction |
+| `onKeyDown` | Yes | Keyboard interaction (Enter/Space) |
+
+---
+
+## Screen Reader Support
+
+### Use `sr-only` for Screen Reader Text
+
+Provide text alternatives for visual-only information.
+
+```tsx
+// ✅ CORRECT - Status indicator with screen reader text
+<div className="flex items-center gap-2">
+  <div 
+    className="h-2 w-2 rounded-full bg-status-success" 
+    aria-hidden="true" 
+  />
+  <span>Active</span>
+</div>
+
+// ✅ CORRECT - Progress bar with screen reader announcement
+<div className="h-2 bg-muted rounded-full" role="progressbar" aria-valuenow={60}>
+  <div className="h-full bg-status-success rounded-full" style={{ width: '60%' }} />
+  <span className="sr-only">60% complete</span>
+</div>
+
+// ✅ CORRECT - Icon with visible text alternative
+<div className="flex items-center gap-2">
+  <CheckCircle className="h-4 w-4 text-status-success" aria-hidden="true" />
+  <span>Verified</span>
+</div>
+
+// ✅ CORRECT - Visual-only decorative icon
+<Star className="h-4 w-4 text-amber-400" aria-hidden="true" />
+```
+
+### When to Use `aria-hidden="true"`
+
+- Decorative icons next to text labels
+- Visual indicators that have text equivalents
+- Purely decorative elements
+
+### When to Use `sr-only`
+
+- Progress percentages not shown visually
+- Additional context for screen readers
+- Descriptions of visual states
+
+---
+
+## Dialog AutoFocus
+
+### Dialogs SHOULD AutoFocus First Interactive Element
+
+```tsx
+// ✅ CORRECT - AutoFocus on first input
+<Dialog>
+  <DialogContent>
+    <DialogHeader>
+      <DialogTitle>Create Item</DialogTitle>
+    </DialogHeader>
+    <div className="space-y-4">
+      <Input 
+        autoFocus  // Focus here when dialog opens
+        placeholder="Item name" 
+      />
+      <Textarea placeholder="Description" />
+    </div>
+    <DialogFooter>
+      <Button variant="secondary">Cancel</Button>
+      <Button>Create</Button>
+    </DialogFooter>
+  </DialogContent>
+</Dialog>
+
+// ✅ CORRECT - For confirmation dialogs, autoFocus on primary action
+<AlertDialog>
+  <AlertDialogContent>
+    <AlertDialogHeader>
+      <AlertDialogTitle>Confirm action?</AlertDialogTitle>
+    </AlertDialogHeader>
+    <AlertDialogFooter>
+      <AlertDialogCancel>Cancel</AlertDialogCancel>
+      <AlertDialogAction autoFocus>Confirm</AlertDialogAction>
+    </AlertDialogFooter>
+  </AlertDialogContent>
+</AlertDialog>
+```
+
+---
+
 ## Pre-Commit Checklist
 
 Before committing any UI code:
@@ -324,6 +597,15 @@ Before committing any UI code:
 ### Navigation
 - [ ] Active states use `text-international-orange`
 - [ ] No cyan colors for navigation
+- [ ] Detail pages (`[id]` routes) have breadcrumb navigation
+
+### Accessibility (NEW)
+- [ ] Interactive elements have 44px minimum touch target
+- [ ] No `window.confirm()` - use AlertDialog instead
+- [ ] No `<div onClick>` without `role="button"`, `tabIndex`, and `onKeyDown`
+- [ ] Dialogs autoFocus first input or primary action
+- [ ] Visual-only icons have `aria-hidden="true"`
+- [ ] Progress indicators have `sr-only` text or `aria-valuenow`
 
 ---
 

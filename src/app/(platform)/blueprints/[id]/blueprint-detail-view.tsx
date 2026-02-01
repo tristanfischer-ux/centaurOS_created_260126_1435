@@ -36,7 +36,7 @@ import type {
 } from '@/types/blueprints'
 import { PROJECT_STAGES, DOMAIN_CATEGORY_COLORS, DomainCategory } from '@/types/blueprints'
 import {
-  ChevronLeft,
+  ChevronRight,
   Settings,
   Play,
   ListTree,
@@ -117,16 +117,23 @@ export function BlueprintDetailView({
 
   return (
     <div className="space-y-6">
-      {/* Breadcrumb & Header */}
+      {/* Breadcrumb Navigation */}
+      <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-sm">
+        <Link 
+          href="/blueprints" 
+          className="text-muted-foreground hover:text-foreground transition-colors"
+        >
+          Blueprints
+        </Link>
+        <ChevronRight className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+        <span className="text-foreground font-medium truncate max-w-[200px]">
+          {blueprint.name}
+        </span>
+      </nav>
+
+      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="min-w-0 flex-1">
-          <Link
-            href="/blueprints"
-            className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground mb-2"
-          >
-            <ChevronLeft className="h-4 w-4 mr-1" />
-            Back to Blueprints
-          </Link>
           <div className={typography.pageHeader}>
             <div className={typography.pageHeaderAccent} />
             <h1 className={typography.h1}>{blueprint.name}</h1>

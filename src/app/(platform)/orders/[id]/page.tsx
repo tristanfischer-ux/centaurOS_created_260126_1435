@@ -3,8 +3,7 @@ import { notFound } from "next/navigation"
 import Link from "next/link"
 import { getOrderDetail } from "@/actions/orders"
 import { OrderDetail, OrderDetailSkeleton } from "@/components/orders"
-import { Button } from "@/components/ui/button"
-import { ChevronLeft } from "lucide-react"
+import { ChevronRight } from "lucide-react"
 
 export const dynamic = "force-dynamic"
 
@@ -41,12 +40,9 @@ export default async function OrderDetailPage({ params }: OrderDetailPageProps) 
             <p className="text-sm text-muted-foreground mt-1">
               You don&apos;t have permission to view this order.
             </p>
-            <Button variant="secondary" asChild className="mt-4">
-              <Link href="/orders">
-                <ChevronLeft className="h-4 w-4 mr-2" />
-                Back to Orders
-              </Link>
-            </Button>
+            <Link href="/orders" className="mt-4 text-sm text-muted-foreground hover:text-foreground transition-colors">
+              ← Back to Orders
+            </Link>
           </div>
         </div>
       )
@@ -57,15 +53,19 @@ export default async function OrderDetailPage({ params }: OrderDetailPageProps) 
 
   return (
     <div className="p-6">
-      {/* Back Navigation */}
-      <div className="mb-6">
-        <Button variant="ghost" size="sm" asChild>
-          <Link href="/orders">
-            <ChevronLeft className="h-4 w-4 mr-1" />
-            Back to Orders
-          </Link>
-        </Button>
-      </div>
+      {/* Breadcrumb Navigation */}
+      <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-sm mb-6">
+        <Link 
+          href="/orders" 
+          className="text-muted-foreground hover:text-foreground transition-colors"
+        >
+          Orders
+        </Link>
+        <ChevronRight className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+        <span className="text-foreground font-medium">
+          Order #{id.slice(0, 8)}
+        </span>
+      </nav>
 
       <Suspense fallback={<OrderDetailSkeleton />}>
         <OrderDetail order={order} userRole={role} />

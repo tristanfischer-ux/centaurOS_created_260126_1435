@@ -1,11 +1,10 @@
 "use client"
 
 import { useState } from "react"
-import { useRouter } from "next/navigation"
 import { formatDistanceToNow } from "date-fns"
 import { motion } from "framer-motion"
 import { 
-    ArrowLeft, 
+    ChevronRight, 
     MessageSquare, 
     Eye, 
     ThumbsUp,
@@ -19,6 +18,7 @@ import {
     Globe,
     Building2
 } from "lucide-react"
+import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { UserAvatar } from "@/components/ui/user-avatar"
@@ -97,7 +97,6 @@ export function QuestionDetailView({
     currentUserId, 
     currentUserRole 
 }: QuestionDetailViewProps) {
-    const router = useRouter()
     const [newAnswer, setNewAnswer] = useState("")
     const [isSubmitting, setIsSubmitting] = useState(false)
     const [isUpvoted, setIsUpvoted] = useState(false)
@@ -158,16 +157,19 @@ export function QuestionDetailView({
 
     return (
         <div className="max-w-4xl mx-auto space-y-6">
-            {/* Back Button */}
-            <Button 
-                variant="ghost" 
-                size="sm" 
-                onClick={() => router.push('/advisory')}
-                className="gap-2 -ml-2"
-            >
-                <ArrowLeft className="h-4 w-4" />
-                Back to Forum
-            </Button>
+            {/* Breadcrumb Navigation */}
+            <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-sm">
+                <Link 
+                    href="/advisory" 
+                    className="text-muted-foreground hover:text-foreground transition-colors"
+                >
+                    Advisory Forum
+                </Link>
+                <ChevronRight className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                <span className="text-foreground font-medium truncate max-w-[300px]">
+                    {question.title}
+                </span>
+            </nav>
 
             {/* Question Header */}
             <motion.div

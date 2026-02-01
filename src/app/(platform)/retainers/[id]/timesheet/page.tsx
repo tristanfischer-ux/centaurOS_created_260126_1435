@@ -2,12 +2,11 @@ import { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import {
-  ArrowLeft,
+  ChevronRight,
   Clock,
   CheckCircle,
   AlertCircle,
 } from 'lucide-react'
-import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
@@ -100,13 +99,26 @@ export default async function TimesheetPage({ params }: TimesheetPageProps) {
 
   return (
     <div className="container max-w-4xl py-8">
-      {/* Back Button */}
-      <Button variant="ghost" className="mb-6" asChild>
-        <Link href={`/retainers/${id}`}>
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Back to Retainer
+      {/* Breadcrumb Navigation */}
+      <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-sm mb-6">
+        <Link 
+          href="/retainers" 
+          className="text-muted-foreground hover:text-foreground transition-colors"
+        >
+          Retainers
         </Link>
-      </Button>
+        <ChevronRight className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+        <Link 
+          href={`/retainers/${id}`}
+          className="text-muted-foreground hover:text-foreground transition-colors"
+        >
+          Details
+        </Link>
+        <ChevronRight className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+        <span className="text-foreground font-medium">
+          Timesheet
+        </span>
+      </nav>
 
       {/* Header */}
       <div className="flex items-start justify-between mb-8">

@@ -7,13 +7,33 @@ description: Create and apply database migrations to Supabase, verify they succe
 
 This skill handles the complete workflow for creating and applying database migrations to Supabase.
 
+## IMPORTANT: Auto-Apply Policy
+
+**Whenever you create or modify a migration file, ALWAYS run `npx supabase db push` automatically.** Do not wait for the user to ask. The user expects database changes to be applied immediately.
+
+## Quick Commands (Use These!)
+
+```bash
+# Push all pending migrations (AUTO-RUN AFTER CREATING MIGRATIONS)
+npx supabase db push
+
+# Check what migrations are pending
+npx supabase migration list
+
+# Generate TypeScript types after schema changes
+npx supabase gen types typescript --linked > src/types/database.types.ts
+
+# Run arbitrary SQL query
+npx supabase db query "SELECT * FROM table LIMIT 5;"
+```
+
 ## Migration Workflow
 
 ```
 Migration Progress:
 - [ ] 1. Create migration file
 - [ ] 2. Review SQL for correctness
-- [ ] 3. Apply migration to Supabase
+- [ ] 3. Apply migration to Supabase (AUTO - npx supabase db push)
 - [ ] 4. Verify migration succeeded
 - [ ] 5. Update TypeScript types if needed
 - [ ] 6. Fix any issues and retry if needed
@@ -23,17 +43,16 @@ Migration Progress:
 
 Create a new migration in `supabase/migrations/`:
 
-```bash
-# Generate timestamp for migration name
-TIMESTAMP=$(date +%Y%m%d%H%M%S)
-echo "Migration: supabase/migrations/${TIMESTAMP}_description.sql"
-```
-
 **Naming convention:** `YYYYMMDDHHMMSS_descriptive_name.sql`
 
 **Example:**
 ```
 20260130143000_add_user_preferences.sql
+```
+
+Use this bash to get a timestamp:
+```bash
+date +%Y%m%d%H%M%S
 ```
 
 ## Step 2: Write Migration SQL
@@ -44,188 +63,306 @@ Follow these patterns for CentaurOS migrations:
 
 ```sql
 -- Create new table
-create table public.feature_name (
-  id uuid primary key default gen_random_uuid(),
-  foundry_id uuid not null references public.foundries(id) on delete cascade,
-  user_id uuid references auth.users(id) on delete set null,
+CREATE TABLE IF NOT EXISTS public.feature_name (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  foundry_id UUID NOT NULL REFERENCES public.foundries(id) ON DELETE CASCADE,
+  user_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
   
   -- Your columns
-  name text not null,
-  description text,
-  status text default 'active' check (status in ('active', 'inactive', 'archived')),
+  name TEXT NOT NULL,
+  description TEXT,
+  status TEXT DEFAULT 'active' CHECK (status IN ('active', 'inactive', 'archived')),
   
   -- Timestamps
-  created_at timestamptz default now() not null,
-  updated_at timestamptz default now() not null
+  created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
+  updated_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
 );
 
 -- Add comment
-comment on table public.feature_name is 'Description of what this table stores';
+COMMENT ON TABLE public.feature_name IS 'Description of what this table stores';
 
 -- Enable RLS (REQUIRED for all tables)
-alter table public.feature_name enable row level security;
+ALTER TABLE public.feature_name ENABLE ROW LEVEL SECURITY;
 
 -- Create RLS policies
-create policy "Users can view own foundry data"
-  on public.feature_name for select
-  using (foundry_id = (
-    select (raw_user_meta_data->>'foundry_id')::uuid 
-    from auth.users 
-    where id = auth.uid()
-  ));
+CREATE POLICY "users_view_own_data" ON public.feature_name
+  FOR SELECT USING (user_id = auth.uid());
 
-create policy "Users can insert own foundry data"
-  on public.feature_name for insert
-  with check (foundry_id = (
-    select (raw_user_meta_data->>'foundry_id')::uuid 
-    from auth.users 
-    where id = auth.uid()
-  ));
+CREATE POLICY "users_manage_own_data" ON public.feature_name
+  FOR ALL USING (user_id = auth.uid());
 
-create policy "Users can update own foundry data"
-  on public.feature_name for update
-  using (foundry_id = (
-    select (raw_user_meta_data->>'foundry_id')::uuid 
-    from auth.users 
-    where id = auth.uid()
-  ));
-
-create policy "Users can delete own foundry data"
-  on public.feature_name for delete
-  using (foundry_id = (
-    select (raw_user_meta_data->>'foundry_id')::uuid 
-    from auth.users 
-    where id = auth.uid()
-  ));
+-- For service role access
+CREATE POLICY "service_role_full_access" ON public.feature_name
+  FOR ALL USING (auth.role() = 'service_role');
 
 -- Create indexes for common queries
-create index idx_feature_name_foundry_id on public.feature_name(foundry_id);
-create index idx_feature_name_created_at on public.feature_name(created_at desc);
-
--- Add updated_at trigger
-create trigger set_updated_at
-  before update on public.feature_name
-  for each row
-  execute function public.handle_updated_at();
+CREATE INDEX IF NOT EXISTS idx_feature_name_user_id ON public.feature_name(user_id);
+CREATE INDEX IF NOT EXISTS idx_feature_name_created_at ON public.feature_name(created_at DESC);
 ```
 
 ### Alter Table Pattern
 
 ```sql
 -- Add column
-alter table public.existing_table 
-  add column new_column text;
+ALTER TABLE public.existing_table 
+  ADD COLUMN IF NOT EXISTS new_column TEXT;
 
 -- Add column with default
-alter table public.existing_table 
-  add column status text default 'pending' not null;
+ALTER TABLE public.existing_table 
+  ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'pending' NOT NULL;
 
 -- Add foreign key
-alter table public.existing_table 
-  add column related_id uuid references public.other_table(id);
-
--- Add constraint
-alter table public.existing_table 
-  add constraint check_status 
-  check (status in ('pending', 'active', 'completed'));
+ALTER TABLE public.existing_table 
+  ADD COLUMN IF NOT EXISTS related_id UUID REFERENCES public.other_table(id);
 ```
 
 ### Create Function Pattern
 
 ```sql
 -- Create or replace function
-create or replace function public.my_function(param1 uuid, param2 text)
-returns table (id uuid, name text) 
-language plpgsql
-security definer
-set search_path = public
-as $$
-begin
-  return query
-  select t.id, t.name
-  from public.some_table t
-  where t.foundry_id = param1;
-end;
+CREATE OR REPLACE FUNCTION public.my_function(param1 UUID, param2 TEXT)
+RETURNS TABLE (id UUID, name TEXT) 
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  RETURN QUERY
+  SELECT t.id, t.name
+  FROM public.some_table t
+  WHERE t.user_id = param1;
+END;
 $$;
-
--- Grant execute permission
-grant execute on function public.my_function to authenticated;
 ```
 
-## Step 3: Apply Migration
+### Atomic Balance/Counter Function Pattern
 
-**Method 1: Supabase CLI (Recommended)**
+For atomic operations that update balances or counters (from billing implementation):
+
+```sql
+-- Function for atomic balance adjustment with audit trail
+CREATE OR REPLACE FUNCTION public.adjust_account_balance(
+  p_user_id UUID,
+  p_amount DECIMAL,
+  p_transaction_type TEXT,
+  p_stripe_payment_intent_id TEXT DEFAULT NULL,
+  p_description TEXT DEFAULT NULL
+)
+RETURNS TABLE (success BOOLEAN, new_balance DECIMAL, error_message TEXT)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_current_balance DECIMAL;
+  v_new_balance DECIMAL;
+BEGIN
+  -- Lock the row for update (prevents race conditions)
+  SELECT balance INTO v_current_balance
+  FROM public.account_balances
+  WHERE user_id = p_user_id
+  FOR UPDATE;
+  
+  -- Create account if doesn't exist
+  IF v_current_balance IS NULL THEN
+    INSERT INTO public.account_balances (user_id, balance)
+    VALUES (p_user_id, 0)
+    ON CONFLICT (user_id) DO NOTHING;
+    v_current_balance := 0;
+  END IF;
+  
+  -- Calculate new balance
+  v_new_balance := v_current_balance + p_amount;
+  
+  -- Prevent negative balance (if required)
+  IF v_new_balance < 0 THEN
+    RETURN QUERY SELECT false, v_current_balance, 'Insufficient balance'::TEXT;
+    RETURN;
+  END IF;
+  
+  -- Update balance
+  UPDATE public.account_balances
+  SET balance = v_new_balance, updated_at = NOW()
+  WHERE user_id = p_user_id;
+  
+  -- Create transaction record
+  INSERT INTO public.balance_transactions (
+    user_id, amount, transaction_type, 
+    stripe_payment_intent_id, description,
+    balance_before, balance_after
+  ) VALUES (
+    p_user_id, p_amount, p_transaction_type,
+    p_stripe_payment_intent_id, p_description,
+    v_current_balance, v_new_balance
+  );
+  
+  RETURN QUERY SELECT true, v_new_balance, NULL::TEXT;
+END;
+$$;
+```
+
+### Trigger Function Pattern
+
+For auto-updating timestamps and derived data:
+
+```sql
+-- Generic updated_at trigger function
+CREATE OR REPLACE FUNCTION public.update_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW.updated_at = NOW();
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Apply to a table
+CREATE TRIGGER update_feature_updated_at
+  BEFORE UPDATE ON public.feature_name
+  FOR EACH ROW
+  EXECUTE FUNCTION public.update_updated_at_column();
+```
+
+### Metrics Calculation Trigger Pattern
+
+For auto-calculating aggregated metrics (from blueprints):
+
+```sql
+-- Function to recalculate coverage metrics
+CREATE OR REPLACE FUNCTION public.calculate_blueprint_coverage()
+RETURNS TRIGGER AS $$
+DECLARE
+  v_blueprint_id UUID;
+  v_total_domains INTEGER;
+  v_covered_domains INTEGER;
+  v_coverage_score DECIMAL;
+BEGIN
+  -- Get blueprint_id from affected row
+  IF TG_OP = 'DELETE' THEN
+    v_blueprint_id := OLD.blueprint_id;
+  ELSE
+    v_blueprint_id := NEW.blueprint_id;
+  END IF;
+  
+  -- Calculate metrics
+  SELECT 
+    COUNT(*),
+    COUNT(*) FILTER (WHERE coverage_status = 'covered')
+  INTO v_total_domains, v_covered_domains
+  FROM public.blueprint_domains
+  WHERE blueprint_id = v_blueprint_id;
+  
+  -- Calculate percentage
+  v_coverage_score := CASE 
+    WHEN v_total_domains > 0 
+    THEN (v_covered_domains::DECIMAL / v_total_domains) * 100
+    ELSE 0 
+  END;
+  
+  -- Update blueprint with new metrics
+  UPDATE public.blueprints
+  SET 
+    total_domains = v_total_domains,
+    covered_domains = v_covered_domains,
+    coverage_score = v_coverage_score,
+    updated_at = NOW()
+  WHERE id = v_blueprint_id;
+  
+  RETURN COALESCE(NEW, OLD);
+END;
+$$ LANGUAGE plpgsql;
+
+-- Create trigger on domain changes
+DROP TRIGGER IF EXISTS trigger_blueprint_coverage ON public.blueprint_domains;
+CREATE TRIGGER trigger_blueprint_coverage
+  AFTER INSERT OR UPDATE OR DELETE ON public.blueprint_domains
+  FOR EACH ROW
+  EXECUTE FUNCTION public.calculate_blueprint_coverage();
+```
+
+### RPC Function for Complex Queries
+
+When you need parameterized queries callable from client:
+
+```sql
+-- Get platform fee based on role and order type
+CREATE OR REPLACE FUNCTION public.get_platform_fee_percent(
+  p_role TEXT,
+  p_order_type TEXT DEFAULT 'default'
+)
+RETURNS DECIMAL
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+AS $$
+BEGIN
+  RETURN COALESCE(
+    (SELECT fee_percent 
+     FROM public.fee_configuration 
+     WHERE role = p_role AND order_type = p_order_type),
+    (SELECT fee_percent 
+     FROM public.fee_configuration 
+     WHERE role = 'default' AND order_type = p_order_type),
+    8.0  -- Fallback default
+  );
+END;
+$$;
+```
+
+### Calling Functions from TypeScript
+
+```typescript
+// Call RPC function
+const { data, error } = await supabase.rpc('get_platform_fee_percent', {
+  p_role: 'executive',
+  p_order_type: 'retainer',
+})
+
+// Call function that returns table rows
+const { data, error } = await supabase.rpc('adjust_account_balance', {
+  p_user_id: userId,
+  p_amount: 1000,
+  p_transaction_type: 'top_up',
+  p_description: 'Account balance top-up',
+})
+
+if (data?.[0]?.success) {
+  console.log('New balance:', data[0].new_balance)
+}
+```
+
+## Step 3: Apply Migration (AUTO-RUN!)
+
+**ALWAYS run this after creating a migration file:**
 
 ```bash
-# Push all pending migrations
 npx supabase db push
-
-# Or push to specific project
-npx supabase db push --db-url "postgresql://postgres:[password]@db.[project-ref].supabase.co:5432/postgres"
 ```
 
-**Method 2: Direct SQL Execution**
+This will:
+1. Connect to your remote Supabase instance
+2. Show pending migrations
+3. Apply them automatically (answers Y to prompts)
 
-If CLI isn't working, run SQL directly:
-
-1. Go to Supabase Dashboard → SQL Editor
-2. Paste migration SQL
-3. Click "Run"
-
-**Method 3: Use Supabase Studio**
-
-1. Open Supabase Dashboard → Table Editor
-2. Make schema changes via UI
-3. These changes apply immediately
+If there are errors, fix the SQL and run again.
 
 ## Step 4: Verify Migration
 
 After applying, verify the migration worked:
 
 ```bash
-# List all migrations (local vs remote)
+# Check migration was applied
 npx supabase migration list
 
-# Check table exists
-npx supabase db query "SELECT * FROM public.feature_name LIMIT 1;"
-
-# Verify RLS policies
-npx supabase db query "
-  SELECT schemaname, tablename, policyname, cmd, qual 
-  FROM pg_policies 
-  WHERE tablename = 'feature_name';
-"
+# Test table exists
+npx supabase db query "SELECT COUNT(*) FROM public.new_table;"
 ```
 
-**Via Supabase Dashboard:**
-1. Table Editor → Check table exists
-2. Authentication → Policies → Verify RLS policies
+## Step 5: Update TypeScript Types (Optional)
 
-## Step 5: Update TypeScript Types
-
-After schema changes, regenerate types:
+If you added new tables/columns that need type-safe access:
 
 ```bash
-# Generate fresh types from database
-npx supabase gen types typescript --project-id [project-ref] > src/types/database.types.ts
-
-# Or if linked
 npx supabase gen types typescript --linked > src/types/database.types.ts
-```
-
-Then update your application types in `src/types/`:
-
-```typescript
-// src/types/feature-name.ts
-export interface FeatureName {
-  id: string;
-  foundry_id: string;
-  name: string;
-  description: string | null;
-  status: 'active' | 'inactive' | 'archived';
-  created_at: string;
-  updated_at: string;
-}
 ```
 
 ## Step 6: Fix Migration Errors
@@ -234,87 +371,98 @@ export interface FeatureName {
 
 | Error | Cause | Solution |
 |-------|-------|----------|
-| `relation already exists` | Table exists | Skip or drop first |
-| `policy already exists` | Policy name conflict | Drop existing policy first |
+| `relation already exists` | Table exists | Use `IF NOT EXISTS` |
+| `policy already exists` | Policy name conflict | Use `DROP POLICY IF EXISTS` first |
 | `column does not exist` | Typo or missing column | Check spelling |
 | `violates foreign key` | Referenced row missing | Add data first or make nullable |
-| `permission denied` | RLS blocking | Use service role or fix policy |
+| `permission denied` | RLS blocking | Check RLS policies |
 
-### Error: Migration Failed Partially
-
-If migration partially applied:
+### Error: Policy Already Exists
 
 ```sql
--- Check what was created
-SELECT table_name FROM information_schema.tables 
-WHERE table_schema = 'public' ORDER BY table_name;
+-- Drop existing policy first
+DROP POLICY IF EXISTS "policy_name" ON public.table_name;
 
--- Manually complete or rollback
-DROP TABLE IF EXISTS public.partially_created_table CASCADE;
+-- Then create new one
+CREATE POLICY "policy_name" ON public.table_name ...
 ```
 
-### Error: RLS Blocking Queries
+### Error: Trigger Already Exists
 
 ```sql
--- Temporarily disable RLS (for debugging only)
-ALTER TABLE public.table_name DISABLE ROW LEVEL SECURITY;
-
--- Re-enable after fixing
-ALTER TABLE public.table_name ENABLE ROW LEVEL SECURITY;
+DROP TRIGGER IF EXISTS trigger_name ON public.table_name;
+CREATE TRIGGER trigger_name ...
 ```
 
-### Creating Rollback Migrations
+## RLS Policy Patterns for CentaurOS
 
-If you need to undo a migration:
-
+### User-owned data
 ```sql
--- YYYYMMDDHHMMSS_rollback_feature_name.sql
--- Rollback: Drop feature_name table
-
--- Drop policies first
-drop policy if exists "Users can view own foundry data" on public.feature_name;
-drop policy if exists "Users can insert own foundry data" on public.feature_name;
-drop policy if exists "Users can update own foundry data" on public.feature_name;
-drop policy if exists "Users can delete own foundry data" on public.feature_name;
-
--- Drop table
-drop table if exists public.feature_name cascade;
+CREATE POLICY "users_manage_own" ON public.table
+  FOR ALL USING (user_id = auth.uid());
 ```
 
-## RLS Policy Patterns
+### Foundry-scoped data
+```sql
+CREATE POLICY "foundry_access" ON public.table
+  FOR ALL USING (
+    foundry_id = (SELECT foundry_id FROM public.profiles WHERE id = auth.uid())
+  );
+```
 
-See [references/rls-patterns.md](references/rls-patterns.md) for comprehensive RLS policy patterns used in CentaurOS.
+### Service role full access
+```sql
+CREATE POLICY "service_full_access" ON public.table
+  FOR ALL USING (auth.role() = 'service_role');
+```
+
+### Authenticated read, restricted write
+```sql
+CREATE POLICY "authenticated_read" ON public.table
+  FOR SELECT USING (auth.role() = 'authenticated');
+
+CREATE POLICY "owner_write" ON public.table
+  FOR INSERT WITH CHECK (user_id = auth.uid());
+```
 
 ## Migration Checklist
 
 Before considering a migration complete:
 
-- [ ] Table created with correct columns
-- [ ] Foreign keys reference correct tables
-- [ ] RLS enabled on table
-- [ ] RLS policies for SELECT, INSERT, UPDATE, DELETE
-- [ ] Appropriate indexes created
-- [ ] TypeScript types updated
-- [ ] Service layer updated to use new schema
+- [ ] SQL uses `IF NOT EXISTS` / `IF EXISTS` for idempotency
+- [ ] Table has RLS enabled
+- [ ] RLS policies cover required access patterns
+- [ ] Service role has access if needed by server actions
+- [ ] Indexes created for frequently queried columns
+- [ ] `npx supabase db push` ran successfully
 
-## Quick Commands
+## Troubleshooting
 
+### Migration won't apply
 ```bash
-# Create new migration file
-touch "supabase/migrations/$(date +%Y%m%d%H%M%S)_description.sql"
+# Check if you're linked to the right project
+npx supabase status
 
-# Push migrations
-npx supabase db push
+# Re-link if needed
+npx supabase link --project-ref YOUR_PROJECT_REF
+```
 
-# Check migration status
-npx supabase migration list
+### Need to check current schema
+```bash
+npx supabase db query "
+  SELECT table_name 
+  FROM information_schema.tables 
+  WHERE table_schema = 'public' 
+  ORDER BY table_name;
+"
+```
 
-# Generate types
-npx supabase gen types typescript --linked > src/types/database.types.ts
-
-# Run arbitrary SQL
-npx supabase db query "SELECT * FROM table LIMIT 5;"
-
-# Reset database (CAUTION: destroys data)
-npx supabase db reset
+### Need to see table columns
+```bash
+npx supabase db query "
+  SELECT column_name, data_type, is_nullable
+  FROM information_schema.columns
+  WHERE table_name = 'your_table'
+  ORDER BY ordinal_position;
+"
 ```

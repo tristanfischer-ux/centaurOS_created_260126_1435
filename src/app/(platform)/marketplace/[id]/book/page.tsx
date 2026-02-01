@@ -2,8 +2,7 @@ import { notFound, redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { getListingForBooking } from '@/actions/booking'
 import { BookingWizard } from '@/components/booking/BookingWizard'
-import { ArrowLeft } from 'lucide-react'
-import { Button } from '@/components/ui/button'
+import { ChevronRight } from 'lucide-react'
 import Link from 'next/link'
 
 // Force dynamic since we're fetching data
@@ -45,14 +44,12 @@ export default async function BookingPage({ params }: BookingPageProps) {
                         Direct booking is only available for People listings. 
                         For Products, Services, and AI, please submit an RFQ (Request for Quote).
                     </p>
-                    <div className="flex justify-center gap-4">
-                        <Button variant="secondary" asChild>
-                            <Link href={`/marketplace`}>
-                                <ArrowLeft className="h-4 w-4 mr-2" />
-                                Back to Marketplace
-                            </Link>
-                        </Button>
-                    </div>
+                    <Link 
+                        href="/marketplace"
+                        className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                        ← Back to Marketplace
+                    </Link>
                 </div>
             </div>
         )
@@ -68,12 +65,12 @@ export default async function BookingPage({ params }: BookingPageProps) {
                         This listing does not have an associated provider profile. 
                         The provider may need to complete their profile setup.
                     </p>
-                    <Button variant="secondary" asChild>
-                        <Link href="/marketplace">
-                            <ArrowLeft className="h-4 w-4 mr-2" />
-                            Back to Marketplace
-                        </Link>
-                    </Button>
+                    <Link 
+                        href="/marketplace"
+                        className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                        ← Back to Marketplace
+                    </Link>
                 </div>
             </div>
         )
@@ -88,12 +85,12 @@ export default async function BookingPage({ params }: BookingPageProps) {
                         This provider is currently not accepting new bookings. 
                         Please check back later or browse other providers.
                     </p>
-                    <Button variant="secondary" asChild>
-                        <Link href="/marketplace">
-                            <ArrowLeft className="h-4 w-4 mr-2" />
-                            Back to Marketplace
-                        </Link>
-                    </Button>
+                    <Link 
+                        href="/marketplace"
+                        className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                        ← Back to Marketplace
+                    </Link>
                 </div>
             </div>
         )
@@ -109,12 +106,12 @@ export default async function BookingPage({ params }: BookingPageProps) {
                         This provider has not set their day rate yet. 
                         Please contact them directly or check back later.
                     </p>
-                    <Button variant="secondary" asChild>
-                        <Link href="/marketplace">
-                            <ArrowLeft className="h-4 w-4 mr-2" />
-                            Back to Marketplace
-                        </Link>
-                    </Button>
+                    <Link 
+                        href="/marketplace"
+                        className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                        ← Back to Marketplace
+                    </Link>
                 </div>
             </div>
         )
@@ -125,12 +122,26 @@ export default async function BookingPage({ params }: BookingPageProps) {
             {/* Header */}
             <div className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
                 <div className="container max-w-3xl mx-auto py-4 px-4">
-                    <Button variant="ghost" size="sm" asChild>
-                        <Link href="/marketplace">
-                            <ArrowLeft className="h-4 w-4 mr-2" />
-                            Back to Marketplace
+                    {/* Breadcrumb Navigation */}
+                    <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-sm">
+                        <Link 
+                            href="/marketplace" 
+                            className="text-muted-foreground hover:text-foreground transition-colors"
+                        >
+                            Marketplace
                         </Link>
-                    </Button>
+                        <ChevronRight className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                        <Link 
+                            href={`/marketplace/${id}`}
+                            className="text-muted-foreground hover:text-foreground transition-colors truncate max-w-[150px]"
+                        >
+                            {listing.title}
+                        </Link>
+                        <ChevronRight className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                        <span className="text-foreground font-medium">
+                            Book
+                        </span>
+                    </nav>
                 </div>
             </div>
 

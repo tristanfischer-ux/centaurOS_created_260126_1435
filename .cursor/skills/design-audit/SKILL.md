@@ -1,6 +1,6 @@
 ---
 name: design-audit
-description: Systematic audit of codebase for design inconsistencies, with quantified metrics and actionable fix plans. Use when the user asks to audit design, check consistency, find UI inconsistencies, review design system usage, or mentions design debt, visual inconsistency, or UX audit.
+description: Systematic audit of codebase for design inconsistencies, with quantified metrics and actionable fix plans. Use when the user asks to audit design, check consistency, find UI inconsistencies, review design system usage, accessibility audit, or mentions design debt, visual inconsistency, UX audit, or a11y audit.
 ---
 
 # Design Consistency Audit
@@ -196,6 +196,146 @@ rg "h-[3-6] w-[3-6]" src/components/Sidebar
 rg "h-[3-6] w-[3-6]" src/components/MobileNav
 ```
 
+---
+
+## Phase 2: Accessibility & UX Audit
+
+Phase 2 audit covers navigation, keyboard accessibility, mobile usability, and screen reader support.
+
+### 5. Navigation & Wayfinding
+
+**What to find:**
+```bash
+# Breadcrumb usage (should match detail page count)
+rg "Breadcrumb|breadcrumb" src/app --count-matches
+rg "ChevronRight.*text-sm" src/app --count-matches
+
+# Detail pages (routes with [id])
+find src/app -name "page.tsx" -path "*\[id\]*" | wc -l
+
+# Back navigation patterns
+rg "ArrowLeft|ChevronLeft.*href" src/app --count-matches
+```
+
+**Target:** Every `[id]` route should have breadcrumb navigation.
+
+### 6. Keyboard Accessibility
+
+**What to find:**
+```bash
+# Clickable divs (potential keyboard traps)
+rg "<div[^>]*onClick" src/ --type tsx | wc -l
+
+# Keyboard handlers
+rg "onKeyDown|onKeyUp|onKeyPress" src/ --count-matches
+
+# Tab index usage
+rg "tabIndex" src/ --count-matches
+
+# Role button without keyboard
+rg 'role="button"' src/ | rg -v "onKeyDown" | wc -l
+
+# Div onClick without role
+rg "<div[^>]*onClick" src/ | rg -v "role=" | wc -l
+```
+
+**Target:** Zero clickable divs without keyboard support.
+
+### 7. Mobile Touch Targets
+
+**What to find:**
+```bash
+# Touch target enforcement (44px minimum)
+rg "min-h-\[44px\]|min-w-\[44px\]" src/ --count-matches
+
+# Small interactive elements (potential violations)
+rg 'size="icon"' src/ --count-matches
+rg "p-1\s|p-1\"" src/components --count-matches
+
+# Button component usage (already has 44px)
+rg "Button.*variant" src/ --count-matches
+```
+
+**Target:** All interactive elements should have 44x44px minimum touch area.
+
+### 8. Screen Reader Support
+
+**What to find:**
+```bash
+# Screen reader only text
+rg "sr-only" src/ --count-matches
+
+# Aria labels on icon buttons
+rg 'size="icon"' src/ | rg "aria-label" | wc -l
+rg 'size="icon"' src/ | rg -v "aria-label" | wc -l
+
+# Role alert for error messages
+rg 'role="alert"' src/ --count-matches
+
+# Aria hidden for decorative elements
+rg 'aria-hidden="true"' src/ --count-matches
+```
+
+**Target:** All icon-only buttons have aria-label, all decorative icons have aria-hidden.
+
+### 9. Dialog & Modal UX
+
+**What to find:**
+```bash
+# window.confirm usage (should be 0)
+rg "window\.confirm|confirm\(" src/app src/components --count-matches
+
+# AlertDialog usage (good)
+rg "AlertDialog" src/ --count-matches
+
+# AutoFocus in dialogs
+rg "autoFocus" src/ --count-matches
+
+# Dialog count (to compare with autoFocus)
+rg "DialogContent|AlertDialogContent" src/ -l | wc -l
+```
+
+**Target:** Zero window.confirm, all dialogs have autoFocus.
+
+### Phase 2 Audit Template
+
+Add these sections to the audit report:
+
+```markdown
+## Phase 2: Accessibility & UX
+
+| Category | Metric | Count | Target | Status |
+|----------|--------|-------|--------|--------|
+| **Navigation** | Detail pages with breadcrumbs | X/Y | 100% | 🔴/🟡/🟢 |
+| **Keyboard** | Div onClick without keyboard | X | 0 | 🔴/🟡/🟢 |
+| **Touch** | Elements with 44px target | X | 100% | 🔴/🟡/🟢 |
+| **Screen Reader** | Icon buttons with aria-label | X/Y | 100% | 🔴/🟡/🟢 |
+| **Dialogs** | window.confirm usage | X | 0 | 🔴/🟡/🟢 |
+| **Dialogs** | Dialogs with autoFocus | X/Y | 100% | 🔴/🟡/🟢 |
+
+### Critical Issues (Phase 2)
+
+#### Issue: Missing Breadcrumbs
+**Affected:** [List of detail pages]
+**Impact:** Users get lost on detail pages
+**Fix:** Add breadcrumb navigation component
+
+#### Issue: Div onClick Without Keyboard
+**Affected:** [File list]
+**Impact:** Keyboard users cannot interact
+**Fix:** Add role="button" tabIndex={0} onKeyDown
+```
+
+### Phase 2 Severity Framework
+
+| Severity | Phase 2 Examples |
+|----------|-----------------|
+| 🔴 Critical | Missing breadcrumbs, keyboard traps, window.confirm |
+| 🟡 Needs Work | Missing aria-labels, no autoFocus, small touch targets |
+| 🟢 Good | Proper screen reader support, full keyboard access |
+
+---
+
 ## Creating Cursor Rules
 
 When audit reveals patterns, create rules to prevent recurrence:
@@ -233,7 +373,21 @@ When audit reveals patterns, create rules to prevent recurrence:
 
 Before completing audit:
 
-- [ ] Quantified all inconsistencies with actual counts
+### Phase 1: Design Consistency
+- [ ] Quantified all color inconsistencies with actual counts
+- [ ] Checked form validation patterns
+- [ ] Verified component usage (Card, Dialog, Badge)
+- [ ] Checked navigation active state colors
+
+### Phase 2: Accessibility & UX
+- [ ] Verified breadcrumb coverage on detail pages
+- [ ] Checked keyboard accessibility (div onClick)
+- [ ] Verified touch targets (44px minimum)
+- [ ] Checked screen reader support (aria-labels, sr-only)
+- [ ] Verified no window.confirm usage
+- [ ] Checked dialog autoFocus
+
+### General
 - [ ] Categorized by severity (Critical/Inconsistent/Minor)
 - [ ] Identified what's working well (not just problems)
 - [ ] Provided specific file paths for worst offenders

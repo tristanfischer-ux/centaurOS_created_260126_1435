@@ -1,254 +1,240 @@
 # Agent Handover Document
-**Date:** January 30, 2026  
-**Previous Agent Task:** Full code review fix implementation  
-**Status:** Mostly complete - Priorities 1, 2, 5 done, 3, 4 pending
+**Date:** January 31, 2026
+**Task:** Create 4 new industry blueprint templates (Rockets, Satellites, AI Data Centres, Pharmaceuticals)
+**Status:** Planning complete, implementation ready to start
 
 ---
 
 ## Context
 
-A comprehensive code review was performed on the CentaurOS codebase. The review identified issues across 6 dimensions: Architecture, Security, Performance, Maintainability, Test Coverage, and Design System Compliance. Multiple sessions focused on fixing critical issues.
+The user requested investigation of the existing blueprint system and creation of 4 new industry-specific blueprint templates. I analysed the existing system, understood the data structures, and created a comprehensive plan. **Important: Centaur Dynamics is UK-based, so all regulatory domains must include UK and EU regulations. For space-related blueprints, note that much of EU space law is based in Luxembourg.**
 
 ---
 
-## SESSION 2 - COMPLETED FIXES ✅
+## COMPLETED ✅
 
-### 8. Remove @ts-nocheck from Action Files (PRIORITY 1 - DONE)
+### Investigation & Analysis
+- Explored the complete blueprint system architecture
+- Identified data structures in `src/types/blueprints.ts`
+- Found existing templates in `supabase/migrations/20260131300001_seed_blueprint_templates.sql`
+- Documented the 4 existing templates: Consumer Electronics, SaaS Platform, Robotics & Automation, Mobile Application
 
-**Files Fixed:** All 38 action files that had `@ts-nocheck` comments
-- Removed `@ts-nocheck` from all action files in `src/actions/`
-- Fixed type errors using `as unknown as` patterns for JSON fields
-- Added proper type annotations for risk levels and status enums
-- Fixed notification schema mismatches (`data` → `metadata`, `read` → `is_read`)
-
-**Key type fixes:**
-- `Json` type casting for Supabase JSON columns
-- `'Low' | 'Medium' | 'High'` type for risk_level fields
-- Proper profile role types
-
-### 9. Design System Color Violations (PRIORITY 2 - DONE)
-
-**Violations Fixed:** 145+ hardcoded color classes across 66+ files
-
-**Color Mapping Applied:**
-- `text-slate-900` → `text-foreground`
-- `text-slate-600/500/400` → `text-muted-foreground`
-- `bg-white` → `bg-background`
-- `bg-slate-50/100` → `bg-muted` or `bg-secondary`
-- `bg-slate-900` → `bg-foreground`
-- `text-blue-*` → `text-electric-blue`
-- `text-green-*` → `text-status-success`
-- `text-red-*` → `text-destructive`
-- `text-amber-*` → `text-status-warning`
-- `border-slate-*` → `border` or `border-muted`
-
-**Files with major fixes:**
-- `tasks-view.tsx`, `task-card.tsx`, `marketplace-view.tsx`
-- `team-comparison-view.tsx`, `PublicProfileView.tsx`
-- All UI components in `src/components/ui/`
-- All marketing components in `src/components/marketing/`
-- Provider portal pages
-
-### 10. sanitizeErrorMessage Applied (PRIORITY 5 - DONE)
-
-**Files Fixed:** 11 action files with 98+ error handler instances
-
-**Pattern Applied:**
-```typescript
-// Before
-return { error: error.message }
-
-// After
-import { sanitizeErrorMessage } from '@/lib/security/sanitize'
-return { error: sanitizeErrorMessage(error) }
-```
-
-**Files Updated:**
-- `tasks.ts`, `team.ts`, `approvals.ts`, `standups.ts`
-- `otjt-tracking.ts`, `apprenticeship-documents.ts`
-- `apprenticeship-progress.ts`, `apprenticeship-enrollment.ts`
-- `sheets-sync.ts`, `org-blueprint.ts`, `offboarding.ts`
-- `admin-permissions.ts`
-
-### 11. Created Custom Hook for Task Card Refactoring
-
-**File Created:** `src/hooks/useTaskCardState.ts`
-- Extracts 16 useState calls into a reusable hook
-- Manages dialog states, loading states, and attachment handling
-- Ready for integration into `task-card.tsx`
+### Planning
+- Designed domain hierarchies for all 4 new templates
+- Identified ~265 total domains across the 4 templates
+- Planned UUID scheme (00000005 for rockets, 00000006 for satellites, 00000007 for AI data centres, 00000008 for pharmaceuticals)
+- User approved the plan
 
 ---
 
-## PREVIOUSLY COMPLETED FIXES ✅
+## KEY FILES
 
-### 1. SQL Injection Vulnerabilities (CRITICAL - FIXED)
-
-**Problem:** String interpolation in Supabase `.or()` queries allowed potential injection.
-
-**Files Fixed:**
-- `src/actions/otjt-tracking.ts` - Lines 446-456 area
-- `src/actions/apprenticeship-documents.ts` - Lines 47-66 area
-- `src/actions/apprenticeship-enrollment.ts` - Lines 146-175 area
-- `src/actions/public-profile.ts` - Lines 270-296 area
-- `src/actions/discovery-calls.ts` - Lines 197-220 and 290-340 areas
-- `src/actions/approvals.ts` - Lines 197-210 area
-
-**Solution Applied:** Replaced `.or()` with string interpolation with separate parameterized queries using `.eq()`, combined with `Promise.all` for parallel execution where appropriate. Added UUID validation using `isValidUUID()` from `@/lib/security/sanitize`.
-
-### 2. N+1 Query Patterns (PERFORMANCE - FIXED)
-
-**Files Fixed:**
-- `src/actions/otjt-tracking.ts` - `bulkApproveOTJTLogs()` function now uses `Promise.all`
-- `src/actions/apprenticeship-progress.ts` - Task inserts in `createProgressReview()` and `completeProgressReview()` now use batch inserts
-
-### 3. Dummy API Key (SECURITY - FIXED)
-
-**File Fixed:** `src/app/api/marketplace/compare/route.ts`
-- Removed `"dummy-key-for-build"` fallback
-- Added runtime validation that returns 503 if `OPENAI_API_KEY` is not configured
-
-### 4. Error Message Sanitization (SECURITY - NEW UTILITY)
-
-**File Created/Modified:** `src/lib/security/sanitize.ts`
-- Added `sanitizeErrorMessage()` function
-- Maps internal database/network errors to user-friendly messages
-- Prevents exposure of internal details in API responses
-
-### 5. Missing Memoization (PERFORMANCE - FIXED)
-
-**Files Fixed:**
-- `src/components/apprenticeship/admin-dashboard.tsx` - Added `useMemo` for statistics
-- `src/components/apprenticeship/mentor-dashboard.tsx` - Added `useMemo` for calculations
-
-### 6. Design System Color Violations (PARTIAL)
-
-**File Fixed:** `src/app/page.tsx`
-- Replaced `text-blue-*` → `text-electric-blue`
-- Replaced `bg-slate-900` → `bg-foreground`
-- Replaced `border-slate-100` → `border-muted`
-- Replaced `hover:bg-slate-*` → `hover:bg-secondary` or `hover:bg-foreground/90`
-
-### 7. Supabase Types Regenerated
-
-**File Regenerated:** `src/types/database.types.ts`
-- Run: `npx supabase gen types typescript --project-id <project-ref> --schema public > src/types/database.types.ts`
+| File | Purpose |
+|------|---------|
+| `src/types/blueprints.ts` | TypeScript types for blueprints, domains, coverage |
+| `supabase/migrations/20260131300001_seed_blueprint_templates.sql` | Existing 4 template definitions - **USE AS REFERENCE FORMAT** |
+| `supabase/migrations/20260131300000_blueprints.sql` | Database schema for blueprint tables |
+| `src/actions/blueprints.ts` | Server actions for blueprint CRUD |
+| `src/components/blueprints/` | UI components for blueprints |
 
 ---
 
 ## REMAINING TASKS 🔧
 
-### Priority 3: Refactor God Components (IN PROGRESS - 37% COMPLETE)
+### Priority 1: Create SQL Migration for New Templates
 
-**Components to Split:**
-1. ✅ `src/app/(platform)/tasks/task-card.tsx` - **1,073 → 675 lines (37% reduction)**
-   - Created `src/hooks/useTaskCardState.ts` (127 lines) - state management
-   - Created `src/hooks/useTaskActions.ts` (200 lines) - action handlers
-   - Created `src/components/tasks/forward-task-dialog.tsx` (199 lines) - forward dialog
-   - Created `src/components/tasks/task-action-buttons.tsx` (341 lines) - action buttons
-   - **Still needs**: CardHeader extraction, CardContent extraction to reach <300 lines
-2. ⏳ `src/app/(platform)/marketplace/marketplace-view.tsx` - 1,293 lines (not started)
-3. ⏳ `src/app/(platform)/team/team-comparison-view.tsx` - 1,467 lines (not started)
+**Problem:** Need to create a new SQL migration file with 4 new blueprint templates and their knowledge domains
 
-**Progress on task-card.tsx:**
-- ✅ Integrated `useTaskCardState` hook (saves 70 lines)
-- ✅ Integrated `useTaskActions` hook (saves 120 lines)
-- ✅ Extracted Forward Dialog component (saves 110 lines)
-- ✅ Extracted Action Buttons component (saves 160 lines)
-- **Total saved: 398 lines (37.1% reduction)**
-- **Current size: 675 lines**
-- **Target: <300 lines**
-- **Still needed**: Extract CardHeader (~150 lines) and CardContent (~100 lines)
+**File to create:** `supabase/migrations/20260131300002_seed_new_blueprint_templates.sql`
 
-**Next Steps:**
-1. Continue task-card.tsx: Extract CardHeader component with assignee picker and badges
-2. Extract CardContent expanded view section
-3. Once task-card.tsx is <300 lines, move to marketplace-view.tsx
-4. Apply same patterns to team-comparison-view.tsx
+**Approach:**
+1. Copy the format from `20260131300001_seed_blueprint_templates.sql`
+2. Create 4 template records in `blueprint_templates` table
+3. Create hierarchical `knowledge_domains` records for each template
 
-### Priority 4: Add Test Coverage
+---
 
-**Current State:** Very low coverage (~5%)
+## THE 4 NEW TEMPLATES TO CREATE
 
-**Priority Test Files Needed:**
-1. `src/actions/payments.ts` - Payment flows (critical)
-2. `src/actions/tasks.ts` - Task lifecycle
-3. `src/actions/rfq.ts` - RFQ workflow
-4. `src/lib/security/sanitize.ts` - Security utilities
+### Template 1: Rockets & Launch Vehicles (`00000005-0000-4000-8000-000000000001`)
+**Slug:** `rockets` | **Icon:** `rocket` | **~65 domains**
+**Tags:** `space`, `aerospace`, `propulsion`, `launch`
 
-**Test Location:** `src/__tests__/` or alongside files as `*.test.ts`
+**Domain Hierarchy:**
 
-### Additional Items
+| ID Prefix | Category | Root Domain | Critical Sub-domains |
+|-----------|----------|-------------|----------------------|
+| 1xxx | Propulsion | Propulsion Systems | Liquid Engines, Solid Motors, Turbopumps, Combustion Chambers, Nozzle Design, Fuel Systems, Ignition Systems |
+| 2xxx | Structures | Vehicle Structures | Airframe Design, Propellant Tanks, Interstage, Fairing Design, Materials Selection, Loads Analysis, Thermal Protection (TPS) |
+| 3xxx | Avionics | Avionics & Electronics | Flight Computers, Power Systems, Telemetry, RF Communications, Sensors & Instrumentation, Pyrotechnics |
+| 4xxx | GNC | Guidance Navigation & Control | GNC Algorithms, Trajectory Design, Attitude Control, Inertial Navigation, GPS Integration, Thrust Vector Control |
+| 5xxx | Software | Flight Software | Embedded Software, Simulation & Modeling, Mission Planning, Data Processing, Ground Software |
+| 6xxx | Manufacturing | Manufacturing & Test | Composite Fabrication, Welding & Metalwork, Assembly & Integration, Static Fire Testing, Engine Testing, Environmental Testing |
+| 7xxx | Regulatory | **Regulatory & Compliance** | **UK Space Agency Licensing**, **CAA Regulations**, **EU Space Regulation**, **Luxembourg Space Law**, ITAR/Export Control, Range Safety, Environmental Impact, Insurance Requirements |
+| 8xxx | Business | Business & Operations | Launch Services, Pricing Model, Customer Contracts, Range Operations, Ground Support Equipment |
 
-**E2E Test Fix Needed:**
-- `e2e/apprenticeship.spec.ts` has TypeScript errors
-- Lines 78, 102, 106: `Property 'first' does not exist on type 'Promise<void>'`
-- This is a Playwright API usage issue, not a production code issue
+**Key Regulatory Questions to Include:**
+- "Have you engaged with the UK Space Agency for launch licensing?"
+- "What is your approach to EU space debris mitigation requirements?"
+- "Have you considered Luxembourg as a licensing jurisdiction?"
+- "What ITAR/export control classifications apply to your technology?"
+
+---
+
+### Template 2: Satellites & Spacecraft (`00000006-0000-4000-8000-000000000001`)
+**Slug:** `satellites` | **Icon:** `satellite` | **~70 domains**
+**Tags:** `space`, `aerospace`, `orbital`, `spacecraft`
+
+**Domain Hierarchy:**
+
+| ID Prefix | Category | Root Domain | Critical Sub-domains |
+|-----------|----------|-------------|----------------------|
+| 1xxx | Payload | Payload Systems | Imaging Sensors (EO/IR), Communications Payload, Scientific Instruments, Antenna Systems, Data Processing Unit |
+| 2xxx | Bus | Spacecraft Bus | Structure & Mechanisms, Attitude Determination & Control (ADCS), Propulsion (electric/chemical), Thermal Control, Harness & Connectors |
+| 3xxx | Power | Power Systems | Solar Arrays, Batteries (Li-ion), Power Distribution Unit, Power Management, Eclipse Operations |
+| 4xxx | Comms | Communications & Data | Ground Station Network, Link Budget Analysis, Frequency Coordination, Data Downlink, Command & Telemetry, Inter-Satellite Links |
+| 5xxx | Software | Software & Flight Systems | Flight Software, Fault Detection & Recovery, Autonomous Operations, Ground Segment Software, Mission Planning |
+| 6xxx | Manufacturing | Manufacturing & AIT | Cleanroom Operations, Integration & Test, Environmental Testing (TVAC, vibration), Launch Integration, Shipping & Handling |
+| 7xxx | Regulatory | **Regulatory & Licensing** | **UK Space Agency Operator License**, **Ofcom Spectrum Licensing**, **ITU Coordination (Luxembourg)**, **EU Space Surveillance**, Debris Mitigation (25-year rule), Export Control, Third-Party Liability |
+| 8xxx | Operations | Mission Operations | Mission Control Centre, Spacecraft Operations, Anomaly Response, Constellation Management, End-of-Life Disposal |
+
+**Key Regulatory Questions to Include:**
+- "Have you applied for a UK Outer Space Act license?"
+- "What is your ITU filing strategy (consider Luxembourg for EU filings)?"
+- "Have you obtained Ofcom authorization for your frequencies?"
+- "What is your debris mitigation and end-of-life disposal plan?"
+
+---
+
+### Template 3: AI Data Centres (`00000007-0000-4000-8000-000000000001`)
+**Slug:** `ai-datacentre` | **Icon:** `server-cog` | **~55 domains**
+**Tags:** `infrastructure`, `AI`, `computing`, `cloud`
+
+**Domain Hierarchy:**
+
+| ID Prefix | Category | Root Domain | Critical Sub-domains |
+|-----------|----------|-------------|----------------------|
+| 1xxx | Compute | Compute Infrastructure | GPU Clusters (NVIDIA H100/B200), TPU/ASIC Systems, CPU Servers, High-Bandwidth Memory, Storage Systems (NVMe, object storage) |
+| 2xxx | Power | Power Infrastructure | Power Delivery Architecture, UPS Systems, Backup Generators, Power Distribution Units (PDU), Power Usage Effectiveness (PUE), Grid Connection |
+| 3xxx | Cooling | Cooling Systems | Direct Liquid Cooling (DLC), Rear-Door Heat Exchangers, Immersion Cooling, CRAC/CRAH Units, Hot/Cold Aisle Containment, Chillers & Cooling Towers |
+| 4xxx | Network | Network Infrastructure | High-Speed Interconnects (InfiniBand, RoCE), Network Switches (400GbE), Structured Cabling, Network Topology (spine-leaf), Load Balancing |
+| 5xxx | Software | Software Platform | ML Frameworks (PyTorch, JAX), Cluster Orchestration (Kubernetes, Slurm), Model Serving (Triton, vLLM), Monitoring & Observability, Data Pipeline (ETL) |
+| 6xxx | Security | Security & Access | Physical Security, Cybersecurity (SOC), Access Control (biometric), DDoS Protection, Compliance Monitoring, Incident Response |
+| 7xxx | Regulatory | **Regulatory & Compliance** | **UK Planning Permission**, **UK Building Regulations**, **UK Grid Connection (National Grid ESO)**, **EU AI Act Compliance**, **UK/EU GDPR**, Energy Efficiency Regulations, Environmental Impact Assessment |
+| 8xxx | Business | Business & Operations | Site Selection, Capacity Planning, Customer Contracts, SLA Management, Pricing Models, Sustainability Reporting |
+
+**Key Regulatory Questions to Include:**
+- "Have you obtained UK planning permission for the data centre?"
+- "What is your grid connection agreement with National Grid ESO?"
+- "How does your facility comply with UK GDPR and EU GDPR?"
+- "What is your approach to EU AI Act compliance for hosted models?"
+
+---
+
+### Template 4: Pharmaceuticals & Drug Development (`00000008-0000-4000-8000-000000000001`)
+**Slug:** `pharmaceuticals` | **Icon:** `pill` | **~75 domains**
+**Tags:** `healthcare`, `biotech`, `drug`, `clinical`
+
+**Domain Hierarchy:**
+
+| ID Prefix | Category | Root Domain | Critical Sub-domains |
+|-----------|----------|-------------|----------------------|
+| 1xxx | Discovery | Drug Discovery | Target Identification & Validation, Lead Optimization, High-Throughput Screening, Medicinal Chemistry, Biologics Discovery (mAbs, ADCs), Computational Drug Design |
+| 2xxx | Preclinical | Preclinical Development | Toxicology Studies (GLP), Pharmacology, Formulation Development, ADME Studies, Animal Models, Biomarker Development |
+| 3xxx | Clinical | Clinical Development | Phase I Trials (First-in-Human), Phase II Trials, Phase III Trials, Biostatistics, CRO Management, Patient Recruitment, Clinical Operations |
+| 4xxx | Manufacturing | Manufacturing (CMC) | API Synthesis (small molecule), Biologics Manufacturing, Formulation & Drug Product, Fill/Finish, Packaging & Labeling, Scale-up & Tech Transfer, Process Development |
+| 5xxx | Quality | Quality & Compliance | GMP Compliance, Quality Assurance, Quality Control (analytical), Validation (process, cleaning, computer), Stability Studies (ICH), Deviation & CAPA Management |
+| 6xxx | Regulatory | **Regulatory Affairs** | **MHRA (UK) Submissions**, **EMA (EU) Submissions**, **IMPD/CTA for Clinical Trials**, **Marketing Authorisation (UK/EU)**, Labeling Requirements, Post-Market Surveillance, Pharmacovigilance |
+| 7xxx | Commercial | Commercial Operations | Market Access, **NICE/SMC Health Technology Assessment**, Pricing & Reimbursement, Medical Affairs, Distribution & Cold Chain, Key Opinion Leader Management |
+| 8xxx | IP | Intellectual Property | Patent Strategy, Freedom to Operate, Data Exclusivity, Supplementary Protection Certificates (SPC) |
+
+**Key Regulatory Questions to Include:**
+- "Have you submitted a Clinical Trial Authorisation (CTA) to MHRA?"
+- "What is your EMA centralised vs national procedure strategy?"
+- "Have you engaged with NICE for health technology assessment?"
+- "What is your pharmacovigilance system for UK/EU?"
+
+---
+
+## SQL FORMAT REFERENCE
+
+Use this format from the existing migration (see `20260131300001_seed_blueprint_templates.sql`):
+
+```sql
+-- Template record
+INSERT INTO blueprint_templates (id, name, description, product_category, icon, estimated_domains, estimated_questions, is_system_template, metadata)
+VALUES (
+    '00000005-0000-4000-8000-000000000001',
+    'Rockets & Launch Vehicles',
+    'For orbital and suborbital launch vehicles, rocket engines, and launch services',
+    'rockets',
+    'rocket',
+    65,
+    200,
+    true,
+    '{"tags": ["space", "aerospace", "propulsion", "launch"], "difficulty": "advanced"}'
+);
+
+-- Domain records (hierarchical)
+INSERT INTO knowledge_domains (id, template_id, parent_id, name, description, category, depth, display_order, criticality, key_questions, typical_roles, learning_time_estimate) VALUES
+-- Root domain (depth 0, no parent)
+('00000005-1000-4000-8000-000000000001', '00000005-0000-4000-8000-000000000001', NULL, 'Propulsion Systems', 'Rocket propulsion and engines', 'Electronics', 0, 1, 'critical', '[]', ARRAY['Propulsion Engineer'], NULL),
+
+-- Child domain (depth 1, has parent)
+('00000005-1100-4000-8000-000000000001', '00000005-0000-4000-8000-000000000001', '00000005-1000-4000-8000-000000000001', 'Liquid Engines', 'Liquid-fueled rocket engines', 'Electronics', 1, 1, 'critical',
+ '[{"id": "le1", "question": "What propellant combination (LOX/RP-1, LOX/LH2, hypergolic)?", "context": "Affects performance, handling, and infrastructure"}, {"id": "le2", "question": "What is your target thrust level?", "context": "Determines engine size and complexity"}]',
+ ARRAY['Propulsion Engineer', 'Combustion Engineer'], '8-12 weeks'),
+
+-- Grandchild domain (depth 2)
+('00000005-1110-4000-8000-000000000001', '00000005-0000-4000-8000-000000000001', '00000005-1100-4000-8000-000000000001', 'Turbopumps', 'Turbomachinery for propellant delivery', 'Electronics', 2, 1, 'critical',
+ '[{"id": "tp1", "question": "What pump type (centrifugal, axial)?", "context": "Affects performance and complexity"}]',
+ ARRAY['Turbomachinery Engineer'], '12-16 weeks');
+```
+
+**UUID Scheme:**
+- Template ID: `0000000X-0000-4000-8000-000000000001` (X = 5,6,7,8)
+- Domain IDs: `0000000X-YYYY-4000-8000-000000000001`
+  - YYYY = 1000, 2000, 3000... for root domains
+  - YYYY = 1100, 1200... for level-1 children
+  - YYYY = 1110, 1120... for level-2 grandchildren
 
 ---
 
 ## USEFUL COMMANDS
 
 ```bash
-# Check TypeScript errors
+# Apply migration to local Supabase
+supabase db push
+
+# Or run migration directly
+supabase migration up
+
+# Check TypeScript types
 npx tsc --noEmit
 
-# Find hardcoded colors
-rg "text-slate-|bg-slate-" src/ --type tsx
-
-# Find @ts-nocheck files
-rg "@ts-nocheck" src/actions/ -l
-
-# Run linter
-npx eslint src/ --ext .ts,.tsx
-
-# Regenerate Supabase types
-npx supabase gen types typescript --project-id $(cat supabase/.temp/project-ref) --schema public > src/types/database.types.ts
-
-# Find large files
-find src -name "*.tsx" -exec wc -l {} + | sort -n | tail -20
+# Start dev server to test
+npm run dev
 ```
-
----
-
-## PROJECT STRUCTURE NOTES
-
-- **Actions:** `src/actions/` - Server actions (data fetching/mutations)
-- **Components:** `src/components/` - Reusable UI components
-- **Pages:** `src/app/(platform)/` - Platform pages (authenticated)
-- **Public Pages:** `src/app/` - Marketing/public pages
-- **Types:** `src/types/` - TypeScript type definitions
-- **Lib:** `src/lib/` - Utilities, helpers, services
-- **Design System:** See `.cursor/rules/` for design standards
-
----
-
-## DESIGN SYSTEM RULES
-
-The project has strict design rules in `.cursor/rules/`:
-- `color-consistency.mdc` - Color token usage
-- `component-patterns.mdc` - Component standards
-- `form-consistency.mdc` - Form patterns
-- `layout-spacing.mdc` - Spacing standards
-- `navigation-consistency.mdc` - Navigation patterns
-
-**Always check these before making UI changes.**
-
----
-
-## CONTACT / RESOURCES
-
-- **Code Review Report:** Was generated in the previous session (search transcript for "Code Review: CentaurOS Full Codebase")
-- **Skills Available:** See `.cursor/skills/` for automated workflows
-- **Supabase Project:** Check `supabase/.temp/project-ref` for project ID
 
 ---
 
 ## QUICK START FOR NEXT AGENT
 
-1. Read this document
-2. Run `npx tsc --noEmit` to see current type errors
-3. Pick a priority task from above
-4. Use the skills in `.cursor/skills/` for guidance on specific tasks
-5. Follow the design rules in `.cursor/rules/`
+1. **Read this document** and understand the 4 template structures above
+2. **Read the reference file** `supabase/migrations/20260131300001_seed_blueprint_templates.sql` for exact SQL format
+3. **Create new migration** `supabase/migrations/20260131300002_seed_new_blueprint_templates.sql`
+4. **Start with Template 1 (Rockets)** - copy format from existing, create template record + all domains
+5. **Continue with Templates 2, 3, 4** in order
+6. **Include UK/EU regulatory focus** in all regulatory domains (MHRA, UKSA, Ofcom, NICE, EMA, etc.)
+7. **Test by running migration** and verifying templates appear in the app
 
-**Recommended first task:** Start removing `@ts-nocheck` from `src/actions/tasks.ts` as it's the most used action file.
+---
+
+## IMPORTANT NOTES
+
+- **UK-Based Company**: All regulatory domains MUST include UK agencies (MHRA, UKSA, Ofcom, NICE, CAA, etc.) and EU equivalents (EMA, ESA, etc.)
+- **Luxembourg Space Law**: For space templates, include Luxembourg as a jurisdiction option (many space companies use Luxembourg for EU satellite filings and ITU coordination)
+- **Categories**: Use existing categories from `DomainCategory` type: `Electronics`, `Mechanical`, `Software`, `Manufacturing`, `Regulatory`, `Business`, `Operations`
+- **Key Questions**: Each leaf domain should have 2-5 key questions with context
+- **Typical Roles**: Include relevant job titles for each domain
+- **Criticality**: Mark propulsion, structures, avionics, GNC as `critical` for space; core compliance as `critical` for pharma

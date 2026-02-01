@@ -4,7 +4,7 @@ import { Badge } from '@/components/ui/badge'
 import { UserAvatar } from '@/components/ui/user-avatar'
 import { Markdown } from '@/components/ui/markdown'
 import Link from 'next/link'
-import { ArrowLeft, FileText } from 'lucide-react'
+import { ChevronRight, FileText } from 'lucide-react'
 
 export default async function ObjectiveDetailPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = await params
@@ -30,11 +30,22 @@ export default async function ObjectiveDetailPage({ params }: { params: Promise<
 
     return (
         <div className="space-y-8 max-w-5xl mx-auto">
-            {/* Header / Back Link */}
-            <div>
-                <Link href="/objectives" className="text-sm text-muted-foreground hover:text-foreground flex items-center mb-4 transition-colors">
-                    <ArrowLeft className="h-4 w-4 mr-1" /> Back to Objectives
+            {/* Breadcrumb Navigation */}
+            <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-sm">
+                <Link 
+                    href="/objectives" 
+                    className="text-muted-foreground hover:text-foreground transition-colors"
+                >
+                    Objectives
                 </Link>
+                <ChevronRight className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                <span className="text-foreground font-medium truncate max-w-[300px]">
+                    {objective.title}
+                </span>
+            </nav>
+
+            {/* Header */}
+            <div>
                 <h1 className="text-3xl font-bold tracking-tight text-foreground mb-2">{objective.title}</h1>
                 {objective.description && (
                     <p className="text-lg text-muted-foreground leading-relaxed max-w-3xl">{objective.description}</p>

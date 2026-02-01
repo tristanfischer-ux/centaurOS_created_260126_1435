@@ -258,6 +258,81 @@ src/components/feature-name/
 └── index.ts               # Barrel exports
 ```
 
+### Service Layer Pattern (For Complex Features)
+
+For features with significant business logic, separate concerns into a service layer (from billing implementation):
+
+```
+src/lib/feature-name/
+├── service.ts          # Core business logic
+├── fees.ts             # Specific calculations (if applicable)
+├── webhooks.ts         # External service integration (if applicable)
+├── types.ts            # Internal types (if not in src/types/)
+└── index.ts            # Barrel exports with organized exports
+```
+
+**When to Use Service Layer:**
+- Feature has complex business logic
+- Multiple actions share the same logic
+- External service integration (Stripe, Telegram, etc.)
+- Complex calculations or validations
+
+**Service Layer Example (from billing):**
+
+```typescript
+// src/lib/billing/index.ts
+// Organized exports by concern
+
+// Fee calculation
+export {
+  getSellerFeePercent,
+  calculateOrderFee,
+  getFeeDescription,
+  FEE_TIERS,
+} from './fees'
+
+// Subscription management
+export {
+  getUserSubscription,
+  createSubscriptionCheckout,
+  cancelSubscription,
+  type SubscriptionTier,
+} from './subscriptions'
+
+// Bank transfers
+export {
+  createBankTransferRequest,
+  handleBankTransferReceived,
+  type BankTransferRequest,
+} from './bank-transfers'
+```
+
+**Actions Call Service Layer:**
+
+```typescript
+// src/actions/billing.ts
+'use server'
+
+import { calculateOrderFee, createSubscriptionCheckout } from '@/lib/billing'
+
+export async function createCheckoutAction(priceId: string) {
+  // Actions handle:
+  // - Authentication
+  // - Input validation
+  // - Calling service layer
+  // - Error wrapping
+  // - Cache revalidation
+  
+  try {
+    const result = await createSubscriptionCheckout(userId, priceId, successUrl, cancelUrl)
+    revalidatePath('/settings/billing')
+    return { success: true, data: result }
+  } catch (error) {
+    return { success: false, error: 'Checkout failed' }
+  }
+}
+```
+
 ### RLS Best Practices
 
 Always include `foundry_id` in tables and RLS policies to ensure data isolation between organizations.
@@ -271,17 +346,40 @@ create policy "Policy name"
 
 ## Common Patterns
 
-### AI Integration
-
-For AI-powered features, see [references/ai-integration-patterns.md](references/ai-integration-patterns.md)
-
-### Realtime Updates
-
-For features requiring realtime updates, see [references/realtime-patterns.md](references/realtime-patterns.md)
-
 ### Payment Integration
 
-For payment-related features, see [references/payment-patterns.md](references/payment-patterns.md)
+For payment/billing features, use the **stripe-integration** skill which covers:
+- Stripe Connect for marketplace
+- Payment intents and checkout
+- Webhook handling
+- Subscription management
+
+### Multi-Step Forms
+
+For complex form wizards, use the **multi-step-form** skill which covers:
+- Step navigation
+- Per-step validation
+- Progress indicators
+- Form state management
+
+### Status Workflows
+
+For features with status transitions, use the **status-workflow** skill which covers:
+- Status enums and types
+- Valid transition validation
+- Status history tracking
+- UI status indicators
+
+### Database Migrations
+
+For complex migrations with functions/triggers, use the **supabase-migration** skill which covers:
+- Atomic balance functions
+- Metrics calculation triggers
+- RPC functions
+
+### Telegram Integration
+
+For Telegram bot features, use the **telegram-integration** skill.
 
 ## Design System
 
@@ -349,11 +447,22 @@ try {
 3. **Add to onboarding** if relevant for new users
 4. **Monitor performance** in production
 
+## Related Skills
+
+| Skill | Use When |
+|-------|----------|
+| **ui-component-standards** | Creating UI components, forms, dialogs |
+| **stripe-integration** | Adding payment/billing features |
+| **multi-step-form** | Building form wizards |
+| **status-workflow** | Implementing status-based workflows |
+| **supabase-migration** | Creating complex database migrations |
+| **accessibility-remediation** | Fixing accessibility issues |
+| **telegram-integration** | Adding Telegram bot features |
+
 ## Additional Resources
 
-- [Project Architecture](references/architecture-patterns.md)
-- [Database Conventions](references/database-conventions.md)
 - [Component Patterns](references/component-patterns.md)
+- `.cursor/rules/` - Design system rules
 
 ---
 

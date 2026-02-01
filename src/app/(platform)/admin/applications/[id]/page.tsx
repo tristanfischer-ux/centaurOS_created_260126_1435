@@ -25,7 +25,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { formatDistanceToNow, format } from "date-fns"
 import { toast } from "sonner"
 import { 
-    ArrowLeft, 
+    ChevronRight, 
     Building2, 
     CheckCircle2, 
     XCircle,
@@ -122,12 +122,11 @@ export default function ApplicationDetailPage({
     if (error || !application) {
         return (
             <div className="text-center py-12">
-                <AlertCircle className="h-12 w-12 text-red-600 mx-auto mb-4" />
+                <AlertCircle className="h-12 w-12 text-destructive mx-auto mb-4" />
                 <h2 className="text-lg font-semibold mb-2">Failed to load application</h2>
                 <p className="text-muted-foreground mb-4">{error}</p>
                 <Link href="/admin/applications">
                     <Button variant="secondary">
-                        <ArrowLeft className="h-4 w-4 mr-2" />
                         Back to Applications
                     </Button>
                 </Link>
@@ -139,11 +138,26 @@ export default function ApplicationDetailPage({
     
     return (
         <div className="space-y-6">
-            {/* Back Link */}
-            <Link href="/admin/applications" className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground">
-                <ArrowLeft className="h-4 w-4 mr-1" />
-                Back to Applications
-            </Link>
+            {/* Breadcrumb Navigation */}
+            <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-sm">
+                <Link 
+                    href="/admin" 
+                    className="text-muted-foreground hover:text-foreground transition-colors"
+                >
+                    Admin
+                </Link>
+                <ChevronRight className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                <Link 
+                    href="/admin/applications" 
+                    className="text-muted-foreground hover:text-foreground transition-colors"
+                >
+                    Applications
+                </Link>
+                <ChevronRight className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                <span className="text-foreground font-medium truncate max-w-[200px]">
+                    {application.profile?.full_name || 'Application'}
+                </span>
+            </nav>
             
             {/* Header */}
             <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">

@@ -2,9 +2,8 @@ import { Suspense } from 'react'
 import { notFound, redirect } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
-import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
-import { ArrowLeft, Loader2 } from 'lucide-react'
+import { ChevronRight, Loader2 } from 'lucide-react'
 import { getRFQDetail, checkIsProvider } from '@/actions/rfq'
 import { getMyRFQResponse } from '@/actions/rfq-responses'
 import { RFQResponseForm } from '@/components/rfq/RFQResponseForm'
@@ -59,13 +58,19 @@ export default async function RFQDetailPage({ params }: RFQDetailPageProps) {
 
   return (
     <div className="container mx-auto py-6 space-y-6">
-      {/* Back button */}
-      <Button variant="ghost" asChild>
-        <Link href="/rfq">
-          <ArrowLeft className="w-4 h-4 mr-2" />
-          Back to RFQs
+      {/* Breadcrumb Navigation */}
+      <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-sm">
+        <Link 
+          href="/rfq" 
+          className="text-muted-foreground hover:text-foreground transition-colors"
+        >
+          RFQs
         </Link>
-      </Button>
+        <ChevronRight className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+        <span className="text-foreground font-medium truncate max-w-[300px]">
+          {rfq.title}
+        </span>
+      </nav>
 
       {/* Main content */}
       <div className="grid gap-6 lg:grid-cols-3">
