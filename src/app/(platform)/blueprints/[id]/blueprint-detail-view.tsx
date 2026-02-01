@@ -27,6 +27,7 @@ import {
   NextActionCard,
   DomainDetailPanel,
 } from '@/components/blueprints'
+import { VisualBlueprintView } from '@/components/blueprints/visual'
 import {
   updateDomainCoverage,
   addExpertise,
@@ -58,6 +59,8 @@ import {
   Filter,
   Eye,
   EyeOff,
+  Sparkles,
+  Map,
 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -80,7 +83,7 @@ export function BlueprintDetailView({
 }: BlueprintDetailViewProps) {
   const router = useRouter()
   const [selectedDomain, setSelectedDomain] = useState<DomainCoverageWithDetails | null>(null)
-  const [viewMode, setViewMode] = useState<'tree' | 'list'>('tree')
+  const [viewMode, setViewMode] = useState<'visual' | 'tree' | 'list'>('visual')
   const [showAllDomains, setShowAllDomains] = useState(false)
   const [statusFilter, setStatusFilter] = useState<CoverageStatus | 'all'>('all')
   const [isUpdating, setIsUpdating] = useState(false)
@@ -269,6 +272,15 @@ export function BlueprintDetailView({
             {/* View mode toggle */}
             <div className="flex items-center gap-1 border rounded-md p-1">
               <Button
+                variant={viewMode === 'visual' ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => setViewMode('visual')}
+                className={viewMode === 'visual' ? 'bg-international-orange hover:bg-international-orange/90' : ''}
+              >
+                <Sparkles className="h-4 w-4 mr-1" />
+                Visual
+              </Button>
+              <Button
                 variant={viewMode === 'tree' ? 'secondary' : 'ghost'}
                 size="sm"
                 onClick={() => setViewMode('tree')}
@@ -307,24 +319,35 @@ export function BlueprintDetailView({
         </div>
 
         <TabsContent value="domains">
-          <Card>
-            <CardContent className="pt-6">
-              {viewMode === 'tree' ? (
-                <DomainTreeView
-                  coverage={filteredCoverage}
-                  onSelect={setSelectedDomain}
-                  selected={selectedDomain?.id}
-                  showAllDomains={showAllDomains}
-                  filterStatus={statusFilter === 'all' ? undefined : statusFilter}
-                />
-              ) : (
-                <DomainListView
-                  coverage={filteredCoverage}
-                  onSelect={setSelectedDomain}
-                />
-              )}
-            </CardContent>
-          </Card>
+          {viewMode === 'visual' ? (
+            <VisualBlueprintView
+              blueprintId={blueprint.id}
+              templateId={blueprint.template_id || 'rocket'}
+              onCreateObjective={(title, description) => {
+                toast.info('Creating objective: ' + title)
+                // TODO: Implement objective creation
+              }}
+            />
+          ) : (
+            <Card>
+              <CardContent className="pt-6">
+                {viewMode === 'tree' ? (
+                  <DomainTreeView
+                    coverage={filteredCoverage}
+                    onSelect={setSelectedDomain}
+                    selected={selectedDomain?.id}
+                    showAllDomains={showAllDomains}
+                    filterStatus={statusFilter === 'all' ? undefined : statusFilter}
+                  />
+                ) : (
+                  <DomainListView
+                    coverage={filteredCoverage}
+                    onSelect={setSelectedDomain}
+                  />
+                )}
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
 
         <TabsContent value="expertise">
@@ -485,10 +508,17 @@ function SummaryCard({
   )
 }
 
+// Expert info type
+interface ExpertInfo {
+  name: string
+  domains: string[]
+  level: string
+}
+
 // Expertise grouped by category
 function ExpertiseByCategory({ coverage }: { coverage: DomainCoverageWithDetails[] }) {
   // Group covered domains by who covers them
-  const expertiseMap = new Map<string, { name: string; domains: string[]; level: string }[]>()
+  const expertiseMap: Record<string, ExpertInfo[]> = {}
 
   for (const item of coverage) {
     if (!item.expertise || item.expertise.length === 0) continue
@@ -497,11 +527,11 @@ function ExpertiseByCategory({ coverage }: { coverage: DomainCoverageWithDetails
       const name = exp.profile?.full_name || exp.external_contact?.name || 'Unknown'
       const key = exp.profile_id || name
 
-      if (!expertiseMap.has(key)) {
-        expertiseMap.set(key, [])
+      if (!expertiseMap[key]) {
+        expertiseMap[key] = []
       }
 
-      const existing = expertiseMap.get(key)!
+      const existing = expertiseMap[key]
       const domainName = item.domain?.name || item.domain_name || 'Unknown'
       
       // Add domain if not already in list
@@ -520,7 +550,7 @@ function ExpertiseByCategory({ coverage }: { coverage: DomainCoverageWithDetails
     }
   }
 
-  const experts = Array.from(expertiseMap.values()).flat()
+  const experts: ExpertInfo[] = Object.values(expertiseMap).flat()
 
   if (experts.length === 0) {
     return (

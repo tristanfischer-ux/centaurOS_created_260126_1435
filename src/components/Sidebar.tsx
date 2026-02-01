@@ -4,7 +4,7 @@ import React from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
-import { LayoutDashboard, Users, CheckSquare, Clock, Store, Target, Compass, LayoutGrid, MessageCircleQuestion, ShieldAlert, FileText, Sun, Bookmark, Settings, HelpCircle, GraduationCap, Repeat, ShoppingCart, Briefcase, Map, Presentation } from "lucide-react"
+import { LayoutDashboard, Users, CheckSquare, Clock, Store, Target, Compass, MessageCircleQuestion, ShieldAlert, FileText, Sun, Bookmark, Settings, HelpCircle, GraduationCap, ShoppingCart, Briefcase, Map } from "lucide-react"
 import { NotificationCenter } from "@/components/NotificationCenter"
 import { ThemeToggle } from "@/components/ThemeToggle"
 import { FocusModeToggle } from "@/components/FocusModeToggle"
@@ -38,22 +38,18 @@ const coreNavigation = [
     { name: "Tasks", href: "/tasks", icon: CheckSquare, tooltip: "Manage and assign actionable items" },
     { name: "Timeline", href: "/timeline", icon: Clock, tooltip: "Gantt chart view of all tasks" },
     { name: "Team", href: "/team", icon: Users, tooltip: "Manage team members and roles" },
-    { name: "Retainers", href: "/retainers", icon: Repeat, tooltip: "Manage ongoing service retainers" },
     { name: "Saved Resources", href: "/saved-resources", icon: Bookmark, tooltip: "Your saved marketplace providers and tools" },
 ]
 
 const communityNavigation = [
     { name: "Marketplace", href: "/marketplace", icon: Store, tooltip: "Browse and compare service providers" },
     { name: "RFQs", href: "/rfq", icon: FileText, tooltip: "Request quotes from suppliers or respond to opportunities" },
-    { name: "Pitch Prep", href: "/pitch-prep", icon: Presentation, tooltip: "Prepare your pitch for investor conversations" },
-    { name: "Guild", href: "/guild", icon: Compass, tooltip: "Community events and resources" },
-    { name: "Apprenticeship", href: "/apprenticeship", icon: GraduationCap, tooltip: "Apprenticeship program and OTJT tracking" },
+    { name: "Talent", href: "/talent", icon: GraduationCap, tooltip: "Find apprentices and manage training programs" },
     { name: "Advice", href: "/advisory", icon: MessageCircleQuestion, tooltip: "Ask questions and get expert guidance" },
 ]
 
 const strategicNavigation = [
     { name: "Blueprints", href: "/blueprints", icon: Map, tooltip: "Map knowledge domains, expertise, and supply chain" },
-    { name: "Org Blueprint", href: "/org-blueprint", icon: LayoutGrid, tooltip: "Business function coverage and gap analysis" },
 ]
 
 const supportNavigation = [

@@ -4,6 +4,9 @@ import { getFoundryIdCached } from '@/lib/supabase/foundry-context'
 import { MarketplaceView } from './marketplace-view'
 import { CreateRFQSheet } from './create-rfq-sheet'
 import { getMarketplaceOnboardingStatus } from '@/actions/onboarding'
+import Link from 'next/link'
+import { Badge } from '@/components/ui/badge'
+import { Presentation, Sparkles } from 'lucide-react'
 
 // Force dynamic since we're fetching data that might change
 export const dynamic = 'force-dynamic'
@@ -103,6 +106,32 @@ export default async function MarketplacePage() {
                 userRole={userRole}
                 onboardingRecommendations={onboardingRecommendations}
             />
+
+            {/* Pitch Prep - Coming Soon */}
+            <section className="pt-4">
+                <Link 
+                    href="/pitch-prep"
+                    className="block border border-dashed border-muted rounded-lg p-4 hover:border-muted-foreground hover:bg-muted/50 transition-all group"
+                >
+                    <div className="flex items-center gap-3">
+                        <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center group-hover:bg-background transition-colors">
+                            <Presentation className="h-5 w-5 text-muted-foreground" />
+                        </div>
+                        <div className="flex-1">
+                            <div className="flex items-center gap-2">
+                                <span className="font-medium text-foreground">Pitch Prep</span>
+                                <Badge variant="secondary" className="text-[10px] bg-muted text-muted-foreground">
+                                    <Sparkles className="h-3 w-3 mr-1" />
+                                    Coming Soon
+                                </Badge>
+                            </div>
+                            <p className="text-sm text-muted-foreground">
+                                Get investor-ready with professional pitch preparation services
+                            </p>
+                        </div>
+                    </div>
+                </Link>
+            </section>
         </div>
     )
 }

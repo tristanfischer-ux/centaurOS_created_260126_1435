@@ -12,7 +12,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "@/components/ui/table"
-import { Check, X, GitCompare, Users, MoreHorizontal, Pencil, Trash2, Loader2, AlertTriangle, Mail, Phone, LayoutGrid, List, ChevronUp, ChevronDown, User, Calendar, Clock, CheckCircle2 } from "lucide-react"
+import { Check, X, GitCompare, Users, MoreHorizontal, Pencil, Trash2, Loader2, AlertTriangle, Mail, Phone, LayoutGrid, List, ChevronUp, ChevronDown, User, Calendar, Clock, CheckCircle2, Sparkles, Repeat } from "lucide-react"
 import { createTeam, addTeamMember, deleteMember } from "@/actions/team"
 import { deleteTeam, updateTeamName } from "@/actions/teams"
 import Link from "next/link"
@@ -1213,6 +1213,54 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                     </div>
                 </section>
             )}
+
+            {/* Coming Soon Features */}
+            <section className="pt-4 space-y-3">
+                <Link 
+                    href="/retainers"
+                    className="block border border-dashed border-muted rounded-lg p-4 hover:border-muted-foreground hover:bg-muted/50 transition-all group"
+                >
+                    <div className="flex items-center gap-3">
+                        <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center group-hover:bg-background transition-colors">
+                            <Repeat className="h-5 w-5 text-muted-foreground" />
+                        </div>
+                        <div className="flex-1">
+                            <div className="flex items-center gap-2">
+                                <span className="font-medium text-foreground">Retainers</span>
+                                <Badge variant="secondary" className="text-[10px] bg-muted text-muted-foreground">
+                                    <Sparkles className="h-3 w-3 mr-1" />
+                                    Coming Soon
+                                </Badge>
+                            </div>
+                            <p className="text-sm text-muted-foreground">
+                                Manage ongoing service retainers with your providers
+                            </p>
+                        </div>
+                    </div>
+                </Link>
+                <Link 
+                    href="/org-blueprint"
+                    className="block border border-dashed border-muted rounded-lg p-4 hover:border-muted-foreground hover:bg-muted/50 transition-all group"
+                >
+                    <div className="flex items-center gap-3">
+                        <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center group-hover:bg-background transition-colors">
+                            <LayoutGrid className="h-5 w-5 text-muted-foreground" />
+                        </div>
+                        <div className="flex-1">
+                            <div className="flex items-center gap-2">
+                                <span className="font-medium text-foreground">Org Blueprint</span>
+                                <Badge variant="secondary" className="text-[10px] bg-muted text-muted-foreground">
+                                    <Sparkles className="h-3 w-3 mr-1" />
+                                    Coming Soon
+                                </Badge>
+                            </div>
+                            <p className="text-sm text-muted-foreground">
+                                Business function coverage and gap analysis for your team
+                            </p>
+                        </div>
+                    </div>
+                </Link>
+            </section>
 
             {/* Comparison Dialog */}
             <Dialog open={showComparison} onOpenChange={setShowComparison}>
