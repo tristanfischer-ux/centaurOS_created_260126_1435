@@ -76,6 +76,7 @@ export function ComparisonModal({ open, onOpenChange, items }: ComparisonModalPr
     const [aiAnalysis, setAiAnalysis] = useState<AIAnalysisResult | null>(null)
     const [isAnalyzing, setIsAnalyzing] = useState(false)
 
+
     // Clear analysis when items change or modal closes
     useEffect(() => {
         setAiAnalysis(null)
@@ -96,11 +97,13 @@ export function ComparisonModal({ open, onOpenChange, items }: ComparisonModalPr
     async function analyzeWithAI() {
         setIsAnalyzing(true)
         setAnalysisError(null)
+        // Filter valid items inline since itemsToRender isn't computed yet at function definition
+        const validItems = items.filter(item => item && item.id && item.title)
         try {
             const response = await fetch('/api/marketplace/compare', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ items })
+                body: JSON.stringify({ items: validItems })
             })
             const data = await response.json()
             
@@ -119,9 +122,20 @@ export function ComparisonModal({ open, onOpenChange, items }: ComparisonModalPr
     }
 
     if (items.length === 0) return null
+    
+    // Filter out any invalid items
+    const validItems = items.filter(item => item && item.id && item.title)
+    
+    if (validItems.length === 0) {
+        console.error('[ComparisonModal] No valid items to compare')
+        return null
+    }
+    
+    // Use validItems instead of items for rendering
+    const itemsToRender = validItems
 
     // Determine the primary category (use most common among items)
-    const categoryCount = items.reduce((acc, item) => {
+    const categoryCount = itemsToRender.reduce((acc, item) => {
         acc[item.category] = (acc[item.category] || 0) + 1
         return acc
     }, {} as Record<string, number>)
@@ -129,7 +143,7 @@ export function ComparisonModal({ open, onOpenChange, items }: ComparisonModalPr
 
     // Extract all unique attribute keys from all items
     const allKeys = Array.from(new Set(
-        items.flatMap(item => Object.keys(item.attributes))
+        itemsToRender.flatMap(item => Object.keys(item.attributes))
     ))
 
     // Get priority attributes for sorting
@@ -142,7 +156,7 @@ export function ComparisonModal({ open, onOpenChange, items }: ComparisonModalPr
     const organizedSections = organizeAttributesIntoSections(allKeys, sectionConfig, priorityAttrs)
     
     // Pre-compute best values for numeric comparisons
-    const bestValues = computeBestValues(items, allKeys)
+    const bestValues = computeBestValues(itemsToRender, allKeys)
 
     return (
         <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -150,13 +164,13 @@ export function ComparisonModal({ open, onOpenChange, items }: ComparisonModalPr
                 <DialogHeader className="p-6 pb-4 border-b flex-shrink-0">
                     <div className="flex items-center justify-between">
                         <DialogTitle className="text-xl font-semibold">
-                            Compare Listings ({items.length} items)
+                            Compare Listings ({itemsToRender.length} items)
                         </DialogTitle>
                         <Button
                             variant="secondary"
                             size="sm"
                             onClick={analyzeWithAI}
-                            disabled={isAnalyzing || items.length < 2}
+                            disabled={isAnalyzing || itemsToRender.length < 2}
                             className="gap-2"
                         >
                             {isAnalyzing ? (
@@ -259,7 +273,7 @@ export function ComparisonModal({ open, onOpenChange, items }: ComparisonModalPr
 
                         {/* Mobile: Card Layout */}
                         <div className="block md:hidden space-y-4">
-                            {items.map(item => (
+                            {itemsToRender.map(item => (
                                 <Card key={item.id} className="p-4">
                                     <div className="flex items-start justify-between mb-3">
                                         <div>
@@ -304,7 +318,7 @@ export function ComparisonModal({ open, onOpenChange, items }: ComparisonModalPr
                                                                     {formatAttributeName(key)}
                                                                 </dt>
                                                                 <dd className="text-right flex items-center gap-1.5">
-                                                                    {renderValue(value, key, items, item.id, bestValues)}
+                                                                    {renderValue(value, key, itemsToRender, item.id, bestValues)}
                                                                 </dd>
                                                             </div>
                                                         )
@@ -330,7 +344,7 @@ export function ComparisonModal({ open, onOpenChange, items }: ComparisonModalPr
                                         <th className="text-left text-sm font-medium text-muted-foreground py-3 pr-4 w-32 align-top sticky left-0 bg-background z-10">
                                             Attribute
                                         </th>
-                                        {items.map(item => (
+                                        {itemsToRender.map(item => (
                                             <th key={item.id} className="text-left py-3 px-4 min-w-[200px] max-w-[250px] align-top">
                                                 <div className="font-bold text-base leading-tight">{item.title}</div>
                                                 <Badge 
@@ -359,7 +373,7 @@ export function ComparisonModal({ open, onOpenChange, items }: ComparisonModalPr
                                                 key={sectionName}
                                                 sectionName={sectionName}
                                                 sectionKeys={sectionKeys}
-                                                items={items}
+                                                items={itemsToRender}
                                                 bestValues={bestValues}
                                             />
                                         )
@@ -367,7 +381,7 @@ export function ComparisonModal({ open, onOpenChange, items }: ComparisonModalPr
                                     
                                     {/* Description section */}
                                     <tr className="border-t-2 border-border">
-                                        <td colSpan={items.length + 1} className="py-2">
+                                        <td colSpan={itemsToRender.length + 1} className="py-2">
                                             <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                                                 Details
                                             </span>
@@ -377,7 +391,7 @@ export function ComparisonModal({ open, onOpenChange, items }: ComparisonModalPr
                                         <td className="text-sm font-medium text-muted-foreground py-3 pr-4 align-top sticky left-0 bg-background z-10">
                                             Description
                                         </td>
-                                        {items.map(item => (
+                                        {itemsToRender.map(item => (
                                             <td key={`${item.id}-desc`} className="text-sm text-muted-foreground leading-relaxed py-3 px-4 align-top">
                                                 {item.description}
                                             </td>

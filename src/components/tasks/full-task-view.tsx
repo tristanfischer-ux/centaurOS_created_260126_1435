@@ -60,7 +60,7 @@ interface Member {
     id: string
     full_name: string
     role: string
-    email?: string
+    email: string
 }
 
 interface Assignee {
@@ -385,7 +385,7 @@ export function FullTaskView({ open, onOpenChange, task, members }: FullTaskView
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent size="lg" className="w-full h-[90vh] p-0 gap-0 flex flex-col overflow-hidden">
                 {/* Header */}
-                <DialogHeader className="p-6 pb-4 border-b border shrink-0">
+                <DialogHeader className="px-6 py-4 border-b border shrink-0">
                     <div className="flex items-start justify-between gap-4">
                         <div className="flex-1 min-w-0">
                             {isEditing ? (
@@ -606,6 +606,17 @@ export function FullTaskView({ open, onOpenChange, task, members }: FullTaskView
                                                                         onChange={() => {}}
                                                                         className="h-4 w-4"
                                                                     />
+                                                                    <Avatar className="h-6 w-6">
+                                                                        {member.role === "AI_Agent" ? (
+                                                                            <AvatarImage src="/images/ai-agent-avatar.png" />
+                                                                        ) : null}
+                                                                        <AvatarFallback className={cn(
+                                                                            "text-[10px]",
+                                                                            member.role === "AI_Agent" ? "bg-accent text-accent-foreground" : "bg-muted text-muted-foreground"
+                                                                        )}>
+                                                                            {member.role === "AI_Agent" ? <Bot className="w-3 h-3" /> : getInitials(member.full_name)}
+                                                                        </AvatarFallback>
+                                                                    </Avatar>
                                                                     <span className="text-sm">{member.full_name}</span>
                                                                 </div>
                                                             ))}
@@ -770,11 +781,7 @@ export function FullTaskView({ open, onOpenChange, task, members }: FullTaskView
                                     <MentionInput
                                         value={newComment}
                                         onChange={setNewComment}
-                                        members={members.filter(m => m.full_name && m.email).map(m => ({
-                                            id: m.id,
-                                            full_name: m.full_name,
-                                            email: m.email!
-                                        }))}
+                                        members={members}
                                         placeholder="Add a note... Use @ to mention someone"
                                         onSubmit={() => {
                                             if (newComment.trim()) {
@@ -829,7 +836,7 @@ export function FullTaskView({ open, onOpenChange, task, members }: FullTaskView
                                                     <div className="text-sm text-foreground">
                                                         <MentionText 
                                                             content={comment.content} 
-                                                            members={members.filter(m => m.full_name).map(m => ({
+                                                            members={members.map(m => ({
                                                                 id: m.id,
                                                                 full_name: m.full_name
                                                             }))}

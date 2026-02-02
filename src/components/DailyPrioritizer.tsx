@@ -1,10 +1,11 @@
 'use client'
 
+import { useState } from 'react'
 import { differenceInDays } from 'date-fns'
 import { Badge } from '@/components/ui/badge'
 import { Target, Clock, AlertTriangle, RefreshCw } from 'lucide-react'
-import Link from 'next/link'
 import { cn } from '@/lib/utils'
+import { FullTaskView } from '@/components/tasks/full-task-view'
 
 interface Task {
     id: string
@@ -18,6 +19,13 @@ interface Task {
         id: string
         title: string
     } | null
+}
+
+interface Member {
+    id: string
+    full_name: string
+    role: string
+    email: string
 }
 
 interface PrioritizedTask extends Task {
@@ -120,10 +128,13 @@ interface DailyPrioritizerProps {
     tasks: Task[]
     maxTasks?: number
     compact?: boolean
+    members: Member[]
+    currentUserId: string
 }
 
-export function DailyPrioritizer({ tasks, maxTasks = 5, compact = false }: DailyPrioritizerProps) {
+export function DailyPrioritizer({ tasks, maxTasks = 5, compact = false, members, currentUserId }: DailyPrioritizerProps) {
     const prioritizedTasks = prioritizeTasks(tasks, maxTasks)
+    const [selectedTask, setSelectedTask] = useState<Task | null>(null)
 
     if (prioritizedTasks.length === 0) {
         return (
@@ -134,10 +145,15 @@ export function DailyPrioritizer({ tasks, maxTasks = 5, compact = false }: Daily
     }
 
     return (
-        <div className={cn("space-y-3", compact && "space-y-2")}>
-            {prioritizedTasks.map((task, index) => (
-                <Link key={task.id} href="/tasks" className="block">
-                    <div className={cn(
+        <>
+            <div className={cn("space-y-3", compact && "space-y-2")}>
+                {prioritizedTasks.map((task, index) => (
+                    <button
+                        key={task.id}
+                        onClick={() => setSelectedTask(task)}
+                        className="block w-full text-left"
+                    >
+                        <div className={cn(
                         "rounded-lg border transition-all group hover:shadow-sm",
                         compact ? "p-2" : "p-3",
                         index === 0 
@@ -221,20 +237,30 @@ export function DailyPrioritizer({ tasks, maxTasks = 5, compact = false }: Daily
                             </div>
                         </div>
                     </div>
-                </Link>
+                </button>
             ))}
 
             {/* Show more hint if there are more tasks */}
             {tasks.length > maxTasks && (
-                <Link href="/tasks" className="block">
-                    <p className={cn(
-                        "text-center text-foundry-400 hover:text-foundry-600",
-                        compact ? "text-[10px] py-1" : "text-xs py-2"
-                    )}>
-                        +{tasks.length - maxTasks} more tasks
-                    </p>
-                </Link>
+                <p className={cn(
+                    "text-center text-foundry-400",
+                    compact ? "text-[10px] py-1" : "text-xs py-2"
+                )}>
+                    +{tasks.length - maxTasks} more tasks
+                </p>
             )}
         </div>
+
+        {/* Full Task View Modal */}
+        {selectedTask && (
+            <FullTaskView
+                open={!!selectedTask}
+                onOpenChange={(open) => !open && setSelectedTask(null)}
+                task={selectedTask}
+                members={members}
+                currentUserId={currentUserId}
+            />
+        )}
+    </>
     )
 }

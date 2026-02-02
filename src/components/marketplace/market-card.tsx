@@ -1,7 +1,7 @@
 'use client'
 
 import { memo, useState, useCallback } from "react"
-import { MarketplaceListing } from "@/actions/marketplace"
+import { MarketplaceListing, saveMarketplaceListing, unsaveMarketplaceListing } from "@/actions/marketplace"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -11,9 +11,10 @@ import {
     ShieldCheck, MapPin, Clock, Briefcase,
     Bot, Sparkles, BarChart3, Zap, Shield, Cpu,
     GitCompareArrows, Mail, Eye, ChevronDown, ChevronUp,
-    Star, Calendar, Award, Globe, Wrench
+    Star, Calendar, Award, Globe, Wrench, Heart
 } from "lucide-react"
 import Link from "next/link"
+import { toast } from "sonner"
 
 export type CardSize = 'small' | 'medium' | 'full'
 
@@ -23,6 +24,8 @@ interface MarketCardProps {
     onToggleSelect: (id: string) => void
     size?: CardSize
     onSizeChange?: (id: string, size: CardSize) => void
+    isSaved?: boolean
+    onSaveToggle?: (id: string, isSaved: boolean) => void
 }
 
 // Get icon for AI subcategory
@@ -96,9 +99,13 @@ export const MarketCard = memo(function MarketCard({
     onToggleSelect,
     size = 'medium',
     onSizeChange,
+    isSaved = false,
+    onSaveToggle,
 }: MarketCardProps) {
     const [isHovered, setIsHovered] = useState(false)
     const [internalSize, setInternalSize] = useState<CardSize>(size)
+    const [isSaving, setIsSaving] = useState(false)
+    const [localSavedState, setLocalSavedState] = useState(isSaved)
     
     // Use controlled or uncontrolled size
     const currentSize = onSizeChange ? size : internalSize
@@ -109,6 +116,42 @@ export const MarketCard = memo(function MarketCard({
             setInternalSize(newSize)
         }
     }, [listing.id, onSizeChange])
+
+    // Handle save/unsave
+    const handleSaveToggle = useCallback(async (e: React.MouseEvent) => {
+        e.stopPropagation()
+        setIsSaving(true)
+        
+        const newSavedState = !localSavedState
+        
+        // Optimistic update
+        setLocalSavedState(newSavedState)
+        
+        try {
+            const result = newSavedState 
+                ? await saveMarketplaceListing(listing.id)
+                : await unsaveMarketplaceListing(listing.id)
+            
+            if (result.error) {
+                // Revert on error
+                setLocalSavedState(!newSavedState)
+                toast.error(result.error)
+            } else {
+                toast.success(newSavedState ? 'Saved to favorites' : 'Removed from favorites')
+                // Notify parent if callback provided
+                if (onSaveToggle) {
+                    onSaveToggle(listing.id, newSavedState)
+                }
+            }
+        } catch (error) {
+            // Revert on exception
+            setLocalSavedState(!newSavedState)
+            toast.error('Failed to update saved status')
+            console.error('[MarketCard] Save toggle error:', error)
+        } finally {
+            setIsSaving(false)
+        }
+    }, [listing.id, localSavedState, onSaveToggle])
 
     // Badge styles matching the category color scheme
     const categoryBadgeStyles: Record<string, string> = {

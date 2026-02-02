@@ -7,9 +7,8 @@ import { useAutoRefresh } from "@/hooks/useAutoRefresh"
 import { RefreshButton } from "@/components/RefreshButton"
 import { TaskCard } from "./task-card"
 import { Button } from "@/components/ui/button"
-import { LayoutGrid, List, X, Trash2, CheckSquare, Loader2, Check, UserPlus, Filter, ChevronDown, ChevronUp, Bot, CalendarDays, Inbox } from "lucide-react"
+import { LayoutGrid, List, X, Trash2, CheckSquare, Loader2, Check, UserPlus, Filter, ChevronDown, ChevronUp, CalendarDays, Inbox } from "lucide-react"
 import { UserAvatar } from "@/components/ui/user-avatar"
-import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
 import { deleteTasks, acceptTask, completeTask, updateTaskAssignees } from "@/actions/tasks"
 import { toast } from "sonner"
 import { CreateTaskDialog } from "./create-task-dialog"
@@ -20,7 +19,7 @@ import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
 import { format, isThisWeek } from "date-fns"
 import { FullTaskView } from "@/components/tasks/full-task-view"
-import { cn, getInitials } from "@/lib/utils"
+import { cn } from "@/lib/utils"
 import {
     Select,
     SelectContent,
@@ -77,6 +76,7 @@ type Member = {
     id: string
     full_name: string
     role: string
+    email: string
 }
 
 interface TasksViewProps {
@@ -608,7 +608,16 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                                                             <SelectItem value="all">All Assignees</SelectItem>
                                                             <SelectItem value="unassigned">Unassigned</SelectItem>
                                                             {members.map(m => (
-                                                                <SelectItem key={m.id} value={m.id}>{m.full_name}</SelectItem>
+                                                                <SelectItem key={m.id} value={m.id}>
+                                                                    <div className="flex items-center gap-2">
+                                                                        <UserAvatar 
+                                                                            name={m.full_name} 
+                                                                            role={m.role} 
+                                                                            size="xs" 
+                                                                        />
+                                                                        <span>{m.full_name}</span>
+                                                                    </div>
+                                                                </SelectItem>
                                                             ))}
                                                         </SelectContent>
                                                     </Select>
@@ -934,17 +943,12 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                                                 <div className="flex items-center gap-1 text-muted-foreground w-32">
                                                     {task.assignee ? (
                                                         <>
-                                                            <Avatar className="h-5 w-5 border border-white bg-muted">
-                                                                {task.assignee.role === "AI_Agent" ? (
-                                                                    <AvatarImage src="/images/ai-agent-avatar.png" className="object-cover" />
-                                                                ) : null}
-                                                                <AvatarFallback className={cn(
-                                                                    "text-[8px] text-white",
-                                                                    task.assignee.role === "AI_Agent" ? "bg-purple-600" : "bg-muted-foreground"
-                                                                )}>
-                                                                    {task.assignee.role === "AI_Agent" ? <Bot className="w-3 h-3" /> : getInitials(task.assignee.full_name)}
-                                                                </AvatarFallback>
-                                                            </Avatar>
+                                                            <UserAvatar
+                                                                name={task.assignee.full_name}
+                                                                role={task.assignee.role}
+                                                                size="xs"
+                                                                className="border border-white"
+                                                            />
                                                             <span className={cn("truncate", task.assignee.role === "AI_Agent" && "text-accent font-medium")}>{task.assignee.full_name}</span>
                                                         </>
                                                     ) : (

@@ -180,7 +180,11 @@ export default async function TodayPage() {
 
     // 5. Dialog data for create dialogs
     const objectivesPromise = supabase.from('objectives').select('id, title')
-    const membersPromise = supabase.from('profiles').select('id, full_name, role, email')
+    const membersPromise = supabase
+        .from('profiles')
+        .select('id, full_name, role, email')
+        .not('email', 'is', null)
+        .not('full_name', 'is', null)
     const teamsPromise = supabase.from('teams').select('id, name')
 
     // Execute all queries in parallel
@@ -544,7 +548,12 @@ export default async function TodayPage() {
                                         }
                                     />
                                 ) : (
-                                    <DailyPrioritizer tasks={myTasks} maxTasks={5} />
+                                    <DailyPrioritizer 
+                                        tasks={myTasks} 
+                                        maxTasks={5}
+                                        members={members}
+                                        currentUserId={user.id}
+                                    />
                                 )}
                             </CardContent>
                         </Card>

@@ -711,7 +711,7 @@ export function FullProfileView({ open, onOpenChange, memberId, currentUserId }:
                         <>
                             {/* Bio Section */}
                             <div className="bg-muted rounded-lg p-6 space-y-4">
-                                <Label className="text-sm font-medium text-foreground">About</Label>
+                                <h3 className="text-sm font-semibold text-foreground uppercase tracking-wider">About</h3>
                                 {isEditing ? (
                                     <Textarea
                                         value={editedBio}
@@ -728,7 +728,7 @@ export function FullProfileView({ open, onOpenChange, memberId, currentUserId }:
                             
                             {/* Contact Details Section */}
                             <div className="bg-muted rounded-lg p-6 space-y-4">
-                                <Label className="text-sm font-medium text-foreground">Contact Details</Label>
+                                <h3 className="text-sm font-semibold text-foreground uppercase tracking-wider">Contact Details</h3>
                                 
                                 {isEditing ? (
                                     <div className="space-y-4">
@@ -827,7 +827,10 @@ export function FullProfileView({ open, onOpenChange, memberId, currentUserId }:
                             {/* Teams Section */}
                             <div>
                                 <div className="flex items-center justify-between mb-4">
-                                    <h2 className="text-xl font-bold text-foreground">Teams</h2>
+                                    <h2 className="text-sm font-semibold text-foreground uppercase tracking-wider flex items-center gap-2">
+                                        <Users className="h-4 w-4" /> Teams
+                                        <Badge variant="secondary" className="text-xs">{teamMemberships.length}</Badge>
+                                    </h2>
                                     {canManageAssignments && availableTeams.length > 0 && (
                                         <div className="flex items-center gap-2">
                                             <Select value={selectedTeamId} onValueChange={setSelectedTeamId}>
@@ -900,7 +903,10 @@ export function FullProfileView({ open, onOpenChange, memberId, currentUserId }:
                             {/* Current Tasks Section */}
                             <div>
                                 <div className="flex items-center justify-between mb-4">
-                                    <h2 className="text-xl font-bold text-foreground">Current Tasks</h2>
+                                    <h2 className="text-sm font-semibold text-foreground uppercase tracking-wider flex items-center gap-2">
+                                        <Briefcase className="h-4 w-4" /> Current Tasks
+                                        <Badge variant="secondary" className="text-xs">{activeTasks.length}</Badge>
+                                    </h2>
                                     {canManageAssignments && unassignedTasks.length > 0 && (
                                         <div className="flex items-center gap-2">
                                             <Select value={selectedTaskId} onValueChange={setSelectedTaskId}>
@@ -974,7 +980,10 @@ export function FullProfileView({ open, onOpenChange, memberId, currentUserId }:
                             
                             {/* Completed Tasks Section */}
                             <div>
-                                <h2 className="text-xl font-bold text-foreground mb-4">Completed Tasks</h2>
+                                <h2 className="text-sm font-semibold text-foreground uppercase tracking-wider flex items-center gap-2 mb-4">
+                                    <Check className="h-4 w-4" /> Completed Tasks
+                                    <Badge variant="secondary" className="text-xs">{completedTasks.length}</Badge>
+                                </h2>
                                 <div className="bg-background border border-slate-200 rounded-lg overflow-hidden">
                                     {completedTasks.length === 0 ? (
                                         <div className="p-8 text-center text-muted-foreground">

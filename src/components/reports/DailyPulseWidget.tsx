@@ -83,17 +83,8 @@ export function DailyPulseWidget({
                 </CardHeader>
                 <CardContent className="pt-0">
                     <p className="text-sm text-muted-foreground">
-                        {error || 'Unable to load daily pulse'}
+                        Coming soon
                     </p>
-                    <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        className="mt-2"
-                        onClick={fetchReport}
-                    >
-                        <RefreshCw className="h-4 w-4 mr-2" />
-                        Try again
-                    </Button>
                 </CardContent>
             </Card>
         )

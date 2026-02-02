@@ -40,7 +40,6 @@ export default async function TasksPage() {
     }
 
     // Parallelize independent queries
-    // SECURITY: Don't fetch email in SSR to prevent exposure in page source
     const [
         { data: currentUserProfile },
         { data: objectives },
@@ -49,7 +48,7 @@ export default async function TasksPage() {
     ] = await Promise.all([
         supabase.from('profiles').select('id, foundry_id, role').eq('id', user.id).single(),
         supabase.from('objectives').select('id, title'),
-        supabase.from('profiles').select('id, full_name, role'),
+        supabase.from('profiles').select('id, full_name, role, email'),
         supabase.from('teams').select('id, name')
     ])
 
@@ -58,7 +57,8 @@ export default async function TasksPage() {
     const members = (membersData || []).map(p => ({
         id: p.id,
         full_name: p.full_name || 'Unknown',
-        role: p.role
+        role: p.role,
+        email: p.email || ''
     }))
     const teams = teamsData || []
 

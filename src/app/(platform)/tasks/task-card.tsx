@@ -49,6 +49,7 @@ type Member = {
     id: string
     full_name: string
     role: string
+    email: string
 }
 
 interface TaskCardProps {

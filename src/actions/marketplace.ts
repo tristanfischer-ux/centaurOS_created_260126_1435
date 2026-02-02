@@ -398,3 +398,193 @@ export async function createManualRecommendation(data: {
         return { success: false, error: 'Failed to create recommendation' }
     }
 }
+
+// ==========================================
+// SAVED LISTINGS (User Favorites)
+// ==========================================
+
+/**
+ * Save a marketplace listing to user's favorites
+ * 
+ * @param listingId - The marketplace listing ID to save
+ * @returns Success status and error message if failed
+ * 
+ * @security User can only save to their own favorites (enforced by RLS)
+ * @audit Creates record in saved_marketplace_listings table
+ */
+export async function saveMarketplaceListing(listingId: string): Promise<{
+    success: boolean
+    error: string | null
+}> {
+    try {
+        const supabase = await createClient()
+        const { data: { user } } = await supabase.auth.getUser()
+        
+        if (!user) {
+            return { success: false, error: 'Not authenticated' }
+        }
+
+        // VALIDATION: Check listing exists
+        const { data: listing } = await supabase
+            .from('marketplace_listings')
+            .select('id')
+            .eq('id', listingId)
+            .single()
+
+        if (!listing) {
+            return { success: false, error: 'Listing not found' }
+        }
+
+        // Insert saved listing
+        const { error } = await supabase
+            .from('saved_marketplace_listings')
+            .insert({
+                user_id: user.id,
+                listing_id: listingId
+            })
+
+        if (error) {
+            // Unique constraint violation - already saved
+            if (error.code === '23505') {
+                return { success: true, error: null } // Treat as success
+            }
+            console.error('[saveMarketplaceListing] Error:', error)
+            return { success: false, error: 'Failed to save listing' }
+        }
+
+        revalidatePath('/marketplace')
+        return { success: true, error: null }
+    } catch (err) {
+        console.error('[saveMarketplaceListing] Exception:', err)
+        return { success: false, error: 'Failed to save listing' }
+    }
+}
+
+/**
+ * Unsave a marketplace listing from user's favorites
+ * 
+ * @param listingId - The marketplace listing ID to unsave
+ * @returns Success status and error message if failed
+ * 
+ * @security User can only unsave their own favorites (enforced by RLS)
+ * @audit Removes record from saved_marketplace_listings table
+ */
+export async function unsaveMarketplaceListing(listingId: string): Promise<{
+    success: boolean
+    error: string | null
+}> {
+    try {
+        const supabase = await createClient()
+        const { data: { user } } = await supabase.auth.getUser()
+        
+        if (!user) {
+            return { success: false, error: 'Not authenticated' }
+        }
+
+        const { error } = await supabase
+            .from('saved_marketplace_listings')
+            .delete()
+            .eq('user_id', user.id)
+            .eq('listing_id', listingId)
+
+        if (error) {
+            console.error('[unsaveMarketplaceListing] Error:', error)
+            return { success: false, error: 'Failed to unsave listing' }
+        }
+
+        revalidatePath('/marketplace')
+        return { success: true, error: null }
+    } catch (err) {
+        console.error('[unsaveMarketplaceListing] Exception:', err)
+        return { success: false, error: 'Failed to unsave listing' }
+    }
+}
+
+/**
+ * Get all saved marketplace listings for the current user
+ * 
+ * @returns Array of saved marketplace listings with full details
+ * 
+ * @security RLS ensures users only see their own saved listings
+ */
+export async function getSavedMarketplaceListings(): Promise<{
+    data: MarketplaceListing[]
+    error: string | null
+}> {
+    try {
+        const supabase = await createClient()
+        const { data: { user } } = await supabase.auth.getUser()
+        
+        if (!user) {
+            return { data: [], error: 'Not authenticated' }
+        }
+
+        // Get saved listing IDs
+        const { data: savedListings, error: savedError } = await supabase
+            .from('saved_marketplace_listings')
+            .select('listing_id, created_at')
+            .eq('user_id', user.id)
+            .order('created_at', { ascending: false })
+
+        if (savedError) {
+            console.error('[getSavedMarketplaceListings] Error fetching saved:', savedError)
+            return { data: [], error: 'Failed to fetch saved listings' }
+        }
+
+        if (!savedListings || savedListings.length === 0) {
+            return { data: [], error: null }
+        }
+
+        // Get full listing details
+        const listingIds = savedListings.map(s => s.listing_id)
+        const { data: listings, error: listingsError } = await supabase
+            .from('marketplace_listings')
+            .select('*')
+            .in('id', listingIds)
+
+        if (listingsError) {
+            console.error('[getSavedMarketplaceListings] Error fetching listings:', listingsError)
+            return { data: [], error: 'Failed to fetch listing details' }
+        }
+
+        return { data: (listings || []) as MarketplaceListing[], error: null }
+    } catch (err) {
+        console.error('[getSavedMarketplaceListings] Exception:', err)
+        return { data: [], error: 'Failed to fetch saved listings' }
+    }
+}
+
+/**
+ * Check if user has saved specific listings (for UI state)
+ * 
+ * @param listingIds - Array of listing IDs to check
+ * @returns Set of saved listing IDs
+ * 
+ * @security RLS ensures users only see their own saved status
+ */
+export async function getSavedListingIds(listingIds: string[]): Promise<Set<string>> {
+    try {
+        if (listingIds.length === 0) return new Set()
+
+        const supabase = await createClient()
+        const { data: { user } } = await supabase.auth.getUser()
+        
+        if (!user) return new Set()
+
+        const { data, error } = await supabase
+            .from('saved_marketplace_listings')
+            .select('listing_id')
+            .eq('user_id', user.id)
+            .in('listing_id', listingIds)
+
+        if (error) {
+            console.error('[getSavedListingIds] Error:', error)
+            return new Set()
+        }
+
+        return new Set((data || []).map(d => d.listing_id))
+    } catch (err) {
+        console.error('[getSavedListingIds] Exception:', err)
+        return new Set()
+    }
+}

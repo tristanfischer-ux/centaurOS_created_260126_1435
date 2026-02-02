@@ -42,7 +42,6 @@ import { addDays } from "date-fns"
 import { cn } from "@/lib/utils"
 import { DatePickerWithShortcuts } from "@/components/ui/date-picker-with-shortcuts"
 import { UserAvatar } from "@/components/ui/user-avatar"
-import { VoiceRecorder } from "@/components/tasks/voice-recorder"
 
 interface CreateTaskDialogProps {
     objectives: { id: string; title: string }[]
@@ -80,21 +79,7 @@ export function CreateTaskDialog({ objectives, members, teams = [], currentUserI
     const [descriptionError, setDescriptionError] = useState<string | null>(null)
     const [assigneeError, setAssigneeError] = useState<string | null>(null)
     const [submitError, setSubmitError] = useState<string | null>(null)
-    const [showVoiceNudge, setShowVoiceNudge] = useState(false)
     const [description, setDescription] = useState("")
-
-    // Check if user has seen voice recorder before
-    useEffect(() => {
-        const hasSeenVoiceRecorder = localStorage.getItem('hasSeenVoiceRecorder')
-        if (!hasSeenVoiceRecorder) {
-            setShowVoiceNudge(true)
-            // Mark as seen after 5 seconds
-            setTimeout(() => {
-                setShowVoiceNudge(false)
-                localStorage.setItem('hasSeenVoiceRecorder', 'true')
-            }, 5000)
-        }
-    }, [])
 
     // Form Refs for manual value setting
     const titleObjRef = useRef<HTMLInputElement>(null)
@@ -207,30 +192,6 @@ export function CreateTaskDialog({ objectives, members, teams = [], currentUserI
             toast.error("An unexpected error occurred")
         } finally {
             setIsLoading(false)
-        }
-    }
-
-    const handleVoiceFill = (data: { title: string; description: string; assignee_type: string; due_date?: string }) => {
-        if (titleObjRef.current) titleObjRef.current.value = data.title;
-        setDescription(data.description);
-
-        // Try to set date
-        if (data.due_date) {
-            const parsed = new Date(data.due_date);
-            if (!isNaN(parsed.getTime())) {
-                setDate(parsed);
-            }
-        }
-
-        // Try to map assignee
-        if (data.assignee_type === "Self") {
-            setSelectedAssignees([currentUserId]);
-        } else if (data.assignee_type === "Legal_AI") {
-            const ai = members.find(m => m.role === 'AI_Agent' && m.full_name?.toLowerCase().includes('legal')); // Heuristic
-            if (ai) setSelectedAssignees([ai.id]);
-        } else if (data.assignee_type === "General_AI") {
-            const ai = members.find(m => m.role === 'AI_Agent' && !m.full_name?.toLowerCase().includes('legal'));
-            if (ai) setSelectedAssignees([ai.id]);
         }
     }
 
@@ -353,30 +314,10 @@ export function CreateTaskDialog({ objectives, members, teams = [], currentUserI
             <DialogContent size="md" className="w-[calc(100vw-2rem)] bg-background text-foreground border max-h-[90dvh] overflow-y-auto">
                 <form onSubmit={onSubmit}>
                     <DialogHeader>
-                        <div className="flex items-start justify-between pr-8">
-                            <div className="flex-1">
-                                <DialogTitle>Create New Task</DialogTitle>
-                                <DialogDescription>
-                                    Assign a new task. Assign to an AI Agent for auto-execution.
-                                </DialogDescription>
-                            </div>
-                            <div className="flex flex-col items-end gap-1 ml-4">
-                                <div className="relative">
-                                    <VoiceRecorder
-                                        onTaskParsed={handleVoiceFill}
-                                        className={`flex items-center gap-2 ${showVoiceNudge ? 'animate-pulse' : ''}`}
-                                    />
-                                    {showVoiceNudge && (
-                                        <div className="absolute -top-8 right-0 bg-status-warning text-status-warning-foreground text-xs px-2 py-1 rounded shadow-lg whitespace-nowrap animate-pulse">
-                                            ✨ Try voice input
-                                        </div>
-                                    )}
-                                </div>
-                                <p className="text-xs text-muted-foreground text-right max-w-[120px]">
-                                    Speak to fill task details
-                                </p>
-                            </div>
-                        </div>
+                        <DialogTitle>Create New Task</DialogTitle>
+                        <DialogDescription>
+                            Assign a new task. Assign to an AI Agent for auto-execution.
+                        </DialogDescription>
                     </DialogHeader>
                     <div className="grid gap-4 py-4">
                         {/* Stage 1 - Required Fields (always visible) */}

@@ -78,11 +78,12 @@ export default async function ObjectivesPage() {
 
     // Fetch data for CreateTaskDialog
     const objectivesForDialog = await supabase.from('objectives').select('id, title').then(r => r.data || [])
-    const membersData = await supabase.from('profiles').select('id, full_name, role')
+    const membersData = await supabase.from('profiles').select('id, full_name, role, email')
     const members = (membersData.data || []).map(p => ({
         id: p.id,
         full_name: p.full_name || 'Unknown',
-        role: p.role
+        role: p.role,
+        email: p.email || ''
     }))
 
     // Fetch Teams
