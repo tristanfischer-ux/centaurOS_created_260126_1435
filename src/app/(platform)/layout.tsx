@@ -8,7 +8,6 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { OfflineIndicator } from "@/components/OfflineIndicator";
 import { OnboardingModal } from "@/components/OnboardingModal";
 import { ExecutiveProfilePrompt, VerificationSuccessToast } from "@/components/onboarding";
-import { FloatingAdminBox } from "@/components/admin/FloatingAdminBox";
 import { MessagingSidebarWrapper } from "@/components/messaging/MessagingSidebarWrapper";
 import { Suspense } from "react";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -104,11 +103,6 @@ export default async function PlatformLayout({
                         <Suspense fallback={null}>
                             <VerificationSuccessToast />
                         </Suspense>
-                        <FloatingAdminBox 
-                            foundryId={foundryId}
-                            isFounder={profile?.role === "Founder"}
-                            hasAdminAccess={hasAdminAccess}
-                        />
                     </div>
                 </ZoomProvider>
             </PresenceProvider>
