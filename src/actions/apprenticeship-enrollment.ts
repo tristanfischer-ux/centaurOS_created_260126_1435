@@ -298,26 +298,36 @@ export async function assignMentors(
     .single()
   
   if (enrollment) {
-    if (seniorMentorId && enrollment.senior_mentor) {
+    // Get default "No objective set" objective for the foundry
+    const { data: defaultObjective } = await supabase
+      .from('objectives')
+      .select('id')
+      .eq('foundry_id', enrollment.foundry_id)
+      .eq('title', 'No objective set')
+      .single()
+
+    if (seniorMentorId && enrollment.senior_mentor && defaultObjective) {
       await supabase.from('tasks').insert({
         title: `Meet your Senior Mentor: ${(enrollment.senior_mentor as { full_name: string }).full_name}`,
         description: 'Schedule a 30-min intro call to discuss your goals, training plan, and expectations.',
         creator_id: seniorMentorId,
         assignee_id: enrollment.apprentice_id,
         foundry_id: enrollment.foundry_id,
+        objective_id: defaultObjective.id,
         status: 'Pending',
         risk_level: 'Low',
         end_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
       })
     }
     
-    if (workplaceBuddyId && enrollment.workplace_buddy) {
+    if (workplaceBuddyId && enrollment.workplace_buddy && defaultObjective) {
       await supabase.from('tasks').insert({
         title: `Meet your Workplace Buddy: ${(enrollment.workplace_buddy as { full_name: string }).full_name}`,
         description: 'Grab coffee (virtual or IRL) with your buddy this week. They\'ll help you navigate the workplace.',
         creator_id: workplaceBuddyId,
         assignee_id: enrollment.apprentice_id,
         foundry_id: enrollment.foundry_id,
+        objective_id: defaultObjective.id,
         status: 'Pending',
         risk_level: 'Low',
         end_date: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString()

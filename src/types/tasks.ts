@@ -105,3 +105,15 @@ export type TeamMember = {
     profile_id: string
     profile?: Profile
 }
+
+// Task thread item for merged message/comment threads
+export type TaskThreadItem = {
+    id: string
+    content: string
+    author: Profile
+    created_at: string
+    source: 'message' | 'comment'
+    message_id?: string
+    task_id?: string
+    conversation_id?: string
+}

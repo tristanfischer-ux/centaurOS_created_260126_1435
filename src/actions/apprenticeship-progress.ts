@@ -56,19 +56,30 @@ export async function createProgressReview(input: ProgressReviewInput) {
       .single()
     
     if (enrollment) {
-      // Batch insert all tasks at once instead of one-by-one
-      const tasksToInsert = input.actionItems.map(item => ({
-        title: item,
-        description: `Action item from ${input.reviewType} progress review`,
-        creator_id: user.id,
-        assignee_id: enrollment.apprentice_id,
-        foundry_id: enrollment.foundry_id,
-        status: 'Pending' as const,
-        risk_level: 'Low' as const,
-        end_date: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString() // Due in 2 weeks
-      }))
-      
-      await supabase.from('tasks').insert(tasksToInsert)
+      // Get default "No objective set" objective for the foundry
+      const { data: defaultObjective } = await supabase
+        .from('objectives')
+        .select('id')
+        .eq('foundry_id', enrollment.foundry_id)
+        .eq('title', 'No objective set')
+        .single()
+
+      if (defaultObjective) {
+        // Batch insert all tasks at once instead of one-by-one
+        const tasksToInsert = input.actionItems.map(item => ({
+          title: item,
+          description: `Action item from ${input.reviewType} progress review`,
+          creator_id: user.id,
+          assignee_id: enrollment.apprentice_id,
+          foundry_id: enrollment.foundry_id,
+          objective_id: defaultObjective.id,
+          status: 'Pending' as const,
+          risk_level: 'Low' as const,
+          end_date: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString() // Due in 2 weeks
+        }))
+        
+        await supabase.from('tasks').insert(tasksToInsert)
+      }
     }
   }
   
@@ -121,18 +132,29 @@ export async function completeProgressReview(
   
   // Create follow-up tasks (batch insert to fix N+1 pattern)
   if (input.actionItems && input.actionItems.length > 0 && review.enrollment) {
-    const tasksToInsert = input.actionItems.map(item => ({
-      title: item,
-      description: `Action item from progress review`,
-      creator_id: user.id,
-      assignee_id: review.enrollment.apprentice_id,
-      foundry_id: review.enrollment.foundry_id,
-      status: 'Pending' as const,
-      risk_level: 'Low' as const,
-      end_date: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString()
-    }))
-    
-    await supabase.from('tasks').insert(tasksToInsert)
+    // Get default "No objective set" objective for the foundry
+    const { data: defaultObjective } = await supabase
+      .from('objectives')
+      .select('id')
+      .eq('foundry_id', review.enrollment.foundry_id)
+      .eq('title', 'No objective set')
+      .single()
+
+    if (defaultObjective) {
+      const tasksToInsert = input.actionItems.map(item => ({
+        title: item,
+        description: `Action item from progress review`,
+        creator_id: user.id,
+        assignee_id: review.enrollment.apprentice_id,
+        foundry_id: review.enrollment.foundry_id,
+        objective_id: defaultObjective.id,
+        status: 'Pending' as const,
+        risk_level: 'Low' as const,
+        end_date: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString()
+      }))
+      
+      await supabase.from('tasks').insert(tasksToInsert)
+    }
   }
   
   revalidatePath('/apprenticeship')
