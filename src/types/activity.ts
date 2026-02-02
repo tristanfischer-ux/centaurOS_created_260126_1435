@@ -13,6 +13,16 @@ export type ActivityItemType = 'task_comment' | 'objective_comment' | 'message' 
 // Action types from task_history for mapping to human-readable content
 export type TaskHistoryActionType = 'CREATED' | 'UPDATED' | 'STATUS_CHANGE' | 'ASSIGNED' | 'COMPLETED' | 'FORWARDED'
 
+// Typed structure for task history changes JSONB
+export interface TaskHistoryChanges {
+  status?: { old: string; new: string }
+  assignee?: { old: string | null; new: string | null }
+  previous_assignee?: string
+  new_assignee?: string
+  reason?: string
+  [key: string]: unknown
+}
+
 export interface ActivityAuthor {
   id: string
   full_name: string | null
@@ -39,6 +49,8 @@ export interface ActivityItem {
   action_type?: TaskHistoryActionType
   // True if this is a system-generated log entry (e.g., automated comments)
   is_system_log?: boolean
+  // For task_history items: the raw changes data for hover details
+  changes?: TaskHistoryChanges
 }
 
 // Raw database types for transformation
@@ -102,7 +114,7 @@ export interface RawTaskHistory {
   task_id: string
   user_id: string
   action_type: TaskHistoryActionType
-  changes: Record<string, { old?: unknown; new?: unknown }> | null
+  changes: TaskHistoryChanges | null
   created_at: string | null
   user: {
     id: string

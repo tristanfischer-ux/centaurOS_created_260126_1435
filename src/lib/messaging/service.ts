@@ -60,6 +60,22 @@ export interface Message {
   parent_message_id: string | null
   reply_count: number
   last_reply_at: string | null
+  // Context fields
+  task_id?: string | null
+  objective_id?: string | null
+}
+
+export interface MessageWithContext extends Message {
+  task?: {
+    id: string
+    title: string
+    task_number: number
+    status: string
+  } | null
+  objective?: {
+    id: string
+    title: string
+  } | null
 }
 
 export interface ConversationWithParticipants extends Conversation {
@@ -935,4 +951,199 @@ export async function searchConversations(
     .limit(limit)
 
   return (byTitle || []) as unknown as ConversationWithParticipants[]
+}
+
+// ============================================================================
+// CONTEXT-AWARE MESSAGING
+// ============================================================================
+
+export interface SendMessageWithContextParams {
+  conversationId: string
+  senderId: string
+  content: string
+  taskId?: string
+  objectiveId?: string
+  messageType?: MessageType
+  fileUrl?: string
+}
+
+/**
+ * Send a message with task/objective context and optionally bridge to task comments
+ */
+export async function sendMessageWithContext(
+  supabase: AnySupabaseClient,
+  params: SendMessageWithContextParams
+): Promise<Message> {
+  const { 
+    conversationId, 
+    senderId, 
+    content, 
+    taskId, 
+    objectiveId, 
+    messageType = 'text', 
+    fileUrl 
+  } = params
+
+  // Create the message with context fields
+  const { data: message, error } = await supabase
+    .from('messages')
+    .insert({
+      conversation_id: conversationId,
+      sender_id: senderId,
+      content,
+      message_type: messageType,
+      file_url: fileUrl || null,
+      is_read: false,
+      task_id: taskId || null,
+      objective_id: objectiveId || null
+    })
+    .select()
+    .single()
+
+  if (error) {
+    throw new Error(`Failed to send message with context: ${error.message}`)
+  }
+
+  // If taskId is provided, also create a task_comment entry
+  if (taskId && message) {
+    try {
+      await bridgeMessageToTaskComment(supabase, message.id, taskId, content, senderId)
+    } catch (bridgeError) {
+      // Log but don't fail the message send
+      console.error('Failed to bridge message to task comment:', bridgeError)
+    }
+  }
+
+  return message as Message
+}
+
+export interface BridgeMessageToTaskCommentParams {
+  messageId: string
+  taskId: string
+  content: string
+  userId: string
+}
+
+/**
+ * Bridge a message to a task comment
+ */
+export async function bridgeMessageToTaskComment(
+  supabase: AnySupabaseClient,
+  messageId: string,
+  taskId: string,
+  content: string,
+  userId: string
+): Promise<void> {
+  // Get the task to retrieve foundry_id
+  const { data: task, error: taskError } = await supabase
+    .from('tasks')
+    .select('foundry_id')
+    .eq('id', taskId)
+    .single()
+
+  if (taskError || !task) {
+    throw new Error(`Task not found: ${taskError?.message || 'Unknown error'}`)
+  }
+
+  // Check if a comment already exists for this message
+  const { data: existing } = await supabase
+    .from('task_comments')
+    .select('id')
+    .eq('task_id', taskId)
+    .eq('user_id', userId)
+    .eq('content', content)
+    .maybeSingle()
+
+  if (existing) {
+    // Comment already exists, skip creation
+    return
+  }
+
+  // Create task comment with reference to message in content or as system note
+  const commentContent = `${content}\n\n_[Synced from conversation - Message ID: ${messageId}]_`
+
+  const { error: commentError } = await supabase
+    .from('task_comments')
+    .insert({
+      task_id: taskId,
+      user_id: userId,
+      content: commentContent,
+      foundry_id: task.foundry_id,
+      is_system_log: true // Mark as system-synced
+    })
+
+  if (commentError) {
+    throw new Error(`Failed to create task comment: ${commentError.message}`)
+  }
+}
+
+/**
+ * Get merged thread of messages and comments for a task
+ */
+export async function getTaskThread(
+  supabase: AnySupabaseClient,
+  taskId: string
+): Promise<import('@/types/tasks').TaskThreadItem[]> {
+  // Fetch all messages where task_id = taskId
+  const { data: messages, error: messagesError } = await supabase
+    .from('messages')
+    .select(`
+      id,
+      content,
+      created_at,
+      conversation_id,
+      sender:profiles!messages_sender_id_fkey(id, full_name, avatar_url, email, role, foundry_id)
+    `)
+    .eq('task_id', taskId)
+    .order('created_at', { ascending: true })
+
+  if (messagesError) {
+    throw new Error(`Failed to fetch messages: ${messagesError.message}`)
+  }
+
+  // Fetch all task_comments for the task
+  const { data: comments, error: commentsError } = await supabase
+    .from('task_comments')
+    .select(`
+      id,
+      content,
+      created_at,
+      task_id,
+      user:profiles!task_comments_user_id_fkey(id, full_name, avatar_url, email, role, foundry_id)
+    `)
+    .eq('task_id', taskId)
+    .order('created_at', { ascending: true })
+
+  if (commentsError) {
+    throw new Error(`Failed to fetch comments: ${commentsError.message}`)
+  }
+
+  // Transform messages to TaskThreadItem format
+  const messageItems = (messages || []).map((msg) => ({
+    id: msg.id,
+    content: msg.content || '',
+    author: msg.sender as import('@/types/tasks').Profile,
+    created_at: msg.created_at,
+    source: 'message' as const,
+    message_id: msg.id,
+    task_id: taskId,
+    conversation_id: msg.conversation_id
+  }))
+
+  // Transform comments to TaskThreadItem format
+  const commentItems = (comments || []).map((comment) => ({
+    id: comment.id,
+    content: comment.content,
+    author: comment.user as import('@/types/tasks').Profile,
+    created_at: comment.created_at || new Date().toISOString(),
+    source: 'comment' as const,
+    task_id: taskId
+  }))
+
+  // Merge and sort by created_at
+  const merged = [...messageItems, ...commentItems].sort(
+    (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+  )
+
+  return merged
 }

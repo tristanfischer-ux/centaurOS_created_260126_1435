@@ -2,13 +2,18 @@
 
 import { useState, useTransition } from 'react'
 import Link from 'next/link'
-import { formatDistanceToNow } from 'date-fns'
+import { formatDistanceToNow, format } from 'date-fns'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { UserAvatar } from '@/components/ui/user-avatar'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
+import {
+  HoverCard,
+  HoverCardContent,
+  HoverCardTrigger,
+} from '@/components/ui/hover-card'
 import { 
   CheckSquare, 
   Target, 
@@ -18,10 +23,13 @@ import {
   Loader2,
   GitCommit,
   History,
-  Bot
+  Bot,
+  ArrowRight,
+  User,
+  Info
 } from 'lucide-react'
 import { replyToActivity, markActivityRead } from '@/actions/activity'
-import type { ActivityItem as ActivityItemType, ActivitySourceType, TaskHistoryActionType } from '@/types/activity'
+import type { ActivityItem as ActivityItemType, ActivitySourceType, TaskHistoryActionType, TaskHistoryChanges } from '@/types/activity'
 
 interface ActivityItemProps {
   item: ActivityItemType
@@ -54,6 +62,79 @@ function getActionTypeBadgeVariant(actionType: TaskHistoryActionType | string): 
     default:
       return 'outline'
   }
+}
+
+// Helper to format change details for display in hover popover
+function formatChangeDetails(changes: TaskHistoryChanges | undefined): Array<{ field: string; before?: string; after?: string }> {
+  if (!changes) return []
+  
+  const details: Array<{ field: string; before?: string; after?: string }> = []
+  
+  // Status change
+  if (changes.status) {
+    details.push({
+      field: 'Status',
+      before: String(changes.status.old || ''),
+      after: String(changes.status.new || '')
+    })
+  }
+  
+  // Assignee change
+  if (changes.assignee) {
+    details.push({
+      field: 'Assignee',
+      before: String(changes.assignee.old || 'Unassigned'),
+      after: String(changes.assignee.new || 'Unassigned')
+    })
+  }
+  
+  // New assignee (for ASSIGNED action)
+  if (changes.new_assignee && !changes.assignee) {
+    details.push({
+      field: 'Assigned to',
+      after: String(changes.new_assignee)
+    })
+  }
+  
+  // Previous assignee (for reassignment)
+  if (changes.previous_assignee && !changes.assignee) {
+    details.push({
+      field: 'Previous assignee',
+      before: String(changes.previous_assignee)
+    })
+  }
+  
+  // Reason (for forwarding, etc.)
+  if (changes.reason) {
+    details.push({
+      field: 'Reason',
+      after: String(changes.reason)
+    })
+  }
+  
+  // Handle any other fields in the changes object
+  const handledKeys = ['status', 'assignee', 'new_assignee', 'previous_assignee', 'reason']
+  for (const [key, value] of Object.entries(changes)) {
+    if (handledKeys.includes(key)) continue
+    if (value === null || value === undefined) continue
+    
+    // Handle object values with old/new
+    if (typeof value === 'object' && value !== null && 'old' in value && 'new' in value) {
+      const typedValue = value as { old?: unknown; new?: unknown }
+      details.push({
+        field: key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+        before: String(typedValue.old ?? ''),
+        after: String(typedValue.new ?? '')
+      })
+    } else if (typeof value === 'string' || typeof value === 'number') {
+      details.push({
+        field: key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+        after: String(value)
+      })
+    }
+  }
+  
+  return details
 }
 
 export function ActivityItem({ item, onReply, onTaskClick }: ActivityItemProps) {
@@ -235,12 +316,75 @@ export function ActivityItem({ item, onReply, onTaskClick }: ActivityItemProps) 
 
       {/* Content */}
       <div className="pl-11 space-y-3">
-        <p className={cn(
-          "text-sm whitespace-pre-wrap line-clamp-4",
-          (isHistoryItem || isSystemLog) ? "text-muted-foreground" : "text-foreground"
-        )}>
-          {item.content}
-        </p>
+        {/* For history items with changes, wrap in HoverCard to show details */}
+        {isHistoryItem && item.changes ? (
+          <HoverCard openDelay={200}>
+            <HoverCardTrigger asChild>
+              <div className="inline-flex items-center gap-2 cursor-help group/hover">
+                <p className="text-sm text-muted-foreground whitespace-pre-wrap line-clamp-4">
+                  {item.content}
+                </p>
+                <Info className="h-3.5 w-3.5 text-muted-foreground opacity-50 group-hover/hover:opacity-100 transition-opacity flex-shrink-0" />
+              </div>
+            </HoverCardTrigger>
+            <HoverCardContent className="w-80" align="start">
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <History className="h-4 w-4 text-muted-foreground" />
+                  <span className="font-semibold text-sm">Change Details</span>
+                </div>
+                
+                {/* Change details */}
+                {formatChangeDetails(item.changes).length > 0 ? (
+                  <div className="space-y-2">
+                    {formatChangeDetails(item.changes).map((change, idx) => (
+                      <div key={idx} className="text-sm">
+                        <span className="text-muted-foreground">{change.field}:</span>
+                        {change.before && change.after ? (
+                          <div className="flex items-center gap-2 mt-0.5 pl-2">
+                            <span className="text-foreground bg-status-error-light px-1.5 py-0.5 rounded text-xs line-through">
+                              {change.before}
+                            </span>
+                            <ArrowRight className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+                            <span className="text-foreground bg-status-success-light px-1.5 py-0.5 rounded text-xs">
+                              {change.after}
+                            </span>
+                          </div>
+                        ) : change.after ? (
+                          <span className="text-foreground ml-1">{change.after}</span>
+                        ) : change.before ? (
+                          <span className="text-muted-foreground ml-1 line-through">{change.before}</span>
+                        ) : null}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    No detailed changes recorded.
+                  </p>
+                )}
+                
+                {/* Metadata */}
+                <div className="pt-2 border-t text-xs text-muted-foreground space-y-1">
+                  <div className="flex items-center gap-2">
+                    <User className="h-3 w-3" />
+                    <span>Changed by {item.author.full_name || 'Unknown'}</span>
+                  </div>
+                  <div>
+                    {format(new Date(item.created_at), 'MMM d, yyyy \'at\' h:mm a')}
+                  </div>
+                </div>
+              </div>
+            </HoverCardContent>
+          </HoverCard>
+        ) : (
+          <p className={cn(
+            "text-sm whitespace-pre-wrap line-clamp-4",
+            (isHistoryItem || isSystemLog) ? "text-muted-foreground" : "text-foreground"
+          )}>
+            {item.content}
+          </p>
+        )}
 
         {/* Reply Section - Only show for comment types, not history or system logs */}
         {!isHistoryItem && !isSystemLog && isReplying ? (

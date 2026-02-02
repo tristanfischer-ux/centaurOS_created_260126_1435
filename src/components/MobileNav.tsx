@@ -26,7 +26,7 @@ function isRouteActive(pathname: string, href: string): boolean {
 // Primary nav items shown in bottom bar (Work items)
 const mainNavigation = [
     { name: "Today", shortName: "Today", href: "/today", icon: Sun },
-    { name: "Inbox", shortName: "Inbox", href: "/messages", icon: Inbox },
+    { name: "Inbox", shortName: "Inbox", href: "/inbox", icon: Inbox },
     { name: "Tasks", shortName: "Tasks", href: "/tasks", icon: CheckSquare },
     { name: "Team", shortName: "Team", href: "/team", icon: Users },
 ]

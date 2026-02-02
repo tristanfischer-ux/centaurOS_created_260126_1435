@@ -189,12 +189,12 @@ export const settingsCommand: SlashCommand = {
 export const messagesCommand: SlashCommand = {
   name: 'messages',
   description: 'Go to Messages',
-  usage: '/messages',
+  usage: '/inbox',
   icon: MessageSquare,
   category: 'navigation',
   aliases: ['inbox'],
   execute: async (): Promise<CommandResult> => {
-    return navigateResult('/messages')
+    return navigateResult('/inbox')
   }
 }
 

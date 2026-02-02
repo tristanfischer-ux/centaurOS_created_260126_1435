@@ -745,7 +745,9 @@ export async function getActivityFeed(options?: {
               task_number: history.task.task_number
             },
             is_unread: false, // History items don't track read status
-            action_type: history.action_type
+            action_type: history.action_type,
+            // Include raw changes data for hover details
+            changes: history.changes || undefined
           })
         }
       }

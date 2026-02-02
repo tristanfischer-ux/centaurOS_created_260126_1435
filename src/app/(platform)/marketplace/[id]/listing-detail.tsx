@@ -96,9 +96,9 @@ export function MarketplaceListingDetail({ listing, trustSignals, ratings }: Mar
     }
 
     return (
-        <div className="max-w-5xl mx-auto space-y-6">
+        <div className="space-y-4">
             {/* Header - Matches Strategic Objectives style exactly */}
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-slate-100">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-3 border-b border-slate-100">
                 <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-3 mb-1">
                         <div className="h-8 w-1 bg-orange-600 rounded-full shadow-[0_0_8px_rgba(234,88,12,0.6)]" />
@@ -153,9 +153,9 @@ export function MarketplaceListingDetail({ listing, trustSignals, ratings }: Mar
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
                 {/* Main content */}
-                <div className="lg:col-span-2 space-y-6">
+                <div className="lg:col-span-2 space-y-4">
                     {/* Description */}
                     <section>
                         <h2 className="text-lg font-semibold text-foreground mb-2">About</h2>
@@ -175,7 +175,7 @@ export function MarketplaceListingDetail({ listing, trustSignals, ratings }: Mar
                 </div>
 
                 {/* Sidebar */}
-                <div className="space-y-6">
+                <div className="space-y-4">
                     {/* Key Metrics */}
                     <KeyMetricsCard category={category} attrs={attrs} />
                     
@@ -247,7 +247,7 @@ function KeyMetricsCard({ category, attrs }: { category: string; attrs: Record<s
 // People-specific section
 function PeopleSection({ attrs }: { attrs: Record<string, any> }) {
     return (
-        <div className="space-y-6">
+        <div className="space-y-4">
             {/* Education */}
             {attrs.education && (
                 <section>
@@ -303,7 +303,7 @@ function PeopleSection({ attrs }: { attrs: Record<string, any> }) {
 // AI-specific section
 function AISection({ attrs }: { attrs: Record<string, any> }) {
     return (
-        <div className="space-y-6">
+        <div className="space-y-4">
             {/* Integrations */}
             {attrs.integrations && (
                 <section>
@@ -416,7 +416,7 @@ function AISection({ attrs }: { attrs: Record<string, any> }) {
 // Products-specific section
 function ProductsSection({ attrs }: { attrs: Record<string, any> }) {
     return (
-        <div className="space-y-6">
+        <div className="space-y-4">
             {/* Certifications */}
             {attrs.certifications && (
                 <section>
@@ -465,7 +465,7 @@ function ProductsSection({ attrs }: { attrs: Record<string, any> }) {
 // Services-specific section
 function ServicesSection({ attrs }: { attrs: Record<string, any> }) {
     return (
-        <div className="space-y-6">
+        <div className="space-y-4">
             {/* Specialty */}
             {attrs.specialty && (
                 <section>
