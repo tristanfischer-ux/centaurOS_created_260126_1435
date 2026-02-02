@@ -45,12 +45,18 @@ export function KeyboardShortcutsDialog() {
 
   useEffect(() => {
     const handleKeyPress = (e: KeyboardEvent) => {
-      // Shift+? to open
-      if (e.key === '?' && e.shiftKey) {
+      // Don't trigger shortcuts when typing in input fields
+      const target = e.target as HTMLElement
+      const isTyping = target.tagName === 'INPUT' || 
+                       target.tagName === 'TEXTAREA' || 
+                       target.isContentEditable
+      
+      // Shift+? to open (only when not typing)
+      if (e.key === '?' && e.shiftKey && !isTyping) {
         e.preventDefault()
         setOpen(true)
       }
-      // Cmd+/ to open
+      // Cmd+/ to open (works everywhere since it's a Cmd combo)
       if (e.key === '/' && (e.metaKey || e.ctrlKey)) {
         e.preventDefault()
         setOpen(true)

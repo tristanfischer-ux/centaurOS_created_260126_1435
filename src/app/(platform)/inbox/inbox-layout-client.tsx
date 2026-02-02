@@ -410,19 +410,48 @@ function DirectConversationView({
     )
   }
   
+  // Find the person details
+  const person = members.find(m => m.id === personId)
+  
   return (
-    <ConversationThread
-      conversationId={conversationId}
-      currentUserId={currentUserId}
-      foundryId={foundryId}
-      members={members.map(m => ({
-        id: m.id,
-        full_name: m.full_name || m.email,
-        email: m.email
-      }))}
-      enableCommands={true}
-      showHeader={true}
-    />
+    <div className="flex flex-col h-full">
+      {/* Person header */}
+      {person && (
+        <div className="border-b border-border px-4 py-3 bg-muted/30">
+          <div className="flex items-center gap-3">
+            <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-semibold text-sm">
+              {(person.full_name || person.email).charAt(0).toUpperCase()}
+            </div>
+            <div className="flex-1">
+              <h3 className="font-medium text-sm">{person.full_name || person.email}</h3>
+              <p className="text-xs text-muted-foreground">{person.role}</p>
+            </div>
+            {person.online_status === 'online' && (
+              <div className="flex items-center gap-1.5">
+                <div className="h-2 w-2 rounded-full bg-status-success" />
+                <span className="text-xs text-muted-foreground">Online</span>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+      
+      {/* Conversation */}
+      <div className="flex-1">
+        <ConversationThread
+          conversationId={conversationId}
+          currentUserId={currentUserId}
+          foundryId={foundryId}
+          members={members.map(m => ({
+            id: m.id,
+            full_name: m.full_name || m.email,
+            email: m.email
+          }))}
+          enableCommands={true}
+          showHeader={false}
+        />
+      </div>
+    </div>
   )
 }
 
