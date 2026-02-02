@@ -213,6 +213,42 @@ export function sanitizeImageSrc(url: string | null | undefined): string | undef
 }
 
 /**
+ * Sanitize a URL for use in file previews (images, PDFs, etc.)
+ * Returns undefined for invalid or potentially dangerous URLs
+ * More permissive than sanitizeImageSrc for PDF viewing
+ */
+export function sanitizeFileSrc(url: string | null | undefined): string | undefined {
+    if (!url || typeof url !== 'string') return undefined
+    
+    const trimmedUrl = url.trim()
+    if (!trimmedUrl) return undefined
+    
+    try {
+        const parsed = new URL(trimmedUrl)
+        
+        // Only allow http and https for file previews
+        if (!['http:', 'https:'].includes(parsed.protocol)) {
+            return undefined
+        }
+        
+        // Block data: URLs and javascript: URLs
+        const lowerUrl = trimmedUrl.toLowerCase()
+        if (lowerUrl.startsWith('data:') || lowerUrl.startsWith('javascript:')) {
+            return undefined
+        }
+        
+        // Block private IPs and localhost
+        if (isBlockedHostname(parsed.hostname)) {
+            return undefined
+        }
+        
+        return trimmedUrl
+    } catch {
+        return undefined
+    }
+}
+
+/**
  * Validate and sanitize a video embed URL
  * Only allows known safe video platforms
  */

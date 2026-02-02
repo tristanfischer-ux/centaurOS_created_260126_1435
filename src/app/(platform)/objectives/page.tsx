@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import { CreateObjectiveDialog } from './create-objective-dialog'
 import { ObjectivesListView } from './objectives-list-view'
 import { FeatureTipWrapper } from './feature-tip-wrapper'
+import { TaskStatusLegend } from '@/components/objectives/task-status-legend'
 
 // Revalidate every 60 seconds
 export const revalidate = 60
@@ -102,6 +103,8 @@ export default async function ObjectivesPage() {
                     <CreateObjectiveDialog />
                 </FeatureTipWrapper>
             </div>
+
+            <TaskStatusLegend className="mb-6" />
 
             <ObjectivesListView 
                 objectives={objectivesWithTasks}

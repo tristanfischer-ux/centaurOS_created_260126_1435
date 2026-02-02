@@ -18,7 +18,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { toast } from "sonner"
 import { deleteTaskAttachment } from "@/actions/tasks"
 import { createClient } from "@/lib/supabase/client"
-import { sanitizeImageSrc } from "@/lib/security/url-validation"
+import { sanitizeImageSrc, sanitizeFileSrc } from "@/lib/security/url-validation"
 
 interface Attachment {
     id: string
@@ -312,35 +312,80 @@ export function AttachmentList({ taskId, attachments, canDelete = false, onDelet
                                     }}
                                 />
                             )}
-                            {getFileType(previewFile.file_name) === 'pdf' && fileUrls[previewFile.file_path] && sanitizeImageSrc(fileUrls[previewFile.file_path]) && (
-                                <iframe 
-                                    src={sanitizeImageSrc(fileUrls[previewFile.file_path])!}
-                                    className="w-full h-[80vh] rounded border"
-                                    title={previewFile.file_name}
-                                    onError={() => {
-                                        toast.error('Failed to load PDF preview')
-                                    }}
-                                />
-                            )}
-                            {(getFileType(previewFile.file_name) === 'other' || !fileUrls[previewFile.file_path]) && (
-                                <div className="flex flex-col items-center justify-center h-[60vh] text-muted-foreground">
-                                    <FileIcon className="h-16 w-16 mb-4" />
-                                    <p className="text-sm mb-2">Preview not available for this file type</p>
-                                    <Button
-                                        variant="secondary"
-                                        size="sm"
-                                        onClick={() => handleDownload(previewFile)}
-                                        disabled={downloadingId === previewFile.id}
-                                    >
-                                        {downloadingId === previewFile.id ? (
-                                            <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                                        ) : (
-                                            <Download className="h-4 w-4 mr-2" />
-                                        )}
-                                        Download File
-                                    </Button>
-                                </div>
-                            )}
+                            {getFileType(previewFile.file_name) === 'pdf' && fileUrls[previewFile.file_path] && (() => {
+                                const sanitizedUrl = sanitizeFileSrc(fileUrls[previewFile.file_path])
+                                console.log('PDF Preview:', { 
+                                    fileName: previewFile.file_name,
+                                    rawUrl: fileUrls[previewFile.file_path],
+                                    sanitizedUrl 
+                                })
+                                if (!sanitizedUrl) {
+                                    return (
+                                        <div className="flex flex-col items-center justify-center h-[60vh] text-muted-foreground">
+                                            <FileText className="h-16 w-16 mb-4 text-destructive" />
+                                            <p className="text-sm mb-2">Unable to preview PDF</p>
+                                            <p className="text-xs mb-4 text-muted-foreground">The file URL could not be validated</p>
+                                            <Button
+                                                variant="secondary"
+                                                size="sm"
+                                                onClick={() => handleDownload(previewFile)}
+                                                disabled={downloadingId === previewFile.id}
+                                            >
+                                                {downloadingId === previewFile.id ? (
+                                                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                                                ) : (
+                                                    <Download className="h-4 w-4 mr-2" />
+                                                )}
+                                                Download PDF Instead
+                                            </Button>
+                                        </div>
+                                    )
+                                }
+                                return (
+                                    <div className="w-full h-[80vh]">
+                                        <iframe 
+                                            src={`${sanitizedUrl}#toolbar=1&navpanes=1&scrollbar=1`}
+                                            className="w-full h-full rounded border bg-muted"
+                                            title={previewFile.file_name}
+                                            onLoad={() => console.log('PDF loaded successfully')}
+                                            onError={(e) => {
+                                                console.error('PDF iframe error:', e)
+                                                toast.error('Failed to load PDF preview. Try downloading instead.')
+                                            }}
+                                        />
+                                    </div>
+                                )
+                            })()}
+                            {(() => {
+                                const fileType = getFileType(previewFile.file_name)
+                                const hasUrl = fileUrls[previewFile.file_path]
+                                
+                                // Only show "no preview" for truly unsupported types or missing URLs
+                                if (fileType === 'other' || !hasUrl) {
+                                    return (
+                                        <div className="flex flex-col items-center justify-center h-[60vh] text-muted-foreground">
+                                            <FileIcon className="h-16 w-16 mb-4" />
+                                            <p className="text-sm mb-2">
+                                                {!hasUrl ? 'Loading preview...' : 'Preview not available for this file type'}
+                                            </p>
+                                            <Button
+                                                variant="secondary"
+                                                size="sm"
+                                                onClick={() => handleDownload(previewFile)}
+                                                disabled={downloadingId === previewFile.id}
+                                            >
+                                                {downloadingId === previewFile.id ? (
+                                                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                                                ) : (
+                                                    <Download className="h-4 w-4 mr-2" />
+                                                )}
+                                                Download File
+                                            </Button>
+                                        </div>
+                                    )
+                                }
+                                return null
+                            })()}
                         </div>
                     )}
                 </DialogContent>
