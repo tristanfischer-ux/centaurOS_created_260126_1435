@@ -1,14 +1,13 @@
 "use client"
 
-import { useEffect, useState, useRef, useMemo } from "react"
-import { createClient } from "@/lib/supabase/client"
+import { useEffect, useState, useRef } from "react"
 import { formatDistanceToNow } from "date-fns"
 import { Loader2, Send, Upload, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { MentionInput } from "@/components/ui/mention-input"
 import { MentionText } from "@/components/ui/mention-text"
 import { AttachmentList } from "@/components/tasks/attachment-list"
-import { addTaskComment, getTaskAttachments } from "@/actions/tasks"
+import { addTaskComment, getTaskComments, getTaskAttachments } from "@/actions/tasks"
 import { uploadTaskAttachment } from "@/actions/attachments"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
@@ -45,23 +44,19 @@ export function InlineThread({ taskId, isOpen, onClose, members }: InlineThreadP
     const [isDragging, setIsDragging] = useState(false)
     const [attachments, setAttachments] = useState<any[]>([])
     const fileInputRef = useRef<HTMLInputElement>(null)
-    const supabase = useMemo(() => createClient(), [])
 
     useEffect(() => {
         const fetchData = async () => {
             setIsLoading(true)
             
-            // Fetch comments (only human notes, not system logs)
-            const { data, error } = await supabase
-                .from('task_comments')
-                .select('*, user:user_id(full_name, role)')
-                .eq('task_id', taskId)
-                .eq('is_system_log', false)
-                .order('created_at', { ascending: false })
-                .limit(10)
-
-            if (!error && data) {
-                setComments(data as Comment[])
+            // Fetch comments using server action for consistent auth
+            const commentsRes = await getTaskComments(taskId)
+            if (commentsRes.error) {
+                console.error('[InlineThread] Failed to fetch comments:', commentsRes.error)
+            } else if (commentsRes.data) {
+                // Filter to only show human notes (not system logs)
+                const humanNotes = commentsRes.data.filter((c: Comment) => !c.is_system_log)
+                setComments(humanNotes.slice(0, 10) as Comment[])
             }
 
             // Fetch attachments
@@ -76,7 +71,7 @@ export function InlineThread({ taskId, isOpen, onClose, members }: InlineThreadP
         if (isOpen && taskId) {
             fetchData()
         }
-    }, [isOpen, taskId, supabase])
+    }, [isOpen, taskId])
 
     const handleSend = async (e: React.FormEvent) => {
         e.preventDefault()
@@ -89,14 +84,13 @@ export function InlineThread({ taskId, isOpen, onClose, members }: InlineThreadP
                 toast.error(result.error)
             } else {
                 setNewComment("")
-                const { data } = await supabase
-                    .from('task_comments')
-                    .select('*, user:user_id(full_name, role)')
-                    .eq('task_id', taskId)
-                    .eq('is_system_log', false)
-                    .order('created_at', { ascending: false })
-                    .limit(10)
-                if (data) setComments(data as Comment[])
+                toast.success("Note added")
+                // Refresh comments using server action for consistent auth
+                const commentsRes = await getTaskComments(taskId)
+                if (commentsRes.data) {
+                    const humanNotes = commentsRes.data.filter((c: Comment) => !c.is_system_log)
+                    setComments(humanNotes.slice(0, 10) as Comment[])
+                }
             }
         } finally {
             setIsSending(false)
@@ -114,15 +108,12 @@ export function InlineThread({ taskId, isOpen, onClose, members }: InlineThreadP
         } else {
             toast.success(`Uploaded ${file.name}`)
             
-            // Refresh both comments and attachments
-            const { data } = await supabase
-                .from('task_comments')
-                .select('*, user:user_id(full_name, role)')
-                .eq('task_id', taskId)
-                .eq('is_system_log', false)
-                .order('created_at', { ascending: false })
-                .limit(10)
-            setComments((data || []) as Comment[])
+            // Refresh comments using server action for consistent auth
+            const commentsRes = await getTaskComments(taskId)
+            if (commentsRes.data) {
+                const humanNotes = commentsRes.data.filter((c: Comment) => !c.is_system_log)
+                setComments(humanNotes.slice(0, 10) as Comment[])
+            }
             
             const attachmentsRes = await getTaskAttachments(taskId)
             if (attachmentsRes.data) {

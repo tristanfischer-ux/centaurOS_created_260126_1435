@@ -100,7 +100,7 @@ export function MarketplaceListingDetail({ listing, trustSignals, ratings }: Mar
     return (
         <div className="max-w-5xl mx-auto">
             {/* Breadcrumb Navigation */}
-            <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-sm mb-6">
+            <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-sm mb-3">
                 <Link 
                     href="/marketplace" 
                     className="text-muted-foreground hover:text-foreground transition-colors"
@@ -125,7 +125,7 @@ export function MarketplaceListingDetail({ listing, trustSignals, ratings }: Mar
             </nav>
 
             {/* Header */}
-            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 pb-6 border-b border-slate-100 mb-8">
+            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 pb-4 border-b border-slate-100 mb-6">
                 <div className="min-w-0 flex-1">
                     <div className={typography.pageHeader}>
                         <div className={typography.pageHeaderAccent} />
@@ -185,12 +185,12 @@ export function MarketplaceListingDetail({ listing, trustSignals, ratings }: Mar
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Main content */}
-                <div className="lg:col-span-2 space-y-8">
+                <div className="lg:col-span-2 space-y-6">
                     {/* Description */}
                     <section>
-                        <h2 className="text-lg font-semibold text-foreground mb-4">About</h2>
+                        <h2 className="text-lg font-semibold text-foreground mb-2">About</h2>
                         <p className="text-muted-foreground leading-relaxed">
                             {listing.description}
                         </p>
@@ -279,11 +279,11 @@ function KeyMetricsCard({ category, attrs }: { category: string; attrs: Record<s
 // People-specific section
 function PeopleSection({ attrs }: { attrs: Record<string, any> }) {
     return (
-        <div className="space-y-8">
+        <div className="space-y-6">
             {/* Education */}
             {attrs.education && (
                 <section>
-                    <h2 className="text-lg font-semibold text-foreground flex items-center gap-2 mb-4">
+                    <h2 className="text-lg font-semibold text-foreground flex items-center gap-2 mb-2">
                         <GraduationCap className="h-5 w-5" />
                         Education
                     </h2>
@@ -294,7 +294,7 @@ function PeopleSection({ attrs }: { attrs: Record<string, any> }) {
             {/* Previous Companies */}
             {attrs.previous_companies && (
                 <section>
-                    <h2 className="text-lg font-semibold text-foreground flex items-center gap-2 mb-4">
+                    <h2 className="text-lg font-semibold text-foreground flex items-center gap-2 mb-2">
                         <Building2 className="h-5 w-5" />
                         Previous Experience
                     </h2>
@@ -315,7 +315,7 @@ function PeopleSection({ attrs }: { attrs: Record<string, any> }) {
             {/* Skills/Expertise */}
             {(attrs.skills || attrs.expertise) && (
                 <section>
-                    <h2 className="text-lg font-semibold text-foreground flex items-center gap-2 mb-4">
+                    <h2 className="text-lg font-semibold text-foreground flex items-center gap-2 mb-2">
                         <Star className="h-5 w-5" />
                         Skills & Expertise
                     </h2>
@@ -335,11 +335,11 @@ function PeopleSection({ attrs }: { attrs: Record<string, any> }) {
 // AI-specific section
 function AISection({ attrs }: { attrs: Record<string, any> }) {
     return (
-        <div className="space-y-8">
+        <div className="space-y-6">
             {/* Integrations */}
             {attrs.integrations && (
                 <section>
-                    <h2 className="text-lg font-semibold text-foreground flex items-center gap-2 mb-4">
+                    <h2 className="text-lg font-semibold text-foreground flex items-center gap-2 mb-2">
                         <Layers className="h-5 w-5" />
                         Integrations
                     </h2>
@@ -360,7 +360,7 @@ function AISection({ attrs }: { attrs: Record<string, any> }) {
             {/* Use Cases */}
             {attrs.use_cases && (
                 <section>
-                    <h2 className="text-lg font-semibold text-foreground flex items-center gap-2 mb-4">
+                    <h2 className="text-lg font-semibold text-foreground flex items-center gap-2 mb-2">
                         <Brain className="h-5 w-5" />
                         Use Cases
                     </h2>
@@ -381,7 +381,7 @@ function AISection({ attrs }: { attrs: Record<string, any> }) {
             {/* Model Info */}
             {(attrs.model || attrs.provider) && (
                 <section>
-                    <h2 className="text-lg font-semibold text-foreground flex items-center gap-2 mb-4">
+                    <h2 className="text-lg font-semibold text-foreground flex items-center gap-2 mb-2">
                         <Cpu className="h-5 w-5" />
                         Model Details
                     </h2>
@@ -409,7 +409,7 @@ function AISection({ attrs }: { attrs: Record<string, any> }) {
             {/* Performance metrics */}
             {(attrs.accuracy || attrs.latency || attrs.throughput) && (
                 <section>
-                    <h2 className="text-lg font-semibold text-foreground flex items-center gap-2 mb-4">
+                    <h2 className="text-lg font-semibold text-foreground flex items-center gap-2 mb-2">
                         <BarChart3 className="h-5 w-5" />
                         Performance
                     </h2>
@@ -448,11 +448,11 @@ function AISection({ attrs }: { attrs: Record<string, any> }) {
 // Products-specific section
 function ProductsSection({ attrs }: { attrs: Record<string, any> }) {
     return (
-        <div className="space-y-8">
+        <div className="space-y-6">
             {/* Certifications */}
             {attrs.certifications && (
                 <section>
-                    <h2 className="text-lg font-semibold text-foreground flex items-center gap-2 mb-4">
+                    <h2 className="text-lg font-semibold text-foreground flex items-center gap-2 mb-2">
                         <Award className="h-5 w-5" />
                         Certifications
                     </h2>
@@ -473,7 +473,7 @@ function ProductsSection({ attrs }: { attrs: Record<string, any> }) {
             {/* Capabilities */}
             {attrs.capabilities && (
                 <section>
-                    <h2 className="text-lg font-semibold text-foreground flex items-center gap-2 mb-4">
+                    <h2 className="text-lg font-semibold text-foreground flex items-center gap-2 mb-2">
                         <Wrench className="h-5 w-5" />
                         Capabilities
                     </h2>
@@ -497,11 +497,11 @@ function ProductsSection({ attrs }: { attrs: Record<string, any> }) {
 // Services-specific section
 function ServicesSection({ attrs }: { attrs: Record<string, any> }) {
     return (
-        <div className="space-y-8">
+        <div className="space-y-6">
             {/* Specialty */}
             {attrs.specialty && (
                 <section>
-                    <h2 className="text-lg font-semibold text-foreground flex items-center gap-2 mb-4">
+                    <h2 className="text-lg font-semibold text-foreground flex items-center gap-2 mb-2">
                         <Target className="h-5 w-5" />
                         Specialty
                     </h2>
@@ -522,7 +522,7 @@ function ServicesSection({ attrs }: { attrs: Record<string, any> }) {
             {/* Focus Areas */}
             {attrs.focus_areas && (
                 <section>
-                    <h2 className="text-lg font-semibold text-foreground flex items-center gap-2 mb-4">
+                    <h2 className="text-lg font-semibold text-foreground flex items-center gap-2 mb-2">
                         <Users className="h-5 w-5" />
                         Focus Areas
                     </h2>
@@ -563,7 +563,7 @@ function AttributesSection({ attrs, category }: { attrs: Record<string, any>; ca
 
     return (
         <section>
-            <h2 className="text-lg font-semibold text-foreground mb-4">
+            <h2 className="text-lg font-semibold text-foreground mb-2">
                 Additional Details
             </h2>
             <Card>

@@ -1,8 +1,7 @@
 "use client"
 
-import { useEffect, useState, useRef, useMemo } from "react"
+import { useEffect, useState, useRef } from "react"
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet"
-import { createClient } from "@/lib/supabase/client"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { formatDistanceToNow } from "date-fns"
 import { Loader2, Send, Check, X, Forward, Paperclip, Bot, Upload } from "lucide-react"
@@ -15,7 +14,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Markdown } from "@/components/ui/markdown"
 import { MentionInput } from "@/components/ui/mention-input"
 import { MentionText } from "@/components/ui/mention-text"
-import { addTaskComment, acceptTask, rejectTask, completeTask, forwardTask, triggerAIWorker } from "@/actions/tasks"
+import { addTaskComment, getTaskComments, acceptTask, rejectTask, completeTask, forwardTask, triggerAIWorker } from "@/actions/tasks"
 import { startTaskDiscussion } from "@/actions/messaging"
 import { uploadTaskAttachment } from "@/actions/attachments"
 import { toast } from "sonner"
@@ -91,7 +90,6 @@ export function ThreadDrawer({
     const [isDragging, setIsDragging] = useState(false)
     const [isStartingDiscussion, setIsStartingDiscussion] = useState(false)
     const fileInputRef = useRef<HTMLInputElement>(null)
-    const supabase = useMemo(() => createClient(), [])
 
     // Check if assignee is AI
     const isAIAssignee = assigneeRole === 'AI_Agent'
@@ -116,14 +114,14 @@ export function ThreadDrawer({
     useEffect(() => {
         const fetchComments = async () => {
             setIsLoading(true)
-            const { data, error } = await supabase
-                .from('task_comments')
-                .select('*, user:user_id(full_name, role)')
-                .eq('task_id', taskId)
-                .order('created_at', { ascending: true })
-
-            if (!error && data) {
-                setComments(data as Comment[])
+            // Use server action for consistent auth with addTaskComment
+            const commentsRes = await getTaskComments(taskId)
+            if (commentsRes.error) {
+                console.error('[ThreadDrawer] Failed to fetch comments:', commentsRes.error)
+            } else if (commentsRes.data) {
+                // Reverse order since server returns DESC, but we want ASC for display
+                const sortedComments = [...commentsRes.data].reverse()
+                setComments(sortedComments as Comment[])
             }
             setIsLoading(false)
         }
@@ -131,7 +129,7 @@ export function ThreadDrawer({
         if (open && taskId) {
             fetchComments()
         }
-    }, [open, taskId, supabase])
+    }, [open, taskId])
 
     const handleSend = async (e: React.FormEvent) => {
         e.preventDefault()
@@ -149,12 +147,13 @@ export function ThreadDrawer({
                 toast.error(result.error)
             } else {
                 setNewComment("")
-                const { data } = await supabase
-                    .from('task_comments')
-                    .select('*, user:user_id(full_name, role)')
-                    .eq('task_id', taskId)
-                    .order('created_at', { ascending: true })
-                if (data) setComments(data as Comment[])
+                toast.success("Note added")
+                // Refresh comments using server action for consistent auth
+                const commentsRes = await getTaskComments(taskId)
+                if (commentsRes.data) {
+                    const sortedComments = [...commentsRes.data].reverse()
+                    setComments(sortedComments as Comment[])
+                }
             }
         } finally {
             setIsSending(false)
@@ -239,13 +238,12 @@ export function ThreadDrawer({
             toast.error(result.error)
         } else {
             toast.success("AI Worker triggered!")
-            // Refresh comments to show new activity
-            const { data } = await supabase
-                .from('task_comments')
-                .select('*, user:user_id(full_name, role)')
-                .eq('task_id', taskId)
-                .order('created_at', { ascending: true })
-            setComments((data || []) as Comment[])
+            // Refresh comments using server action for consistent auth
+            const commentsRes = await getTaskComments(taskId)
+            if (commentsRes.data) {
+                const sortedComments = [...commentsRes.data].reverse()
+                setComments(sortedComments as Comment[])
+            }
         }
         setIsActionLoading(false)
     }
@@ -260,13 +258,12 @@ export function ThreadDrawer({
             toast.error(result.error)
         } else {
             toast.success(`Uploaded ${file.name}`)
-            // Refresh comments to show the attachment log
-            const { data } = await supabase
-                .from('task_comments')
-                .select('*, user:user_id(full_name, role)')
-                .eq('task_id', taskId)
-                .order('created_at', { ascending: true })
-            setComments((data || []) as Comment[])
+            // Refresh comments using server action for consistent auth
+            const commentsRes = await getTaskComments(taskId)
+            if (commentsRes.data) {
+                const sortedComments = [...commentsRes.data].reverse()
+                setComments(sortedComments as Comment[])
+            }
         }
         setIsUploading(false)
         if (fileInputRef.current) fileInputRef.current.value = ''

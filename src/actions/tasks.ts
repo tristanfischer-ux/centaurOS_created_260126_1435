@@ -1459,6 +1459,47 @@ export async function deleteTaskAttachment(fileId: string, filePath: string, tas
     return { success: true }
 }
 
+/**
+ * Fetches comments for a task from the server.
+ * 
+ * @description Retrieves all comments (notes and system logs) for a task.
+ * Uses server-side auth to ensure consistent RLS behavior with addTaskComment.
+ * 
+ * @param taskId - The task ID to fetch comments for
+ * @returns Comments array with user info, or error
+ * 
+ * @security Requires authenticated user with foundry membership
+ */
+export async function getTaskComments(taskId: string) {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return { data: null, error: 'Unauthorized' }
+
+    // SECURITY: Verify user has permission to view this task
+    const foundry_id = await getFoundryIdCached()
+    if (!foundry_id) return { data: null, error: 'User not in a foundry' }
+
+    // AUTH: Check user can access this task
+    const authCheck = await canModifyTask(supabase, taskId, user.id, foundry_id)
+    if (!authCheck.allowed) {
+        return { data: null, error: authCheck.error || 'Unauthorized' }
+    }
+
+    const { data, error } = await supabase
+        .from('task_comments')
+        .select('id, content, is_system_log, created_at, user_id, user:user_id(full_name, role)')
+        .eq('task_id', taskId)
+        .order('created_at', { ascending: false })
+        .limit(50)
+
+    if (error) {
+        console.error('[TaskActions] Failed to fetch comments:', { taskId, error: error.message })
+        return { data: null, error: sanitizeErrorMessage(error) }
+    }
+    
+    return { data }
+}
+
 export async function getTaskAttachments(taskId: string) {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()

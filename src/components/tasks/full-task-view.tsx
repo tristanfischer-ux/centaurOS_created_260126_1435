@@ -33,7 +33,7 @@ import {
     PopoverTrigger,
 } from "@/components/ui/popover"
 import { Calendar as CalendarComponent } from "@/components/ui/calendar"
-import { addTaskComment, getTaskAttachments, getTaskHistory, updateTaskDetails, updateTaskAssignees, updateTaskDates } from "@/actions/tasks"
+import { addTaskComment, getTaskComments, getTaskAttachments, getTaskHistory, updateTaskDetails, updateTaskAssignees, updateTaskDates } from "@/actions/tasks"
 import { uploadTaskAttachment } from "@/actions/attachments"
 import { toast } from "sonner"
 import { cn, getInitials } from "@/lib/utils"
@@ -150,16 +150,12 @@ export function FullTaskView({ open, onOpenChange, task, members }: FullTaskView
         const fetchAllData = async () => {
             setIsLoading(true)
             
-            // Fetch comments (all, including system logs for full history view)
-            const { data: commentsData } = await supabase
-                .from('task_comments')
-                .select('*, user:user_id(full_name, role)')
-                .eq('task_id', task.id)
-                .order('created_at', { ascending: false })
-                .limit(50)
-
-            if (commentsData) {
-                setComments(commentsData as Comment[])
+            // Fetch comments using server action for consistent auth
+            const commentsRes = await getTaskComments(task.id)
+            if (commentsRes.error) {
+                console.error('[FullTaskView] Failed to fetch comments:', commentsRes.error)
+            } else if (commentsRes.data) {
+                setComments(commentsRes.data as Comment[])
             }
 
             // Fetch attachments
@@ -180,7 +176,7 @@ export function FullTaskView({ open, onOpenChange, task, members }: FullTaskView
         if (open && task.id) {
             fetchAllData()
         }
-    }, [open, task.id, supabase])
+    }, [open, task.id])
 
     const handleSend = async (e: React.FormEvent) => {
         e.preventDefault()
@@ -193,14 +189,13 @@ export function FullTaskView({ open, onOpenChange, task, members }: FullTaskView
                 toast.error(result.error)
             } else {
                 setNewComment("")
-                // Refresh comments
-                const { data } = await supabase
-                    .from('task_comments')
-                    .select('*, user:user_id(full_name, role)')
-                    .eq('task_id', task.id)
-                    .order('created_at', { ascending: false })
-                    .limit(50)
-                if (data) setComments(data as Comment[])
+                // Refresh comments using server action for consistent auth
+                const commentsRes = await getTaskComments(task.id)
+                if (commentsRes.error) {
+                    console.error('[FullTaskView] Failed to refresh comments:', commentsRes.error)
+                } else if (commentsRes.data) {
+                    setComments(commentsRes.data as Comment[])
+                }
                 toast.success("Note added")
             }
         } finally {
@@ -237,14 +232,11 @@ export function FullTaskView({ open, onOpenChange, task, members }: FullTaskView
                     setAttachments(attachmentsRes.data)
                 }
                 
-                // Refresh comments (system log entry added)
-                const { data } = await supabase
-                    .from('task_comments')
-                    .select('*, user:user_id(full_name, role)')
-                    .eq('task_id', task.id)
-                    .order('created_at', { ascending: false })
-                    .limit(50)
-                if (data) setComments(data as Comment[])
+                // Refresh comments using server action (system log entry added)
+                const commentsRes = await getTaskComments(task.id)
+                if (commentsRes.data) {
+                    setComments(commentsRes.data as Comment[])
+                }
             }
         } catch (error) {
             console.error('Unexpected error during upload:', error)
