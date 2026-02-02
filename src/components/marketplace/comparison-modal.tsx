@@ -154,6 +154,8 @@ export function ComparisonModal({ open, onOpenChange, items }: ComparisonModalPr
         return true
     })
     
+    console.log('[ComparisonModal] Deduplicated items:', deduplicatedItems.length, deduplicatedItems.map(i => i.title))
+    
     if (deduplicatedItems.length === 0) {
         return null
     }
