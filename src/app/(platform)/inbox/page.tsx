@@ -51,14 +51,16 @@ export default async function InboxPage() {
   ])
   
   return (
-    <InboxLayoutClient
-      members={membersResult}
-      tasks={tasksResult}
-      objectives={objectivesResult}
-      currentUserId={user.id}
-      foundryId={foundryId}
-      initialPreferences={preferences}
-    />
+    <div className="h-[calc(100vh-4rem)] md:h-[calc(100vh-3rem)] -m-4 sm:-m-6 lg:-m-8">
+      <InboxLayoutClient
+        members={membersResult}
+        tasks={tasksResult}
+        objectives={objectivesResult}
+        currentUserId={user.id}
+        foundryId={foundryId}
+        initialPreferences={preferences}
+      />
+    </div>
   )
 }
 
