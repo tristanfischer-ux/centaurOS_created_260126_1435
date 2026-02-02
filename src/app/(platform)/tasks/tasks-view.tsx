@@ -34,6 +34,12 @@ import {
     PopoverTrigger,
 } from "@/components/ui/popover"
 import {
+    Tooltip,
+    TooltipContent,
+    TooltipProvider,
+    TooltipTrigger,
+} from "@/components/ui/tooltip"
+import {
     Command,
     CommandEmpty,
     CommandGroup,
@@ -529,16 +535,44 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                                 >
                                     <List className="h-4 w-4" />
                                 </Button>
-                                <Button
-                                    variant={viewMode === 'timeline' ? 'default' : 'ghost'}
-                                    size="sm"
-                                    onClick={() => setViewMode('timeline')}
-                                    className={viewMode === 'timeline' ? 'shadow-sm' : ''}
-                                    aria-label="Timeline view"
-                                >
-                                    <CalendarDays className="h-4 w-4" />
-                                </Button>
+                                <TooltipProvider>
+                                    <Tooltip>
+                                        <TooltipTrigger asChild>
+                                            <Button
+                                                variant={viewMode === 'timeline' ? 'default' : 'ghost'}
+                                                size="sm"
+                                                onClick={() => setViewMode('timeline')}
+                                                className={viewMode === 'timeline' ? 'shadow-sm' : ''}
+                                                aria-label="Timeline view"
+                                            >
+                                                <CalendarDays className="h-4 w-4" />
+                                            </Button>
+                                        </TooltipTrigger>
+                                        <TooltipContent>
+                                            <p>Timeline (shows all {tasks.length} tasks)</p>
+                                        </TooltipContent>
+                                    </Tooltip>
+                                </TooltipProvider>
                             </div>
+                            {(activePreset || statusFilter.length > 0 || assigneeFilter !== 'all') && (
+                                <div className="flex items-center gap-2 px-3 py-1.5 bg-orange-50 border border-orange-200 rounded-lg">
+                                    <Filter className="h-3.5 w-3.5 text-orange-600" />
+                                    <span className="text-xs font-medium text-orange-700">
+                                        Showing {sortedTasks.length} of {tasks.length} tasks
+                                    </span>
+                                    <button
+                                        onClick={() => {
+                                            setActivePreset(null)
+                                            setStatusFilter([])
+                                            setAssigneeFilter('all')
+                                        }}
+                                        className="text-orange-600 hover:text-orange-800 transition-colors"
+                                        aria-label="Clear all filters"
+                                    >
+                                        <X className="h-3.5 w-3.5" />
+                                    </button>
+                                </div>
+                            )}
                             <FeatureTip
                                 id="tasks-create"
                                 title="Create Tasks"
@@ -557,20 +591,36 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
 
                     {/* Filter Presets */}
                     <div className="flex gap-3 mb-4">
-                        {filterPresets.map(preset => (
-                            <button
-                                key={preset.id}
-                                onClick={() => setActivePreset(activePreset === preset.id ? null : preset.id)}
-                                className={cn(
-                                    "px-3 py-1.5 rounded-full text-sm font-medium transition-all duration-200",
-                                    activePreset === preset.id
-                                        ? "bg-foreground text-background"
-                                        : "bg-muted text-muted-foreground hover:bg-secondary"
-                                )}
-                            >
-                                {preset.label}
-                            </button>
-                        ))}
+                        {filterPresets.map(preset => {
+                            const count = tasks.filter(preset.filter).length
+                            return (
+                                <button
+                                    key={preset.id}
+                                    onClick={() => setActivePreset(activePreset === preset.id ? null : preset.id)}
+                                    className={cn(
+                                        "px-3 py-1.5 rounded-full text-sm font-medium transition-all duration-200",
+                                        activePreset === preset.id
+                                            ? "bg-foreground text-background"
+                                            : "bg-muted text-muted-foreground hover:bg-secondary"
+                                    )}
+                                >
+                                    {preset.label} <span className="ml-1 opacity-70">({count})</span>
+                                </button>
+                            )
+                        })}
+                    </div>
+
+                    {/* Task Count Display */}
+                    <div className="flex items-center justify-between mb-2">
+                        <div className="text-sm text-muted-foreground">
+                            {activePreset || statusFilter.length > 0 || assigneeFilter !== 'all' ? (
+                                <>
+                                    Showing <span className="font-semibold text-foreground">{sortedTasks.length}</span> of {tasks.length} tasks
+                                </>
+                            ) : (
+                                <>Showing all {tasks.length} tasks</>
+                            )}
+                        </div>
                     </div>
 
                     {/* Collapsible Filter Bar */}
@@ -656,14 +706,11 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                                                             }}
                                                             className="text-muted-foreground hover:text-destructive active:text-destructive h-8 ml-2 transition-colors duration-200"
                                                         >
-                                                            <X className="w-3 h-3 mr-1" /> Clear
-                                                        </Button>
-                                                    )}
-                                                </div>
-                                                <div className="ml-auto text-xs text-muted-foreground">
-                                                    Showing {sortedTasks.length} tasks
-                                                </div>
+                                                        <X className="w-3 h-3 mr-1" /> Clear
+                                                    </Button>
+                                                )}
                                             </div>
+                                        </div>
                                         </div>
                                     )}
                                 </>
