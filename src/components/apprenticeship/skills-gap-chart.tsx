@@ -74,7 +74,7 @@ export function SkillsGapChart({ gaps }: SkillsGapChartProps) {
               {[1, 2, 3, 4].map((level) => (
                 <div 
                   key={level}
-                  className="absolute top-0 bottom-0 w-px bg-background/30"
+                  className="absolute top-0 bottom-0 w-px bg-muted"
                   style={{ left: `${(level / 5) * 100}%` }}
                 />
               ))}

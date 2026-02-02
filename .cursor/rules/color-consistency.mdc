@@ -47,6 +47,27 @@ alwaysApply: true
 | `defaultTheme.*system` | Wrong theme config | `defaultTheme="light"` |
 | `enableSystem.*true` | Wrong theme config | `enableSystem={false}` |
 
+## CRITICAL: tailwind.config.ts Color Definitions
+
+**CSS variable colors in tailwind.config.ts MUST use `hsl()` wrapper:**
+
+```ts
+// ✅ CORRECT - Wraps CSS variable in hsl()
+colors: {
+  background: 'hsl(var(--background))',
+  foreground: 'hsl(var(--foreground))',
+  card: { DEFAULT: "hsl(var(--card))" },
+}
+
+// ❌ WRONG - Outputs invalid CSS like "background-color: 0 0% 100%"
+colors: {
+  background: 'var(--background)',  // BROKEN - no hsl() wrapper!
+  foreground: 'var(--foreground)',  // BROKEN - no hsl() wrapper!
+}
+```
+
+**Why this matters:** CSS variables defined in globals.css use space-separated HSL values (e.g., `--background: 0 0% 100%`). Without the `hsl()` wrapper in tailwind.config.ts, `bg-background` outputs invalid CSS and the background becomes transparent!
+
 **Exceptions:**
 - `bg-white/[opacity]` (e.g., `bg-white/90`) for overlays is allowed
 - `border-slate-100` for ultra-light dividers in page headers

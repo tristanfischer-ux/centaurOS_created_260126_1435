@@ -1,49 +1,90 @@
 # Agent Handover Document
 
 **Date:** February 2, 2026
-**Task:** Verify and Fix Transparency Issues
+**Task:** Fix UI Transparency Issues - Phase 2
 **Status:** ✅ COMPLETE
 
 ---
 
 ## Context
 
-The user reported that UI elements (models/modals, etc.) had become transparent again.
-I performed a comprehensive audit of the codebase and the design system rules.
+User reported dark overlay backgrounds on dialogs, sheets, and modals causing a dreary UI that violates the "bright, airy, optimistic" design philosophy. The previous fix session missed the core issue: the Shadcn UI primitives themselves were using `bg-black/80` and `bg-black/50` for overlays.
 
-## Actions Taken
+## Root Cause
 
-1.  **Audit of Codebase:**
-    - Ran `scripts/check-design-tokens.sh` to identify potential violations.
-    - Manually searched for `bg-background/[0-9]`, `bg-white/[0-9]`, `backdrop-blur`, and `opacity-` patterns.
-    - Verified that all identified instances in the code are **intentional** (e.g., marketing components, specific visual effects) as documented in the previous handover.
-    - Verified core UI primitives (`Dialog`, `Sheet`, `Popover`, `DropdownMenu`, `Select`, `Command`, `HoverCard`, `Tooltip`, `AlertDialog`, `Drawer`, `Toaster`) to ensure they use opaque backgrounds (`bg-background` or `bg-card`) without opacity modifiers.
+The overlay components (`DialogOverlay`, `SheetOverlay`, `DrawerOverlay`, `AlertDialogOverlay`) in `src/components/ui/` were using **dark transparent backgrounds** (`bg-black/80`, `bg-black/50`) which created the dreary, dark overlay effect seen in screenshots.
 
-2.  **Fixing the Root Cause of Recurrence:**
-    - Identified a contradiction in `.cursor/rules/dropdown-popover-standards.mdc`.
-    - The rule file previously **recommended** using `backdrop-blur-sm`, which contradicts the strict "no transparency" rule.
-    - **FIXED:** Updated `.cursor/rules/dropdown-popover-standards.mdc` to explicitly forbid `backdrop-blur` and opacity modifiers, aligning it with `.cursor/rules/no-transparency.mdc`.
+## Fixes Applied
 
-## Findings
+### 1. Core UI Component Overlays (CRITICAL)
 
-- **No new code violations found.** The "regression" likely stemmed from developers following the outdated/contradictory advice in the `dropdown-popover-standards.mdc` rule file.
-- **Core primitives are safe.** All standard UI components enforce opacity.
+Changed from dark to light overlays:
+
+| Component | Old Pattern | New Pattern |
+|-----------|-------------|-------------|
+| `dialog.tsx` | `bg-black/80` | `bg-muted/60` |
+| `sheet.tsx` | `bg-black/50` | `bg-muted/60` |
+| `drawer.tsx` | `bg-black/50` | `bg-muted/60` |
+| `alert-dialog.tsx` | `bg-black/80` | `bg-muted/60` |
+
+### 2. Custom Modal Overlays
+
+| File | Old Pattern | New Pattern |
+|------|-------------|-------------|
+| `gdpr/PrivacySettings.tsx` | `bg-black/80` | `bg-muted/60` |
+| `buyer/buyer-dashboard-view.tsx` | `bg-black/50` | `bg-muted/60` |
+| `provider/AvailabilityCalendar.tsx` | `bg-background/80` | `bg-muted` |
+
+### 3. Other Transparency Fixes
+
+| File | Old Pattern | New Pattern |
+|------|-------------|-------------|
+| `team/team-comparison-view.tsx` | `bg-status-success/10 backdrop-blur-[1px]` | `bg-status-success-light` |
+| `team/team-comparison-view.tsx` | `bg-muted0/10 backdrop-blur-[1px]` | `bg-muted` |
+| `apprenticeship/skills-gap-chart.tsx` | `bg-background/30` | `bg-muted` |
+| `provider/PortfolioGrid.tsx` | `bg-white/50 hover:bg-white/75` | `bg-muted hover:bg-background` |
+| `booking/BookingConfirmation.tsx` | `bg-white/80` | `bg-background` |
+| `smart-airlock/RubberStampModal.tsx` | `bg-background/10 backdrop-blur-[2px]` | `bg-background` |
+
+### 4. Updated Design Rules
+
+- Updated `.cursor/rules/no-transparency.mdc` to specify that modal overlays should use `bg-muted/60` (light), NOT `bg-black/80` (dark)
+
+## Intentional Exceptions (Do NOT Fix)
+
+These use transparency intentionally:
+
+1. **Marketing Navbar** (`src/components/marketing/MarketingNavbar.tsx`)
+   - `bg-background/90 backdrop-blur-md` - Glass effect for marketing site
+
+2. **LivePulse Terminal** (`src/components/smart-airlock/LivePulse.tsx`)
+   - `bg-black/40 backdrop-blur-sm` - Intentional terminal/HUD aesthetic
+
+3. **Marketing Trust Section** (`src/components/marketing/TrustSafetySection.tsx`)
+   - `bg-white/10 backdrop-blur-md` - Marketing visual effect
+
+4. **Subtle Hover States** (various files)
+   - `hover:bg-orange-50/50`, `bg-orange-50/30` - Light tints for selection/unread indicators
 
 ## Verification
 
-- `scripts/check-design-tokens.sh` passes (ignoring known intentional exceptions).
-- Core UI components checked:
-    - `Dialog`: `bg-background` (Opaque)
-    - `Sheet`: `bg-background` (Opaque)
-    - `Popover`: `bg-background` (Opaque)
-    - `DropdownMenu`: `bg-background` (Opaque)
-    - `Select`: `bg-background` (Opaque)
-    - `Command`: `bg-background` (Opaque)
+- ✅ `npm run build` succeeds
+- ✅ All dialog, sheet, drawer, alert-dialog overlays now use `bg-muted/60`
+- ✅ No dark `bg-black/XX` overlays in platform components
+- ✅ Remaining transparency uses are documented intentional exceptions
 
-3.  **Additional Fixes:**
-    - Fixed `src/components/ZoomControl.tsx` which was using `bg-muted/80 backdrop-blur-sm`. Changed to `bg-card shadow-md border`.
+## Key Lessons
 
-## Next Steps
+1. **The previous fix session only verified that content panels used `bg-background`/`bg-card`, but missed that the OVERLAY components still used dark transparent backgrounds.** Always check both the content AND the overlay styling in modal components.
 
-- Developers should follow the updated `.cursor/rules/dropdown-popover-standards.mdc`.
-- Continue to run `./scripts/check-design-tokens.sh` before commits.
+2. **CRITICAL BUG FOUND: `tailwind.config.ts` had invalid color definitions.**
+   - `background: 'var(--background)'` outputs invalid CSS: `background-color: 0 0% 100%`
+   - FIXED to: `background: 'hsl(var(--background))'` which outputs valid: `background-color: hsl(0 0% 100%)`
+   - This caused `bg-background` to be transparent because the browser couldn't parse the invalid color!
+
+## Next Agent Actions
+
+1. Run `./scripts/check-design-tokens.sh` before commits
+2. If user reports "dark UI", check the OVERLAY styling, not just content
+3. Never use `bg-black/XX` for modal overlays - use `bg-muted/60` for light theme
+4. **ALWAYS use `hsl(var(--variable))` format in tailwind.config.ts for CSS variable colors**

@@ -41,28 +41,34 @@ backdrop-blur
 
 These specific cases may use transparency:
 
-1. **Modal overlays** (the dark backdrop behind modals):
+1. **Modal overlays** (the backdrop behind modals) - use LIGHT muted backgrounds:
    ```tsx
-   // ✅ OK - Dark overlay behind modal
+   // ✅ OK - Light overlay behind modal (not dark!)
+   <div className="fixed inset-0 bg-muted/60">
+   
+   // ❌ WRONG - Dark overlay creates dreary UI
    <div className="fixed inset-0 bg-black/80">
    ```
 
-2. **Loading overlays** (content is intentionally obscured):
+2. **Marketing site only** - navbar glass effect:
    ```tsx
-   // ✅ OK - Loading state with intentional obscuring
-   <div className="absolute inset-0 bg-background/80">
+   // ✅ OK - Marketing navbar only
+   // File: src/components/marketing/MarketingNavbar.tsx
+   <div className="bg-background/90 backdrop-blur-md">
    ```
 
-3. **Skeleton loaders on dark backgrounds** (marketing sections):
+3. **Terminal-style components** - intentionally dark:
    ```tsx
-   // ✅ OK - Skeleton on dark marketing section
-   <div className="bg-white/5 animate-pulse">
+   // ✅ OK - LivePulse terminal component
+   // File: src/components/smart-airlock/LivePulse.tsx
+   <div className="bg-black/40 backdrop-blur-sm">
    ```
 
-4. **Decorative visual effects** (stamps, ribbons):
+4. **Subtle hover states** on selection indicators:
    ```tsx
-   // ✅ OK - Visual stamp effect
-   <div className="opacity-90 mix-blend-multiply">
+   // ✅ OK - Light hover tints
+   <div className="hover:bg-orange-50/50">
+   <div className="bg-orange-50/30">  // unread indicators
    ```
 
 ## Elements That MUST Be Opaque
@@ -92,8 +98,8 @@ These elements must NEVER have transparent backgrounds:
 // ✅ CORRECT - Video play button
 <div className="bg-background shadow-lg rounded-full">
 
-// ✅ CORRECT - Modal overlay
-<div className="fixed inset-0 bg-black/80">
+// ✅ CORRECT - Modal overlay (light, not dark!)
+<div className="fixed inset-0 bg-muted/60">
 
 // ❌ WRONG - Transparent search dropdown
 <div className="bg-card/50 backdrop-blur-sm">

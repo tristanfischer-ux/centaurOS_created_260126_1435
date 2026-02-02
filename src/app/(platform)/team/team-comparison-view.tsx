@@ -409,7 +409,7 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                 )}
 
                 {isDropTarget && (
-                    <div className="absolute inset-0 flex items-center justify-center bg-status-success/10 rounded-lg z-10 backdrop-blur-[1px]">
+                    <div className="absolute inset-0 flex items-center justify-center bg-status-success-light rounded-lg z-10">
                         <div className="bg-status-success text-white px-3 py-1.5 rounded-full text-xs font-medium flex items-center gap-1 shadow-sm">
                             <Zap className="h-3 w-3 fill-white" />
                             {draggedMemberId && aiAgents.some(a => a.id === draggedMemberId) ? 'Pair Centaur' : 'Combine / Team'}
@@ -417,7 +417,7 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                     </div>
                 )}
                 {(isPairing || isDeleting) && (
-                    <div className="absolute inset-0 flex items-center justify-center bg-muted0/10 rounded-lg z-10 backdrop-blur-[1px]">
+                    <div className="absolute inset-0 flex items-center justify-center bg-muted rounded-lg z-10">
                         <div className="bg-muted text-white px-3 py-1.5 rounded-full text-xs font-medium flex items-center gap-1 shadow-sm">
                             <Loader2 className="h-3 w-3 animate-spin" />
                             {isPairing ? 'Pairing...' : 'Removing...'}

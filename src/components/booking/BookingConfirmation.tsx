@@ -67,7 +67,7 @@ export function BookingConfirmation({
                     </p>
                     <Badge 
                         variant="secondary" 
-                        className="mt-4 bg-white/80 text-status-success-dark font-mono text-lg px-4 py-2"
+                        className="mt-4 bg-background text-status-success-dark font-mono text-lg px-4 py-2"
                     >
                         Order #{confirmation.orderNumber}
                     </Badge>

@@ -19,7 +19,7 @@ export default function SettingsLoading() {
                             { label: "Full Name", width: "w-48" },
                             { label: "Email", width: "w-56" },
                             { label: "Role", width: "w-24" },
-                            { label: "Foundry ID", width: "w-64" },
+                            { label: "Company ID", width: "w-64" },
                         ].map((field, i) => (
                             <div key={i} className="space-y-2">
                                 <Skeleton className="h-4 w-20" />

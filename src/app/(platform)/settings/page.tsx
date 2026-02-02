@@ -73,7 +73,7 @@ export default async function SettingsPage() {
                             <div className="p-2 bg-muted rounded border border-slate-200 font-mono text-status-warning">{profile?.role}</div>
                         </div>
                         <div>
-                            <Label>Foundry ID</Label>
+                            <Label>Company ID</Label>
                             <div className="p-2 bg-muted rounded border border-slate-200 text-xs font-mono">{profile?.foundry_id}</div>
                         </div>
                     </div>

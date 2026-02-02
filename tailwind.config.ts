@@ -21,8 +21,8 @@ const config: Config = {
         },
         extend: {
             colors: {
-                background: 'var(--background)',
-                foreground: 'var(--foreground)',
+                background: 'hsl(var(--background))',
+                foreground: 'hsl(var(--foreground))',
                 // Centaur Dynamics Brand Colors
                 'international-orange': {
                     DEFAULT: '#ff4500',

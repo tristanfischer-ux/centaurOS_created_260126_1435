@@ -72,7 +72,7 @@ export function RubberStampModal({ taskId, isOpen, onClose }: RubberStampModalPr
                             }}
                             className="absolute inset-0 z-50 flex items-center justify-center pointer-events-none"
                         >
-                            <div className="border-8 border-destructive rounded px-8 py-2 text-destructive font-black text-6xl tracking-widest uppercase opacity-90 mix-blend-multiply shadow-[0_0_50px_rgba(220,38,38,0.2)] transform -rotate-12 bg-background/10 backdrop-blur-[2px]">
+                            <div className="border-8 border-destructive rounded px-8 py-2 text-destructive font-black text-6xl tracking-widest uppercase shadow-[0_0_50px_rgba(220,38,38,0.3)] transform -rotate-12 bg-background">
                                 CERTIFIED
                             </div>
                         </motion.div>
