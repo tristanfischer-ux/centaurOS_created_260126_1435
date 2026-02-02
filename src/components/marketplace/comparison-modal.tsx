@@ -28,7 +28,7 @@ const PRIORITY_ATTRIBUTES: Record<string, string[]> = {
     'People': ['rate', 'years_experience', 'location', 'availability', 'education'],
     'AI': ['cost', 'accuracy', 'latency', 'autonomy_level', 'setup_time', 'support'],
     'Products': ['rate', 'price', 'location', 'lead_time', 'certifications', 'capacity_available'],
-    'Services': ['rate', 'specialty', 'location']
+    'Services': ['rate', 'check_size', 'stage', 'focus', 'specialty', 'location']
 }
 
 // Attributes grouped into sections for better organization
@@ -52,8 +52,9 @@ const ATTRIBUTE_SECTIONS: Record<string, Record<string, string[]>> = {
         'Other': []
     },
     'Services': {
-        'Pricing': ['rate', 'pricing_model'],
-        'Expertise': ['specialty', 'certifications', 'experience'],
+        'Investment': ['check_size', 'stage', 'focus'],
+        'Pricing': ['rate', 'pricing_model', 'deliverables'],
+        'Expertise': ['specialty', 'certifications', 'experience', 'jurisdictions'],
         'Availability': ['location', 'availability', 'turnaround'],
         'Other': []
     }
