@@ -11,7 +11,6 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
-import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "@/components/ui/table"
 import { Check, X, GitCompare, Users, MoreHorizontal, Pencil, Trash2, Loader2, AlertTriangle, Mail, Phone, LayoutGrid, List, ChevronUp, ChevronDown, User, Calendar, Clock, CheckCircle2, Sparkles, Repeat, MessageSquare } from "lucide-react"
 import { createTeam, addTeamMember, deleteMember } from "@/actions/team"
 import { startDirectMessage } from "@/actions/messaging"
@@ -44,6 +43,8 @@ import {
 } from "@/components/ui/alert-dialog"
 import { usePresenceContext } from "@/components/PresenceProvider"
 import { PresenceIndicator } from "@/components/PresenceIndicator"
+import { TeamComparisonBar } from "@/components/team/team-comparison-bar"
+import { TeamComparisonModal } from "@/components/team/team-comparison-modal"
 import { cn } from "@/lib/utils"
 
 
@@ -315,16 +316,6 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
             }
         })
     }
-
-    // Comparison attribute rows
-    const comparisonRows = [
-        { label: "Role", getValue: (m: Member) => m.role },
-        { label: "Email", getValue: (m: Member) => m.email || "-" },
-        { label: "Active Tasks", getValue: (m: Member) => m.activeTasks, highlight: true },
-        { label: "Completed", getValue: (m: Member) => m.completedTasks, highlight: true, good: true },
-        { label: "Pending", getValue: (m: Member) => m.pendingTasks },
-        { label: "Rejected", getValue: (m: Member) => m.rejectedTasks, caution: true },
-    ]
 
     // Track expanded member cards
     const [expandedMemberIds, setExpandedMemberIds] = useState<Set<string>>(new Set())
@@ -961,15 +952,6 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                     </FeatureTip>
                     <CreateTeamDialog members={[...executives, ...apprentices]} />
 
-                    {compareMode && selectedIds.size >= 2 && (
-                        <Button
-                            onClick={() => setShowComparison(true)}
-                            className="bg-electric-blue hover:bg-electric-blue-hover text-white"
-                        >
-                            <GitCompare className="h-4 w-4 mr-2" />
-                            Compare {selectedIds.size}
-                        </Button>
-                    )}
                     <Button
                         variant={compareMode ? "default" : "secondary"}
                         onClick={toggleCompareMode}
@@ -1334,67 +1316,29 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                 </Link>
             </section>
 
-            {/* Comparison Dialog */}
-            <Dialog open={showComparison} onOpenChange={setShowComparison}>
-                <DialogContent size="lg" className="bg-background">
-                    <DialogHeader>
-                        <DialogTitle className="text-foreground">Compare Team Members</DialogTitle>
-                        <DialogDescription>Side-by-side comparison of selected members</DialogDescription>
-                    </DialogHeader>
+            {/* Comparison Modal */}
+            <TeamComparisonModal
+                open={showComparison}
+                onOpenChange={setShowComparison}
+                members={selectedMembers}
+            />
 
-                    <Table>
-                        <TableHeader>
-                            <TableRow className="border-b">
-                                <TableHead className="w-32"></TableHead>
-                                {selectedMembers.map(member => (
-                                    <TableHead key={member.id} className="text-center min-w-[160px]">
-                                        <div className="flex flex-col items-center gap-2">
-                                            <Avatar className="h-16 w-16 border-2 border-muted">
-                                                <AvatarFallback className="bg-muted text-muted-foreground text-lg font-bold">
-                                                    {member.full_name?.substring(0, 2).toUpperCase()}
-                                                </AvatarFallback>
-                                            </Avatar>
-                                            <span className="font-semibold text-foreground">{member.full_name}</span>
-                                        </div>
-                                    </TableHead>
-                                ))}
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {comparisonRows.map((row, idx) => (
-                                <TableRow key={row.label} className={idx % 2 === 0 ? 'bg-muted' : 'bg-background'}>
-                                    <TableCell className="text-muted-foreground font-medium text-sm">{row.label}</TableCell>
-                                    {selectedMembers.map(member => {
-                                        const value = row.getValue(member)
-                                        const isNumeric = typeof value === 'number'
-
-                                        // Find best value for highlighting
-                                        const allValues = selectedMembers.map(m => row.getValue(m))
-                                        const numericValues = allValues.filter(v => typeof v === 'number') as number[]
-                                        const maxVal = Math.max(...numericValues)
-                                        const isBest = isNumeric && row.good && value === maxVal
-                                        const isWorst = isNumeric && row.caution && value === maxVal && value > 0
-
-                                        return (
-                                            <TableCell
-                                                key={member.id}
-                                                className={cn(
-                                                    "text-center font-medium",
-                                                    isBest && "text-status-success bg-status-success-light",
-                                                    isWorst && "text-destructive bg-destructive/10",
-                                                    !isBest && !isWorst && "text-foreground"
-                                                )}
-                                            >
-                                                {value}
-                                            </TableCell>
-                                        )
-                                    })}
-                                </TableRow>
-                            ))}
-                        </TableBody>
-                    </Table>
-                </DialogContent>
-            </Dialog>
+            {/* Comparison Bar (bottom sticky) */}
+            {compareMode && (
+                <TeamComparisonBar
+                    selectedMembers={selectedMembers}
+                    onClear={() => {
+                        setSelectedIds(new Set())
+                        setCompareMode(false)
+                    }}
+                    onCompare={() => setShowComparison(true)}
+                    onRemove={(id) => {
+                        const newSet = new Set(selectedIds)
+                        newSet.delete(id)
+                        setSelectedIds(newSet)
+                    }}
+                />
+            )}
 
             {/* Quick Team Creation Dialog (from drag-drop or button) */}
             <Dialog open={showQuickTeamDialog} onOpenChange={setShowQuickTeamDialog}>

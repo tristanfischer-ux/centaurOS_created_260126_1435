@@ -262,7 +262,7 @@ export const MarketCard = memo(function MarketCard({
                 {/* === SMALL SIZE: Compact view === */}
                 {currentSize === 'small' && (
                     <>
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-3 pr-20">
                             {/* Smaller Avatar */}
                             <div className={cn(
                                 "w-10 h-10 rounded-lg bg-gradient-to-br flex items-center justify-center text-white font-semibold text-xs shrink-0 shadow-sm",
@@ -317,7 +317,7 @@ export const MarketCard = memo(function MarketCard({
                 {currentSize === 'medium' && (
                     <>
                         {/* Avatar + Header Row */}
-                        <div className="flex gap-3 mb-3">
+                        <div className="flex gap-3 mb-3 pr-20">
                             <div className={cn(
                                 "w-12 h-12 rounded-lg bg-gradient-to-br flex items-center justify-center text-white font-semibold text-sm shrink-0 shadow-sm",
                                 avatarGradient
@@ -436,7 +436,7 @@ export const MarketCard = memo(function MarketCard({
                 {currentSize === 'full' && (
                     <>
                         {/* Avatar + Header Row - Larger */}
-                        <div className="flex gap-4 mb-4">
+                        <div className="flex gap-4 mb-4 pr-20">
                             <div className={cn(
                                 "w-16 h-16 rounded-lg bg-gradient-to-br flex items-center justify-center text-white font-bold text-lg shrink-0 shadow-sm",
                                 avatarGradient
