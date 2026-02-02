@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom'
 import { Textarea } from '@/components/ui/textarea'
 import { Button } from '@/components/ui/button'
 import { UserAvatar } from '@/components/ui/user-avatar'
+import { MessageInputHelp } from '@/components/messaging/MessageInputHelp'
 import { cn } from '@/lib/utils'
 import { 
   Send, 
@@ -172,10 +173,14 @@ export function CommandInput({
   const insertMention = useCallback((profile: Profile) => {
     if (!autocompleteInfo) return
     
-    const firstName = profile.full_name.split(' ')[0]
+    const fullName = profile.full_name
     const before = inputValue.slice(0, autocompleteInfo.start)
     const after = inputValue.slice(autocompleteInfo.end)
-    const newValue = `${before}@${firstName} ${after}`
+    
+    // Use quotes if name contains spaces
+    const hasSpace = fullName.includes(' ')
+    const mentionText = hasSpace ? `@"${fullName}"` : `@${fullName}`
+    const newValue = `${before}${mentionText} ${after}`
     
     setInputValue(newValue)
     setAutocompleteMode('none')
@@ -183,7 +188,7 @@ export function CommandInput({
     
     setTimeout(() => {
       if (textareaRef.current) {
-        const newPosition = autocompleteInfo.start + firstName.length + 2
+        const newPosition = autocompleteInfo.start + mentionText.length + 1
         textareaRef.current.setSelectionRange(newPosition, newPosition)
       }
     }, 0)
@@ -515,13 +520,8 @@ export function CommandInput({
         </Button>
       </div>
       
-      {/* Hint for slash commands */}
-      {!inputValue && (
-        <p className="text-xs text-muted-foreground mt-2 ml-12">
-          Type <kbd className="px-1 py-0.5 bg-muted rounded text-xs font-mono">/</kbd> for commands, 
-          <kbd className="px-1 py-0.5 bg-muted rounded text-xs font-mono ml-1">@</kbd> to mention
-        </p>
-      )}
+      {/* Quick reference help */}
+      <MessageInputHelp />
     </form>
   )
 }
