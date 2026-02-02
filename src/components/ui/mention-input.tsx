@@ -36,6 +36,7 @@ export function MentionInput({
   const [mentionInfo, setMentionInfo] = useState<{ start: number; end: number } | null>(null)
   const [dropdownPosition, setDropdownPosition] = useState<{ top: number; left: number; width: number } | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const dropdownRef = useRef<HTMLDivElement>(null)
   const [mounted, setMounted] = useState(false)
 
   const updateDropdownPosition = () => {
@@ -127,10 +128,14 @@ export function MentionInput({
     setMounted(true)
   }, [])
 
-  // Close suggestions when clicking outside
+  // Close suggestions when clicking outside (but not when clicking the dropdown itself)
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (textareaRef.current && !textareaRef.current.contains(event.target as Node)) {
+      const target = event.target as Node
+      const isInTextarea = textareaRef.current?.contains(target)
+      const isInDropdown = dropdownRef.current?.contains(target)
+      
+      if (!isInTextarea && !isInDropdown) {
         setShowSuggestions(false)
       }
     }
@@ -161,6 +166,7 @@ export function MentionInput({
 
     return createPortal(
       <div 
+        ref={dropdownRef}
         role="listbox"
         aria-label="Mention suggestions"
         aria-live="polite"
@@ -173,6 +179,8 @@ export function MentionInput({
           transform: 'translateY(-100%)',
           zIndex: 9999
         }}
+        onMouseDown={(e) => e.stopPropagation()}
+        onClick={(e) => e.stopPropagation()}
       >
         <div className="p-2 text-xs text-muted-foreground border-b bg-muted" aria-hidden="true">
           Type to filter, ↑↓ to navigate, Enter to select
@@ -188,7 +196,16 @@ export function MentionInput({
               role="option"
               aria-selected={index === selectedIndex}
               id={`mention-option-${profile.id}`}
-              onClick={() => insertMention(profile, false)}
+              onMouseDown={(e) => {
+                // Prevent the mousedown from closing the dropdown or triggering other elements
+                e.preventDefault()
+                e.stopPropagation()
+              }}
+              onClick={(e) => {
+                e.preventDefault()
+                e.stopPropagation()
+                insertMention(profile, false)
+              }}
               className={cn(
                 'w-full px-3 py-2 text-left text-sm flex items-center gap-3 transition-colors',
                 index === selectedIndex ? 'bg-status-info-light text-status-info-dark' : 'hover:bg-muted'
