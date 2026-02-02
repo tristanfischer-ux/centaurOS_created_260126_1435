@@ -62,7 +62,7 @@ export function BuyerDashboardView({
 
             {/* Onboarding Modal */}
             {showOnboarding && (
-                <div className="fixed inset-0 bg-muted/60 z-50 flex items-center justify-center p-4">
+                <div className="fixed inset-0 bg-muted/90 z-50 flex items-center justify-center p-4">
                     <div className="max-w-lg w-full">
                         <BuyerOnboarding
                             forceShow

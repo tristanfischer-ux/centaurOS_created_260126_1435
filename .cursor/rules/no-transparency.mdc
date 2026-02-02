@@ -41,9 +41,12 @@ backdrop-blur
 
 These specific cases may use transparency:
 
-1. **Modal overlays** (the backdrop behind modals) - use LIGHT muted backgrounds:
+1. **Modal overlays** (the backdrop behind modals) - use LIGHT muted backgrounds at 90% opacity:
    ```tsx
-   // ✅ OK - Light overlay behind modal (not dark!)
+   // ✅ OK - Light overlay behind modal (90% opacity blocks content well)
+   <div className="fixed inset-0 bg-muted/90">
+   
+   // ❌ WRONG - Too transparent (content shows through)
    <div className="fixed inset-0 bg-muted/60">
    
    // ❌ WRONG - Dark overlay creates dreary UI
