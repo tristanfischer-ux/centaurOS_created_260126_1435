@@ -82,7 +82,10 @@ Related Features to Test:
 - AI analysis feature
 - Clear all button
 - Remove individual items
+- **ALL SIMILAR FEATURES** (e.g., if marketplace comparison is modified, ALSO test team comparison)
 ```
+
+**CRITICAL**: If modifying one instance of a pattern (e.g., marketplace comparison), test ALL instances of that pattern (e.g., team comparison, any other comparison features).
 
 ### 4. Cross-Browser/Device Testing
 For UI changes, test on:

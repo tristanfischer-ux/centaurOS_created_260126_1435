@@ -164,7 +164,43 @@ export function TeamComparisonModal({
         }
     }
 
-    if (members.length === 0) return null
+    // Debug logging
+    console.log('[TeamComparisonModal] Received members:', members.length, members.map(m => ({ id: m?.id, name: m?.full_name })))
+
+    if (!members || members.length === 0) {
+        console.warn('[TeamComparisonModal] No members provided')
+        // Show error dialog instead of returning null (which causes empty modal)
+        return (
+            <Dialog open={open} onOpenChange={onOpenChange}>
+                <DialogContent size="sm" className="p-6">
+                    <DialogHeader>
+                        <DialogTitle className="text-xl font-semibold flex items-center gap-2">
+                            <AlertCircle className="h-5 w-5 text-destructive" />
+                            Cannot Compare Members
+                        </DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4">
+                        <p className="text-muted-foreground">
+                            No team members are available to compare. This may be because:
+                        </p>
+                        <ul className="list-disc list-inside space-y-2 text-sm text-muted-foreground">
+                            <li>No members were selected</li>
+                            <li>Selected members were removed from the team</li>
+                            <li>You don't have permission to view these members</li>
+                        </ul>
+                        <p className="text-sm">
+                            Please try selecting team members again or refresh the page.
+                        </p>
+                    </div>
+                    <div className="flex justify-end gap-2 mt-4">
+                        <Button variant="outline" onClick={() => onOpenChange(false)}>
+                            Close
+                        </Button>
+                    </div>
+                </DialogContent>
+            </Dialog>
+        )
+    }
 
     // Pre-compute best values for numeric comparisons
     const bestValues = computeBestValues(members)
