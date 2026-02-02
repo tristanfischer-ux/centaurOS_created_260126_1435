@@ -1,7 +1,7 @@
 'use client'
 
 import * as React from 'react'
-import { Check, ChevronsUpDown, MessageSquare } from 'lucide-react'
+import { Check, ChevronsUpDown, MessageSquare, Target } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import {
@@ -128,10 +128,22 @@ export function ContextSelector({
           variant="secondary"
           role="combobox"
           aria-expanded={open}
-          className="w-full justify-between"
+          className={cn(
+            "w-full justify-between border-2 transition-colors",
+            currentContext 
+              ? "border-international-orange bg-international-orange-light text-international-orange-dark hover:bg-international-orange-light/80" 
+              : "border-muted hover:border-international-orange/50"
+          )}
         >
-          <span className="truncate">{getCurrentLabel()}</span>
-          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+          <span className="flex items-center gap-2">
+            {currentContext ? (
+              <Target className="h-4 w-4 text-international-orange" />
+            ) : (
+              <MessageSquare className="h-4 w-4 text-muted-foreground" />
+            )}
+            <span className="truncate">{getCurrentLabel()}</span>
+          </span>
+          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0" />
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-[400px] p-0" align="start">
