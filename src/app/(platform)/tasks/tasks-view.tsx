@@ -7,7 +7,7 @@ import { useAutoRefresh } from "@/hooks/useAutoRefresh"
 import { RefreshButton } from "@/components/RefreshButton"
 import { TaskCard } from "./task-card"
 import { Button } from "@/components/ui/button"
-import { LayoutGrid, List, X, Trash2, CheckSquare, Loader2, Check, UserPlus, Filter, ChevronDown, Bot } from "lucide-react"
+import { LayoutGrid, List, X, Trash2, CheckSquare, Loader2, Check, UserPlus, Filter, ChevronDown, Bot, CalendarDays, Inbox } from "lucide-react"
 import { UserAvatar } from "@/components/ui/user-avatar"
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
 import { deleteTasks, acceptTask, completeTask, updateTaskAssignees } from "@/actions/tasks"
@@ -52,7 +52,6 @@ import {
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { EmptyState } from "@/components/ui/empty-state"
-import { Inbox } from "lucide-react"
 import { getStatusBadgeClass } from "@/lib/status-colors"
 import { GanttView } from "@/components/timeline/GanttView"
 
@@ -621,22 +620,22 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                             ...task,
                             profiles: task.assignee ? {
                                 id: task.assignee.id,
-                                full_name: task.assignee.full_name,
-                                role: task.assignee.role,
-                                email: task.assignee.email,
+                                full_name: task.assignee.full_name || null,
+                                role: task.assignee.role || null,
+                                email: null,
                                 foundry_id: null,
                                 created_at: '',
                                 updated_at: '',
                                 executive_setup_completed: false
                             } : null,
-                            objectives: objectives.find(obj => obj.id === task.objective_id) || null
+                            objectives: task.objective_id ? (objectives.find(obj => obj.id === task.objective_id) || null) : null
                         }))}
                         objectives={objectives}
                         profiles={members.map(m => ({
                             id: m.id,
-                            full_name: m.full_name,
-                            role: m.role,
-                            email: '',
+                            full_name: m.full_name || null,
+                            role: m.role || null,
+                            email: null,
                             foundry_id: null,
                             created_at: '',
                             updated_at: '',

@@ -1,91 +1,210 @@
 # Agent Handover Document
-
 **Date:** February 2, 2026
-**Task:** Fix UI Transparency Issues - Phase 2
-**Status:** ✅ COMPLETE
+**Task:** Simplify navigation from 14 items to 6, then consolidate lost functionality
+**Status:** Partially complete - Navigation simplified, but feature integration pending
 
 ---
 
 ## Context
 
-User reported dark overlay backgrounds on dialogs, sheets, and modals causing a dreary UI that violates the "bright, airy, optimistic" design philosophy. The previous fix session missed the core issue: the Shadcn UI primitives themselves were using `bg-black/80` and `bg-black/50` for overlays.
+User wanted to simplify the CentaurOS navigation from 14 items down to 6 core items. The goal is to reduce confusion while maintaining the core value loop: help users discover what they don't know → connect them to experts/products in marketplace → monetize.
 
-## Root Cause
+**Key insight:** "Blueprints" (now "Product Map") is the differentiator - it proactively shows users what they don't know, unlike Advisory which is reactive Q&A.
 
-The overlay components (`DialogOverlay`, `SheetOverlay`, `DrawerOverlay`, `AlertDialogOverlay`) in `src/components/ui/` were using **dark transparent backgrounds** (`bg-black/80`, `bg-black/50`) which created the dreary, dark overlay effect seen in screenshots.
+---
 
-## Fixes Applied
+## COMPLETED ✅
 
-### 1. Core UI Component Overlays (CRITICAL)
+### Navigation Simplification
+- Updated `src/components/Sidebar.tsx` - reduced to 6 items
+- Updated `src/components/MobileNav.tsx` - matching 6-item structure
+- Renamed "Messages" → "Inbox"
+- Renamed "Blueprints" → "Product Map"
 
-Changed from dark to light overlays:
+**New sidebar structure:**
+```
+Work: Inbox, Objectives, Tasks, Team
+Discovery: Product Map, Marketplace
+(Settings at bottom)
+```
 
-| Component | Old Pattern | New Pattern |
-|-----------|-------------|-------------|
-| `dialog.tsx` | `bg-black/80` | `bg-muted/60` |
-| `sheet.tsx` | `bg-black/50` | `bg-muted/60` |
-| `drawer.tsx` | `bg-black/50` | `bg-muted/60` |
-| `alert-dialog.tsx` | `bg-black/80` | `bg-muted/60` |
+### Page Title Updates
+- `src/app/(platform)/messages/messages-page-client.tsx` - title changed to "Inbox"
+- `src/app/(platform)/blueprints/blueprints-view.tsx` - title changed to "Product Map"
+- `src/app/(platform)/blueprints/page.tsx` - metadata updated
 
-### 2. Custom Modal Overlays
+### Team Bandwidth Indicators
+- Added to `src/app/(platform)/team/team-comparison-view.tsx`
+- Shows "Has capacity" / "At capacity" / "Overloaded" based on workload score
+- Formula: `(activeTasks * 20) + (pendingTasks * 10)`, thresholds at 40 and 70
 
-| File | Old Pattern | New Pattern |
-|------|-------------|-------------|
-| `gdpr/PrivacySettings.tsx` | `bg-black/80` | `bg-muted/60` |
-| `buyer/buyer-dashboard-view.tsx` | `bg-black/50` | `bg-muted/60` |
-| `provider/AvailabilityCalendar.tsx` | `bg-background/80` | `bg-muted` |
+### Redirect Pages Created (PROBLEM - SEE REMAINING TASKS)
+These pages were **incorrectly replaced with redirects**, losing functionality:
+- `src/app/(platform)/today/page.tsx` → redirects to /messages
+- `src/app/(platform)/timeline/page.tsx` → redirects to /tasks
+- `src/app/(platform)/advisory/page.tsx` → redirects to /blueprints
+- `src/app/(platform)/rfq/page.tsx` → redirects to /marketplace?tab=rfqs
+- `src/app/(platform)/talent/page.tsx` → redirects to /marketplace?tab=talent
+- `src/app/(platform)/saved-resources/page.tsx` → redirects to /marketplace?tab=saved
+- `src/app/(platform)/help/page.tsx` → redirects to /settings
 
-### 3. Other Transparency Fixes
+---
 
-| File | Old Pattern | New Pattern |
-|------|-------------|-------------|
-| `team/team-comparison-view.tsx` | `bg-status-success/10 backdrop-blur-[1px]` | `bg-status-success-light` |
-| `team/team-comparison-view.tsx` | `bg-muted0/10 backdrop-blur-[1px]` | `bg-muted` |
-| `apprenticeship/skills-gap-chart.tsx` | `bg-background/30` | `bg-muted` |
-| `provider/PortfolioGrid.tsx` | `bg-white/50 hover:bg-white/75` | `bg-muted hover:bg-background` |
-| `booking/BookingConfirmation.tsx` | `bg-white/80` | `bg-background` |
-| `smart-airlock/RubberStampModal.tsx` | `bg-background/10 backdrop-blur-[2px]` | `bg-background` |
+## REMAINING TASKS 🔧
 
-### 4. Updated Design Rules
+**CRITICAL:** The redirect pages broke functionality. The original pages had full features that need to be integrated into the new navigation structure.
 
-- Updated `.cursor/rules/no-transparency.mdc` to specify that modal overlays should use `bg-muted/60` (light), NOT `bg-black/80` (dark)
+### Priority 1: Marketplace Tabs
+**Problem:** RFQs, Talent, and Saved Resources functionality is gone
+**Files to modify:** 
+- `src/app/(platform)/marketplace/page.tsx`
+- `src/app/(platform)/marketplace/marketplace-view.tsx`
+**Restore from git:**
+- `git show e264416:src/app/(platform)/rfq/page.tsx`
+- `git show e264416:src/app/(platform)/talent/page.tsx`
+- `git show e264416:src/app/(platform)/saved-resources/page.tsx`
+**Approach:** 
+- Add Tabs component to Marketplace: Browse | My RFQs | Talent | Saved
+- Import content from original pages as tab content
 
-## Intentional Exceptions (Do NOT Fix)
+### Priority 2: Tasks Timeline View
+**Problem:** Timeline/Gantt view is gone
+**Files to modify:** `src/app/(platform)/tasks/page.tsx`
+**Restore from git:** `git show e264416:src/app/(platform)/timeline/page.tsx`
+**Approach:**
+- Add view toggle to Tasks: List | Calendar | Gantt
+- Reuse `src/components/timeline/GanttView.tsx` and `TimelineListView.tsx`
+- Note: Git log shows "feat: add Timeline view to Tasks page" - check if partially done
 
-These use transparency intentionally:
+### Priority 3: Tasks Priority Section
+**Problem:** Prioritized "Focus" tasks from Today page are gone
+**Files to modify:** `src/app/(platform)/tasks/page.tsx`
+**Approach:**
+- Add "Today's Focus" card at top showing top 5 prioritized tasks
+- Reuse `src/components/DailyPrioritizer.tsx`
 
-1. **Marketing Navbar** (`src/components/marketing/MarketingNavbar.tsx`)
-   - `bg-background/90 backdrop-blur-md` - Glass effect for marketing site
+### Priority 4: Inbox Activity Stream
+**Problem:** Activity stream from Today page is gone
+**Files to modify:** `src/app/(platform)/messages/messages-page-client.tsx`
+**Restore from git:** `git show e264416:src/app/(platform)/today/page.tsx`
+**Approach:**
+- Add Activity tab or section to Inbox
+- Reuse `src/components/today/activity-stream.tsx`
 
-2. **LivePulse Terminal** (`src/components/smart-airlock/LivePulse.tsx`)
-   - `bg-black/40 backdrop-blur-sm` - Intentional terminal/HUD aesthetic
+### Priority 5: Inbox Standup Widget
+**Problem:** Daily standup functionality is gone
+**Files to modify:** `src/app/(platform)/messages/messages-page-client.tsx`
+**Approach:**
+- Add Standup section to Inbox
+- Reuse `src/components/StandupWidget.tsx`
+- User decided: standup belongs in Inbox (part of daily workflow)
 
-3. **Marketing Trust Section** (`src/components/marketing/TrustSafetySection.tsx`)
-   - `bg-white/10 backdrop-blur-md` - Marketing visual effect
+### Priority 6: Inbox Daily Pulse
+**Problem:** Daily pulse insights are gone
+**Files to modify:** `src/app/(platform)/messages/messages-page-client.tsx`
+**Approach:**
+- Add Daily Pulse widget to Inbox
+- Reuse `src/components/reports/DailyPulseWidget.tsx`
+- User decided: pulse belongs in Inbox (part of daily briefing)
 
-4. **Subtle Hover States** (various files)
-   - `hover:bg-orange-50/50`, `bg-orange-50/30` - Light tints for selection/unread indicators
+### Priority 7: Inbox Needs Attention
+**Problem:** Needs attention summary is gone
+**Files to modify:** `src/app/(platform)/messages/messages-page-client.tsx`
+**Approach:**
+- Add alerts/notifications section to Inbox
+- Reuse `src/components/today/needs-attention-summary.tsx`
 
-## Verification
+### Priority 8: Product Map Q&A
+**Problem:** Advisory Q&A functionality is gone
+**Files to modify:** `src/app/(platform)/blueprints/[id]/page.tsx` or blueprints-view.tsx
+**Restore from git:** `git show e264416:src/app/(platform)/advisory/page.tsx`
+**Approach:**
+- Add Q&A tab to Product Map detail view
+- Questions tagged to knowledge domains
+- Reuse `src/app/(platform)/advisory/advisory-view.tsx` and `src/components/advisory/*`
+- Keep `src/actions/advisory.ts` - it has all the backend logic
 
-- ✅ `npm run build` succeeds
-- ✅ All dialog, sheet, drawer, alert-dialog overlays now use `bg-muted/60`
-- ✅ No dark `bg-black/XX` overlays in platform components
-- ✅ Remaining transparency uses are documented intentional exceptions
+### Priority 9: Settings Help Section
+**Problem:** Help documentation is gone
+**Files to modify:** `src/app/(platform)/settings/page.tsx`
+**Restore from git:** `git show e264416:src/app/(platform)/help/page.tsx`
+**Approach:**
+- Add "Help & Support" section to Settings page
+- Include getting started guide, FAQs, documentation links
 
-## Key Lessons
+---
 
-1. **The previous fix session only verified that content panels used `bg-background`/`bg-card`, but missed that the OVERLAY components still used dark transparent backgrounds.** Always check both the content AND the overlay styling in modal components.
+## KEY DECISIONS MADE BY USER
 
-2. **CRITICAL BUG FOUND: `globals.css` @theme block had invalid color definitions.**
-   - In Tailwind CSS v4, the `@theme` block in `globals.css` maps utility classes to CSS variables
-   - `--color-background: var(--background)` outputs invalid CSS: `background-color: 0 0% 100%`
-   - FIXED to: `--color-background: hsl(var(--background))` which outputs valid: `background-color: hsl(0 0% 100%)`
-   - This caused ALL `bg-*`, `text-*`, `border-*` utilities to render as transparent!
+1. **Messages renamed to "Inbox"**
+2. **Blueprints renamed to "Product Map"**
+3. **Talent** → Marketplace (not Team)
+4. **Daily Standup** → Inbox (not Team)
+5. **Daily Pulse** → Inbox (not Team or Settings)
+6. **All functionality should be preserved** - just moved to new locations
 
-## Next Agent Actions
+---
 
-1. Run `./scripts/check-design-tokens.sh` before commits
-2. If user reports "dark UI", check the OVERLAY styling, not just content
-3. Never use `bg-black/XX` for modal overlays - use `bg-muted/60` for light theme
-4. **ALWAYS use `hsl(var(--variable))` format in tailwind.config.ts for CSS variable colors**
+## USEFUL COMMANDS
+
+```bash
+# Navigate to project
+cd "/Users/tristanfischer/Library/Mobile Documents/com~apple~CloudDocs/Software development/CentaurOS created 260126 1435"
+
+# Check original page content from git
+git show e264416:src/app/\(platform\)/today/page.tsx
+git show e264416:src/app/\(platform\)/advisory/page.tsx
+git show e264416:src/app/\(platform\)/rfq/page.tsx
+git show e264416:src/app/\(platform\)/timeline/page.tsx
+
+# Type check
+npx tsc --noEmit
+
+# Pre-existing TS errors exist in:
+# - src/actions/reports.ts
+# - src/actions/search.ts  
+# - src/app/(supplier-portal)/*
+# These are NOT related to this work
+```
+
+---
+
+## IMPORTANT FILES
+
+**Navigation:**
+- `src/components/Sidebar.tsx` - Desktop sidebar (already updated)
+- `src/components/MobileNav.tsx` - Mobile bottom nav (already updated)
+
+**Pages to integrate into:**
+- `src/app/(platform)/messages/` - Inbox (needs activity, standup, pulse)
+- `src/app/(platform)/tasks/` - Tasks (needs timeline view, priority section)
+- `src/app/(platform)/blueprints/` - Product Map (needs Q&A)
+- `src/app/(platform)/marketplace/` - Marketplace (needs tabs for RFQs, Talent, Saved)
+- `src/app/(platform)/settings/` - Settings (needs Help section)
+
+**Components to reuse:**
+- `src/components/today/activity-stream.tsx`
+- `src/components/today/needs-attention-summary.tsx`
+- `src/components/StandupWidget.tsx`
+- `src/components/DailyPrioritizer.tsx`
+- `src/components/reports/DailyPulseWidget.tsx`
+- `src/components/timeline/GanttView.tsx`
+- `src/components/timeline/TimelineListView.tsx`
+- `src/components/advisory/*`
+- `src/components/rfq/*`
+
+**Plan file:**
+- `~/.cursor/plans/consolidate_features_into_navigation_77fd6787.plan.md`
+
+---
+
+## QUICK START FOR NEXT AGENT
+
+1. Read this document fully
+2. Start with **Priority 1: Marketplace Tabs** - most contained change
+3. For each priority:
+   - Check original content with `git show e264416:src/app/(platform)/[page]/page.tsx`
+   - Import/reuse existing components where possible
+   - Test the integration works
+4. After all integrations, remove the redirect-only pages
+5. Run `npx tsc --noEmit` to verify (ignore pre-existing errors in reports.ts/search.ts/supplier-portal)

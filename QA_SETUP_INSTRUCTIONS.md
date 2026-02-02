@@ -244,12 +244,27 @@ Results are stored in the `qa_test_runs` table and displayed in the admin UI:
 
 ## 🎯 Next Steps
 
-1. ✅ Configure all GitHub Secrets
-2. ✅ Create test accounts
-3. ✅ Seed test data
-4. ✅ Run first test via admin panel
-5. ✅ Review results and fix any failures
-6. ✅ Schedule weekly automated runs (already configured in workflow)
+### Required User Actions (Cannot be automated):
+
+1. **Configure GitHub Secrets** - Go to GitHub repo Settings > Secrets and variables > Actions:
+   - `TEST_EXECUTIVE_EMAIL` / `TEST_EXECUTIVE_PASSWORD`
+   - `TEST_FOUNDER_EMAIL` / `TEST_FOUNDER_PASSWORD`
+   - `TEST_APPRENTICE_EMAIL` / `TEST_APPRENTICE_PASSWORD`
+   - `GITHUB_TOKEN` (with `repo` and `workflow` scopes)
+   - `GITHUB_REPO` (e.g., `tristanfischer-ux/centaurOS_created_260126_1435`)
+
+2. **Create test accounts** in Supabase (see SQL above)
+
+3. **Seed test data** (optional but recommended)
+
+4. **Run first test** via admin panel (`/admin/qa`)
+
+### Already Complete:
+
+- ✅ GitHub Actions workflow created
+- ✅ E2E test files for all 3 personas
+- ✅ Admin UI page at `/admin/qa`
+- ✅ Weekly scheduled runs configured (Mondays 6am UTC)
 
 ---
 

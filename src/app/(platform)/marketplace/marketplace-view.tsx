@@ -120,6 +120,9 @@ export function MarketplaceView({
     const [maxCostFilter, setMaxCostFilter] = useState<string>('all')
     const [integrationFilter, setIntegrationFilter] = useState<string>('all')
     
+    // Services sub-tab filter ('all' | 'services' | 'ai')
+    const [servicesSubTab, setServicesSubTab] = useState<string>('all')
+    
     // Products-specific filters
     const [certificationFilter, setCertificationFilter] = useState<string>('all')
     const [technologyFilter, setTechnologyFilter] = useState<string>('all')
@@ -539,6 +542,7 @@ export function MarketplaceView({
         setCertificationFilter('all')
         setTechnologyFilter('all')
         setSearchQuery('')
+        setServicesSubTab('all')
     }
 
     const hasActiveFilters = useMemo(() => {
@@ -598,6 +602,14 @@ export function MarketplaceView({
         
         // Services/AI-specific filters
         if (activeTab === 'Services') {
+            // Filter by sub-tab (All, Consulting/Services, AI Tools)
+            if (servicesSubTab === 'services') {
+                filtered = filtered.filter(item => item.category === 'Services')
+            } else if (servicesSubTab === 'ai') {
+                filtered = filtered.filter(item => item.category === 'AI')
+            }
+            // 'all' shows both Services and AI categories (no additional filter)
+            
             if (aiTypeFilter !== 'all') {
                 filtered = filtered.filter(item => item.attributes?.type === aiTypeFilter)
             }
@@ -630,7 +642,7 @@ export function MarketplaceView({
         }
         
         return filtered
-    }, [currentListings, activeTab, debouncedSearchQuery, selectedSubcategories, locationFilter, skillFilter, minExperience, aiTypeFilter, maxCostFilter, integrationFilter, certificationFilter, technologyFilter])
+    }, [currentListings, activeTab, debouncedSearchQuery, selectedSubcategories, locationFilter, skillFilter, minExperience, aiTypeFilter, maxCostFilter, integrationFilter, certificationFilter, technologyFilter, servicesSubTab])
 
     const selectedItems = initialListings.filter(item => selectedIds.has(item.id))
 
@@ -1237,7 +1249,7 @@ export function MarketplaceView({
                         {/* Sub-category tabs for Services (shows AI and Services breakdown) */}
                         {activeTab === 'Services' && (
                             <div className="overflow-x-auto -mx-2 xs:mx-0 px-2 xs:px-0 pb-1">
-                                <Tabs defaultValue="all" className="w-full">
+                                <Tabs value={servicesSubTab} onValueChange={setServicesSubTab} className="w-full">
                                     <TabsList className="inline-flex w-auto max-w-lg min-w-max">
                                         <TabsTrigger value="all" className="px-3 xs:px-4 gap-1.5">
                                             All Services
