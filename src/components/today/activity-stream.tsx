@@ -159,7 +159,7 @@ export function ActivityStream({ initialItems, initialCounts }: ActivityStreamPr
             description={
               filter === 'unread' 
                 ? "You've read all your messages and comments."
-                : "Activity from your tasks, objectives, and conversations will appear here."
+                : "Comments on your tasks and objectives, plus direct messages, will appear here."
             }
             className="py-8"
           />
