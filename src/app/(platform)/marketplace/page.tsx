@@ -1,10 +1,26 @@
+import { Suspense } from 'react'
 import { getMarketplaceListings } from '@/actions/marketplace'
 import { createClient } from '@/lib/supabase/server'
 import { getFoundryIdCached } from '@/lib/supabase/foundry-context'
 import { MarketplaceView } from './marketplace-view'
+import { Skeleton } from '@/components/ui/skeleton'
 
 // Force dynamic since we're fetching data that might change
 export const dynamic = 'force-dynamic'
+
+// Loading skeleton for marketplace
+function MarketplaceLoading() {
+    return (
+        <div className="space-y-6">
+            <Skeleton className="h-12 w-full" />
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {[1, 2, 3, 4, 5, 6].map((i) => (
+                    <Skeleton key={i} className="h-64 w-full rounded-lg" />
+                ))}
+            </div>
+        </div>
+    )
+}
 
 export interface MarketplaceRecommendation {
     id: string
@@ -82,10 +98,12 @@ export default async function MarketplacePage() {
     }
 
     return (
-        <MarketplaceView
-            initialListings={marketplaceListings}
-            recommendations={recommendations}
-            teamMembers={teamMembers}
-        />
+        <Suspense fallback={<MarketplaceLoading />}>
+            <MarketplaceView
+                initialListings={marketplaceListings}
+                recommendations={recommendations}
+                teamMembers={teamMembers}
+            />
+        </Suspense>
     )
 }
