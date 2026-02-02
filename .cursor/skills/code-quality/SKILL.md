@@ -142,6 +142,12 @@ Checklist:
 - [ ] No TODO comments that should be addressed now
 - [ ] Variable/function names are descriptive
 
+**Documentation:**
+- [ ] All exported functions have JSDoc
+- [ ] Security-critical code has // SECURITY: annotations
+- [ ] Complex business logic has explanatory comments
+- [ ] No outdated comments or commented-out code
+
 **Security:**
 - [ ] No sensitive data hardcoded
 - [ ] Input validation in place
@@ -160,13 +166,6 @@ Checklist:
 - [ ] Dialogs use `size` prop (not custom `max-w-[]`)
 - [ ] Status indicators use `StatusBadge` component
 - [ ] Icon-only buttons have `aria-label`
-
-**Documentation Quality Checks:**
-- [ ] All exported functions have JSDoc with `@param`, `@returns`, `@throws`
-- [ ] Security-sensitive code has `// SECURITY:` annotations
-- [ ] Business logic has "why" comments, not just "what"
-- [ ] Complex algorithms are explained
-- [ ] Type assertions have justification comments
 
 ### Code Style Guidelines
 
@@ -225,6 +224,128 @@ export function Component({ prop1, prop2 }: Props) {
   // 3e. Render
   return <div>...</div>;
 }
+```
+
+## Documentation Quality Checks
+
+Good documentation prevents bugs and speeds up onboarding. Check for these patterns:
+
+### JSDoc on Exported Functions
+
+All exported functions should have JSDoc describing purpose, parameters, and return values:
+
+```typescript
+// GOOD
+/**
+ * Calculates the total price including applicable taxes and fees.
+ * @param items - Array of line items with price and quantity
+ * @param taxRate - Tax rate as decimal (e.g., 0.08 for 8%)
+ * @returns Total price in cents
+ */
+export function calculateTotal(items: LineItem[], taxRate: number): number {
+  // ...
+}
+
+// BAD - missing documentation
+export function calculateTotal(items: LineItem[], taxRate: number): number {
+  // ...
+}
+```
+
+### Security Annotations
+
+Auth-related and security-critical code must have `// SECURITY:` annotations:
+
+```typescript
+// GOOD
+// SECURITY: Validates user owns this resource before allowing access
+const { data: task } = await supabase
+  .from('tasks')
+  .select('*')
+  .eq('id', taskId)
+  .eq('foundry_id', foundryId) // SECURITY: Foundry isolation
+  .single();
+
+// SECURITY: Rate limited to prevent brute force attacks
+export async function verifyPassword(email: string, password: string) {
+  // ...
+}
+
+// BAD - security logic without annotation
+const { data: task } = await supabase
+  .from('tasks')
+  .select('*')
+  .eq('id', taskId)
+  .eq('foundry_id', foundryId)
+  .single();
+```
+
+### Business Logic Comments
+
+Complex business logic should have explanatory comments:
+
+```typescript
+// GOOD
+// Business rule: Orders over $10,000 require manager approval.
+// This threshold was set by finance in Q1 2026.
+if (orderTotal > 10000_00) {
+  await requestManagerApproval(orderId);
+}
+
+// Retry with exponential backoff: 1s, 2s, 4s, 8s, 16s
+// Max 5 retries to avoid blocking the queue for too long
+for (let attempt = 0; attempt < 5; attempt++) {
+  const delay = Math.pow(2, attempt) * 1000;
+  // ...
+}
+
+// BAD - magic numbers without explanation
+if (orderTotal > 1000000) {
+  await requestManagerApproval(orderId);
+}
+```
+
+### Component Documentation
+
+React components should document their purpose and props:
+
+```typescript
+// GOOD
+/**
+ * Displays a task card with status, assignee, and due date.
+ * Used in the task list and kanban board views.
+ * 
+ * @example
+ * <TaskCard task={task} onStatusChange={handleChange} />
+ */
+interface TaskCardProps {
+  /** The task to display */
+  task: Task;
+  /** Called when user changes the task status */
+  onStatusChange?: (newStatus: TaskStatus) => void;
+  /** Whether to show the expanded details view */
+  expanded?: boolean;
+}
+
+export function TaskCard({ task, onStatusChange, expanded = false }: TaskCardProps) {
+  // ...
+}
+```
+
+### Quick Documentation Scan
+
+```bash
+# Find exported functions without JSDoc
+rg "^export (async )?function" --type ts -l | xargs -I {} sh -c 'rg -B1 "^export (async )?function" {} | grep -L "^\*/"'
+
+# Find auth/security code without SECURITY annotation
+rg "(password|auth|token|session|permission|foundry_id)" --type ts -l | xargs -I {} sh -c 'grep -L "SECURITY:" {}'
+
+# Find files with TODO comments that need review
+rg "TODO|FIXME|HACK|XXX" --type ts --type tsx
+
+# Count documented vs undocumented exports per file
+rg "^export" --type ts -c | head -20
 ```
 
 ## Unit Testing
@@ -367,6 +488,10 @@ npx madge --circular src/
 
 # Check bundle size
 npx size-limit
+
+# Scan for missing documentation
+rg "^export (async )?function" --type ts -c | sort -t: -k2 -nr | head -10
+rg "(password|auth|token|session)" --type ts -l | xargs grep -L "SECURITY:" 2>/dev/null
 ```
 
 ## Quality Metrics

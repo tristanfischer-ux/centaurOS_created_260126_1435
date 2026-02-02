@@ -1,29 +1,28 @@
 ---
-description: TypeScript/React/Next.js code hygiene standards - typing, naming, error handling, imports
+description: Code hygiene standards - TypeScript, naming conventions, error handling, imports, and function structure
 alwaysApply: true
 ---
 
 # Code Hygiene Standards
 
-These standards ensure consistent, maintainable, and type-safe code across the codebase.
+These standards apply to ALL TypeScript/React code in the codebase.
 
 ## 1. TypeScript Standards
 
 ### Prefer Explicit Types for Function Signatures
 
-```tsx
-// ✅ CORRECT - Explicit return type
+```typescript
+// ✅ CORRECT - Explicit return types
 function calculateTotal(items: CartItem[]): number {
   return items.reduce((sum, item) => sum + item.price, 0)
 }
 
-// ✅ CORRECT - Explicit async return type
 async function fetchUser(id: string): Promise<User | null> {
-  const { data } = await supabase.from('users').select().eq('id', id).single()
-  return data
+  const response = await fetch(`/api/users/${id}`)
+  return response.json()
 }
 
-// ❌ WRONG - Implicit return type (harder to catch breaking changes)
+// ❌ WRONG - Implicit return types
 function calculateTotal(items: CartItem[]) {
   return items.reduce((sum, item) => sum + item.price, 0)
 }
@@ -31,420 +30,428 @@ function calculateTotal(items: CartItem[]) {
 
 ### Avoid `any` - Use `unknown` + Type Guards
 
-```tsx
-// ✅ CORRECT - unknown with type guard
-function processResponse(data: unknown): User {
-  if (!isUser(data)) {
-    throw new Error('Invalid user data')
+```typescript
+// ✅ CORRECT - Use unknown with type guards
+function processData(data: unknown): string {
+  if (typeof data === 'string') {
+    return data.toUpperCase()
   }
-  return data
+  if (isUser(data)) {
+    return data.name
+  }
+  throw new Error('Invalid data type')
 }
 
-function isUser(data: unknown): data is User {
+function isUser(value: unknown): value is User {
   return (
-    typeof data === 'object' &&
-    data !== null &&
-    'id' in data &&
-    'email' in data
+    typeof value === 'object' &&
+    value !== null &&
+    'name' in value &&
+    'email' in value
   )
 }
 
-// ❌ WRONG - any bypasses type safety
-function processResponse(data: any): User {
-  return data // No validation, runtime errors waiting to happen
+// ❌ WRONG - Using any
+function processData(data: any): string {
+  return data.name.toUpperCase()  // Runtime error waiting to happen
 }
 ```
 
 ### Use `satisfies` for Type-Safe Object Literals
 
-```tsx
-// ✅ CORRECT - satisfies preserves literal types while checking structure
-const STATUS_COLORS = {
-  pending: 'warning',
-  active: 'success',
-  cancelled: 'destructive',
-} satisfies Record<TaskStatus, BadgeVariant>
+```typescript
+// ✅ CORRECT - satisfies preserves literal types
+const config = {
+  apiUrl: 'https://api.example.com',
+  timeout: 5000,
+  retries: 3,
+} satisfies Config
 
-// Type is { pending: 'warning', active: 'success', cancelled: 'destructive' }
-// NOT Record<TaskStatus, BadgeVariant>
+// TypeScript knows config.retries is specifically 3, not just number
 
-// ❌ WRONG - Type annotation widens the type
-const STATUS_COLORS: Record<TaskStatus, BadgeVariant> = {
-  pending: 'warning',
-  active: 'success',
-  cancelled: 'destructive',
+// ❌ WRONG - Type annotation loses literal types
+const config: Config = {
+  apiUrl: 'https://api.example.com',
+  timeout: 5000,
+  retries: 3,
 }
-// Type is Record<TaskStatus, BadgeVariant> - loses literal precision
+// TypeScript only knows config.retries is number
 ```
 
-### Document Type Assertions with Justification
+### Prefer Interfaces for Objects, Types for Unions
 
-```tsx
-// ✅ CORRECT - Assertion with justification
-// Safe assertion: Supabase returns user after successful auth
-const user = (await supabase.auth.getUser()).data.user as User
+```typescript
+// ✅ CORRECT - Interface for object shapes
+interface User {
+  id: string
+  name: string
+  email: string
+}
 
-// ✅ CORRECT - Assertion for DOM elements with context
-// Button always exists in this form - it's rendered unconditionally above
-const button = document.getElementById('submit-btn') as HTMLButtonElement
+interface TaskProps {
+  task: Task
+  onComplete: (id: string) => void
+}
 
-// ❌ WRONG - Unexplained assertion
-const user = data as User
-const element = target as HTMLInputElement
+// ✅ CORRECT - Type for unions and intersections
+type Status = 'pending' | 'active' | 'completed' | 'cancelled'
+type TaskOrProject = Task | Project
+type ExtendedUser = User & { permissions: string[] }
+
+// ❌ WRONG - Type for simple objects
+type User = {
+  id: string
+  name: string
+}
+
+// ❌ WRONG - Interface for unions (not possible)
 ```
 
 ## 2. Naming Conventions
 
-| Element | Convention | Example |
-|---------|------------|---------|
+| Category | Convention | Example |
+|----------|------------|---------|
 | Component files | PascalCase | `TaskCard.tsx`, `UserProfile.tsx` |
 | Utility files | kebab-case | `format-date.ts`, `api-client.ts` |
-| Hook files | camelCase with use prefix | `useAuth.ts`, `useTaskFilters.ts` |
-| Functions | camelCase, verb-first | `calculateTotal`, `fetchUser`, `validateInput` |
-| Types/Interfaces | PascalCase | `TaskStatus`, `UserProfile`, `ApiResponse` |
+| Functions | camelCase, verb-first | `calculateTotal()`, `fetchUser()` |
+| Types/Interfaces | PascalCase | `TaskStatus`, `UserProfile` |
 | Constants | SCREAMING_SNAKE_CASE | `MAX_RETRY_COUNT`, `API_BASE_URL` |
-| Boolean variables | is/has/should/can prefix | `isLoading`, `hasError`, `shouldRefresh`, `canEdit` |
-| Event handlers | handle prefix | `handleClick`, `handleSubmit`, `handleChange` |
-| Callbacks (props) | on prefix | `onClick`, `onSubmit`, `onChange` |
+| Boolean vars | is/has/should prefix | `isLoading`, `hasError`, `shouldRefresh` |
+| Event handlers | handle prefix | `handleClick()`, `handleSubmit()` |
+| Hooks | use prefix | `useAuth()`, `useDebounce()` |
+| Context | Context suffix | `AuthContext`, `ThemeContext` |
+| Providers | Provider suffix | `AuthProvider`, `ThemeProvider` |
 
-### Naming Examples
-
-```tsx
-// ✅ CORRECT - Clear, consistent naming
-const MAX_FILE_SIZE = 5 * 1024 * 1024
+```typescript
+// ✅ CORRECT - Following conventions
+const MAX_RETRY_COUNT = 3
 const isLoading = true
 const hasPermission = user.role === 'admin'
 
-function handleSubmit(e: FormEvent): void { ... }
-function calculateDiscountedPrice(price: number, discount: number): number { ... }
-function fetchUserById(id: string): Promise<User> { ... }
-
-interface TaskFilters {
-  status: TaskStatus[]
-  assigneeId: string | null
+function handleSubmit(event: FormEvent): void {
+  event.preventDefault()
+  // ...
 }
 
-// ❌ WRONG - Inconsistent or unclear naming
-const maxFileSize = 5 * 1024 * 1024  // Should be SCREAMING_SNAKE_CASE
-const loading = true                   // Missing 'is' prefix
-const permission = user.role === 'admin' // Missing 'has' prefix
-function submit(e: FormEvent) { ... }  // Missing 'handle' prefix
-function calc(p: number, d: number) { ... } // Unclear abbreviations
+function calculateDiscountedPrice(price: number, discount: number): number {
+  return price * (1 - discount)
+}
+
+// ❌ WRONG - Not following conventions
+const maxRetryCount = 3           // Should be SCREAMING_SNAKE_CASE
+const loading = true              // Should be isLoading
+const permission = user.role      // Should be hasPermission
+
+function submit(e: FormEvent) {   // Should be handleSubmit
+  // ...
+}
+
+function price_calc(p: number) {  // Should be camelCase, verb-first
+  // ...
+}
 ```
 
 ## 3. Error Handling Pattern
 
 ### Never Silently Swallow Errors
 
-```tsx
+```typescript
 // ✅ CORRECT - Log with context, handle gracefully
-async function fetchTasks(userId: string): Promise<Task[]> {
+async function fetchUserData(userId: string): Promise<User | null> {
   try {
-    const { data, error } = await supabase
-      .from('tasks')
-      .select('*')
-      .eq('user_id', userId)
-
-    if (error) {
-      console.error('[fetchTasks] Supabase error:', { userId, error })
-      throw new DatabaseError('Failed to fetch tasks', { cause: error })
+    const response = await fetch(`/api/users/${userId}`)
+    if (!response.ok) {
+      console.error('[fetchUserData] API error:', {
+        userId,
+        status: response.status,
+        statusText: response.statusText,
+      })
+      return null
     }
-
-    return data ?? []
-  } catch (err) {
-    console.error('[fetchTasks] Unexpected error:', { userId, err })
-    throw err // Re-throw for caller to handle
+    return response.json()
+  } catch (error) {
+    console.error('[fetchUserData] Network error:', {
+      userId,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    })
+    return null
   }
 }
 
-// ❌ WRONG - Silent error swallowing
-async function fetchTasks(userId: string): Promise<Task[]> {
+// ❌ WRONG - Silent swallowing
+async function fetchUserData(userId: string): Promise<User | null> {
   try {
-    const { data } = await supabase.from('tasks').select('*').eq('user_id', userId)
-    return data ?? []
+    const response = await fetch(`/api/users/${userId}`)
+    return response.json()
   } catch {
-    return [] // Bug hidden! Why did it fail?
+    return null  // What went wrong? No way to know
   }
 }
-```
-
-### Log with Context for Debugging
-
-```tsx
-// ✅ CORRECT - Rich context in error logs
-console.error('[createTask] Failed to create task:', {
-  userId,
-  taskData,
-  error: error.message,
-  stack: error.stack,
-})
-
-// ❌ WRONG - Useless error messages
-console.error('Error')
-console.error(error)
-console.log('something went wrong')
 ```
 
 ### Prefer Typed Errors Over Generic Error
 
-```tsx
-// ✅ CORRECT - Custom error types
+```typescript
+// ✅ CORRECT - Typed errors with context
+class ApiError extends Error {
+  constructor(
+    message: string,
+    public statusCode: number,
+    public endpoint: string
+  ) {
+    super(message)
+    this.name = 'ApiError'
+  }
+}
+
 class ValidationError extends Error {
   constructor(
     message: string,
-    public readonly field: string,
-    public readonly code: string
+    public field: string,
+    public value: unknown
   ) {
     super(message)
     this.name = 'ValidationError'
   }
 }
 
-class DatabaseError extends Error {
-  constructor(
-    message: string,
-    public readonly options?: { cause?: unknown }
-  ) {
-    super(message, options)
-    this.name = 'DatabaseError'
-  }
-}
-
 // Usage
-function validateEmail(email: string): void {
-  if (!email.includes('@')) {
-    throw new ValidationError('Invalid email format', 'email', 'INVALID_FORMAT')
+function handleError(error: unknown): void {
+  if (error instanceof ApiError) {
+    console.error(`API ${error.statusCode} at ${error.endpoint}: ${error.message}`)
+  } else if (error instanceof ValidationError) {
+    console.error(`Validation failed for ${error.field}: ${error.message}`)
+  } else {
+    console.error('Unknown error:', error)
   }
 }
 
 // ❌ WRONG - Generic errors lose context
-throw new Error('Invalid email') // What field? What code? Harder to handle
+throw new Error('Something went wrong')  // Unhelpful
+throw new Error('API error')             // No status code, endpoint
 ```
 
-### Error Handling in Server Actions
+### Return Types for Error States
 
-```tsx
-// ✅ CORRECT - Return typed result, don't throw
-export async function createTask(data: TaskInput): Promise<ActionResult<Task>> {
-  const session = await auth()
-  if (!session?.user) {
-    return { success: false, error: 'Unauthorized' }
-  }
+```typescript
+// ✅ CORRECT - Explicit error return types
+type Result<T, E = Error> =
+  | { success: true; data: T }
+  | { success: false; error: E }
 
-  try {
-    const task = await db.tasks.create(data)
-    return { success: true, data: task }
-  } catch (err) {
-    console.error('[createTask] Failed:', { data, err })
-    return { success: false, error: 'Failed to create task' }
+async function createTask(input: TaskInput): Promise<Result<Task, ValidationError>> {
+  const validation = validateTaskInput(input)
+  if (!validation.valid) {
+    return { success: false, error: new ValidationError(validation.message, 'input', input) }
   }
+  const task = await db.tasks.create(input)
+  return { success: true, data: task }
 }
 
-// ❌ WRONG - Throwing in server actions
-export async function createTask(data: TaskInput): Promise<Task> {
-  const session = await auth()
-  if (!session?.user) {
-    throw new Error('Unauthorized') // Client can't handle this gracefully
-  }
-  return await db.tasks.create(data) // Unhandled errors crash client
+// Usage - forces error handling
+const result = await createTask(input)
+if (!result.success) {
+  showToast({ title: 'Error', description: result.error.message })
+  return
 }
+// TypeScript knows result.data is Task here
 ```
 
 ## 4. Import Organization
 
-Imports should be organized in this order (separated by blank lines):
+Organize imports in these numbered sections, separated by blank lines:
 
-1. React/Next.js imports
-2. External libraries
-3. Internal aliases (`@/`)
-4. Relative imports (same feature)
-5. Type-only imports (last)
-
-```tsx
+```typescript
 // ✅ CORRECT - Organized imports
-'use client'
 
+// 1. React/Next.js
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
+import Image from 'next/image'
 
-import { format } from 'date-fns'
+// 2. External libraries
+import { format, parseISO } from 'date-fns'
 import { z } from 'zod'
+import { toast } from 'sonner'
 
+// 3. Internal aliases (@/)
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { createTask } from '@/actions/tasks'
-import { cn } from '@/lib/utils'
+import { useAuth } from '@/hooks/useAuth'
 
-import { TaskFilters } from './task-filters'
-import { TaskCard } from './task-card'
+// 4. Relative imports (same feature)
+import { TaskCard } from './TaskCard'
+import { TaskFilters } from './TaskFilters'
+import { useTaskList } from './useTaskList'
 
+// 5. Types (separate section)
 import type { Task, TaskStatus } from '@/types/task'
 import type { User } from '@/types/user'
+```
 
+```typescript
 // ❌ WRONG - Unorganized imports
-import type { Task } from '@/types/task'
+import { Task } from '@/types/task'
 import { useState } from 'react'
-import { TaskCard } from './task-card'
 import { Button } from '@/components/ui/button'
 import { format } from 'date-fns'
+import { TaskCard } from './TaskCard'
+import type { User } from '@/types/user'
 import { useRouter } from 'next/navigation'
 import { z } from 'zod'
 ```
 
-## 5. Function Guidelines
+## 5. Function Standards
 
 ### Max 50 Lines Per Function
 
-Large functions should be broken into smaller, focused helpers.
-
-```tsx
+```typescript
 // ✅ CORRECT - Small, focused functions
-function validateTaskInput(input: TaskInput): ValidationResult {
-  const errors: string[] = []
-  
-  if (!input.title?.trim()) {
-    errors.push('Title is required')
-  }
-  
-  if (input.dueDate && input.dueDate < new Date()) {
-    errors.push('Due date must be in the future')
-  }
-  
-  return { valid: errors.length === 0, errors }
+function validateEmail(email: string): boolean {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+  return emailRegex.test(email)
 }
 
-async function createTask(input: TaskInput): Promise<Task> {
-  const validation = validateTaskInput(input)
-  if (!validation.valid) {
-    throw new ValidationError(validation.errors.join(', '))
+function validatePassword(password: string): ValidationResult {
+  if (password.length < 8) {
+    return { valid: false, message: 'Password must be at least 8 characters' }
   }
-  
-  return await db.tasks.create(input)
+  if (!/[A-Z]/.test(password)) {
+    return { valid: false, message: 'Password must contain uppercase letter' }
+  }
+  return { valid: true, message: '' }
 }
 
-// ❌ WRONG - Monolithic function doing everything
-async function createTask(input: TaskInput): Promise<Task> {
-  // 200 lines of validation, transformation, database calls, notifications...
+function validateUser(user: UserInput): ValidationResult[] {
+  return [
+    validateEmail(user.email) ? { valid: true, message: '' } : { valid: false, message: 'Invalid email' },
+    validatePassword(user.password),
+  ]
+}
+
+// ❌ WRONG - Monolithic function doing too much
+function processUserRegistration(data: unknown) {
+  // 200+ lines of validation, API calls, state updates, etc.
 }
 ```
 
 ### Max 4 Levels of Nesting
 
-Deep nesting indicates the need for extraction or early returns.
-
-```tsx
-// ✅ CORRECT - Early returns, flat structure
+```typescript
+// ✅ CORRECT - Flat structure with early returns
 async function processOrder(orderId: string): Promise<void> {
   const order = await fetchOrder(orderId)
   if (!order) {
-    console.warn('[processOrder] Order not found:', orderId)
-    return
+    throw new Error('Order not found')
   }
 
   if (order.status !== 'pending') {
-    console.info('[processOrder] Order already processed:', orderId)
+    throw new Error('Order already processed')
+  }
+
+  const payment = await processPayment(order)
+  if (!payment.success) {
+    await markOrderFailed(orderId, payment.error)
     return
   }
 
-  if (!order.items.length) {
-    throw new ValidationError('Order has no items')
-  }
-
-  await updateOrderStatus(orderId, 'processing')
-  await notifyCustomer(order.customerId)
+  await fulfillOrder(orderId)
+  await sendConfirmationEmail(order.userId)
 }
 
-// ❌ WRONG - Deep nesting, hard to follow
+// ❌ WRONG - Deep nesting
 async function processOrder(orderId: string): Promise<void> {
   const order = await fetchOrder(orderId)
   if (order) {
     if (order.status === 'pending') {
-      if (order.items.length > 0) {
-        await updateOrderStatus(orderId, 'processing')
-        if (order.customerId) {
-          await notifyCustomer(order.customerId)
+      const payment = await processPayment(order)
+      if (payment.success) {
+        await fulfillOrder(orderId)
+        if (order.userId) {
+          await sendConfirmationEmail(order.userId)
         }
+      } else {
+        await markOrderFailed(orderId, payment.error)
       }
     }
   }
 }
 ```
 
-### Single Responsibility Principle
+### Single Responsibility
 
-Each function should do one thing well.
-
-```tsx
-// ✅ CORRECT - Single responsibility
-function formatCurrency(amount: number, currency: string): string {
+```typescript
+// ✅ CORRECT - Each function does one thing
+function formatCurrency(amount: number): string {
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
-    currency,
+    currency: 'USD',
   }).format(amount)
 }
 
-function calculateOrderTotal(items: OrderItem[]): number {
+function calculateSubtotal(items: CartItem[]): number {
   return items.reduce((sum, item) => sum + item.price * item.quantity, 0)
 }
 
-function formatOrderTotal(items: OrderItem[], currency: string): string {
-  const total = calculateOrderTotal(items)
-  return formatCurrency(total, currency)
+function calculateTax(subtotal: number, rate: number): number {
+  return subtotal * rate
 }
 
-// ❌ WRONG - Multiple responsibilities
-function getOrderTotalDisplay(items: OrderItem[]): string {
-  let total = 0
-  for (const item of items) {
-    total += item.price * item.quantity
+function calculateOrderTotal(items: CartItem[], taxRate: number): OrderTotal {
+  const subtotal = calculateSubtotal(items)
+  const tax = calculateTax(subtotal, taxRate)
+  return {
+    subtotal,
+    tax,
+    total: subtotal + tax,
+    formatted: formatCurrency(subtotal + tax),
   }
-  // Formatting mixed with calculation
-  return '$' + total.toFixed(2)
+}
+
+// ❌ WRONG - Function doing multiple things
+function processCart(items: CartItem[], taxRate: number, userId: string) {
+  // Calculates totals, formats currency, validates inventory,
+  // creates order, processes payment, sends emails...
 }
 ```
 
-## 6. Additional Best Practices
+### Early Returns for Guard Clauses
 
-### Avoid Magic Numbers/Strings
+```typescript
+// ✅ CORRECT - Guard clauses at the top
+function updateUser(userId: string, updates: UserUpdate): Promise<User> {
+  if (!userId) {
+    throw new Error('userId is required')
+  }
 
-```tsx
-// ✅ CORRECT - Named constants
-const MAX_FILE_SIZE_MB = 5
-const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024
-const PAGINATION_PAGE_SIZE = 20
-const TASK_STATUSES = ['pending', 'in_progress', 'completed'] as const
+  if (!updates || Object.keys(updates).length === 0) {
+    throw new Error('No updates provided')
+  }
 
-if (file.size > MAX_FILE_SIZE_BYTES) {
-  throw new Error(`File exceeds ${MAX_FILE_SIZE_MB}MB limit`)
+  if (updates.email && !isValidEmail(updates.email)) {
+    throw new Error('Invalid email format')
+  }
+
+  // Main logic - reader knows preconditions are met
+  return db.users.update({ where: { id: userId }, data: updates })
 }
 
-// ❌ WRONG - Magic numbers
-if (file.size > 5242880) { // What is this number?
-  throw new Error('File too large')
-}
-```
-
-### Use Destructuring Appropriately
-
-```tsx
-// ✅ CORRECT - Clear destructuring
-function TaskCard({ task, onComplete, onDelete }: TaskCardProps) {
-  const { id, title, status, dueDate } = task
-  // ...
-}
-
-// ✅ CORRECT - Rest spreading for forwarding props
-function Button({ children, className, ...props }: ButtonProps) {
-  return (
-    <button className={cn('btn', className)} {...props}>
-      {children}
-    </button>
-  )
-}
-
-// ❌ WRONG - Over-destructuring (loses context)
-function TaskCard({ task: { id, title, status, dueDate, assignee: { name } } }) {
-  // Deeply nested destructuring is hard to read
+// ❌ WRONG - Nested conditions
+function updateUser(userId: string, updates: UserUpdate): Promise<User> {
+  if (userId) {
+    if (updates && Object.keys(updates).length > 0) {
+      if (!updates.email || isValidEmail(updates.email)) {
+        return db.users.update({ where: { id: userId }, data: updates })
+      } else {
+        throw new Error('Invalid email format')
+      }
+    } else {
+      throw new Error('No updates provided')
+    }
+  } else {
+    throw new Error('userId is required')
+  }
 }
 ```
 
@@ -455,25 +462,29 @@ Before committing any code:
 ### TypeScript
 - [ ] Function signatures have explicit return types
 - [ ] No `any` types (use `unknown` + type guards)
-- [ ] Type assertions have justification comments
 - [ ] Object literals use `satisfies` where appropriate
+- [ ] Interfaces for objects, types for unions
 
 ### Naming
-- [ ] Component files are PascalCase
-- [ ] Utility files are kebab-case
-- [ ] Functions are camelCase and verb-first
-- [ ] Constants are SCREAMING_SNAKE_CASE
-- [ ] Booleans have is/has/should/can prefix
-- [ ] Event handlers have handle prefix
+- [ ] Components: PascalCase files and names
+- [ ] Utilities: kebab-case files
+- [ ] Functions: camelCase, verb-first
+- [ ] Constants: SCREAMING_SNAKE_CASE
+- [ ] Booleans: is/has/should prefix
+- [ ] Handlers: handle prefix
 
 ### Error Handling
-- [ ] No silent error swallowing (empty catch blocks)
-- [ ] Errors logged with context (function name, relevant data)
-- [ ] Server actions return typed results, don't throw
+- [ ] No silent `catch {}` blocks
+- [ ] Errors logged with context
+- [ ] Typed errors for specific failure modes
 
-### Structure
-- [ ] Imports organized by category
-- [ ] Functions under 50 lines
+### Imports
+- [ ] Organized in 5 sections (React → External → Internal → Relative → Types)
+- [ ] Type imports use `import type`
+- [ ] No circular dependencies
+
+### Functions
+- [ ] Under 50 lines
 - [ ] Max 4 levels of nesting
-- [ ] Early returns over nested conditionals
-- [ ] No magic numbers/strings
+- [ ] Single responsibility
+- [ ] Guard clauses at the top with early returns

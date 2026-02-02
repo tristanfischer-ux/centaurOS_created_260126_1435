@@ -1,504 +1,634 @@
 ---
 name: refactoring-audit
-description: Systematic workflow for auditing code hygiene and flagging areas needing refactoring. Use when the user asks to audit code, find messy code, code hygiene check, refactoring audit, technical debt scan, find smells, clean up code, or identify refactoring candidates.
+description: Systematic workflow for auditing code hygiene and flagging messy areas. Use when auditing code, checking code hygiene, finding messy code, doing a refactoring audit, hunting code smells, or when the user mentions technical debt, cleanup, or code quality assessment.
 ---
 
 # Refactoring Audit Skill
 
-This skill provides a systematic workflow for auditing code hygiene and identifying areas that need refactoring. It combines automated scans with manual review to produce an actionable prioritized report.
+This skill provides a systematic workflow for auditing code hygiene, identifying technical debt, and prioritizing refactoring efforts.
 
-## Trigger Phrases
+## When to Use This Skill
 
-Use this skill when you hear:
+**Trigger phrases:**
 - "audit code"
+- "check code hygiene"
 - "find messy code"
-- "code hygiene check"
 - "refactoring audit"
-- "technical debt scan"
-- "find code smells"
-- "what needs cleanup"
-- "identify refactoring candidates"
+- "code smell hunt"
+- "technical debt assessment"
+- "cleanup audit"
+- "code quality scan"
+
+## Audit Workflow Overview
+
+```
+Phase 1: Automated Scans → Phase 2: Manual Review → Phase 3: Prioritize → Report → Remediate
+```
 
 ---
 
 ## Phase 1: Automated Scans
 
-Run these commands to gather metrics. Each scan targets a specific code hygiene concern.
+Run these commands to gather objective metrics. All commands use ripgrep (`rg`) which is pre-installed.
 
-### 1.1 Functions Missing JSDoc
-
-Find exported functions without documentation:
+### 1.1 Missing Documentation
 
 ```bash
-# Find exported functions/const without JSDoc (no /** above them)
-rg -B 2 "^export (async )?(function|const) \w+" src/ --type ts --type tsx | rg -v "/\*\*" | rg "^export"
-
-# Count functions missing JSDoc per file
-rg -l "^export (async )?(function|const) \w+" src/ | while read f; do
-  total=$(rg -c "^export (async )?(function|const) \w+" "$f" 2>/dev/null || echo 0)
-  documented=$(rg -cB 1 "^export (async )?(function|const) \w+" "$f" 2>/dev/null | rg -c "/\*\*" || echo 0)
-  missing=$((total - documented))
-  [ $missing -gt 0 ] && echo "$f: $missing missing"
+# Find exported functions/classes without JSDoc (TypeScript/JavaScript)
+rg "^export (async )?(function|const|class) \w+" src/ -l | while read f; do
+  rg -B1 "^export (async )?(function|const|class)" "$f" | rg -v "/\*\*|^\-\-$" && echo "Missing JSDoc: $f"
 done
+
+# Quick count of exports vs documented exports
+echo "Total exports:"
+rg "^export (async )?(function|const|class) \w+" src/ -c | awk -F: '{sum += $2} END {print sum}'
+
+echo "Documented exports (with JSDoc):"
+rg -B1 "^export (async )?(function|const|class)" src/ | rg "/\*\*" -c
 ```
 
 ### 1.2 TypeScript Escape Hatches
 
-Find `@ts-nocheck`, `@ts-ignore`, and `@ts-expect-error` usage:
-
 ```bash
-# Find all TypeScript escape hatches
-rg "@ts-nocheck|@ts-ignore|@ts-expect-error" src/ --type ts --type tsx
+# Find @ts-nocheck usage (file-level type bypass)
+echo "=== @ts-nocheck files ==="
+rg "@ts-nocheck" src/ -l
 
-# Count by type
-echo "=== @ts-nocheck ===" && rg -c "@ts-nocheck" src/ 2>/dev/null || echo "0"
-echo "=== @ts-ignore ===" && rg -c "@ts-ignore" src/ --count-matches 2>/dev/null
-echo "=== @ts-expect-error ===" && rg -c "@ts-expect-error" src/ --count-matches 2>/dev/null
+# Find @ts-ignore/@ts-expect-error usage (line-level type bypass)
+echo "=== @ts-ignore/@ts-expect-error usage ==="
+rg "@ts-ignore|@ts-expect-error" src/ -c
+
+# Show context for each
+rg "@ts-ignore|@ts-expect-error" src/ -B2 -A1
 ```
 
 ### 1.3 `any` Type Usage
 
-Find explicit `any` types that weaken type safety:
-
 ```bash
-# Find all any type usages
-rg ": any|<any>|as any|\bany\b" src/ --type ts --type tsx
+# Count files with explicit 'any' type
+echo "=== Files using 'any' type ==="
+rg ": any\b|<any>|as any" src/ --type ts --type tsx -c | sort -t: -k2 -rn | head -20
 
-# Count any usages per file (sorted by count)
-rg -c ": any|as any" src/ --type ts --type tsx 2>/dev/null | sort -t: -k2 -rn | head -20
+# Total count
+echo "Total 'any' usages:"
+rg ": any\b|<any>|as any" src/ --type ts -c | awk -F: '{sum += $2} END {print sum}'
 
-# Find particularly bad patterns
-rg "Record<string, any>|Promise<any>|\[\]: any" src/
+# Show each usage with context
+rg ": any\b|<any>|as any" src/ -n --type ts | head -50
 ```
 
-### 1.4 Empty Catch Blocks (Silent Error Handling)
-
-Find catch blocks that swallow errors:
+### 1.4 Silent Error Handling
 
 ```bash
-# Find empty catch blocks
-rg "catch\s*\([^)]*\)\s*\{\s*\}" src/ --type ts --type tsx
+# Find empty catch blocks (swallowed errors)
+echo "=== Empty catch blocks ==="
+rg "catch\s*\([^)]*\)\s*\{\s*\}" src/ -n
 
-# Find catch blocks with only comments
-rg -U "catch\s*\([^)]*\)\s*\{\s*//.*\s*\}" src/ --multiline
+# Find catch blocks with only console.log (no rethrow or handling)
+echo "=== Catch blocks with only console.log ==="
+rg -U "catch\s*\([^)]*\)\s*\{[^}]*console\.(log|error)[^}]*\}" src/ -n --multiline
 
-# Find catch blocks that do nothing meaningful
-rg "\.catch\(\(\) => \{\}\)|\.catch\(\(\) => null\)|\.catch\(\(\) => undefined\)" src/
+# Find catches that don't use the error parameter
+echo "=== Catch blocks ignoring error ==="
+rg "catch\s*\(\s*_?\s*\)" src/ -n
 
-# Find try-catch with empty/minimal catch
-rg -U "catch.*\{[\s\n]*\}" src/ --multiline
+# Count all suspect error handling
+echo "Total suspect catches:"
+rg "catch\s*\([^)]*\)\s*\{\s*\}" src/ -c | awk -F: '{sum += $2} END {print sum}'
 ```
 
 ### 1.5 TODO/FIXME/HACK Comments
 
-Find technical debt markers:
-
 ```bash
-# Find all debt markers
-rg "TODO|FIXME|HACK|XXX|KLUDGE|TEMP|TEMPORARY" src/ --type ts --type tsx
+# Find all action comments by type
+echo "=== TODO comments ==="
+rg "// TODO|/\* TODO" src/ -c | sort -t: -k2 -rn
 
-# Count by type
-echo "=== TODOs ===" && rg -c "TODO" src/ --count-matches 2>/dev/null | awk -F: '{sum+=$2} END {print sum}'
-echo "=== FIXMEs ===" && rg -c "FIXME" src/ --count-matches 2>/dev/null | awk -F: '{sum+=$2} END {print sum}'
-echo "=== HACKs ===" && rg -c "HACK" src/ --count-matches 2>/dev/null | awk -F: '{sum+=$2} END {print sum}'
+echo "=== FIXME comments ==="
+rg "// FIXME|/\* FIXME" src/ -c | sort -t: -k2 -rn
 
-# Find old TODOs (with dates if present)
-rg "TODO.*20[0-2][0-9]|FIXME.*20[0-2][0-9]" src/
+echo "=== HACK comments ==="
+rg "// HACK|/\* HACK" src/ -c | sort -t: -k2 -rn
 
-# List files with most debt markers
-rg -c "TODO|FIXME|HACK" src/ --type ts --type tsx 2>/dev/null | sort -t: -k2 -rn | head -15
+# Show all with context
+echo "=== All action comments with context ==="
+rg "(TODO|FIXME|HACK|XXX|BUG):" src/ -n -A1
+
+# Summary counts
+echo "=== Summary ==="
+echo "TODOs: $(rg "TODO" src/ -c | awk -F: '{sum += $2} END {print sum}')"
+echo "FIXMEs: $(rg "FIXME" src/ -c | awk -F: '{sum += $2} END {print sum}')"
+echo "HACKs: $(rg "HACK" src/ -c | awk -F: '{sum += $2} END {print sum}')"
 ```
 
 ### 1.6 Long Functions (>50 lines)
 
-Find functions that are too long:
-
 ```bash
-# Count lines in each function (approximate)
-rg -n "^(export )?(async )?(function \w+|const \w+ = (\([^)]*\)|async \([^)]*\)) =>)" src/ --type tsx --type ts
+# Find functions longer than 50 lines (approximate via brace counting)
+# This script counts lines between function start and closing brace
+rg -n "^(export )?(async )?(function \w+|const \w+ = (async )?(function|\([^)]*\) =>))" src/ --type ts --type tsx | while read line; do
+  file=$(echo "$line" | cut -d: -f1)
+  linenum=$(echo "$line" | cut -d: -f2)
+  funcname=$(echo "$line" | cut -d: -f3-)
+  
+  # Count lines until matching brace (simplified)
+  remaining=$(tail -n +$linenum "$file" 2>/dev/null | head -100 | wc -l)
+  if [ "$remaining" -gt 50 ]; then
+    echo "LONG: $file:$linenum - $funcname (>${remaining} lines)"
+  fi
+done 2>/dev/null | head -20
 
-# Find large files (often contain long functions)
-find src/ -name "*.tsx" -o -name "*.ts" | xargs wc -l | sort -rn | head -20
-
-# Check component sizes
-find src/components -name "*.tsx" -exec wc -l {} + | sort -rn | head -15
-
-# Find functions with many lines between { and }
-rg -U "^(export )?(async )?function \w+[^{]*\{[\s\S]{2000,}?\n\}" src/ --multiline 2>/dev/null | head -30
+# Alternative: Find files with very long continuous code blocks
+echo "=== Files with 50+ line code blocks (potential long functions) ==="
+for f in $(find src -name "*.ts" -o -name "*.tsx" 2>/dev/null); do
+  lines=$(wc -l < "$f")
+  if [ "$lines" -gt 200 ]; then
+    echo "$f: $lines lines total"
+  fi
+done | sort -t: -k2 -rn | head -20
 ```
 
 ### 1.7 Deeply Nested Code
 
-Find code with excessive nesting:
-
 ```bash
-# Find deeply indented lines (proxy for nesting)
-rg "^(\t{4,}|    {4,})" src/ --type ts --type tsx | head -30
+# Find deeply nested code (4+ levels of indentation)
+echo "=== Deeply nested code (4+ levels) ==="
+rg "^(\t{4,}|[ ]{16,})\S" src/ -n | head -30
 
-# Find nested callbacks (callback hell)
-rg "=>\s*\{[\s\S]*=>\s*\{[\s\S]*=>\s*\{" src/ --multiline 2>/dev/null | head -20
+# Find nested ternaries (hard to read)
+echo "=== Nested ternary operators ==="
+rg "\?[^:]+\?[^:]+:" src/ -n | head -20
 
-# Find nested ternaries
-rg "\?.*\?.*\?.*:" src/ --type ts --type tsx
+# Find callback hell patterns
+echo "=== Potential callback hell (nested callbacks) ==="
+rg -U "\.then\([^)]*\{[^}]*\.then\(" src/ -n --multiline | head -20
 
-# Find files with high cyclomatic complexity indicators
-rg "if.*if.*if|else.*if.*else.*if" src/ --type ts --type tsx | head -20
+# Find deeply nested conditionals
+echo "=== Files with many if statements (potential complexity) ==="
+rg "^\s*if\s*\(" src/ --type ts -c | sort -t: -k2 -rn | head -10
 ```
 
-### 1.8 Additional Code Smells
+### 1.8 Console Statements (Debug Leftovers)
 
 ```bash
-# Magic numbers (numbers that should be constants)
-rg "[^a-zA-Z_]([0-9]{4,}|[0-9]+\.[0-9]+)[^a-zA-Z0-9]" src/ --type ts --type tsx | rg -v "test|spec|\.d\.ts" | head -20
+# Find console.log/debug statements (should be removed before commit)
+echo "=== Console statements ==="
+rg "console\.(log|debug|info|warn|error|trace)" src/ -c | sort -t: -k2 -rn | head -20
 
-# Console logs left in code
-rg "console\.(log|debug|info|warn|error)" src/ --type ts --type tsx | rg -v "lib/logger|utils/log" | head -20
+# Total count
+echo "Total console statements:"
+rg "console\.(log|debug|info|warn|error|trace)" src/ -c | awk -F: '{sum += $2} END {print sum}'
+```
 
-# Duplicate string literals (possible constants)
-rg -o '"[^"]{10,}"' src/ --type ts --type tsx | sort | uniq -c | sort -rn | head -15
+### 1.9 Duplicate Code Patterns
 
-# Functions with many parameters (>4)
-rg "function \w+\([^)]*,[^)]*,[^)]*,[^)]*,[^)]*\)|const \w+ = \([^)]*,[^)]*,[^)]*,[^)]*,[^)]*\)" src/
+```bash
+# Find similar import patterns (potential shared module candidates)
+echo "=== Most common imports (potential for barrel exports) ==="
+rg "^import .* from ['\"]@/lib/" src/ -o | sort | uniq -c | sort -rn | head -15
 
-# Large switch statements
-rg -c "case " src/ --type ts --type tsx | sort -t: -k2 -rn | head -10
+# Find repeated code blocks (exact matches)
+echo "=== Duplicate string literals ==="
+rg "\"[^\"]{30,}\"" src/ -o | sort | uniq -c | sort -rn | head -10
+```
 
-# Unused imports (basic check)
-npx eslint src/ --rule '@typescript-eslint/no-unused-vars: error' --format compact 2>/dev/null | head -30
+### 1.10 Quick Audit Summary Script
+
+```bash
+#!/bin/bash
+# Save as audit-summary.sh and run: bash audit-summary.sh
+
+echo "╔══════════════════════════════════════════════════════════════╗"
+echo "║               CODE HYGIENE AUDIT SUMMARY                      ║"
+echo "╚══════════════════════════════════════════════════════════════╝"
+echo ""
+
+echo "📝 DOCUMENTATION"
+echo "   Exports without JSDoc: $(rg "^export (async )?(function|const|class)" src/ -l 2>/dev/null | wc -l | tr -d ' ') files"
+echo ""
+
+echo "⚠️  TYPE SAFETY"
+echo "   @ts-nocheck files: $(rg "@ts-nocheck" src/ -l 2>/dev/null | wc -l | tr -d ' ')"
+echo "   @ts-ignore usages: $(rg "@ts-ignore|@ts-expect-error" src/ -c 2>/dev/null | awk -F: '{sum += $2} END {print sum+0}')"
+echo "   'any' type usages: $(rg ": any\b|<any>|as any" src/ -c 2>/dev/null | awk -F: '{sum += $2} END {print sum+0}')"
+echo ""
+
+echo "🚨 ERROR HANDLING"
+echo "   Empty catch blocks: $(rg "catch\s*\([^)]*\)\s*\{\s*\}" src/ -c 2>/dev/null | awk -F: '{sum += $2} END {print sum+0}')"
+echo ""
+
+echo "📌 ACTION COMMENTS"
+echo "   TODOs: $(rg "// TODO|/\* TODO" src/ -c 2>/dev/null | awk -F: '{sum += $2} END {print sum+0}')"
+echo "   FIXMEs: $(rg "// FIXME|/\* FIXME" src/ -c 2>/dev/null | awk -F: '{sum += $2} END {print sum+0}')"
+echo "   HACKs: $(rg "// HACK|/\* HACK" src/ -c 2>/dev/null | awk -F: '{sum += $2} END {print sum+0}')"
+echo ""
+
+echo "🔧 CODE SMELLS"
+echo "   Console statements: $(rg "console\.(log|debug)" src/ -c 2>/dev/null | awk -F: '{sum += $2} END {print sum+0}')"
+echo "   Deeply nested (4+): $(rg "^(\t{4,}|[ ]{16,})\S" src/ -c 2>/dev/null | awk -F: '{sum += $2} END {print sum+0}')"
+echo ""
+
+echo "═══════════════════════════════════════════════════════════════"
 ```
 
 ---
 
 ## Phase 2: Manual Review Checklist
 
-After running automated scans, manually review using this checklist. Each category has specific checks with "Flag If" criteria.
+After automated scans, manually review using this checklist:
 
-### Documentation
+| Category | Check | Flag If |
+|----------|-------|---------|
+| **Documentation** | Public APIs have JSDoc | Functions exported without description |
+| **Documentation** | Complex logic has comments | Non-obvious code without explanation |
+| **Documentation** | README reflects current state | README doesn't match actual behavior |
+| **Typing** | No `any` types without justification | `any` used for convenience, not necessity |
+| **Typing** | Generic types are constrained | `T` without `extends SomeType` |
+| **Typing** | Return types are explicit | Relying on inference for public APIs |
+| **Error Handling** | Errors are logged with context | `catch (e) { console.log(e) }` |
+| **Error Handling** | Errors propagate or recover | Silently swallowing errors |
+| **Error Handling** | User-facing errors are friendly | Stack traces shown to users |
+| **Complexity** | Functions have single responsibility | Function does multiple unrelated things |
+| **Complexity** | Cyclomatic complexity < 10 | Many branches/conditionals in one function |
+| **Complexity** | Nesting depth < 4 levels | Arrow code / deeply nested blocks |
+| **Duplication** | No copy-pasted code blocks | Same logic in multiple places |
+| **Duplication** | Shared utilities are extracted | Helper functions repeated |
+| **Duplication** | Types are not duplicated | Same interface defined multiple times |
+| **Naming** | Variables describe content | `data`, `temp`, `x`, `item` |
+| **Naming** | Functions describe action | `handle`, `process`, `do` without context |
+| **Naming** | No abbreviations without context | `usr`, `mgr`, `btn` in non-UI code |
+| **Security** | No hardcoded secrets | API keys, passwords in code |
+| **Security** | User input is validated | Direct use of req.body/params |
+| **Security** | SQL queries are parameterized | String concatenation in queries |
 
-| Check | What to Look For | Flag If |
-|-------|------------------|---------|
-| **JSDoc on exports** | All exported functions/types have JSDoc | >20% exports missing docs |
-| **README accuracy** | README reflects current architecture | README is stale or missing sections |
-| **Inline comments** | Complex logic has explanatory comments | Complex algorithms have no explanation |
-| **API documentation** | API routes have request/response docs | No API documentation exists |
-| **Type documentation** | Complex types have descriptions | Type aliases are unclear |
+### Manual Review Questions
 
-### Typing
+Ask these questions for each file/module:
 
-| Check | What to Look For | Flag If |
-|-------|------------------|---------|
-| **any usage** | Explicit `any` types | >10 `any` usages in codebase |
-| **Type assertions** | `as` casts | Frequent `as unknown as X` patterns |
-| **Type coverage** | All functions have return types | Functions missing return types |
-| **Generic constraints** | Generics are properly constrained | `T extends any` or unconstrained generics |
-| **Null handling** | Proper null/undefined handling | Missing optional chaining or nullish coalescing |
-
-### Error Handling
-
-| Check | What to Look For | Flag If |
-|-------|------------------|---------|
-| **Empty catches** | Catch blocks handle errors | Any empty catch blocks exist |
-| **Error types** | Typed error handling | `catch (e: any)` or `catch (e)` without type guard |
-| **User feedback** | Errors shown to users appropriately | Silent failures with no UI feedback |
-| **Error logging** | Errors logged for debugging | Errors caught but not logged |
-| **Error boundaries** | React error boundaries in place | Missing error boundaries for critical sections |
-
-### Complexity
-
-| Check | What to Look For | Flag If |
-|-------|------------------|---------|
-| **Function length** | Functions <50 lines | Any function >50 lines |
-| **Nesting depth** | Max 3 levels of nesting | >3 levels of indentation |
-| **Cyclomatic complexity** | Simple control flow | Functions with >10 branches |
-| **Component size** | Components <300 lines | Components >300 lines |
-| **File organization** | Single responsibility per file | Files with multiple unrelated exports |
-
-### Duplication
-
-| Check | What to Look For | Flag If |
-|-------|------------------|---------|
-| **Copy-paste code** | DRY principle followed | Same logic in multiple places |
-| **Similar components** | Components are composed/shared | Near-duplicate components |
-| **Repeated queries** | Database queries centralized | Same query in multiple files |
-| **Utility extraction** | Common patterns extracted | >3 occurrences of same pattern |
-| **Constants** | Magic values extracted | Same literal used multiple times |
-
-### Naming
-
-| Check | What to Look For | Flag If |
-|-------|------------------|---------|
-| **Descriptive names** | Names reveal intent | Single-letter or cryptic names |
-| **Consistent conventions** | camelCase/PascalCase followed | Mixed naming conventions |
-| **Boolean naming** | Booleans start with is/has/can/should | Unclear boolean names like `flag`, `check` |
-| **Function naming** | Verbs for actions, nouns for getters | Vague names like `process`, `handle`, `do` |
-| **File naming** | Consistent file naming pattern | Mix of kebab-case and camelCase files |
-
-### Security
-
-| Check | What to Look For | Flag If |
-|-------|------------------|---------|
-| **Input validation** | All inputs validated | Missing validation on user inputs |
-| **SQL injection** | Parameterized queries | String interpolation in queries |
-| **XSS prevention** | No dangerouslySetInnerHTML | Unescaped user content rendered |
-| **Auth checks** | All routes protected | Routes missing auth middleware |
-| **Secrets exposure** | No hardcoded secrets | Any credentials in code |
+1. **Would a new developer understand this code in 5 minutes?**
+2. **If this code broke at 3am, could someone fix it without you?**
+3. **Is the "why" documented, not just the "what"?**
+4. **Are edge cases handled or explicitly documented as unsupported?**
+5. **Would you be comfortable showing this code in an interview?**
 
 ---
 
 ## Phase 3: Prioritization Matrix
 
-Use this matrix to prioritize findings. Impact measures business/user effect, Effort measures fix complexity.
+After identifying issues, prioritize using this matrix:
 
 ```
-                    EFFORT
-                    Low         Medium      High
-            ┌───────────────┬───────────┬───────────┐
-    High    │ 🔴 DO FIRST   │ 🟠 PLAN   │ 🟡 PLAN   │
-            │               │ NEXT      │ CAREFULLY │
-I   ────────┼───────────────┼───────────┼───────────┤
-M   Medium  │ 🟢 QUICK WIN  │ 🔵 BATCH  │ 🟣 DEFER  │
-P           │               │ TOGETHER  │ OR SPLIT  │
-A   ────────┼───────────────┼───────────┼───────────┤
-C   Low     │ ⚪ IF TIME    │ 🔘 SKIP   │ ❌ DON'T  │
-T           │ PERMITS       │ FOR NOW   │ DO        │
-            └───────────────┴───────────┴───────────┘
+                     HIGH IMPACT
+                         │
+    ┌────────────────────┼────────────────────┐
+    │                    │                    │
+    │   QUICK WINS       │   MUST DO          │
+    │   Do these first   │   Plan & schedule  │
+    │                    │                    │
+LOW ├────────────────────┼────────────────────┤ HIGH
+EFFORT                   │                    EFFORT
+    │                    │                    │
+    │   IGNORE           │   CONSIDER         │
+    │   Not worth it     │   If time permits  │
+    │                    │                    │
+    └────────────────────┼────────────────────┘
+                         │
+                     LOW IMPACT
 ```
 
-### Recommended Actions by Quadrant
+### Classification Guide
 
-| Quadrant | Impact | Effort | Action |
-|----------|--------|--------|--------|
-| 🔴 **Do First** | High | Low | Fix immediately. These are high-value, easy wins. |
-| 🟠 **Plan Next** | High | Medium | Schedule for next sprint. Worth the investment. |
-| 🟡 **Plan Carefully** | High | High | Break into smaller tasks. May need architecture changes. |
-| 🟢 **Quick Win** | Medium | Low | Batch together. Fix during regular development. |
-| 🔵 **Batch Together** | Medium | Medium | Group similar fixes. Address in dedicated cleanup sprint. |
-| 🟣 **Defer or Split** | Medium | High | Consider if worth doing. Split if possible. |
-| ⚪ **If Time Permits** | Low | Low | Address opportunistically during related work. |
-| 🔘 **Skip for Now** | Low | Medium | Not worth prioritizing. May fix if already touching file. |
-| ❌ **Don't Do** | Low | High | Not worth the effort. Accept the tech debt. |
+| Quadrant | Impact | Effort | Action | Examples |
+|----------|--------|--------|--------|----------|
+| **Quick Wins** | High | Low | Do immediately | Remove console.logs, add missing return types, rename unclear variables |
+| **Must Do** | High | High | Plan sprints | Extract duplicate code to shared utils, refactor complex functions, add comprehensive tests |
+| **Consider** | Low | High | Backlog | Major architectural changes for minor improvements, rewriting working legacy code |
+| **Ignore** | Low | Low | Skip | Stylistic preferences, minor naming tweaks in stable code |
 
-### Impact Assessment Criteria
+### Impact Criteria
 
-| Impact Level | Criteria |
-|--------------|----------|
-| **High** | Affects user experience, causes bugs, security vulnerability, blocks features |
-| **Medium** | Slows development, makes code harder to understand, inconsistent behavior |
-| **Low** | Code style preference, minor inconsistency, theoretical concern |
+**High Impact:**
+- Security vulnerabilities
+- Production bugs waiting to happen
+- Blocks feature development
+- Significantly impacts maintainability
+- Affects multiple files/modules
 
-### Effort Assessment Criteria
+**Low Impact:**
+- Aesthetic/stylistic issues
+- Isolated to single file
+- Working correctly (just messy)
+- No security implications
 
-| Effort Level | Criteria |
-|--------------|----------|
-| **Low** | <30 minutes, single file, no testing changes needed |
-| **Medium** | 30min-2hrs, multiple files, may need test updates |
-| **High** | >2hrs, architectural change, significant test changes, risk of regression |
+### Effort Criteria
+
+**Low Effort (<30 min):**
+- Single file change
+- Automated fix available
+- No test updates needed
+- Clear solution
+
+**High Effort (>30 min):**
+- Multiple files affected
+- Requires new tests
+- Needs design decisions
+- Risk of regression
 
 ---
 
-## Phase 4: Report Generation
+## Output Format
 
-After completing Phases 1-3, generate a comprehensive report using this template.
+### Severity Levels
 
-### Report Template
+| Level | Symbol | Criteria | SLA |
+|-------|--------|----------|-----|
+| **Critical** | 🔴 | Security vulnerability, data loss risk, production breakage | Fix immediately |
+| **High** | 🟠 | Likely to cause bugs, significant tech debt, blocks features | Fix this sprint |
+| **Medium** | 🟡 | Code smell, maintainability concern, minor tech debt | Fix within quarter |
+| **Low** | 🟢 | Stylistic, minor improvement, nice-to-have | Opportunistic |
+
+### Audit Report Template
 
 ```markdown
-# Refactoring Audit Report
+# Code Hygiene Audit Report
 
-**Project:** [Project Name]
-**Audited:** [Date]
+**Date:** YYYY-MM-DD
 **Scope:** [Files/directories audited]
-**Auditor:** [Agent/Person]
-
----
+**Auditor:** [Name or "Automated"]
 
 ## Executive Summary
 
-**Overall Code Health:** [A/B/C/D/F]
+- **Critical Issues:** X
+- **High Issues:** X
+- **Medium Issues:** X
+- **Low Issues:** X
+- **Total Technical Debt Estimate:** X hours
 
-| Metric | Count | Status |
-|--------|-------|--------|
-| Files Scanned | X | - |
-| Functions Missing JSDoc | X | 🟡/🔴/🟢 |
-| TypeScript Escapes | X | 🟡/🔴/🟢 |
-| `any` Types | X | 🟡/🔴/🟢 |
-| Empty Catch Blocks | X | 🟡/🔴/🟢 |
-| TODO/FIXME/HACK | X | 🟡/🔴/🟢 |
-| Long Functions (>50 lines) | X | 🟡/🔴/🟢 |
-| Deep Nesting Issues | X | 🟡/🔴/🟢 |
+## Critical Issues 🔴
 
-**Health Score Thresholds:**
-- 🟢 Green: Within acceptable limits
-- 🟡 Yellow: Needs attention
-- 🔴 Red: Critical, fix soon
+### [CRIT-001] [Short Title]
+- **File:** `path/to/file.ts:123`
+- **Description:** [What's wrong]
+- **Impact:** [Why it matters]
+- **Fix:** [How to fix]
+- **Effort:** [Low/Medium/High]
+
+## High Issues 🟠
+
+### [HIGH-001] [Short Title]
+...
+
+## Medium Issues 🟡
+
+### [MED-001] [Short Title]
+...
+
+## Low Issues 🟢
+
+### [LOW-001] [Short Title]
+...
+
+## Metrics Summary
+
+| Metric | Count | Threshold | Status |
+|--------|-------|-----------|--------|
+| `any` types | X | <10 | ⚠️ |
+| Empty catches | X | 0 | ❌ |
+| TODOs | X | <20 | ✅ |
+| Console.logs | X | 0 | ⚠️ |
+
+## Recommended Actions
+
+1. **Immediate:** [Action items]
+2. **This Sprint:** [Action items]
+3. **Backlog:** [Action items]
+
+## Appendix
+
+[Raw command outputs, additional context]
+```
+
+### Issue Template (for filing individual issues)
+
+```markdown
+## [SEVERITY] [Category]: [Short description]
+
+**Location:** `file:line`
+**Detected by:** [Automated scan / Manual review]
+**Severity:** [Critical/High/Medium/Low]
+
+### Problem
+[Describe what's wrong]
+
+### Current Code
+\`\`\`typescript
+// problematic code here
+\`\`\`
+
+### Expected Code
+\`\`\`typescript
+// fixed code here
+\`\`\`
+
+### Impact
+[Why this matters, what could go wrong]
+
+### Fix Effort
+- [ ] Time estimate: X minutes/hours
+- [ ] Files affected: X
+- [ ] Tests needed: Yes/No
+- [ ] Risk level: Low/Medium/High
+
+### Related
+- Blocks: #XXX
+- Related to: #XXX
+```
 
 ---
 
-## Critical Issues (Must Fix)
+## Remediation Workflow
 
-Issues that should be fixed immediately due to high impact.
+### By Issue Type
 
-| # | Issue | Location | Impact | Effort | Priority |
-|---|-------|----------|--------|--------|----------|
-| 1 | [Description] | `file:line` | High | Low | 🔴 Do First |
-| 2 | [Description] | `file:line` | High | Medium | 🟠 Plan Next |
+#### Missing Documentation
 
-### Issue Details
+```bash
+# 1. Identify undocumented exports
+rg "^export (async )?(function|const)" src/lib/mymodule.ts
 
-#### 1. [Issue Title]
-
-**Location:** `src/path/file.tsx:42`
-**Problem:** [Detailed description]
-**Risk:** [What could go wrong]
-**Fix:** [How to fix it]
+# 2. Add JSDoc above each export
+```
 
 ```typescript
-// Before
-[problematic code]
+// BEFORE
+export function calculateTotal(items: Item[]): number {
+  return items.reduce((sum, item) => sum + item.price, 0);
+}
 
-// After
-[fixed code]
+// AFTER
+/**
+ * Calculates the total price of all items.
+ * @param items - Array of items with price property
+ * @returns Sum of all item prices
+ */
+export function calculateTotal(items: Item[]): number {
+  return items.reduce((sum, item) => sum + item.price, 0);
+}
 ```
 
----
+#### Removing `any` Types
 
-## Recommended Fixes (Should Fix)
+```typescript
+// BEFORE
+function processData(data: any): any {
+  return data.map((item: any) => item.value);
+}
 
-Medium-priority issues that improve code quality.
+// AFTER
+interface DataItem {
+  value: string;
+  // ... other properties
+}
 
-| # | Issue | Location | Impact | Effort | Priority |
-|---|-------|----------|--------|--------|----------|
-| 1 | [Description] | `file.tsx` | Medium | Low | 🟢 Quick Win |
-
----
-
-## Suggestions (Nice to Have)
-
-Low-priority improvements to consider.
-
-| # | Suggestion | Location | Notes |
-|---|------------|----------|-------|
-| 1 | [Description] | `file.tsx` | [Context] |
-
----
-
-## Technical Debt by Category
-
-| Category | Count | Severity | Estimated Effort |
-|----------|-------|----------|------------------|
-| Documentation | X issues | 🟡 Medium | ~Xh |
-| Typing | X issues | 🔴 High | ~Xh |
-| Error Handling | X issues | 🟡 Medium | ~Xh |
-| Complexity | X issues | 🔴 High | ~Xh |
-| Duplication | X issues | 🟡 Medium | ~Xh |
-| Naming | X issues | 🟢 Low | ~Xh |
-| Security | X issues | 🔴 Critical | ~Xh |
-
----
-
-## Files Needing Most Attention
-
-Ranked by number of issues found:
-
-| Rank | File | Issues | Categories |
-|------|------|--------|------------|
-| 1 | `src/path/file.tsx` | X | Typing, Complexity |
-| 2 | `src/path/other.ts` | X | Error Handling |
-
----
-
-## Recommended Action Plan
-
-### Immediate (This Sprint)
-1. [ ] [Action item]
-2. [ ] [Action item]
-
-### Short-term (Next 2-4 Sprints)
-1. [ ] [Action item]
-2. [ ] [Action item]
-
-### Long-term (Backlog)
-1. [ ] [Action item]
-
----
-
-## Effort Estimates
-
-| Priority | Issues | Estimated Total |
-|----------|--------|-----------------|
-| 🔴 Critical | X | ~Xh |
-| 🟠 High | X | ~Xh |
-| 🟢 Medium | X | ~Xh |
-| ⚪ Low | X | ~Xh |
-| **Total** | **X** | **~Xh** |
-
----
-
-## Appendix: Raw Scan Results
-
-<details>
-<summary>Click to expand full scan output</summary>
-
-### Any Type Usage
-[Paste rg output]
-
-### TODO/FIXME Comments
-[Paste rg output]
-
-### Empty Catch Blocks
-[Paste rg output]
-
-</details>
+function processData(data: DataItem[]): string[] {
+  return data.map((item) => item.value);
+}
 ```
 
----
+#### Fixing Silent Error Handling
 
-## Quick Audit Commands
+```typescript
+// BEFORE (silent failure)
+try {
+  await saveData(data);
+} catch (e) {
+  console.log(e);
+}
 
-Run these for a fast overview:
+// AFTER (proper error handling)
+try {
+  await saveData(data);
+} catch (error) {
+  console.error('Failed to save data:', { error, data });
+  throw new Error(`Save failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+}
+```
+
+#### Resolving TODOs
 
 ```bash
-# Quick health check - run all key scans
-echo "=== Code Hygiene Summary ===" && \
-echo "any types:" && rg -c ": any|as any" src/ 2>/dev/null | awk -F: '{sum+=$2} END {print sum}' && \
-echo "TODOs:" && rg -c "TODO|FIXME|HACK" src/ 2>/dev/null | awk -F: '{sum+=$2} END {print sum}' && \
-echo "empty catches:" && rg -c "catch.*\{\s*\}" src/ 2>/dev/null | awk -F: '{sum+=$2} END {print sum}' && \
-echo "ts-ignore:" && rg -c "@ts-ignore|@ts-nocheck" src/ 2>/dev/null | awk -F: '{sum+=$2} END {print sum}' && \
-echo "console.log:" && rg -c "console\.log" src/ 2>/dev/null | awk -F: '{sum+=$2} END {print sum}'
+# 1. List all TODOs with context
+rg "TODO:" src/ -A2
+
+# 2. For each TODO, decide:
+#    - Fix now (if simple)
+#    - Create issue (if complex)
+#    - Remove (if obsolete)
 ```
 
-```bash
-# Top 10 files needing attention
-(rg -c "any|TODO|FIXME|catch.*\{\}" src/ --type ts --type tsx 2>/dev/null || echo "") | sort -t: -k2 -rn | head -10
+#### Simplifying Long Functions
+
+```typescript
+// BEFORE (70+ line function)
+async function processOrder(order: Order) {
+  // validate
+  // calculate totals
+  // apply discounts
+  // check inventory
+  // reserve items
+  // process payment
+  // send confirmation
+  // update analytics
+}
+
+// AFTER (composed of focused functions)
+async function processOrder(order: Order) {
+  const validated = validateOrder(order);
+  const totals = calculateOrderTotals(validated);
+  const discounted = applyDiscounts(totals);
+  await reserveInventory(discounted);
+  const payment = await processPayment(discounted);
+  await sendConfirmation(order, payment);
+  trackOrderAnalytics(order);
+}
 ```
 
+#### Reducing Nesting
+
+```typescript
+// BEFORE (deeply nested)
+function processItem(item) {
+  if (item) {
+    if (item.isValid) {
+      if (item.hasPermission) {
+        if (item.isActive) {
+          return doWork(item);
+        }
+      }
+    }
+  }
+  return null;
+}
+
+// AFTER (early returns)
+function processItem(item) {
+  if (!item) return null;
+  if (!item.isValid) return null;
+  if (!item.hasPermission) return null;
+  if (!item.isActive) return null;
+  
+  return doWork(item);
+}
+```
+
+### PR Strategy
+
+| Issue Count | Strategy |
+|-------------|----------|
+| 1-3 issues | Single PR with clear commits per issue |
+| 4-10 issues | Group by file or category |
+| 10+ issues | Separate PRs by severity level |
+
+**PR Naming Convention:**
+```
+refactor(scope): [brief description]
+
+Examples:
+refactor(lib): add JSDoc to exported functions
+refactor(types): remove any types from order module
+refactor(errors): improve error handling in payment flow
+chore: resolve TODO comments in dashboard
+```
+
+**When to Create Separate PRs:**
+
+- **Always separate:** Security fixes, breaking changes
+- **Prefer separate:** Changes to different domains/modules
+- **Can combine:** Related fixes in same file, simple cleanup
+
+---
+
+## Quick Reference Commands
+
 ```bash
-# Audit specific directory
-TARGET_DIR="src/components"
-echo "=== Auditing $TARGET_DIR ===" && \
-echo "Files:" && find $TARGET_DIR -name "*.tsx" | wc -l && \
-echo "any types:" && rg -c ": any|as any" $TARGET_DIR 2>/dev/null | awk -F: '{sum+=$2} END {print sum}' && \
-echo "TODOs:" && rg -c "TODO|FIXME" $TARGET_DIR 2>/dev/null | awk -F: '{sum+=$2} END {print sum}'
+# Full audit (run all scans)
+bash audit-summary.sh
+
+# Check specific directory
+rg "@ts-ignore|any|TODO|FIXME" src/components/ -c
+
+# Find worst offenders (files with most issues)
+rg "any|TODO|console\.log" src/ -c | sort -t: -k2 -rn | head -10
+
+# Pre-commit quick check
+rg "console\.log|debugger" src/ && echo "❌ Debug code found" || echo "✅ No debug code"
 ```
 
 ---
 
-## Integration with Other Skills
+## Related Skills
 
-This skill works well with:
-
-- **code-quality**: Run after audit to fix lint/type issues
-- **comprehensive-code-review**: For deeper analysis of flagged files
-- **security-review**: When security issues are flagged
-- **bug-fix-workflow**: When audit reveals bugs
-
----
-
-## Audit Workflow Summary
-
-1. **Run Phase 1 scans** → Collect metrics
-2. **Review Phase 2 checklist** → Manual inspection
-3. **Apply Phase 3 matrix** → Prioritize findings
-4. **Generate Phase 4 report** → Actionable document
-5. **Create tasks** → Add high-priority items to backlog
-6. **Track progress** → Re-audit periodically
+- [code-quality](../code-quality/SKILL.md) - Run linters and type checks
+- [comprehensive-code-review](../comprehensive-code-review/SKILL.md) - Deep architectural review
+- [security-review](../security-review/SKILL.md) - Security-focused audit
+- [bug-fix-workflow](../bug-fix-workflow/SKILL.md) - Fix issues found during audit

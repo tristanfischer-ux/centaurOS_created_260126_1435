@@ -1,6 +1,6 @@
 ---
 name: comprehensive-code-review
-description: Deep code review analyzing architecture, security, performance, maintainability, and patterns. Use when reviewing code, analyzing files, assessing code quality, or when the user mentions code review, review this, analyze code, or check this code.
+description: Deep code review analyzing architecture, security, performance, maintainability, auditability, and patterns. Use when reviewing code, analyzing files, assessing code quality, or when the user mentions code review, review this, analyze code, or check this code.
 ---
 
 # Comprehensive Code Review
@@ -240,39 +240,47 @@ rg "expect\(.*\)\.toBeTruthy\(\)|expect\(.*\)\.toBeDefined\(\)" src/
 
 ### 6. Auditability Analysis
 
+This dimension evaluates whether the code can be understood by a third-party auditor.
+
 **What to check:**
-- JSDoc completeness on exports
-- Security annotation presence
-- Business logic explanation
-- Intent clarity (would a new developer understand why?)
-- Audit trail for sensitive operations
+- **JSDoc Coverage**: Are exported functions documented?
+- **Security Annotations**: Is auth/permission logic annotated?
+- **Business Logic Clarity**: Are non-obvious decisions explained?
+- **Intent vs Implementation**: Can an auditor understand WHY, not just WHAT?
 
 **Patterns to find:**
 
 ```bash
-# Exported functions without JSDoc
-rg "^export (async )?(function|const) \w+" src/ -A 1 | rg -B 1 "^export" | rg -v "/\*\*"
+# Check JSDoc coverage on exports
+rg "^export (async )?function" --type ts -l | wc -l
+rg "^\s*\*.*@param" --type ts -l | wc -l
 
-# Missing SECURITY annotations in auth/payment code
-rg -l "password|token|payment|stripe|auth" src/ | xargs rg -L "SECURITY:"
+# Check security annotations
+rg "// (SECURITY|AUTH|RLS):" --type ts -c
 
-# Type assertions without justification
-rg "as [A-Z]" src/ | rg -v "// "
+# Find undocumented exports
+rg -B 3 "^export (async )?function" src/ | rg -v "/\*\*|^\s*\*" | rg "^export"
 
-# Business logic without why comments
-rg -l "if.*&&|switch|\.filter\(|\.reduce\(" src/lib/ | xargs rg -L "why|because|reason"
-
-# Sensitive operations without audit logging
-rg "delete|update.*role|payment" src/actions/ | rg -v "audit|log"
+# Check for inline explanations
+rg "// (NOTE|REASON|WHY|BECAUSE):" src/ -c
 ```
 
 **Red flags:**
-- 🔴 Security-sensitive code with no annotations
-- 🔴 Complex business logic with no explanation
-- 🔴 Sensitive operations with no audit trail
-- 🟡 Exported functions missing JSDoc
-- 🟡 Type assertions without justification comments
-- 🟡 Code that requires tribal knowledge to understand
+- 🔴 No documentation on security-critical functions
+- 🔴 Complex business logic without explanation
+- 🟡 Missing JSDoc on exported functions
+- 🟡 Auth/permission checks without annotations
+- 🟡 Magic values without explaining why
+
+**Grading:**
+
+| Grade | Criteria |
+|-------|----------|
+| **A** | Comprehensive JSDoc, security annotations, business logic explained |
+| **B** | Most exports documented, security code annotated |
+| **C** | Some documentation, inconsistent annotation |
+| **D** | Minimal documentation, missing security annotations |
+| **F** | No documentation, intent unclear |
 
 ---
 
@@ -290,23 +298,13 @@ rg "delete|update.*role|payment" src/actions/ | rg -v "audit|log"
 
 ### Dimension Grades
 
-| Grade | Architecture | Security | Performance | Maintainability |
-|-------|-------------|----------|-------------|-----------------|
-| **A** | Clean separation, proper abstractions | No vulnerabilities, proper validation | Optimized queries, efficient renders | Clear, documented, consistent |
-| **B** | Minor coupling issues | Low-risk findings | Minor optimization opportunities | Some unclear areas |
-| **C** | Noticeable coupling | Medium-risk findings | Performance issues likely | Inconsistent patterns |
-| **D** | Significant architecture issues | High-risk vulnerabilities | Known performance problems | Hard to understand |
-| **F** | No clear architecture | Critical security flaws | Severe performance issues | Unmaintainable |
-
-### Auditability Grades
-
-| Grade | Criteria |
-|-------|----------|
-| **A** | All exports have JSDoc, security annotations present, business logic explained, clear intent, audit trails for sensitive ops |
-| **B** | Most exports documented, some security annotations, key logic explained, generally clear intent |
-| **C** | Partial documentation, missing security annotations in non-critical areas, some unexplained logic |
-| **D** | Minimal documentation, no security annotations, business logic unclear, tribal knowledge required |
-| **F** | No documentation, no annotations, intent completely unclear, no audit capability |
+| Grade | Architecture | Security | Performance | Maintainability | Auditability |
+|-------|-------------|----------|-------------|-----------------|--------------|
+| **A** | Clean separation, proper abstractions | No vulnerabilities, proper validation | Optimized queries, efficient renders | Clear, documented, consistent | Full JSDoc, security annotated, intent clear |
+| **B** | Minor coupling issues | Low-risk findings | Minor optimization opportunities | Some unclear areas | Most exports documented, security noted |
+| **C** | Noticeable coupling | Medium-risk findings | Performance issues likely | Inconsistent patterns | Partial docs, inconsistent annotations |
+| **D** | Significant architecture issues | High-risk vulnerabilities | Known performance problems | Hard to understand | Minimal docs, missing security notes |
+| **F** | No clear architecture | Critical security flaws | Severe performance issues | Unmaintainable | No docs, intent unclear |
 
 ---
 
