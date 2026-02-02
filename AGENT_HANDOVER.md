@@ -77,11 +77,7 @@ These pages were **incorrectly replaced with redirects**, losing functionality:
 - Note: Git log shows "feat: add Timeline view to Tasks page" - check if partially done
 
 ### Priority 3: Tasks Priority Section
-**Problem:** Prioritized "Focus" tasks from Today page are gone
-**Files to modify:** `src/app/(platform)/tasks/page.tsx`
-**Approach:**
-- Add "Today's Focus" card at top showing top 5 prioritized tasks
-- Reuse `src/components/DailyPrioritizer.tsx`
+**Status:** REMOVED - "Today's Focus" section has been removed from Tasks page per user request
 
 ### Priority 4: Inbox Activity Stream
 **Problem:** Activity stream from Today page is gone

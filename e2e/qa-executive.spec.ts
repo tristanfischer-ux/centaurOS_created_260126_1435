@@ -25,9 +25,6 @@ test.describe('Executive - Day in the Life', () => {
       // Verify greeting is visible
       await expect(page.getByText(/Good (morning|afternoon|evening)/)).toBeVisible({ timeout: 10000 })
       
-      // Verify main sections are visible
-      await expect(page.getByText("Today's Focus")).toBeVisible()
-      
       // Check for activity stream or similar content
       const pageContent = await page.content()
       expect(pageContent).toBeTruthy()

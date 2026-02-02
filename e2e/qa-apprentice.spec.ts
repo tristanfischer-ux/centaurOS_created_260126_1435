@@ -25,9 +25,6 @@ test.describe('Apprentice - Day in the Life', () => {
       // Verify greeting is visible
       await expect(page.getByText(/Good (morning|afternoon|evening)/)).toBeVisible({ timeout: 10000 })
       
-      // Verify main sections are visible
-      await expect(page.getByText("Today's Focus")).toBeVisible()
-      
       // Apprentice should NOT see pending approvals count in needs attention
       // (they can't approve tasks)
       

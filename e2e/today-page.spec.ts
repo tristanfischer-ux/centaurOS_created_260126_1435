@@ -20,12 +20,6 @@ test.describe('Today Page (Daily Focus)', () => {
     await expect(page.locator('text=morning briefing')).toBeVisible()
   })
 
-  test.skip('shows Today\'s Focus section', async ({ page }) => {
-    await page.goto('/today')
-    
-    // Check for Today's Focus section
-    await expect(page.locator('text=Today\'s Focus')).toBeVisible()
-  })
 
   test.skip('shows Decisions Pending section for executives', async ({ page }) => {
     await page.goto('/today')

@@ -22,9 +22,6 @@ test.describe('Founder - Day in the Life', () => {
       // Verify greeting is visible
       await expect(page.getByText(/Good (morning|afternoon|evening)/)).toBeVisible({ timeout: 10000 })
       
-      // Verify main sections are visible
-      await expect(page.getByText("Today's Focus")).toBeVisible()
-      
       // No console errors
       const errors: string[] = []
       page.on('console', msg => {

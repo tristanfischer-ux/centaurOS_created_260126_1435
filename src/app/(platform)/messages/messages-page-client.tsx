@@ -8,13 +8,10 @@ import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { UserAvatar } from '@/components/ui/user-avatar'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { ConversationThread } from '@/components/messaging/ConversationThread'
 import { QuickComposeDialog } from '@/components/messaging/QuickComposeDialog'
 import { NeedsAttentionSummary } from '@/components/today/needs-attention-summary'
 import { ActivityStream } from '@/components/today/activity-stream'
-import { StandupWidget } from '@/components/StandupWidget'
-import { DailyPulseWidget } from '@/components/reports/DailyPulseWidget'
 import { useConversationList } from '@/hooks/useConversation'
 import { typography } from '@/lib/design-system'
 import type { ConversationWithParticipants, ConversationType } from '@/lib/messaging/service'
@@ -29,10 +26,7 @@ import {
   Briefcase,
   Target,
   CheckSquare,
-  Activity,
-  ChevronDown,
-  ChevronUp,
-  BarChart3
+  Activity
 } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
 

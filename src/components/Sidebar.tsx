@@ -4,7 +4,7 @@ import React from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
-import { Users, CheckSquare, Store, Target, ShieldAlert, Settings, Map, Inbox } from "lucide-react"
+import { Users, CheckSquare, Store, Target, ShieldAlert, Settings, Map, Inbox, Sun } from "lucide-react"
 import { NotificationCenter } from "@/components/NotificationCenter"
 // ThemeToggle removed - CentaurOS enforces light mode per design philosophy
 import { FocusModeToggle } from "@/components/FocusModeToggle"
@@ -33,6 +33,7 @@ const APP_VERSION = "1.0.3"
 
 // Work: day-to-day operations
 const workNavigation = [
+    { name: "Today", href: "/today", icon: Sun, tooltip: "Your daily priorities, decisions, and focus tasks" },
     { name: "Inbox", href: "/messages", icon: Inbox, tooltip: "Messages, activity feed, and conversations" },
     { name: "Objectives", href: "/objectives", icon: Target, tooltip: "Set and track high-level strategic goals" },
     { name: "Tasks", href: "/tasks", icon: CheckSquare, tooltip: "Manage and assign actionable items" },

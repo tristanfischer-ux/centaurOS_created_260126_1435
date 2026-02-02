@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
-import { Users, CheckSquare, Store, Settings, Target, MoreHorizontal, Map, Inbox } from "lucide-react"
+import { Users, CheckSquare, Store, Settings, Target, MoreHorizontal, Map, Inbox, Sun } from "lucide-react"
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -22,17 +22,18 @@ function isRouteActive(pathname: string, href: string): boolean {
     return false
 }
 
-// Simplified navigation - 6 items total
+// Simplified navigation - 7 items total (5 main + 3 in More)
 // Primary nav items shown in bottom bar (Work items)
 const mainNavigation = [
+    { name: "Today", shortName: "Today", href: "/today", icon: Sun },
     { name: "Inbox", shortName: "Inbox", href: "/messages", icon: Inbox },
-    { name: "Objectives", shortName: "Goals", href: "/objectives", icon: Target },
     { name: "Tasks", shortName: "Tasks", href: "/tasks", icon: CheckSquare },
     { name: "Team", shortName: "Team", href: "/team", icon: Users },
 ]
 
-// Items in the "More" dropdown (Discovery + Settings)
+// Items in the "More" dropdown (Objectives + Discovery + Settings)
 const moreNavigation = [
+    { name: "Objectives", href: "/objectives", icon: Target },
     { name: "Product Map", href: "/blueprints", icon: Map },
     { name: "Marketplace", href: "/marketplace", icon: Store },
     { name: "Settings", href: "/settings", icon: Settings },

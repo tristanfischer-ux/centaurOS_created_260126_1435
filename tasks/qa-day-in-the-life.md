@@ -73,7 +73,6 @@ This script ensures core platform features remain functional for all user roles.
 #### Dashboard Load (`/today`)
 
 - [ ] Activity Stream section visible (left 2/3)
-- [ ] Today's Focus section visible (shows prioritized tasks)
 - [ ] Needs Attention summary visible
 - [ ] Pending approvals count shows (if any exist)
 - [ ] **Check**: No loading spinners stuck, no errors
@@ -192,7 +191,7 @@ Test each sidebar item loads without errors:
 
 #### Dashboard Load (`/today`)
 
-- [ ] All widgets visible (Activity Stream, Today's Focus, Needs Attention)
+- [ ] All widgets visible (Activity Stream, Needs Attention)
 - [ ] Pending approvals count shows (if any)
 - [ ] **Check**: Same experience as Executive
 
@@ -274,7 +273,6 @@ Test all admin subsections:
 #### Dashboard Load (`/today`)
 
 - [ ] Activity Stream visible
-- [ ] Today's Focus shows assigned tasks
 - [ ] Needs Attention shows overdue items
 - [ ] **Check**: Does NOT show "Pending approvals" count (Apprentice can't approve)
 
