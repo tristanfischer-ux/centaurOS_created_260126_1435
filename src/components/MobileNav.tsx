@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
-import { LayoutDashboard, Users, CheckSquare, Clock, Store, Settings, Target, HelpCircle, MoreHorizontal, MessageCircleQuestion, Sun, GraduationCap, Bookmark, MessageSquare } from "lucide-react"
+import { Users, CheckSquare, Store, Settings, Target, MoreHorizontal, Map, Inbox } from "lucide-react"
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -22,26 +22,19 @@ function isRouteActive(pathname: string, href: string): boolean {
     return false
 }
 
-// Primary nav items shown in bottom bar
-// On ultra-narrow screens (Galaxy Fold outer), we show 4 items + More
-// On regular mobile, we show 5 items + More
+// Simplified navigation - 6 items total
+// Primary nav items shown in bottom bar (Work items)
 const mainNavigation = [
-    { name: "Today", shortName: "Today", href: "/today", icon: Sun },
+    { name: "Inbox", shortName: "Inbox", href: "/messages", icon: Inbox },
     { name: "Objectives", shortName: "Goals", href: "/objectives", icon: Target },
     { name: "Tasks", shortName: "Tasks", href: "/tasks", icon: CheckSquare },
     { name: "Team", shortName: "Team", href: "/team", icon: Users },
-    { name: "Timeline", shortName: "Time", href: "/timeline", icon: Clock, hideOnFoldOuter: true },
 ]
 
-// Items in the "More" dropdown
+// Items in the "More" dropdown (Discovery + Settings)
 const moreNavigation = [
-    { name: "Messages", href: "/messages", icon: MessageSquare },
-    { name: "Timeline", href: "/timeline", icon: Clock, showOnFoldOuter: true },
-    { name: "Saved Resources", href: "/saved-resources", icon: Bookmark },
-    { name: "Advisory", href: "/advisory", icon: MessageCircleQuestion },
+    { name: "Product Map", href: "/blueprints", icon: Map },
     { name: "Marketplace", href: "/marketplace", icon: Store },
-    { name: "Talent", href: "/talent", icon: GraduationCap },
-    { name: "Help", href: "/help", icon: HelpCircle },
     { name: "Settings", href: "/settings", icon: Settings },
 ]
 
@@ -59,13 +52,10 @@ export function MobileNav() {
                             href={item.href}
                             className={cn(
                                 "flex flex-col items-center justify-center w-full min-h-[44px] min-w-[44px] h-full space-y-0.5 xs:space-y-1 touch-action-manipulation",
-                                isActive ? "text-international-orange" : "text-muted-foreground hover:text-foreground",
-                                // Hide Timeline on Galaxy Fold outer screen to give more space
-                                item.hideOnFoldOuter && "hidden xs:flex"
+                                isActive ? "text-international-orange" : "text-muted-foreground hover:text-foreground"
                             )}
                         >
                             <item.icon className={cn("h-5 w-5 shrink-0", isActive && "fill-current")} />
-                            {/* Use shorter names on ultra-narrow screens */}
                             <span className="text-[10px] xs:text-xs font-medium truncate max-w-[48px] xs:max-w-none">
                                 <span className="xs:hidden">{item.shortName}</span>
                                 <span className="hidden xs:inline">{item.name}</span>
@@ -91,14 +81,7 @@ export function MobileNav() {
                         {moreNavigation.map((item) => {
                             const isActive = isRouteActive(pathname, item.href)
                             return (
-                                <DropdownMenuItem 
-                                    key={item.name} 
-                                    asChild
-                                    className={cn(
-                                        // Only show Timeline in More menu on Galaxy Fold outer
-                                        item.showOnFoldOuter && "xs:hidden"
-                                    )}
-                                >
+                                <DropdownMenuItem key={item.name} asChild>
                                     <Link
                                         href={item.href}
                                         className={cn(

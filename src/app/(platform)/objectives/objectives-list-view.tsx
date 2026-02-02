@@ -22,6 +22,7 @@ import {
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { CreateTaskDialog } from "@/app/(platform)/tasks/create-task-dialog"
+import { EditTaskDialog } from "@/components/tasks/edit-task-dialog"
 import { getStatusBadgeClass } from "@/lib/status-colors"
 
 
@@ -29,9 +30,12 @@ import { getStatusBadgeClass } from "@/lib/status-colors"
 interface Task {
     id: string
     title: string
+    description: string | null
+    task_number: number | null
     status: string | null
     assignee_id: string | null
     end_date: string | null
+    foundry_id: string | null
     notesCount?: number
     attachmentCount?: number
     assignee?: {
@@ -77,6 +81,7 @@ export function ObjectivesListView({ objectives, objectivesForDialog, members, t
     const [showBulkDeleteDialog, setShowBulkDeleteDialog] = useState(false)
     const [isDeletingSingle, setIsDeletingSingle] = useState(false)
     const [isDeletingBulk, setIsDeletingBulk] = useState(false)
+    const [selectedTask, setSelectedTask] = useState<Task | null>(null)
 
     // Auto-refresh using Supabase Realtime
     useAutoRefresh({ tables: ['objectives', 'tasks'] })

@@ -50,10 +50,13 @@ export default async function ObjectivesPage() {
         .select(`
             id,
             title,
+            description,
+            task_number,
             status,
             assignee_id,
             end_date,
             objective_id,
+            foundry_id,
             assignee:profiles!tasks_assignee_id_fkey(full_name, role),
             task_comments(id, is_system_log),
             task_files(id, file_name, file_size, created_at)

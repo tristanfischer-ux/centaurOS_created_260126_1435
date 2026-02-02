@@ -1,13 +1,14 @@
-import { getSavedResources } from '@/actions/marketplace'
-import { SavedResourcesView } from './saved-resources-view'
+import { redirect } from "next/navigation"
 
-export const metadata = {
-    title: 'Saved Resources | CentaurOS',
-    description: 'View and manage your saved marketplace providers and tools',
-}
-
-export default async function SavedResourcesPage() {
-    const { data: savedResources, error } = await getSavedResources()
-
-    return <SavedResourcesView savedResources={savedResources} error={error} />
+/**
+ * Saved Resources page has been consolidated into Marketplace
+ * 
+ * @description Saved resources (your "stack") are now accessible 
+ * as a tab within the Marketplace.
+ * Navigate to Marketplace and select the "Saved" tab.
+ * 
+ * This redirect ensures old bookmarks and links continue to work.
+ */
+export default function SavedResourcesPage() {
+    redirect("/marketplace?tab=saved")
 }

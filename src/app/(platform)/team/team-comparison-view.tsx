@@ -141,6 +141,19 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
         return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase()
     }
 
+    // Helper: calculate bandwidth from task counts
+    // Uses same formula as routing-agent.ts: workloadScore = (active * 20) + (pending * 10)
+    const getBandwidth = (member: Member): { label: string; className: string; score: number } => {
+        const score = Math.min(100, (member.activeTasks * 20) + (member.pendingTasks * 10))
+        if (score <= 40) {
+            return { label: 'Has capacity', className: 'bg-status-success-light text-status-success-dark', score }
+        } else if (score <= 70) {
+            return { label: 'At capacity', className: 'bg-status-warning-light text-status-warning-dark', score }
+        } else {
+            return { label: 'Overloaded', className: 'bg-status-error-light text-status-error-dark', score }
+        }
+    }
+
     const toggleSelection = (id: string) => {
         const newSet = new Set(selectedIds)
         if (newSet.has(id)) {
@@ -538,7 +551,16 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
 
                     {/* Stats Row */}
                     <div className="flex items-center justify-between mt-3 ml-4">
-                        <div className="flex gap-3 text-xs">
+                        <div className="flex items-center gap-3 text-xs">
+                            {/* Bandwidth indicator */}
+                            {member.role !== 'AI_Agent' && (
+                                <span className={cn(
+                                    "px-1.5 py-0.5 rounded text-[10px] font-medium",
+                                    getBandwidth(member).className
+                                )}>
+                                    {getBandwidth(member).label}
+                                </span>
+                            )}
                             <span className="text-status-success font-medium">{member.completedTasks} done</span>
                             <span className="text-electric-blue font-medium">{member.activeTasks} active</span>
                             <span className="text-muted-foreground">{member.pendingTasks} pending</span>
@@ -833,7 +855,16 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                     )}
                 </td>
                 <td className="px-4 py-3 text-muted-foreground">
-                    <div className="flex flex-col gap-1 text-xs">
+                    <div className="flex flex-col gap-1.5 text-xs">
+                        {/* Bandwidth indicator */}
+                        {member.role !== 'AI_Agent' && (
+                            <span className={cn(
+                                "px-1.5 py-0.5 rounded text-[10px] font-medium w-fit",
+                                getBandwidth(member).className
+                            )}>
+                                {getBandwidth(member).label}
+                            </span>
+                        )}
                         <div className="flex gap-3">
                             <span className="text-status-success font-medium">{member.completedTasks} done</span>
                             <span className="text-electric-blue font-medium">{member.activeTasks} active</span>

@@ -4,7 +4,7 @@ import React from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
-import { LayoutDashboard, Users, CheckSquare, Clock, Store, Target, MessageCircleQuestion, ShieldAlert, FileText, Sun, Bookmark, Settings, HelpCircle, GraduationCap, ShoppingCart, Briefcase, Map, MessageSquare } from "lucide-react"
+import { Users, CheckSquare, Store, Target, ShieldAlert, Settings, Map, Inbox } from "lucide-react"
 import { NotificationCenter } from "@/components/NotificationCenter"
 // ThemeToggle removed - CentaurOS enforces light mode per design philosophy
 import { FocusModeToggle } from "@/components/FocusModeToggle"
@@ -31,30 +31,23 @@ function isRouteActive(pathname: string, href: string): boolean {
 // Keep in sync with package.json version
 const APP_VERSION = "1.0.3"
 
-// Navigation groups with spacers between them
-const coreNavigation = [
-    { name: "Today", href: "/today", icon: Sun, tooltip: "Your daily focus and briefing" },
-    { name: "Messages", href: "/messages", icon: MessageSquare, tooltip: "All conversations and activity" },
+// Simplified navigation - 6 items total
+// Work: day-to-day operations
+const workNavigation = [
+    { name: "Inbox", href: "/messages", icon: Inbox, tooltip: "Messages, activity feed, and conversations" },
     { name: "Objectives", href: "/objectives", icon: Target, tooltip: "Set and track high-level strategic goals" },
     { name: "Tasks", href: "/tasks", icon: CheckSquare, tooltip: "Manage and assign actionable items" },
-    { name: "Timeline", href: "/timeline", icon: Clock, tooltip: "Gantt chart view of all tasks" },
-    { name: "Team", href: "/team", icon: Users, tooltip: "Manage team members and roles" },
-    { name: "Saved Resources", href: "/saved-resources", icon: Bookmark, tooltip: "Your saved marketplace providers and tools" },
+    { name: "Team", href: "/team", icon: Users, tooltip: "Team members, roles, and capacity" },
 ]
 
-const communityNavigation = [
-    { name: "Marketplace", href: "/marketplace", icon: Store, tooltip: "Browse and compare service providers" },
-    { name: "RFQs", href: "/rfq", icon: FileText, tooltip: "Request quotes from suppliers or respond to opportunities" },
-    { name: "Talent", href: "/talent", icon: GraduationCap, tooltip: "Find apprentices and manage training programs" },
-    { name: "Advice", href: "/advisory", icon: MessageCircleQuestion, tooltip: "Ask questions and get expert guidance" },
+// Discovery: finding help and resources
+const discoveryNavigation = [
+    { name: "Product Map", href: "/blueprints", icon: Map, tooltip: "Map what you need to build, find knowledge gaps, get expert help" },
+    { name: "Marketplace", href: "/marketplace", icon: Store, tooltip: "Find experts, suppliers, products, and services" },
 ]
 
-const strategicNavigation = [
-    { name: "Blueprints", href: "/blueprints", icon: Map, tooltip: "Map knowledge domains, expertise, and supply chain" },
-]
-
-const supportNavigation = [
-    { name: "Help", href: "/help", icon: HelpCircle, tooltip: "Help center and documentation" },
+// Settings only - accessible but not prominent
+const settingsNavigation = [
     { name: "Settings", href: "/settings", icon: Settings, tooltip: "Account and app settings" },
 ]
 
@@ -145,26 +138,20 @@ export function Sidebar({ foundryName, foundryId, userName, userRole, isAdmin }:
 
                     return (
                         <>
-                            {/* Core Navigation: Dashboard, Objectives, Tasks, Timeline, Team */}
-                            {coreNavigation.map(renderNavItem)}
+                            {/* Work: Inbox, Objectives, Tasks, Team */}
+                            {workNavigation.map(renderNavItem)}
                             
                             {/* Spacer */}
                             <div className="my-3 border-t border-slate-100" />
                             
-                            {/* Community Navigation: Marketplace, Guild */}
-                            {communityNavigation.map(renderNavItem)}
+                            {/* Discovery: Product Map, Marketplace */}
+                            {discoveryNavigation.map(renderNavItem)}
                             
                             {/* Spacer */}
                             <div className="my-3 border-t border-slate-100" />
                             
-                            {/* Strategic Navigation: Org Blueprint, Advisory */}
-                            {strategicNavigation.map(renderNavItem)}
-                            
-                            {/* Spacer */}
-                            <div className="my-3 border-t border-slate-100" />
-                            
-                            {/* Support Navigation: Help, Settings */}
-                            {supportNavigation.map(renderNavItem)}
+                            {/* Settings */}
+                            {settingsNavigation.map(renderNavItem)}
                         </>
                     )
                 })()}

@@ -4,8 +4,8 @@ import { getBlueprints, getBlueprintTemplates } from '@/actions/blueprints'
 import { Skeleton } from '@/components/ui/skeleton'
 
 export const metadata = {
-  title: 'Blueprints | CentaurOS',
-  description: 'Map your knowledge domains, expertise, and supply chain',
+  title: 'Product Map | CentaurOS',
+  description: 'See everything you need to build your product. Find experts, source suppliers, and turn gaps into action.',
 }
 
 async function BlueprintsData() {

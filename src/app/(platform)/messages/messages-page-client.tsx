@@ -142,13 +142,13 @@ export function MessagesPageClient({ userId, foundryId, members = [] }: Messages
         <div className="min-w-0 flex-1">
           <div className={typography.pageHeader}>
             <div className={typography.pageHeaderAccent} />
-            <h1 className={typography.h1}>Messages</h1>
+            <h1 className={typography.h1}>Inbox</h1>
             {totalUnread > 0 && (
               <Badge className="ml-2 bg-international-orange">{totalUnread} unread</Badge>
             )}
           </div>
           <p className={typography.pageSubtitle}>
-            Communicate with your team, discuss tasks, and message experts
+            Messages, activity, and conversations with your team and experts
           </p>
         </div>
         {/* Hide button when dialog is open to prevent visual clutter/bleed-through */}

@@ -98,7 +98,7 @@ export function BlueprintsView({ blueprints, templates }: BlueprintsViewProps) {
         <div className="min-w-0 flex-1">
           <div className={typography.pageHeader}>
             <div className={typography.pageHeaderAccent} />
-            <h1 className={typography.h1}>Blueprints</h1>
+            <h1 className={typography.h1}>Product Map</h1>
           </div>
           <p className={typography.pageSubtitle}>
             See everything you need to build your product. Find experts, source suppliers, and turn gaps into action.
@@ -117,7 +117,7 @@ export function BlueprintsView({ blueprints, templates }: BlueprintsViewProps) {
             className="bg-international-orange hover:bg-international-orange/90"
           >
             <Plus className="mr-2 h-4 w-4" />
-            New Blueprint
+            New Product Map
           </Button>
         </div>
       </div>
@@ -235,11 +235,11 @@ export function BlueprintsView({ blueprints, templates }: BlueprintsViewProps) {
         </CardContent>
       </Card>
 
-      {/* WHY BLUEPRINTS MATTER - 3 Gradient Cards */}
+      {/* WHY PRODUCT MAPS MATTER - 3 Gradient Cards */}
       <section className="space-y-4">
         <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
           <Lightbulb className="h-5 w-5 text-international-orange" />
-          Why Blueprints Matter
+          Why Product Maps Matter
         </h2>
         <div className="grid gap-4 md:grid-cols-3">
           <Card className="bg-gradient-to-br from-orange-50 to-background border-orange-100">
@@ -299,7 +299,7 @@ export function BlueprintsView({ blueprints, templates }: BlueprintsViewProps) {
         <Card className="bg-muted/30">
           <CardContent className="pt-6">
             <p className="text-sm text-muted-foreground mb-6 text-center max-w-2xl mx-auto">
-              Blueprints are the central hub connecting your team, suppliers, advisors, and work. Everything flows together.
+              Product Maps are the central hub connecting your team, suppliers, advisors, and work. Everything flows together.
             </p>
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
               <IntegrationCard
@@ -385,7 +385,7 @@ export function BlueprintsView({ blueprints, templates }: BlueprintsViewProps) {
           </CardContent>
         </Card>
 
-        {/* Your Blueprints Card */}
+        {/* Your Product Maps Card */}
         <Card className="relative overflow-hidden group hover:shadow-lg transition-all hover:border-international-orange">
           <div className="absolute top-0 left-0 w-1 h-full bg-international-orange" />
           <CardHeader className="pb-2">
@@ -397,11 +397,11 @@ export function BlueprintsView({ blueprints, templates }: BlueprintsViewProps) {
                 {blueprints.length > 0 ? `${blueprints.length} Active` : 'Get Started'}
               </Badge>
             </div>
-            <CardTitle className="text-xl mt-4">Your Blueprints</CardTitle>
+            <CardTitle className="text-xl mt-4">Your Product Maps</CardTitle>
             <CardDescription className="text-sm">
               {blueprints.length > 0 
-                ? `You have ${blueprints.length} active blueprint${blueprints.length > 1 ? 's' : ''} with ${Math.round(blueprints.reduce((sum, b) => sum + b.coverage_score, 0) / blueprints.length)}% average coverage`
-                : 'Create your first blueprint to visualize your product'
+                ? `You have ${blueprints.length} active product map${blueprints.length > 1 ? 's' : ''} with ${Math.round(blueprints.reduce((sum, b) => sum + b.coverage_score, 0) / blueprints.length)}% average coverage`
+                : 'Create your first product map to visualize what you need'
               }
             </CardDescription>
           </CardHeader>
@@ -427,7 +427,7 @@ export function BlueprintsView({ blueprints, templates }: BlueprintsViewProps) {
             {blueprints.length > 0 ? (
               <Button asChild variant="default" className="w-full bg-international-orange hover:bg-international-orange/90">
                 <Link href={`/blueprints/${blueprints[0].id}`}>
-                  View Your Blueprints
+                  View Your Product Maps
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Link>
               </Button>
@@ -437,7 +437,7 @@ export function BlueprintsView({ blueprints, templates }: BlueprintsViewProps) {
                 variant="default" 
                 className="w-full bg-international-orange hover:bg-international-orange/90"
               >
-                Create Your First Blueprint
+                Create Your First Product Map
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
             )}
@@ -445,17 +445,17 @@ export function BlueprintsView({ blueprints, templates }: BlueprintsViewProps) {
         </Card>
       </section>
 
-      {/* Blueprint Grid/Stats - Only if user has blueprints */}
+      {/* Product Map Grid/Stats - Only if user has maps */}
       {blueprints.length > 0 && (
         <section className="space-y-4">
           <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
             <Map className="h-5 w-5 text-muted-foreground" />
-            Your Active Blueprints
+            Your Active Product Maps
           </h2>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
             <StatCard
               icon={Map}
-              label="Active Blueprints"
+              label="Active Maps"
               value={blueprints.length}
             />
             <StatCard
