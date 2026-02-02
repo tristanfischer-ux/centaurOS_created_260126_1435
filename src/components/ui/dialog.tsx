@@ -8,7 +8,7 @@ import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "@/lib/utils"
 
 const dialogContentVariants = cva(
-  "z-50 grid w-[calc(100vw-2rem)] max-h-[90dvh] gap-4 bg-background text-foreground p-6 shadow-2xl duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 border rounded-lg overflow-y-auto",
+  "z-50 grid w-[calc(100vw-2rem)] max-h-[90dvh] gap-4 bg-background text-foreground p-6 shadow-2xl duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 border rounded-lg overflow-y-auto antialiased [backface-visibility:hidden] transform-gpu",
   {
     variants: {
       size: {
