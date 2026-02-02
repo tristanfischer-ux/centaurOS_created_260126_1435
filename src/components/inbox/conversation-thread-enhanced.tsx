@@ -481,8 +481,8 @@ export function ConversationThreadEnhanced({
         </div>
       )}
 
-      {/* Messages area */}
-      <ScrollArea className="flex-1" ref={scrollRef}>
+      {/* Messages area - scrollable with flex-1 and min-h-0 for proper overflow */}
+      <ScrollArea className="flex-1 min-h-0" ref={scrollRef}>
         <div className="p-4 space-y-1">
           {/* Load more button */}
           {hasMore && (

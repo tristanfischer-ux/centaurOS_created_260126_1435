@@ -565,7 +565,7 @@ function TaskConversationView({
     <div className="flex flex-col h-full">
       {/* Task header */}
       {taskDetails && (
-        <div className="border-b border-border px-4 py-3 bg-muted/30">
+        <div className="border-b border-border px-4 py-3 bg-muted/30 flex-shrink-0">
           <div className="flex items-center gap-2">
             <CheckSquare className="h-4 w-4 text-muted-foreground" />
             <div className="flex-1">
@@ -578,8 +578,8 @@ function TaskConversationView({
         </div>
       )}
       
-      {/* Conversation */}
-      <div className="flex-1">
+      {/* Conversation - takes remaining space */}
+      <div className="flex-1 min-h-0">
         <ConversationThread
           conversationId={conversationId}
           currentUserId={currentUserId}

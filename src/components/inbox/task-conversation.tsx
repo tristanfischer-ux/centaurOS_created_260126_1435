@@ -568,8 +568,8 @@ export function TaskConversation({
         </div>
       )}
 
-      {/* Thread area */}
-      <ScrollArea className="flex-1">
+      {/* Thread area - scrollable with flex-1 and min-h-0 for proper overflow */}
+      <ScrollArea className="flex-1 min-h-0">
         <div className="p-4 space-y-4">
           {/* Empty state */}
           {thread.length === 0 && (
@@ -595,9 +595,9 @@ export function TaskConversation({
         </div>
       </ScrollArea>
 
-      {/* Participants section */}
+      {/* Participants section - fixed at bottom above input */}
       {participants.length > 0 && (
-        <div className="px-4 py-3 border-t border-border flex items-center gap-2">
+        <div className="px-4 py-3 border-t border-border flex items-center gap-2 flex-shrink-0">
           <span className="text-xs text-muted-foreground">Participants:</span>
           <div className="flex -space-x-2">
             {participants.slice(0, 5).map(participant => (
