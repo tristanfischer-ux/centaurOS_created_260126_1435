@@ -185,8 +185,7 @@ export function ForwardTaskDialog({
             </Button>
             <Button
               type="submit"
-              variant="default"
-              className="flex-1 bg-status-warning hover:bg-status-warning-dark"
+              className="flex-1 bg-international-orange hover:bg-international-orange-hover text-white"
             >
               Forward Task
             </Button>

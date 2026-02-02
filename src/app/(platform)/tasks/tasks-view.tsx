@@ -156,6 +156,11 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
     // Filter Presets
     const filterPresets = [
         {
+            id: 'all-tasks',
+            label: 'All Tasks',
+            filter: (task: Task) => true // Show all tasks
+        },
+        {
             id: 'my-tasks',
             label: 'My Tasks',
             filter: (task: Task) => task.assignee_id === currentUserId

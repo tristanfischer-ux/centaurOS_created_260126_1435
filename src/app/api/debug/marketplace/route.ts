@@ -1,5 +1,3 @@
-'use server'
-
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { getMarketplaceListings } from '@/actions/marketplace'

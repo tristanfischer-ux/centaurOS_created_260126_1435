@@ -13,6 +13,7 @@ const PUBLIC_ROUTES = [
     '/api/health',
     '/api/webhooks',
     '/api/marketplace/preview',
+    '/api/debug',  // Debug endpoints (temporary)
     '/access-revoked',  // Access revoked page for deactivated users
 ]
 
