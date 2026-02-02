@@ -37,30 +37,56 @@ CREATE INDEX IF NOT EXISTS idx_user_preferences_profile_foundry
 ALTER TABLE public.user_preferences ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policies: Users can only view/manage their own preferences
+DO $$
+BEGIN
+    -- Users can view their own preferences
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_policies 
+        WHERE tablename = 'user_preferences' 
+        AND policyname = 'Users can view own preferences'
+    ) THEN
+        CREATE POLICY "Users can view own preferences"
+            ON public.user_preferences
+            FOR SELECT
+            USING (profile_id = auth.uid());
+    END IF;
 
--- Users can view their own preferences
-CREATE POLICY "Users can view own preferences"
-    ON public.user_preferences
-    FOR SELECT
-    USING (profile_id = auth.uid());
+    -- Users can insert their own preferences
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_policies 
+        WHERE tablename = 'user_preferences' 
+        AND policyname = 'Users can create own preferences'
+    ) THEN
+        CREATE POLICY "Users can create own preferences"
+            ON public.user_preferences
+            FOR INSERT
+            WITH CHECK (profile_id = auth.uid());
+    END IF;
 
--- Users can insert their own preferences
-CREATE POLICY "Users can create own preferences"
-    ON public.user_preferences
-    FOR INSERT
-    WITH CHECK (profile_id = auth.uid());
+    -- Users can update their own preferences
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_policies 
+        WHERE tablename = 'user_preferences' 
+        AND policyname = 'Users can update own preferences'
+    ) THEN
+        CREATE POLICY "Users can update own preferences"
+            ON public.user_preferences
+            FOR UPDATE
+            USING (profile_id = auth.uid());
+    END IF;
 
--- Users can update their own preferences
-CREATE POLICY "Users can update own preferences"
-    ON public.user_preferences
-    FOR UPDATE
-    USING (profile_id = auth.uid());
-
--- Users can delete their own preferences
-CREATE POLICY "Users can delete own preferences"
-    ON public.user_preferences
-    FOR DELETE
-    USING (profile_id = auth.uid());
+    -- Users can delete their own preferences
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_policies 
+        WHERE tablename = 'user_preferences' 
+        AND policyname = 'Users can delete own preferences'
+    ) THEN
+        CREATE POLICY "Users can delete own preferences"
+            ON public.user_preferences
+            FOR DELETE
+            USING (profile_id = auth.uid());
+    END IF;
+END $$;
 
 -- Add comments for documentation
 COMMENT ON TABLE public.user_preferences IS 'Per-user, per-foundry preference storage for inbox and other UI settings';

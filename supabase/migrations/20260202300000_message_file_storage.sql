@@ -35,56 +35,74 @@ VALUES (
 )
 ON CONFLICT (id) DO NOTHING;
 
--- RLS Policy: Users can upload files to conversations they're part of
-CREATE POLICY "Users can upload files to their conversations"
-ON storage.objects
-FOR INSERT
-TO authenticated
-WITH CHECK (
-  bucket_id = 'message-files' AND
-  -- Check if user is participant in the conversation
-  -- Path format: messages/{conversation_id}/{filename}
-  EXISTS (
-    SELECT 1
-    FROM conversation_participants cp
-    WHERE cp.conversation_id = (
-      -- Extract conversation_id from path (messages/{uuid}/filename)
-      (string_to_array(name, '/'))[2]
-    )::uuid
-    AND cp.profile_id = auth.uid()
-  )
-);
+-- RLS Policies (idempotent)
+DO $$
+BEGIN
+    -- RLS Policy: Users can upload files to conversations they're part of
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_policies 
+        WHERE schemaname = 'storage' 
+        AND tablename = 'objects' 
+        AND policyname = 'Users can upload files to their conversations'
+    ) THEN
+        CREATE POLICY "Users can upload files to their conversations"
+        ON storage.objects
+        FOR INSERT
+        TO authenticated
+        WITH CHECK (
+          bucket_id = 'message-files' AND
+          -- Check if user is participant in the conversation
+          -- Path format: messages/{conversation_id}/{filename}
+          EXISTS (
+            SELECT 1
+            FROM conversation_participants cp
+            WHERE cp.conversation_id = (
+              -- Extract conversation_id from path (messages/{uuid}/filename)
+              (string_to_array(name, '/'))[2]
+            )::uuid
+            AND cp.profile_id = auth.uid()
+          )
+        );
+    END IF;
 
--- RLS Policy: Users can view files from conversations they're part of
-CREATE POLICY "Users can view files from their conversations"
-ON storage.objects
-FOR SELECT
-TO authenticated
-USING (
-  bucket_id = 'message-files' AND
-  EXISTS (
-    SELECT 1
-    FROM conversation_participants cp
-    WHERE cp.conversation_id = (
-      (string_to_array(name, '/'))[2]
-    )::uuid
-    AND cp.profile_id = auth.uid()
-  )
-);
+    -- RLS Policy: Users can view files from conversations they're part of
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_policies 
+        WHERE schemaname = 'storage' 
+        AND tablename = 'objects' 
+        AND policyname = 'Users can view files from their conversations'
+    ) THEN
+        CREATE POLICY "Users can view files from their conversations"
+        ON storage.objects
+        FOR SELECT
+        TO authenticated
+        USING (
+          bucket_id = 'message-files' AND
+          EXISTS (
+            SELECT 1
+            FROM conversation_participants cp
+            WHERE cp.conversation_id = (
+              (string_to_array(name, '/'))[2]
+            )::uuid
+            AND cp.profile_id = auth.uid()
+          )
+        );
+    END IF;
 
--- RLS Policy: Users can delete their own uploaded files
-CREATE POLICY "Users can delete their own files"
-ON storage.objects
-FOR DELETE
-TO authenticated
-USING (
-  bucket_id = 'message-files' AND
-  owner = auth.uid()
-);
-
-COMMENT ON POLICY "Users can upload files to their conversations" ON storage.objects IS 
-  'Allows users to upload files to conversations they participate in';
-COMMENT ON POLICY "Users can view files from their conversations" ON storage.objects IS 
-  'Allows users to view files from conversations they participate in';
-COMMENT ON POLICY "Users can delete their own files" ON storage.objects IS 
-  'Allows users to delete files they uploaded';
+    -- RLS Policy: Users can delete their own uploaded files
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_policies 
+        WHERE schemaname = 'storage' 
+        AND tablename = 'objects' 
+        AND policyname = 'Users can delete their own files'
+    ) THEN
+        CREATE POLICY "Users can delete their own files"
+        ON storage.objects
+        FOR DELETE
+        TO authenticated
+        USING (
+          bucket_id = 'message-files' AND
+          owner = auth.uid()
+        );
+    END IF;
+END $$;
