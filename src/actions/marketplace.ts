@@ -215,6 +215,7 @@ export interface MarketplaceListing {
     attributes: Record<string, any>
     image_url: string | null
     is_verified: boolean
+    created_by_provider_id: string | null
 }
 
 export async function getMarketplaceListings(category?: string) {

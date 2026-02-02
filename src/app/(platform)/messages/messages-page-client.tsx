@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useTransition } from 'react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -12,8 +12,10 @@ import { ConversationThread } from '@/components/messaging/ConversationThread'
 import { QuickComposeDialog } from '@/components/messaging/QuickComposeDialog'
 import { NeedsAttentionSummary } from '@/components/today/needs-attention-summary'
 import { ActivityStream } from '@/components/today/activity-stream'
+import { FullTaskView } from '@/components/tasks/full-task-view'
 import { useConversationList } from '@/hooks/useConversation'
 import { typography } from '@/lib/design-system'
+import { getTaskById } from '@/actions/tasks'
 import type { ConversationWithParticipants, ConversationType } from '@/lib/messaging/service'
 import type { ActivityItem } from '@/types/activity'
 import {
@@ -26,14 +28,17 @@ import {
   Briefcase,
   Target,
   CheckSquare,
-  Activity
+  Activity,
+  Loader2
 } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
+import { toast } from 'sonner'
 
 interface TeamMember {
   id: string
   full_name: string
   email: string
+  role: string
 }
 
 interface MessagesPageClientProps {
@@ -110,8 +115,35 @@ export function MessagesPageClient({
   const [searchQuery, setSearchQuery] = useState('')
   const [showCompose, setShowCompose] = useState(false)
   const [activeTab, setActiveTab] = useState<'conversations' | 'activity'>('conversations')
+  
+  // Task dialog state
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null)
+  const [selectedTask, setSelectedTask] = useState<any | null>(null)
+  const [isTaskLoading, setIsTaskLoading] = useTransition()
 
   const { conversations, isLoading, refresh } = useConversationList(userId)
+
+  // Handler to open task dialog
+  const handleTaskClick = useCallback((taskId: string) => {
+    setSelectedTaskId(taskId)
+    setIsTaskLoading(async () => {
+      const result = await getTaskById(taskId)
+      if (result.error) {
+        toast.error(result.error)
+        setSelectedTaskId(null)
+      } else if (result.data) {
+        setSelectedTask(result.data)
+      }
+    })
+  }, [])
+
+  // Handler to close task dialog
+  const handleTaskDialogClose = useCallback((open: boolean) => {
+    if (!open) {
+      setSelectedTaskId(null)
+      setSelectedTask(null)
+    }
+  }, [])
 
   // Filter by search
   const filteredConversations = searchQuery
@@ -345,6 +377,8 @@ export function MessagesPageClient({
               <ActivityStream 
                 initialItems={initialActivityItems} 
                 initialCounts={initialActivityCounts}
+                onTaskClick={handleTaskClick}
+                userRole={userRole}
               />
             </TabsContent>
           </Tabs>
@@ -360,6 +394,26 @@ export function MessagesPageClient({
           refresh()
         }}
       />
+
+      {/* Task view dialog */}
+      {selectedTaskId && (
+        isTaskLoading || !selectedTask ? (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+            <div className="bg-background rounded-lg p-8 flex items-center gap-3">
+              <Loader2 className="h-6 w-6 animate-spin text-primary" />
+              <span className="text-foreground">Loading task...</span>
+            </div>
+          </div>
+        ) : (
+          <FullTaskView
+            open={!!selectedTask}
+            onOpenChange={handleTaskDialogClose}
+            task={selectedTask}
+            members={members}
+            currentUserId={userId}
+          />
+        )
+      )}
     </div>
   )
 }

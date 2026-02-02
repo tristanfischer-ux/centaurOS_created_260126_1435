@@ -23,11 +23,11 @@ export default async function MessagesPage() {
     const userRole = profile?.role || undefined
 
     // Get team members for @mentions (from same foundry)
-    let members: { id: string; full_name: string; email: string }[] = []
+    let members: { id: string; full_name: string; email: string; role: string }[] = []
     if (foundryId) {
         const { data: teamMembers } = await supabase
             .from('profiles')
-            .select('id, full_name, email')
+            .select('id, full_name, email, role')
             .eq('foundry_id', foundryId)
             .neq('id', user.id)
             .limit(100)
@@ -35,7 +35,8 @@ export default async function MessagesPage() {
         members = teamMembers?.map(m => ({
             id: m.id,
             full_name: m.full_name || '',
-            email: m.email || ''
+            email: m.email || '',
+            role: m.role || 'Team Member'
         })) || []
     }
 

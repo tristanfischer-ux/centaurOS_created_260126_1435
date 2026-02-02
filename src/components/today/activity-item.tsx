@@ -2,30 +2,135 @@
 
 import { useState, useTransition } from 'react'
 import Link from 'next/link'
-import { formatDistanceToNow } from 'date-fns'
+import { formatDistanceToNow, format } from 'date-fns'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { UserAvatar } from '@/components/ui/user-avatar'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
+import {
+  HoverCard,
+  HoverCardContent,
+  HoverCardTrigger,
+} from '@/components/ui/hover-card'
 import { 
   CheckSquare, 
   Target, 
   MessageSquare, 
   Send, 
   ChevronRight,
-  Loader2
+  Loader2,
+  History,
+  ArrowRight,
+  User,
+  RefreshCw,
+  CheckCircle2,
+  Forward,
+  Plus,
+  Info
 } from 'lucide-react'
 import { replyToActivity, markActivityRead } from '@/actions/activity'
-import type { ActivityItem as ActivityItemType, ActivitySourceType } from '@/types/activity'
+import type { ActivityItem as ActivityItemType, ActivitySourceType, TaskHistoryActionType, TaskHistoryChanges } from '@/types/activity'
 
 interface ActivityItemProps {
   item: ActivityItemType
   onReply?: () => void
+  onTaskClick?: (taskId: string) => void
 }
 
-export function ActivityItem({ item, onReply }: ActivityItemProps) {
+// Helper to get action type display info
+function getActionTypeInfo(actionType: TaskHistoryActionType): { label: string; icon: typeof History; color: string } {
+  switch (actionType) {
+    case 'CREATED':
+      return { label: 'Created', icon: Plus, color: 'text-status-success' }
+    case 'COMPLETED':
+      return { label: 'Completed', icon: CheckCircle2, color: 'text-status-success' }
+    case 'STATUS_CHANGE':
+      return { label: 'Status Change', icon: RefreshCw, color: 'text-status-info' }
+    case 'ASSIGNED':
+      return { label: 'Assignment', icon: User, color: 'text-status-info' }
+    case 'FORWARDED':
+      return { label: 'Forwarded', icon: Forward, color: 'text-status-warning' }
+    case 'UPDATED':
+    default:
+      return { label: 'Updated', icon: History, color: 'text-muted-foreground' }
+  }
+}
+
+// Helper to format change details for display
+function formatChangeDetails(changes: TaskHistoryChanges | undefined): Array<{ field: string; before?: string; after?: string }> {
+  if (!changes) return []
+  
+  const details: Array<{ field: string; before?: string; after?: string }> = []
+  
+  // Status change
+  if (changes.status) {
+    details.push({
+      field: 'Status',
+      before: changes.status.old,
+      after: changes.status.new
+    })
+  }
+  
+  // Assignee change
+  if (changes.assignee) {
+    details.push({
+      field: 'Assignee',
+      before: changes.assignee.old || 'Unassigned',
+      after: changes.assignee.new || 'Unassigned'
+    })
+  }
+  
+  // New assignee (for ASSIGNED action)
+  if (changes.new_assignee && !changes.assignee) {
+    details.push({
+      field: 'Assigned to',
+      after: changes.new_assignee
+    })
+  }
+  
+  // Previous assignee (for reassignment)
+  if (changes.previous_assignee && !changes.assignee) {
+    details.push({
+      field: 'Previous assignee',
+      before: changes.previous_assignee
+    })
+  }
+  
+  // Reason (for forwarding, etc.)
+  if (changes.reason) {
+    details.push({
+      field: 'Reason',
+      after: changes.reason
+    })
+  }
+  
+  // Handle any other fields in the changes object
+  const handledKeys = ['status', 'assignee', 'new_assignee', 'previous_assignee', 'reason']
+  for (const [key, value] of Object.entries(changes)) {
+    if (handledKeys.includes(key)) continue
+    if (value === null || value === undefined) continue
+    
+    // Handle object values with old/new
+    if (typeof value === 'object' && value !== null && 'old' in value && 'new' in value) {
+      details.push({
+        field: key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+        before: String(value.old),
+        after: String(value.new)
+      })
+    } else if (typeof value === 'string' || typeof value === 'number') {
+      details.push({
+        field: key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+        after: String(value)
+      })
+    }
+  }
+  
+  return details
+}
+
+export function ActivityItem({ item, onReply, onTaskClick }: ActivityItemProps) {
   const [isReplying, setIsReplying] = useState(false)
   const [replyContent, setReplyContent] = useState('')
   const [isPending, startTransition] = useTransition()
@@ -130,14 +235,25 @@ export function ActivityItem({ item, onReply }: ActivityItemProps) {
                 {item.author.full_name || 'Unknown'}
               </span>
               <span className="text-muted-foreground text-xs">on</span>
-              <Link 
-                href={getSourceLink()}
-                className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
-              >
-                {getSourceIcon()}
-                <span className="font-medium">{getSourceLabel()}</span>
-                <ChevronRight className="h-3 w-3" />
-              </Link>
+              {item.source.type === 'task' && onTaskClick ? (
+                <button 
+                  onClick={() => onTaskClick(item.source.id)}
+                  className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  {getSourceIcon()}
+                  <span className="font-medium">{getSourceLabel()}</span>
+                  <ChevronRight className="h-3 w-3" />
+                </button>
+              ) : (
+                <Link 
+                  href={getSourceLink()}
+                  className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  {getSourceIcon()}
+                  <span className="font-medium">{getSourceLabel()}</span>
+                  <ChevronRight className="h-3 w-3" />
+                </Link>
+              )}
             </div>
             <p className="text-xs text-muted-foreground truncate mt-0.5">
               {item.source.title}
@@ -152,9 +268,92 @@ export function ActivityItem({ item, onReply }: ActivityItemProps) {
 
       {/* Content */}
       <div className="pl-11 space-y-3">
-        <p className="text-sm text-foreground whitespace-pre-wrap line-clamp-4">
-          {item.content}
-        </p>
+        {/* For task_history items, wrap in HoverCard to show details */}
+        {item.type === 'task_history' && item.action_type ? (
+          <HoverCard openDelay={200}>
+            <HoverCardTrigger asChild>
+              <div className="inline-flex items-center gap-2 cursor-help">
+                {(() => {
+                  const actionInfo = getActionTypeInfo(item.action_type!)
+                  const ActionIcon = actionInfo.icon
+                  return (
+                    <>
+                      <Badge variant="secondary" className="text-xs gap-1">
+                        <ActionIcon className={cn("h-3 w-3", actionInfo.color)} />
+                        {actionInfo.label}
+                      </Badge>
+                      <span className="text-sm text-foreground">
+                        {item.content}
+                      </span>
+                      <Info className="h-3.5 w-3.5 text-muted-foreground" />
+                    </>
+                  )
+                })()}
+              </div>
+            </HoverCardTrigger>
+            <HoverCardContent className="w-80" align="start">
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  {(() => {
+                    const actionInfo = getActionTypeInfo(item.action_type!)
+                    const ActionIcon = actionInfo.icon
+                    return (
+                      <>
+                        <ActionIcon className={cn("h-4 w-4", actionInfo.color)} />
+                        <span className="font-semibold text-sm">{actionInfo.label} Details</span>
+                      </>
+                    )
+                  })()}
+                </div>
+                
+                {/* Change details */}
+                {item.changes && formatChangeDetails(item.changes).length > 0 ? (
+                  <div className="space-y-2">
+                    {formatChangeDetails(item.changes).map((change, idx) => (
+                      <div key={idx} className="text-sm">
+                        <span className="text-muted-foreground">{change.field}:</span>
+                        {change.before && change.after ? (
+                          <div className="flex items-center gap-2 mt-0.5 pl-2">
+                            <span className="text-foreground bg-status-error-light px-1.5 py-0.5 rounded text-xs line-through">
+                              {change.before}
+                            </span>
+                            <ArrowRight className="h-3 w-3 text-muted-foreground" />
+                            <span className="text-foreground bg-status-success-light px-1.5 py-0.5 rounded text-xs">
+                              {change.after}
+                            </span>
+                          </div>
+                        ) : change.after ? (
+                          <span className="text-foreground ml-1">{change.after}</span>
+                        ) : change.before ? (
+                          <span className="text-muted-foreground ml-1 line-through">{change.before}</span>
+                        ) : null}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    No detailed changes recorded.
+                  </p>
+                )}
+                
+                {/* Metadata */}
+                <div className="pt-2 border-t text-xs text-muted-foreground space-y-1">
+                  <div className="flex items-center gap-2">
+                    <User className="h-3 w-3" />
+                    <span>Changed by {item.author.full_name || 'Unknown'}</span>
+                  </div>
+                  <div>
+                    {format(new Date(item.created_at), 'MMM d, yyyy \'at\' h:mm a')}
+                  </div>
+                </div>
+              </div>
+            </HoverCardContent>
+          </HoverCard>
+        ) : (
+          <p className="text-sm text-foreground whitespace-pre-wrap line-clamp-4">
+            {item.content}
+          </p>
+        )}
 
         {/* Reply Section */}
         {isReplying ? (

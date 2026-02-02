@@ -1663,3 +1663,56 @@ export async function deleteTasks(taskIds: string[]) {
 
     return { success: true, deletedCount, failedIds: [] }
 }
+
+/**
+ * Get a single task by ID with all related data needed for the full task view
+ */
+export async function getTaskById(taskId: string) {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return { error: 'Unauthorized' }
+
+    // Security: Verify user's foundry
+    const foundry_id = await getFoundryIdCached()
+    if (!foundry_id) return { error: 'User not in a foundry' }
+
+    // Validate taskId format (UUID)
+    if (!taskId || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(taskId)) {
+        return { error: 'Invalid task ID' }
+    }
+
+    const { data: task, error } = await supabase
+        .from('tasks')
+        .select(`
+            *,
+            assignee:profiles!assignee_id(id, full_name, role, email, avatar_url),
+            creator:profiles!creator_id(id, full_name, role),
+            objective:objectives!objective_id(id, title),
+            task_files(id, file_name, file_size, created_at),
+            task_assignees(profile:profiles(id, full_name, role, email, avatar_url))
+        `)
+        .eq('id', taskId)
+        .eq('foundry_id', foundry_id)
+        .single()
+
+    if (error) {
+        console.error('Error fetching task:', error)
+        return { error: sanitizeErrorMessage(error) }
+    }
+
+    if (!task) {
+        return { error: 'Task not found' }
+    }
+
+    // Transform the data to match the expected format
+    const taskWithData = {
+        ...task,
+        assignee: Array.isArray(task.assignee) ? task.assignee[0] : task.assignee,
+        creator: Array.isArray(task.creator) ? task.creator[0] : task.creator,
+        objective: Array.isArray(task.objective) ? task.objective[0] : task.objective,
+        assignees: task.task_assignees?.map((ta: { profile: unknown }) => ta.profile).filter(Boolean) || [],
+        task_files: task.task_files || []
+    }
+
+    return { data: taskWithData }
+}

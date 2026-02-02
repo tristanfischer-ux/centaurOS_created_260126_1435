@@ -8,6 +8,8 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { EmptyState } from '@/components/ui/empty-state'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Switch } from '@/components/ui/switch'
+import { Label } from '@/components/ui/label'
 import { ActivityItem } from './activity-item'
 import { getActivityFeed } from '@/actions/activity'
 import { 
@@ -16,6 +18,7 @@ import {
   Target, 
   MessageSquare, 
   Bell,
+  History,
   RefreshCw,
   Loader2
 } from 'lucide-react'
@@ -30,14 +33,21 @@ interface ActivityStreamProps {
     messages: number
     unread: number
   }
+  onTaskClick?: (taskId: string) => void
+  userRole?: string
 }
 
-export function ActivityStream({ initialItems, initialCounts }: ActivityStreamProps) {
+export function ActivityStream({ initialItems, initialCounts, onTaskClick, userRole }: ActivityStreamProps) {
   const router = useRouter()
   const [items, setItems] = useState<ActivityItemType[]>(initialItems)
   const [filter, setFilter] = useState<ActivityFilter>('all')
   const [isPending, startTransition] = useTransition()
   const [isRefreshing, setIsRefreshing] = useState(false)
+  const [showSystemEvents, setShowSystemEvents] = useState(false)
+  const [showAllTeamActivity, setShowAllTeamActivity] = useState(false)
+  
+  // Check if user can see all team activity
+  const canViewAllActivity = userRole === 'Executive' || userRole === 'Founder'
 
   // Calculate counts from items
   const counts = initialCounts || {
@@ -54,7 +64,43 @@ export function ActivityStream({ initialItems, initialCounts }: ActivityStreamPr
     startTransition(async () => {
       const result = await getActivityFeed({ 
         filter: newFilter as ActivityFilter,
-        limit: 30
+        limit: 30,
+        includeSystemLogs: showSystemEvents,
+        showAllFoundryActivity: showAllTeamActivity && canViewAllActivity
+      })
+      
+      if (result.success && result.data) {
+        setItems(result.data)
+      }
+    })
+  }
+
+  const handleSystemEventsToggle = (checked: boolean) => {
+    setShowSystemEvents(checked)
+    
+    startTransition(async () => {
+      const result = await getActivityFeed({ 
+        filter,
+        limit: 30,
+        includeSystemLogs: checked,
+        showAllFoundryActivity: showAllTeamActivity && canViewAllActivity
+      })
+      
+      if (result.success && result.data) {
+        setItems(result.data)
+      }
+    })
+  }
+
+  const handleAllTeamActivityToggle = (checked: boolean) => {
+    setShowAllTeamActivity(checked)
+    
+    startTransition(async () => {
+      const result = await getActivityFeed({ 
+        filter,
+        limit: 30,
+        includeSystemLogs: showSystemEvents,
+        showAllFoundryActivity: checked && canViewAllActivity
       })
       
       if (result.success && result.data) {
@@ -69,7 +115,9 @@ export function ActivityStream({ initialItems, initialCounts }: ActivityStreamPr
     startTransition(async () => {
       const result = await getActivityFeed({ 
         filter,
-        limit: 30
+        limit: 30,
+        includeSystemLogs: showSystemEvents,
+        showAllFoundryActivity: showAllTeamActivity && canViewAllActivity
       })
       
       if (result.success && result.data) {
@@ -79,7 +127,7 @@ export function ActivityStream({ initialItems, initialCounts }: ActivityStreamPr
       setIsRefreshing(false)
       router.refresh()
     })
-  }, [filter, router])
+  }, [filter, router, showSystemEvents, showAllTeamActivity, canViewAllActivity])
 
   const handleReply = useCallback(() => {
     // Refresh the feed after a reply
@@ -116,7 +164,7 @@ export function ActivityStream({ initialItems, initialCounts }: ActivityStreamPr
 
         {/* Filter Tabs */}
         <Tabs value={filter} onValueChange={handleFilterChange}>
-          <TabsList className="w-full grid grid-cols-5">
+          <TabsList className="w-full grid grid-cols-6">
             <TabsTrigger value="all" className="text-xs">
               All
               {counts.all > 0 && (
@@ -135,6 +183,10 @@ export function ActivityStream({ initialItems, initialCounts }: ActivityStreamPr
               <MessageSquare className="h-3 w-3 mr-1" />
               DMs
             </TabsTrigger>
+            <TabsTrigger value="changes" className="text-xs">
+              <History className="h-3 w-3 mr-1" />
+              Changes
+            </TabsTrigger>
             <TabsTrigger value="unread" className="text-xs">
               <Bell className="h-3 w-3 mr-1" />
               Unread
@@ -146,6 +198,42 @@ export function ActivityStream({ initialItems, initialCounts }: ActivityStreamPr
             </TabsTrigger>
           </TabsList>
         </Tabs>
+
+        {/* Toggle Options */}
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 pt-1">
+          <div className="flex items-center gap-2">
+            <Switch
+              id="system-events"
+              checked={showSystemEvents}
+              onCheckedChange={handleSystemEventsToggle}
+              className="h-4 w-7 data-[state=checked]:bg-international-orange"
+            />
+            <Label 
+              htmlFor="system-events" 
+              className="text-xs text-muted-foreground cursor-pointer"
+            >
+              Show system events
+            </Label>
+          </div>
+          
+          {/* All Team Activity Toggle - Only for Executive/Founder */}
+          {canViewAllActivity && (
+            <div className="flex items-center gap-2">
+              <Switch
+                id="all-team-activity"
+                checked={showAllTeamActivity}
+                onCheckedChange={handleAllTeamActivityToggle}
+                className="h-4 w-7 data-[state=checked]:bg-electric-blue"
+              />
+              <Label 
+                htmlFor="all-team-activity" 
+                className="text-xs text-muted-foreground cursor-pointer"
+              >
+                Show all team activity
+              </Label>
+            </div>
+          )}
+        </div>
       </CardHeader>
 
       <CardContent className="flex-1 overflow-auto space-y-3 pt-0">
@@ -170,6 +258,7 @@ export function ActivityStream({ initialItems, initialCounts }: ActivityStreamPr
                 key={`${item.type}-${item.id}`} 
                 item={item} 
                 onReply={handleReply}
+                onTaskClick={onTaskClick}
               />
             ))}
 

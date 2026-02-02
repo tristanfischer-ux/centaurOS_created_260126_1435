@@ -17,7 +17,10 @@ import type {
   ActivitySourceType,
   RawTaskComment, 
   RawObjectiveComment, 
-  RawMessage 
+  RawMessage,
+  RawTaskHistory,
+  TaskHistoryActionType,
+  TaskHistoryChanges
 } from '@/types/activity'
 
 // Note: The following tables are created by migration 20260201300000_activity_stream_tables.sql
@@ -27,6 +30,50 @@ import type {
 // - objective_comment_reads
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnySupabaseClient = any
+
+/**
+ * Format task history action into human-readable content
+ */
+function formatTaskHistoryContent(
+  actionType: TaskHistoryActionType, 
+  changes: TaskHistoryChanges | null,
+  assigneeName?: string | null
+): string {
+  switch (actionType) {
+    case 'CREATED':
+      return 'created this task'
+    case 'COMPLETED':
+      return 'marked task as completed'
+    case 'STATUS_CHANGE': {
+      const statusChange = changes?.status
+      if (statusChange) {
+        return `changed status from "${statusChange.old}" to "${statusChange.new}"`
+      }
+      return 'changed task status'
+    }
+    case 'ASSIGNED': {
+      if (assigneeName) {
+        return `assigned task to ${assigneeName}`
+      }
+      const newAssignee = changes?.new_assignee || changes?.assignee?.new
+      if (newAssignee) {
+        return 'assigned task to someone'
+      }
+      return 'updated task assignment'
+    }
+    case 'FORWARDED': {
+      const reason = changes?.reason
+      if (reason) {
+        return `forwarded task: "${reason}"`
+      }
+      return 'forwarded task to another person'
+    }
+    case 'UPDATED':
+      return 'updated task details'
+    default:
+      return 'made changes to task'
+  }
+}
 
 /**
  * Reply to an activity item - routes to the appropriate source
@@ -494,7 +541,9 @@ export async function addObjectiveComment(
 export async function getActivityFeed(options?: {
   limit?: number
   offset?: number
-  filter?: 'all' | 'tasks' | 'objectives' | 'messages' | 'unread'
+  filter?: 'all' | 'tasks' | 'objectives' | 'messages' | 'unread' | 'changes'
+  includeSystemLogs?: boolean
+  showAllFoundryActivity?: boolean
 }): Promise<{
   success: boolean
   data?: ActivityItem[]
@@ -515,33 +564,73 @@ export async function getActivityFeed(options?: {
 
     const limit = options?.limit || 30
     const filter = options?.filter || 'all'
+    const includeSystemLogs = options?.includeSystemLogs || false
+    const showAllFoundryActivity = options?.showAllFoundryActivity || false
 
-    // Get user's task IDs
-    const { data: myTasks } = await supabase
-      .from('tasks')
-      .select('id')
-      .eq('foundry_id', foundryId)
-      .or(`assignee_id.eq.${user.id},creator_id.eq.${user.id}`)
+    // Server-side role check for showAllFoundryActivity
+    let canViewAllActivity = false
+    if (showAllFoundryActivity) {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .single()
+      
+      canViewAllActivity = profile?.role === 'Executive' || profile?.role === 'Founder'
+    }
 
-    const myTaskIds = myTasks?.map(t => t.id) || []
+    // Get task IDs based on access level
+    let allTaskIds: string[] = []
+    
+    if (canViewAllActivity) {
+      // Executive/Founder can see ALL foundry tasks
+      const { data: allTasks } = await supabase
+        .from('tasks')
+        .select('id')
+        .eq('foundry_id', foundryId)
+      
+      allTaskIds = allTasks?.map(t => t.id) || []
+    } else {
+      // Regular users only see their own tasks
+      const { data: myTasks } = await supabase
+        .from('tasks')
+        .select('id')
+        .eq('foundry_id', foundryId)
+        .or(`assignee_id.eq.${user.id},creator_id.eq.${user.id}`)
 
-    // Get tasks from task_assignees table
-    const { data: additionalTasks } = await supabase
-      .from('task_assignees')
-      .select('task_id')
-      .eq('profile_id', user.id)
+      const myTaskIds = myTasks?.map(t => t.id) || []
 
-    const additionalTaskIds = additionalTasks?.map(t => t.task_id) || []
-    const allTaskIds = [...new Set([...myTaskIds, ...additionalTaskIds])]
+      // Get tasks from task_assignees table
+      const { data: additionalTasks } = await supabase
+        .from('task_assignees')
+        .select('task_id')
+        .eq('profile_id', user.id)
 
-    // Get user's objective IDs - cast to avoid type recursion
-    const { data: myObjectives } = await (supabase as AnySupabaseClient)
-      .from('objectives')
-      .select('id')
-      .eq('foundry_id', foundryId)
-      .eq('owner_id', user.id) as { data: Array<{ id: string }> | null }
+      const additionalTaskIds = additionalTasks?.map(t => t.task_id) || []
+      allTaskIds = [...new Set([...myTaskIds, ...additionalTaskIds])]
+    }
 
-    const myObjectiveIds = myObjectives?.map(o => o.id) || []
+    // Get objective IDs based on access level
+    let myObjectiveIds: string[] = []
+    
+    if (canViewAllActivity) {
+      // Executive/Founder can see ALL foundry objectives
+      const { data: allObjectives } = await (supabase as AnySupabaseClient)
+        .from('objectives')
+        .select('id')
+        .eq('foundry_id', foundryId) as { data: Array<{ id: string }> | null }
+      
+      myObjectiveIds = allObjectives?.map(o => o.id) || []
+    } else {
+      // Regular users only see their own objectives
+      const { data: myObjectives } = await (supabase as AnySupabaseClient)
+        .from('objectives')
+        .select('id')
+        .eq('foundry_id', foundryId)
+        .eq('owner_id', user.id) as { data: Array<{ id: string }> | null }
+
+      myObjectiveIds = myObjectives?.map(o => o.id) || []
+    }
 
     // Get user's conversation IDs
     const { data: myConversations } = await (supabase as AnySupabaseClient)
@@ -558,18 +647,24 @@ export async function getActivityFeed(options?: {
 
     // Fetch task comments
     if ((filter === 'all' || filter === 'tasks' || filter === 'unread') && allTaskIds.length > 0) {
-      const { data: taskComments } = await supabase
+      let taskCommentsQuery = supabase
         .from('task_comments')
         .select(`
-          id, content, created_at,
+          id, content, created_at, is_system_log,
           user:profiles!user_id(id, full_name, avatar_url, role),
           task:tasks!task_id(id, title, task_number)
         `)
         .in('task_id', allTaskIds)
-        .eq('is_system_log', false)
         .neq('user_id', user.id)
         .order('created_at', { ascending: false })
         .limit(limit)
+      
+      // Only filter out system logs if not including them
+      if (!includeSystemLogs) {
+        taskCommentsQuery = taskCommentsQuery.eq('is_system_log', false)
+      }
+      
+      const { data: taskComments } = await taskCommentsQuery
 
       // Get read status for task comments (table created by migration)
       const taskCommentIds = taskComments?.map(c => c.id) || []
@@ -611,20 +706,90 @@ export async function getActivityFeed(options?: {
       }
     }
 
+    // Fetch task history events
+    if ((filter === 'all' || filter === 'tasks' || filter === 'changes') && allTaskIds.length > 0) {
+      const { data: taskHistory } = await (supabase as AnySupabaseClient)
+        .from('task_history')
+        .select(`
+          id, task_id, user_id, action_type, changes, created_at,
+          user:profiles!user_id(id, full_name, avatar_url, role),
+          task:tasks!task_id(id, title, task_number)
+        `)
+        .in('task_id', allTaskIds)
+        .neq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(limit)
+
+      if (taskHistory) {
+        for (const history of taskHistory as RawTaskHistory[]) {
+          if (!history.user || !history.task) continue
+
+          // Get assignee name if this is an assignment action
+          let assigneeName: string | null = null
+          if (history.action_type === 'ASSIGNED') {
+            const newAssigneeId = history.changes?.new_assignee || history.changes?.assignee?.new
+            if (newAssigneeId) {
+              const { data: assignee } = await supabase
+                .from('profiles')
+                .select('full_name')
+                .eq('id', newAssigneeId)
+                .single()
+              assigneeName = assignee?.full_name || null
+            }
+          }
+
+          const content = formatTaskHistoryContent(
+            history.action_type,
+            history.changes,
+            assigneeName
+          )
+
+          items.push({
+            id: history.id,
+            type: 'task_history',
+            content,
+            created_at: history.created_at || new Date().toISOString(),
+            author: {
+              id: history.user.id,
+              full_name: history.user.full_name,
+              avatar_url: history.user.avatar_url,
+              role: history.user.role
+            },
+            source: {
+              type: 'task',
+              id: history.task.id,
+              title: history.task.title,
+              task_number: history.task.task_number
+            },
+            is_unread: true, // Task history items are always considered unread
+            // Include raw data for hover details
+            action_type: history.action_type,
+            changes: history.changes || undefined
+          })
+        }
+      }
+    }
+
     // Fetch objective comments (table created by migration)
     if ((filter === 'all' || filter === 'objectives' || filter === 'unread') && myObjectiveIds.length > 0) {
-      const { data: objectiveComments } = await (supabase as AnySupabaseClient)
+      let objectiveCommentsQuery = (supabase as AnySupabaseClient)
         .from('objective_comments')
         .select(`
-          id, content, created_at,
+          id, content, created_at, is_system_log,
           user:profiles!user_id(id, full_name, avatar_url, role),
           objective:objectives!objective_id(id, title)
         `)
         .in('objective_id', myObjectiveIds)
-        .eq('is_system_log', false)
         .neq('user_id', user.id)
         .order('created_at', { ascending: false })
         .limit(limit)
+      
+      // Only filter out system logs if not including them
+      if (!includeSystemLogs) {
+        objectiveCommentsQuery = objectiveCommentsQuery.eq('is_system_log', false)
+      }
+      
+      const { data: objectiveComments } = await objectiveCommentsQuery
 
       // Get read status for objective comments (table created by migration)
       const objectiveCommentIds = objectiveComments?.map((c: { id: string }) => c.id) || []

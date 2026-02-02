@@ -74,11 +74,11 @@ export function MarketplaceListingDetail({ listing, trustSignals, ratings }: Mar
 
     // Handle contacting the expert/provider
     const handleContact = async () => {
-        // Get the provider ID from the listing attributes
-        const providerId = attrs.provider_id as string
+        // Get the provider ID from the listing's created_by_provider_id column
+        const providerId = listing.created_by_provider_id
         
         if (!providerId) {
-            toast.error('Unable to contact this provider')
+            toast.error('This listing does not have a provider to contact')
             return
         }
 
