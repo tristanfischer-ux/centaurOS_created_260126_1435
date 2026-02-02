@@ -172,10 +172,14 @@ export function CommandInput({
   const insertMention = useCallback((profile: Profile) => {
     if (!autocompleteInfo) return
     
-    const firstName = profile.full_name.split(' ')[0]
+    const fullName = profile.full_name
     const before = inputValue.slice(0, autocompleteInfo.start)
     const after = inputValue.slice(autocompleteInfo.end)
-    const newValue = `${before}@${firstName} ${after}`
+    
+    // Use quotes if name contains spaces
+    const hasSpace = fullName.includes(' ')
+    const mentionText = hasSpace ? `@"${fullName}"` : `@${fullName}`
+    const newValue = `${before}${mentionText} ${after}`
     
     setInputValue(newValue)
     setAutocompleteMode('none')
@@ -183,7 +187,7 @@ export function CommandInput({
     
     setTimeout(() => {
       if (textareaRef.current) {
-        const newPosition = autocompleteInfo.start + firstName.length + 2
+        const newPosition = autocompleteInfo.start + mentionText.length + 1
         textareaRef.current.setSelectionRange(newPosition, newPosition)
       }
     }, 0)

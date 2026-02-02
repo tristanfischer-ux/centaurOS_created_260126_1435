@@ -166,13 +166,15 @@ function escapeHtml(text: string): string {
 
 /**
  * Get users to notify based on mention type
+ * Supports both @username and @"Full Name" formats
  */
 export function getMentionedUserIds(
   text: string,
   options: {
     allUserIds: string[]
     activeUserIds: string[]
-    userIdsByUsername: Record<string, string>
+    /** Map of username OR full_name (lowercase) to user ID */
+    userIdsByName: Record<string, string>
   }
 ): string[] {
   const mentions = parseMentions(text)
@@ -193,8 +195,8 @@ export function getMentionedUserIds(
         options.activeUserIds.forEach(id => userIds.add(id))
         break
       case 'user':
-        // Specific user
-        const userId = options.userIdsByUsername[mention.value.toLowerCase()]
+        // Specific user - lookup by username or full name
+        const userId = options.userIdsByName[mention.value.toLowerCase()]
         if (userId) userIds.add(userId)
         break
     }

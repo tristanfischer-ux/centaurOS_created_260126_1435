@@ -78,7 +78,11 @@ export function MentionInput({
     const fullName = profile.full_name
     const before = value.slice(0, mentionInfo.start)
     const after = value.slice(mentionInfo.end)
-    const newValue = `${before}@${fullName} ${after}`
+    
+    // Use quotes if name contains spaces
+    const hasSpace = fullName.includes(' ')
+    const mentionText = hasSpace ? `@"${fullName}"` : `@${fullName}`
+    const newValue = `${before}${mentionText} ${after}`
     
     onChange(newValue)
     
@@ -92,7 +96,7 @@ export function MentionInput({
     // Set cursor position after the inserted mention
     setTimeout(() => {
       if (textareaRef.current) {
-        const newPosition = mentionInfo.start + fullName.length + 2 // +2 for @ and space
+        const newPosition = mentionInfo.start + mentionText.length + 1 // +1 for space
         textareaRef.current.setSelectionRange(newPosition, newPosition)
       }
     }, 0)
