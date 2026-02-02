@@ -35,7 +35,6 @@ import {
     Loader2,
 } from "lucide-react"
 import Link from "next/link"
-import { typography } from "@/lib/design-system"
 import { ProviderTrustSection } from "@/components/marketplace/ProviderTrustSection"
 import type { PortfolioItem, Certification, ProviderBadge } from "@/actions/trust-signals"
 import type { RatingsSummary, ProviderRating } from "@/actions/ratings"
@@ -98,62 +97,58 @@ export function MarketplaceListingDetail({ listing, trustSignals, ratings }: Mar
     }
 
     return (
-        <div className="max-w-5xl mx-auto">
-            {/* Breadcrumb Navigation */}
-            <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-sm mb-3">
-                <Link 
-                    href="/marketplace" 
-                    className="text-muted-foreground hover:text-foreground transition-colors"
-                >
-                    Marketplace
-                </Link>
-                <ChevronRight className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
-                {category && (
-                    <>
-                        <Link 
-                            href={`/marketplace?category=${encodeURIComponent(category)}`}
-                            className="text-muted-foreground hover:text-foreground transition-colors"
-                        >
-                            {category}
-                        </Link>
-                        <ChevronRight className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
-                    </>
-                )}
-                <span className="text-foreground font-medium truncate max-w-[200px]">
-                    {listing.title}
-                </span>
-            </nav>
-
-            {/* Header */}
-            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 pb-4 border-b border-slate-100 mb-6">
+        <div className="max-w-5xl mx-auto space-y-6">
+            {/* Header - Compact like Strategic Objectives */}
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-slate-100">
                 <div className="min-w-0 flex-1">
-                    <div className={typography.pageHeader}>
-                        <div className={typography.pageHeaderAccent} />
-                        <div className="flex items-center gap-3 flex-wrap">
-                            <Badge 
-                                variant="secondary" 
-                                className={cn(
-                                    "uppercase text-[10px] tracking-wider font-semibold",
-                                    categoryBadgeStyles[category]
-                                )}
-                            >
-                                {listing.subcategory}
-                            </Badge>
-                            {listing.is_verified && (
-                                <div className="flex items-center gap-1 text-status-success" title="Verified">
-                                    <ShieldCheck className="h-4 w-4" />
-                                    <span className="text-xs font-medium">Verified</span>
-                                </div>
+                    {/* Breadcrumb - Inline */}
+                    <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
+                        <Link href="/marketplace" className="hover:text-foreground transition-colors">
+                            Marketplace
+                        </Link>
+                        <ChevronRight className="h-3 w-3" aria-hidden="true" />
+                        {category && (
+                            <>
+                                <Link 
+                                    href={`/marketplace?category=${encodeURIComponent(category)}`}
+                                    className="hover:text-foreground transition-colors"
+                                >
+                                    {category}
+                                </Link>
+                                <ChevronRight className="h-3 w-3" aria-hidden="true" />
+                            </>
+                        )}
+                        <span className="text-foreground font-medium truncate max-w-[200px]">
+                            {listing.title}
+                        </span>
+                    </nav>
+                    
+                    {/* Title row with orange accent */}
+                    <div className="flex items-center gap-3 mb-1">
+                        <div className="h-8 w-1 bg-orange-600 rounded-full shadow-[0_0_8px_rgba(234,88,12,0.6)]" />
+                        <Badge 
+                            variant="secondary" 
+                            className={cn(
+                                "uppercase text-[10px] tracking-wider font-semibold",
+                                categoryBadgeStyles[category]
                             )}
-                            <h1 className={cn(typography.h1, "inline")}>
-                                {listing.title}
-                            </h1>
-                            {category === 'People' && attrs.role && (
-                                <span className="text-lg text-muted-foreground">
-                                    {attrs.role}
-                                </span>
-                            )}
-                        </div>
+                        >
+                            {listing.subcategory}
+                        </Badge>
+                        {listing.is_verified && (
+                            <div className="flex items-center gap-1 text-status-success" title="Verified">
+                                <ShieldCheck className="h-4 w-4" />
+                                <span className="text-xs font-medium">Verified</span>
+                            </div>
+                        )}
+                        <h1 className="text-2xl sm:text-3xl font-display font-semibold text-foreground tracking-tight">
+                            {listing.title}
+                        </h1>
+                        {category === 'People' && attrs.role && (
+                            <span className="text-lg text-muted-foreground">
+                                {attrs.role}
+                            </span>
+                        )}
                     </div>
                 </div>
 
@@ -176,10 +171,7 @@ export function MarketplaceListingDetail({ listing, trustSignals, ratings }: Mar
                                 Connecting...
                             </>
                         ) : (
-                            <>
-                                <MessageSquare className="h-4 w-4 mr-2" />
-                                Message Expert
-                            </>
+                            <MessageSquare className="h-4 w-4" />
                         )}
                     </Button>
                 </div>
