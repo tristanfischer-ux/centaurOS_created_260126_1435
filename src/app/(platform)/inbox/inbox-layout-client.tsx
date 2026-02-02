@@ -14,6 +14,7 @@ import type { UserPreferences } from '@/types/preferences'
 import { PeopleList } from '@/components/inbox/people-list'
 import { TasksList } from '@/components/inbox/tasks-list'
 import { ConversationThread } from '@/components/messaging/ConversationThread'
+import { ConversationThreadEnhanced } from '@/components/inbox/conversation-thread-enhanced'
 
 // Type aliases for cleaner code
 type Profile = Database['public']['Tables']['profiles']['Row']
@@ -290,6 +291,8 @@ export function InboxLayoutClient({
             currentUserId={currentUserId}
             foundryId={foundryId}
             members={members}
+            tasks={tasks}
+            objectives={objectives}
           />
         ) : selectedTaskId ? (
           <TaskConversationView
@@ -314,12 +317,16 @@ function DirectConversationView({
   personId,
   currentUserId,
   foundryId,
-  members
+  members,
+  tasks,
+  objectives
 }: {
   personId: string
   currentUserId: string
   foundryId: string
   members: MemberWithStatus[]
+  tasks: Task[]
+  objectives: Objective[]
 }) {
   const [conversationId, setConversationId] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -413,45 +420,28 @@ function DirectConversationView({
   // Find the person details
   const person = members.find(m => m.id === personId)
   
-  return (
-    <div className="flex flex-col h-full">
-      {/* Person header */}
-      {person && (
-        <div className="border-b border-border px-4 py-3 bg-muted/30">
-          <div className="flex items-center gap-3">
-            <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-semibold text-sm">
-              {(person.full_name || person.email).charAt(0).toUpperCase()}
-            </div>
-            <div className="flex-1">
-              <h3 className="font-medium text-sm">{person.full_name || person.email}</h3>
-              <p className="text-xs text-muted-foreground">{person.role}</p>
-            </div>
-            {person.online_status === 'online' && (
-              <div className="flex items-center gap-1.5">
-                <div className="h-2 w-2 rounded-full bg-status-success" />
-                <span className="text-xs text-muted-foreground">Online</span>
-              </div>
-            )}
-          </div>
+  if (!person) {
+    return (
+      <div className="flex-1 flex items-center justify-center">
+        <div className="text-center">
+          <MessageSquare className="h-16 w-16 text-muted-foreground/50 mx-auto mb-4" />
+          <p className="text-sm text-muted-foreground">Person not found</p>
         </div>
-      )}
-      
-      {/* Conversation */}
-      <div className="flex-1">
-        <ConversationThread
-          conversationId={conversationId}
-          currentUserId={currentUserId}
-          foundryId={foundryId}
-          members={members.map(m => ({
-            id: m.id,
-            full_name: m.full_name || m.email,
-            email: m.email
-          }))}
-          enableCommands={true}
-          showHeader={false}
-        />
       </div>
-    </div>
+    )
+  }
+  
+  return (
+    <ConversationThreadEnhanced
+      conversationId={conversationId}
+      otherPersonId={personId}
+      otherPersonName={person.full_name || person.email}
+      otherPersonAvatar={person.avatar_url || undefined}
+      tasks={tasks}
+      objectives={objectives}
+      currentUserId={currentUserId}
+      showHeader={true}
+    />
   )
 }
 

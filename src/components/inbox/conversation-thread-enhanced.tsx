@@ -14,7 +14,7 @@ import { useMessagingShortcuts } from '@/hooks/useMessagingShortcuts'
 import type { MessageWithSender } from '@/lib/messaging/service'
 import type { MessageWithContext } from '@/types/messaging'
 import { sendMessageWithContext } from '@/lib/messaging/service'
-import { createClientForBrowser } from '@/lib/supabase/client'
+import { createClient } from '@/lib/supabase/client'
 import { 
   Send, 
   Paperclip, 
@@ -268,7 +268,7 @@ export function ConversationThreadEnhanced({
     setInputValue('')
 
     try {
-      const supabase = createClientForBrowser()
+      const supabase = createClient()
       
       await sendMessageWithContext(supabase, {
         conversationId,
