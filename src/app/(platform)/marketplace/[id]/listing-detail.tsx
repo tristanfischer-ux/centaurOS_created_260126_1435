@@ -24,7 +24,6 @@ import {
     Package,
     Wrench,
     Users,
-    ChevronRight,
     Brain,
     Cpu,
     BarChart3,
@@ -98,32 +97,9 @@ export function MarketplaceListingDetail({ listing, trustSignals, ratings }: Mar
 
     return (
         <div className="max-w-5xl mx-auto space-y-6">
-            {/* Header - Compact like Strategic Objectives */}
+            {/* Header - Matches Strategic Objectives style exactly */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-slate-100">
                 <div className="min-w-0 flex-1">
-                    {/* Breadcrumb - Inline */}
-                    <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
-                        <Link href="/marketplace" className="hover:text-foreground transition-colors">
-                            Marketplace
-                        </Link>
-                        <ChevronRight className="h-3 w-3" aria-hidden="true" />
-                        {category && (
-                            <>
-                                <Link 
-                                    href={`/marketplace?category=${encodeURIComponent(category)}`}
-                                    className="hover:text-foreground transition-colors"
-                                >
-                                    {category}
-                                </Link>
-                                <ChevronRight className="h-3 w-3" aria-hidden="true" />
-                            </>
-                        )}
-                        <span className="text-foreground font-medium truncate max-w-[200px]">
-                            {listing.title}
-                        </span>
-                    </nav>
-                    
-                    {/* Title row with orange accent */}
                     <div className="flex items-center gap-3 mb-1">
                         <div className="h-8 w-1 bg-orange-600 rounded-full shadow-[0_0_8px_rgba(234,88,12,0.6)]" />
                         <Badge 
