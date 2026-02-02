@@ -1,16 +1,25 @@
 'use client'
 
+import { useState } from 'react'
 import { cn } from '@/lib/utils'
 import { UserAvatar } from '@/components/ui/user-avatar'
 import { Check, CheckCheck, FileIcon, AlertCircle } from 'lucide-react'
 import type { MessageWithSender } from '@/lib/messaging/service'
 import { sanitizeHref } from '@/lib/security/url-validation'
+import { ReactionDisplay } from './ReactionDisplay'
+import { QuickReactionBar } from './ReactionPicker'
+import type { ReactionGroup } from '@/actions/reactions'
 
 interface MessageBubbleProps {
   message: MessageWithSender
   isOwn: boolean
   showAvatar?: boolean
   showTimestamp?: boolean
+  // Reaction props
+  reactions?: ReactionGroup[]
+  onToggleReaction?: (emoji: string) => void
+  onAddReaction?: (emoji: string) => void
+  showReactions?: boolean
 }
 
 function formatTime(dateString: string): string {
@@ -56,11 +65,25 @@ export function MessageBubble({
   message, 
   isOwn, 
   showAvatar = true,
-  showTimestamp = true 
+  showTimestamp = true,
+  reactions = [],
+  onToggleReaction,
+  onAddReaction,
+  showReactions = true
 }: MessageBubbleProps) {
+  const [showQuickReactions, setShowQuickReactions] = useState(false)
   const sender = message.sender
   const isSystem = message.message_type === 'system'
   const isFile = message.message_type === 'file'
+  
+  const handleToggleReaction = (emoji: string) => {
+    onToggleReaction?.(emoji)
+  }
+  
+  const handleAddReaction = (emoji: string) => {
+    onAddReaction?.(emoji)
+    setShowQuickReactions(false)
+  }
 
   // System messages are centered and styled differently
   if (isSystem) {
@@ -82,9 +105,11 @@ export function MessageBubble({
   return (
     <div
       className={cn(
-        'flex gap-2 max-w-[85%] group',
+        'flex gap-2 max-w-[85%] group relative',
         isOwn ? 'ml-auto flex-row-reverse' : 'mr-auto'
       )}
+      onMouseEnter={() => setShowQuickReactions(true)}
+      onMouseLeave={() => setShowQuickReactions(false)}
     >
       {/* Avatar */}
       {showAvatar && !isOwn && (
@@ -105,34 +130,57 @@ export function MessageBubble({
           </span>
         )}
 
-        {/* Message bubble */}
-        <div
-          className={cn(
-            'px-4 py-2 rounded-2xl max-w-full break-words',
-            isOwn 
-              ? 'bg-international-orange text-white rounded-br-md' 
-              : 'bg-muted text-foreground rounded-bl-md'
+        {/* Message bubble with hover actions */}
+        <div className="relative">
+          {/* Quick reaction bar (appears on hover) */}
+          {showReactions && showQuickReactions && onAddReaction && (
+            <div className={cn(
+              'absolute -top-8 z-10',
+              isOwn ? 'right-0' : 'left-0'
+            )}>
+              <QuickReactionBar onSelect={handleAddReaction} />
+            </div>
           )}
-        >
-          {isFile && message.file_url && sanitizeHref(message.file_url) !== '#' ? (
-            <a 
-              href={sanitizeHref(message.file_url)} 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className={cn(
-                'flex items-center gap-2 hover:underline',
-                isOwn ? 'text-white' : 'text-foreground'
-              )}
-            >
-              <FileIcon className="w-4 h-4 flex-shrink-0" />
-              <span className="text-sm truncate">
-                {message.content || 'Attachment'}
-              </span>
-            </a>
-          ) : (
-            <p className="text-sm whitespace-pre-wrap">{message.content}</p>
-          )}
+          
+          <div
+            className={cn(
+              'px-4 py-2 rounded-2xl max-w-full break-words',
+              isOwn 
+                ? 'bg-international-orange text-white rounded-br-md' 
+                : 'bg-muted text-foreground rounded-bl-md'
+            )}
+          >
+            {isFile && message.file_url && sanitizeHref(message.file_url) !== '#' ? (
+              <a 
+                href={sanitizeHref(message.file_url)} 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className={cn(
+                  'flex items-center gap-2 hover:underline',
+                  isOwn ? 'text-white' : 'text-foreground'
+                )}
+              >
+                <FileIcon className="w-4 h-4 flex-shrink-0" />
+                <span className="text-sm truncate">
+                  {message.content || 'Attachment'}
+                </span>
+              </a>
+            ) : (
+              <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+            )}
+          </div>
         </div>
+
+        {/* Reactions display */}
+        {showReactions && (reactions.length > 0 || onAddReaction) && (
+          <ReactionDisplay
+            reactions={reactions}
+            onToggle={handleToggleReaction}
+            onAddNew={handleAddReaction}
+            showAddButton={!showQuickReactions && !!onAddReaction}
+            className={isOwn ? 'justify-end' : 'justify-start'}
+          />
+        )}
 
         {/* Timestamp and read status */}
         {showTimestamp && (

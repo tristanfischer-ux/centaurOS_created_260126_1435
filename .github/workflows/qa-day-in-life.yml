@@ -1,0 +1,184 @@
+name: QA - Day in the Life Tests
+
+on:
+  # Allow manual trigger from GitHub UI or API
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to test against'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+          - staging
+          - production
+      triggered_by:
+        description: 'User who triggered the test (for reporting)'
+        required: false
+        type: string
+      callback_url:
+        description: 'URL to POST results to (optional)'
+        required: false
+        type: string
+
+  # Also run on schedule (weekly)
+  schedule:
+    - cron: '0 6 * * 1'  # Every Monday at 6am UTC
+
+env:
+  # Test URLs by environment
+  STAGING_URL: ${{ secrets.STAGING_URL || 'https://staging.centauros.io' }}
+  PRODUCTION_URL: ${{ secrets.PRODUCTION_URL || 'https://centauros.io' }}
+
+jobs:
+  qa-tests:
+    name: Run QA Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Create auth directory
+        run: mkdir -p .playwright/auth
+
+      - name: Set test URL based on environment
+        id: set-url
+        run: |
+          if [ "${{ github.event.inputs.environment }}" == "production" ]; then
+            echo "TEST_URL=${{ env.PRODUCTION_URL }}" >> $GITHUB_OUTPUT
+          else
+            echo "TEST_URL=${{ env.STAGING_URL }}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Run QA Tests - Executive
+        id: test-executive
+        continue-on-error: true
+        env:
+          TEST_URL: ${{ steps.set-url.outputs.TEST_URL }}
+          TEST_EXECUTIVE_EMAIL: ${{ secrets.TEST_EXECUTIVE_EMAIL }}
+          TEST_EXECUTIVE_PASSWORD: ${{ secrets.TEST_EXECUTIVE_PASSWORD }}
+        run: |
+          npx playwright test --project=auth-setup --project=qa-executive --reporter=json 2>&1 | tee executive-results.txt
+          echo "exit_code=$?" >> $GITHUB_OUTPUT
+
+      - name: Run QA Tests - Founder
+        id: test-founder
+        continue-on-error: true
+        env:
+          TEST_URL: ${{ steps.set-url.outputs.TEST_URL }}
+          TEST_FOUNDER_EMAIL: ${{ secrets.TEST_FOUNDER_EMAIL }}
+          TEST_FOUNDER_PASSWORD: ${{ secrets.TEST_FOUNDER_PASSWORD }}
+        run: |
+          npx playwright test --project=qa-founder --reporter=json 2>&1 | tee founder-results.txt
+          echo "exit_code=$?" >> $GITHUB_OUTPUT
+
+      - name: Run QA Tests - Apprentice
+        id: test-apprentice
+        continue-on-error: true
+        env:
+          TEST_URL: ${{ steps.set-url.outputs.TEST_URL }}
+          TEST_APPRENTICE_EMAIL: ${{ secrets.TEST_APPRENTICE_EMAIL }}
+          TEST_APPRENTICE_PASSWORD: ${{ secrets.TEST_APPRENTICE_PASSWORD }}
+        run: |
+          npx playwright test --project=qa-apprentice --reporter=json 2>&1 | tee apprentice-results.txt
+          echo "exit_code=$?" >> $GITHUB_OUTPUT
+
+      - name: Generate test summary
+        id: summary
+        run: |
+          echo "## QA Day in the Life Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Environment:** ${{ github.event.inputs.environment || 'staging' }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Triggered by:** ${{ github.event.inputs.triggered_by || github.actor }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Run date:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Results by Persona" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          # Executive status
+          if [ "${{ steps.test-executive.outcome }}" == "success" ]; then
+            echo "- **Executive:** ✅ PASSED" >> $GITHUB_STEP_SUMMARY
+            EXEC_STATUS="passed"
+          else
+            echo "- **Executive:** ❌ FAILED" >> $GITHUB_STEP_SUMMARY
+            EXEC_STATUS="failed"
+          fi
+          
+          # Founder status
+          if [ "${{ steps.test-founder.outcome }}" == "success" ]; then
+            echo "- **Founder:** ✅ PASSED" >> $GITHUB_STEP_SUMMARY
+            FOUNDER_STATUS="passed"
+          else
+            echo "- **Founder:** ❌ FAILED" >> $GITHUB_STEP_SUMMARY
+            FOUNDER_STATUS="failed"
+          fi
+          
+          # Apprentice status
+          if [ "${{ steps.test-apprentice.outcome }}" == "success" ]; then
+            echo "- **Apprentice:** ✅ PASSED" >> $GITHUB_STEP_SUMMARY
+            APPRENTICE_STATUS="passed"
+          else
+            echo "- **Apprentice:** ❌ FAILED" >> $GITHUB_STEP_SUMMARY
+            APPRENTICE_STATUS="failed"
+          fi
+          
+          # Overall status
+          if [ "$EXEC_STATUS" == "passed" ] && [ "$FOUNDER_STATUS" == "passed" ] && [ "$APPRENTICE_STATUS" == "passed" ]; then
+            echo "OVERALL_STATUS=passed" >> $GITHUB_OUTPUT
+          else
+            echo "OVERALL_STATUS=failed" >> $GITHUB_OUTPUT
+          fi
+          
+          echo "EXEC_STATUS=$EXEC_STATUS" >> $GITHUB_OUTPUT
+          echo "FOUNDER_STATUS=$FOUNDER_STATUS" >> $GITHUB_OUTPUT
+          echo "APPRENTICE_STATUS=$APPRENTICE_STATUS" >> $GITHUB_OUTPUT
+
+      - name: Upload test artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report-${{ github.run_id }}
+          path: |
+            playwright-report/
+            test-results/
+            *-results.txt
+          retention-days: 30
+
+      - name: Send results to callback URL
+        if: github.event.inputs.callback_url != ''
+        continue-on-error: true
+        run: |
+          curl -X POST "${{ github.event.inputs.callback_url }}" \
+            -H "Content-Type: application/json" \
+            -H "X-GitHub-Run-Id: ${{ github.run_id }}" \
+            -d '{
+              "run_id": "${{ github.run_id }}",
+              "environment": "${{ github.event.inputs.environment || 'staging' }}",
+              "triggered_by": "${{ github.event.inputs.triggered_by || github.actor }}",
+              "status": "${{ steps.summary.outputs.OVERALL_STATUS }}",
+              "results": {
+                "executive": "${{ steps.summary.outputs.EXEC_STATUS }}",
+                "founder": "${{ steps.summary.outputs.FOUNDER_STATUS }}",
+                "apprentice": "${{ steps.summary.outputs.APPRENTICE_STATUS }}"
+              },
+              "artifacts_url": "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}",
+              "completed_at": "'$(date -u '+%Y-%m-%dT%H:%M:%SZ')'"
+            }'
+
+      - name: Fail if tests failed
+        if: steps.summary.outputs.OVERALL_STATUS == 'failed'
+        run: exit 1

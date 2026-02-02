@@ -1,0 +1,213 @@
+import { 
+  Navigation, 
+  Search, 
+  LayoutDashboard, 
+  CheckSquare, 
+  Target, 
+  Users, 
+  Store,
+  Settings,
+  Calendar,
+  MessageSquare
+} from 'lucide-react'
+import type { SlashCommand, CommandResult } from '../types'
+import { navigateResult, errorResult } from '../executor'
+
+/**
+ * /goto - Navigate to a page or entity
+ */
+export const gotoCommand: SlashCommand = {
+  name: 'goto',
+  description: 'Navigate to a page or item',
+  usage: '/goto [destination]',
+  icon: Navigation,
+  category: 'navigation',
+  aliases: ['go', 'open'],
+  args: [
+    {
+      name: 'destination',
+      description: 'Page or item to navigate to',
+      required: true,
+      options: ['dashboard', 'tasks', 'objectives', 'team', 'marketplace', 'settings', 'messages', 'timeline']
+    }
+  ],
+  execute: async (args: string[]): Promise<CommandResult> => {
+    const destination = args[0]?.toLowerCase()
+    
+    if (!destination) {
+      return errorResult('Usage: /goto [page] - Try: dashboard, tasks, objectives, team, marketplace')
+    }
+    
+    // Map common aliases and shortcuts
+    const routes: Record<string, string> = {
+      'dashboard': '/dashboard',
+      'dash': '/dashboard',
+      'd': '/dashboard',
+      'tasks': '/tasks',
+      't': '/tasks',
+      'objectives': '/objectives',
+      'obj': '/objectives',
+      'o': '/objectives',
+      'team': '/team',
+      'roster': '/team',
+      'r': '/team',
+      'marketplace': '/marketplace',
+      'market': '/marketplace',
+      'm': '/marketplace',
+      'settings': '/settings',
+      's': '/settings',
+      'messages': '/messages',
+      'msg': '/messages',
+      'timeline': '/timeline',
+      'tl': '/timeline'
+    }
+    
+    const path = routes[destination]
+    
+    if (!path) {
+      return errorResult(`Unknown destination: ${destination}. Try: dashboard, tasks, objectives, team, marketplace`)
+    }
+    
+    return navigateResult(path)
+  }
+}
+
+/**
+ * /search - Search messages/conversations
+ */
+export const searchCommand: SlashCommand = {
+  name: 'search',
+  description: 'Search messages and conversations',
+  usage: '/search [query]',
+  icon: Search,
+  category: 'navigation',
+  args: [
+    {
+      name: 'query',
+      description: 'Search query (supports operators like from:@user, is:starred)',
+      required: false
+    }
+  ],
+  execute: async (args: string[]): Promise<CommandResult> => {
+    const query = args.join(' ')
+    
+    // TODO: Open search dialog with pre-filled query
+    // For now, navigate to messages with search param
+    if (query) {
+      return navigateResult(`/messages?search=${encodeURIComponent(query)}`)
+    }
+    
+    // Open search without query - just focus the search
+    return navigateResult('/messages?focus=search')
+  }
+}
+
+/**
+ * Quick navigation shortcuts
+ */
+export const dashboardCommand: SlashCommand = {
+  name: 'dashboard',
+  description: 'Go to Dashboard',
+  usage: '/dashboard',
+  icon: LayoutDashboard,
+  category: 'navigation',
+  aliases: ['dash'],
+  execute: async (): Promise<CommandResult> => {
+    return navigateResult('/dashboard')
+  }
+}
+
+export const tasksCommand: SlashCommand = {
+  name: 'tasks',
+  description: 'Go to Tasks',
+  usage: '/tasks',
+  icon: CheckSquare,
+  category: 'navigation',
+  execute: async (): Promise<CommandResult> => {
+    return navigateResult('/tasks')
+  }
+}
+
+export const objectivesCommand: SlashCommand = {
+  name: 'objectives',
+  description: 'Go to Objectives',
+  usage: '/objectives',
+  icon: Target,
+  category: 'navigation',
+  aliases: ['obj'],
+  execute: async (): Promise<CommandResult> => {
+    return navigateResult('/objectives')
+  }
+}
+
+export const teamCommand: SlashCommand = {
+  name: 'team',
+  description: 'Go to Team Roster',
+  usage: '/team',
+  icon: Users,
+  category: 'navigation',
+  aliases: ['roster'],
+  execute: async (): Promise<CommandResult> => {
+    return navigateResult('/team')
+  }
+}
+
+export const marketplaceCommand: SlashCommand = {
+  name: 'marketplace',
+  description: 'Go to Marketplace',
+  usage: '/marketplace',
+  icon: Store,
+  category: 'navigation',
+  aliases: ['market'],
+  execute: async (): Promise<CommandResult> => {
+    return navigateResult('/marketplace')
+  }
+}
+
+export const settingsCommand: SlashCommand = {
+  name: 'settings',
+  description: 'Go to Settings',
+  usage: '/settings',
+  icon: Settings,
+  category: 'navigation',
+  execute: async (): Promise<CommandResult> => {
+    return navigateResult('/settings')
+  }
+}
+
+export const messagesCommand: SlashCommand = {
+  name: 'messages',
+  description: 'Go to Messages',
+  usage: '/messages',
+  icon: MessageSquare,
+  category: 'navigation',
+  aliases: ['inbox'],
+  execute: async (): Promise<CommandResult> => {
+    return navigateResult('/messages')
+  }
+}
+
+export const timelineCommand: SlashCommand = {
+  name: 'timeline',
+  description: 'Go to Timeline',
+  usage: '/timeline',
+  icon: Calendar,
+  category: 'navigation',
+  execute: async (): Promise<CommandResult> => {
+    return navigateResult('/timeline')
+  }
+}
+
+// Export all navigation commands
+export const navigationCommands: SlashCommand[] = [
+  gotoCommand,
+  searchCommand,
+  dashboardCommand,
+  tasksCommand,
+  objectivesCommand,
+  teamCommand,
+  marketplaceCommand,
+  settingsCommand,
+  messagesCommand,
+  timelineCommand
+]

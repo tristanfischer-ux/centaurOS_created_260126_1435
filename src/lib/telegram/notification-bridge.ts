@@ -245,6 +245,8 @@ export async function createAndPushDecision(params: {
 /**
  * Send daily briefing to all eligible users
  * This should be called by a cron job
+ * 
+ * Enhanced version using the new Daily Pulse report system
  */
 export async function sendDailyBriefings(): Promise<{ sent: number; failed: number }> {
     const supabase = getAdminClient()
@@ -284,32 +286,61 @@ export async function sendDailyBriefings(): Promise<{ sent: number; failed: numb
             return hour === currentHour && currentMinute < 30
         })
 
-        // Send briefings
+        // Send briefings using enhanced Daily Pulse
         for (const user of eligibleUsers) {
             try {
-                // Get briefing data
-                const { data: briefingData } = await supabase
-                    .rpc('get_daily_briefing', { p_profile_id: user.profile_id })
-
                 const { data: profile } = await supabase
                     .from('profiles')
-                    .select('full_name')
+                    .select('full_name, role')
                     .eq('id', user.profile_id)
                     .single()
 
-                if (briefingData && user.messaging_links) {
-                    const { formatDailyBriefing, sendMessage } = await import('./bot')
-                    const chatId = (user.messaging_links as { platform_user_id: string }[])[0]?.platform_user_id
+                if (!profile || !user.messaging_links) continue
 
-                    if (chatId) {
-                        const message = formatDailyBriefing(briefingData, profile?.full_name || 'there')
+                const chatId = (user.messaging_links as { platform_user_id: string }[])[0]?.platform_user_id
+                if (!chatId) continue
+
+                // Try to use enhanced Daily Pulse report
+                try {
+                    const { generateDailyPulseReport, formatDailyPulseForTelegram } = await import('@/lib/reports')
+                    
+                    const report = await generateDailyPulseReport(
+                        user.profile_id,
+                        profile.full_name?.split(' ')[0] || 'there',
+                        profile.role || 'Team Member'
+                    )
+                    
+                    if (report) {
+                        const message = formatDailyPulseForTelegram(report)
+                        const { sendMessage } = await import('./bot')
+                        
                         await sendMessage({
                             chat_id: chatId,
                             text: message,
                             parse_mode: 'HTML',
                         })
                         sent++
+                        continue
                     }
+                } catch (reportError) {
+                    // Fall back to basic briefing if enhanced report fails
+                    console.warn(`Enhanced report failed for ${user.profile_id}, using fallback:`, reportError)
+                }
+
+                // Fallback: Use basic briefing data
+                const { data: briefingData } = await supabase
+                    .rpc('get_daily_briefing', { p_profile_id: user.profile_id })
+
+                if (briefingData) {
+                    const { formatDailyBriefing, sendMessage } = await import('./bot')
+                    const message = formatDailyBriefing(briefingData, profile.full_name || 'there')
+                    
+                    await sendMessage({
+                        chat_id: chatId,
+                        text: message,
+                        parse_mode: 'HTML',
+                    })
+                    sent++
                 }
             } catch (error) {
                 console.error(`Failed to send briefing to user ${user.profile_id}:`, error)

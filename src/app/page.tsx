@@ -281,22 +281,22 @@ export default function MarketingPage() {
               </div>
             </div>
 
-            {/* Factories */}
+            {/* Suppliers / Factories */}
             <div className="border border-slate-200 bg-background p-4 sm:p-6 md:p-8 flex flex-col">
               <div className="h-48 md:h-64 mb-4 md:mb-6 bg-muted border border-slate-200 relative overflow-hidden">
                 <Image
                   src="/images/3d-printed-part.png"
-                  alt="Factories"
+                  alt="Marketplace Suppliers"
                   fill
                   className="object-cover"
                 />
               </div>
               <span className="text-xs text-electric-blue font-mono uppercase tracking-widest mb-2">
-                Manufacturing
+                Marketplace Suppliers
               </span>
-              <h3 className="text-xl md:text-2xl font-bold mb-3 md:mb-4">THE VIRTUAL FACTORY.</h3>
+              <h3 className="text-xl md:text-2xl font-bold mb-3 md:mb-4">SELL YOUR PRODUCTS.</h3>
               <p className="text-muted-foreground text-sm leading-relaxed flex-1">
-                &ldquo;Monetize latent capacity. Connect your machines to Centaur OS. Receive pre-vetted, production-ready files: no sales friction, just print, ship, and bank.&rdquo;
+                &ldquo;List products, services, or manufacturing capacity on our marketplace. Receive qualified orders, respond to RFQs, and grow your business. Zero sales overhead.&rdquo;
               </p>
               {/* Action Buttons */}
               <div className="pt-4 md:pt-6 mt-4 border-t border-muted flex gap-2 md:gap-3">
@@ -307,10 +307,10 @@ export default function MarketingPage() {
                   Login
                 </a>
                 <Link
-                  href="/join/factory"
+                  href="/join/supplier"
                   className="flex-1 bg-foreground hover:bg-international-orange text-background py-2.5 md:py-3 text-center text-xs font-mono font-bold tracking-widest uppercase transition-colors"
                 >
-                  Connect
+                  Start Selling
                 </Link>
               </div>
             </div>

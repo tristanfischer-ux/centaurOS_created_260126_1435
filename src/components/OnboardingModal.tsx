@@ -3,13 +3,17 @@
 import { useState, useEffect } from 'react'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
-import { CheckCircle2, Target, Zap, ArrowRight, LayoutDashboard, Users, Sparkles, GraduationCap } from 'lucide-react'
+import { CheckCircle2, Target, Zap, ArrowRight, LayoutDashboard, Users, Sparkles, GraduationCap, Package, Building2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { VisuallyHidden } from '@radix-ui/react-visually-hidden'
-import { createSampleData, createApprenticeTrainingTasks } from '@/actions/onboarding'
+import { createSampleData, createApprenticeTrainingTasks, setAccountType } from '@/actions/onboarding'
 import { toast } from 'sonner'
+import { useRouter } from 'next/navigation'
 
 const ONBOARDING_KEY = 'centauros_onboarding_completed'
+const INTENT_SELECTED_KEY = 'centauros_intent_selected'
+
+type AccountType = 'team_builder' | 'supplier'
 
 // Role-specific step configurations
 const founderSteps = [
@@ -122,12 +126,17 @@ const defaultSteps = [
 
 interface OnboardingModalProps {
   userRole?: 'Founder' | 'Executive' | 'Apprentice' | 'AI_Agent' | string
+  accountType?: AccountType | null
 }
 
-export function OnboardingModal({ userRole }: OnboardingModalProps) {
+export function OnboardingModal({ userRole, accountType: initialAccountType }: OnboardingModalProps) {
   const [open, setOpen] = useState(false)
   const [currentStep, setCurrentStep] = useState(0)
   const [isCreatingSampleData, setIsCreatingSampleData] = useState(false)
+  const [showIntentSelection, setShowIntentSelection] = useState(false)
+  const [selectedIntent, setSelectedIntent] = useState<AccountType | null>(initialAccountType ?? null)
+  const [isSavingIntent, setIsSavingIntent] = useState(false)
+  const router = useRouter()
 
   // Select steps based on role
   const steps = userRole === 'Founder' ? founderSteps 
@@ -138,11 +147,48 @@ export function OnboardingModal({ userRole }: OnboardingModalProps) {
   useEffect(() => {
     // Check if user has completed onboarding
     const hasCompleted = localStorage.getItem(ONBOARDING_KEY)
+    const hasSelectedIntent = localStorage.getItem(INTENT_SELECTED_KEY)
+    
     if (!hasCompleted) {
       // Small delay to let the page load first
-      setTimeout(() => setOpen(true), 1000)
+      setTimeout(() => {
+        setOpen(true)
+        // Show intent selection if not already selected
+        if (!hasSelectedIntent && !initialAccountType) {
+          setShowIntentSelection(true)
+        }
+      }, 1000)
     }
-  }, [])
+  }, [initialAccountType])
+
+  const handleIntentSelection = async (intent: AccountType) => {
+    setSelectedIntent(intent)
+    setIsSavingIntent(true)
+    
+    try {
+      const result = await setAccountType(intent)
+      if (result.success) {
+        localStorage.setItem(INTENT_SELECTED_KEY, intent)
+        setShowIntentSelection(false)
+        
+        // If supplier, redirect to supplier portal after onboarding
+        if (intent === 'supplier') {
+          localStorage.setItem(ONBOARDING_KEY, 'true')
+          setOpen(false)
+          toast.success('Welcome! Redirecting to your Supplier Portal...')
+          router.push('/supplier-portal')
+          return
+        }
+      } else {
+        toast.error('Failed to save your selection. Please try again.')
+      }
+    } catch (error) {
+      console.error('Failed to set account type:', error)
+      toast.error('Something went wrong. Please try again.')
+    } finally {
+      setIsSavingIntent(false)
+    }
+  }
 
   const handleComplete = async () => {
     // For Founders, create sample data to populate their dashboard
@@ -198,6 +244,90 @@ export function OnboardingModal({ userRole }: OnboardingModalProps) {
   const step = steps[currentStep]
   const Icon = step.icon
 
+  // Intent selection screen
+  if (showIntentSelection) {
+    return (
+      <Dialog open={open} onOpenChange={handleOpenChange}>
+        <DialogContent className="sm:max-w-[560px] p-0 overflow-hidden bg-background border-none shadow-brand-lg">
+          <VisuallyHidden>
+            <DialogTitle>Why are you here?</DialogTitle>
+          </VisuallyHidden>
+
+          <div className="relative overflow-hidden">
+            {/* Subtle Industrial Grid Background */}
+            <div
+              className="absolute inset-0 opacity-[0.03] pointer-events-none bg-[linear-gradient(#000_1px,transparent_1px),linear-gradient(90deg,#000_1px,transparent_1px)] bg-[length:24px_24px]"
+            />
+
+            {/* Content */}
+            <div className="pt-12 pb-10 px-10 text-center relative z-10 font-sans">
+              <h2 className="text-3xl font-display font-medium text-foreground mb-3 tracking-tight">
+                Welcome to CentaurOS
+              </h2>
+              <p className="text-muted-foreground mb-10 max-w-md mx-auto leading-relaxed text-sm">
+                Tell us why you&apos;re here so we can personalize your experience.
+              </p>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
+                {/* Supplier Option */}
+                <button
+                  onClick={() => handleIntentSelection('supplier')}
+                  disabled={isSavingIntent}
+                  className={cn(
+                    "group relative p-6 rounded-lg border-2 transition-all duration-200 text-left",
+                    "hover:border-international-orange hover:bg-orange-50/50",
+                    selectedIntent === 'supplier' 
+                      ? "border-international-orange bg-orange-50/50" 
+                      : "border-muted bg-background",
+                    isSavingIntent && "opacity-50 cursor-not-allowed"
+                  )}
+                >
+                  <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center mb-4 group-hover:bg-orange-100 transition-colors">
+                    <Package className="w-6 h-6 text-international-orange" />
+                  </div>
+                  <h3 className="text-lg font-semibold text-foreground mb-2">
+                    I sell products or services
+                  </h3>
+                  <p className="text-sm text-muted-foreground leading-relaxed">
+                    List your offerings, respond to requests, and manage orders from your dedicated Supplier Portal.
+                  </p>
+                </button>
+
+                {/* Team Builder Option */}
+                <button
+                  onClick={() => handleIntentSelection('team_builder')}
+                  disabled={isSavingIntent}
+                  className={cn(
+                    "group relative p-6 rounded-lg border-2 transition-all duration-200 text-left",
+                    "hover:border-electric-blue hover:bg-blue-50/50",
+                    selectedIntent === 'team_builder' 
+                      ? "border-electric-blue bg-blue-50/50" 
+                      : "border-muted bg-background",
+                    isSavingIntent && "opacity-50 cursor-not-allowed"
+                  )}
+                >
+                  <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center mb-4 group-hover:bg-blue-100 transition-colors">
+                    <Building2 className="w-6 h-6 text-electric-blue" />
+                  </div>
+                  <h3 className="text-lg font-semibold text-foreground mb-2">
+                    I build and manage teams
+                  </h3>
+                  <p className="text-sm text-muted-foreground leading-relaxed">
+                    Define objectives, assign tasks, and collaborate with your team using AI-powered workflows.
+                  </p>
+                </button>
+              </div>
+
+              {isSavingIntent && (
+                <p className="text-sm text-muted-foreground">Saving your selection...</p>
+              )}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    )
+  }
+
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-[480px] p-0 overflow-hidden bg-background border-none shadow-brand-lg">
@@ -248,12 +378,13 @@ export function OnboardingModal({ userRole }: OnboardingModalProps) {
               )}
               <Button
                 onClick={handleNext}
+                disabled={isCreatingSampleData}
                 className={cn(
                   "min-w-[140px] h-11 text-xs uppercase tracking-widest font-semibold bg-foreground text-background hover:bg-international-orange transition-colors duration-300 shadow-lg",
                   currentStep === steps.length - 1 && "bg-international-orange hover:bg-international-orange/90"
                 )}
               >
-                {currentStep === steps.length - 1 ? 'Enter Foundry' : 'Next Step'}
+                {isCreatingSampleData ? 'Setting up...' : currentStep === steps.length - 1 ? 'Enter Foundry' : 'Next Step'}
                 <ArrowRight className="w-3 h-3 ml-2" />
               </Button>
             </div>

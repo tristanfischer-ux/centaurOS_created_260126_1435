@@ -82,13 +82,22 @@ export async function updateSession(request: NextRequest) {
         return false
     })
 
-    // Special handling for app domain root: authenticated users go to dashboard
+    // Special handling for app domain root: authenticated users go to their portal
     if (hostname.includes('centauros.io') && pathname === '/') {
         if (user) {
-            // User is logged in, redirect to dashboard
-            const dashboardUrl = request.nextUrl.clone()
-            dashboardUrl.pathname = '/dashboard'
-            return NextResponse.redirect(dashboardUrl)
+            // Check user's account type to determine redirect destination
+            const { data: profile } = await supabase
+                .from('profiles')
+                .select('account_type')
+                .eq('id', user.id)
+                .single()
+            
+            const redirectUrl = request.nextUrl.clone()
+            // Suppliers go to supplier portal, others to dashboard
+            redirectUrl.pathname = profile?.account_type === 'supplier' 
+                ? '/supplier-portal' 
+                : '/dashboard'
+            return NextResponse.redirect(redirectUrl)
         }
         // User not logged in, let middleware below handle redirect to marketing
     }
@@ -105,7 +114,7 @@ export async function updateSession(request: NextRequest) {
     if (user && !isPublicRoute) {
         const { data: profile, error: profileError } = await supabase
             .from('profiles')
-            .select('role, is_active')
+            .select('role, is_active, account_type')
             .eq('id', user.id)
             .single()
         
@@ -136,6 +145,29 @@ export async function updateSession(request: NextRequest) {
                 const redirectUrl = request.nextUrl.clone()
                 redirectUrl.pathname = '/dashboard'
                 redirectUrl.searchParams.set('error', 'Access denied')
+                return NextResponse.redirect(redirectUrl)
+            }
+        }
+
+        // Route suppliers to supplier portal for platform-only routes
+        // Suppliers can access: /supplier-portal/*, /marketplace, /help, /settings
+        if (profile?.account_type === 'supplier') {
+            const supplierAllowedRoutes = [
+                '/supplier-portal',
+                '/marketplace',
+                '/help',
+                '/rfq', // Allow viewing RFQs
+                '/profile', // Public profiles
+            ]
+            
+            const isAllowedForSupplier = supplierAllowedRoutes.some(route => 
+                pathname === route || pathname.startsWith(`${route}/`)
+            )
+            
+            if (!isAllowedForSupplier && !pathname.startsWith('/api/')) {
+                // Supplier trying to access platform routes - redirect to supplier portal
+                const redirectUrl = request.nextUrl.clone()
+                redirectUrl.pathname = '/supplier-portal'
                 return NextResponse.redirect(redirectUrl)
             }
         }

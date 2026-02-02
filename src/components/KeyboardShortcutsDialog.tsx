@@ -22,6 +22,22 @@ const shortcuts = [
     { keys: 'G then O', description: 'Go to Objectives' },
     { keys: 'G then R', description: 'Go to Team Roster' },
   ]},
+  { category: 'Messaging', items: [
+    { keys: '⌘⇧M', description: 'Go to Messages' },
+    { keys: '⌘[', description: 'Previous conversation' },
+    { keys: '⌘]', description: 'Next conversation' },
+    { keys: '/', description: 'Slash commands' },
+    { keys: '@', description: 'Mention someone' },
+    { keys: '+', description: 'Add reaction' },
+  ]},
+  { category: 'Message Actions', items: [
+    { keys: 'E', description: 'Edit last message' },
+    { keys: 'R', description: 'Reply in thread' },
+    { keys: 'P', description: 'Pin/unpin message' },
+    { keys: 'S', description: 'Star message' },
+    { keys: 'U', description: 'Mark as unread' },
+    { keys: '↑', description: 'Edit/recall previous' },
+  ]},
 ]
 
 export function KeyboardShortcutsDialog() {

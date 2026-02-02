@@ -78,7 +78,21 @@ export async function login(formData: FormData) {
     await resetRateLimit('login', clientIP)
 
     revalidatePath('/', 'layout')
-    // Redirect to dashboard - since login is only accessible on app domain (centauros.io),
-    // this will redirect to centauros.io/dashboard
+    
+    // Check user's account type to determine redirect destination
+    if (loggedInUser) {
+        const { data: profile } = await supabase
+            .from('profiles')
+            .select('account_type')
+            .eq('id', loggedInUser.id)
+            .single()
+        
+        // Suppliers go to their dedicated portal
+        if (profile?.account_type === 'supplier') {
+            redirect('/supplier-portal')
+        }
+    }
+    
+    // Default: team builders and users without account type go to dashboard
     redirect('/dashboard')
 }

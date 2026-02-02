@@ -26,8 +26,16 @@ import {
 } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
 
+interface TeamMember {
+  id: string
+  full_name: string
+  email: string
+}
+
 interface MessagesPageClientProps {
   userId: string
+  foundryId?: string
+  members?: TeamMember[]
 }
 
 function getConversationDisplayName(
@@ -69,7 +77,7 @@ function getConversationIcon(type: ConversationType | undefined) {
   }
 }
 
-export function MessagesPageClient({ userId }: MessagesPageClientProps) {
+export function MessagesPageClient({ userId, foundryId, members = [] }: MessagesPageClientProps) {
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [showCompose, setShowCompose] = useState(false)
@@ -119,6 +127,9 @@ export function MessagesPageClient({ userId }: MessagesPageClientProps) {
           currentUserId={userId}
           showHeader={true}
           className="flex-1"
+          foundryId={foundryId}
+          members={members}
+          enableCommands={true}
         />
       </div>
     )

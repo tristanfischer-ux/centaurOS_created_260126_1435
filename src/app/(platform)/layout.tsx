@@ -35,7 +35,7 @@ export default async function PlatformLayout({
     // Fetch profile to get foundry_id and user info
     const { data: profile, error: profileError } = await supabase
         .from("profiles")
-        .select("foundry_id, full_name, role")
+        .select("foundry_id, full_name, role, account_type")
         .eq("id", user.id)
         .single();
 
@@ -99,7 +99,7 @@ export default async function PlatformLayout({
                         <PWARegister />
                         <DragDropPolyfill />
                         <OfflineIndicator />
-                        <OnboardingModal userRole={profile?.role} />
+                        <OnboardingModal userRole={profile?.role} accountType={profile?.account_type} />
                         <ExecutiveProfilePrompt userRole={profile?.role} />
                         <Suspense fallback={null}>
                             <VerificationSuccessToast />

@@ -13,7 +13,8 @@ import {
     BarChart3,
     Shield,
     Settings,
-    Users
+    Users,
+    FlaskConical
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
@@ -21,6 +22,7 @@ const adminNavigation = [
     { name: "Overview", href: "/admin", icon: LayoutDashboard },
     { name: "Applications", href: "/admin/applications", icon: ClipboardList },
     { name: "Platform Health", href: "/admin/health", icon: Activity },
+    { name: "QA Testing", href: "/admin/qa", icon: FlaskConical },
     { name: "Analytics", href: "/admin/analytics", icon: BarChart3 },
     { name: "GDPR", href: "/admin/gdpr", icon: Shield },
     { name: "Migration", href: "/admin/migration", icon: Users },

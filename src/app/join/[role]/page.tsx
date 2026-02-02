@@ -111,6 +111,25 @@ const roleConfigs: Record<string, RoleConfig> = {
             { id: "capabilities", label: "Capabilities", placeholder: "CNC, 3D Printing, Sheet Metal..." }
         ]
     },
+    supplier: {
+        title: "SUPPLIER",
+        headline: "SELL ON THE MARKETPLACE.",
+        subheadline: "List your products. Get discovered. Grow your business.",
+        description: "Join our marketplace to reach hardware startups and builders. List your products, services, or capacity. Respond to RFQs, manage orders, and get paid—all from your dedicated Supplier Portal.",
+        benefits: [
+            "List unlimited products and services",
+            "Respond to qualified RFQ opportunities",
+            "Manage orders from one dashboard",
+            "Get paid through secure escrow"
+        ],
+        heroImage: "/images/3d-printed-part.png",
+        ctaText: "Start Selling",
+        isApplication: false,
+        additionalFields: [
+            { id: "business_name", label: "Business Name", placeholder: "Your Company Ltd.", required: true },
+            { id: "business_type", label: "What do you sell?", placeholder: "Products, Services, Manufacturing...", required: false }
+        ]
+    },
     university: {
         title: "ACADEMIA",
         headline: "FROM PAPER TO PRODUCT.",

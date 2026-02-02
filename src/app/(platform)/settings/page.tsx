@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { redirect } from 'next/navigation'
 import { TelegramLink } from '@/components/settings/telegram-link'
+import { ReportPreferences } from '@/components/settings/report-preferences'
 
 // Admin client for messaging_links table (not in types yet)
 function getAdminClient() {
@@ -82,6 +83,10 @@ export default async function SettingsPage() {
             <TelegramLink 
                 initialLink={telegramLink} 
                 botUsername={botUsername}
+            />
+
+            <ReportPreferences 
+                hasTelegramLinked={!!telegramLink?.verified_at}
             />
 
             <Card className="border-destructive/20 bg-status-error-light/50">

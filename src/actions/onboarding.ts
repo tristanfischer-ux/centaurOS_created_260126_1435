@@ -4,6 +4,59 @@
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { getFoundryIdCached } from '@/lib/supabase/foundry-context'
+import { Database } from '@/types/database.types'
+
+type AccountType = Database['public']['Enums']['account_type']
+
+/**
+ * Set the user's account type (supplier or team_builder)
+ * This determines which portal they land on after login
+ */
+export async function setAccountType(accountType: AccountType) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  
+  if (!user) return { error: 'Unauthorized' }
+  
+  const { error } = await supabase
+    .from('profiles')
+    .update({ 
+      account_type: accountType,
+      updated_at: new Date().toISOString()
+    })
+    .eq('id', user.id)
+  
+  if (error) {
+    console.error('Error setting account type:', error)
+    return { error: 'Failed to set account type' }
+  }
+  
+  revalidatePath('/')
+  return { success: true }
+}
+
+/**
+ * Get the user's account type
+ */
+export async function getAccountType(): Promise<{ accountType: AccountType | null; error?: string }> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  
+  if (!user) return { accountType: null, error: 'Unauthorized' }
+  
+  const { data: profile, error } = await supabase
+    .from('profiles')
+    .select('account_type')
+    .eq('id', user.id)
+    .single()
+  
+  if (error) {
+    console.error('Error getting account type:', error)
+    return { accountType: null, error: 'Failed to get account type' }
+  }
+  
+  return { accountType: profile?.account_type ?? null }
+}
 
 export async function createSampleData() {
   const supabase = await createClient()

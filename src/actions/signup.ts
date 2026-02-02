@@ -7,8 +7,8 @@ import { headers } from "next/headers";
 import { rateLimit, getClientIP } from "@/lib/security/rate-limit";
 import { sanitizeEmail, escapeHtml } from "@/lib/security/sanitize";
 
-// Direct signup roles (Founder, Executive, Apprentice)
-type SignupRole = "founder" | "executive" | "apprentice";
+// Direct signup roles (Founder, Executive, Apprentice, Supplier)
+type SignupRole = "founder" | "executive" | "apprentice" | "supplier";
 
 // Application roles (VC, Factory, University, Network)
 type ApplicationRole = "vc" | "factory" | "university" | "network";
@@ -88,6 +88,10 @@ export async function signup(formData: FormData) {
   const industry = formData.get("industry") as string | null;
   const stage = formData.get("stage") as string | null;
 
+  // Supplier-specific fields
+  const rawBusinessName = formData.get("business_name") as string | null;
+  const businessType = formData.get("business_type") as string | null;
+
   // Security: Validate and sanitize inputs
   const email = sanitizeEmail(rawEmail);
   if (!email) {
@@ -97,6 +101,7 @@ export async function signup(formData: FormData) {
   // Security: Sanitize name to prevent XSS
   const fullName = rawFullName ? escapeHtml(rawFullName.trim().slice(0, 100)) : "";
   const companyName = rawCompanyName ? escapeHtml(rawCompanyName.trim().slice(0, 100)) : null;
+  const businessName = rawBusinessName ? escapeHtml(rawBusinessName.trim().slice(0, 100)) : null;
 
   if (!fullName || !role) {
     return redirect(`/join/${role || "general"}?error=All fields are required`);
@@ -111,6 +116,11 @@ export async function signup(formData: FormData) {
   // Founders must provide a company name
   if (role === "founder" && !companyName) {
     return redirect(`/join/founder?error=Company name is required`);
+  }
+
+  // Suppliers must provide a business name
+  if (role === "supplier" && !businessName) {
+    return redirect(`/join/supplier?error=Business name is required`);
   }
 
   // Get the base URL for email redirect
@@ -141,9 +151,12 @@ export async function signup(formData: FormData) {
   }
 
   let foundryId: string;
+  let accountType: 'team_builder' | 'supplier' | null = null;
 
-  // 2. Create foundry for Founders, or use shared "centaur-guild" for others
+  // 2. Create foundry for Founders, create business for Suppliers, or use shared "centaur-guild" for others
   if (role === "founder" && companyName) {
+    accountType = 'team_builder'; // Founders are team builders
+    
     // Generate a unique slug
     const baseSlug = generateSlug(companyName);
     const uniqueSlug = `${baseSlug}-${authData.user.id.slice(0, 6)}`;
@@ -170,23 +183,47 @@ export async function signup(formData: FormData) {
       // Use the UUID of the created foundry
       foundryId = foundry.id;
     }
+  } else if (role === "supplier" && businessName) {
+    accountType = 'supplier'; // Suppliers get supplier account type
+    
+    // Suppliers join a dedicated supplier foundry (isolated from team management)
+    foundryId = "centaur-suppliers";
+    
+    // Note: businessName and businessType are captured for later use when creating their listing
   } else {
+    accountType = 'team_builder'; // Executives and Apprentices are team builders
+    
     // Executives and Apprentices join the shared Guild
     foundryId = "centaur-guild";
   }
 
   // 3. Create profile
+  // Suppliers get 'Apprentice' role (minimal permissions) but 'supplier' account_type
+  const memberRole = role === 'supplier' ? 'Apprentice' : capitalizeRole(role);
+  
   const { error: profileError } = await supabase.from("profiles").insert({
     id: authData.user.id,
     email,
     full_name: fullName,
-    role: capitalizeRole(role),
+    role: memberRole,
     foundry_id: foundryId,
+    account_type: accountType,
   });
 
   if (profileError) {
     console.error("Profile creation error:", profileError);
     // Don't fail completely - auth user exists, profile can be created later
+  }
+
+  // 3a. For suppliers, store their business info in onboarding_data for later use
+  if (role === 'supplier' && businessName) {
+    await supabase.from("profiles").update({
+      onboarding_data: {
+        business_name: businessName,
+        business_type: businessType,
+        is_supplier_signup: true,
+      } as any,
+    }).eq('id', authData.user.id);
   }
 
   // 4. Store booking intent if present

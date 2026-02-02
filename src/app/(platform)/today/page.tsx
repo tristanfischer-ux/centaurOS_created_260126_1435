@@ -10,6 +10,7 @@ import { DailyPrioritizer } from "@/components/DailyPrioritizer"
 import { StandupWidget } from "@/components/StandupWidget"
 import { ActivityStream } from "@/components/today/activity-stream"
 import { NeedsAttentionSummary } from "@/components/today/needs-attention-summary"
+import { DailyPulseWidget } from "@/components/reports/DailyPulseWidget"
 import { getActivityFeed } from "@/actions/activity"
 import Link from "next/link"
 import {
@@ -267,6 +268,13 @@ export default async function TodayPage() {
 
                     {/* Right Column - Focus & Widgets (1/3) */}
                     <div className="space-y-6">
+                        {/* Daily Pulse - Summary & Insights */}
+                        <DailyPulseWidget
+                            userId={user.id}
+                            userRole={profile?.role || undefined}
+                            foundryId={foundryId}
+                        />
+
                         {/* Today's Focus - Prioritized Tasks */}
                         <Card className="bg-background border border-t-2 border-t-international-orange">
                             <CardHeader className="pb-3">

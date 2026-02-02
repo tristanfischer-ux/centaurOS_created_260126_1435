@@ -8,7 +8,10 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { Skeleton } from '@/components/ui/skeleton'
 import { UserAvatar } from '@/components/ui/user-avatar'
 import { MessageBubble, DateSeparator } from './MessageBubble'
+import { CommandInput } from './CommandInput'
+import { ThreadPanel } from './ThreadPanel'
 import { useConversation } from '@/hooks/useConversation'
+import { useMessagingShortcuts } from '@/hooks/useMessagingShortcuts'
 import type { MessageWithSender } from '@/lib/messaging/service'
 import { 
   Send, 
@@ -28,12 +31,22 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { archiveConversation, unarchiveConversation } from '@/actions/messaging'
 
+interface TeamMember {
+  id: string
+  full_name: string
+  email: string
+}
+
 interface ConversationThreadProps {
   conversationId: string | null
   currentUserId: string
   onBack?: () => void
   showHeader?: boolean
   className?: string
+  // New props for enhanced input with slash commands
+  foundryId?: string
+  members?: TeamMember[]
+  enableCommands?: boolean
 }
 
 
@@ -56,7 +69,10 @@ export function ConversationThread({
   currentUserId, 
   onBack,
   showHeader = true,
-  className 
+  className,
+  foundryId,
+  members = [],
+  enableCommands = true
 }: ConversationThreadProps) {
   const {
     messages,
@@ -72,9 +88,29 @@ export function ConversationThread({
   const [inputValue, setInputValue] = useState('')
   const [isSending, setIsSending] = useState(false)
   const [isArchiving, setIsArchiving] = useState(false)
+  const [selectedMessageId, setSelectedMessageId] = useState<string | null>(null)
+  const [threadPanelOpen, setThreadPanelOpen] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
+  
+  // Use enhanced input when foundryId is available
+  const useEnhancedInput = enableCommands && !!foundryId
+  
+  // Wire up messaging shortcuts
+  useMessagingShortcuts({
+    onReplyInThread: () => {
+      // Open thread panel for the most recent message (or first selected)
+      if (messages.length > 0 && !threadPanelOpen) {
+        // For now, open thread for the last message
+        // In a full implementation, this would track the "selected" message
+        const lastMessage = messages[messages.length - 1]
+        setSelectedMessageId(lastMessage.id)
+        setThreadPanelOpen(true)
+      }
+    },
+    inputRef,
+  })
 
   // Get other participant
   const otherParticipant = conversation
@@ -286,44 +322,66 @@ export function ConversationThread({
       </ScrollArea>
 
       {/* Input area */}
-      <form onSubmit={handleSend} className="border-t border-border p-4 flex-shrink-0">
-        <div className="flex items-center gap-2">
-          <Button 
-            type="button" 
-            variant="ghost" 
-            size="icon" 
-            onClick={handleFileClick}
-            className="flex-shrink-0"
-            aria-label="Attach file"
-          >
-            <Paperclip className="w-5 h-5" />
-          </Button>
-          
-          <Input
-            ref={inputRef}
-            value={inputValue}
-            onChange={(e) => setInputValue(e.target.value)}
-            placeholder="Type a message..."
-            disabled={isSending}
-            className="flex-1"
-            autoComplete="off"
-          />
-          
-          <Button 
-            type="submit" 
-            size="icon" 
-            disabled={!inputValue.trim() || isSending}
-            className="flex-shrink-0"
-            aria-label={isSending ? "Sending message" : "Send message"}
-          >
-            {isSending ? (
-              <Loader2 className="w-5 h-5 animate-spin" />
-            ) : (
-              <Send className="w-5 h-5" />
-            )}
-          </Button>
-        </div>
-      </form>
+      {useEnhancedInput ? (
+        <CommandInput
+          conversationId={conversationId}
+          currentUserId={currentUserId}
+          foundryId={foundryId!}
+          members={members}
+          onSend={sendMessage}
+          onFileClick={handleFileClick}
+          className="flex-shrink-0"
+        />
+      ) : (
+        <form onSubmit={handleSend} className="border-t border-border p-4 flex-shrink-0">
+          <div className="flex items-center gap-2">
+            <Button 
+              type="button" 
+              variant="ghost" 
+              size="icon" 
+              onClick={handleFileClick}
+              className="flex-shrink-0"
+              aria-label="Attach file"
+            >
+              <Paperclip className="w-5 h-5" />
+            </Button>
+            
+            <Input
+              ref={inputRef}
+              value={inputValue}
+              onChange={(e) => setInputValue(e.target.value)}
+              placeholder="Type a message..."
+              disabled={isSending}
+              className="flex-1"
+              autoComplete="off"
+            />
+            
+            <Button 
+              type="submit" 
+              size="icon" 
+              disabled={!inputValue.trim() || isSending}
+              className="flex-shrink-0"
+              aria-label={isSending ? "Sending message" : "Send message"}
+            >
+              {isSending ? (
+                <Loader2 className="w-5 h-5 animate-spin" />
+              ) : (
+                <Send className="w-5 h-5" />
+              )}
+            </Button>
+          </div>
+        </form>
+      )}
+
+      {/* Thread Panel */}
+      <ThreadPanel
+        parentMessageId={selectedMessageId}
+        open={threadPanelOpen}
+        onClose={() => {
+          setThreadPanelOpen(false)
+          setSelectedMessageId(null)
+        }}
+      />
     </div>
   )
 }

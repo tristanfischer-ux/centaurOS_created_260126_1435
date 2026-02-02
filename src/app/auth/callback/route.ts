@@ -38,16 +38,20 @@ export async function GET(request: Request) {
     const { data: { user } } = await supabase.auth.getUser()
     
     if (user) {
-      // Fetch user profile to get role
+      // Fetch user profile to get role and account type
       const { data: profile } = await supabase
         .from('profiles')
-        .select('role')
+        .select('role, account_type')
         .eq('id', user.id)
         .single()
 
-      // Redirect based on role for better first experience
+      // Redirect based on account type first, then role
       let redirectPath = next
-      if (profile?.role === 'Apprentice') {
+      
+      // Suppliers go to supplier portal
+      if (profile?.account_type === 'supplier') {
+        redirectPath = '/supplier-portal'
+      } else if (profile?.role === 'Apprentice') {
         redirectPath = '/dashboard' // Apprentices go to dashboard to see training tasks
       } else if (profile?.role === 'Executive') {
         redirectPath = '/dashboard' // Executives go to dashboard

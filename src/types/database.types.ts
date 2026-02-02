@@ -1998,6 +1998,76 @@ export type Database = {
         }
         Relationships: []
       }
+      custom_slash_commands: {
+        Row: {
+          action_config: Json
+          action_type: string
+          created_at: string | null
+          created_by: string | null
+          description: string
+          enabled: boolean | null
+          foundry_id: string
+          icon: string | null
+          id: string
+          name: string
+          required_roles: string[] | null
+          updated_at: string | null
+          usage: string | null
+        }
+        Insert: {
+          action_config?: Json
+          action_type: string
+          created_at?: string | null
+          created_by?: string | null
+          description: string
+          enabled?: boolean | null
+          foundry_id: string
+          icon?: string | null
+          id?: string
+          name: string
+          required_roles?: string[] | null
+          updated_at?: string | null
+          usage?: string | null
+        }
+        Update: {
+          action_config?: Json
+          action_type?: string
+          created_at?: string | null
+          created_by?: string | null
+          description?: string
+          enabled?: boolean | null
+          foundry_id?: string
+          icon?: string | null
+          id?: string
+          name?: string
+          required_roles?: string[] | null
+          updated_at?: string | null
+          usage?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "custom_slash_commands_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "buyer_stats"
+            referencedColumns: ["buyer_id"]
+          },
+          {
+            foreignKeyName: "custom_slash_commands_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "custom_slash_commands_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       data_requests: {
         Row: {
           completed_at: string | null
@@ -3519,6 +3589,95 @@ export type Database = {
           },
         ]
       }
+      message_reactions: {
+        Row: {
+          created_at: string | null
+          emoji: string
+          id: string
+          message_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          emoji: string
+          id?: string
+          message_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          emoji?: string
+          id?: string
+          message_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "message_reactions_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "message_reactions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "buyer_stats"
+            referencedColumns: ["buyer_id"]
+          },
+          {
+            foreignKeyName: "message_reactions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      message_stars: {
+        Row: {
+          created_at: string | null
+          id: string
+          message_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          message_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          message_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "message_stars_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "message_stars_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "buyer_stats"
+            referencedColumns: ["buyer_id"]
+          },
+          {
+            foreignKeyName: "message_stars_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       message_templates: {
         Row: {
           category: string | null
@@ -3572,7 +3731,10 @@ export type Database = {
           file_url: string | null
           id: string
           is_read: boolean | null
+          last_reply_at: string | null
           message_type: string | null
+          parent_message_id: string | null
+          reply_count: number | null
           sender_id: string
         }
         Insert: {
@@ -3582,7 +3744,10 @@ export type Database = {
           file_url?: string | null
           id?: string
           is_read?: boolean | null
+          last_reply_at?: string | null
           message_type?: string | null
+          parent_message_id?: string | null
+          reply_count?: number | null
           sender_id: string
         }
         Update: {
@@ -3592,7 +3757,10 @@ export type Database = {
           file_url?: string | null
           id?: string
           is_read?: boolean | null
+          last_reply_at?: string | null
           message_type?: string | null
+          parent_message_id?: string | null
+          reply_count?: number | null
           sender_id?: string
         }
         Relationships: [
@@ -3601,6 +3769,13 @@ export type Database = {
             columns: ["conversation_id"]
             isOneToOne: false
             referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "messages_parent_message_id_fkey"
+            columns: ["parent_message_id"]
+            isOneToOne: false
+            referencedRelation: "messages"
             referencedColumns: ["id"]
           },
           {
@@ -4885,6 +5060,59 @@ export type Database = {
           },
         ]
       }
+      pinned_messages: {
+        Row: {
+          conversation_id: string
+          created_at: string | null
+          id: string
+          message_id: string
+          pinned_by: string | null
+        }
+        Insert: {
+          conversation_id: string
+          created_at?: string | null
+          id?: string
+          message_id: string
+          pinned_by?: string | null
+        }
+        Update: {
+          conversation_id?: string
+          created_at?: string | null
+          id?: string
+          message_id?: string
+          pinned_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pinned_messages_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pinned_messages_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pinned_messages_pinned_by_fkey"
+            columns: ["pinned_by"]
+            isOneToOne: false
+            referencedRelation: "buyer_stats"
+            referencedColumns: ["buyer_id"]
+          },
+          {
+            foreignKeyName: "pinned_messages_pinned_by_fkey"
+            columns: ["pinned_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pitch_prep_requests: {
         Row: {
           additional_files: string[] | null
@@ -5340,6 +5568,7 @@ export type Database = {
       }
       profiles: {
         Row: {
+          account_type: Database["public"]["Enums"]["account_type"] | null
           availability_hours_per_week: number | null
           availability_type: string | null
           avatar_url: string | null
@@ -5370,6 +5599,7 @@ export type Database = {
           years_experience: number | null
         }
         Insert: {
+          account_type?: Database["public"]["Enums"]["account_type"] | null
           availability_hours_per_week?: number | null
           availability_type?: string | null
           avatar_url?: string | null
@@ -5400,6 +5630,7 @@ export type Database = {
           years_experience?: number | null
         }
         Update: {
+          account_type?: Database["public"]["Enums"]["account_type"] | null
           availability_hours_per_week?: number | null
           availability_type?: string | null
           avatar_url?: string | null
@@ -6075,6 +6306,85 @@ export type Database = {
             isOneToOne: true
             referencedRelation: "supplier_search_ranking"
             referencedColumns: ["provider_id"]
+          },
+        ]
+      }
+      qa_test_runs: {
+        Row: {
+          artifacts_url: string | null
+          completed_at: string | null
+          created_at: string
+          duration_seconds: number | null
+          environment: Database["public"]["Enums"]["qa_test_environment"]
+          error_message: string | null
+          foundry_id: string | null
+          github_run_id: string | null
+          github_run_url: string | null
+          id: string
+          results: Json | null
+          started_at: string | null
+          status: Database["public"]["Enums"]["qa_test_status"]
+          triggered_by: string | null
+          triggered_by_name: string | null
+          updated_at: string
+        }
+        Insert: {
+          artifacts_url?: string | null
+          completed_at?: string | null
+          created_at?: string
+          duration_seconds?: number | null
+          environment?: Database["public"]["Enums"]["qa_test_environment"]
+          error_message?: string | null
+          foundry_id?: string | null
+          github_run_id?: string | null
+          github_run_url?: string | null
+          id?: string
+          results?: Json | null
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["qa_test_status"]
+          triggered_by?: string | null
+          triggered_by_name?: string | null
+          updated_at?: string
+        }
+        Update: {
+          artifacts_url?: string | null
+          completed_at?: string | null
+          created_at?: string
+          duration_seconds?: number | null
+          environment?: Database["public"]["Enums"]["qa_test_environment"]
+          error_message?: string | null
+          foundry_id?: string | null
+          github_run_id?: string | null
+          github_run_url?: string | null
+          id?: string
+          results?: Json | null
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["qa_test_status"]
+          triggered_by?: string | null
+          triggered_by_name?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "qa_test_runs_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "qa_test_runs_triggered_by_fkey"
+            columns: ["triggered_by"]
+            isOneToOne: false
+            referencedRelation: "buyer_stats"
+            referencedColumns: ["buyer_id"]
+          },
+          {
+            foreignKeyName: "qa_test_runs_triggered_by_fkey"
+            columns: ["triggered_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -8094,6 +8404,78 @@ export type Database = {
           },
         ]
       }
+      user_reminders: {
+        Row: {
+          completed_at: string | null
+          conversation_id: string | null
+          created_at: string | null
+          foundry_id: string
+          id: string
+          message: string
+          message_id: string | null
+          remind_at: string
+          user_id: string
+        }
+        Insert: {
+          completed_at?: string | null
+          conversation_id?: string | null
+          created_at?: string | null
+          foundry_id: string
+          id?: string
+          message: string
+          message_id?: string | null
+          remind_at: string
+          user_id: string
+        }
+        Update: {
+          completed_at?: string | null
+          conversation_id?: string | null
+          created_at?: string | null
+          foundry_id?: string
+          id?: string
+          message?: string
+          message_id?: string | null
+          remind_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_reminders_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_reminders_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_reminders_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_reminders_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "buyer_stats"
+            referencedColumns: ["buyer_id"]
+          },
+          {
+            foreignKeyName: "user_reminders_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_subscriptions: {
         Row: {
           cancel_at_period_end: boolean | null
@@ -8797,6 +9179,7 @@ export type Database = {
       }
     }
     Enums: {
+      account_type: "team_builder" | "supplier"
       admin_role:
         | "super_admin"
         | "operations"
@@ -8860,6 +9243,8 @@ export type Database = {
         | "VC"
         | "Additive Manufacturing"
         | "Fabrication"
+      qa_test_environment: "staging" | "production"
+      qa_test_status: "pending" | "running" | "passed" | "failed" | "cancelled"
       rfq_status:
         | "Open"
         | "Bidding"
@@ -9009,6 +9394,7 @@ export const Constants = {
   },
   public: {
     Enums: {
+      account_type: ["team_builder", "supplier"],
       admin_role: [
         "super_admin",
         "operations",
@@ -9080,6 +9466,8 @@ export const Constants = {
         "Additive Manufacturing",
         "Fabrication",
       ],
+      qa_test_environment: ["staging", "production"],
+      qa_test_status: ["pending", "running", "passed", "failed", "cancelled"],
       rfq_status: [
         "Open",
         "Bidding",
