@@ -1,0 +1,280 @@
+# Testing Before Deployment Rule
+
+**CRITICAL**: This rule must be followed for ALL deployments to prevent breaking production features.
+
+## Core Principle
+
+**Any code change, no matter how small, requires end-to-end functional testing of affected features before deployment.**
+
+## What Went Wrong
+
+### Incident: Comparison Modal Broken (2026-02-02)
+- **Change Made**: Single CSS class change in comparison modal (`hover:bg-accent/10` → `hover:bg-muted`)
+- **Testing Done**: TypeScript compilation, linter, build verification
+- **Testing Missed**: End-to-end functional testing of comparison feature
+- **Result**: Comparison modal opened but showed no content, breaking user workflow
+- **Root Cause**: Pre-existing bug (items being filtered out) was not caught because functional testing was skipped
+
+### Key Lesson
+**Passing build/lint checks ≠ Working feature**
+
+## Mandatory Testing Before Deployment
+
+### 1. Code-Level Checks (Baseline)
+```bash
+# TypeScript
+npx tsc --noEmit
+
+# Linter
+npm run lint
+
+# Build
+npm run build
+```
+
+### 2. Functional Testing (CRITICAL)
+For EVERY file modified, test the actual feature in browser:
+
+#### UI Component Changes
+```
+Modified: src/components/marketplace/comparison-modal.tsx
+Required Test:
+1. Open marketplace
+2. Select 2+ items  
+3. Click "Compare" button
+4. Verify modal opens AND shows content
+5. Verify all comparison features work
+6. Test in both light/dark mode
+7. Test with different item types
+```
+
+#### Action/Server Changes  
+```
+Modified: src/actions/tasks.ts
+Required Test:
+1. Open task
+2. Perform the action (e.g., update status)
+3. Verify action completes
+4. Verify data persists
+5. Verify no errors in console
+6. Test error cases
+```
+
+#### API Route Changes
+```
+Modified: src/app/api/team/compare/route.ts  
+Required Test:
+1. Make API request via UI
+2. Verify response is correct
+3. Verify security checks work (try invalid data)
+4. Check browser console for errors
+5. Check server logs
+```
+
+### 3. Regression Testing
+Test related features that might be affected:
+
+```
+Changed: comparison-modal.tsx
+Related Features to Test:
+- Comparison bar (bottom sticky bar)
+- Item selection (clicking compare icon on cards)
+- AI analysis feature
+- Clear all button
+- Remove individual items
+```
+
+### 4. Cross-Browser/Device Testing
+For UI changes, test on:
+- Chrome (primary)
+- Safari (macOS/iOS)
+- Mobile viewport (responsive)
+
+## Testing Checklist Template
+
+Copy this for every deployment:
+
+```markdown
+## Pre-Deployment Testing Checklist
+
+### Files Modified
+- [ ] List all modified files
+- [ ] Identify affected features for each file
+
+### Code-Level Checks
+- [ ] TypeScript: No errors
+- [ ] Linter: No errors  
+- [ ] Build: Successful
+- [ ] No console errors in dev mode
+
+### Functional Testing
+For each modified file:
+- [ ] Feature 1: [Name]
+  - [ ] Happy path tested
+  - [ ] Edge cases tested
+  - [ ] Error cases tested
+  - [ ] Console: No errors
+  
+- [ ] Feature 2: [Name]
+  - [ ] Happy path tested
+  - [ ] Edge cases tested
+  - [ ] Error cases tested
+  - [ ] Console: No errors
+
+### Regression Testing  
+- [ ] Related Feature 1: Works
+- [ ] Related Feature 2: Works
+
+### Integration Testing
+- [ ] Database operations work
+- [ ] API calls succeed
+- [ ] State management correct
+
+### Security Testing (if applicable)
+- [ ] Auth checks work
+- [ ] RLS policies enforced
+- [ ] Input validation works
+- [ ] No data leakage
+
+### Performance
+- [ ] No new N+1 queries
+- [ ] Load times acceptable
+- [ ] No memory leaks
+
+### Sign-off
+- [ ] All tests passed
+- [ ] Ready for deployment
+```
+
+## When to Skip Functional Testing
+
+**NEVER.** Always test.
+
+Even for:
+- ❌ "Just a CSS change" → Test the feature
+- ❌ "Just a typo fix" → Test the feature  
+- ❌ "Just refactoring" → Test the feature
+- ❌ "Just adding comments" → Test that code still works
+
+## Automated Testing (Future)
+
+### Priority 1: E2E Tests for Critical Paths
+```typescript
+// e2e/marketplace-comparison.spec.ts
+test('marketplace comparison works', async ({ page }) => {
+  await page.goto('/marketplace')
+  
+  // Select items
+  await page.click('[data-testid="compare-btn-1"]')
+  await page.click('[data-testid="compare-btn-2"]')
+  
+  // Open comparison
+  await page.click('[data-testid="compare-button"]')
+  
+  // Verify modal shows content
+  await expect(page.locator('[data-testid="comparison-content"]')).toBeVisible()
+  await expect(page.locator('[data-testid="comparison-table"]')).toBeVisible()
+})
+```
+
+### Priority 2: Component Tests
+```typescript
+// components/marketplace/comparison-modal.test.tsx  
+describe('ComparisonModal', () => {
+  it('shows error when items have no data', () => {
+    const { getByText } = render(
+      <ComparisonModal 
+        open={true} 
+        items={[{ id: '1', title: '' }]} 
+      />
+    )
+    expect(getByText(/cannot compare/i)).toBeInTheDocument()
+  })
+})
+```
+
+## Integration with Deployment Workflow
+
+### Updated Deployment Checklist
+1. ✅ Code changes complete
+2. ✅ Code-level checks pass (TS, lint, build)
+3. ✅ **Functional tests pass** ← NEW REQUIREMENT
+4. ✅ Regression tests pass
+5. ✅ Commit and push
+6. ✅ Monitor deployment
+7. ✅ Verify in production
+
+### Git Pre-Push Hook (Optional)
+```bash
+#!/bin/bash
+# .git/hooks/pre-push
+
+echo "🧪 Running pre-push tests..."
+
+# Run build
+npm run build || exit 1
+
+echo "✅ Build passed"
+echo "⚠️  Remember to test features manually before deploying!"
+echo "See .cursor/rules/testing-before-deployment.mdc"
+```
+
+## Accountability
+
+### Before Deployment
+- [ ] I have tested ALL affected features manually
+- [ ] I have tested error cases and edge cases
+- [ ] I have checked browser console for errors
+- [ ] I have tested on mobile viewport (if UI change)
+- [ ] I am confident this will not break production
+
+### If Something Breaks
+1. **Immediate**: Revert the deployment
+2. **Root cause**: Why wasn't it caught in testing?
+3. **Prevention**: Update this doc with new test case
+4. **Re-test**: Before re-deploying
+
+## Examples of Good Testing
+
+### Example 1: CSS Change to Button
+```
+Change: Updated button hover color
+Testing:
+✅ Clicked button - still works
+✅ Hovered button - color correct
+✅ Button disabled state - works
+✅ Button in different contexts - works
+✅ Light/dark mode - both work
+```
+
+### Example 2: Server Action Update  
+```
+Change: Added authorization check to updateTask()
+Testing:
+✅ Update task as owner - works
+✅ Update task as team member - works  
+✅ Update task from different foundry - blocked ✓
+✅ Update task without auth - blocked ✓
+✅ Console shows no errors
+```
+
+### Example 3: Database Migration
+```
+Change: Added index to report_snapshots table
+Testing:
+✅ Migration applied successfully
+✅ Queries using indexed column are faster
+✅ No orphaned records  
+✅ FK constraints work
+✅ RLS policies still enforced
+```
+
+## Summary
+
+**The Golden Rule**: If you touch it, you test it. Every time. No exceptions.
+
+**Cost of skipping**: Broken production feature, user frustration, time spent debugging and fixing
+
+**Cost of testing**: 5-10 minutes per feature
+
+The math is simple: Always test.

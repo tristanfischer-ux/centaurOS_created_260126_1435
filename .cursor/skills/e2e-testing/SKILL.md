@@ -1,6 +1,6 @@
 ---
 name: e2e-testing
-description: Run and write Playwright E2E tests for CentaurOS, interpret test results, and fix failing tests. Use when testing features end-to-end, writing integration tests, running Playwright tests, or when the user mentions E2E, Playwright, integration tests, testing, or test suite.
+description: Run and write Playwright E2E tests for CentaurOS, interpret test results, and fix failing tests. Use when testing features end-to-end, writing integration tests, running Playwright tests, or when the user mentions E2E, Playwright, integration tests, testing, or test suite. CRITICAL - Always run functional tests before deploying any changes.
 ---
 
 # E2E Testing Skill
