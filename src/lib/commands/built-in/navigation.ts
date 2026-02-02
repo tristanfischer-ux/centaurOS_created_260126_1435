@@ -73,26 +73,37 @@ export const gotoCommand: SlashCommand = {
 }
 
 /**
- * /search - Search messages/conversations
+ * /search - Search messages/conversations with advanced operators
+ * 
+ * Supports operators:
+ * - is:starred, is:pinned, is:unread
+ * - from:@username, from:me
+ * - has:link, has:file, has:reaction, has:thread
+ * - before:date, after:date
+ * 
+ * @example
+ * /search is:starred from:@john important
+ * /search has:link before:2024-01-01
+ * /search is:pinned urgent
  */
 export const searchCommand: SlashCommand = {
   name: 'search',
-  description: 'Search messages and conversations',
-  usage: '/search [query]',
+  description: 'Search messages with advanced operators (is:, from:, has:, before:, after:)',
+  usage: '/search [operators] [keywords]',
   icon: Search,
   category: 'navigation',
   args: [
     {
       name: 'query',
-      description: 'Search query (supports operators like from:@user, is:starred)',
+      description: 'Search query with operators: is:starred, from:@user, has:link, before:date, after:date',
       required: false
     }
   ],
   execute: async (args: string[]): Promise<CommandResult> => {
     const query = args.join(' ')
     
-    // TODO: Open search dialog with pre-filled query
-    // For now, navigate to messages with search param
+    // Navigate to messages with search param
+    // The search will be processed by the search service
     if (query) {
       return navigateResult(`/messages?search=${encodeURIComponent(query)}`)
     }

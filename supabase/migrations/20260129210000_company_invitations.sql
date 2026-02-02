@@ -20,7 +20,7 @@ CREATE INDEX IF NOT EXISTS idx_foundries_owner_id ON public.foundries(owner_id);
 
 CREATE TABLE IF NOT EXISTS public.company_invitations (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    foundry_id uuid NOT NULL REFERENCES public.foundries(id) ON DELETE CASCADE,
+    foundry_id text NOT NULL REFERENCES public.foundries(id) ON DELETE CASCADE,
     email text NOT NULL,
     role public.member_role NOT NULL DEFAULT 'Apprentice',
     token text UNIQUE NOT NULL,
@@ -104,7 +104,7 @@ CREATE POLICY "Service role full access to invitations" ON public.company_invita
 CREATE TABLE IF NOT EXISTS public.project_assignments (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     apprentice_id uuid NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
-    foundry_id uuid NOT NULL REFERENCES public.foundries(id) ON DELETE CASCADE,
+    foundry_id text NOT NULL REFERENCES public.foundries(id) ON DELETE CASCADE,
     project_name text,
     project_description text,
     assigned_by uuid NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,

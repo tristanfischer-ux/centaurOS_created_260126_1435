@@ -15,8 +15,9 @@
 -- 1. ADD 'Founder' TO member_role ENUM
 -- =============================================
 -- The Founder role sits at the top of the hierarchy with full permissions
+-- (Moved to 20260127215900_add_founder_enum.sql to avoid transaction issues)
 
-ALTER TYPE "public"."member_role" ADD VALUE IF NOT EXISTS 'Founder';
+-- ALTER TYPE "public"."member_role" ADD VALUE IF NOT EXISTS 'Founder';
 
 -- =============================================
 -- 2. HELPER FUNCTION: get_my_role()

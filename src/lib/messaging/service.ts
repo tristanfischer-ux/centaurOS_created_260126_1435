@@ -56,6 +56,10 @@ export interface Message {
   file_url: string | null
   is_read: boolean
   created_at: string
+  // Thread support
+  parent_message_id: string | null
+  reply_count: number
+  last_reply_at: string | null
 }
 
 export interface ConversationWithParticipants extends Conversation {

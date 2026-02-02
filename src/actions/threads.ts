@@ -5,143 +5,44 @@ import { createClient } from '@/lib/supabase/server'
 export interface ThreadMessage {
   id: string
   content: string
-  created_at: string
   sender_id: string
-  parent_message_id: string | null
-  reply_count: number
   sender: {
     id: string
     full_name: string | null
     avatar_url: string | null
   } | null
-}
-
-export interface ThreadSummary {
-  parent_message: ThreadMessage
-  replies: ThreadMessage[]
+  created_at: string
   reply_count: number
 }
 
-/**
- * Get a thread with all its replies
- * 
- * @description Fetches the parent message and all its replies
- * for displaying in the thread panel.
- * 
- * @param parentMessageId - ID of the parent message
- * @returns Thread summary with parent and replies
- * 
- * @security User must be a participant in the conversation
- */
-export async function getThread(
-  parentMessageId: string
-): Promise<{ success: boolean; error?: string; data?: ThreadSummary }> {
-  try {
-    const supabase = await createClient()
-    
-    // AUTH: Get current user
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    if (authError || !user) {
-      return { success: false, error: 'Not authenticated' }
-    }
-    
-    // Fetch parent message
-    const { data: parentMessage, error: parentError } = await supabase
-      .from('messages')
-      .select(`
-        id,
-        content,
-        created_at,
-        sender_id,
-        parent_message_id,
-        reply_count,
-        conversation_id,
-        sender:profiles!messages_sender_id_fkey(id, full_name, avatar_url)
-      `)
-      .eq('id', parentMessageId)
-      .single()
-    
-    if (parentError || !parentMessage) {
-      return { success: false, error: 'Parent message not found' }
-    }
-    
-    // AUTH: Verify user is a participant in the conversation
-    const { data: participant, error: participantError } = await supabase
-      .from('conversation_participants')
-      .select('id')
-      .eq('conversation_id', parentMessage.conversation_id)
-      .eq('profile_id', user.id)
-      .single()
-    
-    if (participantError || !participant) {
-      return { success: false, error: 'Not a participant of this conversation' }
-    }
-    
-    // Fetch all replies
-    const { data: replies, error: repliesError } = await supabase
-      .from('messages')
-      .select(`
-        id,
-        content,
-        created_at,
-        sender_id,
-        parent_message_id,
-        reply_count,
-        sender:profiles!messages_sender_id_fkey(id, full_name, avatar_url)
-      `)
-      .eq('parent_message_id', parentMessageId)
-      .order('created_at', { ascending: true })
-    
-    if (repliesError) {
-      console.error('Error fetching replies:', repliesError)
-      return { success: false, error: 'Failed to fetch replies' }
-    }
-    
-    return {
-      success: true,
-      data: {
-        parent_message: parentMessage as ThreadMessage,
-        replies: (replies || []) as ThreadMessage[],
-        reply_count: parentMessage.reply_count || 0,
-      },
-    }
-  } catch (error) {
-    console.error('Error in getThread:', error)
-    return { success: false, error: 'Failed to fetch thread' }
-  }
+export interface ThreadReply {
+  id: string
+  content: string
+  sender_id: string
+  sender: {
+    id: string
+    full_name: string | null
+    avatar_url: string | null
+  } | null
+  created_at: string
+  parent_message_id: string
 }
 
 /**
- * Send a reply to a thread
- * 
- * @description Creates a new message as a reply to a parent message.
- * Automatically increments reply_count via database trigger.
- * 
- * @param parentMessageId - ID of the parent message
- * @param content - Reply message content
- * @returns The created reply message
- * 
- * @security User must be a participant in the conversation
+ * Get thread replies for a parent message
  */
-export async function sendThreadReply(
-  parentMessageId: string,
-  content: string
-): Promise<{ success: boolean; error?: string; data?: ThreadMessage }> {
+export async function getThreadReplies(
+  parentMessageId: string
+): Promise<{ success: boolean; error?: string; data?: ThreadReply[] }> {
   try {
     const supabase = await createClient()
     
-    // AUTH: Get current user
     const { data: { user }, error: authError } = await supabase.auth.getUser()
     if (authError || !user) {
       return { success: false, error: 'Not authenticated' }
     }
     
-    // VALIDATION: Check content is not empty
-    if (!content || content.trim().length === 0) {
-      return { success: false, error: 'Reply content cannot be empty' }
-    }
-    
-    // Get parent message to find conversation
+    // Verify user has access to the parent message's conversation
     const { data: parentMessage, error: parentError } = await supabase
       .from('messages')
       .select('conversation_id')
@@ -152,7 +53,6 @@ export async function sendThreadReply(
       return { success: false, error: 'Parent message not found' }
     }
     
-    // AUTH: Verify user is a participant
     const { data: participant, error: participantError } = await supabase
       .from('conversation_participants')
       .select('id')
@@ -164,50 +64,148 @@ export async function sendThreadReply(
       return { success: false, error: 'Not a participant of this conversation' }
     }
     
-    // Create reply message
+    // Fetch thread replies
+    const { data: replies, error: repliesError } = await supabase
+      .from('messages')
+      .select(`
+        id,
+        content,
+        sender_id,
+        created_at,
+        parent_message_id,
+        sender:profiles!messages_sender_id_fkey(id, full_name, avatar_url)
+      `)
+      .eq('parent_message_id', parentMessageId)
+      .order('created_at', { ascending: true })
+    
+    if (repliesError) {
+      console.error('Error fetching thread replies:', repliesError)
+      return { success: false, error: 'Failed to fetch thread replies' }
+    }
+    
+    return { success: true, data: replies as ThreadReply[] }
+  } catch (error) {
+    console.error('Error in getThreadReplies:', error)
+    return { success: false, error: 'Failed to fetch thread replies' }
+  }
+}
+
+/**
+ * Send a reply in a thread
+ */
+export async function sendThreadReply(
+  parentMessageId: string,
+  content: string
+): Promise<{ success: boolean; error?: string; data?: ThreadReply }> {
+  try {
+    const supabase = await createClient()
+    
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) {
+      return { success: false, error: 'Not authenticated' }
+    }
+    
+    // Get parent message and conversation
+    const { data: parentMessage, error: parentError } = await supabase
+      .from('messages')
+      .select('conversation_id')
+      .eq('id', parentMessageId)
+      .single()
+    
+    if (parentError || !parentMessage) {
+      return { success: false, error: 'Parent message not found' }
+    }
+    
+    // Verify user is a participant
+    const { data: participant, error: participantError } = await supabase
+      .from('conversation_participants')
+      .select('id')
+      .eq('conversation_id', parentMessage.conversation_id)
+      .eq('profile_id', user.id)
+      .single()
+    
+    if (participantError || !participant) {
+      return { success: false, error: 'Not a participant of this conversation' }
+    }
+    
+    // Create thread reply
     const { data: reply, error: insertError } = await supabase
       .from('messages')
       .insert({
         conversation_id: parentMessage.conversation_id,
         sender_id: user.id,
-        content: content.trim(),
+        content,
         parent_message_id: parentMessageId,
       })
       .select(`
         id,
         content,
-        created_at,
         sender_id,
+        created_at,
         parent_message_id,
-        reply_count,
         sender:profiles!messages_sender_id_fkey(id, full_name, avatar_url)
       `)
       .single()
     
     if (insertError) {
-      console.error('Error creating reply:', insertError)
-      return { success: false, error: 'Failed to create reply' }
+      console.error('Error creating thread reply:', insertError)
+      return { success: false, error: 'Failed to create thread reply' }
     }
     
-    return { success: true, data: reply as ThreadMessage }
+    // Note: reply_count and last_reply_at are auto-updated by database trigger
+    
+    return { success: true, data: reply as ThreadReply }
   } catch (error) {
     console.error('Error in sendThreadReply:', error)
-    return { success: false, error: 'Failed to send reply' }
+    return { success: false, error: 'Failed to send thread reply' }
   }
 }
 
 /**
- * Get reply count for multiple messages (batch)
- * 
- * @description Fetches reply counts for multiple messages efficiently
- * for displaying thread indicators in message lists.
- * 
- * @param messageIds - Array of message IDs
- * @returns Map of message ID to reply count
+ * Get parent message with reply count
+ */
+export async function getThreadParent(
+  messageId: string
+): Promise<{ success: boolean; error?: string; data?: ThreadMessage }> {
+  try {
+    const supabase = await createClient()
+    
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) {
+      return { success: false, error: 'Not authenticated' }
+    }
+    
+    const { data: message, error } = await supabase
+      .from('messages')
+      .select(`
+        id,
+        content,
+        sender_id,
+        created_at,
+        reply_count,
+        sender:profiles!messages_sender_id_fkey(id, full_name, avatar_url)
+      `)
+      .eq('id', messageId)
+      .single()
+    
+    if (error) {
+      console.error('Error fetching thread parent:', error)
+      return { success: false, error: 'Failed to fetch message' }
+    }
+    
+    return { success: true, data: message as ThreadMessage }
+  } catch (error) {
+    console.error('Error in getThreadParent:', error)
+    return { success: false, error: 'Failed to fetch message' }
+  }
+}
+
+/**
+ * Get reply counts for multiple messages (batch operation)
  */
 export async function getBatchReplyCounts(
   messageIds: string[]
-): Promise<{ success: boolean; error?: string; data?: Record<string, number> }> {
+): Promise<{ success: boolean; error?: string; data?: Record<string, { count: number; lastReplyAt: string | null }> }> {
   try {
     if (messageIds.length === 0) {
       return { success: true, data: {} }
@@ -215,15 +213,15 @@ export async function getBatchReplyCounts(
     
     const supabase = await createClient()
     
-    // AUTH: Get current user
     const { data: { user }, error: authError } = await supabase.auth.getUser()
     if (authError || !user) {
       return { success: false, error: 'Not authenticated' }
     }
     
+    // Fetch reply counts for all messages
     const { data: messages, error } = await supabase
       .from('messages')
-      .select('id, reply_count')
+      .select('id, reply_count, last_reply_at')
       .in('id', messageIds)
     
     if (error) {
@@ -231,16 +229,12 @@ export async function getBatchReplyCounts(
       return { success: false, error: 'Failed to fetch reply counts' }
     }
     
-    // Convert to map
-    const result: Record<string, number> = {}
+    // Build result map
+    const result: Record<string, { count: number; lastReplyAt: string | null }> = {}
     for (const msg of messages || []) {
-      result[msg.id] = msg.reply_count || 0
-    }
-    
-    // Initialize 0 for messages without replies
-    for (const id of messageIds) {
-      if (!(id in result)) {
-        result[id] = 0
+      result[msg.id] = {
+        count: msg.reply_count || 0,
+        lastReplyAt: msg.last_reply_at,
       }
     }
     

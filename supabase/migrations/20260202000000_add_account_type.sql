@@ -23,6 +23,6 @@ VALUES (
     'centaur-suppliers',
     'Centaur Marketplace Suppliers',
     'centaur-suppliers',
-    '00000000-0000-0000-0000-000000000000' -- System user
+    NULL -- System user (no profile)
 )
 ON CONFLICT (id) DO NOTHING;

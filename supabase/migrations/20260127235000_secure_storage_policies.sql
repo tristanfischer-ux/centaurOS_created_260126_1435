@@ -31,6 +31,9 @@ DROP POLICY IF EXISTS "Allow authenticated uploads" ON storage.objects;
 DROP POLICY IF EXISTS "Allow authenticated selects" ON storage.objects;
 DROP POLICY IF EXISTS "Allow authenticated deletes" ON storage.objects;
 DROP POLICY IF EXISTS "Users can view task files in their foundry" ON storage.objects;
+DROP POLICY IF EXISTS "Foundry members can view task files" ON storage.objects;
+DROP POLICY IF EXISTS "Foundry members can upload to their tasks" ON storage.objects;
+DROP POLICY IF EXISTS "File owners can delete their uploads" ON storage.objects;
 
 -- =============================================
 -- Step 2: Create secure SELECT policy

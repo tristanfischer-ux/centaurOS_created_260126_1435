@@ -1,65 +1,68 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { X, Send, MessageSquare } from 'lucide-react'
+import { X, Send, Loader2, MessageSquare } from 'lucide-react'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { formatDistanceToNow } from 'date-fns'
-import { getThread, sendThreadReply, type ThreadMessage, type ThreadSummary } from '@/actions/threads'
 import { cn } from '@/lib/utils'
+import { format } from 'date-fns'
+import { getThreadReplies, sendThreadReply, getThreadParent, type ThreadReply, type ThreadMessage } from '@/actions/threads'
+import { ReactionDisplay } from './ReactionDisplay'
+import { ReactionPicker } from './ReactionPicker'
 
 interface ThreadPanelProps {
-  /** ID of the parent message to show thread for */
+  /** The parent message ID to show thread for */
   parentMessageId: string | null
+  /** Called when the panel should close */
+  onClose: () => void
   /** Whether the panel is open */
   open: boolean
-  /** Callback when panel should close */
-  onClose: () => void
-  /** Optional className */
-  className?: string
 }
 
 /**
- * ThreadPanel - Slack-style thread replies side panel
+ * ThreadPanel - Slack-style thread reply panel
  * 
- * @description Displays a parent message and all its replies in a side panel.
- * Allows sending new replies with optimistic updates.
- * 
- * @example
- * <ThreadPanel
- *   parentMessageId={selectedMessageId}
- *   open={threadOpen}
- *   onClose={() => setThreadOpen(false)}
- * />
+ * Shows thread replies in a slide-in panel on the right side.
+ * Users can view replies and add new ones.
  */
-export function ThreadPanel({
-  parentMessageId,
-  open,
-  onClose,
-  className,
-}: ThreadPanelProps) {
-  const [thread, setThread] = useState<ThreadSummary | null>(null)
-  const [isLoading, setIsLoading] = useState(false)
+export function ThreadPanel({ parentMessageId, onClose, open }: ThreadPanelProps) {
+  const [parentMessage, setParentMessage] = useState<ThreadMessage | null>(null)
+  const [replies, setReplies] = useState<ThreadReply[]>([])
   const [replyContent, setReplyContent] = useState('')
+  const [isLoading, setIsLoading] = useState(false)
   const [isSending, setIsSending] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const repliesEndRef = useRef<HTMLDivElement>(null)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
 
-  // Load thread when panel opens or parent message changes
+  // Load thread data when panel opens
   useEffect(() => {
     if (open && parentMessageId) {
       loadThread()
+    } else {
+      // Reset state when closed
+      setParentMessage(null)
+      setReplies([])
+      setReplyContent('')
+      setError(null)
     }
   }, [open, parentMessageId])
 
-  // Scroll to bottom when replies change
+  // Auto-scroll to bottom when new replies arrive
   useEffect(() => {
-    if (repliesEndRef.current) {
-      repliesEndRef.current.scrollIntoView({ behavior: 'smooth' })
+    if (replies.length > 0) {
+      repliesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
     }
-  }, [thread?.replies.length])
+  }, [replies.length])
+
+  // Focus textarea when panel opens
+  useEffect(() => {
+    if (open && !isLoading) {
+      textareaRef.current?.focus()
+    }
+  }, [open, isLoading])
 
   async function loadThread() {
     if (!parentMessageId) return
@@ -67,199 +70,233 @@ export function ThreadPanel({
     setIsLoading(true)
     setError(null)
 
-    const result = await getThread(parentMessageId)
+    try {
+      // Load parent message and replies in parallel
+      const [parentResult, repliesResult] = await Promise.all([
+        getThreadParent(parentMessageId),
+        getThreadReplies(parentMessageId),
+      ])
 
-    if (result.success && result.data) {
-      setThread(result.data)
-    } else {
-      setError(result.error || 'Failed to load thread')
+      if (!parentResult.success) {
+        setError(parentResult.error || 'Failed to load thread')
+        return
+      }
+
+      if (!repliesResult.success) {
+        setError(repliesResult.error || 'Failed to load replies')
+        return
+      }
+
+      setParentMessage(parentResult.data || null)
+      setReplies(repliesResult.data || [])
+    } catch (err) {
+      setError('Failed to load thread')
+      console.error('Error loading thread:', err)
+    } finally {
+      setIsLoading(false)
     }
-
-    setIsLoading(false)
   }
 
-  async function handleSendReply(e: React.FormEvent) {
-    e.preventDefault()
-
+  async function handleSendReply() {
     if (!parentMessageId || !replyContent.trim() || isSending) return
 
     setIsSending(true)
     setError(null)
 
-    const result = await sendThreadReply(parentMessageId, replyContent)
+    try {
+      const result = await sendThreadReply(parentMessageId, replyContent.trim())
 
-    if (result.success && result.data) {
-      // Optimistic update: add reply to local state
-      setThread((prev) => {
-        if (!prev) return prev
-        return {
-          ...prev,
-          replies: [...prev.replies, result.data!],
-          reply_count: prev.reply_count + 1,
+      if (!result.success) {
+        setError(result.error || 'Failed to send reply')
+        return
+      }
+
+      // Add reply to list
+      if (result.data) {
+        setReplies(prev => [...prev, result.data!])
+        setReplyContent('')
+        
+        // Update parent message reply count
+        if (parentMessage) {
+          setParentMessage({
+            ...parentMessage,
+            reply_count: parentMessage.reply_count + 1,
+          })
         }
-      })
-      setReplyContent('')
-    } else {
-      setError(result.error || 'Failed to send reply')
+      }
+    } catch (err) {
+      setError('Failed to send reply')
+      console.error('Error sending reply:', err)
+    } finally {
+      setIsSending(false)
     }
-
-    setIsSending(false)
   }
 
-  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
-    // Send on Enter (not Shift+Enter)
-    if (e.key === 'Enter' && !e.shiftKey) {
+  function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
+    // Cmd+Enter or Ctrl+Enter to send
+    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
       e.preventDefault()
-      handleSendReply(e as any)
+      handleSendReply()
     }
+  }
+
+  function getInitials(name: string | null): string {
+    if (!name) return '?'
+    return name
+      .split(' ')
+      .map(n => n[0])
+      .join('')
+      .toUpperCase()
+      .slice(0, 2)
   }
 
   return (
-    <Sheet open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
-      <SheetContent side="right" className={cn('w-[480px] flex flex-col', className)}>
-        <SheetHeader className="border-b pb-4">
+    <Sheet open={open} onOpenChange={(open) => !open && onClose()}>
+      <SheetContent side="right" className="w-[480px] sm:w-[540px] p-0 flex flex-col">
+        {/* Header */}
+        <SheetHeader className="px-6 py-4 border-b">
           <div className="flex items-center justify-between">
-            <SheetTitle className="flex items-center gap-2">
-              <MessageSquare className="h-5 w-5" />
-              Thread
-            </SheetTitle>
-            <Button variant="ghost" size="icon" onClick={onClose}>
+            <div className="flex items-center gap-2">
+              <MessageSquare className="h-5 w-5 text-muted-foreground" />
+              <SheetTitle>Thread</SheetTitle>
+              {parentMessage && (
+                <span className="text-sm text-muted-foreground">
+                  {parentMessage.reply_count} {parentMessage.reply_count === 1 ? 'reply' : 'replies'}
+                </span>
+              )}
+            </div>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={onClose}
+              className="h-8 w-8"
+              aria-label="Close thread"
+            >
               <X className="h-4 w-4" />
             </Button>
           </div>
         </SheetHeader>
 
-        {isLoading && (
-          <div className="flex-1 flex items-center justify-center text-muted-foreground">
-            Loading thread...
-          </div>
-        )}
-
-        {error && !isLoading && (
-          <div className="flex-1 flex items-center justify-center">
-            <div className="text-center">
-              <p className="text-destructive mb-2">{error}</p>
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto">
+          {isLoading ? (
+            <div className="flex items-center justify-center h-full">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            </div>
+          ) : error ? (
+            <div className="flex flex-col items-center justify-center h-full gap-4 px-6">
+              <p className="text-destructive text-center">{error}</p>
               <Button variant="outline" onClick={loadThread}>
-                Try Again
+                Retry
               </Button>
             </div>
-          </div>
-        )}
-
-        {thread && !isLoading && (
-          <>
-            {/* Scrollable messages area */}
-            <div className="flex-1 overflow-y-auto space-y-4 py-4">
-              {/* Parent message */}
-              <div className="bg-muted rounded-lg p-4">
-                <MessageItem message={thread.parent_message} isParent />
-              </div>
-
-              {/* Replies */}
-              {thread.replies.length > 0 && (
-                <div className="space-y-3">
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <div className="flex-1 border-t" />
-                    <span>{thread.reply_count} {thread.reply_count === 1 ? 'reply' : 'replies'}</span>
-                    <div className="flex-1 border-t" />
+          ) : (
+            <div className="space-y-6 px-6 py-4">
+              {/* Parent Message */}
+              {parentMessage && (
+                <div className="pb-6 border-b">
+                  <div className="flex gap-3">
+                    <Avatar className="h-10 w-10 flex-shrink-0">
+                      <AvatarImage src={parentMessage.sender?.avatar_url || undefined} />
+                      <AvatarFallback>
+                        {getInitials(parentMessage.sender?.full_name || null)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-baseline gap-2 mb-1">
+                        <span className="font-semibold text-foreground">
+                          {parentMessage.sender?.full_name || 'Unknown User'}
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          {format(new Date(parentMessage.created_at), 'MMM d, h:mm a')}
+                        </span>
+                      </div>
+                      <div className="text-foreground whitespace-pre-wrap break-words">
+                        {parentMessage.content}
+                      </div>
+                    </div>
                   </div>
-
-                  {thread.replies.map((reply) => (
-                    <MessageItem key={reply.id} message={reply} />
-                  ))}
                 </div>
               )}
 
-              {thread.replies.length === 0 && (
+              {/* Thread Replies */}
+              {replies.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
-                  <MessageSquare className="h-12 w-12 mx-auto mb-2 opacity-20" />
-                  <p className="text-sm">No replies yet. Be the first to reply!</p>
+                  <MessageSquare className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                  <p>No replies yet</p>
+                  <p className="text-sm mt-1">Be the first to reply!</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {replies.map((reply) => (
+                    <div key={reply.id} className="flex gap-3">
+                      <Avatar className="h-8 w-8 flex-shrink-0">
+                        <AvatarImage src={reply.sender?.avatar_url || undefined} />
+                        <AvatarFallback className="text-xs">
+                          {getInitials(reply.sender?.full_name || null)}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-baseline gap-2 mb-1">
+                          <span className="font-medium text-sm text-foreground">
+                            {reply.sender?.full_name || 'Unknown User'}
+                          </span>
+                          <span className="text-xs text-muted-foreground">
+                            {format(new Date(reply.created_at), 'h:mm a')}
+                          </span>
+                        </div>
+                        <div className="text-sm text-foreground whitespace-pre-wrap break-words">
+                          {reply.content}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                  <div ref={repliesEndRef} />
                 </div>
               )}
-
-              <div ref={repliesEndRef} />
             </div>
-
-            {/* Reply input */}
-            <div className="border-t pt-4 mt-auto">
-              <form onSubmit={handleSendReply} className="flex gap-2">
-                <Input
-                  value={replyContent}
-                  onChange={(e) => setReplyContent(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  placeholder="Reply to thread..."
-                  disabled={isSending}
-                  className="flex-1"
-                />
-                <Button
-                  type="submit"
-                  disabled={!replyContent.trim() || isSending}
-                  size="icon"
-                >
-                  {isSending ? (
-                    <div className="h-4 w-4 border-2 border-background border-t-transparent rounded-full animate-spin" />
-                  ) : (
-                    <Send className="h-4 w-4" />
-                  )}
-                </Button>
-              </form>
-              {error && (
-                <p className="text-sm text-destructive mt-2">{error}</p>
-              )}
-            </div>
-          </>
-        )}
-      </SheetContent>
-    </Sheet>
-  )
-}
-
-/**
- * MessageItem - Individual message display in thread
- */
-function MessageItem({
-  message,
-  isParent = false,
-}: {
-  message: ThreadMessage
-  isParent?: boolean
-}) {
-  const initials = message.sender?.full_name
-    ?.split(' ')
-    .map((n) => n[0])
-    .join('')
-    .toUpperCase() || '?'
-
-  return (
-    <div className="flex gap-3">
-      <Avatar className="h-8 w-8 flex-shrink-0">
-        {message.sender?.avatar_url && (
-          <AvatarImage src={message.sender.avatar_url} alt={message.sender.full_name || ''} />
-        )}
-        <AvatarFallback className="text-xs">{initials}</AvatarFallback>
-      </Avatar>
-
-      <div className="flex-1 min-w-0">
-        <div className="flex items-baseline gap-2 mb-1">
-          <span className={cn(
-            'font-medium text-sm',
-            isParent && 'text-foreground',
-            !isParent && 'text-muted-foreground'
-          )}>
-            {message.sender?.full_name || 'Unknown User'}
-          </span>
-          <span className="text-xs text-muted-foreground">
-            {formatDistanceToNow(new Date(message.created_at), { addSuffix: true })}
-          </span>
-          {isParent && (
-            <span className="text-xs text-muted-foreground">(Original message)</span>
           )}
         </div>
 
-        <p className="text-sm text-foreground whitespace-pre-wrap break-words">
-          {message.content}
-        </p>
-      </div>
-    </div>
+        {/* Reply Input */}
+        {!isLoading && !error && (
+          <div className="border-t p-4">
+            <div className="space-y-2">
+              <Textarea
+                ref={textareaRef}
+                value={replyContent}
+                onChange={(e) => setReplyContent(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder={`Reply to ${parentMessage?.sender?.full_name || 'thread'}...`}
+                className="min-h-[80px] resize-none"
+                disabled={isSending}
+              />
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-muted-foreground">
+                  {isSending ? 'Sending...' : 'Cmd+Enter to send'}
+                </span>
+                <Button
+                  onClick={handleSendReply}
+                  disabled={!replyContent.trim() || isSending}
+                  size="sm"
+                >
+                  {isSending ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Sending
+                    </>
+                  ) : (
+                    <>
+                      <Send className="h-4 w-4 mr-2" />
+                      Send
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+      </SheetContent>
+    </Sheet>
   )
 }

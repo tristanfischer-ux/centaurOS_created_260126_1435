@@ -30,6 +30,9 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { archiveConversation, unarchiveConversation } from '@/actions/messaging'
+import { getBatchReplyCounts } from '@/actions/threads'
+import { toggleStarMessage, togglePinMessage, markConversationUnread } from '@/actions/message-actions'
+import { toast } from 'sonner'
 
 interface TeamMember {
   id: string
@@ -90,6 +93,8 @@ export function ConversationThread({
   const [isArchiving, setIsArchiving] = useState(false)
   const [selectedMessageId, setSelectedMessageId] = useState<string | null>(null)
   const [threadPanelOpen, setThreadPanelOpen] = useState(false)
+  const [replyCounts, setReplyCounts] = useState<Record<string, number>>({})
+  const [hoveredMessageId, setHoveredMessageId] = useState<string | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
@@ -100,13 +105,54 @@ export function ConversationThread({
   // Wire up messaging shortcuts
   useMessagingShortcuts({
     onReplyInThread: () => {
-      // Open thread panel for the most recent message (or first selected)
+      // Open thread panel for the most recent message
       if (messages.length > 0 && !threadPanelOpen) {
-        // For now, open thread for the last message
-        // In a full implementation, this would track the "selected" message
-        const lastMessage = messages[messages.length - 1]
-        setSelectedMessageId(lastMessage.id)
-        setThreadPanelOpen(true)
+        const targetMessage = hoveredMessageId 
+          ? messages.find(m => m.id === hoveredMessageId)
+          : messages[messages.length - 1]
+        if (targetMessage) {
+          setSelectedMessageId(targetMessage.id)
+          setThreadPanelOpen(true)
+        }
+      }
+    },
+    onStarMessage: async () => {
+      // Star the hovered or last message
+      const targetMessage = hoveredMessageId
+        ? messages.find(m => m.id === hoveredMessageId)
+        : messages[messages.length - 1]
+      if (targetMessage) {
+        const result = await toggleStarMessage(targetMessage.id)
+        if (result.success) {
+          toast.success(result.starred ? 'Message starred' : 'Message unstarred')
+        } else {
+          toast.error(result.error || 'Failed to toggle star')
+        }
+      }
+    },
+    onPinMessage: async () => {
+      // Pin the hovered or last message
+      if (!conversationId) return
+      const targetMessage = hoveredMessageId
+        ? messages.find(m => m.id === hoveredMessageId)
+        : messages[messages.length - 1]
+      if (targetMessage) {
+        const result = await togglePinMessage(targetMessage.id, conversationId)
+        if (result.success) {
+          toast.success(result.pinned ? 'Message pinned' : 'Message unpinned')
+        } else {
+          toast.error(result.error || 'Failed to toggle pin')
+        }
+      }
+    },
+    onMarkUnread: async () => {
+      // Mark entire conversation as unread
+      if (!conversationId) return
+      const result = await markConversationUnread(conversationId)
+      if (result.success) {
+        toast.success('Conversation marked as unread')
+      } else {
+        toast.error(result.error || 'Failed to mark as unread')
       }
     },
     inputRef,
@@ -125,6 +171,24 @@ export function ConversationThread({
       bottomRef.current.scrollIntoView({ behavior: 'smooth' })
     }
   }, [messages.length])
+
+  // Fetch reply counts for all messages
+  useEffect(() => {
+    if (messages.length === 0) return
+
+    const messageIds = messages.map(m => m.id)
+    
+    getBatchReplyCounts(messageIds).then(result => {
+      if (result.success && result.data) {
+        // Extract just the count from each entry
+        const counts: Record<string, number> = {}
+        for (const [id, data] of Object.entries(result.data)) {
+          counts[id] = data.count
+        }
+        setReplyCounts(counts)
+      }
+    })
+  }, [messages.length]) // Only refetch when message count changes
 
   // Handle send message
   const handleSend = useCallback(async (e: FormEvent) => {
@@ -167,6 +231,12 @@ export function ConversationThread({
   const handleFileClick = () => {
     // TODO: Implement file upload
     console.log('File attachment clicked - implement upload')
+  }
+
+  // Handle opening thread panel
+  const handleOpenThread = (messageId: string) => {
+    setSelectedMessageId(messageId)
+    setThreadPanelOpen(true)
   }
 
   // Group messages by date
@@ -300,6 +370,9 @@ export function ConversationThread({
                       message={message}
                       isOwn={message.sender_id === currentUserId}
                       showAvatar={showAvatar}
+                      replyCount={replyCounts[message.id] || 0}
+                      lastReplyAt={message.last_reply_at || null}
+                      onOpenThread={handleOpenThread}
                     />
                   )
                 })}

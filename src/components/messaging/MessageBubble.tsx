@@ -3,12 +3,16 @@
 import { useState } from 'react'
 import { cn } from '@/lib/utils'
 import { UserAvatar } from '@/components/ui/user-avatar'
-import { Check, CheckCheck, FileIcon, AlertCircle } from 'lucide-react'
+import { Check, CheckCheck, FileIcon, AlertCircle, MessageSquare } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 import type { MessageWithSender } from '@/lib/messaging/service'
 import { sanitizeHref } from '@/lib/security/url-validation'
 import { ReactionDisplay } from './ReactionDisplay'
 import { QuickReactionBar } from './ReactionPicker'
+import { StarredIndicator } from './StarredIndicator'
+import { PinnedIndicator } from './PinnedIndicator'
 import type { ReactionGroup } from '@/actions/reactions'
+import { formatDistanceToNow } from 'date-fns'
 
 interface MessageBubbleProps {
   message: MessageWithSender
@@ -20,6 +24,13 @@ interface MessageBubbleProps {
   onToggleReaction?: (emoji: string) => void
   onAddReaction?: (emoji: string) => void
   showReactions?: boolean
+  // Thread props
+  replyCount?: number
+  lastReplyAt?: string | null
+  onOpenThread?: (messageId: string) => void
+  // Message status props
+  isStarred?: boolean
+  isPinned?: boolean
 }
 
 function formatTime(dateString: string): string {
@@ -69,12 +80,18 @@ export function MessageBubble({
   reactions = [],
   onToggleReaction,
   onAddReaction,
-  showReactions = true
+  showReactions = true,
+  replyCount = 0,
+  lastReplyAt,
+  onOpenThread,
+  isStarred = false,
+  isPinned = false
 }: MessageBubbleProps) {
   const [showQuickReactions, setShowQuickReactions] = useState(false)
   const sender = message.sender
   const isSystem = message.message_type === 'system'
   const isFile = message.message_type === 'file'
+  const hasReplies = replyCount > 0
   
   const handleToggleReaction = (emoji: string) => {
     onToggleReaction?.(emoji)
@@ -83,6 +100,12 @@ export function MessageBubble({
   const handleAddReaction = (emoji: string) => {
     onAddReaction?.(emoji)
     setShowQuickReactions(false)
+  }
+  
+  const handleOpenThread = () => {
+    if (onOpenThread) {
+      onOpenThread(message.id)
+    }
   }
 
   // System messages are centered and styled differently
@@ -144,12 +167,15 @@ export function MessageBubble({
           
           <div
             className={cn(
-              'px-4 py-2 rounded-2xl max-w-full break-words',
+              'px-4 py-2 rounded-2xl max-w-full break-words relative',
               isOwn 
                 ? 'bg-international-orange text-white rounded-br-md' 
                 : 'bg-muted text-foreground rounded-bl-md'
             )}
           >
+            {/* Starred and Pinned indicators */}
+            <StarredIndicator isStarred={isStarred} />
+            <PinnedIndicator isPinned={isPinned} />
             {isFile && message.file_url && sanitizeHref(message.file_url) !== '#' ? (
               <a 
                 href={sanitizeHref(message.file_url)} 
@@ -180,6 +206,53 @@ export function MessageBubble({
             showAddButton={!showQuickReactions && !!onAddReaction}
             className={isOwn ? 'justify-end' : 'justify-start'}
           />
+        )}
+
+        {/* Thread indicator */}
+        {replyCount && replyCount > 0 && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleOpenThread}
+            className={cn(
+              'h-auto py-1 px-2 text-xs text-muted-foreground hover:text-foreground gap-1.5',
+              isOwn && 'ml-auto'
+            )}
+          >
+            <MessageSquare className="h-3.5 w-3.5" />
+            <span>{replyCount} {replyCount === 1 ? 'reply' : 'replies'}</span>
+            {lastReplyAt && (
+              <span className="text-muted-foreground/70">
+                · {formatDistanceToNow(new Date(lastReplyAt), { addSuffix: true })}
+              </span>
+            )}
+          </Button>
+        )}
+
+        {/* Thread indicator */}
+        {hasReplies && onOpenThread && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleOpenThread}
+            className={cn(
+              'h-auto py-1 px-2 text-xs text-muted-foreground hover:text-foreground gap-1.5',
+              isOwn ? 'ml-auto' : 'mr-auto'
+            )}
+          >
+            <MessageSquare className="h-3.5 w-3.5" />
+            <span>
+              {replyCount} {replyCount === 1 ? 'reply' : 'replies'}
+            </span>
+            {lastReplyAt && (
+              <>
+                <span>•</span>
+                <span className="text-[10px]">
+                  Last reply {formatDistanceToNow(new Date(lastReplyAt), { addSuffix: true })}
+                </span>
+              </>
+            )}
+          </Button>
         )}
 
         {/* Timestamp and read status */}

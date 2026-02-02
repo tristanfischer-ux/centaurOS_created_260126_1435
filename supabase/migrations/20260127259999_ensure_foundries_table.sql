@@ -3,9 +3,10 @@
 
 -- Create foundries table if it doesn't exist
 CREATE TABLE IF NOT EXISTS public.foundries (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  id text PRIMARY KEY DEFAULT gen_random_uuid()::text,
   name text NOT NULL,
   slug text UNIQUE,
+  owner_id uuid REFERENCES public.profiles(id),
   industry text,
   stage text,
   created_at timestamptz DEFAULT now(),

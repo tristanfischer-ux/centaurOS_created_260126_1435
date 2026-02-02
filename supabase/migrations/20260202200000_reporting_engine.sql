@@ -642,9 +642,10 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 -- Triggers for updated_at
 -- ===========================================
 
+-- Use existing update_messaging_updated_at function from telegram integration
 CREATE TRIGGER report_preferences_updated_at
     BEFORE UPDATE ON report_preferences
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+    FOR EACH ROW EXECUTE FUNCTION update_messaging_updated_at();
 
 -- Grant execute permissions
 GRANT EXECUTE ON FUNCTION get_daily_pulse(UUID, DATE) TO authenticated;
