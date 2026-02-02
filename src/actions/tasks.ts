@@ -602,6 +602,56 @@ export async function addTaskComment(taskId: string, content: string) {
 
     if (error) return { error: sanitizeErrorMessage(error) }
 
+    // Parse mentions from content and create notifications
+    try {
+        const { parseUserMentions } = await import('@/lib/mentions')
+        const mentions = parseUserMentions(validatedContent)
+        
+        if (mentions.length > 0) {
+            // Get all foundry members to match mentions
+            const { data: members } = await supabase
+                .from('foundry_members')
+                .select('user_id, profiles!inner(id, full_name)')
+                .eq('foundry_id', foundry_id)
+            
+            if (members) {
+                // Match mentioned names to user IDs (case-insensitive first name match)
+                const mentionedUserIds = new Set<string>()
+                for (const mention of mentions) {
+                    const matchedMember = members.find(m => 
+                        m.profiles?.full_name?.toLowerCase().startsWith(mention.toLowerCase())
+                    )
+                    if (matchedMember && matchedMember.user_id !== user.id) {
+                        mentionedUserIds.add(matchedMember.user_id)
+                    }
+                }
+
+                // Create notifications for mentioned users
+                if (mentionedUserIds.size > 0) {
+                    const { data: task } = await supabase
+                        .from('tasks')
+                        .select('title, task_number')
+                        .eq('id', taskId)
+                        .single()
+
+                    const notifications = Array.from(mentionedUserIds).map(userId => ({
+                        user_id: userId,
+                        type: 'mention' as const,
+                        title: 'Mentioned in task comment',
+                        message: `${user.email?.split('@')[0] || 'Someone'} mentioned you in task #${task?.task_number || ''}: ${task?.title || 'Untitled'}`,
+                        task_id: taskId,
+                        is_read: false
+                    }))
+
+                    await supabase.from('notifications').insert(notifications)
+                }
+            }
+        }
+    } catch (mentionError) {
+        // Don't fail the main operation if mention processing fails
+        console.error('Failed to process mentions:', mentionError)
+    }
+
     // Sync comment to messages so it appears in the unified inbox
     try {
         await syncTaskCommentToMessages(supabase, {

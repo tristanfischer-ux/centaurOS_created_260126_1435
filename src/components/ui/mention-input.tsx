@@ -165,12 +165,13 @@ export function MentionInput({
         aria-label="Mention suggestions"
         aria-live="polite"
         aria-atomic="false"
-        className="fixed bg-background border-2 border rounded-lg shadow-xl z-[200] overflow-hidden"
+        className="fixed bg-background border-2 border rounded-lg shadow-xl overflow-hidden"
         style={{
           top: dropdownPosition.top - 4,
           left: dropdownPosition.left,
           width: dropdownPosition.width,
-          transform: 'translateY(-100%)'
+          transform: 'translateY(-100%)',
+          zIndex: 9999
         }}
       >
         <div className="p-2 text-xs text-muted-foreground border-b bg-muted" aria-hidden="true">
