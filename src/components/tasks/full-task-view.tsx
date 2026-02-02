@@ -23,7 +23,6 @@ import { toast } from "sonner"
 import { cn, getInitials } from "@/lib/utils"
 import { getStatusColor } from "@/lib/status-colors"
 import {
-    X,
     Loader2,
     Send,
     Upload,
@@ -251,29 +250,24 @@ export function FullTaskView({ open, onOpenChange, task, members }: FullTaskView
             <DialogContent size="lg" className="w-full h-[90vh] p-0 gap-0 flex flex-col overflow-hidden">
                 {/* Header */}
                 <DialogHeader className="p-6 pb-4 border-b border shrink-0">
-                    <div className="flex items-start justify-between gap-4">
-                        <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 mb-2 flex-wrap">
-                                <span className="text-sm font-mono text-muted-foreground">
-                                    #{task.task_number ?? '...'}
-                                </span>
-                                <Badge className={`${getStatusColor(task.status).bar} text-white border-0`}>
-                                    {(task.status || 'Pending').replace(/_/g, ' ')}
-                                </Badge>
-                                {getRiskBadge(task.risk_level)}
-                            </div>
-                            <DialogTitle className="text-2xl font-display font-semibold text-foreground tracking-tight">
-                                {task.title}
-                            </DialogTitle>
-                            {task.objective && (
-                                <p className="text-sm text-primary mt-1">
-                                    {task.objective.title}
-                                </p>
-                            )}
+                    <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-2 flex-wrap">
+                            <span className="text-sm font-mono text-muted-foreground">
+                                #{task.task_number ?? '...'}
+                            </span>
+                            <Badge className={`${getStatusColor(task.status).bar} text-white border-0`}>
+                                {(task.status || 'Pending').replace(/_/g, ' ')}
+                            </Badge>
+                            {getRiskBadge(task.risk_level)}
                         </div>
-                        <Button variant="ghost" size="icon" onClick={() => onOpenChange(false)} className="shrink-0" aria-label="Close">
-                            <X className="h-5 w-5" />
-                        </Button>
+                        <DialogTitle className="text-2xl font-display font-semibold text-foreground tracking-tight">
+                            {task.title}
+                        </DialogTitle>
+                        {task.objective && (
+                            <p className="text-sm text-primary mt-1">
+                                {task.objective.title}
+                            </p>
+                        )}
                     </div>
                 </DialogHeader>
 
