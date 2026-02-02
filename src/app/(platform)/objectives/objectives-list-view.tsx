@@ -418,10 +418,9 @@ export function ObjectivesListView({ objectives, objectivesForDialog, members, t
 
                                                 return (
                                                     <div key={task.id} className="flex items-center gap-2 sm:gap-4 p-4 pl-9 sm:pl-16 hover:bg-card transition-colors">
-                                                        <StatusIcon 
-                                                            className={`h-4 w-4 shrink-0 ${statusConfig.color.split(' ')[1]}`}
-                                                            title={task.status?.replace('_', ' ') || 'Pending'}
-                                                        />
+                                                        <div title={task.status?.replace('_', ' ') || 'Pending'}>
+                                                            <StatusIcon className={`h-4 w-4 shrink-0 ${statusConfig.color.split(' ')[1]}`} />
+                                                        </div>
 
                                                         <button
                                                             onClick={(e) => {
