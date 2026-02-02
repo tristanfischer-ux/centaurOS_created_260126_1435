@@ -225,7 +225,7 @@ export function ComparisonModal({ open, onOpenChange, items }: ComparisonModalPr
 
     return (
         <Dialog open={open} onOpenChange={handleOpenChange}>
-            <DialogContent size="xl" className="max-h-[85vh] flex flex-col p-0 gap-0">
+            <DialogContent size="xl" className="h-[85vh] max-h-[85vh] flex flex-col p-0 gap-0">
                 <DialogHeader className="p-6 pb-4 border-b flex-shrink-0">
                     <div className="flex items-center justify-between">
                         <DialogTitle className="text-xl font-semibold">
