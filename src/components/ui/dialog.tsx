@@ -8,7 +8,7 @@ import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "@/lib/utils"
 
 const dialogContentVariants = cva(
-  "z-50 grid w-[calc(100vw-2rem)] max-h-[90dvh] gap-4 bg-background text-foreground p-6 shadow-2xl duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:slide-out-to-bottom-2 data-[state=open]:slide-in-from-bottom-2 border rounded-lg overflow-y-auto [-webkit-font-smoothing:antialiased] [-moz-osx-font-smoothing:grayscale]",
+  "z-50 grid w-[calc(100vw-2rem)] max-h-[90dvh] gap-4 bg-background text-foreground p-6 shadow-2xl duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:slide-out-to-bottom-2 data-[state=open]:slide-in-from-bottom-2 border rounded-lg overflow-y-auto [-webkit-font-smoothing:subpixel-antialiased] [-moz-osx-font-smoothing:auto]",
   {
     variants: {
       size: {
@@ -62,7 +62,7 @@ const DialogContent = React.forwardRef<
     <DialogPrimitive.Content
       ref={ref}
       className={cn(
-        "fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 [backface-visibility:hidden]",
+        "fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 [backface-visibility:hidden] [will-change:transform]",
         dialogContentVariants({ size, className })
       )}
       {...props}

@@ -213,24 +213,47 @@ export const MarketCard = memo(function MarketCard({
             onMouseLeave={() => setIsHovered(false)}
             onClick={handleCardClick}
         >
-            {/* Compare button - appears on hover in top right */}
-            <button
-                onClick={(e) => {
-                    e.stopPropagation()
-                    onToggleSelect(listing.id)
-                }}
-                className={cn(
-                    "absolute top-3 right-3 z-20 w-8 h-8 rounded-full flex items-center justify-center transition-all duration-200",
-                    isSelected 
-                        ? "bg-orange-500 text-white shadow-md" 
-                        : isHovered 
-                            ? "bg-background text-muted-foreground shadow-md border opacity-100"
-                            : "opacity-0"
-                )}
-                title={isSelected ? "Remove from comparison" : "Add to comparison"}
-            >
-                <GitCompareArrows className="w-4 h-4" />
-            </button>
+            {/* Action buttons - top right */}
+            <div className="absolute top-3 right-3 z-20 flex items-center gap-2">
+                {/* Save/Heart button */}
+                <button
+                    onClick={handleSaveToggle}
+                    disabled={isSaving}
+                    className={cn(
+                        "w-8 h-8 rounded-full flex items-center justify-center transition-all duration-200",
+                        localSavedState
+                            ? "bg-red-500 text-white shadow-md"
+                            : isHovered
+                                ? "bg-background text-muted-foreground shadow-md border opacity-100"
+                                : "opacity-0 group-hover:opacity-100"
+                    )}
+                    title={localSavedState ? "Remove from saved" : "Save for later"}
+                >
+                    <Heart className={cn(
+                        "w-4 h-4 transition-all",
+                        localSavedState && "fill-current"
+                    )} />
+                </button>
+
+                {/* Compare button */}
+                <button
+                    onClick={(e) => {
+                        e.stopPropagation()
+                        onToggleSelect(listing.id)
+                    }}
+                    className={cn(
+                        "w-8 h-8 rounded-full flex items-center justify-center transition-all duration-200",
+                        isSelected 
+                            ? "bg-orange-500 text-white shadow-md" 
+                            : isHovered 
+                                ? "bg-background text-muted-foreground shadow-md border opacity-100"
+                                : "opacity-0 group-hover:opacity-100"
+                    )}
+                    title={isSelected ? "Remove from comparison" : "Add to comparison"}
+                >
+                    <GitCompareArrows className="w-4 h-4" />
+                </button>
+            </div>
 
             <CardContent className={cn(
                 "flex flex-col flex-1 transition-all duration-200",

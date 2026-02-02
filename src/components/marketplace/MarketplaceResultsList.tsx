@@ -18,6 +18,8 @@ interface MarketplaceResultsListProps {
     hasActiveFilters: boolean
     onClearFilters: () => void
     getResultsLabel: () => string
+    savedIds?: Set<string>
+    onSaveToggle?: (id: string, isSaved: boolean) => void
 }
 
 /**
@@ -32,6 +34,8 @@ export const MarketplaceResultsList = memo(function MarketplaceResultsList({
     hasActiveFilters,
     onClearFilters,
     getResultsLabel,
+    savedIds = new Set(),
+    onSaveToggle,
 }: MarketplaceResultsListProps) {
     if (items.length === 0) {
         return (
@@ -57,6 +61,8 @@ export const MarketplaceResultsList = memo(function MarketplaceResultsList({
                         listing={item}
                         isSelected={selectedIds.has(item.id)}
                         onToggleSelect={onToggleSelect}
+                        isSaved={savedIds.has(item.id)}
+                        onSaveToggle={onSaveToggle}
                     />
                 ))}
             </div>

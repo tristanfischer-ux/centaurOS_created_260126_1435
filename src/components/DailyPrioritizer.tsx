@@ -10,11 +10,21 @@ import { FullTaskView } from '@/components/tasks/full-task-view'
 interface Task {
     id: string
     title: string
+    description: string | null
     status: string
+    start_date: string | null
     end_date: string | null
     created_at: string
     updated_at: string
     risk_level?: string | null
+    task_number?: number
+    assignee?: {
+        id: string
+        full_name: string | null
+        role: string | null
+        email: string
+        avatar_url?: string | null
+    } | null
     objective?: {
         id: string
         title: string

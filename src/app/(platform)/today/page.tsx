@@ -32,15 +32,20 @@ import { typography } from "@/lib/design-system"
 interface TodayTask {
     id: string
     title: string
+    description: string | null
     status: "Pending" | "Accepted" | "Rejected" | "Amended" | "Amended_Pending_Approval" | "Completed" | "Pending_Peer_Review" | "Pending_Executive_Approval"
+    start_date: string | null
     end_date: string | null
     created_at: string
     updated_at: string
     risk_level: string | null
+    task_number?: number
     assignee?: {
         id: string
         full_name: string | null
         role: string | null
+        email: string
+        avatar_url?: string | null
     }
     creator?: {
         id: string
@@ -158,12 +163,15 @@ export default async function TodayPage() {
         .select(`
             id,
             title,
+            description,
             status,
+            start_date,
             end_date,
             created_at,
             updated_at,
             risk_level,
-            assignee:profiles!assignee_id(id, full_name, role),
+            task_number,
+            assignee:profiles!assignee_id(id, full_name, role, email, avatar_url),
             objective:objectives!objective_id(id, title)
         `)
         .in('status', ['Pending', 'Accepted'])

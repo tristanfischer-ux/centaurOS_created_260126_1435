@@ -37,7 +37,7 @@ import {
     getAutocomplete
 } from "@/actions/search"
 import { getMyRFQs } from "@/actions/rfq"
-import { getSavedResources } from "@/actions/marketplace"
+import { getSavedResources, getSavedMarketplaceListings, getSavedListingIds } from "@/actions/marketplace"
 import { RFQCard } from "@/components/rfq/RFQCard"
 import { RFQSummary } from "@/types/rfq"
 
@@ -83,6 +83,8 @@ export function MarketplaceView({
     const [topTab, setTopTab] = useState<string>('browse')
     const [myRfqs, setMyRfqs] = useState<RFQSummary[]>([])
     const [savedResources, setSavedResources] = useState<any[]>([])
+    const [savedListings, setSavedListings] = useState<MarketplaceListing[]>([])
+    const [savedListingIds, setSavedListingIds] = useState<Set<string>>(new Set())
     const [isLoadingRfqs, setIsLoadingRfqs] = useState(false)
     const [isLoadingSaved, setIsLoadingSaved] = useState(false)
     const [searchQuery, setSearchQuery] = useState('')
@@ -250,29 +252,64 @@ export function MarketplaceView({
         }
     }, [])
 
-    // Fetch saved resources when switching to Saved tab
+    // Fetch saved marketplace listings when switching to Saved tab
     const fetchSavedResources = useCallback(async () => {
         setIsLoadingSaved(true)
         try {
-            const result = await getSavedResources()
+            const result = await getSavedMarketplaceListings()
             if (!result.error && result.data) {
-                setSavedResources(result.data)
+                setSavedListings(result.data)
+                // Also update savedListingIds set
+                setSavedListingIds(new Set(result.data.map(l => l.id)))
             }
         } catch (err) {
-            console.error('Error fetching saved resources:', err)
+            console.error('Error fetching saved listings:', err)
         } finally {
             setIsLoadingSaved(false)
         }
     }, [])
 
+    // Load saved listing IDs for current visible items
+    useEffect(() => {
+        const loadSavedIds = async () => {
+            const visibleIds = filteredResults.map(item => item.id)
+            if (visibleIds.length > 0) {
+                const ids = await getSavedListingIds(visibleIds)
+                setSavedListingIds(ids)
+            }
+        }
+        if (topTab === 'browse') {
+            loadSavedIds()
+        }
+    }, [filteredResults, topTab])
+
     // Fetch data when top tab changes
     useEffect(() => {
         if (topTab === 'rfqs' && myRfqs.length === 0) {
             fetchMyRfqs()
-        } else if (topTab === 'saved' && savedResources.length === 0) {
+        } else if (topTab === 'saved' && savedListings.length === 0) {
             fetchSavedResources()
         }
-    }, [topTab, myRfqs.length, savedResources.length, fetchMyRfqs, fetchSavedResources])
+    }, [topTab, myRfqs.length, savedListings.length, fetchMyRfqs, fetchSavedResources])
+
+    // Handle save/unsave toggle from card
+    const handleSaveToggle = useCallback((listingId: string, isSaved: boolean) => {
+        // Update saved IDs set
+        setSavedListingIds(prev => {
+            const next = new Set(prev)
+            if (isSaved) {
+                next.add(listingId)
+            } else {
+                next.delete(listingId)
+            }
+            return next
+        })
+        
+        // If we're on the saved tab, refetch to update the list
+        if (topTab === 'saved') {
+            fetchSavedResources()
+        }
+    }, [topTab, fetchSavedResources])
 
     // Handle top tab change and update URL
     const handleTopTabChange = useCallback((newTab: string) => {
@@ -790,9 +827,9 @@ export function MarketplaceView({
                     <TabsTrigger value="saved" className="flex-1 gap-2">
                         <Heart className="h-4 w-4" />
                         Saved
-                        {savedResources.length > 0 && (
+                        {savedListings.length > 0 && (
                             <Badge variant="secondary" className="ml-1 h-5 min-w-[20px] px-1.5">
-                                {savedResources.length}
+                                {savedListings.length}
                             </Badge>
                         )}
                     </TabsTrigger>
@@ -1610,6 +1647,8 @@ export function MarketplaceView({
                                     onToggleSelect={toggleSelect}
                                     size={cardSizes[item.id] || defaultCardSize}
                                     onSizeChange={handleCardSizeChange}
+                                    isSaved={savedListingIds.has(item.id)}
+                                    onSaveToggle={handleSaveToggle}
                                 />
                             ))}
                         </div>
@@ -1815,8 +1854,8 @@ export function MarketplaceView({
                         {/* Header with refresh */}
                         <div className="flex items-center justify-between">
                             <div>
-                                <h2 className="text-2xl font-bold">Saved Resources</h2>
-                                <p className="text-muted-foreground">Bookmarked people, products, and services</p>
+                                <h2 className="text-2xl font-bold">Saved Listings</h2>
+                                <p className="text-muted-foreground">Your favorited marketplace listings</p>
                             </div>
                             <Button
                                 variant="secondary"
@@ -1834,18 +1873,18 @@ export function MarketplaceView({
                         </div>
 
                         {/* Loading state */}
-                        {isLoadingSaved && savedResources.length === 0 && (
+                        {isLoadingSaved && savedListings.length === 0 && (
                             <div className="flex items-center justify-center py-12">
                                 <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
                             </div>
                         )}
 
                         {/* Empty state */}
-                        {!isLoadingSaved && savedResources.length === 0 && (
+                        {!isLoadingSaved && savedListings.length === 0 && (
                             <EmptyState
                                 icon={<Heart className="h-12 w-12 text-muted-foreground" />}
-                                title="No saved resources"
-                                description="Save people, products, and services from the marketplace to access them quickly later."
+                                title="No saved listings"
+                                description="Save people, products, services, and AI tools from the marketplace to access them quickly later. Click the heart icon on any listing card to save it."
                                 action={
                                     <Button variant="secondary" onClick={() => handleTopTabChange('browse')}>
                                         Browse Marketplace
@@ -1854,50 +1893,21 @@ export function MarketplaceView({
                             />
                         )}
 
-                        {/* Saved Resources Grid */}
-                        {savedResources.length > 0 && (
-                            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                                {savedResources.map((saved) => {
-                                    const listing = saved.marketplace_listings
-                                    if (!listing) return null
-                                    
-                                    return (
-                                        <Card key={saved.id} className="group hover:shadow-md transition-shadow">
-                                            <CardContent className="p-4">
-                                                <div className="flex items-start justify-between gap-2 mb-3">
-                                                    <Badge variant="secondary" className="text-xs">
-                                                        {listing.category}
-                                                    </Badge>
-                                                    <Heart className="h-4 w-4 text-rose-500 fill-rose-500" />
-                                                </div>
-                                                <h3 className="font-semibold text-foreground line-clamp-1 mb-1">
-                                                    {listing.name}
-                                                </h3>
-                                                {listing.headline && (
-                                                    <p className="text-sm text-muted-foreground line-clamp-2 mb-3">
-                                                        {listing.headline}
-                                                    </p>
-                                                )}
-                                                {listing.subcategory && (
-                                                    <p className="text-xs text-muted-foreground mb-3">
-                                                        {listing.subcategory}
-                                                    </p>
-                                                )}
-                                                <div className="flex items-center justify-between">
-                                                    {listing.rating_average && (
-                                                        <div className="flex items-center gap-1 text-sm">
-                                                            <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
-                                                            <span>{listing.rating_average.toFixed(1)}</span>
-                                                        </div>
-                                                    )}
-                                                    <Button size="sm" variant="secondary" asChild>
-                                                        <a href={`/marketplace/${saved.provider_id}`}>View</a>
-                                                    </Button>
-                                                </div>
-                                            </CardContent>
-                                        </Card>
-                                    )
-                                })}
+                        {/* Saved Listings Grid */}
+                        {savedListings.length > 0 && (
+                            <div className="grid gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                                {savedListings.map(listing => (
+                                    <MarketCard
+                                        key={listing.id}
+                                        listing={listing}
+                                        isSelected={selectedIds.has(listing.id)}
+                                        onToggleSelect={toggleSelect}
+                                        size={cardSizes[listing.id] || defaultCardSize}
+                                        onSizeChange={handleCardSizeChange}
+                                        isSaved={true}
+                                        onSaveToggle={handleSaveToggle}
+                                    />
+                                ))}
                             </div>
                         )}
                     </div>
