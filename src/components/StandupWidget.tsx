@@ -7,6 +7,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { 
     CheckCircle2, 
     Target, 
@@ -167,59 +168,171 @@ export function StandupWidget({ userRole, compact = false }: StandupWidgetProps)
     // Compact view for dashboard
     if (compact) {
         return (
-            <Card>
-                <CardHeader className="pb-2">
-                    <div className="flex items-center justify-between">
-                        <CardTitle className="text-base flex items-center gap-2">
-                            <Target className="h-4 w-4 text-muted-foreground" />
-                            Daily Standup
-                        </CardTitle>
+            <>
+                <Card>
+                    <CardHeader className="pb-2">
+                        <div className="flex items-center justify-between">
+                            <CardTitle className="text-base flex items-center gap-2">
+                                <Target className="h-4 w-4 text-muted-foreground" />
+                                Daily Standup
+                            </CardTitle>
+                            {hasSubmitted ? (
+                                <Badge variant="secondary" className="bg-status-success-light text-status-success-dark">
+                                    <CheckCircle2 className="h-3 w-3 mr-1" />
+                                    Done
+                                </Badge>
+                            ) : (
+                                <Badge variant="secondary" className="bg-status-warning-light text-status-warning-dark">
+                                    Pending
+                                </Badge>
+                            )}
+                        </div>
+                    </CardHeader>
+                    <CardContent>
                         {hasSubmitted ? (
-                            <Badge variant="secondary" className="bg-status-success-light text-status-success-dark">
-                                <CheckCircle2 className="h-3 w-3 mr-1" />
-                                Done
-                            </Badge>
-                        ) : (
-                            <Badge variant="secondary" className="bg-status-warning-light text-status-warning-dark">
-                                Pending
-                            </Badge>
-                        )}
-                    </div>
-                </CardHeader>
-                <CardContent>
-                    {hasSubmitted ? (
-                        <div className="text-sm text-muted-foreground">
-                            <p className="line-clamp-2">{myStandup?.planned || 'No plans shared'}</p>
-                            <Button 
-                                variant="link" 
-                                size="sm" 
-                                className="px-0 h-auto text-xs"
-                                onClick={() => setShowForm(true)}
-                            >
-                                Edit standup
-                            </Button>
-                        </div>
-                    ) : (
-                        <Button 
-                            size="sm" 
-                            onClick={() => setShowForm(true)}
-                            className="w-full"
-                        >
-                            Submit Standup
-                        </Button>
-                    )}
-                    
-                    {stats && (
-                        <div className="mt-3 pt-3 border-t">
-                            <div className="flex items-center justify-between text-xs text-muted-foreground">
-                                <span>{stats.submittedToday}/{stats.totalMembers} submitted</span>
-                                <span>{stats.participationRate}%</span>
+                            <div className="text-sm text-muted-foreground">
+                                <p className="line-clamp-2">{myStandup?.planned || 'No plans shared'}</p>
+                                <Button 
+                                    variant="link" 
+                                    size="sm" 
+                                    className="px-0 h-auto text-xs"
+                                    onClick={() => setShowForm(true)}
+                                >
+                                    Edit standup
+                                </Button>
                             </div>
-                            <Progress value={stats.participationRate} className="h-1 mt-1" />
+                        ) : (
+                            <Button 
+                                size="sm" 
+                                onClick={() => setShowForm(true)}
+                                className="w-full"
+                            >
+                                Submit Standup
+                            </Button>
+                        )}
+                        
+                        {stats && (
+                            <div className="mt-3 pt-3 border-t">
+                                <div className="flex items-center justify-between text-xs text-muted-foreground">
+                                    <span>{stats.submittedToday}/{stats.totalMembers} submitted</span>
+                                    <span>{stats.participationRate}%</span>
+                                </div>
+                                <Progress value={stats.participationRate} className="h-1 mt-1" />
+                            </div>
+                        )}
+                    </CardContent>
+                </Card>
+
+                {/* Standup Dialog for compact mode */}
+                <Dialog open={showForm} onOpenChange={setShowForm}>
+                    <DialogContent size="md">
+                        <DialogHeader>
+                            <DialogTitle>Daily Standup</DialogTitle>
+                        </DialogHeader>
+                        
+                        <div className="space-y-4">
+                            <div className="space-y-2">
+                                <label htmlFor="standup-yesterday" className="text-sm font-medium text-foreground flex items-center gap-2">
+                                    <CheckCircle2 className="h-4 w-4 text-status-success" />
+                                    What did you accomplish?
+                                </label>
+                                <Textarea
+                                    id="standup-yesterday"
+                                    value={completed}
+                                    onChange={(e) => setCompleted(e.target.value)}
+                                    placeholder="Yesterday I completed..."
+                                    className="min-h-[80px] bg-background border"
+                                />
+                            </div>
+                            
+                            <div className="space-y-2">
+                                <label htmlFor="standup-today" className="text-sm font-medium text-foreground flex items-center gap-2">
+                                    <Target className="h-4 w-4 text-status-info" />
+                                    What will you work on today?
+                                </label>
+                                <Textarea
+                                    id="standup-today"
+                                    value={planned}
+                                    onChange={(e) => setPlanned(e.target.value)}
+                                    placeholder="Today I plan to..."
+                                    className="min-h-[80px] bg-background border"
+                                />
+                            </div>
+                            
+                            <div className="space-y-2">
+                                <label htmlFor="standup-blockers" className="text-sm font-medium text-foreground flex items-center gap-2">
+                                    <AlertTriangle className="h-4 w-4 text-status-warning" />
+                                    Any blockers or issues?
+                                </label>
+                                <Textarea
+                                    id="standup-blockers"
+                                    value={blockers}
+                                    onChange={(e) => setBlockers(e.target.value)}
+                                    placeholder="I'm blocked by... (or leave empty)"
+                                    className="min-h-[60px] bg-background border"
+                                />
+                                {blockers && (
+                                    <label className="flex items-center gap-2 text-sm">
+                                        <input
+                                            type="checkbox"
+                                            checked={needsHelp}
+                                            onChange={(e) => setNeedsHelp(e.target.checked)}
+                                            className="rounded border"
+                                        />
+                                        <span className="text-muted-foreground">I need help unblocking this</span>
+                                    </label>
+                                )}
+                            </div>
+                            
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium text-foreground">How are you feeling?</label>
+                                <div className="flex gap-2">
+                                    {moodOptions.map((option) => {
+                                        const Icon = option.icon
+                                        return (
+                                            <button
+                                                key={option.value}
+                                                type="button"
+                                                onClick={() => setMood(option.value)}
+                                                className={cn(
+                                                    'flex-1 py-2 px-3 rounded-lg border transition-all',
+                                                    mood === option.value
+                                                        ? option.color + ' border-2'
+                                                        : 'border hover:border-muted-foreground/30 bg-background'
+                                                )}
+                                            >
+                                                <Icon className={cn(
+                                                    'h-5 w-5 mx-auto',
+                                                    mood === option.value ? '' : 'text-muted-foreground'
+                                                )} />
+                                                <span className={cn(
+                                                    'text-xs block mt-1',
+                                                    mood === option.value ? '' : 'text-muted-foreground'
+                                                )}>
+                                                    {option.label}
+                                                </span>
+                                            </button>
+                                        )
+                                    })}
+                                </div>
+                            </div>
                         </div>
-                    )}
-                </CardContent>
-            </Card>
+
+                        <DialogFooter>
+                            <Button variant="secondary" onClick={() => setShowForm(false)}>
+                                Cancel
+                            </Button>
+                            <Button
+                                onClick={handleSubmit}
+                                disabled={isPending || (!completed && !planned)}
+                            >
+                                {isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                                {hasSubmitted ? 'Update Standup' : 'Submit Standup'}
+                            </Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
+            </>
         )
     }
 

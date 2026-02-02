@@ -42,17 +42,25 @@ The `DialogContent` component already provides `bg-background` which is solid. *
 <DialogContent style={{ opacity: 0.9 }}> // Wrong
 ```
 
-### 3. Overlay Backdrop Opacity
+### 3. Overlay Backdrop Transparency
 
-The dialog overlay (dark background behind dialog) CAN have transparency with blur, but the dialog content itself MUST be solid.
+The dialog overlay (dark background behind dialog) uses semi-transparent dark background (NO blur) to allow seeing the page behind while keeping focus on the modal.
 
 ```tsx
-// ✅ CORRECT - Overlay is translucent (already default in dialog.tsx)
-// bg-black/70 backdrop-blur-md
+// ✅ CORRECT - Overlay is semi-transparent (already default in dialog.tsx)
+// Uses: bg-black/40 (40% opacity, no backdrop-blur)
 
-// Dialog content is solid
-<DialogContent className="bg-background"> // Solid
+// Dialog content is ALWAYS solid
+<DialogContent className="bg-background"> // Solid, opaque
+
+// ❌ WRONG - Do NOT add backdrop-blur (causes fuzzy appearance)
+<DialogOverlay className="backdrop-blur-sm"> // Wrong
 ```
+
+**Key principles:**
+- Overlay: `bg-black/40` (semi-transparent, allows seeing page)
+- Modal content: `bg-background` (solid, opaque)
+- NO `backdrop-blur` anywhere (causes fuzzy appearance)
 
 ### 4. Card Backgrounds in Dialogs
 

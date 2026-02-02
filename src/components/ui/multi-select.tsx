@@ -115,7 +115,8 @@ export function MultiSelect({
                                 <div
                                     key={option.value}
                                     className={cn(
-                                        "flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-muted transition-colors",
+                                        "flex items-center gap-2 px-3 py-2 cursor-pointer transition-colors",
+                                        "hover:bg-muted hover:text-foreground",
                                         isSelected && "bg-muted"
                                     )}
                                     onClick={() => handleSelect(option.value)}

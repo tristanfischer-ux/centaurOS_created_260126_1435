@@ -276,26 +276,28 @@ BEGIN
         
         -- Active objectives progress
         'objectives', (
-            SELECT COALESCE(jsonb_agg(jsonb_build_object(
-                'id', o.id,
-                'title', o.title,
-                'progress', COALESCE(o.progress, 0),
-                'status', o.status,
-                'end_date', o.end_date,
-                'tasks_completed_today', (
-                    SELECT COUNT(*)::INTEGER
-                    FROM task_history th
-                    JOIN tasks t ON t.id = th.task_id
-                    WHERE t.objective_id = o.id
-                        AND th.action_type = 'COMPLETED'
-                        AND th.created_at::date = p_date
-                )
-            )), '[]'::jsonb)
-            FROM objectives o
-            WHERE o.foundry_id = v_foundry_id
-                AND o.status = 'In Progress'
-            ORDER BY o.end_date ASC NULLS LAST
-            LIMIT 5
+            SELECT COALESCE(jsonb_agg(obj_data), '[]'::jsonb)
+            FROM (
+                SELECT jsonb_build_object(
+                    'id', o.id,
+                    'title', o.title,
+                    'progress', COALESCE(o.progress, 0),
+                    'status', o.status,
+                    'tasks_completed_today', (
+                        SELECT COUNT(*)::INTEGER
+                        FROM task_history th
+                        JOIN tasks t ON t.id = th.task_id
+                        WHERE t.objective_id = o.id
+                            AND th.action_type = 'COMPLETED'
+                            AND th.created_at::date = p_date
+                    )
+                ) as obj_data
+                FROM objectives o
+                WHERE o.foundry_id = v_foundry_id
+                    AND o.status = 'In Progress'
+                ORDER BY o.updated_at DESC NULLS LAST
+                LIMIT 5
+            ) subq
         )
         
     ) INTO v_result;

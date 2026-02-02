@@ -41,18 +41,19 @@ backdrop-blur
 
 These specific cases may use transparency:
 
-1. **Modal overlays** (the backdrop behind modals) - use SOLID opaque backgrounds:
+1. **Modal overlays** (the backdrop behind modals) - use semi-transparent dark overlays to allow seeing the page:
    ```tsx
-   // ✅ OK - Solid opaque overlay (completely blocks content)
+   // ✅ CORRECT - Semi-transparent overlay (allows seeing page behind)
+   <div className="fixed inset-0 bg-black/40">
+   
+   // ❌ WRONG - Opaque overlay blocks entire page
    <div className="fixed inset-0 bg-muted">
    
-   // ❌ WRONG - Any transparency allows content to show through
-   <div className="fixed inset-0 bg-muted/90">
-   <div className="fixed inset-0 bg-muted/60">
-   
-   // ❌ WRONG - Dark overlay creates dreary UI
-   <div className="fixed inset-0 bg-black/80">
+   // ❌ WRONG - Do NOT use backdrop-blur (causes fuzzy appearance)
+   <div className="fixed inset-0 bg-black/40 backdrop-blur-sm">
    ```
+   
+   **Note:** Modal *content* must always be opaque (`bg-background`), only the *overlay* is semi-transparent.
 
 2. **Marketing site only** - navbar glass effect:
    ```tsx
@@ -102,8 +103,8 @@ These elements must NEVER have transparent backgrounds:
 // ✅ CORRECT - Video play button
 <div className="bg-background shadow-lg rounded-full">
 
-// ✅ CORRECT - Modal overlay (light, not dark!)
-<div className="fixed inset-0 bg-muted/60">
+// ✅ CORRECT - Modal overlay (semi-transparent, allows seeing page)
+<div className="fixed inset-0 bg-black/40">
 
 // ❌ WRONG - Transparent search dropdown
 <div className="bg-card/50 backdrop-blur-sm">
