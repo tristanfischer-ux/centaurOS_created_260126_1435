@@ -55,7 +55,7 @@ BEGIN
 
     -- Compute & AI (5xxx)
     INSERT INTO knowledge_domains (id, template_id, parent_id, name, description, category, depth, display_order, criticality, key_questions, typical_roles, learning_time_estimate) VALUES
-    ('00000003-5000-4000-8000-000000000001', template_id, NULL, 'Compute & AI', 'Onboard compute and intelligence', 'Software', 0, 5, 'critical', '[]', ARRAY['Computer Architect', 'AI Engineer'], NULL),
+    ('00000003-5000-4000-8000-000000000001', v_template_id, NULL, 'Compute & AI', 'Onboard compute and intelligence', 'Software', 0, 5, 'critical', '[]', ARRAY['Computer Architect', 'AI Engineer'], NULL),
 
     ('00000003-5100-4000-8000-000000000001', v_template_id, '00000003-5000-4000-8000-000000000001', 'Edge Compute', 'Onboard processing hardware', 'Electronics', 1, 1, 'critical',
     '[{"id": "ec1", "question": "What are the TOPS requirements?", "context": "For neural net inference"}, {"id": "ec2", "question": "Power budget for compute?", "context": "Affects battery life"}]',
@@ -76,7 +76,7 @@ BEGIN
 
     -- Power & Energy (6xxx)
     INSERT INTO knowledge_domains (id, template_id, parent_id, name, description, category, depth, display_order, criticality, key_questions, typical_roles, learning_time_estimate) VALUES
-    ('00000003-6000-4000-8000-000000000001', template_id, NULL, 'Power & Energy', 'Energy storage and distribution', 'Electronics', 0, 6, 'critical', '[]', ARRAY['Power Engineer'], NULL),
+    ('00000003-6000-4000-8000-000000000001', v_template_id, NULL, 'Power & Energy', 'Energy storage and distribution', 'Electronics', 0, 6, 'critical', '[]', ARRAY['Power Engineer'], NULL),
 
     ('00000003-6100-4000-8000-000000000001', v_template_id, '00000003-6000-4000-8000-000000000001', 'High-Discharge Batteries', 'Power dense energy storage', 'Electronics', 1, 1, 'critical',
     '[{"id": "bat1", "question": "What is the peak C-rate?", "context": "Required for dynamic motions (jumping)"}, {"id": "bat2", "question": "Gravimetric energy density?", "context": "Affects robot weight"}]',
@@ -93,7 +93,7 @@ BEGIN
 
     -- Locomotion & Manipulation (7xxx)
     INSERT INTO knowledge_domains (id, template_id, parent_id, name, description, category, depth, display_order, criticality, key_questions, typical_roles, learning_time_estimate) VALUES
-    ('00000003-7000-4000-8000-000000000001', template_id, NULL, 'Locomotion & Manipulation', 'Moving and interacting', 'Mechanical', 0, 7, 'critical', '[]', ARRAY['Robotics Engineer', 'Mechanical Engineer'], NULL),
+    ('00000003-7000-4000-8000-000000000001', v_template_id, NULL, 'Locomotion & Manipulation', 'Moving and interacting', 'Mechanical', 0, 7, 'critical', '[]', ARRAY['Robotics Engineer', 'Mechanical Engineer'], NULL),
 
     ('00000003-7100-4000-8000-000000000001', v_template_id, '00000003-7000-4000-8000-000000000001', 'Bipedal Locomotion', 'Walking and balancing', 'Software', 1, 1, 'critical',
     '[{"id": "loc1", "question": "Gait generation strategy?", "context": "ZMP, LIPM, or RL-based"}, {"id": "loc2", "question": "Terrain handling capabilities?", "context": "Stairs, slopes, rough terrain"}]',
@@ -110,7 +110,7 @@ BEGIN
 
     -- Communication & Connectivity (8xxx)
     INSERT INTO knowledge_domains (id, template_id, parent_id, name, description, category, depth, display_order, criticality, key_questions, typical_roles, learning_time_estimate) VALUES
-    ('00000003-8000-4000-8000-000000000001', template_id, NULL, 'Communication', 'Data bus and connectivity', 'Electronics', 0, 8, 'important', '[]', ARRAY['Embedded Engineer'], NULL),
+    ('00000003-8000-4000-8000-000000000001', v_template_id, NULL, 'Communication', 'Data bus and connectivity', 'Electronics', 0, 8, 'important', '[]', ARRAY['Embedded Engineer'], NULL),
 
     ('00000003-8100-4000-8000-000000000001', v_template_id, '00000003-8000-4000-8000-000000000001', 'Real-Time Bus', 'EtherCAT, CAN FD', 'Electronics', 1, 1, 'critical',
     '[{"id": "bus1", "question": "Bus cycle time requirement?", "context": "Critical for control loop stability"}, {"id": "bus2", "question": "Topology (Daisy chain, Star)?", "context": "Wiring complexity"}]',
@@ -123,7 +123,7 @@ BEGIN
 
     -- Materials & Manufacturing (9xxx)
     INSERT INTO knowledge_domains (id, template_id, parent_id, name, description, category, depth, display_order, criticality, key_questions, typical_roles, learning_time_estimate) VALUES
-    ('00000003-9000-4000-8000-000000000001', template_id, NULL, 'Materials & Manufacturing', 'Advanced fabrication', 'Mechanical', 0, 9, 'important', '[]', ARRAY['Mechanical Engineer', 'Manufacturing Engineer'], NULL),
+    ('00000003-9000-4000-8000-000000000001', v_template_id, NULL, 'Materials & Manufacturing', 'Advanced fabrication', 'Mechanical', 0, 9, 'important', '[]', ARRAY['Mechanical Engineer', 'Manufacturing Engineer'], NULL),
 
     ('00000003-9100-4000-8000-000000000001', v_template_id, '00000003-9000-4000-8000-000000000001', 'Generative Design', 'Topology optimization', 'Mechanical', 1, 1, 'nice-to-have',
     '[{"id": "gen1", "question": "Weight reduction targets?", "context": "Critical for dynamic performance"}, {"id": "gen2", "question": "Manufacturing constraints?", "context": "Additive vs subtractive"}]',
