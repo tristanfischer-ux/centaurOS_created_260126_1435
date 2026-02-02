@@ -1663,3 +1663,64 @@ export async function deleteTasks(taskIds: string[]) {
 
     return { success: true, deletedCount, failedIds: [] }
 }
+
+/**
+ * Fetch a single task by ID with all related data for the FullTaskView dialog
+ * 
+ * @param taskId - The task ID to fetch
+ * @returns Task data with assignees, objective info, and file count
+ */
+export async function getTaskById(taskId: string) {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return { data: null, error: 'Unauthorized' }
+
+    // Security: Verify user has permission to view this task
+    const foundry_id = await getFoundryIdCached()
+    if (!foundry_id) return { data: null, error: 'User not in a foundry' }
+
+    // Fetch task with all related data
+    const { data: task, error } = await supabase
+        .from('tasks')
+        .select(`
+            id,
+            title,
+            description,
+            status,
+            risk_level,
+            start_date,
+            end_date,
+            task_number,
+            foundry_id,
+            assignee:profiles!assignee_id(id, full_name, role, email, avatar_url),
+            objective:objectives!objective_id(id, title),
+            task_files(id)
+        `)
+        .eq('id', taskId)
+        .single()
+
+    if (error) return { data: null, error: sanitizeErrorMessage(error) }
+    if (!task) return { data: null, error: 'Task not found' }
+
+    // Verify task belongs to user's foundry
+    if (task.foundry_id !== foundry_id) {
+        return { data: null, error: 'Unauthorized: Task belongs to a different foundry' }
+    }
+
+    // Fetch additional assignees from task_assignees table
+    const { data: taskAssignees } = await supabase
+        .from('task_assignees')
+        .select('profile:profiles(id, full_name, role, email, avatar_url)')
+        .eq('task_id', taskId)
+
+    // Transform assignees to flat array
+    const assignees = taskAssignees?.map(ta => ta.profile).filter(Boolean) || []
+
+    return {
+        data: {
+            ...task,
+            assignees: assignees.length > 0 ? assignees : (task.assignee ? [task.assignee] : [])
+        },
+        error: null
+    }
+}

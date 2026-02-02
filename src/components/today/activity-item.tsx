@@ -15,23 +15,61 @@ import {
   MessageSquare, 
   Send, 
   ChevronRight,
-  Loader2
+  Loader2,
+  GitCommit,
+  History,
+  Bot
 } from 'lucide-react'
 import { replyToActivity, markActivityRead } from '@/actions/activity'
-import type { ActivityItem as ActivityItemType, ActivitySourceType } from '@/types/activity'
+import type { ActivityItem as ActivityItemType, ActivitySourceType, TaskHistoryActionType } from '@/types/activity'
 
 interface ActivityItemProps {
   item: ActivityItemType
   onReply?: () => void
+  onTaskClick?: (taskId: string) => void
 }
 
-export function ActivityItem({ item, onReply }: ActivityItemProps) {
+// Helper to get a human-readable label for history action types
+function getActionTypeLabel(actionType: TaskHistoryActionType | string): string {
+  const labels: Record<string, string> = {
+    CREATED: 'Created',
+    UPDATED: 'Updated',
+    STATUS_CHANGE: 'Status Change',
+    ASSIGNED: 'Assigned',
+    COMPLETED: 'Completed',
+    FORWARDED: 'Forwarded',
+  }
+  return labels[actionType] || actionType
+}
+
+// Helper to get badge variant based on action type
+function getActionTypeBadgeVariant(actionType: TaskHistoryActionType | string): 'default' | 'secondary' | 'outline' {
+  switch (actionType) {
+    case 'CREATED':
+      return 'default'
+    case 'COMPLETED':
+      return 'default'
+    case 'STATUS_CHANGE':
+      return 'secondary'
+    default:
+      return 'outline'
+  }
+}
+
+export function ActivityItem({ item, onReply, onTaskClick }: ActivityItemProps) {
   const [isReplying, setIsReplying] = useState(false)
   const [replyContent, setReplyContent] = useState('')
   const [isPending, startTransition] = useTransition()
   const [isRead, setIsRead] = useState(!item.is_unread)
 
+  const isHistoryItem = item.type === 'task_history'
+  const isSystemLog = item.is_system_log === true
+
   const getSourceIcon = () => {
+    // For history items, use a different icon
+    if (isHistoryItem) {
+      return <GitCommit className="h-3.5 w-3.5" />
+    }
     switch (item.source.type) {
       case 'task':
         return <CheckSquare className="h-3.5 w-3.5" />
@@ -43,6 +81,10 @@ export function ActivityItem({ item, onReply }: ActivityItemProps) {
   }
 
   const getSourceLabel = () => {
+    // For history items, show it as a change event
+    if (isHistoryItem) {
+      return `Task #${item.source.task_number}`
+    }
     switch (item.source.type) {
       case 'task':
         return `Task #${item.source.task_number}`
@@ -107,7 +149,11 @@ export function ActivityItem({ item, onReply }: ActivityItemProps) {
     <div 
       className={cn(
         "group relative rounded-lg border bg-card p-4 transition-colors",
-        !isRead && "bg-orange-50/30 border-orange-200/50"
+        !isRead && "bg-orange-50/30 border-orange-200/50",
+        // History items have a subtle different styling
+        isHistoryItem && "bg-muted/30 border-muted-foreground/20",
+        // System logs have muted styling
+        isSystemLog && "bg-muted/20 border-muted-foreground/10"
       )}
       onMouseEnter={handleMarkRead}
     >
@@ -119,25 +165,62 @@ export function ActivityItem({ item, onReply }: ActivityItemProps) {
       {/* Header: Author + Source + Time */}
       <div className="flex items-start justify-between gap-3 mb-2">
         <div className="flex items-center gap-3 min-w-0">
-          <UserAvatar 
-            name={item.author.full_name || 'Unknown'} 
-            role={item.author.role || undefined}
-            size="sm"
-          />
+          {isSystemLog ? (
+            <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center">
+              <Bot className="h-4 w-4 text-muted-foreground" />
+            </div>
+          ) : isHistoryItem ? (
+            <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center">
+              <History className="h-4 w-4 text-muted-foreground" />
+            </div>
+          ) : (
+            <UserAvatar 
+              name={item.author.full_name || 'Unknown'} 
+              role={item.author.role || undefined}
+              size="sm"
+            />
+          )}
           <div className="min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
               <span className="font-medium text-sm text-foreground truncate">
-                {item.author.full_name || 'Unknown'}
+                {isSystemLog ? 'System' : (item.author.full_name || 'Unknown')}
               </span>
+              {isSystemLog && (
+                <Badge 
+                  variant="outline"
+                  className="text-[10px] px-1.5 py-0 text-muted-foreground"
+                >
+                  Automated
+                </Badge>
+              )}
+              {isHistoryItem && item.action_type && (
+                <Badge 
+                  variant={getActionTypeBadgeVariant(item.action_type)}
+                  className="text-[10px] px-1.5 py-0"
+                >
+                  {getActionTypeLabel(item.action_type)}
+                </Badge>
+              )}
               <span className="text-muted-foreground text-xs">on</span>
-              <Link 
-                href={getSourceLink()}
-                className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
-              >
-                {getSourceIcon()}
-                <span className="font-medium">{getSourceLabel()}</span>
-                <ChevronRight className="h-3 w-3" />
-              </Link>
+              {item.source.type === 'task' && onTaskClick ? (
+                <button
+                  onClick={() => onTaskClick(item.source.id)}
+                  className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  {getSourceIcon()}
+                  <span className="font-medium">{getSourceLabel()}</span>
+                  <ChevronRight className="h-3 w-3" />
+                </button>
+              ) : (
+                <Link 
+                  href={getSourceLink()}
+                  className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  {getSourceIcon()}
+                  <span className="font-medium">{getSourceLabel()}</span>
+                  <ChevronRight className="h-3 w-3" />
+                </Link>
+              )}
             </div>
             <p className="text-xs text-muted-foreground truncate mt-0.5">
               {item.source.title}
@@ -152,12 +235,15 @@ export function ActivityItem({ item, onReply }: ActivityItemProps) {
 
       {/* Content */}
       <div className="pl-11 space-y-3">
-        <p className="text-sm text-foreground whitespace-pre-wrap line-clamp-4">
+        <p className={cn(
+          "text-sm whitespace-pre-wrap line-clamp-4",
+          (isHistoryItem || isSystemLog) ? "text-muted-foreground" : "text-foreground"
+        )}>
           {item.content}
         </p>
 
-        {/* Reply Section */}
-        {isReplying ? (
+        {/* Reply Section - Only show for comment types, not history or system logs */}
+        {!isHistoryItem && !isSystemLog && isReplying ? (
           <div className="space-y-2">
             <Textarea
               value={replyContent}
@@ -199,7 +285,7 @@ export function ActivityItem({ item, onReply }: ActivityItemProps) {
               </div>
             </div>
           </div>
-        ) : (
+        ) : (!isHistoryItem && !isSystemLog) ? (
           <Button
             variant="ghost"
             size="sm"
@@ -209,7 +295,7 @@ export function ActivityItem({ item, onReply }: ActivityItemProps) {
             <MessageSquare className="h-4 w-4 mr-1" />
             Reply
           </Button>
-        )}
+        ) : null}
       </div>
     </div>
   )

@@ -17,9 +17,24 @@ import {
   MessageSquare, 
   Bell,
   RefreshCw,
-  Loader2
+  Loader2,
+  History,
+  Bot,
+  Users
 } from 'lucide-react'
+import { Switch } from '@/components/ui/switch'
+import { Label } from '@/components/ui/label'
 import type { ActivityItem as ActivityItemType, ActivityFilter } from '@/types/activity'
+
+interface Member {
+  id: string
+  full_name: string
+  role: string
+  email: string
+}
+
+// Roles that can see all foundry activity
+const ADMIN_ROLES = ['Founder', 'Executive', 'Admin']
 
 interface ActivityStreamProps {
   initialItems: ActivityItemType[]
@@ -29,15 +44,25 @@ interface ActivityStreamProps {
     objectives: number
     messages: number
     unread: number
+    history: number
   }
+  onTaskClick?: (taskId: string) => void
+  members?: Member[]
+  currentUserId?: string
+  userRole?: string
 }
 
-export function ActivityStream({ initialItems, initialCounts }: ActivityStreamProps) {
+export function ActivityStream({ initialItems, initialCounts, onTaskClick, members: _members = [], currentUserId: _currentUserId, userRole }: ActivityStreamProps) {
   const router = useRouter()
   const [items, setItems] = useState<ActivityItemType[]>(initialItems)
   const [filter, setFilter] = useState<ActivityFilter>('all')
   const [isPending, startTransition] = useTransition()
   const [isRefreshing, setIsRefreshing] = useState(false)
+  const [showSystemLogs, setShowSystemLogs] = useState(false)
+  const [showAllFoundryActivity, setShowAllFoundryActivity] = useState(false)
+  
+  // Check if user has admin privileges
+  const isAdmin = userRole && ADMIN_ROLES.includes(userRole)
 
   // Calculate counts from items
   const counts = initialCounts || {
@@ -45,7 +70,8 @@ export function ActivityStream({ initialItems, initialCounts }: ActivityStreamPr
     tasks: items.filter(i => i.type === 'task_comment').length,
     objectives: items.filter(i => i.type === 'objective_comment').length,
     messages: items.filter(i => i.type === 'message').length,
-    unread: items.filter(i => i.is_unread).length
+    unread: items.filter(i => i.is_unread).length,
+    history: items.filter(i => i.type === 'task_history').length
   }
 
   const handleFilterChange = (newFilter: string) => {
@@ -54,7 +80,43 @@ export function ActivityStream({ initialItems, initialCounts }: ActivityStreamPr
     startTransition(async () => {
       const result = await getActivityFeed({ 
         filter: newFilter as ActivityFilter,
-        limit: 30
+        limit: 30,
+        includeSystemLogs: showSystemLogs,
+        showAllFoundryActivity
+      })
+      
+      if (result.success && result.data) {
+        setItems(result.data)
+      }
+    })
+  }
+
+  const handleSystemLogsToggle = (checked: boolean) => {
+    setShowSystemLogs(checked)
+    
+    startTransition(async () => {
+      const result = await getActivityFeed({ 
+        filter,
+        limit: 30,
+        includeSystemLogs: checked,
+        showAllFoundryActivity
+      })
+      
+      if (result.success && result.data) {
+        setItems(result.data)
+      }
+    })
+  }
+
+  const handleAllFoundryActivityToggle = (checked: boolean) => {
+    setShowAllFoundryActivity(checked)
+    
+    startTransition(async () => {
+      const result = await getActivityFeed({ 
+        filter,
+        limit: 30,
+        includeSystemLogs: showSystemLogs,
+        showAllFoundryActivity: checked
       })
       
       if (result.success && result.data) {
@@ -69,7 +131,9 @@ export function ActivityStream({ initialItems, initialCounts }: ActivityStreamPr
     startTransition(async () => {
       const result = await getActivityFeed({ 
         filter,
-        limit: 30
+        limit: 30,
+        includeSystemLogs: showSystemLogs,
+        showAllFoundryActivity
       })
       
       if (result.success && result.data) {
@@ -79,7 +143,7 @@ export function ActivityStream({ initialItems, initialCounts }: ActivityStreamPr
       setIsRefreshing(false)
       router.refresh()
     })
-  }, [filter, router])
+  }, [filter, router, showSystemLogs, showAllFoundryActivity])
 
   const handleReply = useCallback(() => {
     // Refresh the feed after a reply
@@ -101,22 +165,39 @@ export function ActivityStream({ initialItems, initialCounts }: ActivityStreamPr
               </Badge>
             )}
           </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={handleRefresh}
-            disabled={isRefreshing || isPending}
-          >
-            <RefreshCw className={cn(
-              "h-4 w-4",
-              (isRefreshing || isPending) && "animate-spin"
-            )} />
-          </Button>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
+              <Switch
+                id="show-system-logs"
+                checked={showSystemLogs}
+                onCheckedChange={handleSystemLogsToggle}
+                disabled={isPending}
+              />
+              <Label 
+                htmlFor="show-system-logs" 
+                className="text-xs text-muted-foreground cursor-pointer flex items-center gap-1"
+              >
+                <Bot className="h-3 w-3" />
+                System
+              </Label>
+            </div>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleRefresh}
+              disabled={isRefreshing || isPending}
+            >
+              <RefreshCw className={cn(
+                "h-4 w-4",
+                (isRefreshing || isPending) && "animate-spin"
+              )} />
+            </Button>
+          </div>
         </div>
 
         {/* Filter Tabs */}
         <Tabs value={filter} onValueChange={handleFilterChange}>
-          <TabsList className="w-full grid grid-cols-5">
+          <TabsList className="w-full grid grid-cols-6">
             <TabsTrigger value="all" className="text-xs">
               All
               {counts.all > 0 && (
@@ -135,6 +216,10 @@ export function ActivityStream({ initialItems, initialCounts }: ActivityStreamPr
               <MessageSquare className="h-3 w-3 mr-1" />
               DMs
             </TabsTrigger>
+            <TabsTrigger value="history" className="text-xs">
+              <History className="h-3 w-3 mr-1" />
+              Changes
+            </TabsTrigger>
             <TabsTrigger value="unread" className="text-xs">
               <Bell className="h-3 w-3 mr-1" />
               Unread
@@ -146,6 +231,27 @@ export function ActivityStream({ initialItems, initialCounts }: ActivityStreamPr
             </TabsTrigger>
           </TabsList>
         </Tabs>
+
+        {/* Admin toggle - only show for Founder/Executive/Admin roles */}
+        {isAdmin && (
+          <div className="flex items-center justify-between pt-2 border-t">
+            <div className="flex items-center gap-2">
+              <Users className="h-4 w-4 text-muted-foreground" />
+              <Label 
+                htmlFor="all-foundry-activity" 
+                className="text-sm font-medium cursor-pointer"
+              >
+                See all team activity
+              </Label>
+            </div>
+            <Switch
+              id="all-foundry-activity"
+              checked={showAllFoundryActivity}
+              onCheckedChange={handleAllFoundryActivityToggle}
+              disabled={isPending}
+            />
+          </div>
+        )}
       </CardHeader>
 
       <CardContent className="flex-1 overflow-auto space-y-3 pt-0">
@@ -170,6 +276,7 @@ export function ActivityStream({ initialItems, initialCounts }: ActivityStreamPr
                 key={`${item.type}-${item.id}`} 
                 item={item} 
                 onReply={handleReply}
+                onTaskClick={onTaskClick}
               />
             ))}
 
