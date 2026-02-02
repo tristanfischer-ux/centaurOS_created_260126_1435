@@ -1774,12 +1774,15 @@ export function MarketplaceView({
                 </div>
             </div>
 
-            <ComparisonBar
-                selectedItems={selectedItems}
-                onClear={clearSelection}
-                onCompare={() => setIsComparisonOpen(true)}
-                onRemove={(id) => toggleSelect(id)}
-            />
+            {/* Comparison Bar - hides when modal opens */}
+            {!isComparisonOpen && (
+                <ComparisonBar
+                    selectedItems={selectedItems}
+                    onClear={clearSelection}
+                    onCompare={() => setIsComparisonOpen(true)}
+                    onRemove={(id) => toggleSelect(id)}
+                />
+            )}
 
             <ComparisonModal
                 open={isComparisonOpen}

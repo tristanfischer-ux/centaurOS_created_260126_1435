@@ -64,18 +64,24 @@ export function MessageInputHelp({ className }: { className?: string }) {
                 <Target className="w-3.5 h-3.5 text-international-orange" />
                 <CheckSquare className="w-3.5 h-3.5 text-international-orange" />
               </div>
-              <span>Link to Tasks & Objectives</span>
+              <span>Link Messages to Tasks & Objectives</span>
             </div>
             <div className="ml-5 text-muted-foreground space-y-1">
               <p>
-                <span className="font-medium text-international-orange">Context Selector</span>
-                <span className="mx-1">(above message input)</span>
+                <span className="font-semibold text-international-orange">In Inbox conversations:</span>
+                <span className="mx-1">Click the dropdown button above the message input</span>
               </p>
-              <p>
-                Select a task or objective
-                <span className="mx-1 text-status-info font-medium">→ Messages appear in task notes</span>
+              <p className="text-[11px]">
+                It shows "General conversation" by default
+                <span className="mx-1 text-status-info font-medium">→ Click to select a task or objective</span>
               </p>
-              <p className="text-[11px] italic">Keeps conversations organized by project context</p>
+              <p className="text-[11px] mt-1">
+                <span className="font-semibold">In Tasks:</span>
+                <span className="mx-1">Messages automatically link to that task</span>
+              </p>
+              <p className="text-[11px] italic mt-1">
+                Linked messages appear in task notes for better organization
+              </p>
             </div>
           </div>
 

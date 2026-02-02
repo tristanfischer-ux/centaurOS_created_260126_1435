@@ -1369,17 +1369,19 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                 members={selectedMembers}
             />
 
-            {/* Comparison Bar (bottom sticky) - shows automatically when members selected */}
-            <TeamComparisonBar
-                selectedMembers={selectedMembers}
-                onClear={() => setSelectedIds(new Set())}
-                onCompare={() => setShowComparison(true)}
-                onRemove={(id) => {
-                    const newSet = new Set(selectedIds)
-                    newSet.delete(id)
-                    setSelectedIds(newSet)
-                }}
-            />
+            {/* Comparison Bar (bottom sticky) - shows automatically when members selected, hides when modal opens */}
+            {!showComparison && (
+                <TeamComparisonBar
+                    selectedMembers={selectedMembers}
+                    onClear={() => setSelectedIds(new Set())}
+                    onCompare={() => setShowComparison(true)}
+                    onRemove={(id) => {
+                        const newSet = new Set(selectedIds)
+                        newSet.delete(id)
+                        setSelectedIds(newSet)
+                    }}
+                />
+            )}
 
             {/* Quick Team Creation Dialog (from drag-drop or button) */}
             <Dialog open={showQuickTeamDialog} onOpenChange={setShowQuickTeamDialog}>

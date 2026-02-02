@@ -77,7 +77,7 @@ export function TeamComparisonBar({
     if (selectedMembers.length === 0) return null
 
     return (
-        <div className="fixed bottom-20 md:bottom-8 left-1/2 -translate-x-1/2 z-[200] animate-in slide-in-from-bottom-10 fade-in duration-300 w-full max-w-4xl px-4 pointer-events-none">
+        <div className="fixed bottom-20 md:bottom-8 left-1/2 -translate-x-1/2 z-40 animate-in slide-in-from-bottom-10 fade-in duration-300 w-full max-w-4xl px-4 pointer-events-none">
             <Card className="shadow-xl bg-background border-t-2 border-t-international-orange pointer-events-auto">
                 {/* Header row */}
                 <div className="flex items-center justify-between px-4 py-2 border-b border-border/50">
