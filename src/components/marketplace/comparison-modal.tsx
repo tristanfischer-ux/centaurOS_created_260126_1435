@@ -77,16 +77,6 @@ export function ComparisonModal({ open, onOpenChange, items }: ComparisonModalPr
     const [isAnalyzing, setIsAnalyzing] = useState(false)
     const [analysisError, setAnalysisError] = useState<string | null>(null)
 
-    // Debug: Log raw items received
-    console.log('[ComparisonModal] RAW items prop:', items?.length, 'items')
-    console.log('[ComparisonModal] RAW items details:', items?.map(i => ({ 
-        id: i?.id?.substring(0, 8), 
-        title: i?.title, 
-        category: i?.category,
-        hasAttributes: !!i?.attributes,
-        attrKeys: i?.attributes ? Object.keys(i.attributes).length : 0
-    })))
-
     // Clear analysis when items change or modal closes
     useEffect(() => {
         setAiAnalysis(null)
@@ -163,18 +153,12 @@ export function ComparisonModal({ open, onOpenChange, items }: ComparisonModalPr
         return true
     })
     
-    console.log('[ComparisonModal] After validation:', validItems.length, 'valid,', deduplicatedItems.length, 'after dedup')
-    
     if (deduplicatedItems.length === 0) {
-        console.error('[ComparisonModal] No valid items to compare from', items.length, 'raw items')
         return null
     }
     
     // Final items to render
     const itemsToRender = deduplicatedItems
-    
-    console.log('[ComparisonModal] RENDERING', itemsToRender.length, 'items:', 
-        itemsToRender.map(i => `${i.category}: ${i.title} (${Object.keys(i.attributes).length} attrs)`))
 
     // Determine the primary category (use most common among items)
     const categoryCount = itemsToRender.reduce((acc, item) => {
@@ -232,18 +216,6 @@ export function ComparisonModal({ open, onOpenChange, items }: ComparisonModalPr
 
                 <div className="flex-1 overflow-auto">
                     <div className="p-6 pt-4">
-                        {/* Debug banner - shows items being compared */}
-                        <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm">
-                            <strong>Debug: Comparing {itemsToRender.length} items:</strong>
-                            <ul className="mt-1 ml-4 list-disc">
-                                {itemsToRender.map((item, idx) => (
-                                    <li key={`debug-${item.id}`}>
-                                        Column {idx + 1}: <strong>{item.title}</strong> ({item.category} / {item.subcategory}) - ID: {item.id.substring(0, 8)}...
-                                    </li>
-                                ))}
-                            </ul>
-                        </div>
-
                         {/* AI Analysis Error */}
                         {analysisError && (
                             <Card className="mb-6 p-4 bg-status-error-light border-destructive/20">
@@ -403,23 +375,20 @@ export function ComparisonModal({ open, onOpenChange, items }: ComparisonModalPr
                                 <div className="bg-muted/50 p-3 font-medium text-sm text-muted-foreground border-b">
                                     Attribute
                                 </div>
-                                {itemsToRender.map((item, index) => {
-                                    console.log(`[ComparisonModal] Rendering header ${index + 1}/${itemsToRender.length}: ${item.title}`)
-                                    return (
-                                        <div key={`header-${item.id}`} className="bg-muted/50 p-3 border-b border-l">
-                                            <div className="font-bold text-base leading-tight">{item.title}</div>
-                                            <Badge 
-                                                variant="secondary" 
-                                                className={cn(
-                                                    "mt-2 uppercase text-[10px] tracking-wider font-semibold border-0",
-                                                    categoryBadgeStyles[item.category]
-                                                )}
-                                            >
-                                                {item.subcategory}
-                                            </Badge>
-                                        </div>
-                                    )
-                                })}
+                                {itemsToRender.map((item) => (
+                                    <div key={`header-${item.id}`} className="bg-muted/50 p-3 border-b border-l">
+                                        <div className="font-bold text-base leading-tight">{item.title}</div>
+                                        <Badge 
+                                            variant="secondary" 
+                                            className={cn(
+                                                "mt-2 uppercase text-[10px] tracking-wider font-semibold border-0",
+                                                categoryBadgeStyles[item.category]
+                                            )}
+                                        >
+                                            {item.subcategory}
+                                        </Badge>
+                                    </div>
+                                ))}
                                 
                                 {/* Section Content */}
                                 {Object.entries(organizedSections).map(([sectionName, sectionKeys]) => {
