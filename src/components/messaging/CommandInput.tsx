@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom'
 import { Textarea } from '@/components/ui/textarea'
 import { Button } from '@/components/ui/button'
 import { UserAvatar } from '@/components/ui/user-avatar'
+import { MessageInputHelp } from '@/components/messaging/MessageInputHelp'
 import { cn } from '@/lib/utils'
 import { 
   Send, 
