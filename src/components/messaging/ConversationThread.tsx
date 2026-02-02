@@ -33,7 +33,6 @@ import { archiveConversation, unarchiveConversation } from '@/actions/messaging'
 import { getBatchReplyCounts } from '@/actions/threads'
 import { toggleStarMessage, togglePinMessage, markConversationUnread } from '@/actions/message-actions'
 import { toast } from 'sonner'
-import { MessageInputHelp } from './MessageInputHelp'
 
 interface TeamMember {
   id: string
@@ -228,58 +227,63 @@ export function ConversationThread({
     }
   }
 
-  // State for file upload
-  const fileInputRef = useRef<HTMLInputElement>(null)
-  const [isUploadingFile, setIsUploadingFile] = useState(false)
-  
   // Handle file attachment
+  const [isUploadingFile, setIsUploadingFile] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
   const handleFileClick = () => {
+    // Trigger file input click
     fileInputRef.current?.click()
   }
-  
-  // Handle file selection and upload
+
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
-    if (!file || !conversationId) return
-    
+    if (!file) return
+
+    // Validate file size (10MB max)
+    const MAX_SIZE = 10 * 1024 * 1024
+    if (file.size > MAX_SIZE) {
+      toast.error('File size must be less than 10MB')
+      return
+    }
+
     setIsUploadingFile(true)
-    
+
     try {
-      // Import upload function dynamically
-      const { uploadMessageFile, validateFile } = await import('@/lib/file-upload')
-      
-      // Validate file
-      const validation = validateFile(file)
-      if (!validation.valid) {
-        toast.error(validation.error || 'Invalid file')
-        return
-      }
-      
-      // Upload file
-      const result = await uploadMessageFile(file, conversationId, currentUserId)
-      
-      // Send message with file attachment
-      const success = await sendMessage({
-        content: result.fileName,
-        fileUrl: result.url,
-        messageType: 'file'
+      // Upload file to server
+      const formData = new FormData()
+      formData.append('file', file)
+
+      const response = await fetch('/api/messages/upload', {
+        method: 'POST',
+        body: formData,
       })
-      
-      if (success) {
-        toast.success('File uploaded successfully')
-      } else {
-        toast.error('Failed to send file message')
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || 'Upload failed')
       }
-    } catch (error) {
-      console.error('[ConversationThread] File upload error:', error)
-      const message = error instanceof Error ? error.message : 'Failed to upload file'
-      toast.error(message)
-    } finally {
-      setIsUploadingFile(false)
+
+      const { url, filename } = await response.json()
+
+      // Send message with file attachment using hook
+      const success = await sendMessage(filename, url)
+      if (!success) {
+        throw new Error('Failed to send message')
+      }
+
+      toast.success('File attached successfully')
+
       // Reset file input
       if (fileInputRef.current) {
         fileInputRef.current.value = ''
       }
+
+    } catch (error) {
+      console.error('[ConversationThread] File upload failed:', error)
+      toast.error(error instanceof Error ? error.message : 'Failed to upload file')
+    } finally {
+      setIsUploadingFile(false)
     }
   }
 
@@ -457,13 +461,16 @@ export function ConversationThread({
         />
       ) : (
         <form onSubmit={handleSend} className="border-t border-border p-4 flex-shrink-0">
+          {/* Hidden file input */}
           <input
             ref={fileInputRef}
             type="file"
-            className="hidden"
             onChange={handleFileSelect}
-            accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.zip"
+            accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,.doc,.docx,.xls,.xlsx,.txt,.csv,.zip"
+            style={{ display: 'none' }}
+            aria-label="File upload"
           />
+          
           <div className="flex items-center gap-2">
             <Button 
               type="button" 
@@ -505,9 +512,6 @@ export function ConversationThread({
               )}
             </Button>
           </div>
-          
-          {/* Quick reference help */}
-          <MessageInputHelp />
         </form>
       )}
 
