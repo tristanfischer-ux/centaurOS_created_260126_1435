@@ -2,12 +2,12 @@
 
 import Image from "next/image"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useMemo } from "react"
 import { useAutoRefresh } from "@/hooks/useAutoRefresh"
 import { RefreshButton } from "@/components/RefreshButton"
 import { TaskCard } from "./task-card"
 import { Button } from "@/components/ui/button"
-import { LayoutGrid, List, X, Trash2, CheckSquare, Loader2, Check, UserPlus, Filter, ChevronDown, Bot, CalendarDays, Inbox } from "lucide-react"
+import { LayoutGrid, List, X, Trash2, CheckSquare, Loader2, Check, UserPlus, Filter, ChevronDown, ChevronUp, Bot, CalendarDays, Inbox, Sparkles } from "lucide-react"
 import { UserAvatar } from "@/components/ui/user-avatar"
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
 import { deleteTasks, acceptTask, completeTask, updateTaskAssignees } from "@/actions/tasks"
@@ -53,7 +53,8 @@ import {
 } from "@/components/ui/alert-dialog"
 import { EmptyState } from "@/components/ui/empty-state"
 import { getStatusBadgeClass } from "@/lib/status-colors"
-import { GanttView } from "@/components/timeline/GanttView"
+import { GanttView, JoinedTask } from "@/components/timeline/GanttView"
+import { DailyPrioritizer } from "@/components/DailyPrioritizer"
 
 // Task type update
 type Task = Database["public"]["Tables"]["tasks"]["Row"] & {
@@ -103,6 +104,14 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
     // Filter Presets State
     const [activePreset, setActivePreset] = useState<string | null>(null)
 
+    // Today's Focus collapsed state
+    const [todaysFocusCollapsed, setTodaysFocusCollapsed] = useState(() => {
+        if (typeof window !== 'undefined') {
+            return localStorage.getItem('tasks-todays-focus-collapsed') === 'true'
+        }
+        return false
+    })
+
     // Load active preset from localStorage on mount
     useEffect(() => {
         const savedPreset = localStorage.getItem('tasks-active-preset')
@@ -119,6 +128,11 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
             localStorage.removeItem('tasks-active-preset')
         }
     }, [activePreset])
+
+    // Save Today's Focus collapsed state to localStorage
+    useEffect(() => {
+        localStorage.setItem('tasks-todays-focus-collapsed', String(todaysFocusCollapsed))
+    }, [todaysFocusCollapsed])
 
     // Auto-refresh using Supabase Realtime
     useAutoRefresh({ tables: ['tasks', 'task_comments', 'task_files'] })
@@ -170,6 +184,25 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
             filter: (task: Task) => ['Pending', 'Accepted'].includes(task.status || '')
         },
     ]
+
+    // Tasks with objectives for DailyPrioritizer (needs objective.title for display)
+    const tasksWithObjectives = useMemo(() => {
+        // Filter to non-completed tasks for prioritization
+        return tasks
+            .filter(task => task.status !== 'Completed' && task.status !== 'Rejected')
+            .map(task => ({
+                id: task.id,
+                title: task.title || 'Untitled',
+                status: task.status || 'Pending',
+                end_date: task.end_date,
+                created_at: task.created_at || '',
+                updated_at: task.updated_at || '',
+                risk_level: null,
+                objective: task.objective_id
+                    ? objectives.find(obj => obj.id === task.objective_id) || null
+                    : null
+            }))
+    }, [tasks, objectives])
 
     // Filter Logic
     const filteredTasks = tasks.filter(task => {
@@ -393,6 +426,36 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
     return (
         <>
             <div className="space-y-8">
+                {/* Today's Focus Section - Collapsible */}
+                {tasksWithObjectives.length > 0 && (
+                    <div className="rounded-xl border bg-gradient-to-br from-orange-50/50 to-amber-50/30 dark:from-orange-950/20 dark:to-amber-950/10 overflow-hidden">
+                        <button
+                            onClick={() => setTodaysFocusCollapsed(!todaysFocusCollapsed)}
+                            className="w-full flex items-center justify-between px-5 py-4 hover:bg-orange-50/50 dark:hover:bg-orange-950/20 transition-colors"
+                        >
+                            <div className="flex items-center gap-3">
+                                <div className="p-2 rounded-lg bg-orange-100 dark:bg-orange-900/30">
+                                    <Sparkles className="h-5 w-5 text-orange-600 dark:text-orange-400" />
+                                </div>
+                                <div className="text-left">
+                                    <h2 className="font-display font-semibold text-foreground tracking-tight">Today&apos;s Focus</h2>
+                                    <p className="text-xs text-muted-foreground">Top priority tasks based on urgency and deadlines</p>
+                                </div>
+                            </div>
+                            {todaysFocusCollapsed ? (
+                                <ChevronDown className="h-5 w-5 text-muted-foreground" />
+                            ) : (
+                                <ChevronUp className="h-5 w-5 text-muted-foreground" />
+                            )}
+                        </button>
+                        {!todaysFocusCollapsed && (
+                            <div className="px-5 pb-5">
+                                <DailyPrioritizer tasks={tasksWithObjectives} maxTasks={5} />
+                            </div>
+                        )}
+                    </div>
+                )}
+
                 <div className="flex flex-col gap-4">
                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-slate-100">
                         <div className="min-w-0 flex-1">
@@ -635,10 +698,10 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                                 created_at: '',
                                 updated_at: '',
                                 executive_setup_completed: false
-                            } : null,
+                            } as unknown as Database["public"]["Tables"]["profiles"]["Row"] : null,
                             objectives: task.objective_id ? (objectives.find(obj => obj.id === task.objective_id) || null) : null
-                        }))}
-                        objectives={objectives}
+                        })) as JoinedTask[]}
+                        objectives={objectives as Database["public"]["Tables"]["objectives"]["Row"][]}
                         profiles={members.map(m => ({
                             id: m.id,
                             full_name: m.full_name || null,
@@ -648,7 +711,7 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                             created_at: '',
                             updated_at: '',
                             executive_setup_completed: false
-                        }))}
+                        } as unknown as Database["public"]["Tables"]["profiles"]["Row"]))}
                         members={members}
                         currentUserId={currentUserId}
                     />

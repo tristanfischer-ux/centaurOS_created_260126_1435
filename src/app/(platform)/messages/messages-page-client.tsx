@@ -5,14 +5,20 @@ import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
-import { ScrollArea } from '@/components/ui/scroll-area'
 import { Skeleton } from '@/components/ui/skeleton'
 import { UserAvatar } from '@/components/ui/user-avatar'
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { ConversationThread } from '@/components/messaging/ConversationThread'
 import { QuickComposeDialog } from '@/components/messaging/QuickComposeDialog'
+import { NeedsAttentionSummary } from '@/components/today/needs-attention-summary'
+import { ActivityStream } from '@/components/today/activity-stream'
+import { StandupWidget } from '@/components/StandupWidget'
+import { DailyPulseWidget } from '@/components/reports/DailyPulseWidget'
 import { useConversationList } from '@/hooks/useConversation'
 import { typography } from '@/lib/design-system'
 import type { ConversationWithParticipants, ConversationType } from '@/lib/messaging/service'
+import type { ActivityItem } from '@/types/activity'
 import {
   MessageSquare,
   Search,
@@ -22,7 +28,11 @@ import {
   User,
   Briefcase,
   Target,
-  CheckSquare
+  CheckSquare,
+  Activity,
+  ChevronDown,
+  ChevronUp,
+  BarChart3
 } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
 
@@ -35,7 +45,21 @@ interface TeamMember {
 interface MessagesPageClientProps {
   userId: string
   foundryId?: string
+  userRole?: string
   members?: TeamMember[]
+  // Activity stream data
+  initialActivityItems?: ActivityItem[]
+  initialActivityCounts?: {
+    all: number
+    tasks: number
+    objectives: number
+    messages: number
+    unread: number
+  }
+  // Needs attention counts
+  overdueCount?: number
+  approvalsCount?: number
+  blockersCount?: number
 }
 
 function getConversationDisplayName(
@@ -77,10 +101,22 @@ function getConversationIcon(type: ConversationType | undefined) {
   }
 }
 
-export function MessagesPageClient({ userId, foundryId, members = [] }: MessagesPageClientProps) {
+export function MessagesPageClient({ 
+  userId, 
+  foundryId, 
+  userRole,
+  members = [],
+  initialActivityItems = [],
+  initialActivityCounts,
+  overdueCount = 0,
+  approvalsCount = 0,
+  blockersCount = 0
+}: MessagesPageClientProps) {
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [showCompose, setShowCompose] = useState(false)
+  const [activeTab, setActiveTab] = useState<'conversations' | 'activity'>('conversations')
+  const [insightsExpanded, setInsightsExpanded] = useState(false)
 
   const { conversations, isLoading, refresh } = useConversationList(userId)
 
@@ -137,6 +173,13 @@ export function MessagesPageClient({ userId, foundryId, members = [] }: Messages
 
   return (
     <div className="space-y-6">
+      {/* Needs Attention Banner */}
+      <NeedsAttentionSummary
+        overdueCount={overdueCount}
+        approvalsCount={approvalsCount}
+        blockersCount={blockersCount}
+      />
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-slate-100">
         <div className="min-w-0 flex-1">
@@ -164,120 +207,213 @@ export function MessagesPageClient({ userId, foundryId, members = [] }: Messages
         </Button>
       </div>
 
-      {/* Search */}
-      <div className="relative max-w-md">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input
-          placeholder="Search conversations..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="pl-9"
-        />
+      {/* Main Content with Tabs */}
+      <div className="flex flex-col lg:flex-row gap-6">
+        {/* Left Column: Conversations / Activity */}
+        <div className="flex-1 min-w-0">
+          <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as typeof activeTab)}>
+            <TabsList className="w-full grid grid-cols-2 mb-4">
+              <TabsTrigger value="conversations" className="gap-2">
+                <MessageSquare className="h-4 w-4" />
+                Conversations
+                {totalUnread > 0 && (
+                  <Badge variant="secondary" className="ml-1 h-5 px-1.5 text-xs bg-international-orange text-white">
+                    {totalUnread}
+                  </Badge>
+                )}
+              </TabsTrigger>
+              <TabsTrigger value="activity" className="gap-2">
+                <Activity className="h-4 w-4" />
+                Activity
+                {(initialActivityCounts?.unread || 0) > 0 && (
+                  <Badge variant="secondary" className="ml-1 h-5 px-1.5 text-xs bg-electric-blue text-white">
+                    {initialActivityCounts?.unread}
+                  </Badge>
+                )}
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="conversations" className="mt-0">
+              {/* Search */}
+              <div className="relative max-w-md mb-4">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search conversations..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-9"
+                />
+              </div>
+
+              {/* Conversation List */}
+              {isLoading ? (
+                <div className="space-y-3">
+                  {[1, 2, 3, 4, 5].map(i => (
+                    <div key={i} className="flex items-center gap-3 p-4 border rounded-lg">
+                      <Skeleton className="h-10 w-10 rounded-full" />
+                      <div className="flex-1 space-y-2">
+                        <Skeleton className="h-4 w-40" />
+                        <Skeleton className="h-3 w-60" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : conversations.length === 0 ? (
+                <div className="text-center py-16">
+                  <MessageSquare className="h-16 w-16 text-muted-foreground/50 mx-auto mb-4" />
+                  <h3 className="text-lg font-semibold text-foreground mb-2">No conversations yet</h3>
+                  <p className="text-muted-foreground mb-6 max-w-md mx-auto">
+                    Start messaging team members, discuss tasks, or contact experts from the marketplace.
+                  </p>
+                  {/* Hide button when dialog is open to prevent visual clutter/bleed-through */}
+                  <Button
+                    onClick={() => setShowCompose(true)}
+                    className={cn(
+                      "bg-international-orange hover:bg-international-orange-hover",
+                      showCompose && "invisible"
+                    )}
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Start a Conversation
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  {/* Channels */}
+                  {channels.length > 0 && (
+                    <div>
+                      <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-2">
+                        <Hash className="h-4 w-4" />
+                        Channels
+                      </h2>
+                      <div className="space-y-2">
+                        {channels.map((conv) => (
+                          <ConversationListItem
+                            key={conv.id}
+                            conversation={conv}
+                            currentUserId={userId}
+                            onClick={() => handleSelectConversation(conv.id)}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Direct Messages */}
+                  {dms.length > 0 && (
+                    <div>
+                      <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-2">
+                        <User className="h-4 w-4" />
+                        Direct Messages
+                      </h2>
+                      <div className="space-y-2">
+                        {dms.map((conv) => (
+                          <ConversationListItem
+                            key={conv.id}
+                            conversation={conv}
+                            currentUserId={userId}
+                            onClick={() => handleSelectConversation(conv.id)}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Experts */}
+                  {experts.length > 0 && (
+                    <div>
+                      <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-2">
+                        <Briefcase className="h-4 w-4" />
+                        Experts
+                      </h2>
+                      <div className="space-y-2">
+                        {experts.map((conv) => (
+                          <ConversationListItem
+                            key={conv.id}
+                            conversation={conv}
+                            currentUserId={userId}
+                            onClick={() => handleSelectConversation(conv.id)}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {searchQuery && filteredConversations.length === 0 && (
+                    <div className="text-center py-8">
+                      <p className="text-muted-foreground">
+                        No conversations match "{searchQuery}"
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </TabsContent>
+
+            <TabsContent value="activity" className="mt-0">
+              <ActivityStream 
+                initialItems={initialActivityItems} 
+                initialCounts={initialActivityCounts}
+              />
+            </TabsContent>
+          </Tabs>
+        </div>
+
+        {/* Right Column: Daily Insights (Collapsible on mobile, visible on desktop) */}
+        {foundryId && (
+          <div className="lg:w-80 lg:flex-shrink-0">
+            {/* Desktop: Always visible */}
+            <div className="hidden lg:block space-y-4">
+              <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+                <BarChart3 className="h-4 w-4" />
+                Daily Insights
+              </h3>
+              <DailyPulseWidget 
+                userId={userId}
+                userRole={userRole}
+                foundryId={foundryId}
+              />
+              <StandupWidget 
+                userRole={userRole}
+                compact={true}
+              />
+            </div>
+
+            {/* Mobile: Collapsible */}
+            <div className="lg:hidden">
+              <Collapsible open={insightsExpanded} onOpenChange={setInsightsExpanded}>
+                <CollapsibleTrigger asChild>
+                  <Button 
+                    variant="outline" 
+                    className="w-full justify-between"
+                  >
+                    <span className="flex items-center gap-2">
+                      <BarChart3 className="h-4 w-4" />
+                      Daily Insights
+                    </span>
+                    {insightsExpanded ? (
+                      <ChevronUp className="h-4 w-4" />
+                    ) : (
+                      <ChevronDown className="h-4 w-4" />
+                    )}
+                  </Button>
+                </CollapsibleTrigger>
+                <CollapsibleContent className="space-y-4 pt-4">
+                  <DailyPulseWidget 
+                    userId={userId}
+                    userRole={userRole}
+                    foundryId={foundryId}
+                  />
+                  <StandupWidget 
+                    userRole={userRole}
+                    compact={true}
+                  />
+                </CollapsibleContent>
+              </Collapsible>
+            </div>
+          </div>
+        )}
       </div>
-
-      {/* Conversation List */}
-      {isLoading ? (
-        <div className="space-y-3">
-          {[1, 2, 3, 4, 5].map(i => (
-            <div key={i} className="flex items-center gap-3 p-4 border rounded-lg">
-              <Skeleton className="h-10 w-10 rounded-full" />
-              <div className="flex-1 space-y-2">
-                <Skeleton className="h-4 w-40" />
-                <Skeleton className="h-3 w-60" />
-              </div>
-            </div>
-          ))}
-        </div>
-      ) : conversations.length === 0 ? (
-        <div className="text-center py-16">
-          <MessageSquare className="h-16 w-16 text-muted-foreground/50 mx-auto mb-4" />
-          <h3 className="text-lg font-semibold text-foreground mb-2">No conversations yet</h3>
-          <p className="text-muted-foreground mb-6 max-w-md mx-auto">
-            Start messaging team members, discuss tasks, or contact experts from the marketplace.
-          </p>
-          {/* Hide button when dialog is open to prevent visual clutter/bleed-through */}
-          <Button
-            onClick={() => setShowCompose(true)}
-            className={cn(
-              "bg-international-orange hover:bg-international-orange-hover",
-              showCompose && "invisible"
-            )}
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            Start a Conversation
-          </Button>
-        </div>
-      ) : (
-        <div className="space-y-6">
-          {/* Channels */}
-          {channels.length > 0 && (
-            <div>
-              <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-2">
-                <Hash className="h-4 w-4" />
-                Channels
-              </h2>
-              <div className="space-y-2">
-                {channels.map((conv) => (
-                  <ConversationListItem
-                    key={conv.id}
-                    conversation={conv}
-                    currentUserId={userId}
-                    onClick={() => handleSelectConversation(conv.id)}
-                  />
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Direct Messages */}
-          {dms.length > 0 && (
-            <div>
-              <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-2">
-                <User className="h-4 w-4" />
-                Direct Messages
-              </h2>
-              <div className="space-y-2">
-                {dms.map((conv) => (
-                  <ConversationListItem
-                    key={conv.id}
-                    conversation={conv}
-                    currentUserId={userId}
-                    onClick={() => handleSelectConversation(conv.id)}
-                  />
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Experts */}
-          {experts.length > 0 && (
-            <div>
-              <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-2">
-                <Briefcase className="h-4 w-4" />
-                Experts
-              </h2>
-              <div className="space-y-2">
-                {experts.map((conv) => (
-                  <ConversationListItem
-                    key={conv.id}
-                    conversation={conv}
-                    currentUserId={userId}
-                    onClick={() => handleSelectConversation(conv.id)}
-                  />
-                ))}
-              </div>
-            </div>
-          )}
-
-          {searchQuery && filteredConversations.length === 0 && (
-            <div className="text-center py-8">
-              <p className="text-muted-foreground">
-                No conversations match "{searchQuery}"
-              </p>
-            </div>
-          )}
-        </div>
-      )}
 
       {/* Quick compose dialog */}
       <QuickComposeDialog

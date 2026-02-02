@@ -5,14 +5,14 @@ import { ComparisonBar } from "@/components/marketplace/comparison-bar"
 import { ComparisonModal } from "@/components/marketplace/comparison-modal"
 import { MarketCard, CardSize } from "@/components/marketplace/market-card"
 import { MarketplaceOnboardingModal } from "@/components/onboarding/MarketplaceOnboardingModal"
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { EmptyState } from "@/components/ui/empty-state"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useState, useMemo, useEffect, useCallback } from "react"
-import { Loader2, Store, Search, X, SlidersHorizontal, MapPin, Briefcase, GraduationCap, Bot, Factory, Zap, Shield, LayoutGrid, List, ShieldCheck, Clock, Sparkles, Users, ArrowRight, Bookmark, Star, Rows3, Square, LayoutList, Minus, AlignJustify, UserCircle, Package, Wrench, CheckCircle2 } from "lucide-react"
+import { Loader2, Store, Search, X, SlidersHorizontal, MapPin, Briefcase, GraduationCap, Bot, Factory, Zap, Shield, LayoutGrid, List, ShieldCheck, Clock, Sparkles, Users, ArrowRight, Bookmark, Star, Rows3, Square, LayoutList, Minus, AlignJustify, UserCircle, Package, Wrench, CheckCircle2, FileText, Heart, RefreshCw } from "lucide-react"
 import { toast } from "sonner"
 import { Card, CardContent } from "@/components/ui/card"
 import { cn } from "@/lib/utils"
@@ -36,6 +36,10 @@ import {
     saveSearchQuery,
     getAutocomplete
 } from "@/actions/search"
+import { getMyRFQs } from "@/actions/rfq"
+import { getSavedResources } from "@/actions/marketplace"
+import { RFQCard } from "@/components/rfq/RFQCard"
+import { RFQSummary } from "@/types/rfq"
 
 interface MarketplaceRecommendation {
     id: string
@@ -74,6 +78,13 @@ export function MarketplaceView({
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
     const [isComparisonOpen, setIsComparisonOpen] = useState(false)
     const [activeTab, setActiveTab] = useState<string>('People') // Default to People
+    
+    // Top-level marketplace tabs state
+    const [topTab, setTopTab] = useState<string>('browse')
+    const [myRfqs, setMyRfqs] = useState<RFQSummary[]>([])
+    const [savedResources, setSavedResources] = useState<any[]>([])
+    const [isLoadingRfqs, setIsLoadingRfqs] = useState(false)
+    const [isLoadingSaved, setIsLoadingSaved] = useState(false)
     const [searchQuery, setSearchQuery] = useState('')
     const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('')
     const [showFilters, setShowFilters] = useState(false)
@@ -209,8 +220,72 @@ export function MarketplaceView({
             if (params.subcategories) setSelectedSubcategories(new Set(params.subcategories))
             if (params.location) setLocationFilter(params.location)
             if (params.sortBy) setSortBy(params.sortBy)
+            
+            // Check for top-level tab params (from redirects)
+            const tab = urlSearchParams.get('tab')
+            if (tab === 'rfqs' || tab === 'my-rfqs') {
+                setTopTab('rfqs')
+            } else if (tab === 'saved') {
+                setTopTab('saved')
+            } else if (tab === 'talent') {
+                // Talent redirects to browse with People category
+                setTopTab('browse')
+                setActiveTab('People')
+            }
         }
     }, [])
+
+    // Fetch RFQs when switching to RFQs tab
+    const fetchMyRfqs = useCallback(async () => {
+        setIsLoadingRfqs(true)
+        try {
+            const result = await getMyRFQs('buyer')
+            if (!result.error) {
+                setMyRfqs(result.data)
+            }
+        } catch (err) {
+            console.error('Error fetching RFQs:', err)
+        } finally {
+            setIsLoadingRfqs(false)
+        }
+    }, [])
+
+    // Fetch saved resources when switching to Saved tab
+    const fetchSavedResources = useCallback(async () => {
+        setIsLoadingSaved(true)
+        try {
+            const result = await getSavedResources()
+            if (!result.error && result.data) {
+                setSavedResources(result.data)
+            }
+        } catch (err) {
+            console.error('Error fetching saved resources:', err)
+        } finally {
+            setIsLoadingSaved(false)
+        }
+    }, [])
+
+    // Fetch data when top tab changes
+    useEffect(() => {
+        if (topTab === 'rfqs' && myRfqs.length === 0) {
+            fetchMyRfqs()
+        } else if (topTab === 'saved' && savedResources.length === 0) {
+            fetchSavedResources()
+        }
+    }, [topTab, myRfqs.length, savedResources.length, fetchMyRfqs, fetchSavedResources])
+
+    // Handle top tab change and update URL
+    const handleTopTabChange = useCallback((newTab: string) => {
+        setTopTab(newTab)
+        const params = new URLSearchParams(urlSearchParams?.toString() || '')
+        if (newTab === 'browse') {
+            params.delete('tab')
+        } else {
+            params.set('tab', newTab)
+        }
+        const newURL = params.toString() ? `${pathname}?${params.toString()}` : pathname
+        router.push(newURL, { scroll: false })
+    }, [pathname, router, urlSearchParams])
 
     // Update URL with search params
     const updateURL = useCallback((query: string, category: string) => {
@@ -696,8 +771,37 @@ export function MarketplaceView({
                 />
             )}
 
-            {/* Hero Category Cards - Rich detail about each category */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            {/* Top-level Marketplace Tabs */}
+            <Tabs value={topTab} onValueChange={handleTopTabChange} className="w-full">
+                <TabsList className="mb-6 w-full max-w-md">
+                    <TabsTrigger value="browse" className="flex-1 gap-2">
+                        <Store className="h-4 w-4" />
+                        Browse
+                    </TabsTrigger>
+                    <TabsTrigger value="rfqs" className="flex-1 gap-2">
+                        <FileText className="h-4 w-4" />
+                        My RFQs
+                        {myRfqs.length > 0 && (
+                            <Badge variant="secondary" className="ml-1 h-5 min-w-[20px] px-1.5">
+                                {myRfqs.length}
+                            </Badge>
+                        )}
+                    </TabsTrigger>
+                    <TabsTrigger value="saved" className="flex-1 gap-2">
+                        <Heart className="h-4 w-4" />
+                        Saved
+                        {savedResources.length > 0 && (
+                            <Badge variant="secondary" className="ml-1 h-5 min-w-[20px] px-1.5">
+                                {savedResources.length}
+                            </Badge>
+                        )}
+                    </TabsTrigger>
+                </TabsList>
+
+                {/* Browse Tab - Original Marketplace Content */}
+                <TabsContent value="browse" className="mt-0">
+                    {/* Hero Category Cards - Rich detail about each category */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
                 {/* People Card - International Orange (warm, human) */}
                 <div 
                     onClick={() => handleCategoryClick('People')}
@@ -1635,6 +1739,170 @@ export function MarketplaceView({
                 onOpenChange={setIsComparisonOpen}
                 items={selectedItems}
             />
+                </TabsContent>
+
+                {/* My RFQs Tab */}
+                <TabsContent value="rfqs" className="mt-0">
+                    <div className="space-y-6">
+                        {/* Header with refresh */}
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <h2 className="text-2xl font-bold">My RFQs</h2>
+                                <p className="text-muted-foreground">Request for Quotes you've created</p>
+                            </div>
+                            <div className="flex gap-2">
+                                <Button
+                                    variant="secondary"
+                                    size="sm"
+                                    onClick={fetchMyRfqs}
+                                    disabled={isLoadingRfqs}
+                                >
+                                    {isLoadingRfqs ? (
+                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                    ) : (
+                                        <RefreshCw className="h-4 w-4" />
+                                    )}
+                                    <span className="ml-2">Refresh</span>
+                                </Button>
+                                <Button asChild>
+                                    <a href="/rfq/new">
+                                        <FileText className="h-4 w-4 mr-2" />
+                                        New RFQ
+                                    </a>
+                                </Button>
+                            </div>
+                        </div>
+
+                        {/* Loading state */}
+                        {isLoadingRfqs && myRfqs.length === 0 && (
+                            <div className="flex items-center justify-center py-12">
+                                <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+                            </div>
+                        )}
+
+                        {/* Empty state */}
+                        {!isLoadingRfqs && myRfqs.length === 0 && (
+                            <EmptyState
+                                icon={<FileText className="h-12 w-12 text-muted-foreground" />}
+                                title="No RFQs yet"
+                                description="Create a Request for Quote to get competitive bids from suppliers in the marketplace."
+                                action={
+                                    <Button asChild>
+                                        <a href="/rfq/new">Create Your First RFQ</a>
+                                    </Button>
+                                }
+                            />
+                        )}
+
+                        {/* RFQ Grid */}
+                        {myRfqs.length > 0 && (
+                            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                                {myRfqs.map((rfq) => (
+                                    <RFQCard
+                                        key={rfq.id}
+                                        rfq={rfq}
+                                        role="buyer"
+                                    />
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                </TabsContent>
+
+                {/* Saved Resources Tab */}
+                <TabsContent value="saved" className="mt-0">
+                    <div className="space-y-6">
+                        {/* Header with refresh */}
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <h2 className="text-2xl font-bold">Saved Resources</h2>
+                                <p className="text-muted-foreground">Bookmarked people, products, and services</p>
+                            </div>
+                            <Button
+                                variant="secondary"
+                                size="sm"
+                                onClick={fetchSavedResources}
+                                disabled={isLoadingSaved}
+                            >
+                                {isLoadingSaved ? (
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                    <RefreshCw className="h-4 w-4" />
+                                )}
+                                <span className="ml-2">Refresh</span>
+                            </Button>
+                        </div>
+
+                        {/* Loading state */}
+                        {isLoadingSaved && savedResources.length === 0 && (
+                            <div className="flex items-center justify-center py-12">
+                                <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+                            </div>
+                        )}
+
+                        {/* Empty state */}
+                        {!isLoadingSaved && savedResources.length === 0 && (
+                            <EmptyState
+                                icon={<Heart className="h-12 w-12 text-muted-foreground" />}
+                                title="No saved resources"
+                                description="Save people, products, and services from the marketplace to access them quickly later."
+                                action={
+                                    <Button variant="secondary" onClick={() => handleTopTabChange('browse')}>
+                                        Browse Marketplace
+                                    </Button>
+                                }
+                            />
+                        )}
+
+                        {/* Saved Resources Grid */}
+                        {savedResources.length > 0 && (
+                            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                                {savedResources.map((saved) => {
+                                    const listing = saved.marketplace_listings
+                                    if (!listing) return null
+                                    
+                                    return (
+                                        <Card key={saved.id} className="group hover:shadow-md transition-shadow">
+                                            <CardContent className="p-4">
+                                                <div className="flex items-start justify-between gap-2 mb-3">
+                                                    <Badge variant="secondary" className="text-xs">
+                                                        {listing.category}
+                                                    </Badge>
+                                                    <Heart className="h-4 w-4 text-rose-500 fill-rose-500" />
+                                                </div>
+                                                <h3 className="font-semibold text-foreground line-clamp-1 mb-1">
+                                                    {listing.name}
+                                                </h3>
+                                                {listing.headline && (
+                                                    <p className="text-sm text-muted-foreground line-clamp-2 mb-3">
+                                                        {listing.headline}
+                                                    </p>
+                                                )}
+                                                {listing.subcategory && (
+                                                    <p className="text-xs text-muted-foreground mb-3">
+                                                        {listing.subcategory}
+                                                    </p>
+                                                )}
+                                                <div className="flex items-center justify-between">
+                                                    {listing.rating_average && (
+                                                        <div className="flex items-center gap-1 text-sm">
+                                                            <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
+                                                            <span>{listing.rating_average.toFixed(1)}</span>
+                                                        </div>
+                                                    )}
+                                                    <Button size="sm" variant="secondary" asChild>
+                                                        <a href={`/marketplace/${saved.provider_id}`}>View</a>
+                                                    </Button>
+                                                </div>
+                                            </CardContent>
+                                        </Card>
+                                    )
+                                })}
+                            </div>
+                        )}
+                    </div>
+                </TabsContent>
+            </Tabs>
         </div>
     )
 }

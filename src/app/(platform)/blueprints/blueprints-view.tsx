@@ -1,11 +1,12 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { typography } from '@/lib/design-system'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Input } from '@/components/ui/input'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -17,11 +18,21 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible'
+import {
   BlueprintGrid,
   CreateBlueprintDialog,
 } from '@/components/blueprints'
 import { archiveBlueprint, deleteBlueprint } from '@/actions/blueprints'
+import { createAdvisoryQuestion } from '@/actions/advisory'
 import type { Blueprint, BlueprintTemplate } from '@/types/blueprints'
+import { QuestionCard, Question } from '@/components/advisory/question-card'
+import { AskModal } from '@/components/advisory/ask-modal'
+import { StatusLegend } from '@/components/advisory/status-legend'
+import { EmptyState } from '@/components/ui/empty-state'
 import {
   Plus,
   Map,
@@ -42,20 +53,80 @@ import {
   Lightbulb,
   CircuitBoard,
   Bot,
+  MessageSquare,
+  HelpCircle,
+  ChevronDown,
+  Search,
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { toast } from 'sonner'
+import { cn } from '@/lib/utils'
 
 interface BlueprintsViewProps {
   blueprints: Blueprint[]
   templates: BlueprintTemplate[]
+  questions?: Question[]
+  currentUserId?: string
+  currentUserRole?: string
 }
 
-export function BlueprintsView({ blueprints, templates }: BlueprintsViewProps) {
+export function BlueprintsView({ 
+  blueprints, 
+  templates,
+  questions = [],
+  currentUserId: _currentUserId = '',
+  currentUserRole: _currentUserRole,
+}: BlueprintsViewProps) {
+  // Note: _currentUserId and _currentUserRole are available for future "My Questions" filter
   const router = useRouter()
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [isDeleting, setIsDeleting] = useState<string | null>(null)
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
+  
+  // Q&A State
+  const [isQAOpen, setIsQAOpen] = useState(true)
+  const [qaSearchQuery, setQaSearchQuery] = useState('')
+  
+  // Filter questions based on search
+  const filteredQuestions = useMemo(() => {
+    if (!qaSearchQuery.trim()) return questions
+    const query = qaSearchQuery.toLowerCase()
+    return questions.filter(q => 
+      q.title.toLowerCase().includes(query) ||
+      q.body.toLowerCase().includes(query) ||
+      q.category.toLowerCase().includes(query)
+    )
+  }, [questions, qaSearchQuery])
+
+  // Handle Q&A submission
+  const handleAskQuestion = async (data: {
+    title: string
+    body: string
+    category: string
+    visibility: 'public' | 'foundry'
+    getAiAnswer: boolean
+  }) => {
+    const result = await createAdvisoryQuestion({
+      title: data.title,
+      body: data.body,
+      category: data.category,
+      visibility: data.visibility === 'public' ? 'network' : 'foundry',
+      getAiAnswer: data.getAiAnswer,
+    })
+    
+    if (result.error) {
+      toast.error(result.error)
+      return { error: result.error }
+    }
+    
+    toast.success(
+      data.getAiAnswer 
+        ? 'Question submitted! AI is generating an answer...' 
+        : 'Question submitted successfully'
+    )
+    router.refresh()
+    return { questionId: result.data?.id }
+  }
 
   const handleArchive = async (id: string) => {
     const { error } = await archiveBlueprint(id)
@@ -579,6 +650,111 @@ export function BlueprintsView({ blueprints, templates }: BlueprintsViewProps) {
             </CardContent>
           </Card>
         </div>
+      </section>
+
+      {/* ADVISORY Q&A SECTION */}
+      <section className="space-y-4 mt-8 pt-8 border-t border-muted">
+        <Collapsible open={isQAOpen} onOpenChange={setIsQAOpen}>
+          <div className="flex items-center justify-between">
+            <CollapsibleTrigger asChild>
+              <button className="flex items-center gap-2 hover:opacity-80 transition-opacity">
+                <div className="h-10 w-10 rounded-lg bg-violet-100 flex items-center justify-center">
+                  <MessageSquare className="h-5 w-5 text-violet-600" />
+                </div>
+                <div className="text-left">
+                  <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
+                    Advisory Q&A
+                    <Badge variant="secondary" className="text-xs">
+                      {questions.length} {questions.length === 1 ? 'question' : 'questions'}
+                    </Badge>
+                  </h2>
+                  <p className="text-sm text-muted-foreground">
+                    Get AI-powered insights verified by human experts
+                  </p>
+                </div>
+                <ChevronDown className={cn(
+                  "h-5 w-5 text-muted-foreground transition-transform ml-2",
+                  isQAOpen && "rotate-180"
+                )} />
+              </button>
+            </CollapsibleTrigger>
+            <AskModal onSubmit={handleAskQuestion} />
+          </div>
+
+          <CollapsibleContent className="mt-6 space-y-4">
+            {/* Status Legend */}
+            <StatusLegend className="pb-4" />
+
+            {/* Search */}
+            {questions.length > 0 && (
+              <div className="flex items-center gap-3">
+                <div className="relative flex-1 max-w-md">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    type="search"
+                    placeholder="Search questions..."
+                    value={qaSearchQuery}
+                    onChange={(e) => setQaSearchQuery(e.target.value)}
+                    className="pl-9"
+                  />
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  {filteredQuestions.length} {filteredQuestions.length === 1 ? 'question' : 'questions'} 
+                  {qaSearchQuery && ' found'}
+                </p>
+              </div>
+            )}
+
+            {/* Questions Grid */}
+            {filteredQuestions.length === 0 ? (
+              <Card className="border-2 border-dashed">
+                <CardContent className="py-12">
+                  <EmptyState
+                    icon={<HelpCircle className="h-12 w-12" />}
+                    title={qaSearchQuery ? "No questions match your search" : "No questions yet"}
+                    description={
+                      qaSearchQuery 
+                        ? "Try adjusting your search terms."
+                        : "Ask your first question to get AI-powered insights verified by experts."
+                    }
+                    action={
+                      qaSearchQuery ? (
+                        <Button variant="link" onClick={() => setQaSearchQuery('')} className="text-electric-blue">
+                          Clear Search
+                        </Button>
+                      ) : (
+                        <AskModal 
+                          onSubmit={handleAskQuestion}
+                          trigger={
+                            <Button className="gap-2">
+                              <MessageSquare className="h-4 w-4" />
+                              Ask a Question
+                            </Button>
+                          }
+                        />
+                      )
+                    }
+                  />
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {filteredQuestions.slice(0, 6).map((question) => (
+                  <QuestionCard key={question.id} question={question} />
+                ))}
+              </div>
+            )}
+
+            {/* Show more indicator */}
+            {filteredQuestions.length > 6 && (
+              <div className="text-center pt-4">
+                <p className="text-sm text-muted-foreground">
+                  Showing 6 of {filteredQuestions.length} questions. Use search to find specific topics.
+                </p>
+              </div>
+            )}
+          </CollapsibleContent>
+        </Collapsible>
       </section>
 
       {/* Create dialog */}
