@@ -151,9 +151,13 @@ export function MessagesPageClient({ userId, foundryId, members = [] }: Messages
             Communicate with your team, discuss tasks, and message experts
           </p>
         </div>
+        {/* Hide button when dialog is open to prevent visual clutter/bleed-through */}
         <Button
           onClick={() => setShowCompose(true)}
-          className="bg-international-orange hover:bg-international-orange-hover"
+          className={cn(
+            "bg-international-orange hover:bg-international-orange-hover",
+            showCompose && "invisible"
+          )}
         >
           <Plus className="h-4 w-4 mr-2" />
           New Message
@@ -191,9 +195,13 @@ export function MessagesPageClient({ userId, foundryId, members = [] }: Messages
           <p className="text-muted-foreground mb-6 max-w-md mx-auto">
             Start messaging team members, discuss tasks, or contact experts from the marketplace.
           </p>
+          {/* Hide button when dialog is open to prevent visual clutter/bleed-through */}
           <Button
             onClick={() => setShowCompose(true)}
-            className="bg-international-orange hover:bg-international-orange-hover"
+            className={cn(
+              "bg-international-orange hover:bg-international-orange-hover",
+              showCompose && "invisible"
+            )}
           >
             <Plus className="h-4 w-4 mr-2" />
             Start a Conversation
