@@ -17,7 +17,23 @@ import { MentionInput } from "@/components/ui/mention-input"
 import { MentionText } from "@/components/ui/mention-text"
 import { AttachmentList } from "@/components/tasks/attachment-list"
 import { Markdown } from "@/components/ui/markdown"
-import { addTaskComment, getTaskAttachments, getTaskHistory } from "@/actions/tasks"
+import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
+import { Label } from "@/components/ui/label"
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select"
+import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+} from "@/components/ui/popover"
+import { Calendar as CalendarComponent } from "@/components/ui/calendar"
+import { addTaskComment, getTaskAttachments, getTaskHistory, updateTaskDetails, updateTaskAssignees, updateTaskDates } from "@/actions/tasks"
 import { uploadTaskAttachment } from "@/actions/attachments"
 import { toast } from "sonner"
 import { cn, getInitials } from "@/lib/utils"
@@ -33,7 +49,10 @@ import {
     History,
     ShieldAlert,
     ShieldCheck,
-    Bot
+    Bot,
+    Edit2,
+    X,
+    Check
 } from "lucide-react"
 import { Database } from "@/types/database.types"
 
@@ -103,6 +122,23 @@ export function FullTaskView({ open, onOpenChange, task, members }: FullTaskView
     const [isDragging, setIsDragging] = useState(false)
     const fileInputRef = useRef<HTMLInputElement>(null)
     const supabase = useMemo(() => createClient(), [])
+
+    // Editing state
+    const [isEditing, setIsEditing] = useState(false)
+    const [isSaving, setIsSaving] = useState(false)
+    const [editedTitle, setEditedTitle] = useState(task.title)
+    const [editedDescription, setEditedDescription] = useState(task.description || "")
+    const [editedStatus, setEditedStatus] = useState(task.status || "Pending")
+    const [editedRiskLevel, setEditedRiskLevel] = useState(task.risk_level || "Low")
+    const [editedStartDate, setEditedStartDate] = useState<Date | undefined>(
+        task.start_date ? new Date(task.start_date) : undefined
+    )
+    const [editedEndDate, setEditedEndDate] = useState<Date | undefined>(
+        task.end_date ? new Date(task.end_date) : undefined
+    )
+    const [editedAssigneeIds, setEditedAssigneeIds] = useState<string[]>(
+        task.assignees?.map(a => a.id) || (task.assignee ? [task.assignee.id] : [])
+    )
 
     // Get assignees
     const assignees = task.assignees && task.assignees.length > 0
@@ -202,6 +238,87 @@ export function FullTaskView({ open, onOpenChange, task, members }: FullTaskView
         if (fileInputRef.current) fileInputRef.current.value = ''
     }
 
+    const handleSaveEdits = async () => {
+        setIsSaving(true)
+        try {
+            // Update basic details (title, description)
+            if (editedTitle !== task.title || editedDescription !== task.description) {
+                const res = await updateTaskDetails(task.id, {
+                    title: editedTitle,
+                    description: editedDescription
+                })
+                if (res.error) {
+                    toast.error(res.error)
+                    setIsSaving(false)
+                    return
+                }
+            }
+
+            // Update dates
+            if (editedStartDate || editedEndDate) {
+                const startDateStr = editedStartDate?.toISOString() || task.start_date || new Date().toISOString()
+                const endDateStr = editedEndDate?.toISOString() || task.end_date || new Date().toISOString()
+                const res = await updateTaskDates(task.id, startDateStr, endDateStr)
+                if (res.error) {
+                    toast.error(res.error)
+                    setIsSaving(false)
+                    return
+                }
+            }
+
+            // Update assignees
+            const currentAssigneeIds = task.assignees?.map(a => a.id) || (task.assignee ? [task.assignee.id] : [])
+            const assigneesChanged = JSON.stringify(editedAssigneeIds.sort()) !== JSON.stringify(currentAssigneeIds.sort())
+            if (assigneesChanged && editedAssigneeIds.length > 0) {
+                const res = await updateTaskAssignees(task.id, editedAssigneeIds)
+                if (res.error) {
+                    toast.error(res.error)
+                    setIsSaving(false)
+                    return
+                }
+            }
+
+            // Update status and risk_level directly via Supabase (no dedicated action exists)
+            const updates: any = {}
+            if (editedStatus !== task.status) updates.status = editedStatus
+            if (editedRiskLevel !== task.risk_level) updates.risk_level = editedRiskLevel
+
+            if (Object.keys(updates).length > 0) {
+                const { error } = await supabase
+                    .from('tasks')
+                    .update(updates)
+                    .eq('id', task.id)
+                
+                if (error) {
+                    toast.error(error.message)
+                    setIsSaving(false)
+                    return
+                }
+            }
+
+            toast.success("Task updated successfully")
+            setIsEditing(false)
+            
+            // Reload the page to reflect changes
+            window.location.reload()
+        } catch (error) {
+            toast.error("Failed to save changes")
+        } finally {
+            setIsSaving(false)
+        }
+    }
+
+    const handleCancelEdits = () => {
+        setEditedTitle(task.title)
+        setEditedDescription(task.description || "")
+        setEditedStatus(task.status || "Pending")
+        setEditedRiskLevel(task.risk_level || "Low")
+        setEditedStartDate(task.start_date ? new Date(task.start_date) : undefined)
+        setEditedEndDate(task.end_date ? new Date(task.end_date) : undefined)
+        setEditedAssigneeIds(task.assignees?.map(a => a.id) || (task.assignee ? [task.assignee.id] : []))
+        setIsEditing(false)
+    }
+
     const getRiskBadge = (level: string | null) => {
         if (level === 'High') {
             return (
@@ -250,24 +367,112 @@ export function FullTaskView({ open, onOpenChange, task, members }: FullTaskView
             <DialogContent size="lg" className="w-full h-[90vh] p-0 gap-0 flex flex-col overflow-hidden">
                 {/* Header */}
                 <DialogHeader className="p-6 pb-4 border-b border shrink-0">
-                    <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-2 flex-wrap">
-                            <span className="text-sm font-mono text-muted-foreground">
-                                #{task.task_number ?? '...'}
-                            </span>
-                            <Badge className={`${getStatusColor(task.status).bar} text-white border-0`}>
-                                {(task.status || 'Pending').replace(/_/g, ' ')}
-                            </Badge>
-                            {getRiskBadge(task.risk_level)}
+                    <div className="flex items-start justify-between gap-4">
+                        <div className="flex-1 min-w-0">
+                            {isEditing ? (
+                                <div className="space-y-4">
+                                    {/* Editable Status and Risk */}
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                        <span className="text-sm font-mono text-muted-foreground">
+                                            #{task.task_number ?? '...'}
+                                        </span>
+                                        <Select value={editedStatus} onValueChange={setEditedStatus}>
+                                            <SelectTrigger className="w-[180px] h-8">
+                                                <SelectValue />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="Pending">Pending</SelectItem>
+                                                <SelectItem value="Accepted">Accepted</SelectItem>
+                                                <SelectItem value="In_Progress">In Progress</SelectItem>
+                                                <SelectItem value="Pending_Approval">Pending Approval</SelectItem>
+                                                <SelectItem value="Completed">Completed</SelectItem>
+                                                <SelectItem value="Rejected">Rejected</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                        <Select value={editedRiskLevel} onValueChange={setEditedRiskLevel}>
+                                            <SelectTrigger className="w-[140px] h-8">
+                                                <SelectValue />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="Low">Low Risk</SelectItem>
+                                                <SelectItem value="Medium">Medium Risk</SelectItem>
+                                                <SelectItem value="High">High Risk</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                    {/* Editable Title */}
+                                    <Input
+                                        value={editedTitle}
+                                        onChange={(e) => setEditedTitle(e.target.value)}
+                                        className="text-2xl font-display font-semibold h-auto py-2"
+                                        placeholder="Task title"
+                                    />
+                                    {task.objective && (
+                                        <p className="text-sm text-primary">
+                                            {task.objective.title}
+                                        </p>
+                                    )}
+                                </div>
+                            ) : (
+                                <div>
+                                    <div className="flex items-center gap-2 mb-2 flex-wrap">
+                                        <span className="text-sm font-mono text-muted-foreground">
+                                            #{task.task_number ?? '...'}
+                                        </span>
+                                        <Badge className={`${getStatusColor(task.status).bar} text-white border-0`}>
+                                            {(task.status || 'Pending').replace(/_/g, ' ')}
+                                        </Badge>
+                                        {getRiskBadge(task.risk_level)}
+                                    </div>
+                                    <DialogTitle className="text-2xl font-display font-semibold text-foreground tracking-tight">
+                                        {task.title}
+                                    </DialogTitle>
+                                    {task.objective && (
+                                        <p className="text-sm text-primary mt-1">
+                                            {task.objective.title}
+                                        </p>
+                                    )}
+                                </div>
+                            )}
                         </div>
-                        <DialogTitle className="text-2xl font-display font-semibold text-foreground tracking-tight">
-                            {task.title}
-                        </DialogTitle>
-                        {task.objective && (
-                            <p className="text-sm text-primary mt-1">
-                                {task.objective.title}
-                            </p>
-                        )}
+                        {/* Edit/Save/Cancel Buttons */}
+                        <div className="flex items-center gap-2">
+                            {isEditing ? (
+                                <>
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={handleCancelEdits}
+                                        disabled={isSaving}
+                                    >
+                                        <X className="h-4 w-4 mr-1" />
+                                        Cancel
+                                    </Button>
+                                    <Button
+                                        variant="default"
+                                        size="sm"
+                                        onClick={handleSaveEdits}
+                                        disabled={isSaving}
+                                    >
+                                        {isSaving ? (
+                                            <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                                        ) : (
+                                            <Check className="h-4 w-4 mr-1" />
+                                        )}
+                                        Save
+                                    </Button>
+                                </>
+                            ) : (
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => setIsEditing(true)}
+                                >
+                                    <Edit2 className="h-4 w-4 mr-1" />
+                                    Edit
+                                </Button>
+                            )}
+                        </div>
                     </div>
                 </DialogHeader>
 
@@ -281,67 +486,167 @@ export function FullTaskView({ open, onOpenChange, task, members }: FullTaskView
                                 <h3 className="text-sm font-semibold text-foreground uppercase tracking-wider flex items-center gap-2">
                                     <MessageSquare className="h-4 w-4" /> Description
                                 </h3>
-                                <div className="bg-muted rounded-lg p-4 min-h-[100px]">
-                                    {task.description ? (
-                                        <Markdown content={task.description} className="text-sm text-foreground leading-relaxed" />
-                                    ) : (
-                                        <p className="text-sm text-muted-foreground italic">No description provided.</p>
-                                    )}
-                                </div>
+                                {isEditing ? (
+                                    <Textarea
+                                        value={editedDescription}
+                                        onChange={(e) => setEditedDescription(e.target.value)}
+                                        className="min-h-[150px] bg-muted"
+                                        placeholder="Add a description..."
+                                    />
+                                ) : (
+                                    <div className="bg-muted rounded-lg p-4 min-h-[100px]">
+                                        {task.description ? (
+                                            <Markdown content={task.description} className="text-sm text-foreground leading-relaxed" />
+                                        ) : (
+                                            <p className="text-sm text-muted-foreground italic">No description provided.</p>
+                                        )}
+                                    </div>
+                                )}
                             </div>
 
                             {/* Details */}
                             <div className="space-y-4">
                                 <h3 className="text-sm font-semibold text-foreground uppercase tracking-wider">Details</h3>
                                 <div className="bg-muted rounded-lg p-4 space-y-3">
-                                    <div className="flex items-center gap-2 text-sm">
-                                        <Calendar className="h-4 w-4 text-muted-foreground" />
-                                        <span className="text-muted-foreground">Start:</span>
-                                        <span className="font-medium">
-                                            {task.start_date ? format(new Date(task.start_date), "MMM d, yyyy") : "Not set"}
-                                        </span>
-                                    </div>
-                                    <div className="flex items-center gap-2 text-sm">
-                                        <Calendar className="h-4 w-4 text-muted-foreground" />
-                                        <span className="text-muted-foreground">Due:</span>
-                                        <span className={cn(
-                                            "font-medium",
-                                            task.end_date && new Date(task.end_date) < new Date() && task.status !== 'Completed' && "text-destructive"
-                                        )}>
-                                            {task.end_date ? format(new Date(task.end_date), "MMM d, yyyy") : "Not set"}
-                                        </span>
-                                    </div>
-                                    <Separator className="my-2" />
-                                    <div className="flex items-start gap-2 text-sm">
-                                        <User className="h-4 w-4 text-muted-foreground mt-0.5" />
-                                        <div>
-                                            <span className="text-muted-foreground block mb-1">Assignee:</span>
-                                            {assignees.length > 0 ? (
-                                                <div className="space-y-1">
-                                                    {assignees.map(a => (
-                                                        <div key={a.id} className="flex items-center gap-2">
-                                                            <Avatar className="h-6 w-6">
-                                                                {a.role === "AI_Agent" ? (
-                                                                    <AvatarImage src="/images/ai-agent-avatar.png" />
-                                                                ) : a.avatar_url ? (
-                                                                    <AvatarImage src={a.avatar_url} />
-                                                                ) : null}
-                                                                <AvatarFallback className={cn(
-                                                                    "text-[10px]",
-                                                                    a.role === "AI_Agent" ? "bg-accent text-accent-foreground" : "bg-muted text-muted-foreground"
-                                                                )}>
-                                                                    {a.role === "AI_Agent" ? <Bot className="w-3 h-3" /> : getInitials(a.full_name)}
-                                                                </AvatarFallback>
-                                                            </Avatar>
-                                                            <span className="font-medium">{a.full_name}</span>
+                                    {isEditing ? (
+                                        <>
+                                            {/* Editable Start Date */}
+                                            <div className="space-y-2">
+                                                <Label className="text-sm text-muted-foreground">Start Date</Label>
+                                                <Popover>
+                                                    <PopoverTrigger asChild>
+                                                        <Button variant="outline" className="w-full justify-start text-left font-normal">
+                                                            <Calendar className="mr-2 h-4 w-4" />
+                                                            {editedStartDate ? format(editedStartDate, "MMM d, yyyy") : "Pick a date"}
+                                                        </Button>
+                                                    </PopoverTrigger>
+                                                    <PopoverContent className="w-auto p-0" align="start">
+                                                        <CalendarComponent
+                                                            mode="single"
+                                                            selected={editedStartDate}
+                                                            onSelect={setEditedStartDate}
+                                                            initialFocus
+                                                        />
+                                                    </PopoverContent>
+                                                </Popover>
+                                            </div>
+                                            {/* Editable End Date */}
+                                            <div className="space-y-2">
+                                                <Label className="text-sm text-muted-foreground">Due Date</Label>
+                                                <Popover>
+                                                    <PopoverTrigger asChild>
+                                                        <Button variant="outline" className="w-full justify-start text-left font-normal">
+                                                            <Calendar className="mr-2 h-4 w-4" />
+                                                            {editedEndDate ? format(editedEndDate, "MMM d, yyyy") : "Pick a date"}
+                                                        </Button>
+                                                    </PopoverTrigger>
+                                                    <PopoverContent className="w-auto p-0" align="start">
+                                                        <CalendarComponent
+                                                            mode="single"
+                                                            selected={editedEndDate}
+                                                            onSelect={setEditedEndDate}
+                                                            initialFocus
+                                                        />
+                                                    </PopoverContent>
+                                                </Popover>
+                                            </div>
+                                            <Separator className="my-2" />
+                                            {/* Editable Assignees */}
+                                            <div className="space-y-2">
+                                                <Label className="text-sm text-muted-foreground">Assignees</Label>
+                                                <Popover>
+                                                    <PopoverTrigger asChild>
+                                                        <Button variant="outline" className="w-full justify-start text-left font-normal">
+                                                            <User className="mr-2 h-4 w-4" />
+                                                            {editedAssigneeIds.length > 0 
+                                                                ? `${editedAssigneeIds.length} selected`
+                                                                : "Select assignees"
+                                                            }
+                                                        </Button>
+                                                    </PopoverTrigger>
+                                                    <PopoverContent className="w-[250px] p-0" align="start">
+                                                        <div className="p-2 space-y-1 max-h-[300px] overflow-y-auto">
+                                                            {members.map((member) => (
+                                                                <div
+                                                                    key={member.id}
+                                                                    className={cn(
+                                                                        "flex items-center gap-2 p-2 rounded-md cursor-pointer hover:bg-muted",
+                                                                        editedAssigneeIds.includes(member.id) && "bg-muted"
+                                                                    )}
+                                                                    onClick={() => {
+                                                                        if (editedAssigneeIds.includes(member.id)) {
+                                                                            setEditedAssigneeIds(editedAssigneeIds.filter(id => id !== member.id))
+                                                                        } else {
+                                                                            setEditedAssigneeIds([...editedAssigneeIds, member.id])
+                                                                        }
+                                                                    }}
+                                                                >
+                                                                    <input
+                                                                        type="checkbox"
+                                                                        checked={editedAssigneeIds.includes(member.id)}
+                                                                        onChange={() => {}}
+                                                                        className="h-4 w-4"
+                                                                    />
+                                                                    <span className="text-sm">{member.full_name}</span>
+                                                                </div>
+                                                            ))}
                                                         </div>
-                                                    ))}
+                                                    </PopoverContent>
+                                                </Popover>
+                                            </div>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <div className="flex items-center gap-2 text-sm">
+                                                <Calendar className="h-4 w-4 text-muted-foreground" />
+                                                <span className="text-muted-foreground">Start:</span>
+                                                <span className="font-medium">
+                                                    {task.start_date ? format(new Date(task.start_date), "MMM d, yyyy") : "Not set"}
+                                                </span>
+                                            </div>
+                                            <div className="flex items-center gap-2 text-sm">
+                                                <Calendar className="h-4 w-4 text-muted-foreground" />
+                                                <span className="text-muted-foreground">Due:</span>
+                                                <span className={cn(
+                                                    "font-medium",
+                                                    task.end_date && new Date(task.end_date) < new Date() && task.status !== 'Completed' && "text-destructive"
+                                                )}>
+                                                    {task.end_date ? format(new Date(task.end_date), "MMM d, yyyy") : "Not set"}
+                                                </span>
+                                            </div>
+                                            <Separator className="my-2" />
+                                            <div className="flex items-start gap-2 text-sm">
+                                                <User className="h-4 w-4 text-muted-foreground mt-0.5" />
+                                                <div>
+                                                    <span className="text-muted-foreground block mb-1">Assignee:</span>
+                                                    {assignees.length > 0 ? (
+                                                        <div className="space-y-1">
+                                                            {assignees.map(a => (
+                                                                <div key={a.id} className="flex items-center gap-2">
+                                                                    <Avatar className="h-6 w-6">
+                                                                        {a.role === "AI_Agent" ? (
+                                                                            <AvatarImage src="/images/ai-agent-avatar.png" />
+                                                                        ) : a.avatar_url ? (
+                                                                            <AvatarImage src={a.avatar_url} />
+                                                                        ) : null}
+                                                                        <AvatarFallback className={cn(
+                                                                            "text-[10px]",
+                                                                            a.role === "AI_Agent" ? "bg-accent text-accent-foreground" : "bg-muted text-muted-foreground"
+                                                                        )}>
+                                                                            {a.role === "AI_Agent" ? <Bot className="w-3 h-3" /> : getInitials(a.full_name)}
+                                                                        </AvatarFallback>
+                                                                    </Avatar>
+                                                                    <span className="font-medium">{a.full_name}</span>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    ) : (
+                                                        <span className="font-medium text-muted-foreground italic">Unassigned</span>
+                                                    )}
                                                 </div>
-                                            ) : (
-                                                <span className="font-medium text-muted-foreground italic">Unassigned</span>
-                                            )}
-                                        </div>
-                                    </div>
+                                            </div>
+                                        </>
+                                    )}
                                 </div>
                             </div>
                         </div>
