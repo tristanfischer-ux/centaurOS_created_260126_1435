@@ -149,11 +149,11 @@ export function ActivityItem({ item, onReply, onTaskClick }: ActivityItemProps) 
     <div 
       className={cn(
         "group relative rounded-lg border bg-card p-4 transition-colors",
-        !isRead && "bg-orange-50/30 border-orange-200/50",
+        !isRead && "bg-status-warning-light border-status-warning",
         // History items have a subtle different styling
-        isHistoryItem && "bg-muted/30 border-muted-foreground/20",
+        isHistoryItem && "bg-muted border-muted-foreground",
         // System logs have muted styling
-        isSystemLog && "bg-muted/20 border-muted-foreground/10"
+        isSystemLog && "bg-muted border-muted-foreground"
       )}
       onMouseEnter={handleMarkRead}
     >

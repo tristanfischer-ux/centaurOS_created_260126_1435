@@ -412,7 +412,7 @@ export async function getActivityUnreadCount(): Promise<{
       objectiveCommentCount = (allObjectiveComments || []).filter((c: { id: string }) => !readObjIds.has(c.id)).length
     }
 
-    // Get unread message count from conversations
+    // Get unread message count from conversations (batched query to avoid N+1)
     const { data: conversations } = await (supabase as AnySupabaseClient)
       .from('conversation_participants')
       .select('conversation_id, last_read_at')
@@ -420,15 +420,22 @@ export async function getActivityUnreadCount(): Promise<{
 
     let messageCount = 0
     if (conversations && conversations.length > 0) {
-      for (const conv of conversations) {
-        const { count } = await supabase
-          .from('messages')
-          .select('id', { count: 'exact', head: true })
-          .eq('conversation_id', conv.conversation_id)
-          .neq('sender_id', user.id)
-          .gt('created_at', conv.last_read_at || '1970-01-01')
-
-        messageCount += count || 0
+      const conversationIds = conversations.map(c => c.conversation_id)
+      
+      // Single batch query for all messages across all conversations
+      const { data: allMessages } = await supabase
+        .from('messages')
+        .select('id, conversation_id, sender_id, created_at')
+        .in('conversation_id', conversationIds)
+        .neq('sender_id', user.id)
+      
+      if (allMessages) {
+        // Filter messages by last_read_at in memory
+        const conversationMap = new Map(conversations.map(c => [c.conversation_id, c.last_read_at || '1970-01-01']))
+        messageCount = allMessages.filter(msg => {
+          const lastReadAt = conversationMap.get(msg.conversation_id)
+          return lastReadAt && msg.created_at > lastReadAt
+        }).length
       }
     }
 

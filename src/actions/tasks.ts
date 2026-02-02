@@ -1366,6 +1366,71 @@ export async function updateTaskAssignees(taskId: string, assigneeIds: string[])
     return { success: true }
 }
 
+/**
+ * Update task status and/or risk level with proper authorization and validation
+ */
+export async function updateTaskStatusAndRisk(
+    taskId: string,
+    updates: {
+        status?: 'backlog' | 'todo' | 'in_progress' | 'in_review' | 'done' | 'cancelled'
+        risk_level?: 'low' | 'medium' | 'high' | 'critical'
+    }
+) {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return { error: 'Unauthorized' }
+
+    // Security: Verify user has permission to modify this task
+    const foundry_id = await getFoundryIdCached()
+    if (!foundry_id) return { error: 'User not in a foundry' }
+
+    const authCheck = await canModifyTask(supabase, taskId, user.id, foundry_id)
+    if (!authCheck.allowed) {
+        return { error: authCheck.error || 'Unauthorized' }
+    }
+
+    // Validate at least one field is being updated
+    if (!updates.status && !updates.risk_level) {
+        return { error: 'No updates provided' }
+    }
+
+    // Build update object
+    const updateData: any = {}
+    if (updates.status) {
+        updateData.status = updates.status
+    }
+    if (updates.risk_level) {
+        updateData.risk_level = updates.risk_level
+    }
+
+    const { error } = await supabase
+        .from('tasks')
+        .update(updateData)
+        .eq('id', taskId)
+
+    if (error) return { error: sanitizeErrorMessage(error) }
+
+    // Log the status change
+    try {
+        if (updates.status) {
+            await logTaskHistory(taskId, 'STATUS_CHANGED', user.id, {
+                new_status: updates.status
+            })
+        }
+        if (updates.risk_level) {
+            await logTaskHistory(taskId, 'RISK_LEVEL_CHANGED', user.id, {
+                new_risk_level: updates.risk_level
+            })
+        }
+    } catch (logError) {
+        console.error('Failed to log task history:', logError)
+    }
+
+    revalidatePath('/tasks')
+    revalidatePath(`/tasks/${taskId}`)
+    return { success: true }
+}
+
 export async function uploadTaskAttachment(taskId: string, formData: FormData) {
     const supabase = await createClient()
     const foundry_id = await getFoundryIdCached()

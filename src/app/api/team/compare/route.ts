@@ -3,6 +3,7 @@ import OpenAI from "openai";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { rateLimit } from "@/lib/security/rate-limit";
+import { getFoundryIdCached } from "@/lib/supabase/foundry-context";
 
 /**
  * @file Team Member Comparison API
@@ -117,6 +118,56 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         }
         
         const { members, taskContext } = validation.data;
+
+        // SECURITY: Verify foundry isolation - all members must belong to user's foundry
+        const foundry_id = await getFoundryIdCached();
+        if (!foundry_id) {
+            return NextResponse.json(
+                { error: "User not in a foundry" },
+                { status: 403 }
+            );
+        }
+
+        // Verify all member IDs belong to the same foundry
+        const memberIds = members.map(m => m.id);
+        const { data: memberProfiles, error: memberError } = await supabase
+            .from('profiles')
+            .select('id, foundry_id')
+            .in('id', memberIds);
+
+        if (memberError || !memberProfiles) {
+            console.error('[TeamCompareAPI] Failed to verify members:', memberError);
+            return NextResponse.json(
+                { error: "Failed to verify team members" },
+                { status: 500 }
+            );
+        }
+
+        // Check all members belong to user's foundry
+        const invalidMembers = memberProfiles.filter(p => p.foundry_id !== foundry_id);
+        if (invalidMembers.length > 0) {
+            console.warn('[TeamCompareAPI] Cross-foundry comparison attempt:', {
+                userId: user.id,
+                userFoundry: foundry_id,
+                invalidMembers: invalidMembers.map(m => ({ id: m.id, foundry: m.foundry_id }))
+            });
+            return NextResponse.json(
+                { error: "Unauthorized: All team members must belong to your foundry" },
+                { status: 403 }
+            );
+        }
+
+        // Ensure we found all requested members
+        if (memberProfiles.length !== memberIds.length) {
+            console.warn('[TeamCompareAPI] Some members not found:', {
+                requested: memberIds.length,
+                found: memberProfiles.length
+            });
+            return NextResponse.json(
+                { error: "Some team members could not be found" },
+                { status: 404 }
+            );
+        }
 
         // Build the prompt
         const systemPrompt = `You are an expert advisor helping founders and executives delegate tasks effectively within their team.

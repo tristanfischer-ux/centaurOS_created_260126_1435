@@ -306,7 +306,7 @@ export function BlueprintsView({
               <p className="text-center text-sm text-muted-foreground">
                 Click any node to explore what you need to know, find experts who can help, and connect with suppliers
               </p>
-              <div className="flex items-center justify-center gap-4 text-xs text-muted-foreground bg-background/50 rounded-lg py-2 px-4 max-w-2xl mx-auto">
+              <div className="flex items-center justify-center gap-4 text-xs text-muted-foreground bg-muted rounded-lg py-2 px-4 max-w-2xl mx-auto">
                 <div className="flex items-center gap-1.5">
                   <CheckCircle2 className="h-3.5 w-3.5 text-status-success" />
                   <span>Covered</span>
