@@ -201,23 +201,23 @@ export function TasksList({
                 const progress = calculateProgress(objectiveTasks)
 
                 return (
-                  <AccordionItem key={objective.id} value={objective.id} className="border-b">
-                    <AccordionTrigger className="px-4 py-3 hover:bg-muted/50 transition-colors">
+                  <AccordionItem key={objective.id} value={objective.id} className="border-b border-l-4 border-l-electric-blue/40">
+                    <AccordionTrigger className="px-4 py-3.5 hover:bg-electric-blue/5 transition-colors bg-gradient-to-r from-electric-blue/5 to-transparent">
                       <div className="flex items-center justify-between w-full pr-4">
                         <div className="flex items-center gap-3 min-w-0 flex-1">
-                          <div className="h-2 w-2 rounded-full bg-electric-blue shrink-0" />
+                          <div className="h-2.5 w-2.5 rounded-full bg-electric-blue shrink-0 shadow-sm" />
                           <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-2 mb-1">
-                              <h3 className="font-semibold text-sm text-foreground truncate">
+                            <div className="flex items-center gap-2 mb-1.5">
+                              <h3 className="font-bold text-base text-foreground truncate">
                                 {objective.title}
                               </h3>
-                              <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                              <Badge variant="secondary" className="text-[10px] px-2 py-0.5 bg-electric-blue/10 text-electric-blue font-semibold">
                                 {objectiveTasks.length}
                               </Badge>
                             </div>
                             <div className="flex items-center gap-2">
-                              <Progress value={progress} className="h-1.5 flex-1 max-w-[120px]" />
-                              <span className="text-[10px] text-muted-foreground font-medium">
+                              <Progress value={progress} className="h-2 flex-1 max-w-[140px]" />
+                              <span className="text-xs text-muted-foreground font-semibold">
                                 {progress}%
                               </span>
                             </div>
@@ -225,7 +225,7 @@ export function TasksList({
                         </div>
                       </div>
                     </AccordionTrigger>
-                    <AccordionContent className="px-0 py-0">
+                    <AccordionContent className="px-0 py-0 bg-gradient-to-r from-muted/20 to-transparent">
                       {objectiveTasks.map(task => {
                         const assignees = getTaskAssignees(task)
                         const taskIsOverdue = isOverdue(task)
@@ -235,8 +235,8 @@ export function TasksList({
                             key={task.id}
                             onClick={() => onSelectTask(task.id)}
                             className={cn(
-                              "px-4 py-3 border-b last:border-0 cursor-pointer transition-colors hover:bg-muted/50 active:bg-muted",
-                              selectedTaskId === task.id && "bg-electric-blue-light/10 border-l-2 border-l-electric-blue"
+                              "pl-10 pr-4 py-3 border-b last:border-0 cursor-pointer transition-colors hover:bg-background/80 active:bg-background",
+                              selectedTaskId === task.id && "bg-electric-blue/10 border-l-4 border-l-electric-blue shadow-sm"
                             )}
                           >
                             <div className="flex items-start justify-between gap-3">
@@ -315,17 +315,17 @@ export function TasksList({
 
             {/* Orphaned tasks (no objective) */}
             {tasksByObjective.orphanedTasks.length > 0 && (
-              <AccordionItem value="no-objective" className="border-b">
-                <AccordionTrigger className="px-4 py-3 hover:bg-muted/50 transition-colors">
+              <AccordionItem value="no-objective" className="border-b border-l-4 border-l-muted-foreground/20">
+                <AccordionTrigger className="px-4 py-3.5 hover:bg-muted/30 transition-colors bg-gradient-to-r from-muted/20 to-transparent">
                   <div className="flex items-center justify-between w-full pr-4">
                     <div className="flex items-center gap-3 min-w-0 flex-1">
-                      <div className="h-2 w-2 rounded-full bg-muted-foreground shrink-0" />
+                      <div className="h-2.5 w-2.5 rounded-full bg-muted-foreground/50 shrink-0 shadow-sm" />
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2">
-                          <h3 className="font-semibold text-sm text-muted-foreground">
+                          <h3 className="font-bold text-base text-muted-foreground">
                             General Tasks
                           </h3>
-                          <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                          <Badge variant="secondary" className="text-[10px] px-2 py-0.5 bg-muted font-semibold">
                             {tasksByObjective.orphanedTasks.length}
                           </Badge>
                         </div>
@@ -333,7 +333,7 @@ export function TasksList({
                     </div>
                   </div>
                 </AccordionTrigger>
-                <AccordionContent className="px-0 py-0">
+                <AccordionContent className="px-0 py-0 bg-gradient-to-r from-muted/10 to-transparent">
                   {tasksByObjective.orphanedTasks.map(task => {
                     const assignees = getTaskAssignees(task)
                     const taskIsOverdue = isOverdue(task)
@@ -343,8 +343,8 @@ export function TasksList({
                         key={task.id}
                         onClick={() => onSelectTask(task.id)}
                         className={cn(
-                          "px-4 py-3 border-b last:border-0 cursor-pointer transition-colors hover:bg-muted/50 active:bg-muted",
-                          selectedTaskId === task.id && "bg-electric-blue-light/10 border-l-2 border-l-electric-blue"
+                          "pl-10 pr-4 py-3 border-b last:border-0 cursor-pointer transition-colors hover:bg-background/80 active:bg-background",
+                          selectedTaskId === task.id && "bg-electric-blue/10 border-l-4 border-l-electric-blue shadow-sm"
                         )}
                       >
                         <div className="flex items-start justify-between gap-3">
