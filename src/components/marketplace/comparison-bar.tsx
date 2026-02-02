@@ -25,15 +25,15 @@ function getCategoryIcon(category: string) {
     }
 }
 
-// Get category color classes - consistent color scheme
-// People: Orange (warm, human), Products: Slate (industrial), Services: Blue (tech), AI: Violet
+// Get category color classes using semantic tokens
+// People: Brand warm, Products: Neutral, Services: Brand tech, AI: Info
 function getCategoryColors(category: string) {
     switch (category) {
-        case 'People': return '!bg-orange-100 text-orange-700 border-orange-200'
-        case 'Products': return '!bg-slate-100 text-slate-700 border-slate-200'
-        case 'Services': return '!bg-blue-100 text-blue-700 border-blue-200'
-        case 'AI': return '!bg-violet-50 text-violet-700 border-violet-200'
-        default: return '!bg-muted text-muted-foreground border-border'
+        case 'People': return 'bg-international-orange-light text-international-orange border-international-orange-light'
+        case 'Products': return 'bg-muted text-muted-foreground border-border'
+        case 'Services': return 'bg-electric-blue-light text-electric-blue border-electric-blue-light'
+        case 'AI': return 'bg-status-info-light text-status-info-dark border-status-info-light'
+        default: return 'bg-muted text-muted-foreground border-border'
     }
 }
 

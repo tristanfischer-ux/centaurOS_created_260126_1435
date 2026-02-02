@@ -62,7 +62,7 @@ const DialogContent = React.forwardRef<
     <DialogPrimitive.Content
       ref={ref}
       className={cn(
-        "fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2",
+        "fixed inset-0 m-auto h-fit",
         dialogContentVariants({ size, className })
       )}
       {...props}

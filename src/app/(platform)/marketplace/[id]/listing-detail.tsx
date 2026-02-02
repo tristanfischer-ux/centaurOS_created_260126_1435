@@ -129,7 +129,7 @@ export function MarketplaceListingDetail({ listing, trustSignals, ratings }: Mar
                 <div className="min-w-0 flex-1">
                     <div className={typography.pageHeader}>
                         <div className={typography.pageHeaderAccent} />
-                        <div className="flex items-center gap-3 mb-2">
+                        <div className="flex items-center gap-3 flex-wrap">
                             <Badge 
                                 variant="secondary" 
                                 className={cn(
@@ -145,15 +145,15 @@ export function MarketplaceListingDetail({ listing, trustSignals, ratings }: Mar
                                     <span className="text-xs font-medium">Verified</span>
                                 </div>
                             )}
+                            <h1 className={cn(typography.h1, "inline")}>
+                                {listing.title}
+                            </h1>
+                            {category === 'People' && attrs.role && (
+                                <span className="text-lg text-muted-foreground">
+                                    {attrs.role}
+                                </span>
+                            )}
                         </div>
-                        <h1 className={typography.h1}>
-                            {listing.title}
-                        </h1>
-                        {category === 'People' && attrs.role && (
-                            <p className="text-lg text-muted-foreground mt-1">
-                                {attrs.role}
-                            </p>
-                        )}
                     </div>
                 </div>
 

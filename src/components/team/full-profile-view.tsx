@@ -51,7 +51,6 @@ import {
     Plus,
     Users,
 } from "lucide-react"
-import { CompareToDialog } from "@/app/(platform)/team/[id]/compare-to-dialog"
 
 // ============================================================================
 // TYPES
@@ -575,6 +574,7 @@ export function FullProfileView({ open, onOpenChange, memberId, currentUserId }:
                 <DialogHeader className="px-6 py-4 border-b flex-shrink-0">
                     {isLoading ? (
                         <div className="flex items-center gap-4">
+                            <DialogTitle className="sr-only">Loading profile...</DialogTitle>
                             <div className="h-32 w-32 bg-muted rounded-full animate-pulse" />
                             <div className="flex-1">
                                 <div className="h-8 w-64 bg-muted rounded animate-pulse mb-2" />
@@ -594,6 +594,7 @@ export function FullProfileView({ open, onOpenChange, memberId, currentUserId }:
                                     <div className="flex-1 min-w-0">
                                         {isEditing ? (
                                             <div className="space-y-4">
+                                                <DialogTitle className="sr-only">Editing {profile.full_name}</DialogTitle>
                                                 <div>
                                                     <Label htmlFor="full_name" className="text-sm font-medium">
                                                         Full Name <span className="text-destructive">*</span>
@@ -632,13 +633,6 @@ export function FullProfileView({ open, onOpenChange, memberId, currentUserId }:
                                     </div>
                                     
                                     <div className="flex items-center gap-2 flex-shrink-0">
-                                        {!isEditing && currentMemberMetrics && (
-                                            <CompareToDialog
-                                                currentMember={currentMemberMetrics}
-                                                allMembers={allMembers}
-                                            />
-                                        )}
-                                        
                                         {isEditing ? (
                                             <Select value={editedRole} onValueChange={setEditedRole}>
                                                 <SelectTrigger className="w-40">

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useTransition } from "react"
+import { useState, useTransition, useCallback } from "react"
 import { useAutoRefresh } from "@/hooks/useAutoRefresh"
 import { RefreshButton } from "@/components/RefreshButton"
 import { formatDistanceToNow, isPast, parseISO } from "date-fns"
@@ -45,6 +45,7 @@ import { usePresenceContext } from "@/components/PresenceProvider"
 import { PresenceIndicator } from "@/components/PresenceIndicator"
 import { TeamComparisonBar } from "@/components/team/team-comparison-bar"
 import { TeamComparisonModal } from "@/components/team/team-comparison-modal"
+import { TeamMemberCard, CardSize } from "@/components/team/team-member-card"
 import { cn } from "@/lib/utils"
 
 
@@ -104,7 +105,6 @@ interface TeamComparisonViewProps {
 }
 
 export function TeamComparisonView({ founders, executives, apprentices, aiAgents, teams, currentUserId }: TeamComparisonViewProps) {
-    const [compareMode, setCompareMode] = useState(false)
     const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
     const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null)
@@ -137,6 +137,25 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
     const selectedMembers = allMembers.filter(m => selectedIds.has(m.id))
     const quickTeamMembers = allMembers.filter(m => quickTeamMemberIds.includes(m.id))
 
+    // Message handler for marketplace-style cards
+    const handleMessage = async (memberId: string) => {
+        const result = await startDirectMessage(memberId)
+        const member = allMembers.find(m => m.id === memberId)
+        if (result.success) {
+            toast.success(`Started conversation with ${member?.full_name || 'member'}`)
+        } else {
+            toast.error(result.error || 'Failed to start conversation')
+        }
+    }
+
+    // Add to team handler - opens quick team dialog with member pre-selected
+    const handleAddToTeam = (memberId: string) => {
+        setQuickTeamMemberIds([memberId])
+        setTeamName("")
+        setTeamError(null)
+        setShowQuickTeamDialog(true)
+    }
+
     // Helper: get initials from full name
     const getInitials = (name: string | null) => {
         if (!name) return '?'
@@ -166,13 +185,6 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
             newSet.add(id)
         }
         setSelectedIds(newSet)
-    }
-
-    const toggleCompareMode = () => {
-        if (compareMode) {
-            setSelectedIds(new Set())
-        }
-        setCompareMode(!compareMode)
     }
 
     // Drag-and-drop handlers
@@ -317,7 +329,14 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
         })
     }
 
-    // Track expanded member cards
+    // Track card sizes for marketplace-style cards
+    const [cardSizes, setCardSizes] = useState<Record<string, CardSize>>({})
+    
+    const handleCardSizeChange = useCallback((memberId: string, size: CardSize) => {
+        setCardSizes(prev => ({ ...prev, [memberId]: size }))
+    }, [])
+
+    // Track expanded member cards (legacy, kept for compatibility)
     const [expandedMemberIds, setExpandedMemberIds] = useState<Set<string>>(new Set())
     
     const toggleMemberExpand = (memberId: string) => {
@@ -402,18 +421,24 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                 bg-background border shadow-sm transition-all cursor-pointer relative group/card
                 ${borderClass}
                 hover:border-muted hover:shadow-md hover:-translate-y-[2px] active:translate-y-0 active:shadow-sm
-                ${compareMode && isSelected ? `ring-2 ${ringClass}` : ''}
+                ${isSelected ? `ring-2 ${ringClass}` : ''}
                 ${isDragging ? 'opacity-50 scale-95' : ''}
                 ${isDropTarget ? 'ring-2 ring-status-success border-status-success bg-status-success-light' : ''}
                 ${isPairing || isDeleting ? 'opacity-60' : ''}
             `}>
-                {compareMode && (
-                    <div className={`absolute top-2 right-2 h-6 w-6 rounded-full flex items-center justify-center text-white text-xs z-10
-                        ${isSelected ? bgCheckClass : 'bg-muted'}
-                    `}>
-                        {isSelected ? <Check className="h-4 w-4" /> : null}
-                    </div>
-                )}
+                {/* Compare button - always visible on hover */}
+                <button
+                    onClick={(e) => {
+                        e.stopPropagation()
+                        toggleSelection(member.id)
+                    }}
+                    className={`absolute top-2 right-2 h-6 w-6 rounded-full flex items-center justify-center z-10 transition-all duration-200
+                        ${isSelected ? `${bgCheckClass} text-white` : 'bg-background border text-muted-foreground opacity-0 group-hover/card:opacity-100'}
+                    `}
+                    title={isSelected ? "Remove from comparison" : "Add to comparison"}
+                >
+                    {isSelected ? <Check className="h-4 w-4" /> : <GitCompare className="h-4 w-4" />}
+                </button>
 
                 {isDropTarget && (
                     <div className="absolute inset-0 flex items-center justify-center bg-status-success-light rounded-lg z-10">
@@ -563,7 +588,7 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                             onClick={(e) => {
                                 e.preventDefault()
                                 e.stopPropagation()
-                                if (!compareMode) toggleMemberExpand(member.id)
+                                toggleMemberExpand(member.id)
                             }}
                             className="text-muted-foreground hover:text-muted-foreground transition-colors p-1"
                         >
@@ -731,16 +756,7 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
             </Card>
         )
 
-        // In compare mode, don't allow drag-drop
-        if (compareMode) {
-            return (
-                <div className="block group" onClick={() => toggleSelection(member.id)}>
-                    {cardContent}
-                </div>
-            )
-        }
-
-        // Normal mode: draggable cards with link functionality
+        // Draggable cards with link functionality
         return (
             <div
                 draggable={true}
@@ -952,15 +968,7 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                     </FeatureTip>
                     <CreateTeamDialog members={[...executives, ...apprentices]} />
 
-                    <Button
-                        variant={compareMode ? "default" : "secondary"}
-                        onClick={toggleCompareMode}
-                        className={compareMode ? "bg-muted" : ""}
-                    >
-                        {compareMode ? <X className="h-4 w-4 mr-2" /> : <GitCompare className="h-4 w-4 mr-2" />}
-                        {compareMode ? "Cancel" : "Compare"}
-                    </Button>
-                    <div className="flex bg-muted p-1 rounded-lg border border-muted ml-2">
+                    <div className="flex bg-muted p-1 rounded-lg border border-muted">
                         <Button
                             variant="ghost"
                             size="sm"
@@ -981,13 +989,6 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                 </div>
             </div>
 
-            {compareMode && (
-                <div className="bg-electric-blue-light border border-electric-blue-light rounded-lg p-3 text-sm text-electric-blue">
-                    Select 2-4 team members to compare. Click a card to select.
-                    {selectedIds.size > 0 && ` (${selectedIds.size} selected)`}
-                </div>
-            )}
-
             {/* Pending Invitations */}
             <PendingInvitations />
 
@@ -1000,7 +1001,19 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                     {viewMode === 'grid' ? (
                         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                             {founders.map(member => (
-                                <MemberCard key={member.id} member={member} type="founder" />
+                                <TeamMemberCard
+                                    key={member.id}
+                                    member={member}
+                                    isSelected={selectedIds.has(member.id)}
+                                    onToggleSelect={toggleSelection}
+                                    size={cardSizes[member.id] || 'medium'}
+                                    onSizeChange={handleCardSizeChange}
+                                    onViewProfile={setSelectedMemberId}
+                                    onMessage={handleMessage}
+                                    onAddToTeam={handleAddToTeam}
+                                    presenceStatus={getPresenceForUser(member.id)?.status as 'online' | 'away' | 'busy' | 'offline' || 'offline'}
+                                    presence={getPresenceForUser(member.id)}
+                                />
                             ))}
                         </div>
                     ) : (
@@ -1034,7 +1047,19 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                 {viewMode === 'grid' ? (
                     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                         {executives.map(member => (
-                            <MemberCard key={member.id} member={member} type="executive" />
+                            <TeamMemberCard
+                                key={member.id}
+                                member={member}
+                                isSelected={selectedIds.has(member.id)}
+                                onToggleSelect={toggleSelection}
+                                size={cardSizes[member.id] || 'medium'}
+                                onSizeChange={handleCardSizeChange}
+                                onViewProfile={setSelectedMemberId}
+                                onMessage={handleMessage}
+                                onAddToTeam={handleAddToTeam}
+                                presenceStatus={getPresenceForUser(member.id)?.status as 'online' | 'away' | 'busy' | 'offline' || 'offline'}
+                                presence={getPresenceForUser(member.id)}
+                            />
                         ))}
                         {executives.length === 0 && (
                             <div className="col-span-full border-2 border-dashed border-muted rounded-lg">
@@ -1087,7 +1112,19 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                 {viewMode === 'grid' ? (
                     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                         {apprentices.map(member => (
-                            <MemberCard key={member.id} member={member} type="apprentice" />
+                            <TeamMemberCard
+                                key={member.id}
+                                member={member}
+                                isSelected={selectedIds.has(member.id)}
+                                onToggleSelect={toggleSelection}
+                                size={cardSizes[member.id] || 'medium'}
+                                onSizeChange={handleCardSizeChange}
+                                onViewProfile={setSelectedMemberId}
+                                onMessage={handleMessage}
+                                onAddToTeam={handleAddToTeam}
+                                presenceStatus={getPresenceForUser(member.id)?.status as 'online' | 'away' | 'busy' | 'offline' || 'offline'}
+                                presence={getPresenceForUser(member.id)}
+                            />
                         ))}
                         {apprentices.length === 0 && (
                             <div className="col-span-full border-2 border-dashed border-muted rounded-lg">
@@ -1153,7 +1190,16 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                     ) : (
                         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                             {aiAgents.map(member => (
-                                <MemberCard key={member.id} member={member} type="ai_agent" />
+                                <TeamMemberCard
+                                    key={member.id}
+                                    member={member}
+                                    isSelected={selectedIds.has(member.id)}
+                                    onToggleSelect={toggleSelection}
+                                    size={cardSizes[member.id] || 'medium'}
+                                    onSizeChange={handleCardSizeChange}
+                                    onViewProfile={setSelectedMemberId}
+                                    presenceStatus="online"
+                                />
                             ))}
                         </div>
                     )}
@@ -1323,22 +1369,17 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                 members={selectedMembers}
             />
 
-            {/* Comparison Bar (bottom sticky) */}
-            {compareMode && (
-                <TeamComparisonBar
-                    selectedMembers={selectedMembers}
-                    onClear={() => {
-                        setSelectedIds(new Set())
-                        setCompareMode(false)
-                    }}
-                    onCompare={() => setShowComparison(true)}
-                    onRemove={(id) => {
-                        const newSet = new Set(selectedIds)
-                        newSet.delete(id)
-                        setSelectedIds(newSet)
-                    }}
-                />
-            )}
+            {/* Comparison Bar (bottom sticky) - shows automatically when members selected */}
+            <TeamComparisonBar
+                selectedMembers={selectedMembers}
+                onClear={() => setSelectedIds(new Set())}
+                onCompare={() => setShowComparison(true)}
+                onRemove={(id) => {
+                    const newSet = new Set(selectedIds)
+                    newSet.delete(id)
+                    setSelectedIds(newSet)
+                }}
+            />
 
             {/* Quick Team Creation Dialog (from drag-drop or button) */}
             <Dialog open={showQuickTeamDialog} onOpenChange={setShowQuickTeamDialog}>

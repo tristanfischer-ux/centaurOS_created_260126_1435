@@ -8,7 +8,6 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
 import { Markdown } from "@/components/ui/markdown"
-import Link from "next/link"
 import { deleteObjective } from "@/actions/objectives"
 import { toast } from "sonner"
 import { EditObjectiveDialog } from "@/components/objectives/edit-objective-dialog"
@@ -362,9 +361,15 @@ export function ObjectivesListView({ objectives, objectivesForDialog, members, t
 
                                 <div className="flex-1 min-w-0">
                                     <div className="flex items-center gap-2 flex-wrap">
-                                        <Link href={`/objectives/${objective.id}`} className="font-semibold text-foreground hover:text-status-warning transition-colors" onClick={(e) => e.stopPropagation()}>
+                                        <button 
+                                            onClick={(e) => {
+                                                e.stopPropagation()
+                                                setObjectiveToEdit(objective)
+                                            }}
+                                            className="font-semibold text-foreground hover:text-international-orange transition-colors text-left"
+                                        >
                                             {objective.title}
-                                        </Link>
+                                        </button>
                                         {objective.extended_description && (
                                             <Badge variant="secondary" className="ml-1 text-xs gap-1">
                                                 <FileText className="h-3 w-3" />

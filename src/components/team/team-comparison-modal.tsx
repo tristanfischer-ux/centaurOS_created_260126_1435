@@ -48,13 +48,13 @@ interface TeamComparisonModalProps {
 }
 
 /**
- * Get role color classes for badges.
+ * Get role color classes for badges using semantic tokens.
  */
 function getRoleBadgeClass(role: string): string {
     switch (role) {
-        case 'Founder': return 'bg-purple-100 text-purple-700 border-0'
+        case 'Founder': return 'bg-accent/10 text-accent border-0'
         case 'Executive': return 'bg-status-warning-light text-status-warning-dark border-0'
-        case 'AI_Agent': return 'bg-indigo-100 text-indigo-700 border-0'
+        case 'AI_Agent': return 'bg-status-info-light text-status-info-dark border-0'
         case 'Apprentice':
         default: return 'bg-electric-blue-light text-electric-blue border-0'
     }
@@ -88,11 +88,12 @@ function getBandwidth(member: TeamMemberForComparison): {
     }
 }
 
-// Attributes organized into sections
+// Attributes organized into sections - matching marketplace grouped style
 const ATTRIBUTE_SECTIONS = {
-    'Role & Status': ['role', 'bandwidth', 'centaur'],
-    'Workload': ['activeTasks', 'pendingTasks', 'completedTasks', 'rejectedTasks'],
-    'Details': ['email', 'bio']
+    'PRICING & AVAILABILITY': ['bandwidth', 'activeTasks'],
+    'EXPERIENCE': ['completedTasks', 'rejectedTasks', 'role'],
+    'SKILLS & LOCATION': ['email', 'centaur'],
+    'OTHER': ['bio']
 } as const
 
 // Attributes where higher is better (for highlighting)
@@ -523,19 +524,19 @@ function getMemberValue(member: TeamMemberForComparison, key: string): string | 
 }
 
 /**
- * Format attribute key for display.
+ * Format attribute key for display - matches marketplace naming convention.
  */
 function formatAttributeName(key: string): string {
     const names: Record<string, string> = {
         role: 'Role',
         email: 'Email',
-        bio: 'Bio',
-        activeTasks: 'Active Tasks',
-        completedTasks: 'Completed',
+        bio: 'Description',
+        activeTasks: 'Availability',
+        completedTasks: 'Tasks Completed',
         pendingTasks: 'Pending',
         rejectedTasks: 'Rejected',
         bandwidth: 'Bandwidth',
-        centaur: 'Centaur'
+        centaur: 'AI Pairing'
     }
     return names[key] || key.replace(/_/g, ' ')
 }

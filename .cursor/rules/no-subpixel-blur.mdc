@@ -1,0 +1,70 @@
+# Avoid Sub-Pixel Blur from CSS Transforms
+
+**CRITICAL:** Percentage-based transforms (`translate-x-1/2`, `translate-y-1/2`, `-translate-x-1/2`, `-translate-y-1/2`) cause sub-pixel rendering which makes content appear fuzzy/blurry on many displays.
+
+## The Problem
+
+```tsx
+// ❌ WRONG - Causes fuzzy/blurry rendering
+<div className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
+  <Dialog />
+</div>
+```
+
+When using percentage-based transforms for centering, the browser may position elements at sub-pixel coordinates (e.g., 423.5px). This causes:
+- Blurry text
+- Fuzzy borders
+- Overall lack of sharpness
+
+## The Solution
+
+Use margin-based centering instead:
+
+```tsx
+// ✅ CORRECT - Sharp, pixel-perfect rendering
+<div className="fixed inset-0 m-auto h-fit w-fit">
+  <Dialog />
+</div>
+```
+
+Or use flexbox centering on a container:
+
+```tsx
+// ✅ CORRECT - Flexbox centering
+<div className="fixed inset-0 flex items-center justify-center">
+  <Dialog />
+</div>
+```
+
+## Common Patterns to Avoid
+
+| Pattern | Problem | Fix |
+|---------|---------|-----|
+| `left-1/2 -translate-x-1/2` | Sub-pixel X | `inset-x-0 mx-auto` |
+| `top-1/2 -translate-y-1/2` | Sub-pixel Y | `inset-y-0 my-auto` |
+| `left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2` | Sub-pixel both | `inset-0 m-auto h-fit` |
+| `transform: translate(-50%, -50%)` | Same issue | Use margin/flex centering |
+
+## Affected Components
+
+These UI components commonly use centered positioning and should be checked:
+- Dialogs/Modals
+- Popovers
+- Tooltips
+- Dropdown menus
+- Toast notifications
+- Loading spinners (centered)
+
+## When Transforms ARE Safe
+
+Transforms are fine when:
+- Using pixel values (`translate-x-4`, `-translate-y-2`)
+- Animation/transition purposes (temporary blur is acceptable)
+- Elements where slight blur is not noticeable
+
+## Quick Test
+
+If something looks "fuzzy" or "blurry":
+1. Check for `translate-x-1/2` or `translate-y-1/2` classes
+2. Check for `transform: translate(-50%, -50%)` inline styles
+3. Replace with margin-based or flexbox centering

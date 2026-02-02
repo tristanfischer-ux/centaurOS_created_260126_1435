@@ -23,16 +23,16 @@ interface TeamComparisonBarProps {
 }
 
 /**
- * Get role color classes for visual distinction.
+ * Get role color classes for visual distinction using semantic tokens.
  * 
  * @param role - The member's role (Founder, Executive, Apprentice, AI_Agent)
  * @returns Tailwind color classes for the chip
  */
 function getRoleColors(role: string): string {
     switch (role) {
-        case 'Founder': return 'bg-purple-100 text-purple-700 border-purple-200'
+        case 'Founder': return 'bg-accent/10 text-accent border-accent/30'
         case 'Executive': return 'bg-status-warning-light text-status-warning-dark border-status-warning-light'
-        case 'AI_Agent': return 'bg-indigo-100 text-indigo-700 border-indigo-200'
+        case 'AI_Agent': return 'bg-status-info-light text-status-info-dark border-status-info-light'
         case 'Apprentice': 
         default: return 'bg-electric-blue-light text-electric-blue border-electric-blue-light'
     }
