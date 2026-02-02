@@ -198,6 +198,9 @@ export function BlueprintsView({
         <CardContent className="p-0">
           <div className="bg-muted p-6 sm:p-8">
             <div className="text-center mb-6">
+              <Badge variant="secondary" className="mb-3">
+                Demo Example
+              </Badge>
               <h2 className="text-xl sm:text-2xl font-display font-bold text-foreground mb-2">
                 Your Product as a Technology Tree
               </h2>
@@ -299,9 +302,27 @@ export function BlueprintsView({
               </svg>
             </div>
             
-            <p className="text-center text-sm text-muted-foreground mt-4">
-              Click any node to explore what you need to know, find experts who can help, and connect with suppliers
-            </p>
+            <div className="mt-4 space-y-2">
+              <p className="text-center text-sm text-muted-foreground">
+                Click any node to explore what you need to know, find experts who can help, and connect with suppliers
+              </p>
+              <div className="flex items-center justify-center gap-4 text-xs text-muted-foreground bg-background/50 rounded-lg py-2 px-4 max-w-2xl mx-auto">
+                <div className="flex items-center gap-1.5">
+                  <CheckCircle2 className="h-3.5 w-3.5 text-status-success" />
+                  <span>Covered</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <div className="h-3.5 w-3.5 rounded-full bg-blue-100 flex items-center justify-center">
+                    <div className="h-1.5 w-1.5 rounded-full bg-electric-blue" />
+                  </div>
+                  <span>In Progress (example)</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <Sparkles className="h-3.5 w-3.5 text-international-orange" />
+                  <span>Needs Attention (example)</span>
+                </div>
+              </div>
+            </div>
           </div>
         </CardContent>
       </Card>

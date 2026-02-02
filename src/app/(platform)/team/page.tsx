@@ -162,6 +162,7 @@ export default async function TeamPage() {
             apprentices={apprentices}
             aiAgents={aiAgents}
             teams={teams || []}
+            currentUserId={user.id}
         />
     )
 }

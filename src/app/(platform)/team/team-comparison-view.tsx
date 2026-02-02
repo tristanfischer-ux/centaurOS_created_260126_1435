@@ -24,6 +24,7 @@ import { FeatureTip } from "@/components/onboarding"
 import { pairCentaur, unpairCentaur } from "@/actions/team"
 import { Brain, Unplug, Zap } from "lucide-react"
 import { toast } from "sonner"
+import { FullProfileView } from "@/components/team/full-profile-view"
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -98,12 +99,14 @@ interface TeamComparisonViewProps {
     apprentices: Member[]
     aiAgents: Member[]
     teams: Team[]
+    currentUserId: string
 }
 
-export function TeamComparisonView({ founders, executives, apprentices, aiAgents, teams }: TeamComparisonViewProps) {
+export function TeamComparisonView({ founders, executives, apprentices, aiAgents, teams, currentUserId }: TeamComparisonViewProps) {
     const [compareMode, setCompareMode] = useState(false)
     const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+    const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null)
     const [showComparison, setShowComparison] = useState(false)
 
     // Drag-and-drop team creation state
@@ -507,7 +510,7 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                                     <DropdownMenuItem
                                         onClick={(e) => {
                                             e.stopPropagation()
-                                            window.location.href = `/team/${member.id}`
+                                            setSelectedMemberId(member.id)
                                         }}
                                     >
                                         <User className="mr-2 h-4 w-4" /> View Profile
@@ -673,7 +676,7 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                         )}
 
                         {/* Action Buttons */}
-                        <div className="flex gap-2 pt-2 border-t border-muted">
+                        <div className="flex gap-2 pt-2 border-muted">
                             <Button 
                                 variant="secondary" 
                                 size="sm" 
@@ -681,7 +684,7 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                                 onClick={(e) => {
                                     e.preventDefault()
                                     e.stopPropagation()
-                                    window.location.href = `/team/${member.id}`
+                                    setSelectedMemberId(member.id)
                                 }}
                             >
                                 <User className="h-3 w-3 mr-1" />
@@ -768,13 +771,16 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                     }
                 }}
             >
-                <Link
-                    href={`/team/${member.id}`}
-                    draggable={false}
-                    onClick={(e) => { if (draggedMemberId) e.preventDefault() }}
+                <div
+                    className="cursor-pointer"
+                    onClick={() => {
+                        if (!draggedMemberId) {
+                            setSelectedMemberId(member.id)
+                        }
+                    }}
                 >
                     {cardContent}
-                </Link>
+                </div>
             </div>
         )
     }
@@ -802,7 +808,10 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
             <tr className="group hover:bg-muted active:bg-muted transition-colors border-b border-muted last:border-0">
                 <td className="px-4 py-3 pl-6">
                     <div className="flex items-center gap-3">
-                        <Link href={`/team/${member.id}`} className="flex items-center gap-3">
+                        <div 
+                            className="flex items-center gap-3 cursor-pointer"
+                            onClick={() => setSelectedMemberId(member.id)}
+                        >
                             <div className="relative">
                                 <Avatar className="h-9 w-9 border border-muted">
                                     <AvatarFallback className="bg-muted text-muted-foreground text-xs">
@@ -820,7 +829,7 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                             <span className="font-medium text-foreground group-hover:text-electric-blue group-active:text-electric-blue-hover transition-colors">
                                 {member.full_name}
                             </span>
-                        </Link>
+                        </div>
                     </div>
                 </td>
                 <td className="px-4 py-3">
@@ -897,8 +906,10 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                             </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                            <DropdownMenuItem asChild>
-                                <Link href={`/team/${member.id}`}>View Profile</Link>
+                            <DropdownMenuItem
+                                onClick={() => setSelectedMemberId(member.id)}
+                            >
+                                View Profile
                             </DropdownMenuItem>
                             {member.role !== 'AI_Agent' && (
                                 <DropdownMenuItem
@@ -1568,6 +1579,14 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
+
+            {/* Profile Modal */}
+            <FullProfileView
+                open={!!selectedMemberId}
+                onOpenChange={(open) => !open && setSelectedMemberId(null)}
+                memberId={selectedMemberId || ''}
+                currentUserId={currentUserId}
+            />
 
         </div>
     )
