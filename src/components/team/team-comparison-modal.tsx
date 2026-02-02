@@ -233,7 +233,7 @@ export function TeamComparisonModal({
                                         variant="ghost"
                                         size="sm"
                                         onClick={() => setAiAnalysis(null)}
-                                        className="h-7 px-2 text-accent hover:text-accent hover:bg-accent/10"
+                                        className="h-7 px-2 text-accent hover:text-accent hover:bg-muted"
                                     >
                                         <X className="h-4 w-4" />
                                     </Button>

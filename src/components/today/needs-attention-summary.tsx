@@ -28,7 +28,7 @@ export function NeedsAttentionSummary({
 
   if (totalCount === 0) {
     return (
-      <Card className={cn("border-status-success bg-status-success-light/30", className)}>
+      <Card className={cn("border-status-success bg-status-success-light", className)}>
         <CardContent className="py-4">
           <div className="flex items-center gap-2 text-status-success-dark">
             <ShieldCheck className="h-4 w-4" />
@@ -40,7 +40,7 @@ export function NeedsAttentionSummary({
   }
 
   return (
-    <Card className={cn("border-red-200/50", className)}>
+    <Card className={cn("border-destructive", className)}>
       <CardHeader className="pb-2 pt-4 px-4">
         <div className="flex items-center gap-2">
           <AlertCircle className="h-4 w-4 text-destructive" />
