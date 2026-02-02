@@ -75,7 +75,17 @@ const categoryBadgeStyles: Record<string, string> = {
 export function ComparisonModal({ open, onOpenChange, items }: ComparisonModalProps) {
     const [aiAnalysis, setAiAnalysis] = useState<AIAnalysisResult | null>(null)
     const [isAnalyzing, setIsAnalyzing] = useState(false)
+    const [analysisError, setAnalysisError] = useState<string | null>(null)
 
+    // Debug: Log raw items received
+    console.log('[ComparisonModal] RAW items prop:', items?.length, 'items')
+    console.log('[ComparisonModal] RAW items details:', items?.map(i => ({ 
+        id: i?.id?.substring(0, 8), 
+        title: i?.title, 
+        category: i?.category,
+        hasAttributes: !!i?.attributes,
+        attrKeys: i?.attributes ? Object.keys(i.attributes).length : 0
+    })))
 
     // Clear analysis when items change or modal closes
     useEffect(() => {
@@ -91,8 +101,6 @@ export function ComparisonModal({ open, onOpenChange, items }: ComparisonModalPr
         }
         onOpenChange(newOpen)
     }
-
-    const [analysisError, setAnalysisError] = useState<string | null>(null)
 
     async function analyzeWithAI() {
         setIsAnalyzing(true)
@@ -121,31 +129,52 @@ export function ComparisonModal({ open, onOpenChange, items }: ComparisonModalPr
         }
     }
 
-    if (items.length === 0) return null
+    if (!items || items.length === 0) return null
     
-    // Filter out any invalid items and ensure attributes exists
+    // Step 1: Filter out null/undefined items and ensure basic structure
     const validItems = items.filter(item => {
-        if (!item || !item.id || !item.title) {
-            console.warn('[ComparisonModal] Skipping invalid item:', item)
+        if (!item) {
+            console.warn('[ComparisonModal] Skipping null/undefined item')
             return false
         }
-        // Ensure attributes exists
-        if (!item.attributes) {
-            item.attributes = {}
+        if (!item.id) {
+            console.warn('[ComparisonModal] Skipping item without id:', item.title)
+            return false
         }
+        if (!item.title) {
+            console.warn('[ComparisonModal] Skipping item without title:', item.id)
+            return false
+        }
+        return true
+    }).map(item => ({
+        // Create a new object to avoid mutation issues
+        ...item,
+        attributes: item.attributes || {}
+    }))
+    
+    // Step 2: Deduplicate by ID (in case the same item was added twice)
+    const seenIds = new Set<string>()
+    const deduplicatedItems = validItems.filter(item => {
+        if (seenIds.has(item.id)) {
+            console.warn('[ComparisonModal] Skipping duplicate item:', item.id, item.title)
+            return false
+        }
+        seenIds.add(item.id)
         return true
     })
     
-    if (validItems.length === 0) {
-        console.error('[ComparisonModal] No valid items to compare from', items.length, 'items')
-        console.error('[ComparisonModal] Items received:', items.map(i => ({ id: i?.id, title: i?.title, category: i?.category })))
+    console.log('[ComparisonModal] After validation:', validItems.length, 'valid,', deduplicatedItems.length, 'after dedup')
+    
+    if (deduplicatedItems.length === 0) {
+        console.error('[ComparisonModal] No valid items to compare from', items.length, 'raw items')
         return null
     }
     
-    console.log('[ComparisonModal] Comparing', validItems.length, 'items:', validItems.map(i => `${i.category}: ${i.title}`))
+    // Final items to render
+    const itemsToRender = deduplicatedItems
     
-    // Use validItems instead of items for rendering
-    const itemsToRender = validItems
+    console.log('[ComparisonModal] RENDERING', itemsToRender.length, 'items:', 
+        itemsToRender.map(i => `${i.category}: ${i.title} (${Object.keys(i.attributes).length} attrs)`))
 
     // Determine the primary category (use most common among items)
     const categoryCount = itemsToRender.reduce((acc, item) => {
@@ -351,33 +380,46 @@ export function ComparisonModal({ open, onOpenChange, items }: ComparisonModalPr
 
                         {/* Desktop: Table Layout */}
                         <div className="hidden md:block overflow-x-auto pb-4">
-                            <table className="w-full border-collapse min-w-max">
+                            {/* Debug: Show column count */}
+                            {process.env.NODE_ENV === 'development' && (
+                                <div className="mb-2 text-xs text-muted-foreground bg-muted px-2 py-1 rounded">
+                                    Debug: Rendering {itemsToRender.length} columns: {itemsToRender.map(i => i.title).join(' | ')}
+                                </div>
+                            )}
+                            <table 
+                                key={`comparison-table-${itemsToRender.map(i => i.id).join('-')}`}
+                                className="w-full border-collapse min-w-max"
+                            >
                                 <thead>
                                     <tr>
                                         <th className="text-left text-sm font-medium text-muted-foreground py-3 pr-4 w-32 align-top sticky left-0 bg-background z-10">
                                             Attribute
                                         </th>
-                                        {itemsToRender.map(item => (
-                                            <th key={item.id} className="text-left py-3 px-4 min-w-[200px] max-w-[250px] align-top">
-                                                <div className="font-bold text-base leading-tight">{item.title}</div>
-                                                <Badge 
-                                                    variant="secondary" 
-                                                    className={cn(
-                                                        "mt-2 uppercase text-[10px] tracking-wider font-semibold border-0",
-                                                        categoryBadgeStyles[item.category]
-                                                    )}
-                                                >
-                                                    {item.subcategory}
-                                                </Badge>
-                                            </th>
-                                        ))}
+                                        {itemsToRender.map((item, index) => {
+                                            console.log(`[ComparisonModal] Rendering column ${index + 1}/${itemsToRender.length}: ${item.title} (id: ${item.id.substring(0, 8)})`)
+                                            return (
+                                                <th key={item.id} className="text-left py-3 px-4 min-w-[200px] max-w-[250px] align-top">
+                                                    <div className="font-bold text-base leading-tight">{item.title}</div>
+                                                    <Badge 
+                                                        variant="secondary" 
+                                                        className={cn(
+                                                            "mt-2 uppercase text-[10px] tracking-wider font-semibold border-0",
+                                                            categoryBadgeStyles[item.category]
+                                                        )}
+                                                    >
+                                                        {item.subcategory}
+                                                    </Badge>
+                                                </th>
+                                            )
+                                        })}
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {Object.entries(organizedSections).map(([sectionName, sectionKeys]) => {
                                         if (sectionKeys.length === 0) return null
+                                        // Use itemsToRender (validated items) instead of items (raw prop)
                                         const hasAnyValue = sectionKeys.some(key => 
-                                            items.some(item => (item.attributes || {})[key] !== undefined)
+                                            itemsToRender.some(item => item.attributes[key] !== undefined)
                                         )
                                         if (!hasAnyValue) return null
                                         

@@ -757,12 +757,23 @@ export function MarketplaceView({
     }, [filteredItems, topTab])
 
     // Build selected items for comparison, ensuring all have valid attributes
-    const selectedItems = initialListings
-        .filter(item => selectedIds.has(item.id))
-        .map(item => ({
-            ...item,
-            attributes: item.attributes || {}
-        }))
+    const selectedItems = useMemo(() => {
+        const ids = Array.from(selectedIds)
+        console.log('[MarketplaceView] Building selectedItems from', ids.length, 'selected IDs:', ids)
+        console.log('[MarketplaceView] initialListings count:', initialListings.length)
+        
+        const items = initialListings
+            .filter(item => selectedIds.has(item.id))
+            .map(item => ({
+                ...item,
+                attributes: item.attributes || {}
+            }))
+        
+        console.log('[MarketplaceView] selectedItems result:', items.length, 'items:', 
+            items.map(i => ({ id: i.id.substring(0, 8), title: i.title, category: i.category })))
+        
+        return items
+    }, [initialListings, selectedIds])
 
     const getSearchPlaceholder = () => {
         switch (activeTab) {
