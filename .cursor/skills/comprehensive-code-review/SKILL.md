@@ -1,6 +1,6 @@
 ---
 name: comprehensive-code-review
-description: Deep code review analyzing architecture, security, performance, maintainability, auditability, and patterns. Use when reviewing code, analyzing files, assessing code quality, or when the user mentions code review, review this, analyze code, or check this code.
+description: Deep code review analyzing architecture, security, performance, maintainability, auditability, and test coverage. Use when reviewing code, analyzing files, assessing code quality, or when the user mentions code review, review this, analyze code, or check this code.
 ---
 
 # Comprehensive Code Review
@@ -60,8 +60,8 @@ Use this template for findings:
 | Security | [A-F] | [One line] |
 | Performance | [A-F] | [One line] |
 | Maintainability | [A-F] | [One line] |
-| Test Coverage | [A-F] | [One line] |
 | Auditability | [A-F] | [One line] |
+| Test Coverage | [A-F] | [One line] |
 
 ## Critical Issues (Must Fix)
 🔴 [Issue with file:line reference]
@@ -240,47 +240,55 @@ rg "expect\(.*\)\.toBeTruthy\(\)|expect\(.*\)\.toBeDefined\(\)" src/
 
 ### 6. Auditability Analysis
 
-This dimension evaluates whether the code can be understood by a third-party auditor.
-
 **What to check:**
-- **JSDoc Coverage**: Are exported functions documented?
-- **Security Annotations**: Is auth/permission logic annotated?
-- **Business Logic Clarity**: Are non-obvious decisions explained?
-- **Intent vs Implementation**: Can an auditor understand WHY, not just WHAT?
+- Can a third-party auditor understand the INTENT behind the code?
+- Are security decisions documented?
+- Is business logic explained?
+- Are exported functions documented?
 
 **Patterns to find:**
 
 ```bash
-# Check JSDoc coverage on exports
-rg "^export (async )?function" --type ts -l | wc -l
-rg "^\s*\*.*@param" --type ts -l | wc -l
+# Exported functions missing JSDoc
+rg "^export (async )?(function|const) \w+" src/ -B 3 | rg -v "^\s*\*|^\s*/\*\*" | rg "^export"
 
-# Check security annotations
-rg "// (SECURITY|AUTH|RLS):" --type ts -c
+# Security-sensitive code without annotations
+rg "foundry_id|user_id|auth|permission" src/actions/ | rg -v "SECURITY:|AUTH:|RLS:"
 
-# Find undocumented exports
-rg -B 3 "^export (async )?function" src/ | rg -v "/\*\*|^\s*\*" | rg "^export"
+# Complex business logic without explanation
+rg "if.*&&.*&&|if.*\|\|.*\|\|" src/ | rg -v "//"
 
-# Check for inline explanations
-rg "// (NOTE|REASON|WHY|BECAUSE):" src/ -c
+# Find files with security annotations (good)
+rg "// SECURITY:|// AUTH:|// RLS:|// VALIDATION:" src/ --count-matches
+
+# Find undocumented error handling
+rg "catch.*error" src/actions/ | rg -v "//"
 ```
 
+**Documentation audit checklist:**
+
+| Check | Command | Expected |
+|-------|---------|----------|
+| JSDoc on exports | `rg "^export" src/actions/ -c` vs `rg "@param\|@returns" src/actions/ -c` | Ratio > 0.8 |
+| Security annotations | `rg "// SECURITY:" src/ -c` | Presence in auth code |
+| Business rule comments | `rg "Business rule:" src/ -c` | Coverage of complex logic |
+| Error context | `rg "catch.*console.error" src/ -c` | All catches logged |
+
 **Red flags:**
-- 🔴 No documentation on security-critical functions
-- 🔴 Complex business logic without explanation
-- 🟡 Missing JSDoc on exported functions
-- 🟡 Auth/permission checks without annotations
-- 🟡 Magic values without explaining why
+- 🔴 Security-sensitive code without `// SECURITY:` annotations
+- 🔴 Exported functions without JSDoc
+- 🔴 Complex business rules without "why" explanation
+- 🟡 Auth checks without `// AUTH:` annotations
+- 🟡 Error handlers without logging context
+- 🟡 Magic numbers without named constants
 
-**Grading:**
+**Good patterns to look for:**
+- ✅ JSDoc with `@security` and `@audit` tags
+- ✅ `// SECURITY:` annotations on auth code
+- ✅ `// Business rule:` comments explaining constraints
+- ✅ Error logging with module context: `[Module] Action failed: { details }`
 
-| Grade | Criteria |
-|-------|----------|
-| **A** | Comprehensive JSDoc, security annotations, business logic explained |
-| **B** | Most exports documented, security code annotated |
-| **C** | Some documentation, inconsistent annotation |
-| **D** | Minimal documentation, missing security annotations |
-| **F** | No documentation, intent unclear |
+See **documentation-standards** rule for full requirements.
 
 ---
 
@@ -300,11 +308,11 @@ rg "// (NOTE|REASON|WHY|BECAUSE):" src/ -c
 
 | Grade | Architecture | Security | Performance | Maintainability | Auditability |
 |-------|-------------|----------|-------------|-----------------|--------------|
-| **A** | Clean separation, proper abstractions | No vulnerabilities, proper validation | Optimized queries, efficient renders | Clear, documented, consistent | Full JSDoc, security annotated, intent clear |
-| **B** | Minor coupling issues | Low-risk findings | Minor optimization opportunities | Some unclear areas | Most exports documented, security noted |
-| **C** | Noticeable coupling | Medium-risk findings | Performance issues likely | Inconsistent patterns | Partial docs, inconsistent annotations |
-| **D** | Significant architecture issues | High-risk vulnerabilities | Known performance problems | Hard to understand | Minimal docs, missing security notes |
-| **F** | No clear architecture | Critical security flaws | Severe performance issues | Unmaintainable | No docs, intent unclear |
+| **A** | Clean separation, proper abstractions | No vulnerabilities, proper validation | Optimized queries, efficient renders | Clear, documented, consistent | Full JSDoc, security annotations, business logic explained |
+| **B** | Minor coupling issues | Low-risk findings | Minor optimization opportunities | Some unclear areas | Most exports documented, some annotations missing |
+| **C** | Noticeable coupling | Medium-risk findings | Performance issues likely | Inconsistent patterns | Sparse documentation, few annotations |
+| **D** | Significant architecture issues | High-risk vulnerabilities | Known performance problems | Hard to understand | Minimal docs, security code undocumented |
+| **F** | No clear architecture | Critical security flaws | Severe performance issues | Unmaintainable | No documentation, impossible to audit |
 
 ---
 
@@ -356,7 +364,7 @@ helpful recovery options. Consider documenting this as the standard pattern.
 
 Before completing review:
 
-- [ ] All 6 dimensions analyzed (Architecture, Security, Performance, Maintainability, Tests, Auditability)
+- [ ] All 6 dimensions analyzed (Architecture, Security, Performance, Maintainability, Auditability, Tests)
 - [ ] Graded each dimension A-F
 - [ ] Listed all critical issues with file:line references
 - [ ] Provided code examples for fixes (not just problems)

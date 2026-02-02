@@ -141,12 +141,9 @@ Checklist:
 - [ ] No console.log statements (unless intentional)
 - [ ] No TODO comments that should be addressed now
 - [ ] Variable/function names are descriptive
-
-**Documentation:**
-- [ ] All exported functions have JSDoc
-- [ ] Security-critical code has // SECURITY: annotations
-- [ ] Complex business logic has explanatory comments
-- [ ] No outdated comments or commented-out code
+- [ ] Exported functions have JSDoc documentation
+- [ ] Complex logic has explanatory comments
+- [ ] Security-sensitive code is annotated
 
 **Security:**
 - [ ] No sensitive data hardcoded
@@ -226,127 +223,50 @@ export function Component({ prop1, prop2 }: Props) {
 }
 ```
 
-## Documentation Quality Checks
+## Documentation Quality
 
-Good documentation prevents bugs and speeds up onboarding. Check for these patterns:
+### JSDoc Check
 
-### JSDoc on Exported Functions
+Before committing, verify exported functions have documentation:
 
-All exported functions should have JSDoc describing purpose, parameters, and return values:
-
-```typescript
-// GOOD
-/**
- * Calculates the total price including applicable taxes and fees.
- * @param items - Array of line items with price and quantity
- * @param taxRate - Tax rate as decimal (e.g., 0.08 for 8%)
- * @returns Total price in cents
- */
-export function calculateTotal(items: LineItem[], taxRate: number): number {
-  // ...
-}
-
-// BAD - missing documentation
-export function calculateTotal(items: LineItem[], taxRate: number): number {
-  // ...
-}
+```bash
+# Find exported functions missing JSDoc (manual check required)
+rg "^export (async )?(function|const) \w+" src/path/to/file.tsx -B 3 | rg -v "^\s*\*|^\s*/\*\*"
 ```
 
-### Security Annotations
+### Documentation Checklist
 
-Auth-related and security-critical code must have `// SECURITY:` annotations:
+- [ ] Exported functions have JSDoc with @param and @returns
+- [ ] Complex business logic has "why" comments
+- [ ] Security-sensitive code has `// SECURITY:` annotations
+- [ ] Auth checks have `// AUTH:` annotations
+- [ ] Non-obvious decisions are explained
+- [ ] No outdated comments or TODOs that should be fixed
+
+### Security Annotation Requirements
+
+When writing security-sensitive code, use these standardized annotations:
 
 ```typescript
-// GOOD
-// SECURITY: Validates user owns this resource before allowing access
-const { data: task } = await supabase
-  .from('tasks')
-  .select('*')
-  .eq('id', taskId)
-  .eq('foundry_id', foundryId) // SECURITY: Foundry isolation
-  .single();
-
-// SECURITY: Rate limited to prevent brute force attacks
-export async function verifyPassword(email: string, password: string) {
-  // ...
-}
-
-// BAD - security logic without annotation
-const { data: task } = await supabase
-  .from('tasks')
-  .select('*')
-  .eq('id', taskId)
-  .eq('foundry_id', foundryId)
-  .single();
+// SECURITY: Validates foundry_id ownership before modification
+// AUTH: Requires task:write permission
+// RLS: Protected by tasks_foundry_isolation policy
+// VALIDATION: Sanitizes user input to prevent XSS
 ```
 
 ### Business Logic Comments
 
-Complex business logic should have explanatory comments:
-
 ```typescript
-// GOOD
-// Business rule: Orders over $10,000 require manager approval.
-// This threshold was set by finance in Q1 2026.
-if (orderTotal > 10000_00) {
-  await requestManagerApproval(orderId);
-}
+// Business rule: Tasks can only be nudged once every 24 hours
+// This prevents notification spam while maintaining urgency
+const NUDGE_COOLDOWN_MS = 24 * 60 * 60 * 1000
 
-// Retry with exponential backoff: 1s, 2s, 4s, 8s, 16s
-// Max 5 retries to avoid blocking the queue for too long
-for (let attempt = 0; attempt < 5; attempt++) {
-  const delay = Math.pow(2, attempt) * 1000;
-  // ...
-}
-
-// BAD - magic numbers without explanation
-if (orderTotal > 1000000) {
-  await requestManagerApproval(orderId);
-}
+// State transition: pending -> active requires owner approval
+// Exception: Auto-approval for tasks created by the owner themselves
+if (task.created_by === userId) { ... }
 ```
 
-### Component Documentation
-
-React components should document their purpose and props:
-
-```typescript
-// GOOD
-/**
- * Displays a task card with status, assignee, and due date.
- * Used in the task list and kanban board views.
- * 
- * @example
- * <TaskCard task={task} onStatusChange={handleChange} />
- */
-interface TaskCardProps {
-  /** The task to display */
-  task: Task;
-  /** Called when user changes the task status */
-  onStatusChange?: (newStatus: TaskStatus) => void;
-  /** Whether to show the expanded details view */
-  expanded?: boolean;
-}
-
-export function TaskCard({ task, onStatusChange, expanded = false }: TaskCardProps) {
-  // ...
-}
-```
-
-### Quick Documentation Scan
-
-```bash
-# Find exported functions without JSDoc
-rg "^export (async )?function" --type ts -l | xargs -I {} sh -c 'rg -B1 "^export (async )?function" {} | grep -L "^\*/"'
-
-# Find auth/security code without SECURITY annotation
-rg "(password|auth|token|session|permission|foundry_id)" --type ts -l | xargs -I {} sh -c 'grep -L "SECURITY:" {}'
-
-# Find files with TODO comments that need review
-rg "TODO|FIXME|HACK|XXX" --type ts --type tsx
-
-# Count documented vs undocumented exports per file
-rg "^export" --type ts -c | head -20
-```
+See **documentation-standards** rule for full requirements.
 
 ## Unit Testing
 
@@ -488,10 +408,6 @@ npx madge --circular src/
 
 # Check bundle size
 npx size-limit
-
-# Scan for missing documentation
-rg "^export (async )?function" --type ts -c | sort -t: -k2 -nr | head -10
-rg "(password|auth|token|session)" --type ts -l | xargs grep -L "SECURITY:" 2>/dev/null
 ```
 
 ## Quality Metrics
