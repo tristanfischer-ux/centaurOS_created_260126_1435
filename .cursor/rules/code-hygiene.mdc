@@ -1,0 +1,490 @@
+---
+description: Code hygiene standards - TypeScript, naming conventions, error handling, imports, and function structure
+alwaysApply: true
+---
+
+# Code Hygiene Standards
+
+These standards apply to ALL TypeScript/React code in the codebase.
+
+## 1. TypeScript Standards
+
+### Prefer Explicit Types for Function Signatures
+
+```typescript
+// ✅ CORRECT - Explicit return types
+function calculateTotal(items: CartItem[]): number {
+  return items.reduce((sum, item) => sum + item.price, 0)
+}
+
+async function fetchUser(id: string): Promise<User | null> {
+  const response = await fetch(`/api/users/${id}`)
+  return response.json()
+}
+
+// ❌ WRONG - Implicit return types
+function calculateTotal(items: CartItem[]) {
+  return items.reduce((sum, item) => sum + item.price, 0)
+}
+```
+
+### Avoid `any` - Use `unknown` + Type Guards
+
+```typescript
+// ✅ CORRECT - Use unknown with type guards
+function processData(data: unknown): string {
+  if (typeof data === 'string') {
+    return data.toUpperCase()
+  }
+  if (isUser(data)) {
+    return data.name
+  }
+  throw new Error('Invalid data type')
+}
+
+function isUser(value: unknown): value is User {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'name' in value &&
+    'email' in value
+  )
+}
+
+// ❌ WRONG - Using any
+function processData(data: any): string {
+  return data.name.toUpperCase()  // Runtime error waiting to happen
+}
+```
+
+### Use `satisfies` for Type-Safe Object Literals
+
+```typescript
+// ✅ CORRECT - satisfies preserves literal types
+const config = {
+  apiUrl: 'https://api.example.com',
+  timeout: 5000,
+  retries: 3,
+} satisfies Config
+
+// TypeScript knows config.retries is specifically 3, not just number
+
+// ❌ WRONG - Type annotation loses literal types
+const config: Config = {
+  apiUrl: 'https://api.example.com',
+  timeout: 5000,
+  retries: 3,
+}
+// TypeScript only knows config.retries is number
+```
+
+### Prefer Interfaces for Objects, Types for Unions
+
+```typescript
+// ✅ CORRECT - Interface for object shapes
+interface User {
+  id: string
+  name: string
+  email: string
+}
+
+interface TaskProps {
+  task: Task
+  onComplete: (id: string) => void
+}
+
+// ✅ CORRECT - Type for unions and intersections
+type Status = 'pending' | 'active' | 'completed' | 'cancelled'
+type TaskOrProject = Task | Project
+type ExtendedUser = User & { permissions: string[] }
+
+// ❌ WRONG - Type for simple objects
+type User = {
+  id: string
+  name: string
+}
+
+// ❌ WRONG - Interface for unions (not possible)
+```
+
+## 2. Naming Conventions
+
+| Category | Convention | Example |
+|----------|------------|---------|
+| Component files | PascalCase | `TaskCard.tsx`, `UserProfile.tsx` |
+| Utility files | kebab-case | `format-date.ts`, `api-client.ts` |
+| Functions | camelCase, verb-first | `calculateTotal()`, `fetchUser()` |
+| Types/Interfaces | PascalCase | `TaskStatus`, `UserProfile` |
+| Constants | SCREAMING_SNAKE_CASE | `MAX_RETRY_COUNT`, `API_BASE_URL` |
+| Boolean vars | is/has/should prefix | `isLoading`, `hasError`, `shouldRefresh` |
+| Event handlers | handle prefix | `handleClick()`, `handleSubmit()` |
+| Hooks | use prefix | `useAuth()`, `useDebounce()` |
+| Context | Context suffix | `AuthContext`, `ThemeContext` |
+| Providers | Provider suffix | `AuthProvider`, `ThemeProvider` |
+
+```typescript
+// ✅ CORRECT - Following conventions
+const MAX_RETRY_COUNT = 3
+const isLoading = true
+const hasPermission = user.role === 'admin'
+
+function handleSubmit(event: FormEvent): void {
+  event.preventDefault()
+  // ...
+}
+
+function calculateDiscountedPrice(price: number, discount: number): number {
+  return price * (1 - discount)
+}
+
+// ❌ WRONG - Not following conventions
+const maxRetryCount = 3           // Should be SCREAMING_SNAKE_CASE
+const loading = true              // Should be isLoading
+const permission = user.role      // Should be hasPermission
+
+function submit(e: FormEvent) {   // Should be handleSubmit
+  // ...
+}
+
+function price_calc(p: number) {  // Should be camelCase, verb-first
+  // ...
+}
+```
+
+## 3. Error Handling Pattern
+
+### Never Silently Swallow Errors
+
+```typescript
+// ✅ CORRECT - Log with context, handle gracefully
+async function fetchUserData(userId: string): Promise<User | null> {
+  try {
+    const response = await fetch(`/api/users/${userId}`)
+    if (!response.ok) {
+      console.error('[fetchUserData] API error:', {
+        userId,
+        status: response.status,
+        statusText: response.statusText,
+      })
+      return null
+    }
+    return response.json()
+  } catch (error) {
+    console.error('[fetchUserData] Network error:', {
+      userId,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    })
+    return null
+  }
+}
+
+// ❌ WRONG - Silent swallowing
+async function fetchUserData(userId: string): Promise<User | null> {
+  try {
+    const response = await fetch(`/api/users/${userId}`)
+    return response.json()
+  } catch {
+    return null  // What went wrong? No way to know
+  }
+}
+```
+
+### Prefer Typed Errors Over Generic Error
+
+```typescript
+// ✅ CORRECT - Typed errors with context
+class ApiError extends Error {
+  constructor(
+    message: string,
+    public statusCode: number,
+    public endpoint: string
+  ) {
+    super(message)
+    this.name = 'ApiError'
+  }
+}
+
+class ValidationError extends Error {
+  constructor(
+    message: string,
+    public field: string,
+    public value: unknown
+  ) {
+    super(message)
+    this.name = 'ValidationError'
+  }
+}
+
+// Usage
+function handleError(error: unknown): void {
+  if (error instanceof ApiError) {
+    console.error(`API ${error.statusCode} at ${error.endpoint}: ${error.message}`)
+  } else if (error instanceof ValidationError) {
+    console.error(`Validation failed for ${error.field}: ${error.message}`)
+  } else {
+    console.error('Unknown error:', error)
+  }
+}
+
+// ❌ WRONG - Generic errors lose context
+throw new Error('Something went wrong')  // Unhelpful
+throw new Error('API error')             // No status code, endpoint
+```
+
+### Return Types for Error States
+
+```typescript
+// ✅ CORRECT - Explicit error return types
+type Result<T, E = Error> =
+  | { success: true; data: T }
+  | { success: false; error: E }
+
+async function createTask(input: TaskInput): Promise<Result<Task, ValidationError>> {
+  const validation = validateTaskInput(input)
+  if (!validation.valid) {
+    return { success: false, error: new ValidationError(validation.message, 'input', input) }
+  }
+  const task = await db.tasks.create(input)
+  return { success: true, data: task }
+}
+
+// Usage - forces error handling
+const result = await createTask(input)
+if (!result.success) {
+  showToast({ title: 'Error', description: result.error.message })
+  return
+}
+// TypeScript knows result.data is Task here
+```
+
+## 4. Import Organization
+
+Organize imports in these numbered sections, separated by blank lines:
+
+```typescript
+// ✅ CORRECT - Organized imports
+
+// 1. React/Next.js
+import { useState, useEffect, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
+import Image from 'next/image'
+
+// 2. External libraries
+import { format, parseISO } from 'date-fns'
+import { z } from 'zod'
+import { toast } from 'sonner'
+
+// 3. Internal aliases (@/)
+import { Button } from '@/components/ui/button'
+import { Card } from '@/components/ui/card'
+import { createTask } from '@/actions/tasks'
+import { useAuth } from '@/hooks/useAuth'
+
+// 4. Relative imports (same feature)
+import { TaskCard } from './TaskCard'
+import { TaskFilters } from './TaskFilters'
+import { useTaskList } from './useTaskList'
+
+// 5. Types (separate section)
+import type { Task, TaskStatus } from '@/types/task'
+import type { User } from '@/types/user'
+```
+
+```typescript
+// ❌ WRONG - Unorganized imports
+import { Task } from '@/types/task'
+import { useState } from 'react'
+import { Button } from '@/components/ui/button'
+import { format } from 'date-fns'
+import { TaskCard } from './TaskCard'
+import type { User } from '@/types/user'
+import { useRouter } from 'next/navigation'
+import { z } from 'zod'
+```
+
+## 5. Function Standards
+
+### Max 50 Lines Per Function
+
+```typescript
+// ✅ CORRECT - Small, focused functions
+function validateEmail(email: string): boolean {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+  return emailRegex.test(email)
+}
+
+function validatePassword(password: string): ValidationResult {
+  if (password.length < 8) {
+    return { valid: false, message: 'Password must be at least 8 characters' }
+  }
+  if (!/[A-Z]/.test(password)) {
+    return { valid: false, message: 'Password must contain uppercase letter' }
+  }
+  return { valid: true, message: '' }
+}
+
+function validateUser(user: UserInput): ValidationResult[] {
+  return [
+    validateEmail(user.email) ? { valid: true, message: '' } : { valid: false, message: 'Invalid email' },
+    validatePassword(user.password),
+  ]
+}
+
+// ❌ WRONG - Monolithic function doing too much
+function processUserRegistration(data: unknown) {
+  // 200+ lines of validation, API calls, state updates, etc.
+}
+```
+
+### Max 4 Levels of Nesting
+
+```typescript
+// ✅ CORRECT - Flat structure with early returns
+async function processOrder(orderId: string): Promise<void> {
+  const order = await fetchOrder(orderId)
+  if (!order) {
+    throw new Error('Order not found')
+  }
+
+  if (order.status !== 'pending') {
+    throw new Error('Order already processed')
+  }
+
+  const payment = await processPayment(order)
+  if (!payment.success) {
+    await markOrderFailed(orderId, payment.error)
+    return
+  }
+
+  await fulfillOrder(orderId)
+  await sendConfirmationEmail(order.userId)
+}
+
+// ❌ WRONG - Deep nesting
+async function processOrder(orderId: string): Promise<void> {
+  const order = await fetchOrder(orderId)
+  if (order) {
+    if (order.status === 'pending') {
+      const payment = await processPayment(order)
+      if (payment.success) {
+        await fulfillOrder(orderId)
+        if (order.userId) {
+          await sendConfirmationEmail(order.userId)
+        }
+      } else {
+        await markOrderFailed(orderId, payment.error)
+      }
+    }
+  }
+}
+```
+
+### Single Responsibility
+
+```typescript
+// ✅ CORRECT - Each function does one thing
+function formatCurrency(amount: number): string {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+  }).format(amount)
+}
+
+function calculateSubtotal(items: CartItem[]): number {
+  return items.reduce((sum, item) => sum + item.price * item.quantity, 0)
+}
+
+function calculateTax(subtotal: number, rate: number): number {
+  return subtotal * rate
+}
+
+function calculateOrderTotal(items: CartItem[], taxRate: number): OrderTotal {
+  const subtotal = calculateSubtotal(items)
+  const tax = calculateTax(subtotal, taxRate)
+  return {
+    subtotal,
+    tax,
+    total: subtotal + tax,
+    formatted: formatCurrency(subtotal + tax),
+  }
+}
+
+// ❌ WRONG - Function doing multiple things
+function processCart(items: CartItem[], taxRate: number, userId: string) {
+  // Calculates totals, formats currency, validates inventory,
+  // creates order, processes payment, sends emails...
+}
+```
+
+### Early Returns for Guard Clauses
+
+```typescript
+// ✅ CORRECT - Guard clauses at the top
+function updateUser(userId: string, updates: UserUpdate): Promise<User> {
+  if (!userId) {
+    throw new Error('userId is required')
+  }
+
+  if (!updates || Object.keys(updates).length === 0) {
+    throw new Error('No updates provided')
+  }
+
+  if (updates.email && !isValidEmail(updates.email)) {
+    throw new Error('Invalid email format')
+  }
+
+  // Main logic - reader knows preconditions are met
+  return db.users.update({ where: { id: userId }, data: updates })
+}
+
+// ❌ WRONG - Nested conditions
+function updateUser(userId: string, updates: UserUpdate): Promise<User> {
+  if (userId) {
+    if (updates && Object.keys(updates).length > 0) {
+      if (!updates.email || isValidEmail(updates.email)) {
+        return db.users.update({ where: { id: userId }, data: updates })
+      } else {
+        throw new Error('Invalid email format')
+      }
+    } else {
+      throw new Error('No updates provided')
+    }
+  } else {
+    throw new Error('userId is required')
+  }
+}
+```
+
+## Quick Checklist
+
+Before committing any code:
+
+### TypeScript
+- [ ] Function signatures have explicit return types
+- [ ] No `any` types (use `unknown` + type guards)
+- [ ] Object literals use `satisfies` where appropriate
+- [ ] Interfaces for objects, types for unions
+
+### Naming
+- [ ] Components: PascalCase files and names
+- [ ] Utilities: kebab-case files
+- [ ] Functions: camelCase, verb-first
+- [ ] Constants: SCREAMING_SNAKE_CASE
+- [ ] Booleans: is/has/should prefix
+- [ ] Handlers: handle prefix
+
+### Error Handling
+- [ ] No silent `catch {}` blocks
+- [ ] Errors logged with context
+- [ ] Typed errors for specific failure modes
+
+### Imports
+- [ ] Organized in 5 sections (React → External → Internal → Relative → Types)
+- [ ] Type imports use `import type`
+- [ ] No circular dependencies
+
+### Functions
+- [ ] Under 50 lines
+- [ ] Max 4 levels of nesting
+- [ ] Single responsibility
+- [ ] Guard clauses at the top with early returns

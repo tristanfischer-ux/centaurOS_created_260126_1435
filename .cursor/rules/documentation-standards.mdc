@@ -1,0 +1,433 @@
+---
+description: Documentation standards for third-party auditability - JSDoc, security annotations, and business logic comments
+alwaysApply: true
+---
+
+# Documentation Standards
+
+All code must be documented to enable third-party security audits and onboarding. These standards ensure critical decisions, security logic, and business rules are transparent and traceable.
+
+## 1. JSDoc Requirements
+
+All exported functions MUST have complete JSDoc documentation:
+
+```tsx
+// ✅ CORRECT - Complete JSDoc with all required tags
+/**
+ * Transfers funds from buyer escrow to provider's connected Stripe account.
+ * Includes platform fee calculation and audit logging.
+ *
+ * @param orderId - The order ID to process payment for
+ * @param amount - Payment amount in cents (must be positive integer)
+ * @param options - Optional configuration for the transfer
+ * @param options.skipFeeCalculation - If true, no platform fee is deducted
+ *
+ * @returns The Stripe transfer object with transaction ID
+ *
+ * @throws {AuthError} If user is not authenticated
+ * @throws {PermissionError} If user lacks payment:process permission
+ * @throws {ValidationError} If amount is invalid or order not found
+ * @throws {StripeError} If Stripe transfer fails
+ *
+ * @security Requires authenticated user with payment:process permission.
+ *           User must belong to the same foundry as the order.
+ *
+ * @audit Logs PAYMENT_PROCESSED event with order_id, amount, user_id, and transfer_id.
+ *        Failed attempts log PAYMENT_FAILED with error details.
+ *
+ * @example
+ * const transfer = await processPayment('order_123', 10000)
+ * // transfer.id = 'tr_abc123'
+ */
+export async function processPayment(
+  orderId: string,
+  amount: number,
+  options?: { skipFeeCalculation?: boolean }
+): Promise<Stripe.Transfer> {
+  // Implementation
+}
+
+// ❌ WRONG - Missing JSDoc
+export async function processPayment(orderId: string, amount: number) {
+  // No documentation - violates standards
+}
+
+// ❌ WRONG - Incomplete JSDoc
+/**
+ * Process a payment.
+ */
+export async function processPayment(orderId: string, amount: number) {
+  // Missing @param, @returns, @throws, @security, @audit
+}
+```
+
+### Required JSDoc Tags
+
+| Tag | When Required | Description |
+|-----|---------------|-------------|
+| `@param` | Always | Describe each parameter's purpose and constraints |
+| `@returns` | Always | Describe what is returned and its structure |
+| `@throws` | If throws | List all error types and conditions |
+| `@security` | If auth-related | Document required permissions and access rules |
+| `@audit` | If logged | Document what events are logged and fields |
+| `@example` | For complex APIs | Show typical usage |
+
+## 2. Security Annotation Conventions
+
+Use inline comment prefixes for security-critical code:
+
+```tsx
+// ✅ CORRECT - Clear security annotations
+
+// SECURITY: Rate limited to 5 requests per minute per IP to prevent brute force
+const rateLimiter = rateLimit({ windowMs: 60000, max: 5 })
+
+// AUTH: Verify user owns this resource before allowing modification
+const order = await getOrder(orderId)
+if (order.foundry_id !== user.foundry_id) {
+  throw new PermissionError('Cannot access order from another foundry')
+}
+
+// AUDIT: Log sensitive data access for compliance (GDPR Article 30)
+await auditLog.create({
+  event: 'USER_DATA_EXPORTED',
+  user_id: requesterId,
+  target_user_id: userId,
+  ip_address: request.ip,
+})
+
+// RLS: This query relies on foundry_id RLS policy - see migration 20240115
+const tasks = await supabase.from('tasks').select('*')
+
+// VALIDATION: Sanitize HTML to prevent XSS (allows only safe tags)
+const cleanHtml = sanitizeHtml(userInput, { allowedTags: ['p', 'b', 'i'] })
+
+// ❌ WRONG - No annotation on security-critical code
+const order = await getOrder(orderId)
+if (order.foundry_id !== user.foundry_id) {
+  throw new Error('Access denied')  // Why? What permission? What foundry?
+}
+```
+
+### Annotation Reference
+
+| Prefix | Use For | Example |
+|--------|---------|---------|
+| `// SECURITY:` | Security decisions, attack prevention | Rate limiting, CSRF protection |
+| `// AUTH:` | Authentication/authorization checks | Permission verification, token validation |
+| `// AUDIT:` | Audit-logged operations | Data access logs, compliance events |
+| `// RLS:` | Row Level Security dependencies | Queries relying on RLS policies |
+| `// VALIDATION:` | Input validation logic | Sanitization, schema validation |
+
+## 3. Business Logic Comments
+
+Document non-obvious business rules and decisions:
+
+### When to Comment
+
+```tsx
+// ✅ CORRECT - Non-obvious business rule
+// Business rule: Providers can only accept 3 concurrent orders to ensure quality.
+// This limit was set based on Q3 2024 provider feedback surveys.
+if (activeOrderCount >= 3) {
+  throw new BusinessRuleError('Provider at maximum concurrent order capacity')
+}
+
+// ✅ CORRECT - Magic number explanation
+// 72 hours = standard response SLA per provider agreement Section 4.2
+const RESPONSE_DEADLINE_MS = 72 * 60 * 60 * 1000
+
+// ✅ CORRECT - State transition explanation
+// Order state machine:
+// draft -> submitted: when buyer confirms details
+// submitted -> accepted: when provider accepts (or auto-accepts if trusted)
+// accepted -> in_progress: when provider starts work
+// in_progress -> completed: when all milestones done
+// Any state -> cancelled: buyer/provider can cancel with reason
+const ORDER_TRANSITIONS = { /* ... */ }
+
+// ✅ CORRECT - Edge case explanation
+// Edge case: If user deletes their account while they have pending orders,
+// we must preserve order data for financial records but anonymize PII.
+// See GDPR compliance doc: docs/gdpr-data-retention.md
+if (user.status === 'deleted') {
+  return anonymizeOrderData(order)
+}
+
+// ✅ CORRECT - Temporal constraint
+// Cooldown: Users can only request password reset once per 5 minutes
+// to prevent email bombing. Tracked in Redis with TTL.
+const RESET_COOLDOWN_MS = 5 * 60 * 1000
+```
+
+### What to Document
+
+| Type | Example | Why Document |
+|------|---------|--------------|
+| Business rules | Order limits, pricing rules | Not obvious from code |
+| Magic numbers | Timeouts, limits, thresholds | Explain the "why" |
+| State transitions | Workflow state machines | Complex logic |
+| Edge cases | Null handling, race conditions | Prevent future bugs |
+| Temporal constraints | Cooldowns, rate limits, TTLs | Explain timing decisions |
+| External dependencies | Third-party API quirks | Save debugging time |
+
+## 4. Component Documentation Template
+
+All complex React components should include component-level documentation:
+
+```tsx
+// ✅ CORRECT - Full component documentation
+
+/**
+ * @component OrderCard
+ *
+ * Displays an order summary with status, amount, and quick actions.
+ * Supports both buyer and provider views with role-specific actions.
+ *
+ * @example
+ * // Basic usage
+ * <OrderCard order={order} viewAs="buyer" />
+ *
+ * @example
+ * // With custom actions
+ * <OrderCard
+ *   order={order}
+ *   viewAs="provider"
+ *   onStatusChange={(newStatus) => handleStatusChange(order.id, newStatus)}
+ *   showTimeline
+ * />
+ *
+ * ## State Management
+ * - Uses local state for UI interactions (expanded/collapsed)
+ * - Order data comes from parent via props (no internal fetching)
+ * - Status changes are delegated to parent via onStatusChange callback
+ *
+ * ## Props
+ * @param order - The order object to display
+ * @param viewAs - Whether viewing as 'buyer' or 'provider' (affects available actions)
+ * @param onStatusChange - Callback when user changes order status
+ * @param showTimeline - Whether to show order history timeline
+ * @param className - Additional CSS classes
+ */
+interface OrderCardProps {
+  order: Order
+  viewAs: 'buyer' | 'provider'
+  onStatusChange?: (status: OrderStatus) => void
+  showTimeline?: boolean
+  className?: string
+}
+
+export function OrderCard({ order, viewAs, onStatusChange, showTimeline, className }: OrderCardProps) {
+  // Component implementation
+}
+
+// ❌ WRONG - No component documentation
+interface OrderCardProps {
+  order: Order
+  viewAs: 'buyer' | 'provider'
+}
+
+export function OrderCard({ order, viewAs }: OrderCardProps) {
+  // What does this do? How do I use it?
+}
+```
+
+## 5. File Header Template
+
+Complex files (services, utilities, integrations) should have a file header:
+
+```tsx
+// ✅ CORRECT - File header for complex service
+
+/**
+ * @file Order Service
+ *
+ * @description
+ * Handles all order lifecycle operations including creation, status transitions,
+ * payment processing, and dispute resolution. This is the primary entry point
+ * for order-related business logic.
+ *
+ * @dependencies
+ * - Stripe: Payment processing and escrow
+ * - Supabase: Order data persistence
+ * - Notification Service: User alerts
+ *
+ * @related
+ * - src/lib/payments/flow.ts - Payment processing logic
+ * - src/lib/disputes/service.ts - Dispute handling
+ * - src/types/order.ts - Order type definitions
+ * - supabase/migrations/20240101_orders.sql - Database schema
+ *
+ * @security
+ * All functions require authenticated user context.
+ * Foundry isolation enforced via RLS and explicit checks.
+ */
+
+import { createClient } from '@/lib/supabase/server'
+// ... rest of file
+
+// ❌ WRONG - No file header on complex service
+import { createClient } from '@/lib/supabase/server'
+// Immediately into code with no context
+```
+
+### When to Add File Headers
+
+- Services with multiple responsibilities
+- Integration files (Stripe, external APIs)
+- Complex utility modules
+- Files with security implications
+- Files over 300 lines
+
+## 6. What NOT to Comment
+
+Avoid unnecessary comments that add noise:
+
+```tsx
+// ❌ WRONG - Commenting obvious code
+// Increment the counter
+counter++
+
+// ❌ WRONG - Restating the code
+// Get the user by ID
+const user = await getUserById(userId)
+
+// ❌ WRONG - Commenting self-documenting names
+// Check if user is admin
+if (user.isAdmin) {
+
+// ❌ WRONG - Commenting framework boilerplate
+// Export the page component
+export default function Page() {
+
+// ❌ WRONG - Commenting type information
+// userId is a string
+const userId: string = params.userId
+
+// ✅ CORRECT - Let code speak for itself
+counter++
+const user = await getUserById(userId)
+if (user.isAdmin) {
+export default function Page() {
+const userId: string = params.userId
+```
+
+### Self-Documenting Code Principles
+
+```tsx
+// ❌ WRONG - Needs comment to explain
+// Check if order can be cancelled
+if (order.status !== 'completed' && order.status !== 'cancelled' && !order.disputeId) {
+
+// ✅ CORRECT - Self-documenting
+const canCancelOrder = (order: Order) =>
+  !['completed', 'cancelled'].includes(order.status) && !order.disputeId
+
+if (canCancelOrder(order)) {
+```
+
+## 7. Anti-Patterns to Avoid
+
+### Outdated Comments
+
+```tsx
+// ❌ WRONG - Comment doesn't match code
+// Send email notification
+await sendSlackMessage(user.slackId, message)  // Actually sends Slack!
+
+// ✅ CORRECT - Keep comments in sync
+// Send Slack notification
+await sendSlackMessage(user.slackId, message)
+```
+
+### Commented-Out Code
+
+```tsx
+// ❌ WRONG - Dead code in comments
+// const oldImplementation = async () => {
+//   const result = await fetch('/api/old-endpoint')
+//   return result.json()
+// }
+
+const newImplementation = async () => {
+  return await fetch('/api/v2/endpoint').then(r => r.json())
+}
+
+// ✅ CORRECT - Remove dead code, use git history if needed
+const fetchData = async () => {
+  return await fetch('/api/v2/endpoint').then(r => r.json())
+}
+```
+
+### TODOs Without Tickets
+
+```tsx
+// ❌ WRONG - Orphan TODO
+// TODO: Fix this later
+// TODO: Refactor this
+// TODO: Handle edge cases
+
+// ✅ CORRECT - TODO with tracking
+// TODO(CEN-1234): Add retry logic for transient failures
+// TODO(@username): Review security implications before launch
+// FIXME(CEN-5678): Race condition when multiple users edit simultaneously
+```
+
+### Anti-Pattern Summary
+
+| Anti-Pattern | Why It's Bad | Fix |
+|--------------|--------------|-----|
+| Outdated comments | Misleads readers, causes bugs | Update or remove |
+| Commented-out code | Clutters codebase, confuses readers | Delete, use git |
+| TODOs without tickets | Never get fixed, accumulate | Add ticket reference |
+| Excessive comments | Noise reduces signal | Trust self-documenting code |
+| Comments instead of code | Lazy fix for bad naming | Refactor to be clear |
+
+## 8. Quick Checklist
+
+Before committing any code:
+
+### JSDoc
+- [ ] All exported functions have JSDoc
+- [ ] `@param` for each parameter with description
+- [ ] `@returns` describes return value
+- [ ] `@throws` lists all error conditions
+- [ ] `@security` for auth-related functions
+- [ ] `@audit` for logged operations
+
+### Security Annotations
+- [ ] `// SECURITY:` on rate limiting, attack prevention
+- [ ] `// AUTH:` on permission checks
+- [ ] `// AUDIT:` on logged operations
+- [ ] `// RLS:` on queries relying on Row Level Security
+- [ ] `// VALIDATION:` on input sanitization
+
+### Business Logic
+- [ ] Non-obvious business rules explained
+- [ ] Magic numbers have explanatory comments
+- [ ] State transitions documented
+- [ ] Edge cases explained with reasoning
+- [ ] Temporal constraints (cooldowns, TTLs) documented
+
+### Component Documentation
+- [ ] Complex components have `@component` JSDoc
+- [ ] Usage examples provided
+- [ ] State management explained
+- [ ] Props documented
+
+### Hygiene
+- [ ] No commented-out code
+- [ ] No orphan TODOs (all have ticket references)
+- [ ] Comments match actual code behavior
+- [ ] No comments on obvious/self-documenting code
+- [ ] File headers on complex services
+
+## Documentation Debt Warning Signs
+
+If you encounter these, documentation is needed:
+
+- "What does this function do?" - Add JSDoc
+- "Why is this check here?" - Add `// SECURITY:` or business rule comment
+- "What does 86400 mean?" - Add magic number explanation
+- "Is this logged for audits?" - Add `// AUDIT:` annotation
+- "Does RLS protect this?" - Add `// RLS:` annotation
