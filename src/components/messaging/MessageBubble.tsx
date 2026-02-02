@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { cn } from '@/lib/utils'
 import { UserAvatar } from '@/components/ui/user-avatar'
-import { Check, CheckCheck, FileIcon, AlertCircle, MessageSquare } from 'lucide-react'
+import { Check, CheckCheck, FileIcon, AlertCircle, MessageSquare, Download, Image as ImageIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import type { MessageWithSender } from '@/lib/messaging/service'
 import { sanitizeHref } from '@/lib/security/url-validation'
@@ -13,6 +13,8 @@ import { StarredIndicator } from './StarredIndicator'
 import { PinnedIndicator } from './PinnedIndicator'
 import type { ReactionGroup } from '@/actions/reactions'
 import { formatDistanceToNow } from 'date-fns'
+import { isImageFile, getFileIcon } from '@/lib/file-upload'
+import Image from 'next/image'
 
 interface MessageBubbleProps {
   message: MessageWithSender
@@ -70,6 +72,102 @@ function getInitials(name: string | null, email: string): string {
       .slice(0, 2)
   }
   return email.slice(0, 2).toUpperCase()
+}
+
+/**
+ * File attachment display component
+ */
+function FileAttachment({ 
+  fileUrl, 
+  fileName, 
+  isOwn 
+}: { 
+  fileUrl: string
+  fileName: string
+  isOwn: boolean
+}) {
+  const safeUrl = sanitizeHref(fileUrl)
+  if (safeUrl === '#') {
+    return <span className="text-sm">Invalid file</span>
+  }
+  
+  // Detect file type from URL or name
+  const extension = fileName.split('.').pop()?.toLowerCase() || ''
+  const imageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp']
+  const isImage = imageExtensions.includes(extension)
+  
+  // Determine file type icon
+  const fileIcon = getFileIcon(isImage ? 'image/jpeg' : `application/${extension}`)
+  
+  if (isImage) {
+    return (
+      <div className="flex flex-col gap-2">
+        <a 
+          href={safeUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="block rounded-lg overflow-hidden border-2 border-white/20 hover:border-white/40 transition-colors"
+        >
+          <div className="relative w-full max-w-sm h-48 bg-black/10">
+            <Image
+              src={safeUrl}
+              alt={fileName}
+              fill
+              className="object-contain"
+              unoptimized
+            />
+          </div>
+        </a>
+        <a
+          href={safeUrl}
+          download={fileName}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={cn(
+            'flex items-center gap-2 text-xs hover:underline',
+            isOwn ? 'text-white/90' : 'text-muted-foreground'
+          )}
+        >
+          <Download className="w-3 h-3" />
+          <span className="truncate">{fileName}</span>
+        </a>
+      </div>
+    )
+  }
+  
+  // Non-image file
+  return (
+    <a
+      href={safeUrl}
+      download={fileName}
+      target="_blank"
+      rel="noopener noreferrer"
+      className={cn(
+        'flex items-center gap-3 p-3 rounded-lg border-2 hover:bg-white/5 transition-colors',
+        isOwn ? 'border-white/20 hover:border-white/30' : 'border-border'
+      )}
+    >
+      <div className="text-2xl flex-shrink-0">{fileIcon}</div>
+      <div className="flex-1 min-w-0">
+        <p className={cn(
+          'text-sm font-medium truncate',
+          isOwn ? 'text-white' : 'text-foreground'
+        )}>
+          {fileName}
+        </p>
+        <p className={cn(
+          'text-xs',
+          isOwn ? 'text-white/70' : 'text-muted-foreground'
+        )}>
+          Click to download
+        </p>
+      </div>
+      <Download className={cn(
+        'w-4 h-4 flex-shrink-0',
+        isOwn ? 'text-white/70' : 'text-muted-foreground'
+      )} />
+    </a>
+  )
 }
 
 export function MessageBubble({ 
@@ -177,20 +275,11 @@ export function MessageBubble({
             <StarredIndicator isStarred={isStarred} />
             <PinnedIndicator isPinned={isPinned} />
             {isFile && message.file_url && sanitizeHref(message.file_url) !== '#' ? (
-              <a 
-                href={sanitizeHref(message.file_url)} 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className={cn(
-                  'flex items-center gap-2 hover:underline',
-                  isOwn ? 'text-white' : 'text-foreground'
-                )}
-              >
-                <FileIcon className="w-4 h-4 flex-shrink-0" />
-                <span className="text-sm truncate">
-                  {message.content || 'Attachment'}
-                </span>
-              </a>
+              <FileAttachment 
+                fileUrl={message.file_url}
+                fileName={message.content || 'Attachment'}
+                isOwn={isOwn}
+              />
             ) : (
               <p className="text-sm whitespace-pre-wrap">{message.content}</p>
             )}

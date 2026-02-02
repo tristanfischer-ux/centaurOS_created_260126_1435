@@ -306,10 +306,69 @@ export function ConversationThreadEnhanced({
     }
   }
 
-  // Handle file attachment (structure only)
+  // State for file upload
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [isUploadingFile, setIsUploadingFile] = useState(false)
+  
+  // Handle file attachment
   const handleFileClick = () => {
-    // TODO: Implement file upload
-    toast.info('File attachment: Coming soon')
+    fileInputRef.current?.click()
+  }
+  
+  // Handle file selection and upload
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    
+    setIsUploadingFile(true)
+    
+    try {
+      // Import upload function dynamically
+      const { uploadMessageFile, validateFile } = await import('@/lib/file-upload')
+      
+      // Validate file
+      const validation = validateFile(file)
+      if (!validation.valid) {
+        toast.error(validation.error || 'Invalid file')
+        return
+      }
+      
+      // Upload file
+      const result = await uploadMessageFile(file, conversationId, currentUserId)
+      
+      // Send message with file attachment using context-aware function
+      const supabase = createClient()
+      const { data: message, error } = await supabase
+        .from('messages')
+        .insert({
+          conversation_id: conversationId,
+          sender_id: currentUserId,
+          content: result.fileName,
+          message_type: 'file',
+          file_url: result.url,
+          task_id: currentContext?.type === 'task' ? currentContext.id : null,
+          objective_id: currentContext?.type === 'objective' ? currentContext.id : null,
+        })
+        .select()
+        .single()
+      
+      if (error) {
+        console.error('[ConversationThreadEnhanced] Failed to send file message:', error)
+        toast.error('Failed to send file')
+      } else {
+        toast.success('File uploaded successfully')
+      }
+    } catch (error) {
+      console.error('[ConversationThreadEnhanced] File upload error:', error)
+      const message = error instanceof Error ? error.message : 'Failed to upload file'
+      toast.error(message)
+    } finally {
+      setIsUploadingFile(false)
+      // Reset file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ''
+      }
+    }
   }
 
   // Group messages by date
@@ -497,16 +556,28 @@ export function ConversationThreadEnhanced({
 
       {/* Input area */}
       <form onSubmit={handleSend} className="border-t border-border p-4 flex-shrink-0">
+        <input
+          ref={fileInputRef}
+          type="file"
+          className="hidden"
+          onChange={handleFileSelect}
+          accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.zip"
+        />
         <div className="flex items-center gap-2">
           <Button 
             type="button" 
             variant="ghost" 
             size="icon" 
             onClick={handleFileClick}
+            disabled={isUploadingFile || isSending}
             className="flex-shrink-0"
             aria-label="Attach file"
           >
-            <Paperclip className="w-5 h-5" />
+            {isUploadingFile ? (
+              <Loader2 className="w-5 h-5 animate-spin" />
+            ) : (
+              <Paperclip className="w-5 h-5" />
+            )}
           </Button>
           
           <Input

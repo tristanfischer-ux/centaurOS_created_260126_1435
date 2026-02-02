@@ -227,10 +227,59 @@ export function ConversationThread({
     }
   }
 
-  // Handle file attachment (structure only)
+  // State for file upload
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [isUploadingFile, setIsUploadingFile] = useState(false)
+  
+  // Handle file attachment
   const handleFileClick = () => {
-    // TODO: Implement file upload
-    console.log('File attachment clicked - implement upload')
+    fileInputRef.current?.click()
+  }
+  
+  // Handle file selection and upload
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file || !conversationId) return
+    
+    setIsUploadingFile(true)
+    
+    try {
+      // Import upload function dynamically
+      const { uploadMessageFile, validateFile } = await import('@/lib/file-upload')
+      
+      // Validate file
+      const validation = validateFile(file)
+      if (!validation.valid) {
+        toast.error(validation.error || 'Invalid file')
+        return
+      }
+      
+      // Upload file
+      const result = await uploadMessageFile(file, conversationId, currentUserId)
+      
+      // Send message with file attachment
+      const success = await sendMessage({
+        content: result.fileName,
+        fileUrl: result.url,
+        messageType: 'file'
+      })
+      
+      if (success) {
+        toast.success('File uploaded successfully')
+      } else {
+        toast.error('Failed to send file message')
+      }
+    } catch (error) {
+      console.error('[ConversationThread] File upload error:', error)
+      const message = error instanceof Error ? error.message : 'Failed to upload file'
+      toast.error(message)
+    } finally {
+      setIsUploadingFile(false)
+      // Reset file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ''
+      }
+    }
   }
 
   // Handle opening thread panel
@@ -407,16 +456,28 @@ export function ConversationThread({
         />
       ) : (
         <form onSubmit={handleSend} className="border-t border-border p-4 flex-shrink-0">
+          <input
+            ref={fileInputRef}
+            type="file"
+            className="hidden"
+            onChange={handleFileSelect}
+            accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.zip"
+          />
           <div className="flex items-center gap-2">
             <Button 
               type="button" 
               variant="ghost" 
               size="icon" 
               onClick={handleFileClick}
+              disabled={isUploadingFile || isSending}
               className="flex-shrink-0"
               aria-label="Attach file"
             >
-              <Paperclip className="w-5 h-5" />
+              {isUploadingFile ? (
+                <Loader2 className="w-5 h-5 animate-spin" />
+              ) : (
+                <Paperclip className="w-5 h-5" />
+              )}
             </Button>
             
             <Input
