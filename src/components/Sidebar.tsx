@@ -31,7 +31,6 @@ function isRouteActive(pathname: string, href: string): boolean {
 // Keep in sync with package.json version
 const APP_VERSION = "1.0.3"
 
-// Simplified navigation - 6 items total
 // Work: day-to-day operations
 const workNavigation = [
     { name: "Inbox", href: "/messages", icon: Inbox, tooltip: "Messages, activity feed, and conversations" },

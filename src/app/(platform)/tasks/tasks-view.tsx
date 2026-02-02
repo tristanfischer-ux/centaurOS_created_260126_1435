@@ -54,6 +54,7 @@ import {
 import { EmptyState } from "@/components/ui/empty-state"
 import { Inbox } from "lucide-react"
 import { getStatusBadgeClass } from "@/lib/status-colors"
+import { GanttView } from "@/components/timeline/GanttView"
 
 // Task type update
 type Task = Database["public"]["Tables"]["tasks"]["Row"] & {
@@ -84,7 +85,7 @@ interface TasksViewProps {
 
 // ...
 export function TasksView({ tasks, objectives, members, currentUserId, currentUserRole, teams }: TasksViewProps) {
-    const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
+    const [viewMode, setViewMode] = useState<'grid' | 'list' | 'timeline'>('grid')
     const [selectedTask, setSelectedTask] = useState<Task | null>(null)
     const [isSelectionMode, setIsSelectionMode] = useState(false)
     const [selectedTaskIds, setSelectedTaskIds] = useState<Set<string>>(new Set())
@@ -458,6 +459,15 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                                 >
                                     <List className="h-4 w-4" />
                                 </Button>
+                                <Button
+                                    variant={viewMode === 'timeline' ? 'default' : 'ghost'}
+                                    size="sm"
+                                    onClick={() => setViewMode('timeline')}
+                                    className={viewMode === 'timeline' ? 'shadow-sm' : ''}
+                                    aria-label="Timeline view"
+                                >
+                                    <CalendarDays className="h-4 w-4" />
+                                </Button>
                             </div>
                             <FeatureTip
                                 id="tasks-create"
@@ -605,7 +615,37 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                     />
                 </div>
 
-                {viewMode === 'grid' ? (
+                {viewMode === 'timeline' ? (
+                    <GanttView
+                        tasks={sortedTasks.map(task => ({
+                            ...task,
+                            profiles: task.assignee ? {
+                                id: task.assignee.id,
+                                full_name: task.assignee.full_name,
+                                role: task.assignee.role,
+                                email: task.assignee.email,
+                                foundry_id: null,
+                                created_at: '',
+                                updated_at: '',
+                                executive_setup_completed: false
+                            } : null,
+                            objectives: objectives.find(obj => obj.id === task.objective_id) || null
+                        }))}
+                        objectives={objectives}
+                        profiles={members.map(m => ({
+                            id: m.id,
+                            full_name: m.full_name,
+                            role: m.role,
+                            email: '',
+                            foundry_id: null,
+                            created_at: '',
+                            updated_at: '',
+                            executive_setup_completed: false
+                        }))}
+                        members={members}
+                        currentUserId={currentUserId}
+                    />
+                ) : viewMode === 'grid' ? (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         {sortedTasks.map((task) => (
                             <div key={task.id} className="h-full">
