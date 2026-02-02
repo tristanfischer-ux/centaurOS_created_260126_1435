@@ -4,9 +4,17 @@
 
 -- 1. Add missing foreign key constraint on report_snapshots.foundry_id
 -- This prevents orphaned records if a foundry is deleted
-ALTER TABLE report_snapshots 
-ADD CONSTRAINT report_snapshots_foundry_id_fkey 
-FOREIGN KEY (foundry_id) REFERENCES foundries(id) ON DELETE CASCADE;
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint 
+        WHERE conname = 'report_snapshots_foundry_id_fkey'
+    ) THEN
+        ALTER TABLE report_snapshots 
+        ADD CONSTRAINT report_snapshots_foundry_id_fkey 
+        FOREIGN KEY (foundry_id) REFERENCES foundries(id) ON DELETE CASCADE;
+    END IF;
+END $$;
 
 -- 2. Add missing indexes on foreign key columns for performance
 -- These indexes speed up joins and RLS policy checks
