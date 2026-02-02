@@ -483,6 +483,8 @@ function TaskConversationView({
               objective_id: context?.objectiveId || null,
               is_group: true,
               creator_id: currentUserId,
+              buyer_id: currentUserId, // Required legacy field
+              seller_id: currentUserId, // Required legacy field
               status: 'active',
               title: task?.title ? `Task: ${task.title}` : 'Task Discussion'
             })
