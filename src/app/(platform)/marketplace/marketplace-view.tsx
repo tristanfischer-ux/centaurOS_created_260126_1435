@@ -269,20 +269,6 @@ export function MarketplaceView({
         }
     }, [])
 
-    // Load saved listing IDs for current visible items
-    useEffect(() => {
-        const loadSavedIds = async () => {
-            const visibleIds = filteredResults.map(item => item.id)
-            if (visibleIds.length > 0) {
-                const ids = await getSavedListingIds(visibleIds)
-                setSavedListingIds(ids)
-            }
-        }
-        if (topTab === 'browse') {
-            loadSavedIds()
-        }
-    }, [filteredResults, topTab])
-
     // Fetch data when top tab changes
     useEffect(() => {
         if (topTab === 'rfqs' && myRfqs.length === 0) {
@@ -755,6 +741,20 @@ export function MarketplaceView({
         
         return filtered
     }, [currentListings, activeTab, debouncedSearchQuery, selectedSubcategories, locationFilter, skillFilter, minExperience, aiTypeFilter, maxCostFilter, integrationFilter, certificationFilter, technologyFilter, servicesSubTab])
+
+    // Load saved listing IDs for current visible items (must be after filteredItems definition)
+    useEffect(() => {
+        const loadSavedIds = async () => {
+            const visibleIds = filteredItems.map(item => item.id)
+            if (visibleIds.length > 0) {
+                const ids = await getSavedListingIds(visibleIds)
+                setSavedListingIds(ids)
+            }
+        }
+        if (topTab === 'browse') {
+            loadSavedIds()
+        }
+    }, [filteredItems, topTab])
 
     // Build selected items for comparison, ensuring all have valid attributes
     const selectedItems = initialListings
