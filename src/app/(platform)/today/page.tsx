@@ -88,9 +88,10 @@ export default async function TodayPage() {
     const isExecutiveOrFounder = profile?.role === 'Executive' || profile?.role === 'Founder'
     const foundryId = profile?.foundry_id
 
-    // Get current time for greeting
+    // Get current time for greeting and briefing description
     const hour = new Date().getHours()
     const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening'
+    const briefingTime = hour < 12 ? 'morning' : hour < 17 ? 'afternoon' : 'evening'
 
     // --- PARALLEL DATA FETCHING ---
 
@@ -242,7 +243,7 @@ export default async function TodayPage() {
                         </h1>
                     </div>
                     <p className={typography.pageSubtitle}>
-                        Here's your morning briefing
+                        Here's your {briefingTime} briefing
                     </p>
                 </div>
                 <div className="flex gap-2 flex-wrap shrink-0">

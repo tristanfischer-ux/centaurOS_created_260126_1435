@@ -3,7 +3,6 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
-import { typography } from '@/lib/design-system'
 import {
   Dialog,
   DialogContent,
@@ -32,33 +31,15 @@ import {
   Stethoscope,
   Package,
   ChevronRight,
-  Rocket,
-  Satellite,
-  Database,
-  Pill,
-  Factory,
-  Car,
-  Building2,
 } from 'lucide-react'
 
-// Template icons - maps product_category to Lucide icon
+// Template icons
 const templateIcons: Record<string, React.ElementType> = {
   'consumer-electronics': Smartphone,
   electronics: Cpu,
   saas: Server,
   robotics: Bot,
   medical: Stethoscope,
-  pharmaceuticals: Pill,
-  rockets: Rocket,
-  'launch-vehicles': Rocket,
-  satellites: Satellite,
-  spacecraft: Satellite,
-  'ai-datacentre': Database,
-  'data-centre': Database,
-  automotive: Car,
-  industrial: Factory,
-  construction: Building2,
-  mobile: Smartphone,
   default: Package,
 }
 
@@ -131,9 +112,9 @@ export function CreateBlueprintDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent size="lg">
+      <DialogContent className="sm:max-w-[700px]">
         <DialogHeader>
-          <DialogTitle>Create New Blueprint</DialogTitle>
+          <DialogTitle className="text-xl">Create New Blueprint</DialogTitle>
         </DialogHeader>
 
         <Tabs value={tab} onValueChange={(v) => setTab(v as 'describe' | 'template')}>
@@ -148,48 +129,30 @@ export function CreateBlueprintDialog({
             </TabsTrigger>
           </TabsList>
 
-          <div className="mt-6 space-y-6">
+          <div className="mt-6 space-y-4">
             {/* Common fields */}
             <div className="space-y-2">
-              <Label htmlFor="blueprint-name" className="text-sm font-medium">
-                Blueprint Name
-                <span className="text-destructive ml-1" aria-label="required">*</span>
-              </Label>
+              <Label htmlFor="name">Blueprint Name *</Label>
               <Input
-                id="blueprint-name"
-                name="name"
+                id="name"
                 value={name}
-                onChange={(e) => {
-                  setName(e.target.value)
-                  if (error) setError(null)
-                }}
+                onChange={(e) => setName(e.target.value)}
                 placeholder="e.g., Smart Thermostat v2"
-                aria-required="true"
-                aria-invalid={!!error && !name.trim()}
-                aria-describedby={error && !name.trim() ? 'name-error' : undefined}
-                className={cn(error && !name.trim() && 'border-destructive')}
               />
             </div>
 
             <div className="space-y-2">
-              <Label id="stage-label" className="text-sm font-medium">Project Stage</Label>
-              <div 
-                className="grid grid-cols-3 gap-2"
-                role="radiogroup"
-                aria-labelledby="stage-label"
-              >
+              <Label htmlFor="stage">Project Stage</Label>
+              <div className="grid grid-cols-3 gap-2">
                 {PROJECT_STAGES.slice(0, 6).map((s) => (
                   <Button
                     key={s.value}
                     type="button"
-                    role="radio"
-                    aria-checked={stage === s.value}
-                    onClick={() => setStage(s.value)}
-                    variant={stage === s.value ? 'default' : 'outline'}
+                    variant={stage === s.value ? 'default' : 'secondary'}
                     size="sm"
+                    onClick={() => setStage(s.value)}
                     className={cn(
-                      "min-h-[40px]",
-                      stage === s.value && "bg-international-orange hover:bg-international-orange/90 border-international-orange"
+                      stage === s.value && 'bg-international-orange hover:bg-international-orange/90'
                     )}
                   >
                     {s.label}
@@ -309,9 +272,7 @@ export function CreateBlueprintDialog({
         </Tabs>
 
         {error && (
-          <p id="name-error" role="alert" className="text-sm text-destructive">
-            {error}
-          </p>
+          <p className="text-sm text-destructive">{error}</p>
         )}
 
         <DialogFooter>
@@ -321,6 +282,7 @@ export function CreateBlueprintDialog({
           <Button
             onClick={handleCreate}
             disabled={isLoading || !name.trim() || (tab === 'template' && !selectedTemplate)}
+            className="bg-international-orange hover:bg-international-orange/90"
           >
             {isLoading ? (
               <>

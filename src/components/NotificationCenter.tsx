@@ -9,7 +9,6 @@ import { createClient } from '@/lib/supabase/client'
 import { formatDistanceToNow } from 'date-fns'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
-import { sanitizeHref } from '@/lib/security/url-validation'
 
 interface Notification {
   id: string
@@ -131,84 +130,68 @@ export function NotificationCenter() {
   return (
     <Popover open={isOpen} onOpenChange={setIsOpen}>
       <PopoverTrigger asChild>
-        <button className="relative p-2 rounded-full hover:bg-foundry-100 transition-colors">
-          <Bell className="h-5 w-5 text-foundry-600" />
+        <button className="relative p-2 rounded-full hover:bg-slate-100 transition-colors">
+          <Bell className="h-5 w-5 text-slate-600" />
           {unreadCount > 0 && (
-            <span className="absolute -top-0.5 -right-0.5 bg-international-orange text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center shadow-sm">
+            <span className="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-xs font-medium rounded-full h-5 w-5 flex items-center justify-center">
               {unreadCount > 9 ? '9+' : unreadCount}
             </span>
           )}
         </button>
       </PopoverTrigger>
-      <PopoverContent className="w-96 p-0 bg-popover" align="end">
-        <div className="flex items-center justify-between px-6 py-4 border-b bg-muted">
-          <h3 className="text-lg font-semibold text-foundry-900">Notifications</h3>
+      <PopoverContent className="w-80 p-0" align="end">
+        <div className="flex items-center justify-between p-3 border-b">
+          <h3 className="font-semibold">Notifications</h3>
           {unreadCount > 0 && (
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              onClick={markAllAsRead}
-              className="text-electric-blue hover:text-electric-blue/80 hover:bg-electric-blue/10"
-            >
-              <CheckCheck className="h-4 w-4 mr-2" />
+            <Button variant="ghost" size="sm" onClick={markAllAsRead}>
+              <CheckCheck className="h-4 w-4 mr-1" />
               Mark all read
             </Button>
           )}
         </div>
-        <ScrollArea className="h-96">
+        <ScrollArea className="h-80">
           {notifications.length === 0 ? (
-            <div className="p-12 text-center">
-              <Bell className="h-12 w-12 mx-auto mb-4 text-foundry-300" />
-              <p className="text-foundry-600 font-medium mb-2">No notifications yet</p>
-              <p className="text-sm text-foundry-500">We'll let you know when something important happens</p>
+            <div className="p-8 text-center text-muted-foreground">
+              <Bell className="h-8 w-8 mx-auto mb-2 opacity-50" />
+              <p>No notifications yet</p>
             </div>
           ) : (
-            <div className="divide-y divide-foundry-200">
-              {notifications.map(notification => {
-                const hasValidLink = notification.link && sanitizeHref(notification.link) !== '#'
-                const NotificationWrapper = hasValidLink ? Link : 'div'
-                const wrapperProps = hasValidLink 
-                  ? { href: sanitizeHref(notification.link), onClick: () => markAsRead(notification.id) }
-                  : { onClick: () => markAsRead(notification.id) }
-                
-                return (
-                  <NotificationWrapper
-                    key={notification.id}
-                    {...wrapperProps}
-                    className={cn(
-                      'block p-6 hover:bg-muted cursor-pointer transition-colors',
-                      !notification.is_read && 'bg-status-info-light/30 border-l-4 border-l-electric-blue'
-                    )}
-                  >
-                    <div className="flex gap-4">
-                      <span className="text-2xl flex-shrink-0">{getIcon(notification.type)}</span>
-                      <div className="flex-1 min-w-0 space-y-1.5">
-                        <p className={cn(
-                          'text-sm leading-relaxed text-foreground',
-                          !notification.is_read && 'font-semibold'
-                        )}>
-                          {notification.title}
+            <div className="divide-y">
+              {notifications.map(notification => (
+                <div
+                  key={notification.id}
+                  className={cn(
+                    'p-3 hover:bg-slate-50 cursor-pointer transition-colors',
+                    !notification.is_read && 'bg-blue-50/50'
+                  )}
+                  onClick={() => markAsRead(notification.id)}
+                >
+                  <div className="flex gap-4">
+                    <span className="text-lg">{getIcon(notification.type)}</span>
+                    <div className="flex-1 min-w-0">
+                      <p className={cn(
+                        'text-sm',
+                        !notification.is_read && 'font-medium'
+                      )}>
+                        {notification.title}
+                      </p>
+                      {notification.message && (
+                        <p className="text-xs text-muted-foreground truncate">
+                          {notification.message}
                         </p>
-                        {notification.message && (
-                          <p className="text-xs text-muted-foreground leading-relaxed">
-                            {notification.message}
-                          </p>
-                        )}
-                        <div className="flex items-center gap-3 pt-1">
-                          <p className="text-xs text-muted-foreground">
-                            {formatDistanceToNow(new Date(notification.created_at), { addSuffix: true })}
-                          </p>
-                          {hasValidLink && (
-                            <span className="text-xs text-electric-blue font-medium flex items-center gap-1">
-                              View <ExternalLink className="h-3 w-3" />
-                            </span>
-                          )}
-                        </div>
-                      </div>
+                      )}
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {formatDistanceToNow(new Date(notification.created_at), { addSuffix: true })}
+                      </p>
                     </div>
-                  </NotificationWrapper>
-                )
-              })}
+                    {notification.link && (
+                      <Link href={notification.link} onClick={(e) => e.stopPropagation()}>
+                        <ExternalLink className="h-4 w-4 text-muted-foreground hover:text-foreground" />
+                      </Link>
+                    )}
+                  </div>
+                </div>
+              ))}
             </div>
           )}
         </ScrollArea>

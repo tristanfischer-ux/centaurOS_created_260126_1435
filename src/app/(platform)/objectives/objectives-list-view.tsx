@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { useAutoRefresh } from "@/hooks/useAutoRefresh"
 import { RefreshButton } from "@/components/RefreshButton"
-import { ChevronDown, ChevronRight, Target, CheckCircle2, Clock, AlertCircle, ArrowRight, Trash, MessageSquare, Paperclip, Loader2, Plus, FileText } from "lucide-react"
+import { ChevronDown, ChevronRight, Target, CheckCircle2, Clock, AlertCircle, ArrowRight, Trash, MessageSquare, Paperclip, Loader2, Plus, FileText, Pencil } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
@@ -11,6 +11,7 @@ import { Markdown } from "@/components/ui/markdown"
 import Link from "next/link"
 import { deleteObjective } from "@/actions/objectives"
 import { toast } from "sonner"
+import { EditObjectiveDialog } from "@/components/objectives/edit-objective-dialog"
 import {
     AlertDialog,
     AlertDialogAction,
@@ -78,6 +79,7 @@ export function ObjectivesListView({ objectives, objectivesForDialog, members, t
     const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
     const [objectiveToDelete, setObjectiveToDelete] = useState<string | null>(null)
+    const [objectiveToEdit, setObjectiveToEdit] = useState<Objective | null>(null)
     const [showBulkDeleteDialog, setShowBulkDeleteDialog] = useState(false)
     const [isDeletingSingle, setIsDeletingSingle] = useState(false)
     const [isDeletingBulk, setIsDeletingBulk] = useState(false)
@@ -266,6 +268,15 @@ export function ObjectivesListView({ objectives, objectivesForDialog, members, t
                 />
             )}
 
+            {/* Edit Objective Dialog */}
+            {objectiveToEdit && (
+                <EditObjectiveDialog
+                    open={!!objectiveToEdit}
+                    onOpenChange={(open) => !open && setObjectiveToEdit(null)}
+                    objective={objectiveToEdit}
+                />
+            )}
+
             {/* Objectives List */}
             <div className="space-y-4">
                 {/* Select All Header (Optional, but good for bulk actions) */}
@@ -392,11 +403,25 @@ export function ObjectivesListView({ objectives, objectivesForDialog, members, t
                                     <Button
                                         variant="ghost"
                                         size="icon"
+                                        className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-muted active:scale-[0.98] transition-all"
+                                        onClick={(e) => {
+                                            e.stopPropagation()
+                                            setObjectiveToEdit(objective)
+                                        }}
+                                        aria-label="Edit objective"
+                                    >
+                                        <Pencil className="h-4 w-4" />
+                                    </Button>
+
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
                                         className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 active:scale-[0.98] transition-all"
                                         onClick={(e) => {
                                             e.stopPropagation()
                                             setObjectiveToDelete(objective.id)
                                         }}
+                                        aria-label="Delete objective"
                                     >
                                         <Trash className="h-4 w-4" />
                                     </Button>

@@ -4,7 +4,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { Database } from '@/types/database.types'
-import { createObjectiveSchema, validate } from '@/lib/validations'
+import { createObjectiveSchema, updateObjectiveSchema, validate } from '@/lib/validations'
 import { getFoundryIdCached } from '@/lib/supabase/foundry-context'
 import { withRetry } from '@/lib/retry'
 
@@ -242,6 +242,132 @@ export async function createObjective(formData: FormData) {
 
     revalidatePath('/objectives')
     revalidatePath('/tasks')
+    return { success: true }
+}
+
+
+/**
+ * Updates an existing objective's title, description, or extended description.
+ * 
+ * @description Allows the creator or foundry members to update objective details.
+ * Only foundry members can edit objectives within their foundry.
+ * 
+ * @param objectiveId - The ID of the objective to update
+ * @param updates - Object containing fields to update (title, description, extendedDescription)
+ * @returns Success status or error message
+ * 
+ * @throws {UnauthorizedError} If user is not authenticated or not in the foundry
+ * @throws {NotFoundError} If objective doesn't exist or user can't access it
+ * 
+ * @security Verifies user is authenticated and objective belongs to their foundry
+ * @audit Logs objective_updated event
+ */
+export async function updateObjective(
+    objectiveId: string,
+    updates: {
+        title?: string
+        description?: string | null
+        extendedDescription?: string | null
+    }
+) {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+
+    // AUTH: Verify user is authenticated
+    if (!user) return { error: 'Unauthorized' }
+
+    // SECURITY: Get user's foundry_id for multi-tenant isolation
+    const foundry_id = await getFoundryIdCached()
+    if (!foundry_id) return { error: 'User not in a foundry' }
+
+    // VALIDATION: Validate input using Zod schema
+    const rawData = {
+        objectiveId,
+        title: updates.title,
+        description: updates.description,
+        extendedDescription: updates.extendedDescription
+    }
+
+    const validation = validate(updateObjectiveSchema, rawData)
+    if (!validation.success) {
+        return { error: 'error' in validation ? validation.error : 'Validation failed' }
+    }
+
+    const { title, description, extendedDescription } = validation.data
+
+    // SECURITY: Verify objective exists and belongs to user's foundry
+    const { data: objective, error: fetchError } = await supabase
+        .from('objectives')
+        .select('id, foundry_id')
+        .eq('id', objectiveId)
+        .single()
+
+    if (fetchError || !objective) {
+        return { error: 'Objective not found' }
+    }
+
+    // SECURITY: Check foundry isolation
+    if (objective.foundry_id !== foundry_id) {
+        console.warn(`[SECURITY] User ${user.id} attempted to update objective ${objectiveId} from different foundry`)
+        return { error: 'Objective not found' } // Don't reveal it exists
+    }
+
+    // Build update object with only provided fields
+    const updateData: {
+        title?: string
+        description?: string | null
+        extended_description?: string | null
+        updated_at: string
+    } = {
+        updated_at: new Date().toISOString()
+    }
+
+    if (title !== undefined) {
+        updateData.title = title
+    }
+    if (description !== undefined) {
+        updateData.description = description
+    }
+    if (extendedDescription !== undefined) {
+        updateData.extended_description = extendedDescription
+    }
+
+    // Perform the update
+    try {
+        const { error: updateError } = await withRetry(async () => {
+            const res = await supabase
+                .from('objectives')
+                .update(updateData)
+                .eq('id', objectiveId)
+            if (res.error) throw res.error
+            return res
+        })
+
+        if (updateError) {
+            console.error('[ObjectiveService] Failed to update objective:', {
+                objectiveId,
+                error: updateError.message
+            })
+            return { error: updateError.message }
+        }
+    } catch (error) {
+        console.error('[ObjectiveService] Unexpected error updating objective:', {
+            objectiveId,
+            error: error instanceof Error ? error.message : 'Unknown error'
+        })
+        return { error: error instanceof Error ? error.message : 'Failed to update objective' }
+    }
+
+    // AUDIT: Log update event
+    console.info('[ObjectiveService] Objective updated:', {
+        objectiveId,
+        updatedBy: user.id,
+        foundryId: foundry_id,
+        fieldsUpdated: Object.keys(updateData).filter(k => k !== 'updated_at')
+    })
+
+    revalidatePath('/objectives')
+    revalidatePath(`/objectives/${objectiveId}`)
     return { success: true }
 }
 
