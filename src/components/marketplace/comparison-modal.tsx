@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from "react"
+import React, { useState, useEffect } from "react"
 import { MarketplaceListing } from "@/actions/marketplace"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Card } from "@/components/ui/card"
@@ -390,82 +390,77 @@ export function ComparisonModal({ open, onOpenChange, items }: ComparisonModalPr
                             ))}
                         </div>
 
-                        {/* Desktop: Table Layout */}
+                        {/* Desktop: Grid Layout - Fixed version */}
                         <div className="hidden md:block overflow-x-auto pb-4">
-                            {/* Debug: Show column count */}
-                            {process.env.NODE_ENV === 'development' && (
-                                <div className="mb-2 text-xs text-muted-foreground bg-muted px-2 py-1 rounded">
-                                    Debug: Rendering {itemsToRender.length} columns: {itemsToRender.map(i => i.title).join(' | ')}
-                                </div>
-                            )}
-                            <table 
-                                key={`comparison-table-${itemsToRender.map(i => i.id).join('-')}`}
-                                className="w-full border-collapse min-w-max"
+                            {/* Comparison Grid - using CSS Grid for reliable multi-column layout */}
+                            <div 
+                                className="grid gap-0 border rounded-lg overflow-hidden"
+                                style={{ 
+                                    gridTemplateColumns: `150px repeat(${itemsToRender.length}, minmax(200px, 1fr))` 
+                                }}
                             >
-                                <thead>
-                                    <tr>
-                                        <th className="text-left text-sm font-medium text-muted-foreground py-3 pr-4 w-32 align-top sticky left-0 bg-background z-10">
-                                            Attribute
-                                        </th>
-                                        {itemsToRender.map((item, index) => {
-                                            console.log(`[ComparisonModal] Rendering column ${index + 1}/${itemsToRender.length}: ${item.title} (id: ${item.id.substring(0, 8)})`)
-                                            return (
-                                                <th key={item.id} className="text-left py-3 px-4 min-w-[200px] max-w-[250px] align-top">
-                                                    <div className="font-bold text-base leading-tight">{item.title}</div>
-                                                    <Badge 
-                                                        variant="secondary" 
-                                                        className={cn(
-                                                            "mt-2 uppercase text-[10px] tracking-wider font-semibold border-0",
-                                                            categoryBadgeStyles[item.category]
-                                                        )}
-                                                    >
-                                                        {item.subcategory}
-                                                    </Badge>
-                                                </th>
-                                            )
-                                        })}
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {Object.entries(organizedSections).map(([sectionName, sectionKeys]) => {
-                                        if (sectionKeys.length === 0) return null
-                                        // Use itemsToRender (validated items) instead of items (raw prop)
-                                        const hasAnyValue = sectionKeys.some(key => 
-                                            itemsToRender.some(item => item.attributes[key] !== undefined)
-                                        )
-                                        if (!hasAnyValue) return null
-                                        
-                                        return (
-                                            <SectionGroup 
-                                                key={sectionName}
-                                                sectionName={sectionName}
-                                                sectionKeys={sectionKeys}
-                                                items={itemsToRender}
-                                                bestValues={bestValues}
-                                            />
-                                        )
-                                    })}
+                                {/* Header Row */}
+                                <div className="bg-muted/50 p-3 font-medium text-sm text-muted-foreground border-b">
+                                    Attribute
+                                </div>
+                                {itemsToRender.map((item, index) => {
+                                    console.log(`[ComparisonModal] Rendering header ${index + 1}/${itemsToRender.length}: ${item.title}`)
+                                    return (
+                                        <div key={`header-${item.id}`} className="bg-muted/50 p-3 border-b border-l">
+                                            <div className="font-bold text-base leading-tight">{item.title}</div>
+                                            <Badge 
+                                                variant="secondary" 
+                                                className={cn(
+                                                    "mt-2 uppercase text-[10px] tracking-wider font-semibold border-0",
+                                                    categoryBadgeStyles[item.category]
+                                                )}
+                                            >
+                                                {item.subcategory}
+                                            </Badge>
+                                        </div>
+                                    )
+                                })}
+                                
+                                {/* Section Content */}
+                                {Object.entries(organizedSections).map(([sectionName, sectionKeys]) => {
+                                    if (sectionKeys.length === 0) return null
+                                    const hasAnyValue = sectionKeys.some(key => 
+                                        itemsToRender.some(item => item.attributes[key] !== undefined)
+                                    )
+                                    if (!hasAnyValue) return null
                                     
-                                    {/* Description section */}
-                                    <tr className="border-t-2 border-border">
-                                        <td colSpan={itemsToRender.length + 1} className="py-2">
-                                            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                                                Details
-                                            </span>
-                                        </td>
-                                    </tr>
-                                    <tr>
-                                        <td className="text-sm font-medium text-muted-foreground py-3 pr-4 align-top sticky left-0 bg-background z-10">
-                                            Description
-                                        </td>
-                                        {itemsToRender.map(item => (
-                                            <td key={`${item.id}-desc`} className="text-sm text-muted-foreground leading-relaxed py-3 px-4 align-top">
-                                                {item.description}
-                                            </td>
-                                        ))}
-                                    </tr>
-                                </tbody>
-                            </table>
+                                    return (
+                                        <GridSectionGroup 
+                                            key={sectionName}
+                                            sectionName={sectionName}
+                                            sectionKeys={sectionKeys}
+                                            items={itemsToRender}
+                                            bestValues={bestValues}
+                                            columnCount={itemsToRender.length}
+                                        />
+                                    )
+                                })}
+                                
+                                {/* Description section header */}
+                                <div 
+                                    className="col-span-full py-2 border-t-2 border-border"
+                                    style={{ gridColumn: `1 / -1` }}
+                                >
+                                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                                        Details
+                                    </span>
+                                </div>
+                                
+                                {/* Description row */}
+                                <div className="text-sm font-medium text-muted-foreground py-3 pr-4 border-t border-border/50">
+                                    Description
+                                </div>
+                                {itemsToRender.map(item => (
+                                    <div key={`${item.id}-desc`} className="text-sm text-muted-foreground leading-relaxed py-3 px-4 border-t border-border/50 border-l">
+                                        {item.description}
+                                    </div>
+                                ))}
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -474,53 +469,58 @@ export function ComparisonModal({ open, onOpenChange, items }: ComparisonModalPr
     )
 }
 
-interface SectionGroupProps {
+interface GridSectionGroupProps {
     sectionName: string
     sectionKeys: string[]
     items: MarketplaceListing[]
     bestValues: Record<string, { value: number; itemId: string; direction: 'higher' | 'lower' } | null>
+    columnCount: number
 }
 
-function SectionGroup({ sectionName, sectionKeys, items, bestValues }: SectionGroupProps) {
+function GridSectionGroup({ sectionName, sectionKeys, items, bestValues, columnCount }: GridSectionGroupProps) {
     return (
         <>
-            {/* Section header */}
-            <tr className="border-t-2 border-border">
-                <td colSpan={items.length + 1} className="py-2">
-                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                        {sectionName}
-                    </span>
-                </td>
-            </tr>
+            {/* Section header - spans all columns */}
+            <div 
+                className="py-2 border-t-2 border-border"
+                style={{ gridColumn: `1 / span ${columnCount + 1}` }}
+            >
+                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                    {sectionName}
+                </span>
+            </div>
+            
             {/* Section rows */}
             {sectionKeys.map((key) => {
                 const hasAnyValue = items.some(item => (item.attributes || {})[key] !== undefined)
                 if (!hasAnyValue) return null
                 
                 return (
-                    <tr key={key} className="border-t border-border/50">
-                        <td className="text-sm font-medium text-muted-foreground capitalize py-3 pr-4 align-top sticky left-0 bg-background z-10">
+                    <React.Fragment key={key}>
+                        {/* Attribute label cell */}
+                        <div className="text-sm font-medium text-muted-foreground capitalize py-3 pr-4 border-t border-border/50">
                             {formatAttributeName(key)}
-                        </td>
+                        </div>
+                        {/* Value cells for each item */}
                         {items.map(item => {
                             const value = (item.attributes || {})[key]
                             const isBest = bestValues[key]?.itemId === item.id
                             
-                                            return (
-                                                <td 
-                                                    key={`${item.id}-${key}`} 
-                                                    className={cn(
-                                                        "text-sm py-3 px-4 align-top transition-colors",
-                                                        isBest && "bg-status-success-light"
-                                                    )}
-                                                >
+                            return (
+                                <div 
+                                    key={`${item.id}-${key}`} 
+                                    className={cn(
+                                        "text-sm py-3 px-4 border-t border-border/50 border-l transition-colors",
+                                        isBest && "bg-status-success-light"
+                                    )}
+                                >
                                     <div className="flex items-center gap-1.5">
                                         {renderValue(value, key, items, item.id, bestValues)}
                                     </div>
-                                </td>
+                                </div>
                             )
                         })}
-                    </tr>
+                    </React.Fragment>
                 )
             })}
         </>
