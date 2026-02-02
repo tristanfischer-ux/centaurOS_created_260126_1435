@@ -23,58 +23,103 @@ export interface MarketplaceRecommendation {
 }
 
 export default async function MarketplacePage() {
-    const supabase = await createClient()
-    const foundryId = await getFoundryIdCached()
-    const { data: { user } } = await supabase.auth.getUser()
-
-    // Fetch marketplace listings
-    const marketplaceListings = await getMarketplaceListings()
-
-    // Get user profile for role
+    // Initialize with safe defaults
+    let marketplaceListings: Awaited<ReturnType<typeof getMarketplaceListings>> = []
     let userRole: 'Executive' | 'Apprentice' | 'Founder' | 'AI_Agent' = 'Apprentice'
-    if (user) {
-        const { data: profile } = await supabase
-            .from('profiles')
-            .select('role')
-            .eq('id', user.id)
-            .single()
-        
-        if (profile?.role) {
-            userRole = profile.role as typeof userRole
-        }
-    }
-
-    // Check if user needs marketplace onboarding
-    const { needsOnboarding } = await getMarketplaceOnboardingStatus()
-
-    // Fetch AI recommendations for this foundry
+    let needsOnboarding = false
     let recommendations: MarketplaceRecommendation[] = []
+    let teamMembers: { id: string; full_name: string | null; role: string }[] = []
+
+    // Each query is wrapped in try-catch to prevent any single failure from breaking the page
+    const supabase = await createClient()
     
-    if (foundryId) {
-        const { data: recs } = await supabase
-            .rpc('get_marketplace_recommendations', { 
-                p_foundry_id: foundryId,
-                p_limit: 5 
-            })
-        
-        if (recs) {
-            recommendations = recs as MarketplaceRecommendation[]
+    // Get foundry context
+    let foundryId: string | null = null
+    try {
+        foundryId = await getFoundryIdCached()
+    } catch (err) {
+        console.error('[Marketplace] Failed to get foundry ID:', err)
+    }
+
+    // Get current user
+    let user: { id: string } | null = null
+    try {
+        const { data } = await supabase.auth.getUser()
+        user = data?.user ?? null
+    } catch (err) {
+        console.error('[Marketplace] Failed to get user:', err)
+    }
+
+    // Fetch marketplace listings (critical - this is what users come for)
+    try {
+        marketplaceListings = await getMarketplaceListings()
+        console.log('[Marketplace] Loaded', marketplaceListings.length, 'listings')
+    } catch (err) {
+        console.error('[Marketplace] Failed to fetch listings:', err)
+        // Don't throw - show empty marketplace rather than error page
+    }
+
+    // Get user profile for role (non-critical)
+    if (user) {
+        try {
+            const { data: profile } = await supabase
+                .from('profiles')
+                .select('role')
+                .eq('id', user.id)
+                .single()
+            
+            if (profile?.role) {
+                userRole = profile.role as typeof userRole
+            }
+        } catch (err) {
+            console.error('[Marketplace] Failed to get user role:', err)
         }
     }
 
-    // Also fetch team members for Centaur Matcher
-    let teamMembers: { id: string; full_name: string | null; role: string }[] = []
-    
+    // Check if user needs marketplace onboarding (non-critical)
+    try {
+        const result = await getMarketplaceOnboardingStatus()
+        needsOnboarding = result.needsOnboarding ?? false
+    } catch (err) {
+        console.error('[Marketplace] Failed to check onboarding status:', err)
+    }
+
+    // Fetch AI recommendations for this foundry (non-critical)
     if (foundryId) {
-        const { data: members } = await supabase
-            .from('profiles')
-            .select('id, full_name, role')
-            .eq('foundry_id', foundryId)
-            .neq('role', 'AI_Agent')
-            .order('full_name')
-        
-        if (members) {
-            teamMembers = members
+        try {
+            const { data: recs, error } = await supabase
+                .rpc('get_marketplace_recommendations', { 
+                    p_foundry_id: foundryId,
+                    p_limit: 5 
+                })
+            
+            if (error) {
+                console.error('[Marketplace] Recommendations RPC error:', error)
+            } else if (recs) {
+                recommendations = recs as MarketplaceRecommendation[]
+            }
+        } catch (err) {
+            console.error('[Marketplace] Failed to fetch recommendations:', err)
+        }
+    }
+
+    // Fetch team members for Centaur Matcher (non-critical)
+    if (foundryId) {
+        try {
+            const { data: members, error } = await supabase
+                .from('profiles')
+                .select('id, full_name, role')
+                .eq('foundry_id', foundryId)
+                .neq('role', 'AI_Agent')
+                .order('full_name')
+            
+            if (error) {
+                console.error('[Marketplace] Team members query error:', error)
+            } else if (members) {
+                teamMembers = members
+            }
+        } catch (err) {
+            console.error('[Marketplace] Failed to fetch team members:', err)
         }
     }
 
