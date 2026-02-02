@@ -1,0 +1,521 @@
+---
+description: TypeScript standards, naming conventions, error handling, imports, and logging for clean, maintainable code
+alwaysApply: true
+---
+
+# Code Hygiene Standards
+
+These standards ensure consistent, readable, and maintainable code across CentaurOS.
+
+## 1. TypeScript Standards
+
+### Explicit Types for Function Signatures
+
+Always declare parameter types and return types explicitly for functions.
+
+```tsx
+// ✅ CORRECT - Explicit types for parameters and return value
+function calculateTotal(items: CartItem[], discount: number): number {
+  return items.reduce((sum, item) => sum + item.price, 0) * (1 - discount)
+}
+
+async function fetchUser(id: string): Promise<User | null> {
+  const { data } = await supabase.from('users').select().eq('id', id).single()
+  return data
+}
+
+// ❌ WRONG - Implicit return type, missing parameter types
+function calculateTotal(items, discount) {
+  return items.reduce((sum, item) => sum + item.price, 0) * (1 - discount)
+}
+
+// ❌ WRONG - Relying on inference for non-trivial functions
+const fetchUser = async (id) => {
+  const { data } = await supabase.from('users').select().eq('id', id).single()
+  return data
+}
+```
+
+### Avoid `any` - Use `unknown` + Type Guards
+
+Never use `any`. Use `unknown` and narrow with type guards.
+
+```tsx
+// ✅ CORRECT - Use unknown with type guard
+function processApiResponse(response: unknown): User {
+  if (!isUser(response)) {
+    throw new Error('Invalid user response')
+  }
+  return response
+}
+
+function isUser(value: unknown): value is User {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'id' in value &&
+    'email' in value
+  )
+}
+
+// ❌ WRONG - Using any hides type errors
+function processApiResponse(response: any): User {
+  return response  // No type safety
+}
+
+// ❌ WRONG - Casting any to bypass checks
+const user = response as any as User  // Double cast smell
+```
+
+### Use `satisfies` for Type-Safe Object Literals
+
+Use `satisfies` to validate object structure while preserving literal types.
+
+```tsx
+// ✅ CORRECT - satisfies validates + preserves literal types
+const STATUS_COLORS = {
+  pending: 'bg-status-warning-light',
+  active: 'bg-status-success-light',
+  cancelled: 'bg-status-error-light',
+} satisfies Record<TaskStatus, string>
+
+// TypeScript knows: STATUS_COLORS.pending is exactly 'bg-status-warning-light'
+
+// ❌ WRONG - Type annotation loses literal types
+const STATUS_COLORS: Record<TaskStatus, string> = {
+  pending: 'bg-status-warning-light',
+  active: 'bg-status-success-light',
+  cancelled: 'bg-status-error-light',
+}
+// TypeScript only knows: STATUS_COLORS.pending is string
+
+// ❌ WRONG - No type checking at all
+const STATUS_COLORS = {
+  pending: 'bg-status-warning-light',
+  active: 'bg-status-success-light',
+  // Missing 'cancelled' - no error!
+}
+```
+
+### Type Assertion Guidelines
+
+Use type assertions sparingly and always with justification.
+
+```tsx
+// ✅ CORRECT - Assertion with justification comment
+// Safe assertion: id is guaranteed by Supabase RLS policy to exist
+const foundryId = user.foundry_id as string
+
+// ✅ CORRECT - Narrowing after validation
+const element = document.getElementById('root')
+if (!element) throw new Error('Root element not found')
+// Now element is HTMLElement, not HTMLElement | null
+
+// ❌ WRONG - Assertion without justification
+const foundryId = user.foundry_id as string  // Why is this safe?
+
+// ❌ WRONG - Bypassing null check with assertion
+const element = document.getElementById('root') as HTMLElement  // Could be null!
+
+// ❌ WRONG - Using ! operator without validation
+const name = user.profile!.name  // Will crash if profile is undefined
+```
+
+## 2. Naming Conventions
+
+| Entity | Convention | Example |
+|--------|------------|---------|
+| Files (components) | PascalCase | `TaskCard.tsx`, `UserProfile.tsx` |
+| Files (utilities) | kebab-case | `format-date.ts`, `parse-query.ts` |
+| Files (hooks) | camelCase with use prefix | `useTaskList.ts`, `useAuth.ts` |
+| Functions | camelCase, verb-first | `calculateTotal`, `fetchUser`, `validateInput` |
+| Types/Interfaces | PascalCase | `TaskStatus`, `UserProfile`, `ApiResponse` |
+| Constants | SCREAMING_SNAKE_CASE | `MAX_RETRY_COUNT`, `DEFAULT_PAGE_SIZE` |
+| Boolean vars | `is`/`has`/`should`/`can` prefix | `isLoading`, `hasError`, `shouldRetry` |
+| Event handlers | `handle` prefix | `handleClick`, `handleSubmit`, `handleChange` |
+| Callbacks (props) | `on` prefix | `onClick`, `onSubmit`, `onChange` |
+
+### Examples
+
+```tsx
+// ✅ CORRECT - Following naming conventions
+
+// File: TaskCard.tsx (component - PascalCase)
+// File: format-date.ts (utility - kebab-case)
+// File: useTaskList.ts (hook - camelCase with use prefix)
+
+// Constants
+const MAX_RETRY_COUNT = 3
+const DEFAULT_PAGE_SIZE = 20
+const API_TIMEOUT_MS = 5000
+
+// Boolean variables
+const isLoading = status === 'loading'
+const hasPermission = user.role === 'admin'
+const shouldShowBanner = !dismissed && isNewUser
+const canEdit = isOwner || isAdmin
+
+// Functions (verb-first)
+function fetchUserById(id: string): Promise<User> { ... }
+function calculateDiscountedPrice(price: number, discount: number): number { ... }
+function validateEmailFormat(email: string): boolean { ... }
+
+// Event handlers
+function handleFormSubmit(e: FormEvent): void { ... }
+function handleDeleteClick(): void { ... }
+
+// Component with callback props
+interface TaskCardProps {
+  task: Task
+  onClick: () => void      // Callback prop: on prefix
+  onDelete: () => void     // Callback prop: on prefix
+}
+
+function TaskCard({ task, onClick, onDelete }: TaskCardProps) {
+  // Internal handler: handle prefix
+  function handleDeleteClick(): void {
+    if (confirm('Delete?')) {
+      onDelete()
+    }
+  }
+  
+  return (
+    <Card onClick={onClick}>
+      <Button onClick={handleDeleteClick}>Delete</Button>
+    </Card>
+  )
+}
+
+// ❌ WRONG - Naming violations
+
+// File: taskCard.tsx (should be PascalCase for components)
+// File: FormatDate.ts (should be kebab-case for utilities)
+
+const maxRetryCount = 3           // Should be MAX_RETRY_COUNT
+const loading = true              // Should be isLoading
+function userData() { ... }        // Should be fetchUserData (verb-first)
+function clickHandler() { ... }    // Should be handleClick
+```
+
+## 3. Error Handling Pattern
+
+### Explicit Error Handling
+
+Never silently catch and ignore errors. Always handle them explicitly.
+
+```tsx
+// ✅ CORRECT - Explicit error handling with context
+async function fetchTask(taskId: string): Promise<Task | null> {
+  try {
+    const { data, error } = await supabase
+      .from('tasks')
+      .select()
+      .eq('id', taskId)
+      .single()
+
+    if (error) {
+      console.error('[TaskService] Failed to fetch task:', {
+        taskId,
+        error: error.message,
+        code: error.code,
+      })
+      return null
+    }
+
+    return data
+  } catch (error) {
+    console.error('[TaskService] Unexpected error fetching task:', {
+      taskId,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    })
+    throw error  // Re-throw for caller to handle
+  }
+}
+
+// ❌ WRONG - Silent catch hides bugs
+async function fetchTask(taskId: string) {
+  try {
+    const { data } = await supabase.from('tasks').select().eq('id', taskId).single()
+    return data
+  } catch {
+    return null  // Silent failure - impossible to debug
+  }
+}
+
+// ❌ WRONG - Catching without context
+async function fetchTask(taskId: string) {
+  try {
+    const { data } = await supabase.from('tasks').select().eq('id', taskId).single()
+    return data
+  } catch (error) {
+    console.error(error)  // No context - which task? what operation?
+    return null
+  }
+}
+```
+
+### Typed Errors
+
+Create typed errors for better error handling downstream.
+
+```tsx
+// ✅ CORRECT - Typed errors with context
+class TaskNotFoundError extends Error {
+  constructor(public taskId: string) {
+    super(`Task not found: ${taskId}`)
+    this.name = 'TaskNotFoundError'
+  }
+}
+
+class PermissionDeniedError extends Error {
+  constructor(
+    public userId: string,
+    public resource: string,
+    public action: string
+  ) {
+    super(`User ${userId} cannot ${action} ${resource}`)
+    this.name = 'PermissionDeniedError'
+  }
+}
+
+// Usage
+async function deleteTask(taskId: string, userId: string): Promise<void> {
+  const task = await fetchTask(taskId)
+  
+  if (!task) {
+    throw new TaskNotFoundError(taskId)
+  }
+  
+  if (task.owner_id !== userId) {
+    throw new PermissionDeniedError(userId, 'task', 'delete')
+  }
+  
+  await supabase.from('tasks').delete().eq('id', taskId)
+}
+
+// ❌ WRONG - Generic errors lose context
+async function deleteTask(taskId: string, userId: string): Promise<void> {
+  const task = await fetchTask(taskId)
+  
+  if (!task) {
+    throw new Error('Task not found')  // Which task?
+  }
+  
+  if (task.owner_id !== userId) {
+    throw new Error('Permission denied')  // For what? By whom?
+  }
+}
+```
+
+### Error Handling Anti-Patterns
+
+```tsx
+// ❌ WRONG - Empty catch block
+try {
+  await riskyOperation()
+} catch {
+  // TODO: handle this later
+}
+
+// ❌ WRONG - Swallowing errors with console.log only
+try {
+  await riskyOperation()
+} catch (error) {
+  console.log('Something went wrong')  // Lost all error details
+}
+
+// ❌ WRONG - Returning undefined/null without logging
+try {
+  return await fetchData()
+} catch {
+  return undefined  // Caller has no idea why
+}
+
+// ❌ WRONG - Using error.message without type check
+catch (error) {
+  console.error(error.message)  // error might not be Error type
+}
+
+// ✅ CORRECT - Safe error message access
+catch (error) {
+  const message = error instanceof Error ? error.message : 'Unknown error'
+  console.error('[Module] Operation failed:', message)
+}
+```
+
+## 4. Import Organization
+
+Organize imports in this order with blank lines between groups:
+
+1. React / Next.js
+2. External libraries (node_modules)
+3. Internal aliases (@/)
+4. Relative imports (./)
+5. Type imports (at the end)
+
+```tsx
+// ✅ CORRECT - Organized imports
+
+// 1. React/Next.js
+import { useState, useEffect, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
+import Image from 'next/image'
+
+// 2. External libraries
+import { format, parseISO } from 'date-fns'
+import { z } from 'zod'
+import { toast } from 'sonner'
+
+// 3. Internal aliases (@/)
+import { Button } from '@/components/ui/button'
+import { Card, CardHeader, CardContent } from '@/components/ui/card'
+import { useAuth } from '@/hooks/useAuth'
+import { fetchTasks } from '@/actions/tasks'
+import { cn } from '@/lib/utils'
+
+// 4. Relative imports
+import { TaskCard } from './TaskCard'
+import { TaskFilters } from './TaskFilters'
+import { useTaskList } from './useTaskList'
+
+// 5. Type imports (at the end)
+import type { Task, TaskStatus } from '@/types/task'
+import type { User } from '@/types/user'
+
+// ❌ WRONG - Unorganized imports
+import { Task } from '@/types/task'
+import { useState } from 'react'
+import { Button } from '@/components/ui/button'
+import { format } from 'date-fns'
+import { TaskCard } from './TaskCard'
+import type { User } from '@/types/user'
+import { useRouter } from 'next/navigation'
+import { z } from 'zod'
+```
+
+## 5. Logging Standards
+
+### Structured Logging Format
+
+Use structured logging with module context and relevant details.
+
+```tsx
+// ✅ CORRECT - Structured logging with context
+
+// Info: Key events
+console.info('[TaskService] Task created:', {
+  taskId: task.id,
+  userId: user.id,
+  foundryId: user.foundry_id,
+})
+
+// Warn: Recoverable issues
+console.warn('[PaymentService] Retry required:', {
+  attempt: retryCount,
+  maxRetries: MAX_RETRY_COUNT,
+  paymentId,
+})
+
+// Error: Failures requiring attention
+console.error('[AuthService] Login failed:', {
+  email: user.email,  // OK to log email
+  error: error.message,
+  code: error.code,
+})
+
+// ❌ WRONG - Unstructured logging
+console.log('Task created')  // No context
+console.log('Error:', error)  // No module, unstructured
+console.log(user)  // Logs entire object (may contain sensitive data)
+```
+
+### Log Levels
+
+| Level | Use For | Example |
+|-------|---------|---------|
+| `error` | Failures that need attention | Auth failures, DB errors, payment failures |
+| `warn` | Recoverable issues | Retry attempts, deprecated usage, validation warnings |
+| `info` | Key business events | User signup, task completion, payment success |
+| `debug` | Development details | Function entry/exit, intermediate values |
+
+### Never Log Sensitive Data
+
+```tsx
+// ❌ WRONG - Logging sensitive data
+console.log('[Auth] User login:', {
+  email: user.email,
+  password: user.password,     // NEVER log passwords
+  token: session.access_token, // NEVER log tokens
+  ssn: user.ssn,              // NEVER log PII
+  creditCard: payment.card,    // NEVER log payment details
+})
+
+// ✅ CORRECT - Safe logging
+console.info('[Auth] User login:', {
+  userId: user.id,
+  email: user.email,           // Email is OK
+  loginMethod: 'password',
+  // Omit sensitive fields entirely
+})
+
+// ✅ CORRECT - Mask sensitive data if needed for debugging
+console.info('[Payment] Processing:', {
+  paymentId: payment.id,
+  cardLast4: payment.card.slice(-4),  // Only last 4 digits
+  amount: payment.amount,
+})
+```
+
+## 6. Quick Checklist
+
+Before committing code, verify:
+
+### TypeScript
+- [ ] All function parameters have explicit types
+- [ ] All non-trivial functions have explicit return types
+- [ ] No `any` types (use `unknown` + type guards)
+- [ ] Type assertions have justification comments
+- [ ] `satisfies` used for typed object literals
+
+### Naming
+- [ ] Component files: PascalCase (`TaskCard.tsx`)
+- [ ] Utility files: kebab-case (`format-date.ts`)
+- [ ] Functions: camelCase, verb-first (`fetchUser`, `calculateTotal`)
+- [ ] Constants: SCREAMING_SNAKE_CASE (`MAX_RETRY_COUNT`)
+- [ ] Booleans: `is`/`has`/`should`/`can` prefix (`isLoading`)
+- [ ] Handlers: `handle` prefix (`handleClick`)
+- [ ] Callback props: `on` prefix (`onClick`, `onSubmit`)
+
+### Error Handling
+- [ ] No empty catch blocks
+- [ ] No silent error swallowing
+- [ ] Errors logged with context (`[Module] Action: { details }`)
+- [ ] Safe error message access (`error instanceof Error`)
+- [ ] Typed errors for domain-specific failures
+
+### Imports
+- [ ] React/Next.js first
+- [ ] External libraries second
+- [ ] Internal aliases (@/) third
+- [ ] Relative imports fourth
+- [ ] Type imports last
+- [ ] Blank lines between groups
+
+### Logging
+- [ ] Structured format: `[Module] Action: { details }`
+- [ ] No passwords, tokens, or PII in logs
+- [ ] Appropriate log level (error/warn/info)
+- [ ] Context included for debugging
+
+## Anti-Patterns Summary
+
+| Anti-Pattern | Problem | Solution |
+|--------------|---------|----------|
+| Using `any` | No type safety | Use `unknown` + type guards |
+| Silent catch | Hides bugs | Log error with context |
+| Missing return types | Hard to maintain | Explicit return types |
+| Inconsistent naming | Hard to find code | Follow naming conventions |
+| Unstructured logging | Hard to debug | `[Module] Action: { details }` |
+| Logging sensitive data | Security risk | Never log passwords/tokens/PII |
+| Random import order | Hard to scan | Organize by category |
+| Generic errors | Hard to handle | Create typed errors |
