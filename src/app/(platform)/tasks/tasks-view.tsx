@@ -221,13 +221,8 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
         return 0
     })
 
-    // Timeline view should show ALL tasks regardless of filters
-    const timelineTasks = [...tasks].sort((a, b) => {
-        // Sort by due date for timeline view
-        if (!a.end_date) return 1
-        if (!b.end_date) return -1
-        return new Date(a.end_date).getTime() - new Date(b.end_date).getTime()
-    })
+    // Timeline view uses the same filtered tasks as grid/list views for consistency
+    // (Removed separate timelineTasks variable - timeline now respects all filters)
 
     // Group tasks by objective (using sorted tasks)
     const tasksByObjective: Record<string, Task[]> = {}
@@ -486,7 +481,7 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                                             </Button>
                                         </TooltipTrigger>
                                         <TooltipContent>
-                                            <p>Timeline (shows all {tasks.length} tasks)</p>
+                                            <p>Timeline (Gantt chart view)</p>
                                         </TooltipContent>
                                     </Tooltip>
                                 </TooltipProvider>
@@ -671,7 +666,7 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
 
                 {viewMode === 'timeline' ? (
                     <GanttView
-                        tasks={timelineTasks.map(task => ({
+                        tasks={sortedTasks.map(task => ({
                             ...task,
                             profiles: task.assignee ? {
                                 id: task.assignee.id,
