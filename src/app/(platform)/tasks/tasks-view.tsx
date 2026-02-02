@@ -19,7 +19,7 @@ import { Database } from "@/types/database.types"
 import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
 import { format, isThisWeek } from "date-fns"
-import { ThreadDrawer } from "./thread-drawer"
+import { FullTaskView } from "@/components/tasks/full-task-view"
 import { cn, getInitials } from "@/lib/utils"
 import {
     Select,
@@ -1126,21 +1126,15 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                 )
             }
 
-            {/* Task Detail Drawer */}
-            <ThreadDrawer
-                open={!!selectedTask}
-                onOpenChange={(open) => !open && setSelectedTask(null)}
-                taskId={selectedTask?.id || ''}
-                taskTitle={selectedTask?.title || ''}
-                taskStatus={selectedTask?.status || 'Pending'}
-                taskDescription={selectedTask?.description || undefined}
-                assigneeName={selectedTask?.assignee?.full_name || undefined}
-                assigneeId={selectedTask?.assignee_id || undefined}
-                assigneeRole={selectedTask?.assignee?.role}
-                isAssignee={selectedTask?.assignee_id === currentUserId}
-                isCreator={selectedTask?.creator_id === currentUserId}
-                members={members}
-            />
+            {/* Full Task View */}
+            {selectedTask && (
+                <FullTaskView
+                    task={selectedTask}
+                    onClose={() => setSelectedTask(null)}
+                    members={members}
+                    currentUserId={currentUserId}
+                />
+            )}
 
             {/* Bulk Delete Confirmation Dialog */}
             <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>

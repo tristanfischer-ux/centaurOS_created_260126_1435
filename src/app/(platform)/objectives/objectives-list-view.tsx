@@ -22,7 +22,7 @@ import {
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { CreateTaskDialog } from "@/app/(platform)/tasks/create-task-dialog"
-import { EditTaskDialog } from "@/components/tasks/edit-task-dialog"
+import { FullTaskView } from "@/components/tasks/full-task-view"
 import { getStatusBadgeClass } from "@/lib/status-colors"
 
 
@@ -255,13 +255,13 @@ export function ObjectivesListView({ objectives, objectivesForDialog, members, t
                 </AlertDialogContent>
             </AlertDialog>
 
-            {/* Edit Task Dialog */}
+            {/* Full Task View */}
             {selectedTask && (
-                <EditTaskDialog
-                    open={!!selectedTask}
-                    onOpenChange={(open) => !open && setSelectedTask(null)}
+                <FullTaskView
                     task={selectedTask as any}
+                    onClose={() => setSelectedTask(null)}
                     members={members}
+                    currentUserId={currentUserId}
                 />
             )}
 

@@ -8,11 +8,7 @@ import { MultiSelect } from "@/components/ui/multi-select"
 
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
-import {
-    Dialog,
-    DialogContent,
-} from "@/components/ui/dialog"
-import { ChevronLeft, ChevronRight, CalendarDays, ArrowUpDown, X } from "lucide-react"
+import { ChevronLeft, ChevronRight, CalendarDays, ArrowUpDown } from "lucide-react"
 import { updateTaskDates } from "@/actions/tasks"
 import {
     Select,
@@ -26,7 +22,7 @@ import { toast } from "sonner"
 import { useRouter } from "next/navigation"
 import { format, addDays, subDays, addWeeks, subWeeks, addMonths, subMonths } from "date-fns"
 import { getStatusHex } from "@/lib/status-colors"
-import { TaskCard } from "@/app/(platform)/tasks/task-card"
+import { FullTaskView } from "@/components/tasks/full-task-view"
 
 // Profile type for assignees
 type AssigneeProfile = {
@@ -786,47 +782,33 @@ export function GanttView({ tasks, objectives, profiles, members = [], currentUs
                 </div>
             )}
 
-            {/* Task Detail Modal */}
-            <Dialog open={!!selectedTask} onOpenChange={(open) => !open && setSelectedTaskId(null)}>
-                <DialogContent size="lg" className="max-h-[90vh] overflow-y-auto p-0 bg-background">
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        aria-label="Close"
-                        className="absolute right-2 top-2 z-50 h-8 w-8 rounded-full bg-background hover:bg-muted shadow-md"
-                        onClick={() => setSelectedTaskId(null)}
-                    >
-                        <X className="h-4 w-4" />
-                    </Button>
-                    {selectedTask && (
-                        <TaskCard
-                            task={{
-                                ...selectedTask,
-                                assignee: selectedTask.profiles ? {
-                                    id: selectedTask.profiles.id,
-                                    full_name: selectedTask.profiles.full_name,
-                                    role: selectedTask.profiles.role || 'Apprentice',
-                                    email: selectedTask.profiles.email || ''
-                                } : null,
-                                assignees: selectedTask.task_assignees?.map(ta => ({
-                                    id: ta.profile?.id || '',
-                                    full_name: ta.profile?.full_name || null,
-                                    role: ta.profile?.role || 'Apprentice',
-                                    email: ta.profile?.email || ''
-                                })).filter(a => a.id) || [],
-                                objective: selectedTask.objectives ? {
-                                    id: selectedTask.objectives.id,
-                                    title: selectedTask.objectives.title || 'Untitled'
-                                } : null
-                            }}
-                            currentUserId={currentUserId}
-                            members={members}
-                            expanded={true}
-                            onToggle={() => {}}
-                        />
-                    )}
-                </DialogContent>
-            </Dialog>
+            {/* Full Task View */}
+            {selectedTask && (
+                <FullTaskView
+                    task={{
+                        ...selectedTask,
+                        assignee: selectedTask.profiles ? {
+                            id: selectedTask.profiles.id,
+                            full_name: selectedTask.profiles.full_name,
+                            role: selectedTask.profiles.role || 'Apprentice',
+                            email: selectedTask.profiles.email || ''
+                        } : null,
+                        assignees: selectedTask.task_assignees?.map(ta => ({
+                            id: ta.profile?.id || '',
+                            full_name: ta.profile?.full_name || null,
+                            role: ta.profile?.role || 'Apprentice',
+                            email: ta.profile?.email || ''
+                        })).filter(a => a.id) || [],
+                        objective: selectedTask.objectives ? {
+                            id: selectedTask.objectives.id,
+                            title: selectedTask.objectives.title || 'Untitled'
+                        } : null
+                    }}
+                    onClose={() => setSelectedTaskId(null)}
+                    members={members}
+                    currentUserId={currentUserId}
+                />
+            )}
         </div>
     )
 }
