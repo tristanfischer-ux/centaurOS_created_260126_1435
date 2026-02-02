@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useTransition } from 'react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -12,8 +12,11 @@ import { ConversationThread } from '@/components/messaging/ConversationThread'
 import { QuickComposeDialog } from '@/components/messaging/QuickComposeDialog'
 import { NeedsAttentionSummary } from '@/components/today/needs-attention-summary'
 import { ActivityStream } from '@/components/today/activity-stream'
+import { FullTaskView } from '@/components/tasks/full-task-view'
 import { useConversationList } from '@/hooks/useConversation'
 import { typography } from '@/lib/design-system'
+import { getTaskById } from '@/actions/tasks'
+import { toast } from 'sonner'
 import type { ConversationWithParticipants, ConversationType } from '@/lib/messaging/service'
 import type { ActivityItem } from '@/types/activity'
 import {
@@ -34,6 +37,7 @@ interface TeamMember {
   id: string
   full_name: string
   email: string
+  role: string
 }
 
 interface MessagesPageClientProps {
@@ -49,6 +53,7 @@ interface MessagesPageClientProps {
     objectives: number
     messages: number
     unread: number
+    history: number
   }
   // Needs attention counts
   overdueCount?: number
@@ -95,6 +100,22 @@ function getConversationIcon(type: ConversationType | undefined) {
   }
 }
 
+// Task type for FullTaskView dialog
+interface TaskForDialog {
+  id: string
+  title: string
+  description: string | null
+  status: string | null
+  risk_level: string | null
+  start_date: string | null
+  end_date: string | null
+  task_number?: number
+  assignee?: { id: string; full_name: string | null; role: string; email: string; avatar_url?: string | null } | null
+  assignees?: { id: string; full_name: string | null; role: string; email: string; avatar_url?: string | null }[]
+  task_files?: { id: string }[]
+  objective?: { id: string; title: string } | null
+}
+
 export function MessagesPageClient({ 
   userId, 
   foundryId, 
@@ -110,8 +131,28 @@ export function MessagesPageClient({
   const [searchQuery, setSearchQuery] = useState('')
   const [showCompose, setShowCompose] = useState(false)
   const [activeTab, setActiveTab] = useState<'conversations' | 'activity'>('conversations')
+  
+  // Task dialog state
+  const [selectedTask, setSelectedTask] = useState<TaskForDialog | null>(null)
+  const [taskDialogOpen, setTaskDialogOpen] = useState(false)
+  const [_isLoadingTask, startTaskTransition] = useTransition()
 
   const { conversations, isLoading, refresh } = useConversationList(userId)
+  
+  // Handler for task click from activity stream
+  const handleTaskClick = useCallback((taskId: string) => {
+    startTaskTransition(async () => {
+      const result = await getTaskById(taskId)
+      if (result.error) {
+        toast.error(result.error)
+        return
+      }
+      if (result.data) {
+        setSelectedTask(result.data as TaskForDialog)
+        setTaskDialogOpen(true)
+      }
+    })
+  }, [])
 
   // Filter by search
   const filteredConversations = searchQuery
@@ -345,6 +386,10 @@ export function MessagesPageClient({
               <ActivityStream 
                 initialItems={initialActivityItems} 
                 initialCounts={initialActivityCounts}
+                onTaskClick={handleTaskClick}
+                members={members}
+                currentUserId={userId}
+                userRole={userRole}
               />
             </TabsContent>
           </Tabs>
@@ -360,6 +405,22 @@ export function MessagesPageClient({
           refresh()
         }}
       />
+
+      {/* Task detail dialog from activity stream */}
+      {selectedTask && (
+        <FullTaskView
+          open={taskDialogOpen}
+          onOpenChange={(open) => {
+            setTaskDialogOpen(open)
+            if (!open) {
+              setSelectedTask(null)
+            }
+          }}
+          task={selectedTask}
+          members={members}
+          currentUserId={userId}
+        />
+      )}
     </div>
   )
 }

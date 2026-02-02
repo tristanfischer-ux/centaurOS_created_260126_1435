@@ -23,11 +23,11 @@ export default async function MessagesPage() {
     const userRole = profile?.role || undefined
 
     // Get team members for @mentions (from same foundry)
-    let members: { id: string; full_name: string; email: string }[] = []
+    let members: { id: string; full_name: string; email: string; role: string }[] = []
     if (foundryId) {
         const { data: teamMembers } = await supabase
             .from('profiles')
-            .select('id, full_name, email')
+            .select('id, full_name, email, role')
             .eq('foundry_id', foundryId)
             .neq('id', user.id)
             .limit(100)
@@ -35,13 +35,14 @@ export default async function MessagesPage() {
         members = teamMembers?.map(m => ({
             id: m.id,
             full_name: m.full_name || '',
-            email: m.email || ''
+            email: m.email || '',
+            role: m.role || ''
         })) || []
     }
 
     // Fetch activity feed data
     let activityItems: ActivityItem[] = []
-    let activityCounts = { all: 0, tasks: 0, objectives: 0, messages: 0, unread: 0 }
+    let activityCounts = { all: 0, tasks: 0, objectives: 0, messages: 0, unread: 0, history: 0 }
     
     const activityResult = await getActivityFeed({ limit: 30 })
     if (activityResult.success && activityResult.data) {
@@ -51,7 +52,8 @@ export default async function MessagesPage() {
             tasks: activityItems.filter(i => i.type === 'task_comment').length,
             objectives: activityItems.filter(i => i.type === 'objective_comment').length,
             messages: activityItems.filter(i => i.type === 'message').length,
-            unread: activityItems.filter(i => i.is_unread).length
+            unread: activityItems.filter(i => i.is_unread).length,
+            history: activityItems.filter(i => i.type === 'task_history').length
         }
     }
 

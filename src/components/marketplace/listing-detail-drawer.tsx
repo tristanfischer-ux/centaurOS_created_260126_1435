@@ -1,11 +1,14 @@
 'use client'
 
+import { useState } from "react"
 import { MarketplaceListing } from "@/actions/marketplace"
+import { contactExpert } from "@/actions/messaging"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { cn } from "@/lib/utils"
+import { toast } from "sonner"
 import {
     ShieldCheck,
     MapPin,
@@ -30,6 +33,7 @@ import {
     BarChart3,
     CheckCircle2,
     Star,
+    Loader2,
 } from "lucide-react"
 
 interface ListingDetailDrawerProps {
@@ -47,6 +51,8 @@ const categoryBadgeStyles = {
 }
 
 export function ListingDetailDrawer({ open, onOpenChange, listing }: ListingDetailDrawerProps) {
+    const [isContacting, setIsContacting] = useState(false)
+    
     if (!listing) return null
 
     const attrs = listing.attributes || {}
@@ -56,8 +62,29 @@ export function ListingDetailDrawer({ open, onOpenChange, listing }: ListingDeta
         console.log('Add to comparison:', listing.id, listing.title)
     }
 
-    const handleContact = () => {
-        console.log('Contact/Enquire:', listing.id, listing.title)
+    // Handle contacting the expert/provider
+    const handleContact = async () => {
+        // Get the provider ID from the listing attributes
+        const providerId = attrs.provider_id as string
+        
+        if (!providerId) {
+            toast.error('Unable to contact this provider')
+            return
+        }
+
+        setIsContacting(true)
+        try {
+            const result = await contactExpert(providerId, listing.id)
+            if (result.success) {
+                toast.success('Conversation started! Check the Messages sidebar.')
+            } else {
+                toast.error(result.error || 'Failed to start conversation')
+            }
+        } catch {
+            toast.error('Failed to contact expert')
+        } finally {
+            setIsContacting(false)
+        }
     }
 
     return (
@@ -136,9 +163,19 @@ export function ListingDetailDrawer({ open, onOpenChange, listing }: ListingDeta
                         variant="default" 
                         className="flex-1"
                         onClick={handleContact}
+                        disabled={isContacting}
                     >
-                        <Mail className="w-4 h-4 mr-1" />
-                        {category === 'People' ? 'Contact' : 'Enquire'}
+                        {isContacting ? (
+                            <>
+                                <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                                Connecting...
+                            </>
+                        ) : (
+                            <>
+                                <Mail className="w-4 h-4 mr-1" />
+                                {category === 'People' ? 'Contact' : 'Enquire'}
+                            </>
+                        )}
                     </Button>
                 </div>
             </SheetContent>

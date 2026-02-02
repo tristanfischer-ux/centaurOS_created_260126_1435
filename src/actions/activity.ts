@@ -17,7 +17,8 @@ import type {
   ActivitySourceType,
   RawTaskComment, 
   RawObjectiveComment, 
-  RawMessage 
+  RawTaskHistory,
+  TaskHistoryActionType
 } from '@/types/activity'
 
 // Note: The following tables are created by migration 20260201300000_activity_stream_tables.sql
@@ -27,6 +28,54 @@ import type {
 // - objective_comment_reads
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnySupabaseClient = any
+
+/**
+ * Map task_history action types to human-readable content
+ */
+function formatTaskHistoryContent(
+  actionType: TaskHistoryActionType,
+  changes: Record<string, { old?: unknown; new?: unknown }> | null
+): string {
+  switch (actionType) {
+    case 'CREATED':
+      return 'created this task'
+    case 'STATUS_CHANGE': {
+      const newStatus = changes?.status?.new as string | undefined
+      if (newStatus) {
+        // Format status: "in_progress" -> "In Progress"
+        const formattedStatus = newStatus
+          .split('_')
+          .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+          .join(' ')
+        return `changed status to ${formattedStatus}`
+      }
+      return 'changed the status'
+    }
+    case 'ASSIGNED': {
+      const assigneeName = changes?.assignee_name?.new as string | undefined
+      if (assigneeName) {
+        return `assigned to ${assigneeName}`
+      }
+      return 'assigned this task'
+    }
+    case 'COMPLETED':
+      return 'marked as completed'
+    case 'FORWARDED':
+      return 'forwarded for approval'
+    case 'UPDATED': {
+      // Try to identify what was updated
+      const updatedFields = changes ? Object.keys(changes) : []
+      if (updatedFields.length === 1) {
+        const field = updatedFields[0]
+        const formattedField = field.replace(/_/g, ' ')
+        return `updated ${formattedField}`
+      }
+      return 'updated task details'
+    }
+    default:
+      return 'updated this task'
+  }
+}
 
 /**
  * Reply to an activity item - routes to the appropriate source
@@ -494,7 +543,9 @@ export async function addObjectiveComment(
 export async function getActivityFeed(options?: {
   limit?: number
   offset?: number
-  filter?: 'all' | 'tasks' | 'objectives' | 'messages' | 'unread'
+  filter?: 'all' | 'tasks' | 'objectives' | 'messages' | 'unread' | 'history'
+  includeSystemLogs?: boolean
+  showAllFoundryActivity?: boolean
 }): Promise<{
   success: boolean
   data?: ActivityItem[]
@@ -515,33 +566,57 @@ export async function getActivityFeed(options?: {
 
     const limit = options?.limit || 30
     const filter = options?.filter || 'all'
+    const includeSystemLogs = options?.includeSystemLogs || false
+    const showAllFoundryActivity = options?.showAllFoundryActivity || false
 
-    // Get user's task IDs
-    const { data: myTasks } = await supabase
-      .from('tasks')
-      .select('id')
-      .eq('foundry_id', foundryId)
-      .or(`assignee_id.eq.${user.id},creator_id.eq.${user.id}`)
+    let allTaskIds: string[] = []
+    let myObjectiveIds: string[] = []
 
-    const myTaskIds = myTasks?.map(t => t.id) || []
+    if (showAllFoundryActivity) {
+      // Admin mode: get ALL tasks in the foundry
+      const { data: allTasks } = await supabase
+        .from('tasks')
+        .select('id')
+        .eq('foundry_id', foundryId)
 
-    // Get tasks from task_assignees table
-    const { data: additionalTasks } = await supabase
-      .from('task_assignees')
-      .select('task_id')
-      .eq('profile_id', user.id)
+      allTaskIds = allTasks?.map(t => t.id) || []
 
-    const additionalTaskIds = additionalTasks?.map(t => t.task_id) || []
-    const allTaskIds = [...new Set([...myTaskIds, ...additionalTaskIds])]
+      // Get ALL objectives in the foundry
+      const { data: allObjectives } = await (supabase as AnySupabaseClient)
+        .from('objectives')
+        .select('id')
+        .eq('foundry_id', foundryId) as { data: Array<{ id: string }> | null }
 
-    // Get user's objective IDs - cast to avoid type recursion
-    const { data: myObjectives } = await (supabase as AnySupabaseClient)
-      .from('objectives')
-      .select('id')
-      .eq('foundry_id', foundryId)
-      .eq('owner_id', user.id) as { data: Array<{ id: string }> | null }
+      myObjectiveIds = allObjectives?.map(o => o.id) || []
+    } else {
+      // Standard mode: only user's tasks
+      // Get user's task IDs
+      const { data: myTasks } = await supabase
+        .from('tasks')
+        .select('id')
+        .eq('foundry_id', foundryId)
+        .or(`assignee_id.eq.${user.id},creator_id.eq.${user.id}`)
 
-    const myObjectiveIds = myObjectives?.map(o => o.id) || []
+      const myTaskIds = myTasks?.map(t => t.id) || []
+
+      // Get tasks from task_assignees table
+      const { data: additionalTasks } = await supabase
+        .from('task_assignees')
+        .select('task_id')
+        .eq('profile_id', user.id)
+
+      const additionalTaskIds = additionalTasks?.map(t => t.task_id) || []
+      allTaskIds = [...new Set([...myTaskIds, ...additionalTaskIds])]
+
+      // Get user's objective IDs - cast to avoid type recursion
+      const { data: myObjectives } = await (supabase as AnySupabaseClient)
+        .from('objectives')
+        .select('id')
+        .eq('foundry_id', foundryId)
+        .eq('owner_id', user.id) as { data: Array<{ id: string }> | null }
+
+      myObjectiveIds = myObjectives?.map(o => o.id) || []
+    }
 
     // Get user's conversation IDs
     const { data: myConversations } = await (supabase as AnySupabaseClient)
@@ -558,18 +633,24 @@ export async function getActivityFeed(options?: {
 
     // Fetch task comments
     if ((filter === 'all' || filter === 'tasks' || filter === 'unread') && allTaskIds.length > 0) {
-      const { data: taskComments } = await supabase
+      let taskCommentsQuery = supabase
         .from('task_comments')
         .select(`
-          id, content, created_at,
+          id, content, created_at, is_system_log,
           user:profiles!user_id(id, full_name, avatar_url, role),
           task:tasks!task_id(id, title, task_number)
         `)
         .in('task_id', allTaskIds)
-        .eq('is_system_log', false)
         .neq('user_id', user.id)
         .order('created_at', { ascending: false })
         .limit(limit)
+
+      // Only filter out system logs if not explicitly including them
+      if (!includeSystemLogs) {
+        taskCommentsQuery = taskCommentsQuery.eq('is_system_log', false)
+      }
+
+      const { data: taskComments } = await taskCommentsQuery
 
       // Get read status for task comments (table created by migration)
       const taskCommentIds = taskComments?.map(c => c.id) || []
@@ -605,7 +686,59 @@ export async function getActivityFeed(options?: {
               title: comment.task.title,
               task_number: comment.task.task_number
             },
-            is_unread: isUnread
+            is_unread: isUnread,
+            is_system_log: comment.is_system_log || false
+          })
+        }
+      }
+    }
+
+    // Fetch task history events (status changes, assignments, completions, etc.)
+    // Include when filter is 'all', 'tasks', or specifically 'history'
+    if ((filter === 'all' || filter === 'tasks' || filter === 'history') && allTaskIds.length > 0) {
+      const { data: taskHistory } = await (supabase as AnySupabaseClient)
+        .from('task_history')
+        .select(`
+          id, task_id, user_id, action_type, changes, created_at,
+          user:profiles!user_id(id, full_name, avatar_url, role),
+          task:tasks!task_id(id, title, task_number)
+        `)
+        .in('task_id', allTaskIds)
+        .neq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(limit)
+
+      if (taskHistory) {
+        for (const history of taskHistory as RawTaskHistory[]) {
+          if (!history.user || !history.task) continue
+
+          // Task history items don't have read status tracking
+          // Note: This block only runs when filter is 'all' or 'tasks' (not 'unread')
+
+          const content = formatTaskHistoryContent(
+            history.action_type,
+            history.changes
+          )
+
+          items.push({
+            id: history.id,
+            type: 'task_history',
+            content,
+            created_at: history.created_at || new Date().toISOString(),
+            author: {
+              id: history.user.id,
+              full_name: history.user.full_name,
+              avatar_url: history.user.avatar_url,
+              role: history.user.role
+            },
+            source: {
+              type: 'task',
+              id: history.task.id,
+              title: history.task.title,
+              task_number: history.task.task_number
+            },
+            is_unread: false, // History items don't track read status
+            action_type: history.action_type
           })
         }
       }
@@ -613,18 +746,24 @@ export async function getActivityFeed(options?: {
 
     // Fetch objective comments (table created by migration)
     if ((filter === 'all' || filter === 'objectives' || filter === 'unread') && myObjectiveIds.length > 0) {
-      const { data: objectiveComments } = await (supabase as AnySupabaseClient)
+      let objectiveCommentsQuery = (supabase as AnySupabaseClient)
         .from('objective_comments')
         .select(`
-          id, content, created_at,
+          id, content, created_at, is_system_log,
           user:profiles!user_id(id, full_name, avatar_url, role),
           objective:objectives!objective_id(id, title)
         `)
         .in('objective_id', myObjectiveIds)
-        .eq('is_system_log', false)
         .neq('user_id', user.id)
         .order('created_at', { ascending: false })
         .limit(limit)
+
+      // Only filter out system logs if not explicitly including them
+      if (!includeSystemLogs) {
+        objectiveCommentsQuery = objectiveCommentsQuery.eq('is_system_log', false)
+      }
+
+      const { data: objectiveComments } = await objectiveCommentsQuery
 
       // Get read status for objective comments (table created by migration)
       const objectiveCommentIds = objectiveComments?.map((c: { id: string }) => c.id) || []
@@ -659,7 +798,8 @@ export async function getActivityFeed(options?: {
               id: comment.objective.id,
               title: comment.objective.title
             },
-            is_unread: isUnread
+            is_unread: isUnread,
+            is_system_log: comment.is_system_log || false
           })
         }
       }
