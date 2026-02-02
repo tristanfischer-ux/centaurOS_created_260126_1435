@@ -209,33 +209,52 @@ export function FullTaskView({ open, onOpenChange, task, members }: FullTaskView
     }
 
     const handleFileUpload = async (file: File) => {
-        setIsUploading(true)
-        const formData = new FormData()
-        formData.append('file', file)
-
-        const result = await uploadTaskAttachment(task.id, formData)
-        if (result.error) {
-            toast.error(result.error)
-        } else {
-            toast.success(`Uploaded ${file.name}`)
-            
-            // Refresh attachments
-            const attachmentsRes = await getTaskAttachments(task.id)
-            if (attachmentsRes.data) {
-                setAttachments(attachmentsRes.data)
-            }
-            
-            // Refresh comments (system log entry added)
-            const { data } = await supabase
-                .from('task_comments')
-                .select('*, user:user_id(full_name, role)')
-                .eq('task_id', task.id)
-                .order('created_at', { ascending: false })
-                .limit(50)
-            if (data) setComments(data as Comment[])
+        if (!file) {
+            console.error('No file provided to handleFileUpload')
+            return
         }
-        setIsUploading(false)
-        if (fileInputRef.current) fileInputRef.current.value = ''
+
+        console.log('Starting file upload:', file.name, file.size, 'bytes')
+        setIsUploading(true)
+        
+        try {
+            const formData = new FormData()
+            formData.append('file', file)
+
+            console.log('Calling uploadTaskAttachment for task:', task.id)
+            const result = await uploadTaskAttachment(task.id, formData)
+            
+            if (result.error) {
+                console.error('Upload failed:', result.error)
+                toast.error(`Upload failed: ${result.error}`)
+            } else {
+                console.log('Upload successful')
+                toast.success(`Uploaded ${file.name}`)
+                
+                // Refresh attachments
+                const attachmentsRes = await getTaskAttachments(task.id)
+                if (attachmentsRes.data) {
+                    setAttachments(attachmentsRes.data)
+                }
+                
+                // Refresh comments (system log entry added)
+                const { data } = await supabase
+                    .from('task_comments')
+                    .select('*, user:user_id(full_name, role)')
+                    .eq('task_id', task.id)
+                    .order('created_at', { ascending: false })
+                    .limit(50)
+                if (data) setComments(data as Comment[])
+            }
+        } catch (error) {
+            console.error('Unexpected error during upload:', error)
+            toast.error('Unexpected error during upload')
+        } finally {
+            setIsUploading(false)
+            if (fileInputRef.current) {
+                fileInputRef.current.value = ''
+            }
+        }
     }
 
     const handleSaveEdits = async () => {
@@ -661,30 +680,53 @@ export function FullTaskView({ open, onOpenChange, task, members }: FullTaskView
                             {/* Upload Area */}
                             <div
                                 className={cn(
-                                    "border-2 border-dashed rounded-lg p-4 text-center transition-colors cursor-pointer",
-                                    isUploading ? "border-primary bg-primary/10 cursor-wait" : isDragging ? "border-primary bg-primary/10" : "border hover:border-muted",
-                                    isUploading && "pointer-events-none"
+                                    "border-2 border-dashed rounded-lg p-6 text-center transition-colors",
+                                    isUploading 
+                                        ? "border-primary bg-primary/10 cursor-wait pointer-events-none" 
+                                        : isDragging 
+                                        ? "border-primary bg-primary/10" 
+                                        : "border-muted-foreground/30 hover:border-primary cursor-pointer bg-muted/30 hover:bg-muted/50"
                                 )}
-                                onClick={() => !isUploading && fileInputRef.current?.click()}
-                                onDragOver={(e) => { e.preventDefault(); if (!isUploading) setIsDragging(true) }}
-                                onDragLeave={(e) => { e.preventDefault(); setIsDragging(false) }}
+                                onClick={(e) => {
+                                    e.preventDefault()
+                                    e.stopPropagation()
+                                    if (!isUploading && fileInputRef.current) {
+                                        fileInputRef.current.click()
+                                    }
+                                }}
+                                onDragOver={(e) => { 
+                                    e.preventDefault()
+                                    e.stopPropagation()
+                                    if (!isUploading) setIsDragging(true) 
+                                }}
+                                onDragLeave={(e) => { 
+                                    e.preventDefault()
+                                    e.stopPropagation()
+                                    setIsDragging(false) 
+                                }}
                                 onDrop={async (e) => {
                                     e.preventDefault()
+                                    e.stopPropagation()
                                     setIsDragging(false)
                                     if (isUploading) return
                                     const files = Array.from(e.dataTransfer.files)
-                                    if (files.length > 0) await handleFileUpload(files[0])
+                                    if (files.length > 0) {
+                                        await handleFileUpload(files[0])
+                                    }
                                 }}
                             >
                                 {isUploading ? (
-                                    <div className="flex items-center justify-center gap-2">
-                                        <Loader2 className="h-5 w-5 text-primary animate-spin" />
-                                        <span className="text-primary font-medium">Uploading...</span>
+                                    <div className="flex flex-col items-center justify-center gap-3">
+                                        <Loader2 className="h-8 w-8 text-primary animate-spin" />
+                                        <span className="text-sm text-primary font-medium">Uploading...</span>
                                     </div>
                                 ) : (
-                                    <div className="flex items-center justify-center gap-2">
-                                        <Upload className="h-5 w-5 text-muted-foreground" />
-                                        <span className="text-muted-foreground">Drop file here or click to upload</span>
+                                    <div className="flex flex-col items-center justify-center gap-3">
+                                        <Upload className="h-8 w-8 text-muted-foreground" />
+                                        <div className="flex flex-col gap-1">
+                                            <span className="text-sm font-medium text-foreground">Click to upload or drag and drop</span>
+                                            <span className="text-xs text-muted-foreground">Any file type supported</span>
+                                        </div>
                                     </div>
                                 )}
                             </div>
@@ -692,11 +734,17 @@ export function FullTaskView({ open, onOpenChange, task, members }: FullTaskView
                                 type="file"
                                 ref={fileInputRef}
                                 onChange={async (e) => {
+                                    e.preventDefault()
+                                    e.stopPropagation()
                                     const file = e.target.files?.[0]
-                                    if (file && !isUploading) await handleFileUpload(file)
+                                    if (file && !isUploading) {
+                                        console.log('File selected:', file.name)
+                                        await handleFileUpload(file)
+                                    }
                                 }}
                                 disabled={isUploading}
                                 className="hidden"
+                                aria-label="Upload file"
                             />
 
                             {/* Attachments List */}
