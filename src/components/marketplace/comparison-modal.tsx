@@ -64,12 +64,12 @@ const HIGHER_IS_BETTER = ['years_experience', 'accuracy', 'projects_completed', 
 // Numeric attributes where lower is better
 const LOWER_IS_BETTER = ['cost', 'latency', 'setup_time', 'lead_time', 'price']
 
-// Badge styles matching the category color scheme
+// Badge styles matching the category color scheme - using semantic tokens
 const categoryBadgeStyles: Record<string, string> = {
-    'People': 'bg-orange-100 text-orange-700',      // Orange - warm, human
-    'Products': 'bg-slate-100 text-slate-700',      // Slate - industrial
-    'Services': 'bg-blue-100 text-blue-700',        // Blue - tech, digital
-    'AI': 'bg-violet-50 text-violet-700'            // Violet - AI distinction
+    'People': 'bg-international-orange-light text-international-orange',  // Brand warm - human
+    'Products': 'bg-muted text-muted-foreground',                         // Neutral - industrial
+    'Services': 'bg-electric-blue-light text-electric-blue',              // Brand tech - digital
+    'AI': 'bg-status-info-light text-status-info-dark'                    // Info blue - AI distinction
 }
 
 export function ComparisonModal({ open, onOpenChange, items }: ComparisonModalProps) {
@@ -232,6 +232,18 @@ export function ComparisonModal({ open, onOpenChange, items }: ComparisonModalPr
 
                 <div className="flex-1 overflow-auto">
                     <div className="p-6 pt-4">
+                        {/* Debug banner - shows items being compared */}
+                        <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm">
+                            <strong>Debug: Comparing {itemsToRender.length} items:</strong>
+                            <ul className="mt-1 ml-4 list-disc">
+                                {itemsToRender.map((item, idx) => (
+                                    <li key={`debug-${item.id}`}>
+                                        Column {idx + 1}: <strong>{item.title}</strong> ({item.category} / {item.subcategory}) - ID: {item.id.substring(0, 8)}...
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+
                         {/* AI Analysis Error */}
                         {analysisError && (
                             <Card className="mb-6 p-4 bg-status-error-light border-destructive/20">
