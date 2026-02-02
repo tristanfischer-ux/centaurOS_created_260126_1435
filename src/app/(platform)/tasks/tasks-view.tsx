@@ -1066,8 +1066,9 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
             {/* Full Task View */}
             {selectedTask && (
                 <FullTaskView
+                    open={!!selectedTask}
+                    onOpenChange={(open) => !open && setSelectedTask(null)}
                     task={selectedTask}
-                    onClose={() => setSelectedTask(null)}
                     members={members}
                     currentUserId={currentUserId}
                 />

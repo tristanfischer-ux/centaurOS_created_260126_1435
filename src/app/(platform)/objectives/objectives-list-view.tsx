@@ -258,8 +258,9 @@ export function ObjectivesListView({ objectives, objectivesForDialog, members, t
             {/* Full Task View */}
             {selectedTask && (
                 <FullTaskView
+                    open={!!selectedTask}
+                    onOpenChange={(open) => !open && setSelectedTask(null)}
                     task={selectedTask as any}
-                    onClose={() => setSelectedTask(null)}
                     members={members}
                     currentUserId={currentUserId}
                 />

@@ -110,7 +110,6 @@ export function MessagesPageClient({
   const [searchQuery, setSearchQuery] = useState('')
   const [showCompose, setShowCompose] = useState(false)
   const [activeTab, setActiveTab] = useState<'conversations' | 'activity'>('conversations')
-  const [insightsExpanded, setInsightsExpanded] = useState(false)
 
   const { conversations, isLoading, refresh } = useConversationList(userId)
 
@@ -202,9 +201,7 @@ export function MessagesPageClient({
       </div>
 
       {/* Main Content with Tabs */}
-      <div className="flex flex-col lg:flex-row gap-6">
-        {/* Left Column: Conversations / Activity */}
-        <div className="flex-1 min-w-0">
+      <div>
           <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as typeof activeTab)}>
             <TabsList className="w-full grid grid-cols-2 mb-4">
               <TabsTrigger value="conversations" className="gap-2">
@@ -351,62 +348,6 @@ export function MessagesPageClient({
               />
             </TabsContent>
           </Tabs>
-        </div>
-
-        {/* Right Column: Daily Insights (Collapsible on mobile, visible on desktop) */}
-        {foundryId && (
-          <div className="lg:w-80 lg:flex-shrink-0">
-            {/* Desktop: Always visible */}
-            <div className="hidden lg:block space-y-4">
-              <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
-                <BarChart3 className="h-4 w-4" />
-                Daily Insights
-              </h3>
-              <DailyPulseWidget 
-                userId={userId}
-                userRole={userRole}
-                foundryId={foundryId}
-              />
-              <StandupWidget 
-                userRole={userRole}
-                compact={true}
-              />
-            </div>
-
-            {/* Mobile: Collapsible */}
-            <div className="lg:hidden">
-              <Collapsible open={insightsExpanded} onOpenChange={setInsightsExpanded}>
-                <CollapsibleTrigger asChild>
-                  <Button 
-                    variant="outline" 
-                    className="w-full justify-between"
-                  >
-                    <span className="flex items-center gap-2">
-                      <BarChart3 className="h-4 w-4" />
-                      Daily Insights
-                    </span>
-                    {insightsExpanded ? (
-                      <ChevronUp className="h-4 w-4" />
-                    ) : (
-                      <ChevronDown className="h-4 w-4" />
-                    )}
-                  </Button>
-                </CollapsibleTrigger>
-                <CollapsibleContent className="space-y-4 pt-4">
-                  <DailyPulseWidget 
-                    userId={userId}
-                    userRole={userRole}
-                    foundryId={foundryId}
-                  />
-                  <StandupWidget 
-                    userRole={userRole}
-                    compact={true}
-                  />
-                </CollapsibleContent>
-              </Collapsible>
-            </div>
-          </div>
-        )}
       </div>
 
       {/* Quick compose dialog */}

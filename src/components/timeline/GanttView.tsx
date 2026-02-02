@@ -785,6 +785,8 @@ export function GanttView({ tasks, objectives, profiles, members = [], currentUs
             {/* Full Task View */}
             {selectedTask && (
                 <FullTaskView
+                    open={!!selectedTask}
+                    onOpenChange={(open) => !open && setSelectedTaskId(null)}
                     task={{
                         ...selectedTask,
                         assignee: selectedTask.profiles ? {
@@ -804,7 +806,6 @@ export function GanttView({ tasks, objectives, profiles, members = [], currentUs
                             title: selectedTask.objectives.title || 'Untitled'
                         } : null
                     }}
-                    onClose={() => setSelectedTaskId(null)}
                     members={members}
                     currentUserId={currentUserId}
                 />
