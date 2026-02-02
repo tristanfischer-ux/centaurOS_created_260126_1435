@@ -40,11 +40,27 @@ interface TeamMember {
   role: string
 }
 
+interface Task {
+  id: string
+  title: string
+  status: string | null
+  task_number?: number
+  objective_id?: string | null
+}
+
+interface Objective {
+  id: string
+  title: string
+}
+
 interface MessagesPageClientProps {
   userId: string
   foundryId?: string
   userRole?: string
   members?: TeamMember[]
+  // Context linking data
+  tasks?: Task[]
+  objectives?: Objective[]
   // Activity stream data
   initialActivityItems?: ActivityItem[]
   initialActivityCounts?: {
@@ -121,6 +137,8 @@ export function MessagesPageClient({
   foundryId, 
   userRole,
   members = [],
+  tasks = [],
+  objectives = [],
   initialActivityItems = [],
   initialActivityCounts,
   overdueCount = 0,
@@ -200,6 +218,8 @@ export function MessagesPageClient({
           foundryId={foundryId}
           members={members}
           enableCommands={true}
+          tasks={tasks}
+          objectives={objectives}
         />
       </div>
     )

@@ -24,6 +24,11 @@ export default async function MessagesPage() {
 
     // Get team members for @mentions (from same foundry)
     let members: { id: string; full_name: string; email: string; role: string }[] = []
+    // Fetch tasks for context linking
+    let tasks: { id: string; title: string; status: string | null; task_number?: number; objective_id?: string | null }[] = []
+    // Fetch objectives for context linking
+    let objectives: { id: string; title: string }[] = []
+    
     if (foundryId) {
         const { data: teamMembers } = await supabase
             .from('profiles')
@@ -37,6 +42,37 @@ export default async function MessagesPage() {
             full_name: m.full_name || '',
             email: m.email || '',
             role: m.role || ''
+        })) || []
+
+        // Fetch active tasks for context linking
+        const { data: taskData } = await supabase
+            .from('tasks')
+            .select('id, title, status, task_number, objective_id')
+            .eq('foundry_id', foundryId)
+            .not('status', 'in', '("Completed","Rejected","Cancelled")')
+            .order('updated_at', { ascending: false })
+            .limit(100)
+        
+        tasks = taskData?.map(t => ({
+            id: t.id,
+            title: t.title,
+            status: t.status,
+            task_number: t.task_number,
+            objective_id: t.objective_id
+        })) || []
+
+        // Fetch active objectives for context linking
+        const { data: objectiveData } = await supabase
+            .from('objectives')
+            .select('id, title')
+            .eq('foundry_id', foundryId)
+            .not('status', 'in', '("Completed","Abandoned")')
+            .order('updated_at', { ascending: false })
+            .limit(50)
+        
+        objectives = objectiveData?.map(o => ({
+            id: o.id,
+            title: o.title
         })) || []
     }
 
@@ -119,6 +155,8 @@ export default async function MessagesPage() {
             foundryId={foundryId || undefined}
             userRole={userRole}
             members={members}
+            tasks={tasks}
+            objectives={objectives}
             initialActivityItems={activityItems}
             initialActivityCounts={activityCounts}
             overdueCount={overdueCount}

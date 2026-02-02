@@ -10,8 +10,11 @@ import { UserAvatar } from '@/components/ui/user-avatar'
 import { MessageBubble, DateSeparator } from './MessageBubble'
 import { CommandInput } from './CommandInput'
 import { ThreadPanel } from './ThreadPanel'
+import { ContextSelector } from '@/components/inbox/context-selector'
 import { useConversation } from '@/hooks/useConversation'
 import { useMessagingShortcuts } from '@/hooks/useMessagingShortcuts'
+import { sendMessageWithContext } from '@/lib/messaging/service'
+import { createClient } from '@/lib/supabase/client'
 import type { MessageWithSender } from '@/lib/messaging/service'
 import { 
   Send, 
@@ -21,8 +24,13 @@ import {
   ArrowLeft,
   Loader2,
   WifiOff,
-  ChevronUp
+  ChevronUp,
+  ExternalLink,
+  Target,
+  CheckSquare
 } from 'lucide-react'
+import Link from 'next/link'
+import { Badge } from '@/components/ui/badge'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -40,6 +48,19 @@ interface TeamMember {
   email: string
 }
 
+interface Task {
+  id: string
+  title: string
+  status: string | null
+  task_number?: number
+  objective_id?: string | null
+}
+
+interface Objective {
+  id: string
+  title: string
+}
+
 interface ConversationThreadProps {
   conversationId: string | null
   currentUserId: string
@@ -50,8 +71,17 @@ interface ConversationThreadProps {
   foundryId?: string
   members?: TeamMember[]
   enableCommands?: boolean
+  // Context linking props
+  tasks?: Task[]
+  objectives?: Objective[]
 }
 
+
+// Extended message type with context
+interface MessageWithContext extends MessageWithSender {
+  task_id?: string | null
+  objective_id?: string | null
+}
 
 // Group messages by date
 function groupMessagesByDate(messages: MessageWithSender[]): Map<string, MessageWithSender[]> {
@@ -67,6 +97,56 @@ function groupMessagesByDate(messages: MessageWithSender[]): Map<string, Message
   return groups
 }
 
+// Context tag component for messages
+interface MessageContextTagProps {
+  taskId?: string | null
+  objectiveId?: string | null
+  tasks: Task[]
+  objectives: Objective[]
+}
+
+function MessageContextTag({ 
+  taskId, 
+  objectiveId, 
+  tasks, 
+  objectives 
+}: MessageContextTagProps) {
+  // Resolve task/objective from IDs
+  const task = taskId ? tasks.find(t => t.id === taskId) : undefined
+  const objective = objectiveId ? objectives.find(o => o.id === objectiveId) : undefined
+
+  if (!task && !objective) return null
+
+  return (
+    <div className="mb-1 flex items-center gap-1">
+      {task && (
+        <Link 
+          href={`/tasks?taskId=${task.id}`}
+          className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+        >
+          <Badge variant="secondary" className="text-xs px-1.5 py-0 gap-1">
+            <CheckSquare className="w-3 h-3" />
+            #{task.task_number || '??'}: {task.title.length > 30 ? task.title.slice(0, 30) + '...' : task.title}
+          </Badge>
+          <ExternalLink className="w-3 h-3" />
+        </Link>
+      )}
+      {objective && (
+        <Link 
+          href={`/objectives?objectiveId=${objective.id}`}
+          className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+        >
+          <Badge variant="secondary" className="text-xs px-1.5 py-0 gap-1">
+            <Target className="w-3 h-3" />
+            {objective.title.length > 30 ? objective.title.slice(0, 30) + '...' : objective.title}
+          </Badge>
+          <ExternalLink className="w-3 h-3" />
+        </Link>
+      )}
+    </div>
+  )
+}
+
 export function ConversationThread({ 
   conversationId, 
   currentUserId, 
@@ -75,7 +155,9 @@ export function ConversationThread({
   className,
   foundryId,
   members = [],
-  enableCommands = true
+  enableCommands = true,
+  tasks = [],
+  objectives = []
 }: ConversationThreadProps) {
   const {
     messages,
@@ -95,12 +177,33 @@ export function ConversationThread({
   const [threadPanelOpen, setThreadPanelOpen] = useState(false)
   const [replyCounts, setReplyCounts] = useState<Record<string, number>>({})
   const [hoveredMessageId, setHoveredMessageId] = useState<string | null>(null)
+  // Context linking state
+  const [currentContext, setCurrentContext] = useState<{ taskId?: string; objectiveId?: string } | null>(null)
+  const [recentContexts, setRecentContexts] = useState<Array<{ taskId?: string; objectiveId?: string }>>([])
   const scrollRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   
   // Use enhanced input when foundryId is available
   const useEnhancedInput = enableCommands && !!foundryId
+  
+  // Show context selector when tasks or objectives are available
+  const showContextSelector = tasks.length > 0 || objectives.length > 0
+  
+  // Handle context change
+  const handleContextChange = useCallback((context: { taskId?: string; objectiveId?: string } | null) => {
+    setCurrentContext(context)
+    
+    // Track recent contexts (max 5)
+    if (context) {
+      setRecentContexts(prev => {
+        const filtered = prev.filter(c => 
+          c.taskId !== context.taskId || c.objectiveId !== context.objectiveId
+        )
+        return [context, ...filtered].slice(0, 5)
+      })
+    }
+  }, [])
   
   // Wire up messaging shortcuts
   useMessagingShortcuts({
@@ -201,15 +304,33 @@ export function ConversationThread({
     setInputValue('')
 
     try {
-      const success = await sendMessage(content)
-      if (!success) {
-        setInputValue(content) // Restore input on failure
+      // Use context-aware send if context is selected
+      if (currentContext?.taskId || currentContext?.objectiveId) {
+        const supabase = createClient()
+        await sendMessageWithContext(supabase, {
+          conversationId,
+          senderId: currentUserId,
+          content,
+          taskId: currentContext.taskId,
+          objectiveId: currentContext.objectiveId,
+          messageType: 'text'
+        })
+        // Message will appear via real-time subscription
+      } else {
+        const success = await sendMessage(content)
+        if (!success) {
+          setInputValue(content) // Restore input on failure
+        }
       }
+    } catch (error) {
+      console.error('[ConversationThread] Send failed:', error)
+      setInputValue(content) // Restore input on failure
+      toast.error('Failed to send message')
     } finally {
       setIsSending(false)
       inputRef.current?.focus()
     }
-  }, [inputValue, isSending, conversationId, sendMessage])
+  }, [inputValue, isSending, conversationId, sendMessage, currentContext, currentUserId])
 
   // Handle archive/unarchive
   const handleArchive = async () => {
@@ -389,6 +510,19 @@ export function ConversationThread({
         </div>
       )}
 
+      {/* Context Selector for linking messages to tasks/objectives */}
+      {showContextSelector && (
+        <div className="px-4 py-2 border-b border-border bg-muted/30">
+          <ContextSelector
+            tasks={tasks}
+            objectives={objectives}
+            currentContext={currentContext}
+            onContextChange={handleContextChange}
+            recentContexts={recentContexts}
+          />
+        </div>
+      )}
+
       {/* Messages area - scrollable with min-h-0 for proper flexbox overflow */}
       <ScrollArea className="flex-1 min-h-0" ref={scrollRef}>
         <div className="p-4 space-y-1">
@@ -418,16 +552,35 @@ export function ConversationThread({
                     prevMessage.sender_id !== message.sender_id ||
                     message.message_type === 'system'
 
+                  // Cast to MessageWithContext to access task_id/objective_id
+                  const messageWithContext = message as MessageWithContext
+                  const hasContext = messageWithContext.task_id || messageWithContext.objective_id
+
                   return (
-                    <MessageBubble
-                      key={message.id}
-                      message={message}
-                      isOwn={message.sender_id === currentUserId}
-                      showAvatar={showAvatar}
-                      replyCount={replyCounts[message.id] || 0}
-                      lastReplyAt={message.last_reply_at || null}
-                      onOpenThread={handleOpenThread}
-                    />
+                    <div key={message.id}>
+                      {/* Context tag above message */}
+                      {hasContext && (
+                        <div className={cn(
+                          'px-2',
+                          message.sender_id === currentUserId ? 'text-right' : 'text-left'
+                        )}>
+                          <MessageContextTag
+                            taskId={messageWithContext.task_id}
+                            objectiveId={messageWithContext.objective_id}
+                            tasks={tasks}
+                            objectives={objectives}
+                          />
+                        </div>
+                      )}
+                      <MessageBubble
+                        message={message}
+                        isOwn={message.sender_id === currentUserId}
+                        showAvatar={showAvatar}
+                        replyCount={replyCounts[message.id] || 0}
+                        lastReplyAt={message.last_reply_at || null}
+                        onOpenThread={handleOpenThread}
+                      />
+                    </div>
                   )
                 })}
               </div>
@@ -492,7 +645,13 @@ export function ConversationThread({
               ref={inputRef}
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
-              placeholder="Type a message..."
+              placeholder={
+                currentContext?.taskId 
+                  ? `Message linked to task...` 
+                  : currentContext?.objectiveId 
+                  ? `Message linked to objective...` 
+                  : 'Type a message...'
+              }
               disabled={isSending}
               className="flex-1"
               autoComplete="off"
