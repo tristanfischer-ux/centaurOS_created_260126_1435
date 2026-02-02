@@ -389,8 +389,8 @@ export function ConversationThread({
         </div>
       )}
 
-      {/* Messages area */}
-      <ScrollArea className="flex-1" ref={scrollRef}>
+      {/* Messages area - scrollable with min-h-0 for proper flexbox overflow */}
+      <ScrollArea className="flex-1 min-h-0" ref={scrollRef}>
         <div className="p-4 space-y-1">
           {/* Load more button */}
           {hasMore && (

@@ -78,6 +78,13 @@ export function ComparisonModal({ open, onOpenChange, items }: ComparisonModalPr
     const [isAnalyzing, setIsAnalyzing] = useState(false)
     const [analysisError, setAnalysisError] = useState<string | null>(null)
 
+    // Debug logging
+    console.log('[ComparisonModal] Rendered with:', { 
+        open, 
+        itemCount: items?.length || 0,
+        items: items?.map(i => ({ id: i?.id, title: i?.title })) 
+    })
+
     // Clear analysis when items change or modal closes
     useEffect(() => {
         setAiAnalysis(null)
@@ -120,8 +127,6 @@ export function ComparisonModal({ open, onOpenChange, items }: ComparisonModalPr
         }
     }
 
-    if (!items || items.length === 0) return null
-    
     // Step 1: Filter out null/undefined items and ensure basic structure
     const validItems = items.filter(item => {
         if (!item) {
@@ -156,8 +161,39 @@ export function ComparisonModal({ open, onOpenChange, items }: ComparisonModalPr
     
     console.log('[ComparisonModal] Deduplicated items:', deduplicatedItems.length, deduplicatedItems.map(i => i.title))
     
-    if (deduplicatedItems.length === 0) {
-        return null
+    if (!items || items.length === 0 || deduplicatedItems.length === 0) {
+        console.warn('[ComparisonModal] No valid items to compare')
+        // Show error dialog instead of returning null
+        return (
+            <Dialog open={open} onOpenChange={onOpenChange}>
+                <DialogContent size="sm" className="p-6">
+                    <DialogHeader>
+                        <DialogTitle className="text-xl font-semibold flex items-center gap-2">
+                            <AlertCircle className="h-5 w-5 text-destructive" />
+                            Cannot Compare Listings
+                        </DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4">
+                        <p className="text-muted-foreground">
+                            No listings are available to compare. This may be because:
+                        </p>
+                        <ul className="list-disc list-inside space-y-2 text-sm text-muted-foreground">
+                            <li>No listings were selected</li>
+                            <li>Selected listings are missing required data</li>
+                            <li>Duplicate listings were selected</li>
+                        </ul>
+                        <p className="text-sm">
+                            Please try selecting listings again or refresh the page.
+                        </p>
+                    </div>
+                    <div className="flex justify-end gap-2 mt-4">
+                        <Button variant="outline" onClick={() => onOpenChange(false)}>
+                            Close
+                        </Button>
+                    </div>
+                </DialogContent>
+            </Dialog>
+        )
     }
     
     // Final items to render
