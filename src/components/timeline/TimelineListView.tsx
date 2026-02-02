@@ -19,7 +19,7 @@ import {
     CommandList,
 } from "@/components/ui/command"
 import { Calendar as CalendarComponent } from "@/components/ui/calendar"
-import { FullTaskView } from "@/components/tasks/full-task-view"
+import { EditTaskDialog } from "@/components/tasks/edit-task-dialog"
 import { updateTaskAssignees, updateTaskDates } from "@/actions/tasks"
 import { toast } from "sonner"
 import { format } from "date-fns"
@@ -560,7 +560,7 @@ export function TimelineListView({ tasks, members, currentUserId }: TimelineList
                                                         />
                                                     </div>
 
-                                                    {/* View Details Button */}
+                                                    {/* Edit Task Button */}
                                                     <Button
                                                         onClick={(e) => openTaskModal(task, e)}
                                                         variant="ghost"
@@ -568,7 +568,7 @@ export function TimelineListView({ tasks, members, currentUserId }: TimelineList
                                                         className="ml-11 mt-3 text-xs font-semibold text-international-orange hover:text-international-orange-hover hover:bg-orange-50 gap-1"
                                                     >
                                                         <Maximize2 className="h-3 w-3" />
-                                                        Open Full Task
+                                                        Edit Task
                                                     </Button>
                                                 </div>
                                             )}
@@ -581,38 +581,13 @@ export function TimelineListView({ tasks, members, currentUserId }: TimelineList
                 )
             })}
             
-            {/* Task Modal */}
+            {/* Edit Task Dialog */}
             {selectedTask && (
-                <FullTaskView
+                <EditTaskDialog
                     open={taskModalOpen}
                     onOpenChange={setTaskModalOpen}
-                    task={{
-                        id: selectedTask.id,
-                        title: selectedTask.title || '',
-                        description: selectedTask.description,
-                        status: selectedTask.status || 'Pending',
-                        risk_level: selectedTask.risk_level,
-                        start_date: selectedTask.start_date,
-                        end_date: selectedTask.end_date,
-                        task_number: selectedTask.task_number,
-                        assignee: selectedTask.profiles ? {
-                            id: selectedTask.profiles.id,
-                            full_name: selectedTask.profiles.full_name,
-                            role: selectedTask.profiles.role || 'Unknown',
-                            email: selectedTask.profiles.email || '',
-                            avatar_url: selectedTask.profiles.avatar_url
-                        } : null,
-                        assignees: selectedTask.assignees,
-                        objective: selectedTask.objectives ? {
-                            id: selectedTask.objectives.id,
-                            title: selectedTask.objectives.title || 'Untitled'
-                        } : null
-                    }}
-                    members={members.map(m => ({
-                        ...m,
-                        email: m.email || ''
-                    }))}
-                    currentUserId={currentUserId}
+                    task={selectedTask}
+                    members={members.map(m => ({ id: m.id, full_name: m.full_name, role: m.role }))}
                 />
             )}
         </div>

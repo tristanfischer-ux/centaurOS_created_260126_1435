@@ -255,6 +255,16 @@ export function ObjectivesListView({ objectives, objectivesForDialog, members, t
                 </AlertDialogContent>
             </AlertDialog>
 
+            {/* Edit Task Dialog */}
+            {selectedTask && (
+                <EditTaskDialog
+                    open={!!selectedTask}
+                    onOpenChange={(open) => !open && setSelectedTask(null)}
+                    task={selectedTask as any}
+                    members={members}
+                />
+            )}
+
             {/* Objectives List */}
             <div className="space-y-4">
                 {/* Select All Header (Optional, but good for bulk actions) */}
@@ -409,9 +419,15 @@ export function ObjectivesListView({ objectives, objectivesForDialog, members, t
                                                     <div key={task.id} className="flex items-center gap-2 sm:gap-4 p-4 pl-9 sm:pl-16 hover:bg-card transition-colors">
                                                         <StatusIcon className={`h-4 w-4 shrink-0 ${statusConfig.color.split(' ')[1]}`} />
 
-                                                        <Link href={`/tasks?task=${task.id}`} className="flex-1 min-w-0 text-sm text-foreground hover:text-status-warning truncate">
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.stopPropagation()
+                                                                setSelectedTask(task)
+                                                            }}
+                                                            className="flex-1 min-w-0 text-sm text-foreground hover:text-status-warning truncate text-left"
+                                                        >
                                                             {task.title}
-                                                        </Link>
+                                                        </button>
 
                                                         <Badge className={`${statusConfig.color} border-0 text-xs shrink-0 hidden sm:inline-flex`}>
                                                             {task.status?.replace('_', ' ') || 'Pending'}
