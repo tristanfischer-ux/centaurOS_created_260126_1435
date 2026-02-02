@@ -77,10 +77,11 @@ These use transparency intentionally:
 
 1. **The previous fix session only verified that content panels used `bg-background`/`bg-card`, but missed that the OVERLAY components still used dark transparent backgrounds.** Always check both the content AND the overlay styling in modal components.
 
-2. **CRITICAL BUG FOUND: `tailwind.config.ts` had invalid color definitions.**
-   - `background: 'var(--background)'` outputs invalid CSS: `background-color: 0 0% 100%`
-   - FIXED to: `background: 'hsl(var(--background))'` which outputs valid: `background-color: hsl(0 0% 100%)`
-   - This caused `bg-background` to be transparent because the browser couldn't parse the invalid color!
+2. **CRITICAL BUG FOUND: `globals.css` @theme block had invalid color definitions.**
+   - In Tailwind CSS v4, the `@theme` block in `globals.css` maps utility classes to CSS variables
+   - `--color-background: var(--background)` outputs invalid CSS: `background-color: 0 0% 100%`
+   - FIXED to: `--color-background: hsl(var(--background))` which outputs valid: `background-color: hsl(0 0% 100%)`
+   - This caused ALL `bg-*`, `text-*`, `border-*` utilities to render as transparent!
 
 ## Next Agent Actions
 

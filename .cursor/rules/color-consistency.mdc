@@ -47,26 +47,32 @@ alwaysApply: true
 | `defaultTheme.*system` | Wrong theme config | `defaultTheme="light"` |
 | `enableSystem.*true` | Wrong theme config | `enableSystem={false}` |
 
-## CRITICAL: tailwind.config.ts Color Definitions
+## CRITICAL: Tailwind CSS v4 @theme Color Definitions
 
-**CSS variable colors in tailwind.config.ts MUST use `hsl()` wrapper:**
+**In Tailwind CSS v4, colors are mapped in the `@theme` block in `globals.css`.**
+**All HSL color variables MUST be wrapped in `hsl()`:**
 
-```ts
-// ✅ CORRECT - Wraps CSS variable in hsl()
-colors: {
-  background: 'hsl(var(--background))',
-  foreground: 'hsl(var(--foreground))',
-  card: { DEFAULT: "hsl(var(--card))" },
+```css
+/* src/app/globals.css */
+
+@theme {
+  /* ✅ CORRECT - Wraps CSS variable in hsl() */
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+  --color-card: hsl(var(--card));
+  --color-muted: hsl(var(--muted));
+  /* ... all other colors */
 }
 
-// ❌ WRONG - Outputs invalid CSS like "background-color: 0 0% 100%"
-colors: {
-  background: 'var(--background)',  // BROKEN - no hsl() wrapper!
-  foreground: 'var(--foreground)',  // BROKEN - no hsl() wrapper!
+/* ❌ WRONG - Outputs invalid CSS like "background-color: 0 0% 100%" */
+@theme {
+  --color-background: var(--background);  /* BROKEN - no hsl() wrapper! */
 }
 ```
 
-**Why this matters:** CSS variables defined in globals.css use space-separated HSL values (e.g., `--background: 0 0% 100%`). Without the `hsl()` wrapper in tailwind.config.ts, `bg-background` outputs invalid CSS and the background becomes transparent!
+**Why this matters:** CSS variables in `:root` use space-separated HSL values (e.g., `--background: 0 0% 100%`). Without the `hsl()` wrapper in @theme, `bg-background` outputs invalid CSS and the background becomes transparent!
+
+**Location:** `src/app/globals.css` in the `@theme { }` block (lines 23-76)
 
 **Exceptions:**
 - `bg-white/[opacity]` (e.g., `bg-white/90`) for overlays is allowed
