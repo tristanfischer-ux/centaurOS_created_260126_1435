@@ -33,6 +33,7 @@ import { archiveConversation, unarchiveConversation } from '@/actions/messaging'
 import { getBatchReplyCounts } from '@/actions/threads'
 import { toggleStarMessage, togglePinMessage, markConversationUnread } from '@/actions/message-actions'
 import { toast } from 'sonner'
+import { MessageInputHelp } from './MessageInputHelp'
 
 interface TeamMember {
   id: string
@@ -504,6 +505,9 @@ export function ConversationThread({
               )}
             </Button>
           </div>
+          
+          {/* Quick reference help */}
+          <MessageInputHelp />
         </form>
       )}
 

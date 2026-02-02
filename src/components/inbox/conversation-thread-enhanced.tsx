@@ -38,6 +38,7 @@ import { toggleStarMessage, togglePinMessage, markConversationUnread } from '@/a
 import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
 import Link from 'next/link'
+import { MessageInputHelp } from '@/components/messaging/MessageInputHelp'
 
 interface Task {
   id: string
@@ -610,6 +611,9 @@ export function ConversationThreadEnhanced({
             )}
           </Button>
         </div>
+        
+        {/* Quick reference help */}
+        <MessageInputHelp />
       </form>
     </div>
   )

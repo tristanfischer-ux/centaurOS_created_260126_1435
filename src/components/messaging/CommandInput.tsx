@@ -519,13 +519,8 @@ export function CommandInput({
         </Button>
       </div>
       
-      {/* Hint for slash commands */}
-      {!inputValue && (
-        <p className="text-xs text-muted-foreground mt-2 ml-12">
-          Type <kbd className="px-1 py-0.5 bg-muted rounded text-xs font-mono">/</kbd> for commands, 
-          <kbd className="px-1 py-0.5 bg-muted rounded text-xs font-mono ml-1">@</kbd> to mention
-        </p>
-      )}
+      {/* Quick reference help */}
+      <MessageInputHelp />
     </form>
   )
 }
