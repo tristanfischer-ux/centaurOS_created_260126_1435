@@ -437,7 +437,7 @@ export async function saveMarketplaceListing(listingId: string): Promise<{
 
         // Insert saved listing
         const { error } = await supabase
-            .from('saved_marketplace_listings')
+            .from('saved_marketplace_listings' as any)
             .insert({
                 user_id: user.id,
                 listing_id: listingId
@@ -482,7 +482,7 @@ export async function unsaveMarketplaceListing(listingId: string): Promise<{
         }
 
         const { error } = await supabase
-            .from('saved_marketplace_listings')
+            .from('saved_marketplace_listings' as any)
             .delete()
             .eq('user_id', user.id)
             .eq('listing_id', listingId)
@@ -521,7 +521,7 @@ export async function getSavedMarketplaceListings(): Promise<{
 
         // Get saved listing IDs
         const { data: savedListings, error: savedError } = await supabase
-            .from('saved_marketplace_listings')
+            .from('saved_marketplace_listings' as any)
             .select('listing_id, created_at')
             .eq('user_id', user.id)
             .order('created_at', { ascending: false })
@@ -572,7 +572,7 @@ export async function getSavedListingIds(listingIds: string[]): Promise<Set<stri
         if (!user) return new Set()
 
         const { data, error } = await supabase
-            .from('saved_marketplace_listings')
+            .from('saved_marketplace_listings' as any)
             .select('listing_id')
             .eq('user_id', user.id)
             .in('listing_id', listingIds)

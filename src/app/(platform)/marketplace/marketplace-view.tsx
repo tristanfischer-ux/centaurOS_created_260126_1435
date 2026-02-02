@@ -756,7 +756,13 @@ export function MarketplaceView({
         return filtered
     }, [currentListings, activeTab, debouncedSearchQuery, selectedSubcategories, locationFilter, skillFilter, minExperience, aiTypeFilter, maxCostFilter, integrationFilter, certificationFilter, technologyFilter, servicesSubTab])
 
-    const selectedItems = initialListings.filter(item => selectedIds.has(item.id))
+    // Build selected items for comparison, ensuring all have valid attributes
+    const selectedItems = initialListings
+        .filter(item => selectedIds.has(item.id))
+        .map(item => ({
+            ...item,
+            attributes: item.attributes || {}
+        }))
 
     const getSearchPlaceholder = () => {
         switch (activeTab) {

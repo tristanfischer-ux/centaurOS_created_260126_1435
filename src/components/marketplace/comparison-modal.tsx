@@ -123,13 +123,26 @@ export function ComparisonModal({ open, onOpenChange, items }: ComparisonModalPr
 
     if (items.length === 0) return null
     
-    // Filter out any invalid items
-    const validItems = items.filter(item => item && item.id && item.title)
+    // Filter out any invalid items and ensure attributes exists
+    const validItems = items.filter(item => {
+        if (!item || !item.id || !item.title) {
+            console.warn('[ComparisonModal] Skipping invalid item:', item)
+            return false
+        }
+        // Ensure attributes exists
+        if (!item.attributes) {
+            item.attributes = {}
+        }
+        return true
+    })
     
     if (validItems.length === 0) {
-        console.error('[ComparisonModal] No valid items to compare')
+        console.error('[ComparisonModal] No valid items to compare from', items.length, 'items')
+        console.error('[ComparisonModal] Items received:', items.map(i => ({ id: i?.id, title: i?.title, category: i?.category })))
         return null
     }
+    
+    console.log('[ComparisonModal] Comparing', validItems.length, 'items:', validItems.map(i => `${i.category}: ${i.title}`))
     
     // Use validItems instead of items for rendering
     const itemsToRender = validItems
@@ -143,7 +156,7 @@ export function ComparisonModal({ open, onOpenChange, items }: ComparisonModalPr
 
     // Extract all unique attribute keys from all items
     const allKeys = Array.from(new Set(
-        itemsToRender.flatMap(item => Object.keys(item.attributes))
+        itemsToRender.flatMap(item => Object.keys(item.attributes || {}))
     ))
 
     // Get priority attributes for sorting
@@ -292,7 +305,7 @@ export function ComparisonModal({ open, onOpenChange, items }: ComparisonModalPr
                                     
                                     {Object.entries(organizedSections).map(([sectionName, sectionKeys]) => {
                                         if (sectionKeys.length === 0) return null
-                                        const hasAnyValue = sectionKeys.some(key => item.attributes[key] !== undefined)
+                                        const hasAnyValue = sectionKeys.some(key => (item.attributes || {})[key] !== undefined)
                                         if (!hasAnyValue) return null
                                         
                                         return (
@@ -302,7 +315,7 @@ export function ComparisonModal({ open, onOpenChange, items }: ComparisonModalPr
                                                 </h4>
                                                 <dl className="space-y-2 text-sm">
                                                     {sectionKeys.map((key) => {
-                                                        const value = item.attributes[key]
+                                                        const value = (item.attributes || {})[key]
                                                         if (value === undefined) return null
                                                         const isBest = bestValues[key]?.itemId === item.id
                                                         
@@ -364,7 +377,7 @@ export function ComparisonModal({ open, onOpenChange, items }: ComparisonModalPr
                                     {Object.entries(organizedSections).map(([sectionName, sectionKeys]) => {
                                         if (sectionKeys.length === 0) return null
                                         const hasAnyValue = sectionKeys.some(key => 
-                                            items.some(item => item.attributes[key] !== undefined)
+                                            items.some(item => (item.attributes || {})[key] !== undefined)
                                         )
                                         if (!hasAnyValue) return null
                                         
@@ -427,7 +440,7 @@ function SectionGroup({ sectionName, sectionKeys, items, bestValues }: SectionGr
             </tr>
             {/* Section rows */}
             {sectionKeys.map((key) => {
-                const hasAnyValue = items.some(item => item.attributes[key] !== undefined)
+                const hasAnyValue = items.some(item => (item.attributes || {})[key] !== undefined)
                 if (!hasAnyValue) return null
                 
                 return (
@@ -436,7 +449,7 @@ function SectionGroup({ sectionName, sectionKeys, items, bestValues }: SectionGr
                             {formatAttributeName(key)}
                         </td>
                         {items.map(item => {
-                            const value = item.attributes[key]
+                            const value = (item.attributes || {})[key]
                             const isBest = bestValues[key]?.itemId === item.id
                             
                                             return (
@@ -509,7 +522,7 @@ function computeBestValues(
         const numericValues: { value: number; itemId: string }[] = []
         
         for (const item of items) {
-            const rawValue = item.attributes[key]
+            const rawValue = (item.attributes || {})[key]
             const numValue = extractNumericValue(rawValue)
             if (numValue !== null) {
                 numericValues.push({ value: numValue, itemId: item.id })
