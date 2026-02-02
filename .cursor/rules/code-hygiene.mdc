@@ -1,0 +1,479 @@
+---
+description: TypeScript/React/Next.js code hygiene standards - typing, naming, error handling, imports
+alwaysApply: true
+---
+
+# Code Hygiene Standards
+
+These standards ensure consistent, maintainable, and type-safe code across the codebase.
+
+## 1. TypeScript Standards
+
+### Prefer Explicit Types for Function Signatures
+
+```tsx
+// ✅ CORRECT - Explicit return type
+function calculateTotal(items: CartItem[]): number {
+  return items.reduce((sum, item) => sum + item.price, 0)
+}
+
+// ✅ CORRECT - Explicit async return type
+async function fetchUser(id: string): Promise<User | null> {
+  const { data } = await supabase.from('users').select().eq('id', id).single()
+  return data
+}
+
+// ❌ WRONG - Implicit return type (harder to catch breaking changes)
+function calculateTotal(items: CartItem[]) {
+  return items.reduce((sum, item) => sum + item.price, 0)
+}
+```
+
+### Avoid `any` - Use `unknown` + Type Guards
+
+```tsx
+// ✅ CORRECT - unknown with type guard
+function processResponse(data: unknown): User {
+  if (!isUser(data)) {
+    throw new Error('Invalid user data')
+  }
+  return data
+}
+
+function isUser(data: unknown): data is User {
+  return (
+    typeof data === 'object' &&
+    data !== null &&
+    'id' in data &&
+    'email' in data
+  )
+}
+
+// ❌ WRONG - any bypasses type safety
+function processResponse(data: any): User {
+  return data // No validation, runtime errors waiting to happen
+}
+```
+
+### Use `satisfies` for Type-Safe Object Literals
+
+```tsx
+// ✅ CORRECT - satisfies preserves literal types while checking structure
+const STATUS_COLORS = {
+  pending: 'warning',
+  active: 'success',
+  cancelled: 'destructive',
+} satisfies Record<TaskStatus, BadgeVariant>
+
+// Type is { pending: 'warning', active: 'success', cancelled: 'destructive' }
+// NOT Record<TaskStatus, BadgeVariant>
+
+// ❌ WRONG - Type annotation widens the type
+const STATUS_COLORS: Record<TaskStatus, BadgeVariant> = {
+  pending: 'warning',
+  active: 'success',
+  cancelled: 'destructive',
+}
+// Type is Record<TaskStatus, BadgeVariant> - loses literal precision
+```
+
+### Document Type Assertions with Justification
+
+```tsx
+// ✅ CORRECT - Assertion with justification
+// Safe assertion: Supabase returns user after successful auth
+const user = (await supabase.auth.getUser()).data.user as User
+
+// ✅ CORRECT - Assertion for DOM elements with context
+// Button always exists in this form - it's rendered unconditionally above
+const button = document.getElementById('submit-btn') as HTMLButtonElement
+
+// ❌ WRONG - Unexplained assertion
+const user = data as User
+const element = target as HTMLInputElement
+```
+
+## 2. Naming Conventions
+
+| Element | Convention | Example |
+|---------|------------|---------|
+| Component files | PascalCase | `TaskCard.tsx`, `UserProfile.tsx` |
+| Utility files | kebab-case | `format-date.ts`, `api-client.ts` |
+| Hook files | camelCase with use prefix | `useAuth.ts`, `useTaskFilters.ts` |
+| Functions | camelCase, verb-first | `calculateTotal`, `fetchUser`, `validateInput` |
+| Types/Interfaces | PascalCase | `TaskStatus`, `UserProfile`, `ApiResponse` |
+| Constants | SCREAMING_SNAKE_CASE | `MAX_RETRY_COUNT`, `API_BASE_URL` |
+| Boolean variables | is/has/should/can prefix | `isLoading`, `hasError`, `shouldRefresh`, `canEdit` |
+| Event handlers | handle prefix | `handleClick`, `handleSubmit`, `handleChange` |
+| Callbacks (props) | on prefix | `onClick`, `onSubmit`, `onChange` |
+
+### Naming Examples
+
+```tsx
+// ✅ CORRECT - Clear, consistent naming
+const MAX_FILE_SIZE = 5 * 1024 * 1024
+const isLoading = true
+const hasPermission = user.role === 'admin'
+
+function handleSubmit(e: FormEvent): void { ... }
+function calculateDiscountedPrice(price: number, discount: number): number { ... }
+function fetchUserById(id: string): Promise<User> { ... }
+
+interface TaskFilters {
+  status: TaskStatus[]
+  assigneeId: string | null
+}
+
+// ❌ WRONG - Inconsistent or unclear naming
+const maxFileSize = 5 * 1024 * 1024  // Should be SCREAMING_SNAKE_CASE
+const loading = true                   // Missing 'is' prefix
+const permission = user.role === 'admin' // Missing 'has' prefix
+function submit(e: FormEvent) { ... }  // Missing 'handle' prefix
+function calc(p: number, d: number) { ... } // Unclear abbreviations
+```
+
+## 3. Error Handling Pattern
+
+### Never Silently Swallow Errors
+
+```tsx
+// ✅ CORRECT - Log with context, handle gracefully
+async function fetchTasks(userId: string): Promise<Task[]> {
+  try {
+    const { data, error } = await supabase
+      .from('tasks')
+      .select('*')
+      .eq('user_id', userId)
+
+    if (error) {
+      console.error('[fetchTasks] Supabase error:', { userId, error })
+      throw new DatabaseError('Failed to fetch tasks', { cause: error })
+    }
+
+    return data ?? []
+  } catch (err) {
+    console.error('[fetchTasks] Unexpected error:', { userId, err })
+    throw err // Re-throw for caller to handle
+  }
+}
+
+// ❌ WRONG - Silent error swallowing
+async function fetchTasks(userId: string): Promise<Task[]> {
+  try {
+    const { data } = await supabase.from('tasks').select('*').eq('user_id', userId)
+    return data ?? []
+  } catch {
+    return [] // Bug hidden! Why did it fail?
+  }
+}
+```
+
+### Log with Context for Debugging
+
+```tsx
+// ✅ CORRECT - Rich context in error logs
+console.error('[createTask] Failed to create task:', {
+  userId,
+  taskData,
+  error: error.message,
+  stack: error.stack,
+})
+
+// ❌ WRONG - Useless error messages
+console.error('Error')
+console.error(error)
+console.log('something went wrong')
+```
+
+### Prefer Typed Errors Over Generic Error
+
+```tsx
+// ✅ CORRECT - Custom error types
+class ValidationError extends Error {
+  constructor(
+    message: string,
+    public readonly field: string,
+    public readonly code: string
+  ) {
+    super(message)
+    this.name = 'ValidationError'
+  }
+}
+
+class DatabaseError extends Error {
+  constructor(
+    message: string,
+    public readonly options?: { cause?: unknown }
+  ) {
+    super(message, options)
+    this.name = 'DatabaseError'
+  }
+}
+
+// Usage
+function validateEmail(email: string): void {
+  if (!email.includes('@')) {
+    throw new ValidationError('Invalid email format', 'email', 'INVALID_FORMAT')
+  }
+}
+
+// ❌ WRONG - Generic errors lose context
+throw new Error('Invalid email') // What field? What code? Harder to handle
+```
+
+### Error Handling in Server Actions
+
+```tsx
+// ✅ CORRECT - Return typed result, don't throw
+export async function createTask(data: TaskInput): Promise<ActionResult<Task>> {
+  const session = await auth()
+  if (!session?.user) {
+    return { success: false, error: 'Unauthorized' }
+  }
+
+  try {
+    const task = await db.tasks.create(data)
+    return { success: true, data: task }
+  } catch (err) {
+    console.error('[createTask] Failed:', { data, err })
+    return { success: false, error: 'Failed to create task' }
+  }
+}
+
+// ❌ WRONG - Throwing in server actions
+export async function createTask(data: TaskInput): Promise<Task> {
+  const session = await auth()
+  if (!session?.user) {
+    throw new Error('Unauthorized') // Client can't handle this gracefully
+  }
+  return await db.tasks.create(data) // Unhandled errors crash client
+}
+```
+
+## 4. Import Organization
+
+Imports should be organized in this order (separated by blank lines):
+
+1. React/Next.js imports
+2. External libraries
+3. Internal aliases (`@/`)
+4. Relative imports (same feature)
+5. Type-only imports (last)
+
+```tsx
+// ✅ CORRECT - Organized imports
+'use client'
+
+import { useState, useEffect, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
+
+import { format } from 'date-fns'
+import { z } from 'zod'
+
+import { Button } from '@/components/ui/button'
+import { Card } from '@/components/ui/card'
+import { createTask } from '@/actions/tasks'
+import { cn } from '@/lib/utils'
+
+import { TaskFilters } from './task-filters'
+import { TaskCard } from './task-card'
+
+import type { Task, TaskStatus } from '@/types/task'
+import type { User } from '@/types/user'
+
+// ❌ WRONG - Unorganized imports
+import type { Task } from '@/types/task'
+import { useState } from 'react'
+import { TaskCard } from './task-card'
+import { Button } from '@/components/ui/button'
+import { format } from 'date-fns'
+import { useRouter } from 'next/navigation'
+import { z } from 'zod'
+```
+
+## 5. Function Guidelines
+
+### Max 50 Lines Per Function
+
+Large functions should be broken into smaller, focused helpers.
+
+```tsx
+// ✅ CORRECT - Small, focused functions
+function validateTaskInput(input: TaskInput): ValidationResult {
+  const errors: string[] = []
+  
+  if (!input.title?.trim()) {
+    errors.push('Title is required')
+  }
+  
+  if (input.dueDate && input.dueDate < new Date()) {
+    errors.push('Due date must be in the future')
+  }
+  
+  return { valid: errors.length === 0, errors }
+}
+
+async function createTask(input: TaskInput): Promise<Task> {
+  const validation = validateTaskInput(input)
+  if (!validation.valid) {
+    throw new ValidationError(validation.errors.join(', '))
+  }
+  
+  return await db.tasks.create(input)
+}
+
+// ❌ WRONG - Monolithic function doing everything
+async function createTask(input: TaskInput): Promise<Task> {
+  // 200 lines of validation, transformation, database calls, notifications...
+}
+```
+
+### Max 4 Levels of Nesting
+
+Deep nesting indicates the need for extraction or early returns.
+
+```tsx
+// ✅ CORRECT - Early returns, flat structure
+async function processOrder(orderId: string): Promise<void> {
+  const order = await fetchOrder(orderId)
+  if (!order) {
+    console.warn('[processOrder] Order not found:', orderId)
+    return
+  }
+
+  if (order.status !== 'pending') {
+    console.info('[processOrder] Order already processed:', orderId)
+    return
+  }
+
+  if (!order.items.length) {
+    throw new ValidationError('Order has no items')
+  }
+
+  await updateOrderStatus(orderId, 'processing')
+  await notifyCustomer(order.customerId)
+}
+
+// ❌ WRONG - Deep nesting, hard to follow
+async function processOrder(orderId: string): Promise<void> {
+  const order = await fetchOrder(orderId)
+  if (order) {
+    if (order.status === 'pending') {
+      if (order.items.length > 0) {
+        await updateOrderStatus(orderId, 'processing')
+        if (order.customerId) {
+          await notifyCustomer(order.customerId)
+        }
+      }
+    }
+  }
+}
+```
+
+### Single Responsibility Principle
+
+Each function should do one thing well.
+
+```tsx
+// ✅ CORRECT - Single responsibility
+function formatCurrency(amount: number, currency: string): string {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency,
+  }).format(amount)
+}
+
+function calculateOrderTotal(items: OrderItem[]): number {
+  return items.reduce((sum, item) => sum + item.price * item.quantity, 0)
+}
+
+function formatOrderTotal(items: OrderItem[], currency: string): string {
+  const total = calculateOrderTotal(items)
+  return formatCurrency(total, currency)
+}
+
+// ❌ WRONG - Multiple responsibilities
+function getOrderTotalDisplay(items: OrderItem[]): string {
+  let total = 0
+  for (const item of items) {
+    total += item.price * item.quantity
+  }
+  // Formatting mixed with calculation
+  return '$' + total.toFixed(2)
+}
+```
+
+## 6. Additional Best Practices
+
+### Avoid Magic Numbers/Strings
+
+```tsx
+// ✅ CORRECT - Named constants
+const MAX_FILE_SIZE_MB = 5
+const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024
+const PAGINATION_PAGE_SIZE = 20
+const TASK_STATUSES = ['pending', 'in_progress', 'completed'] as const
+
+if (file.size > MAX_FILE_SIZE_BYTES) {
+  throw new Error(`File exceeds ${MAX_FILE_SIZE_MB}MB limit`)
+}
+
+// ❌ WRONG - Magic numbers
+if (file.size > 5242880) { // What is this number?
+  throw new Error('File too large')
+}
+```
+
+### Use Destructuring Appropriately
+
+```tsx
+// ✅ CORRECT - Clear destructuring
+function TaskCard({ task, onComplete, onDelete }: TaskCardProps) {
+  const { id, title, status, dueDate } = task
+  // ...
+}
+
+// ✅ CORRECT - Rest spreading for forwarding props
+function Button({ children, className, ...props }: ButtonProps) {
+  return (
+    <button className={cn('btn', className)} {...props}>
+      {children}
+    </button>
+  )
+}
+
+// ❌ WRONG - Over-destructuring (loses context)
+function TaskCard({ task: { id, title, status, dueDate, assignee: { name } } }) {
+  // Deeply nested destructuring is hard to read
+}
+```
+
+## Quick Checklist
+
+Before committing any code:
+
+### TypeScript
+- [ ] Function signatures have explicit return types
+- [ ] No `any` types (use `unknown` + type guards)
+- [ ] Type assertions have justification comments
+- [ ] Object literals use `satisfies` where appropriate
+
+### Naming
+- [ ] Component files are PascalCase
+- [ ] Utility files are kebab-case
+- [ ] Functions are camelCase and verb-first
+- [ ] Constants are SCREAMING_SNAKE_CASE
+- [ ] Booleans have is/has/should/can prefix
+- [ ] Event handlers have handle prefix
+
+### Error Handling
+- [ ] No silent error swallowing (empty catch blocks)
+- [ ] Errors logged with context (function name, relevant data)
+- [ ] Server actions return typed results, don't throw
+
+### Structure
+- [ ] Imports organized by category
+- [ ] Functions under 50 lines
+- [ ] Max 4 levels of nesting
+- [ ] Early returns over nested conditionals
+- [ ] No magic numbers/strings

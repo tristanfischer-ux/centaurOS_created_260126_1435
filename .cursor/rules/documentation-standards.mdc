@@ -1,0 +1,328 @@
+---
+description: Documentation and auditability standards - enables third-party auditors to understand code intent
+alwaysApply: true
+---
+
+# Documentation Standards
+
+These standards ensure code is auditable and maintainable by third parties. Well-documented code reduces onboarding time, prevents security oversights, and enables effective code reviews.
+
+## 1. JSDoc Requirements
+
+ALL exported functions MUST have JSDoc documentation.
+
+### Required Tags
+
+| Tag | Description | Required |
+|-----|-------------|----------|
+| `@param` | Document each parameter with type and purpose | Always |
+| `@returns` | Document return type and what it represents | Always |
+| `@throws` | Document errors/exceptions that can be thrown | When applicable |
+| `@example` | Show usage example | Recommended |
+| `@security` | Note security considerations | For security-sensitive code |
+| `@audit` | Reference audit requirements | When audit trail needed |
+
+### Complete JSDoc Template
+
+```typescript
+/**
+ * Brief description of what the function does.
+ * 
+ * Additional context explaining why this function exists and
+ * any important behavior details.
+ * 
+ * @param userId - The unique identifier of the user
+ * @param options - Configuration options for the operation
+ * @param options.includeDeleted - Whether to include soft-deleted records
+ * @param options.limit - Maximum number of results to return
+ * 
+ * @returns Object containing the results and any errors
+ * @returns.data - The fetched records, or null if error
+ * @returns.error - Error message if operation failed, null otherwise
+ * 
+ * @throws {AuthenticationError} When user is not authenticated
+ * @throws {ValidationError} When userId format is invalid
+ * 
+ * @security Validates user has permission to access requested data
+ * @audit Creates audit log entry for data access
+ * 
+ * @example
+ * ```ts
+ * const { data, error } = await fetchUserData(userId, { limit: 10 })
+ * if (error) {
+ *   console.error('Failed to fetch:', error)
+ *   return
+ * }
+ * ```
+ */
+export async function fetchUserData(
+  userId: string,
+  options?: { includeDeleted?: boolean; limit?: number }
+): Promise<{ data: UserRecord[] | null; error: string | null }> {
+  // Implementation
+}
+```
+
+## 2. Security Annotations
+
+Use inline comments with specific prefixes for security-critical code. These make security logic immediately visible during code review.
+
+### Annotation Prefixes
+
+| Prefix | Use For | Example |
+|--------|---------|---------|
+| `// SECURITY:` | Security-critical logic, attack prevention | `// SECURITY: Prevents timing attacks` |
+| `// AUTH:` | Authentication and authorization checks | `// AUTH: Verify user owns this resource` |
+| `// AUDIT:` | Audit trail and logging requirements | `// AUDIT: Log all payment events` |
+| `// RLS:` | Row Level Security policy explanations | `// RLS: Users can only see own data` |
+| `// VALIDATION:` | Input validation and sanitization | `// VALIDATION: Sanitize user HTML input` |
+
+### Security Annotation Examples
+
+```typescript
+// SECURITY: Atomic idempotency check - prevents race conditions where
+// the same webhook could be processed multiple times concurrently
+const { acquired, alreadyProcessed } = await acquireEventLock(event)
+
+// AUTH: Verify the requesting user owns this resource before allowing access
+// This prevents IDOR attacks where attackers guess resource IDs
+const { data: resource } = await supabase
+  .from('resources')
+  .select('*')
+  .eq('id', resourceId)
+  .eq('user_id', user.id)  // AUTH: Ownership check
+  .single()
+
+// AUDIT: Log all payment state changes for compliance and debugging
+console.log('Payment state transition:', {
+  orderId,
+  previousStatus: order.status,
+  newStatus: 'paid',
+  timestamp: new Date().toISOString(),
+})
+
+// RLS: This policy ensures users can only access their own foundry's data.
+// The foundry_id check is critical for multi-tenant isolation.
+await supabase
+  .from('foundry_settings')
+  .select('*')
+  .eq('foundry_id', user.foundry_id)
+
+// VALIDATION: Sanitize file path to prevent directory traversal attacks
+// User input could contain "../" sequences to access unauthorized files
+const safePath = path.normalize(userPath).replace(/^(\.\.[\/\\])+/, '')
+
+// SECURITY: Verify payment amount matches database to prevent amount tampering
+// Attackers could modify client-side amounts before submission
+const expectedAmount = Math.round(Number(orderValidation.total_amount) * 100)
+if (Math.abs(paymentIntent.amount - expectedAmount) > 1) {
+  console.error('[SECURITY] Payment amount mismatch!', {
+    expected: expectedAmount,
+    received: paymentIntent.amount,
+  })
+}
+```
+
+## 3. Business Logic Comments
+
+### Explain "Why" Not "What"
+
+```typescript
+// ❌ BAD: Describes what the code does (obvious from reading it)
+// Check if user is admin
+if (user.role === 'admin') {
+
+// ✅ GOOD: Explains why this check exists
+// Admins can view all foundries for support purposes, while regular
+// users are restricted to their own foundry for data isolation
+if (user.role === 'admin') {
+```
+
+### Document Business Rules and Exceptions
+
+```typescript
+// ✅ GOOD: Documents the business rule and its origin
+// Business Rule: Orders under £10 don't incur platform fees
+// This was introduced to encourage small transactions and matches
+// competitor pricing (see PRD-2024-Q3 section 4.2)
+const platformFee = orderAmount < 1000 ? 0 : calculatePlatformFee(orderAmount)
+
+// ✅ GOOD: Explains a non-obvious edge case
+// Edge case: Retainers can be paid even when order is disputed.
+// This ensures ongoing work isn't blocked by disputes on unrelated orders.
+// Approved by legal review 2024-11-15 (ticket: LEGAL-847)
+if (order.status === 'disputed' && paymentType !== 'retainer') {
+  return { error: 'Cannot process payment for disputed order' }
+}
+```
+
+### Include References to Requirements
+
+```typescript
+// Per GDPR Article 17, users can request data deletion
+// Ticket: COMPLIANCE-234
+// Note: Some data retained for 7 years per financial regulations
+async function deleteUserData(userId: string) {
+```
+
+## 4. Component Documentation Template
+
+For React components, include this documentation structure:
+
+```tsx
+/**
+ * OrderSummaryCard - Displays order details with payment status
+ * 
+ * Purpose:
+ * Shows a summary of an order including items, pricing, and current
+ * status. Used in both buyer and seller views of order management.
+ * 
+ * Props:
+ * @param order - The order object containing all order details
+ * @param showSellerActions - Whether to show seller-specific action buttons
+ * @param onStatusChange - Callback when order status is updated
+ * 
+ * State Management:
+ * - Local state for UI interactions (expanded sections, loading states)
+ * - Order data comes from parent, mutations trigger onStatusChange callback
+ * - Uses optimistic updates for better UX on status changes
+ * 
+ * @example
+ * ```tsx
+ * <OrderSummaryCard
+ *   order={orderData}
+ *   showSellerActions={isSeller}
+ *   onStatusChange={handleStatusChange}
+ * />
+ * ```
+ */
+interface OrderSummaryCardProps {
+  order: Order
+  showSellerActions?: boolean
+  onStatusChange?: (orderId: string, newStatus: OrderStatus) => Promise<void>
+}
+
+export function OrderSummaryCard({
+  order,
+  showSellerActions = false,
+  onStatusChange,
+}: OrderSummaryCardProps) {
+  // Component implementation
+}
+```
+
+## 5. File Header Template
+
+For complex files (>200 lines, critical business logic, or security-sensitive), include a file header:
+
+```typescript
+/**
+ * @file Stripe Webhook Handler
+ * 
+ * Purpose:
+ * Handles incoming Stripe webhook events for payment processing,
+ * account updates, and dispute management. This is a critical
+ * financial pathway - changes require security review.
+ * 
+ * Key Responsibilities:
+ * - Verify webhook signatures (security-critical)
+ * - Process payment events with idempotency
+ * - Handle disputes and refunds
+ * - Update order and account statuses
+ * 
+ * Security Considerations:
+ * - All events verified via Stripe signature
+ * - Atomic idempotency prevents double-processing
+ * - Payment amounts validated against database
+ * - Generic error responses prevent information leakage
+ * 
+ * Related Files:
+ * - src/lib/stripe/client.ts - Stripe client configuration
+ * - src/lib/payments/flow.ts - Payment confirmation logic
+ * - src/types/billing.ts - Billing type definitions
+ * 
+ * @see https://stripe.com/docs/webhooks for Stripe webhook documentation
+ * @see src/actions/billing.ts for related billing actions
+ */
+```
+
+## 6. When Documentation is Required
+
+| Code Type | Documentation Required | Notes |
+|-----------|----------------------|-------|
+| Exported functions | **Always** | Full JSDoc with all applicable tags |
+| Complex internal functions | Yes | At minimum: brief description and param types |
+| Security-sensitive code | **Always** | Must include `// SECURITY:` or `// AUTH:` annotation |
+| Business rules | **Always** | Explain the "why" with reference to requirements if available |
+| Type assertions (`as Type`) | Yes | Explain why the assertion is safe |
+| Workarounds/hacks | Yes | Include ticket reference for proper fix |
+| Non-obvious algorithms | Yes | Explain the approach and any edge cases |
+| Database queries with complex conditions | Yes | Explain what data is being fetched and why |
+| Error handling decisions | Yes | Explain why errors are handled this way |
+
+### Type Assertion Documentation
+
+```typescript
+// ❌ BAD: Unexplained type assertion
+const user = data as User
+
+// ✅ GOOD: Justified type assertion
+// Safe assertion: query filters ensure only User records returned,
+// and we've validated data exists before this point
+const user = data as User
+
+// ✅ BETTER: Avoid assertion with runtime check
+if (!isUser(data)) {
+  throw new Error('Invalid user data structure')
+}
+const user = data
+```
+
+### Workaround Documentation
+
+```typescript
+// ❌ BAD: Undocumented workaround
+// @ts-nocheck
+
+// ✅ GOOD: Documented workaround with ticket
+// @ts-nocheck - Billing tables exist but types not regenerated after 
+// billing_enhancements migration. Remove after running `npm run db:types`
+// Ticket: TECH-DEBT-456
+```
+
+## 7. Documentation Quality Checklist
+
+Before submitting code for review, verify:
+
+### JSDoc Completeness
+- [ ] All exported functions have JSDoc
+- [ ] All parameters documented with types and purpose
+- [ ] Return type documented with meaning
+- [ ] Throws documented for functions that can throw
+
+### Security Documentation
+- [ ] Security-critical code has `// SECURITY:` annotations
+- [ ] Auth checks have `// AUTH:` annotations
+- [ ] Validation logic has `// VALIDATION:` annotations
+- [ ] RLS-related code has `// RLS:` annotations
+
+### Business Logic
+- [ ] Business rules explained with "why" not "what"
+- [ ] Non-obvious decisions documented
+- [ ] Edge cases explained
+- [ ] External references (tickets, PRDs) included where relevant
+
+### Code Clarity
+- [ ] Complex algorithms explained
+- [ ] Type assertions justified
+- [ ] Workarounds documented with ticket references
+- [ ] No magic numbers (constants documented)
+
+## Exemplary Files
+
+These files in the codebase demonstrate excellent documentation practices:
+
+- `src/app/api/webhooks/stripe/route.ts` - Security annotations, function documentation, atomic operations
+- `src/actions/billing.ts` - Section headers, JSDoc for all exported functions, consistent error handling
+
+Study these files when unsure about documentation standards.
