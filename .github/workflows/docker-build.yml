@@ -9,7 +9,8 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}
+  # Convert to lowercase as Docker image names must be lowercase
+  IMAGE_NAME: ${{ github.repository_owner }}/centauros_created_260126_1435
 
 jobs:
   build-and-test:
