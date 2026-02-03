@@ -927,23 +927,22 @@ function IndustryPacksView({
         </div>
       </div>
 
-      {/* Objective Packs Grid */}
-      <div className="mt-8">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h2 className="text-2xl font-semibold">Objective Packs</h2>
-            <p className="text-sm text-muted-foreground mt-1">
-              {loadingPacks ? 'Loading...' : `${industryPacks.length} packs available for ${selectedIndustry.name}`}
-            </p>
-          </div>
-          
-          {/* Size toggle for pack cards - same controls as Business Objectives */}
+      {/* Results count and size controls - exactly matches Business Objectives */}
+      <div className="flex items-center justify-between mb-4">
+        <p className="text-sm text-muted-foreground">
+          {loadingPacks ? 'Loading...' : `Showing ${industryPacks.length} packs`}
+        </p>
+        <div className="flex items-center gap-3">
+          {/* Card size controls */}
           <div className="bg-muted p-1 rounded-md flex items-center" title="Card detail level">
             <Button
               variant={defaultCardSize === 'small' ? 'default' : 'ghost'}
               size="sm"
               onClick={() => setAllCardsSize('small')}
-              className={cn("h-8 w-8 p-0", defaultCardSize === 'small' && 'shadow-sm')}
+              className={cn(
+                "h-8 w-8 p-0",
+                defaultCardSize === 'small' && 'shadow-sm'
+              )}
               title="Compact cards"
             >
               <Minus className="h-4 w-4" />
@@ -952,7 +951,10 @@ function IndustryPacksView({
               variant={defaultCardSize === 'medium' ? 'default' : 'ghost'}
               size="sm"
               onClick={() => setAllCardsSize('medium')}
-              className={cn("h-8 w-8 p-0", defaultCardSize === 'medium' && 'shadow-sm')}
+              className={cn(
+                "h-8 w-8 p-0",
+                defaultCardSize === 'medium' && 'shadow-sm'
+              )}
               title="Standard cards"
             >
               <Square className="h-4 w-4" />
@@ -961,58 +963,66 @@ function IndustryPacksView({
               variant={defaultCardSize === 'full' ? 'default' : 'ghost'}
               size="sm"
               onClick={() => setAllCardsSize('full')}
-              className={cn("h-8 w-8 p-0", defaultCardSize === 'full' && 'shadow-sm')}
+              className={cn(
+                "h-8 w-8 p-0",
+                defaultCardSize === 'full' && 'shadow-sm'
+              )}
               title="Detailed cards (opens modal)"
             >
               <AlignJustify className="h-4 w-4" />
             </Button>
           </div>
         </div>
-        
-        {loadingPacks ? (
-          // Loading skeleton - same as Business Objectives
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {[1, 2, 3, 4].map((i) => (
-              <Card key={i} className="animate-pulse">
-                <CardHeader>
-                  <div className="h-6 w-48 bg-muted rounded" />
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-2">
-                    <div className="h-4 w-full bg-muted rounded" />
-                    <div className="h-4 w-3/4 bg-muted rounded" />
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        ) : industryPacks.length === 0 ? (
-          <Card>
-            <CardContent className="pt-6">
-              <p className="text-muted-foreground text-center">
-                No objective packs available for {selectedIndustry.name} yet.
-              </p>
-            </CardContent>
-          </Card>
-        ) : (
-          // Pack grid - exactly same as Business Objectives
-          <div className={cn(
-            "grid gap-4 lg:gap-6 animate-fade-in",
-            defaultCardSize === 'full' 
-              ? "grid-cols-1 lg:grid-cols-2" 
-              : "grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
-          )}>
-            {industryPacks.map((pack) => (
-              <PackCard
-                key={pack.id}
-                pack={pack}
-                size={cardSizes[pack.id] || defaultCardSize}
-                onSizeChange={handleCardSizeChange}
-              />
-            ))}
-          </div>
-        )}
       </div>
+
+      {/* Pack grid */}
+      {loadingPacks ? (
+        // Loading skeleton - same as Business Objectives
+        <div className={cn(
+          "grid gap-4 lg:gap-6",
+          defaultCardSize === 'full' 
+            ? "grid-cols-1 lg:grid-cols-2" 
+            : "grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+        )}>
+          {[1, 2, 3, 4].map((i) => (
+            <Card key={i} className="animate-pulse">
+              <CardHeader>
+                <div className="h-6 w-48 bg-muted rounded" />
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  <div className="h-4 w-full bg-muted rounded" />
+                  <div className="h-4 w-3/4 bg-muted rounded" />
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      ) : industryPacks.length === 0 ? (
+        <Card>
+          <CardContent className="pt-6">
+            <p className="text-muted-foreground text-center">
+              No objective packs available for this category yet.
+            </p>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className={cn(
+          "grid gap-4 lg:gap-6 animate-fade-in",
+          defaultCardSize === 'full' 
+            ? "grid-cols-1 lg:grid-cols-2" 
+            : "grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+        )}>
+          {industryPacks.map(pack => (
+            <PackCard
+              key={pack.id}
+              pack={pack}
+              size={cardSizes[pack.id] || defaultCardSize}
+              onSizeChange={handleCardSizeChange}
+            />
+          ))}
+        </div>
+      )}
     </div>
   )
 }
