@@ -102,6 +102,8 @@ export interface HomeLayoutClientProps {
   currentUserId: string
   foundryId: string
   initialPreferences: UserPreferences
+  /** Optional: Pre-select the last conversation on load */
+  initialSelectedPersonId?: string | null
   // Summary panel props
   overdueTasks: ActionTask[]
   pendingDecisions: ActionTask[]
@@ -127,6 +129,7 @@ export function HomeLayoutClient({
   currentUserId,
   foundryId,
   initialPreferences,
+  initialSelectedPersonId,
   overdueTasks,
   pendingDecisions,
   blockers,
@@ -141,15 +144,15 @@ export function HomeLayoutClient({
   const [taskFilter, setTaskFilter] = useState<'my_tasks' | 'all_tasks'>(initialPreferences.inbox_task_filter)
   const [mobileView, setMobileView] = useState<'messages' | 'summary'>('messages')
   
-  // Selection state
-  const [selectedPersonId, setSelectedPersonId] = useState<string | null>(null)
+  // Selection state - default to last conversation if available
+  const [selectedPersonId, setSelectedPersonId] = useState<string | null>(initialSelectedPersonId ?? null)
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null)
   const [currentContext, setCurrentContext] = useState<ConversationContext | null>(null)
   
   // Layout state
   const [screenSize, setScreenSize] = useState<'large' | 'medium' | 'small'>('large')
   const [listPanelOpen, setListPanelOpen] = useState(false)
-  const [showConversation, setShowConversation] = useState(false)
+  const [showConversation, setShowConversation] = useState(!!initialSelectedPersonId)
   
   // Preference update debouncing
   const preferenceUpdateTimeout = useRef<NodeJS.Timeout | null>(null)
@@ -640,6 +643,13 @@ function DirectConversationView({
     )
   }
   
+  // Convert members to the format expected by CommandInput
+  const membersList = members.map(m => ({
+    id: m.id,
+    full_name: m.full_name || m.email,
+    email: m.email
+  }))
+  
   return (
     <ConversationThreadEnhanced
       conversationId={conversationId}
@@ -649,6 +659,8 @@ function DirectConversationView({
       tasks={tasks}
       objectives={objectives}
       currentUserId={currentUserId}
+      foundryId={foundryId}
+      members={membersList}
       showHeader={true}
     />
   )

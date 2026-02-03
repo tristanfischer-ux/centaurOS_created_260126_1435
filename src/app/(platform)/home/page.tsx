@@ -3,6 +3,7 @@ import { getFoundryIdCached } from '@/lib/supabase/foundry-context'
 import { getOrCreateUserPreferences } from '@/lib/preferences/service'
 import { HomeLayoutClient } from './home-layout-client'
 import { HomeHeader } from './home-header'
+import { StandupStatusBanner } from '@/components/today/StandupStatusBanner'
 import { redirect } from 'next/navigation'
 import { startOfDay, endOfDay, startOfWeek, endOfWeek, isToday } from 'date-fns'
 import type { MemberWithStatus, TaskWithContext } from './home-layout-client'
@@ -156,11 +157,15 @@ export default async function HomePage() {
   const totalUnreadTasks = tasksResult.reduce((sum, t) => sum + (t.unread_message_count || 0), 0)
   const totalUnread = totalUnreadPeople + totalUnreadTasks
   
+  // Find the most recent conversation to pre-select (first member with conversation history)
+  const lastConversationPersonId = membersResult.find(m => m.last_message_at)?.id ?? null
+  
   return (
     <div className="flex flex-col h-[calc(100vh-4rem)] md:h-[calc(100vh-3rem)] -m-4 sm:-m-6 lg:-m-8">
       {/* Page Header */}
-      <div className="px-4 sm:px-6 lg:px-8 pt-4 sm:pt-6 lg:pt-8 pb-4 border-b border-slate-100 flex-shrink-0">
+      <div className="px-4 sm:px-6 lg:px-8 pt-4 sm:pt-6 lg:pt-8 pb-4 border-b border-slate-100 flex-shrink-0 space-y-4">
         <HomeHeader totalUnread={totalUnread} userName={profile?.full_name || undefined} />
+        <StandupStatusBanner />
       </div>
       
       {/* Main Content */}
@@ -172,6 +177,7 @@ export default async function HomePage() {
           currentUserId={user.id}
           foundryId={foundryId}
           initialPreferences={preferences}
+          initialSelectedPersonId={lastConversationPersonId}
           // Summary panel data
           overdueTasks={overdueTasksResult.data || []}
           pendingDecisions={pendingDecisionsResult.data || []}

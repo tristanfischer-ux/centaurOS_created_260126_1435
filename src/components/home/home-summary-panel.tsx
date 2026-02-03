@@ -7,7 +7,6 @@
  * Includes:
  * - Action items (overdue, decisions, blockers)
  * - Tasks due (today, this week)
- * - Daily Pulse widget
  * - Team activity
  */
 
@@ -15,7 +14,6 @@ import { cn } from '@/lib/utils'
 import { ActionItemsSection } from './action-items-section'
 import { TasksDueSection } from './tasks-due-section'
 import { TeamActivitySection } from './team-activity-section'
-import { DailyPulseWidget } from '@/components/reports/DailyPulseWidget'
 import { Skeleton } from '@/components/ui/skeleton'
 
 interface ActionTask {
@@ -138,15 +136,6 @@ export function HomeSummaryPanel({
           tasksDueThisWeek={tasksDueThisWeek}
         />
         
-        {/* Daily Pulse Widget */}
-        {foundryId && (
-          <DailyPulseWidget
-            userId={userId}
-            userRole={userRole}
-            foundryId={foundryId}
-          />
-        )}
-        
         {/* Team Activity */}
         <TeamActivitySection
           teamMembers={teamMembers}
@@ -172,12 +161,6 @@ export function HomeSummaryPanelSkeleton() {
       <div className="space-y-2">
         <Skeleton className="h-4 w-24" />
         <Skeleton className="h-32 w-full" />
-      </div>
-      
-      {/* Daily pulse skeleton */}
-      <div className="space-y-2">
-        <Skeleton className="h-4 w-28" />
-        <Skeleton className="h-40 w-full" />
       </div>
       
       {/* Team activity skeleton */}

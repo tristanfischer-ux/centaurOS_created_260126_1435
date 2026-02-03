@@ -1,9 +1,8 @@
 'use client'
 
-import { useState, useRef, useEffect, useCallback, FormEvent } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Skeleton } from '@/components/ui/skeleton'
 import { UserAvatar } from '@/components/ui/user-avatar'
@@ -13,11 +12,9 @@ import { useConversation } from '@/hooks/useConversation'
 import { useMessagingShortcuts } from '@/hooks/useMessagingShortcuts'
 import type { MessageWithSender } from '@/lib/messaging/service'
 import type { MessageWithContext } from '@/types/messaging'
-import { sendMessageWithContext } from '@/lib/messaging/service'
+import { sendMessageWithTaskSync } from '@/lib/messaging/service'
 import { createClient } from '@/lib/supabase/client'
 import { 
-  Send, 
-  Paperclip, 
   MoreVertical, 
   Archive, 
   ArrowLeft,
@@ -38,7 +35,7 @@ import { toggleStarMessage, togglePinMessage, markConversationUnread } from '@/a
 import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
 import Link from 'next/link'
-import { MessageInputHelp } from '@/components/messaging/MessageInputHelp'
+import { CommandInput } from '@/components/messaging/CommandInput'
 
 interface Task {
   id: string
@@ -54,6 +51,12 @@ interface Objective {
   title: string
 }
 
+interface Member {
+  id: string
+  full_name: string
+  email: string
+}
+
 interface ConversationThreadEnhancedProps {
   conversationId: string
   otherPersonId: string
@@ -62,6 +65,8 @@ interface ConversationThreadEnhancedProps {
   tasks: Task[]
   objectives: Objective[]
   currentUserId: string
+  foundryId: string
+  members?: Member[]
   onClose?: () => void
   showHeader?: boolean
   className?: string
@@ -140,7 +145,9 @@ export function ConversationThreadEnhanced({
   otherPersonAvatar,
   tasks,
   objectives,
-  currentUserId, 
+  currentUserId,
+  foundryId,
+  members = [],
   onClose,
   showHeader = true,
   className,
@@ -155,7 +162,6 @@ export function ConversationThreadEnhanced({
     isConnected
   } = useConversation(conversationId)
 
-  const [inputValue, setInputValue] = useState('')
   const [isSending, setIsSending] = useState(false)
   const [isArchiving, setIsArchiving] = useState(false)
   const [hoveredMessageId, setHoveredMessageId] = useState<string | null>(null)
@@ -164,7 +170,6 @@ export function ConversationThreadEnhanced({
   const [recentContexts, setRecentContexts] = useState<Array<{ taskId?: string; objectiveId?: string }>>([])
   
   const scrollRef = useRef<HTMLDivElement>(null)
-  const inputRef = useRef<HTMLInputElement>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   
   // Wire up messaging shortcuts
@@ -216,7 +221,6 @@ export function ConversationThreadEnhanced({
         toast.error(result.error || 'Failed to mark as unread')
       }
     },
-    inputRef,
   })
 
   // Scroll to bottom on new messages
@@ -258,38 +262,35 @@ export function ConversationThreadEnhanced({
     }
   }, [])
 
-  // Handle send message with context
-  const handleSend = useCallback(async (e: FormEvent) => {
-    e.preventDefault()
-    
-    const content = inputValue.trim()
-    if (!content || isSending || !conversationId) return
+  // Handle send message with context and task sync (for CommandInput)
+  const handleSend = useCallback(async (content: string): Promise<boolean> => {
+    if (!content.trim() || isSending || !conversationId) return false
 
     setIsSending(true)
-    setInputValue('')
 
     try {
       const supabase = createClient()
       
-      await sendMessageWithContext(supabase, {
+      // Use sendMessageWithTaskSync to handle #123 task references in content
+      await sendMessageWithTaskSync(supabase, {
         conversationId,
         senderId: currentUserId,
-        content,
+        content: content.trim(),
         taskId: currentContext?.taskId,
         objectiveId: currentContext?.objectiveId,
         messageType: 'text'
-      })
+      }, foundryId)
       
       // Success - message will appear via real-time subscription
+      return true
     } catch (error) {
       console.error('Failed to send message:', error)
-      setInputValue(content) // Restore input on failure
       toast.error('Failed to send message')
+      return false
     } finally {
       setIsSending(false)
-      inputRef.current?.focus()
     }
-  }, [inputValue, isSending, conversationId, currentUserId, currentContext])
+  }, [isSending, conversationId, currentUserId, currentContext, foundryId])
 
   // Handle archive/unarchive
   const handleArchive = async () => {
@@ -555,66 +556,33 @@ export function ConversationThreadEnhanced({
         </div>
       </ScrollArea>
 
-      {/* Input area */}
-      <form onSubmit={handleSend} className="border-t border-border p-4 flex-shrink-0">
-        <input
-          ref={fileInputRef}
-          type="file"
-          className="hidden"
-          onChange={handleFileSelect}
-          accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.zip"
-        />
-        <div className="flex items-center gap-2">
-          <Button 
-            type="button" 
-            variant="ghost" 
-            size="icon" 
-            onClick={handleFileClick}
-            disabled={isUploadingFile || isSending}
-            className="flex-shrink-0"
-            aria-label="Attach file"
-          >
-            {isUploadingFile ? (
-              <Loader2 className="w-5 h-5 animate-spin" />
-            ) : (
-              <Paperclip className="w-5 h-5" />
-            )}
-          </Button>
-          
-          <Input
-            ref={inputRef}
-            value={inputValue}
-            onChange={(e) => setInputValue(e.target.value)}
-            placeholder={
-              currentContext?.taskId 
-                ? `Message about task...` 
-                : currentContext?.objectiveId 
-                ? `Message about objective...` 
-                : 'Type a message...'
-            }
-            disabled={isSending}
-            className="flex-1"
-            autoComplete="off"
-          />
-          
-          <Button 
-            type="submit" 
-            size="icon" 
-            disabled={!inputValue.trim() || isSending}
-            className="flex-shrink-0"
-            aria-label={isSending ? "Sending message" : "Send message"}
-          >
-            {isSending ? (
-              <Loader2 className="w-5 h-5 animate-spin" />
-            ) : (
-              <Send className="w-5 h-5" />
-            )}
-          </Button>
-        </div>
-        
-        {/* Quick reference help */}
-        <MessageInputHelp />
-      </form>
+      {/* Hidden file input for file uploads */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        className="hidden"
+        onChange={handleFileSelect}
+        accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.zip"
+      />
+
+      {/* Message input with @ mentions, slash commands, and # task references */}
+      <CommandInput
+        conversationId={conversationId}
+        currentUserId={currentUserId}
+        foundryId={foundryId}
+        members={members}
+        tasks={tasks}
+        onSend={handleSend}
+        onFileClick={handleFileClick}
+        placeholder={
+          currentContext?.taskId 
+            ? `Message about task... (/ for commands, @ to mention, # to link task)` 
+            : currentContext?.objectiveId 
+            ? `Message about objective... (/ for commands, @ to mention, # to link task)` 
+            : 'Type a message... (/ for commands, @ to mention, # to link task)'
+        }
+        disabled={isSending || isUploadingFile}
+      />
     </div>
   )
 }

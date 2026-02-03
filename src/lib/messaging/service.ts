@@ -1147,3 +1147,107 @@ export async function getTaskThread(
 
   return merged
 }
+
+/**
+ * Parse task references from message content
+ * 
+ * Extracts task references in the format #123 or #[taskid] from message content.
+ * Returns an array of task numbers (as strings) found in the content.
+ * 
+ * @param content - The message content to parse
+ * @returns Array of task numbers found in the content
+ * 
+ * @example
+ * parseTaskReferences("Check #123 and #456")
+ * // Returns ["123", "456"]
+ */
+export function parseTaskReferences(content: string): string[] {
+  // Match #123 pattern (task number)
+  const taskNumberPattern = /#(\d+)/g
+  const matches: string[] = []
+  
+  let match
+  while ((match = taskNumberPattern.exec(content)) !== null) {
+    matches.push(match[1])
+  }
+  
+  return [...new Set(matches)] // Remove duplicates
+}
+
+/**
+ * Find task IDs from task numbers
+ * 
+ * @param supabase - Supabase client
+ * @param taskNumbers - Array of task numbers to look up
+ * @param foundryId - The foundry ID to scope the lookup
+ * @returns Array of task IDs
+ */
+export async function findTaskIdsByNumbers(
+  supabase: AnySupabaseClient,
+  taskNumbers: string[],
+  foundryId: string
+): Promise<string[]> {
+  if (taskNumbers.length === 0) return []
+  
+  const { data: tasks, error } = await supabase
+    .from('tasks')
+    .select('id, task_number')
+    .eq('foundry_id', foundryId)
+    .in('task_number', taskNumbers.map(n => parseInt(n, 10)))
+  
+  if (error) {
+    console.error('[MessagingService] Failed to find tasks by number:', error)
+    return []
+  }
+  
+  return (tasks || []).map(t => t.id)
+}
+
+/**
+ * Send message and sync to task comments if task references are found
+ * 
+ * @param supabase - Supabase client  
+ * @param params - Message parameters including content and conversation info
+ * @param foundryId - The foundry ID for task lookup
+ * @returns The created message
+ */
+export async function sendMessageWithTaskSync(
+  supabase: AnySupabaseClient,
+  params: SendMessageWithContextParams,
+  foundryId: string
+): Promise<Message> {
+  const { content, senderId } = params
+  
+  // Parse task references from content
+  const taskNumbers = parseTaskReferences(content)
+  
+  // If no explicit taskId but task references found, use the first one
+  let taskIdToUse = params.taskId
+  if (!taskIdToUse && taskNumbers.length > 0) {
+    const taskIds = await findTaskIdsByNumbers(supabase, taskNumbers, foundryId)
+    taskIdToUse = taskIds[0] // Use first referenced task
+  }
+  
+  // Send the message with context
+  const message = await sendMessageWithContext(supabase, {
+    ...params,
+    taskId: taskIdToUse
+  })
+  
+  // If we have task references and the message was sent, sync to all referenced tasks
+  if (taskNumbers.length > 0) {
+    const taskIds = await findTaskIdsByNumbers(supabase, taskNumbers, foundryId)
+    
+    // Bridge to task comments for all referenced tasks
+    for (const taskId of taskIds) {
+      try {
+        await bridgeMessageToTaskComment(supabase, message.id, taskId, content, senderId)
+      } catch (error) {
+        console.error(`[MessagingService] Failed to sync message to task ${taskId}:`, error)
+        // Continue with other tasks even if one fails
+      }
+    }
+  }
+  
+  return message
+}

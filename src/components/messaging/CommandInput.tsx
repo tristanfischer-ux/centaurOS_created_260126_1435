@@ -12,7 +12,9 @@ import {
   Paperclip, 
   Loader2,
   Slash,
-  AtSign
+  AtSign,
+  Hash,
+  CheckSquare
 } from 'lucide-react'
 import { getMentionAtCursor } from '@/lib/mentions'
 import { 
@@ -35,26 +37,39 @@ interface Profile {
   email: string
 }
 
+interface Task {
+  id: string
+  title: string
+  task_number?: number
+  status?: string | null
+}
+
 interface CommandInputProps {
   conversationId: string | null
   currentUserId: string
   foundryId: string
   members: Profile[]
+  /** Optional list of tasks for # task references */
+  tasks?: Task[]
   onSend: (content: string) => Promise<boolean>
+  /** Callback to handle task references in messages */
+  onTaskReference?: (taskId: string, content: string) => Promise<void>
   onFileClick?: () => void
   placeholder?: string
   className?: string
   disabled?: boolean
 }
 
-type AutocompleteMode = 'none' | 'command' | 'mention'
+type AutocompleteMode = 'none' | 'command' | 'mention' | 'task'
 
 export function CommandInput({
   conversationId,
   currentUserId,
   foundryId,
   members,
+  tasks = [],
   onSend,
+  onTaskReference,
   onFileClick,
   placeholder = "Type a message... (/ for commands)",
   className,
@@ -85,6 +100,7 @@ export function CommandInput({
   const [autocompleteMode, setAutocompleteMode] = useState<AutocompleteMode>('none')
   const [commandSuggestions, setCommandSuggestions] = useState<CommandSuggestion[]>([])
   const [mentionSuggestions, setMentionSuggestions] = useState<Profile[]>([])
+  const [taskSuggestions, setTaskSuggestions] = useState<Task[]>([])
   const [selectedIndex, setSelectedIndex] = useState(0)
   const [autocompleteInfo, setAutocompleteInfo] = useState<{ start: number; end: number } | null>(null)
   const [dropdownPosition, setDropdownPosition] = useState<{ top: number; left: number; width: number } | null>(null)
@@ -108,6 +124,30 @@ export function CommandInput({
     }
   }, [])
   
+  // Helper to detect task reference at cursor position (#123 or #task)
+  const getTaskRefAtCursor = useCallback((text: string, cursor: number): { ref: string; start: number; end: number } | null => {
+    // Find the start of the task reference (looking backwards from cursor)
+    let start = cursor - 1
+    while (start >= 0 && text[start] !== '#' && text[start] !== ' ' && text[start] !== '\n') {
+      start--
+    }
+    
+    // Check if we found a # at the start
+    if (start < 0 || text[start] !== '#') {
+      return null
+    }
+    
+    // Check if # is at the start or preceded by whitespace
+    if (start > 0 && text[start - 1] !== ' ' && text[start - 1] !== '\n') {
+      return null
+    }
+    
+    // Extract the reference text (after #)
+    const ref = text.slice(start + 1, cursor)
+    
+    return { ref, start, end: cursor }
+  }, [])
+
   // Handle input change with autocomplete detection
   const handleChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const newValue = e.target.value
@@ -143,9 +183,35 @@ export function CommandInput({
       return
     }
     
+    // Check for task reference (#123 or #taskname)
+    if (tasks.length > 0) {
+      const taskRefMatch = getTaskRefAtCursor(newValue, cursorPosition)
+      if (taskRefMatch) {
+        const searchTerm = taskRefMatch.ref.toLowerCase()
+        const filtered = tasks.filter(t => {
+          // Match by task number
+          if (t.task_number && t.task_number.toString().includes(searchTerm)) {
+            return true
+          }
+          // Match by title
+          if (t.title.toLowerCase().includes(searchTerm)) {
+            return true
+          }
+          return false
+        }).slice(0, 8)
+        
+        setTaskSuggestions(filtered)
+        setAutocompleteInfo({ start: taskRefMatch.start, end: taskRefMatch.end })
+        setAutocompleteMode(filtered.length > 0 ? 'task' : 'none')
+        setSelectedIndex(0)
+        updateDropdownPosition()
+        return
+      }
+    }
+    
     // No autocomplete
     setAutocompleteMode('none')
-  }, [members, setInputValue, updateDropdownPosition])
+  }, [members, tasks, setInputValue, updateDropdownPosition, getTaskRefAtCursor])
   
   // Insert command into input
   const insertCommand = useCallback((command: SlashCommand) => {
@@ -194,13 +260,39 @@ export function CommandInput({
     }, 0)
   }, [autocompleteInfo, inputValue, setInputValue])
   
+  // Insert task reference into input
+  const insertTask = useCallback((task: Task) => {
+    if (!autocompleteInfo) return
+    
+    const before = inputValue.slice(0, autocompleteInfo.start)
+    const after = inputValue.slice(autocompleteInfo.end)
+    
+    // Format: #123 Task Title
+    const taskNum = task.task_number ? `#${task.task_number}` : `#[${task.id.slice(0, 8)}]`
+    const taskText = `${taskNum} ${task.title}`
+    const newValue = `${before}${taskText} ${after}`
+    
+    setInputValue(newValue)
+    setAutocompleteMode('none')
+    textareaRef.current?.focus()
+    
+    setTimeout(() => {
+      if (textareaRef.current) {
+        const newPosition = autocompleteInfo.start + taskText.length + 1
+        textareaRef.current.setSelectionRange(newPosition, newPosition)
+      }
+    }, 0)
+  }, [autocompleteInfo, inputValue, setInputValue])
+  
   // Handle keyboard navigation
   const handleKeyDown = useCallback((e: KeyboardEvent<HTMLTextAreaElement>) => {
     // Handle autocomplete navigation
     if (autocompleteMode !== 'none') {
       const maxIndex = autocompleteMode === 'command' 
         ? commandSuggestions.length - 1 
-        : mentionSuggestions.length - 1
+        : autocompleteMode === 'mention'
+        ? mentionSuggestions.length - 1
+        : taskSuggestions.length - 1
       
       if (e.key === 'ArrowDown') {
         e.preventDefault()
@@ -220,6 +312,8 @@ export function CommandInput({
           insertCommand(commandSuggestions[selectedIndex].command)
         } else if (autocompleteMode === 'mention' && mentionSuggestions[selectedIndex]) {
           insertMention(mentionSuggestions[selectedIndex])
+        } else if (autocompleteMode === 'task' && taskSuggestions[selectedIndex]) {
+          insertTask(taskSuggestions[selectedIndex])
         }
         return
       }
@@ -269,10 +363,12 @@ export function CommandInput({
   }, [
     autocompleteMode, 
     commandSuggestions, 
-    mentionSuggestions, 
+    mentionSuggestions,
+    taskSuggestions,
     selectedIndex, 
     insertCommand, 
     insertMention,
+    insertTask,
     inputValue,
     handleUpArrow,
     handleDownArrow,
@@ -385,10 +481,16 @@ export function CommandInput({
       return null
     }
     
+    const ariaLabel = autocompleteMode === 'command' 
+      ? 'Command suggestions' 
+      : autocompleteMode === 'mention'
+      ? 'Mention suggestions'
+      : 'Task suggestions'
+    
     return createPortal(
       <div 
         role="listbox"
-        aria-label={autocompleteMode === 'command' ? 'Command suggestions' : 'Mention suggestions'}
+        aria-label={ariaLabel}
         className="fixed bg-background border-2 rounded-lg shadow-xl z-[200] overflow-hidden"
         style={{
           top: dropdownPosition.top - 4,
@@ -404,10 +506,15 @@ export function CommandInput({
               <Slash className="h-3 w-3" />
               <span>Commands · ↑↓ to navigate · Enter to select</span>
             </>
-          ) : (
+          ) : autocompleteMode === 'mention' ? (
             <>
               <AtSign className="h-3 w-3" />
               <span>Mention · ↑↓ to navigate · Enter to select</span>
+            </>
+          ) : (
+            <>
+              <Hash className="h-3 w-3" />
+              <span>Link task · ↑↓ to navigate · Enter to select</span>
             </>
           )}
         </div>
@@ -465,6 +572,37 @@ export function CommandInput({
               <div className="flex-1 min-w-0">
                 <div className="font-medium truncate text-foreground">{profile.full_name}</div>
                 <div className="text-xs text-muted-foreground truncate">{profile.email}</div>
+              </div>
+            </button>
+          ))}
+          
+          {autocompleteMode === 'task' && taskSuggestions.map((task, index) => (
+            <button
+              key={task.id}
+              type="button"
+              role="option"
+              aria-selected={index === selectedIndex}
+              onClick={() => insertTask(task)}
+              className={cn(
+                'w-full px-3 py-2 text-left flex items-center gap-3 transition-colors',
+                index === selectedIndex 
+                  ? 'bg-status-info-light' 
+                  : 'hover:bg-muted'
+              )}
+            >
+              <CheckSquare className="h-4 w-4 text-muted-foreground shrink-0" />
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="font-mono text-xs text-muted-foreground">
+                    #{task.task_number || '--'}
+                  </span>
+                  <span className="font-medium truncate text-foreground">{task.title}</span>
+                </div>
+                {task.status && (
+                  <div className="text-xs text-muted-foreground truncate mt-0.5">
+                    {task.status.replace(/_/g, ' ')}
+                  </div>
+                )}
               </div>
             </button>
           ))}
