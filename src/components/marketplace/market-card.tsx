@@ -13,8 +13,8 @@ import {
     GitCompareArrows, Mail, Eye, ChevronDown, ChevronUp,
     Star, Calendar, Award, Globe, Wrench, Heart
 } from "lucide-react"
-import Link from "next/link"
 import { toast } from "sonner"
+import { MarketplaceListingDialog } from "./marketplace-listing-dialog"
 
 export type CardSize = 'small' | 'medium' | 'full'
 
@@ -417,17 +417,19 @@ export const MarketCard = memo(function MarketCard({
                                 </button>
                             </div>
                             
-                            <Button 
-                                size="sm" 
-                                variant="default"
-                                className="h-8 text-xs shadow-sm"
-                                asChild
-                            >
-                                <Link href={`/marketplace/${listing.id}`}>
-                                    <Eye className="w-3 h-3 mr-1" />
-                                    View
-                                </Link>
-                            </Button>
+                            <MarketplaceListingDialog
+                                listing={listing}
+                                trigger={
+                                    <Button 
+                                        size="sm" 
+                                        variant="default"
+                                        className="h-8 text-xs shadow-sm"
+                                    >
+                                        <Eye className="w-3 h-3 mr-1" />
+                                        View
+                                    </Button>
+                                }
+                            />
                         </div>
                     </>
                 )}
@@ -599,17 +601,19 @@ export const MarketCard = memo(function MarketCard({
                                     <GitCompareArrows className="w-3 h-3 mr-1" />
                                     {isSelected ? 'Remove' : 'Compare'}
                                 </Button>
-                                <Button 
-                                    size="sm" 
-                                    variant="default"
-                                    className="h-8 text-xs shadow-sm"
-                                    asChild
-                                >
-                                    <Link href={`/marketplace/${listing.id}`}>
-                                        <Eye className="w-3 h-3 mr-1" />
-                                        View Details
-                                    </Link>
-                                </Button>
+                                <MarketplaceListingDialog
+                                    listing={listing}
+                                    trigger={
+                                        <Button 
+                                            size="sm" 
+                                            variant="default"
+                                            className="h-8 text-xs shadow-sm"
+                                        >
+                                            <Eye className="w-3 h-3 mr-1" />
+                                            View Details
+                                        </Button>
+                                    }
+                                />
                             </div>
                         </div>
                     </>
