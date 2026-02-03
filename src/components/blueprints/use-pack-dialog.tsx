@@ -16,16 +16,13 @@ import {
   ChevronDown,
   ChevronUp,
   Info,
-  User,
-  Users,
-  Bot,
-  UserX,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Checkbox } from '@/components/ui/checkbox'
+import { UserAvatar } from '@/components/ui/user-avatar'
 import {
   Dialog,
   DialogContent,
@@ -276,7 +273,7 @@ export function UsePackDialog({ pack, trigger }: UsePackDialogProps) {
             </div>
 
             {/* Task Selection */}
-            <div className="space-y-2">
+            <div className="flex-1 flex flex-col min-h-0 space-y-2">
               <div className="flex items-center justify-between">
                 <Label>Select tasks to include</Label>
                 <Button
@@ -291,7 +288,7 @@ export function UsePackDialog({ pack, trigger }: UsePackDialogProps) {
                 </Button>
               </div>
 
-              <div className="rounded-md border">
+              <div className="rounded-md border flex-1 overflow-y-auto">
                 <div className="p-2 space-y-2">
                   {pack.items?.map((item, idx) => {
                     const isExpanded = expandedTaskId === item.id
@@ -336,33 +333,27 @@ export function UsePackDialog({ pack, trigger }: UsePackDialogProps) {
                                 <SelectContent>
                                   <SelectItem value="unassigned">
                                     <div className="flex items-center gap-2">
-                                      <div className="h-5 w-5 rounded-full bg-muted flex items-center justify-center shrink-0">
-                                        <UserX className="h-3 w-3 text-muted-foreground" />
+                                      <div className="h-6 w-6 rounded-full bg-muted flex items-center justify-center shrink-0">
+                                        <span className="text-[10px] font-medium text-muted-foreground">?</span>
                                       </div>
                                       <span>Unassigned</span>
                                     </div>
                                   </SelectItem>
                                   <SelectItem value="you">
                                     <div className="flex items-center gap-2">
-                                      <div className="h-5 w-5 rounded-full bg-orange-100 flex items-center justify-center shrink-0">
-                                        <User className="h-3 w-3 text-orange-700" />
-                                      </div>
+                                      <UserAvatar name="You" role="Founder" size="sm" />
                                       <span>You</span>
                                     </div>
                                   </SelectItem>
                                   <SelectItem value="team">
                                     <div className="flex items-center gap-2">
-                                      <div className="h-5 w-5 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
-                                        <Users className="h-3 w-3 text-blue-700" />
-                                      </div>
+                                      <UserAvatar name="Team" role="Executive" size="sm" />
                                       <span>Team Member</span>
                                     </div>
                                   </SelectItem>
                                   <SelectItem value="agent">
                                     <div className="flex items-center gap-2">
-                                      <div className="h-5 w-5 rounded-full bg-purple-100 flex items-center justify-center shrink-0">
-                                        <Bot className="h-3 w-3 text-purple-700" />
-                                      </div>
+                                      <UserAvatar name="AI" role="AI_Agent" size="sm" />
                                       <span>AI Agent</span>
                                     </div>
                                   </SelectItem>
