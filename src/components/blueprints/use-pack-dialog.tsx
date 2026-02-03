@@ -16,10 +16,6 @@ import {
   ChevronDown,
   ChevronUp,
   Info,
-  User,
-  Users,
-  Bot,
-  UserX,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -35,6 +31,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog'
+import { UserAvatar } from '@/components/ui/user-avatar'
 import {
   Select,
   SelectContent,
@@ -157,7 +154,7 @@ export function UsePackDialog({ pack, trigger }: UsePackDialogProps) {
             </TabsList>
 
             {/* OVERVIEW TAB */}
-            <TabsContent value="overview" className="flex-1 overflow-y-auto p-6 m-0 space-y-4">
+            <TabsContent value="overview" className="flex-1 overflow-y-auto p-6 m-0 space-y-4 data-[state=active]:block">
             {/* What is this pack? */}
             <Card className="bg-blue-50/50 border-blue-100">
               <CardContent className="pt-6">
@@ -336,33 +333,25 @@ export function UsePackDialog({ pack, trigger }: UsePackDialogProps) {
                                 <SelectContent>
                                   <SelectItem value="unassigned">
                                     <div className="flex items-center gap-2">
-                                      <div className="h-5 w-5 rounded-full bg-muted flex items-center justify-center shrink-0">
-                                        <UserX className="h-3 w-3 text-muted-foreground" />
-                                      </div>
+                                      <UserAvatar name="Unassigned" role="default" size="sm" />
                                       <span>Unassigned</span>
                                     </div>
                                   </SelectItem>
                                   <SelectItem value="you">
                                     <div className="flex items-center gap-2">
-                                      <div className="h-5 w-5 rounded-full bg-orange-100 flex items-center justify-center shrink-0">
-                                        <User className="h-3 w-3 text-orange-700" />
-                                      </div>
+                                      <UserAvatar name="You" role="Founder" size="sm" />
                                       <span>You</span>
                                     </div>
                                   </SelectItem>
                                   <SelectItem value="team">
                                     <div className="flex items-center gap-2">
-                                      <div className="h-5 w-5 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
-                                        <Users className="h-3 w-3 text-blue-700" />
-                                      </div>
+                                      <UserAvatar name="Team" role="Executive" size="sm" />
                                       <span>Team Member</span>
                                     </div>
                                   </SelectItem>
                                   <SelectItem value="agent">
                                     <div className="flex items-center gap-2">
-                                      <div className="h-5 w-5 rounded-full bg-purple-100 flex items-center justify-center shrink-0">
-                                        <Bot className="h-3 w-3 text-purple-700" />
-                                      </div>
+                                      <UserAvatar name="AI Agent" role="AI_Agent" size="sm" />
                                       <span>AI Agent</span>
                                     </div>
                                   </SelectItem>
