@@ -105,11 +105,11 @@ export default function MarketingPage() {
       {/* Hero Section */}
       <HeroSection />
 
-      {/* THE CENTAURS Section */}
-      <section id="centaurs" className="py-12 md:py-24 bg-background">
+      {/* People Section */}
+      <section id="people" className="py-12 md:py-24 bg-background">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
           <AnimatedHeader className="text-3xl sm:text-4xl md:text-5xl font-black mb-8 md:mb-16">
-            THE CENTAURS.
+            THE PEOPLE.
           </AnimatedHeader>
 
           <StaggerContainer className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-8">

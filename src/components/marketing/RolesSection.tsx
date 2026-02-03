@@ -49,7 +49,7 @@ export function RolesSection() {
                                     src={role.image}
                                     alt={role.title}
                                     fill
-                                    className="object-cover opacity-90 transition-transform duration-700 group-hover:scale-105" // removed mix-blend-multiply for jpgs
+                                    className="object-cover opacity-90 transition-transform duration-700 group-hover:scale-105"
                                 />
                             </div>
 

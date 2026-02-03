@@ -38,10 +38,10 @@ export function MarketingNavbar() {
                 {/* Navigation Links */}
                 <div className="hidden md:flex items-center gap-12">
                     <Link
-                        href="#centaurs"
+                        href="#people"
                         className="text-muted-foreground text-xs font-medium tracking-[0.2em] uppercase hover:text-foreground transition-colors"
                     >
-                        THE CENTAURS
+                        THE PEOPLE
                     </Link>
                     <Link
                         href="#network"

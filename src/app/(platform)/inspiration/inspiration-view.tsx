@@ -1043,12 +1043,14 @@ function IndustryPacksView({
             ? "grid-cols-1 lg:grid-cols-2" 
             : "grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
         )}>
-          {filteredPacks.map(pack => (
+          {industryPacks.map(pack => (
             <PackCard
               key={pack.id}
               pack={pack}
               size={cardSizes[pack.id] || defaultCardSize}
               onSizeChange={handleCardSizeChange}
+              isSaved={savedPackIds.has(pack.id)}
+              onSaveToggle={onSaveToggle}
             />
           ))}
         </div>
@@ -1734,7 +1736,9 @@ export function InspirationView({ templates = [], packs = [], initialSavedPackId
         selectedIndustry ? (
           <IndustryPacksView 
             selectedIndustry={selectedIndustry} 
-            onBack={() => setSelectedIndustry(null)} 
+            onBack={() => setSelectedIndustry(null)}
+            savedPackIds={savedPackIds}
+            onSaveToggle={handleSaveToggle}
           />
         ) : (
           // Industry template grid - simple selection (no size toggle)

@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useState, useEffect } from "react";
+import { use, useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
@@ -8,7 +8,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Check, ArrowRight, ArrowLeft } from "lucide-react";
 import { signup, submitApplication } from "@/actions/signup";
-import { MarketplacePreviewSection, PreviewSkeleton } from "@/components/marketing/MarketplacePreviewSection";
 
 interface RoleConfig {
     title: string;
@@ -18,7 +17,7 @@ interface RoleConfig {
     benefits: string[];
     heroImage: string;
     ctaText: string;
-    isApplication: boolean; // true for network partners
+    isApplication: boolean;
     additionalFields?: { id: string; label: string; placeholder: string; type?: string; required?: boolean }[];
 }
 
@@ -185,38 +184,69 @@ export default function JoinPage({ params }: { params: Promise<{ role: string }>
     const resolvedParams = use(params);
     const roleKey = resolvedParams.role.toLowerCase();
     const config = roleConfigs[roleKey] || roleConfigs["general"];
-    const [stage, setStage] = useState<"hook" | "form">("hook");
-    const [marketplaceListings, setMarketplaceListings] = useState<any[]>([]);
-    const [isLoadingListings, setIsLoadingListings] = useState(true);
-    const [bookingIntent, setBookingIntent] = useState<{ intent: string; listing_id?: string } | null>(null);
+    const [stage, setStage] = useState<"hook" | "transitioning" | "form">("hook");
+    const [fadeToBlack, setFadeToBlack] = useState(false);
+    const videoRef = useRef<HTMLVideoElement>(null);
 
-    // Fetch marketplace preview listings
-    useEffect(() => {
-        async function fetchPreview() {
-            try {
-                setIsLoadingListings(true);
-                const response = await fetch(`/api/marketplace/preview?role=${roleKey}`);
-                const data = await response.json();
-                setMarketplaceListings(data.listings || []);
-            } catch (error) {
-                console.error('Failed to fetch marketplace preview:', error);
-            } finally {
-                setIsLoadingListings(false);
-            }
+    // Check if this role has a video (currently only founder)
+    const hasVideo = roleKey === "founder";
+
+    // Handle the cinematic transition
+    const handleBeginInduction = () => {
+        if (hasVideo) {
+            setStage("transitioning");
+            
+            // After video expands (1s), fade to black
+            setTimeout(() => {
+                setFadeToBlack(true);
+            }, 1000);
+            
+            // After fade to black completes (1s more), show form
+            setTimeout(() => {
+                setStage("form");
+                setFadeToBlack(false);
+            }, 2000);
+        } else {
+            setStage("form");
         }
-
-        fetchPreview();
-    }, [roleKey]);
-
-    const handleBookClick = (listingId: string) => {
-        setBookingIntent({ intent: 'book_listing', listing_id: listingId });
-        setStage("form");
     };
 
+    // Ensure video plays on mount
+    useEffect(() => {
+        if (videoRef.current && hasVideo) {
+            videoRef.current.play().catch(() => {
+                // Autoplay might be blocked, that's okay
+            });
+        }
+    }, [hasVideo]);
+
     return (
-        <div className="min-h-screen bg-background text-foreground">
-            {/* Navigation */}
-            <nav className="absolute top-0 left-0 right-0 z-50 px-4 sm:px-6 py-4 sm:py-6">
+        <div className="min-h-screen bg-slate-900 text-white overflow-hidden">
+            {/* Video Transition Overlay - Shows during transition */}
+            {hasVideo && stage === "transitioning" && (
+                <div className="fixed inset-0 z-[100]">
+                    <video
+                        className="absolute inset-0 w-full h-full object-cover"
+                        autoPlay
+                        loop
+                        muted
+                        playsInline
+                    >
+                        <source src="/videos/founder-intro.mp4" type="video/mp4" />
+                    </video>
+                    {/* Fade to black overlay */}
+                    <div 
+                        className={`absolute inset-0 bg-black transition-opacity duration-1000 ${
+                            fadeToBlack ? "opacity-100" : "opacity-0"
+                        }`}
+                    />
+                </div>
+            )}
+
+            {/* Navigation - hide during transition */}
+            <nav className={`absolute top-0 left-0 right-0 z-50 px-4 sm:px-6 py-4 sm:py-6 transition-opacity duration-500 ${
+                stage === "transitioning" ? "opacity-0" : "opacity-100"
+            }`}>
                 <div className="max-w-7xl mx-auto flex items-center justify-between">
                     <Link href="/" className="text-white/80 hover:text-white text-sm font-mono uppercase tracking-widest flex items-center gap-2">
                         <ArrowLeft className="w-4 h-4" />
@@ -228,27 +258,42 @@ export default function JoinPage({ params }: { params: Promise<{ role: string }>
                 </div>
             </nav>
 
-            {stage === "hook" ? (
+            {stage === "hook" || stage === "transitioning" ? (
                 /* Stage 1: The Hook */
-                <div className="min-h-screen flex flex-col justify-center">
-                    {/* Hero Image Background */}
+                <div className={`min-h-screen flex flex-col justify-center transition-opacity duration-500 ${
+                    stage === "transitioning" ? "opacity-0" : "opacity-100"
+                }`}>
+                    {/* Hero Video/Image Background */}
                     <div className="absolute inset-0 z-0">
-                        <Image
-                            src={config.heroImage}
-                            alt={config.title}
-                            fill
-                            className="object-cover opacity-20"
-                            priority
-                        />
-                        <div className="absolute inset-0 bg-gradient-to-t from-background via-background/80 to-background/60" />
+                        {hasVideo ? (
+                            <video
+                                ref={videoRef}
+                                className="absolute inset-0 w-full h-full object-cover opacity-40"
+                                autoPlay
+                                loop
+                                muted
+                                playsInline
+                            >
+                                <source src="/videos/founder-intro.mp4" type="video/mp4" />
+                            </video>
+                        ) : (
+                            <Image
+                                src={config.heroImage}
+                                alt={config.title}
+                                fill
+                                className="object-cover opacity-20"
+                                priority
+                            />
+                        )}
+                        <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-slate-900/80 to-slate-900/60" />
                     </div>
 
                     {/* Content */}
                     <div className="relative z-10 flex flex-col items-center px-4 sm:px-6 text-center pt-20 pb-8">
                         {/* Protocol Badge */}
-                        <div className="inline-flex items-center gap-2 mb-4 sm:mb-6 px-3 sm:px-4 py-2 border border-status-info/30 bg-status-info-light">
-                            <span className="w-2 h-2 rounded-full bg-status-info animate-pulse" />
-                            <span className="text-status-info text-xs font-mono uppercase tracking-widest">
+                        <div className="inline-flex items-center gap-2 mb-4 sm:mb-6 px-3 sm:px-4 py-2 border border-blue-500/30 bg-blue-500/10 backdrop-blur-sm">
+                            <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
+                            <span className="text-blue-400 text-xs font-mono uppercase tracking-widest">
                                 Induction Protocol: {config.title}
                             </span>
                         </div>
@@ -265,8 +310,9 @@ export default function JoinPage({ params }: { params: Promise<{ role: string }>
 
                         {/* CTA Button */}
                         <button
-                            onClick={() => setStage("form")}
-                            className="group bg-background text-foreground px-8 sm:px-12 py-4 sm:py-5 text-sm sm:text-base font-bold tracking-widest uppercase hover:bg-blue-500 hover:text-white transition-all duration-300 flex items-center gap-3 mb-8 sm:mb-10"
+                            onClick={handleBeginInduction}
+                            disabled={stage === "transitioning"}
+                            className="group bg-white text-slate-900 px-8 sm:px-12 py-4 sm:py-5 text-sm sm:text-base font-bold tracking-widest uppercase hover:bg-international-orange hover:text-white transition-all duration-300 flex items-center gap-3 mb-8 sm:mb-10 disabled:opacity-50"
                         >
                             {config.ctaText}
                             <ArrowRight className="w-4 sm:w-5 h-4 sm:h-5 group-hover:translate-x-1 transition-transform" />
@@ -278,38 +324,40 @@ export default function JoinPage({ params }: { params: Promise<{ role: string }>
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 sm:gap-8 md:gap-12 max-w-3xl mx-auto">
                                 {config.benefits.map((benefit, index) => (
                                     <div key={index} className="flex items-start gap-3 justify-center sm:justify-start">
-                                        <div className="mt-0.5 w-5 h-5 rounded-full bg-status-info/20 flex items-center justify-center shrink-0">
-                                            <Check className="w-3 h-3 text-status-info" />
+                                        <div className="mt-0.5 w-5 h-5 rounded-full bg-blue-500/20 flex items-center justify-center shrink-0">
+                                            <Check className="w-3 h-3 text-blue-400" />
                                         </div>
                                         <span className="text-white/80 text-sm">{benefit}</span>
                                     </div>
                                 ))}
                             </div>
                         </div>
-
-                        {/* Marketplace Preview Section */}
-                        {isLoadingListings ? (
-                            <PreviewSkeleton />
-                        ) : (
-                            <MarketplacePreviewSection 
-                                listings={marketplaceListings} 
-                                onBookClick={handleBookClick}
-                            />
-                        )}
                     </div>
                 </div>
             ) : (
                 /* Stage 2: The Form */
-                <div className="min-h-screen flex flex-col md:flex-row">
-                    {/* Left: Context */}
-                    <div className="w-full md:w-1/2 relative overflow-hidden">
-                        <Image
-                            src={config.heroImage}
-                            alt={config.title}
-                            fill
-                            className="object-cover opacity-30"
-                        />
-                        <div className="absolute inset-0 bg-gradient-to-r from-background via-background/90 to-background/70" />
+                <div className="min-h-screen flex flex-col md:flex-row animate-in fade-in duration-1000">
+                    {/* Left: Context with Video Background */}
+                    <div className="w-full md:w-1/2 relative overflow-hidden bg-slate-900">
+                        {hasVideo ? (
+                            <video
+                                className="absolute inset-0 w-full h-full object-cover opacity-50"
+                                autoPlay
+                                loop
+                                muted
+                                playsInline
+                            >
+                                <source src="/videos/founder-intro.mp4" type="video/mp4" />
+                            </video>
+                        ) : (
+                            <Image
+                                src={config.heroImage}
+                                alt={config.title}
+                                fill
+                                className="object-cover opacity-30"
+                            />
+                        )}
+                        <div className="absolute inset-0 bg-gradient-to-r from-slate-900 via-slate-900/90 to-slate-900/70" />
                         <div className="relative z-10 p-6 sm:p-8 md:p-12 lg:p-16 flex flex-col justify-center min-h-[40vh] md:min-h-screen">
                             <button
                                 onClick={() => setStage("hook")}
@@ -318,10 +366,10 @@ export default function JoinPage({ params }: { params: Promise<{ role: string }>
                                 <ArrowLeft className="w-4 h-4" />
                                 Back
                             </button>
-                            <span className="text-xs font-mono text-status-info tracking-widest mb-3 sm:mb-4 block uppercase">
+                            <span className="text-xs font-mono text-blue-400 tracking-widest mb-3 sm:mb-4 block uppercase">
                                 {config.isApplication ? "Application" : "Induction"}: {config.title}
                             </span>
-                            <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-4 sm:mb-6 leading-tight">
+                            <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-4 sm:mb-6 leading-tight text-white">
                                 {config.headline}
                             </h2>
                             <p className="text-white/60 text-sm sm:text-base leading-relaxed max-w-md">
@@ -331,13 +379,13 @@ export default function JoinPage({ params }: { params: Promise<{ role: string }>
                     </div>
 
                     {/* Right: Form */}
-                    <div className="w-full md:w-1/2 bg-background text-foreground p-6 sm:p-8 md:p-12 lg:p-16 flex flex-col justify-center">
+                    <div className="w-full md:w-1/2 bg-white text-slate-900 p-6 sm:p-8 md:p-12 lg:p-16 flex flex-col justify-center">
                         <div className="w-full max-w-md mx-auto space-y-6 sm:space-y-8">
                             <div>
-                                <h2 className="text-xl sm:text-2xl font-bold text-foreground">
+                                <h2 className="text-xl sm:text-2xl font-bold text-slate-900">
                                     {config.isApplication ? "Apply for consideration" : "Create your account"}
                                 </h2>
-                                <p className="text-muted-foreground mt-2 text-sm">
+                                <p className="text-slate-600 mt-2 text-sm">
                                     {config.isApplication 
                                         ? "We review every application personally." 
                                         : "Enter your details to begin the induction."}
@@ -346,34 +394,26 @@ export default function JoinPage({ params }: { params: Promise<{ role: string }>
 
                             <form action={config.isApplication ? submitApplication : signup} className="space-y-4 sm:space-y-5">
                                 <input type="hidden" name="role" value={roleKey} />
-                                {bookingIntent && (
-                                    <>
-                                        <input type="hidden" name="intent" value={bookingIntent.intent} />
-                                        {bookingIntent.listing_id && (
-                                            <input type="hidden" name="listing_id" value={bookingIntent.listing_id} />
-                                        )}
-                                    </>
-                                )}
                                 
                                 <div className="space-y-2">
-                                    <Label htmlFor="name" className="text-sm font-medium text-foreground">Full Name</Label>
+                                    <Label htmlFor="name" className="text-sm font-medium text-slate-900">Full Name</Label>
                                     <Input
                                         id="name"
                                         name="name"
                                         placeholder="John Doe"
-                                        className="bg-background border focus:border-status-info focus:ring-status-info h-11 sm:h-12"
+                                        className="bg-white border-slate-300 focus:border-blue-500 focus:ring-blue-500"
                                         required
                                     />
                                 </div>
 
                                 <div className="space-y-2">
-                                    <Label htmlFor="email" className="text-sm font-medium text-foreground">Email</Label>
+                                    <Label htmlFor="email" className="text-sm font-medium text-slate-900">Email</Label>
                                     <Input
                                         id="email"
                                         name="email"
                                         type="email"
                                         placeholder="you@example.com"
-                                        className="bg-background border focus:border-status-info focus:ring-status-info h-11 sm:h-12"
+                                        className="bg-white border-slate-300 focus:border-blue-500 focus:ring-blue-500"
                                         required
                                     />
                                 </div>
@@ -381,16 +421,16 @@ export default function JoinPage({ params }: { params: Promise<{ role: string }>
                                 {/* Additional fields for applications and founder details */}
                                 {config.additionalFields?.map((field) => (
                                     <div key={field.id} className="space-y-2">
-                                        <Label htmlFor={field.id} className="text-sm font-medium text-foreground">
+                                        <Label htmlFor={field.id} className="text-sm font-medium text-slate-900">
                                             {field.label}
-                                            {field.required && <span className="text-destructive ml-1">*</span>}
+                                            {field.required && <span className="text-red-500 ml-1">*</span>}
                                         </Label>
                                         <Input
                                             id={field.id}
                                             name={field.id}
                                             type={field.type || "text"}
                                             placeholder={field.placeholder}
-                                            className="bg-background border focus:border-status-info focus:ring-status-info h-11 sm:h-12"
+                                            className="bg-white border-slate-300 focus:border-blue-500 focus:ring-blue-500"
                                             required={field.required}
                                         />
                                     </div>
@@ -398,13 +438,13 @@ export default function JoinPage({ params }: { params: Promise<{ role: string }>
 
                                 {!config.isApplication && (
                                     <div className="space-y-2">
-                                        <Label htmlFor="password" className="text-sm font-medium text-foreground">Password</Label>
+                                        <Label htmlFor="password" className="text-sm font-medium text-slate-900">Password</Label>
                                         <Input
                                             id="password"
                                             name="password"
                                             type="password"
                                             placeholder="Create a strong password"
-                                            className="bg-background border focus:border-status-info focus:ring-status-info h-11 sm:h-12"
+                                            className="bg-white border-slate-300 focus:border-blue-500 focus:ring-blue-500"
                                             required
                                         />
                                     </div>
@@ -412,17 +452,17 @@ export default function JoinPage({ params }: { params: Promise<{ role: string }>
 
                                 <Button 
                                     type="submit"
-                                    className="w-full bg-accent hover:bg-accent/90 text-white font-bold tracking-widest uppercase py-5 sm:py-6 h-auto text-sm transition-colors"
+                                    className="w-full bg-international-orange hover:bg-international-orange-hover text-white font-bold tracking-widest uppercase py-5 sm:py-6 h-auto text-sm transition-colors"
                                 >
                                     {config.ctaText}
                                 </Button>
                             </form>
 
-                            <p className="text-xs text-center text-muted-foreground">
+                            <p className="text-xs text-center text-slate-500">
                                 By {config.isApplication ? "applying" : "joining"}, you agree to our{" "}
-                                <Link href="#" className="underline hover:text-foreground">Terms of Service</Link>{" "}
+                                <Link href="#" className="underline hover:text-slate-700">Terms of Service</Link>{" "}
                                 and{" "}
-                                <Link href="#" className="underline hover:text-foreground">Privacy Policy</Link>.
+                                <Link href="#" className="underline hover:text-slate-700">Privacy Policy</Link>.
                             </p>
                         </div>
                     </div>

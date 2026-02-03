@@ -2,7 +2,7 @@ import { Suspense } from 'react'
 import { InspirationView } from './inspiration-view'
 import { Skeleton } from '@/components/ui/skeleton'
 import { getBlueprintTemplates } from '@/actions/blueprints'
-import { getObjectivePacks } from '@/actions/packs'
+import { getObjectivePacks, getSavedPackIds } from '@/actions/packs'
 
 export const metadata = {
   title: 'Inspiration | CentaurOS',
@@ -10,15 +10,20 @@ export const metadata = {
 }
 
 async function InspirationData() {
-  const [templatesResult, packsResult] = await Promise.all([
+  const [templatesResult, packsResult, savedPacksResult] = await Promise.all([
     getBlueprintTemplates(),
     getObjectivePacks(),
+    getSavedPackIds(),
   ])
+
+  // Convert Set to array for serialization
+  const initialSavedPackIds = Array.from(savedPacksResult.savedIds || [])
 
   return (
     <InspirationView 
       templates={templatesResult.data || []}
       packs={packsResult.packs || []}
+      initialSavedPackIds={initialSavedPackIds}
     />
   )
 }

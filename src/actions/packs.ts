@@ -3,6 +3,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { unstable_noStore as noStore } from 'next/cache'
+import { revalidatePath } from 'next/cache'
 
 export type PackItem = {
     id: string
@@ -195,5 +196,131 @@ export async function getPackDetails(packId: string): Promise<{ pack: ObjectiveP
             ...(pack as unknown as ObjectivePack),
             items: items as PackItem[]
         }
+    }
+}
+
+/**
+ * Save a pack to user's favorites
+ * 
+ * @param packId - The pack ID to save
+ * @returns Success status and error message if failed
+ * 
+ * @security User can only save to their own favorites (enforced by RLS)
+ * @audit Creates record in saved_packs table
+ */
+export async function savePack(packId: string): Promise<{
+    success: boolean
+    error: string | null
+}> {
+    try {
+        const supabase = await createClient()
+        const { data: { user } } = await supabase.auth.getUser()
+        
+        if (!user) {
+            return { success: false, error: 'Not authenticated' }
+        }
+
+        // Insert saved pack
+        const { error } = await supabase
+            .from('saved_packs' as unknown as 'profiles')
+            .insert({
+                user_id: user.id,
+                pack_id: packId
+            } as unknown as Record<string, unknown>)
+
+        if (error) {
+            // Unique constraint violation - already saved
+            if (error.code === '23505') {
+                return { success: true, error: null } // Treat as success
+            }
+            console.error('[savePack] Error:', error)
+            return { success: false, error: 'Failed to save pack' }
+        }
+
+        revalidatePath('/inspiration')
+        return { success: true, error: null }
+    } catch (err) {
+        console.error('[savePack] Exception:', err)
+        return { success: false, error: 'Failed to save pack' }
+    }
+}
+
+/**
+ * Unsave a pack from user's favorites
+ * 
+ * @param packId - The pack ID to unsave
+ * @returns Success status and error message if failed
+ * 
+ * @security User can only unsave their own favorites (enforced by RLS)
+ * @audit Removes record from saved_packs table
+ */
+export async function unsavePack(packId: string): Promise<{
+    success: boolean
+    error: string | null
+}> {
+    try {
+        const supabase = await createClient()
+        const { data: { user } } = await supabase.auth.getUser()
+        
+        if (!user) {
+            return { success: false, error: 'Not authenticated' }
+        }
+
+        const { error } = await supabase
+            .from('saved_packs' as unknown as 'profiles')
+            .delete()
+            .eq('user_id', user.id)
+            .eq('pack_id', packId)
+
+        if (error) {
+            console.error('[unsavePack] Error:', error)
+            return { success: false, error: 'Failed to unsave pack' }
+        }
+
+        revalidatePath('/inspiration')
+        return { success: true, error: null }
+    } catch (err) {
+        console.error('[unsavePack] Exception:', err)
+        return { success: false, error: 'Failed to unsave pack' }
+    }
+}
+
+/**
+ * Get IDs of all saved packs for the current user
+ * 
+ * @returns Set of saved pack IDs
+ * 
+ * @security RLS ensures users only see their own saved packs
+ */
+export async function getSavedPackIds(): Promise<{
+    savedIds: Set<string>
+    error: string | null
+}> {
+    noStore()
+    try {
+        const supabase = await createClient()
+        const { data: { user } } = await supabase.auth.getUser()
+        
+        if (!user) {
+            return { savedIds: new Set(), error: null }
+        }
+
+        const { data: savedPacks, error } = await supabase
+            .from('saved_packs' as unknown as 'profiles')
+            .select('pack_id')
+            .eq('user_id', user.id)
+
+        if (error) {
+            console.error('[getSavedPackIds] Error:', error)
+            return { savedIds: new Set(), error: 'Failed to fetch saved packs' }
+        }
+
+        const savedIds = new Set(
+            ((savedPacks as unknown as Array<{ pack_id: string }>) || []).map(s => s.pack_id)
+        )
+        return { savedIds, error: null }
+    } catch (err) {
+        console.error('[getSavedPackIds] Exception:', err)
+        return { savedIds: new Set(), error: 'Failed to fetch saved packs' }
     }
 }

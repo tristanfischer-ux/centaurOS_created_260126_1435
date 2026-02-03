@@ -100,6 +100,18 @@ export function Sidebar({ foundryName, foundryId, userName, userRole, isAdmin }:
                 {(() => {
                     const renderNavItem = (item: { name: string; href: string; icon: React.ComponentType<{ className?: string }>; tooltip?: string }) => {
                         const isActive = isRouteActive(pathname, item.href)
+                        
+                        // Determine which badge to show
+                        let badgeContent = null
+                        
+                        if (item.href === '/inspiration' || item.href === '/marketplace') {
+                            // Show "Demo" badge for Inspiration and Marketplace
+                            badgeContent = <NewBadge customText="Demo" />
+                        } else if (item.href !== '/objectives' && item.href !== '/settings') {
+                            // Show "New" badge only for routes other than objectives and settings
+                            badgeContent = <NewBadge route={item.href} />
+                        }
+                        
                         const navLink = (
                             <Link
                                 href={item.href}
@@ -120,7 +132,7 @@ export function Sidebar({ foundryName, foundryId, userName, userRole, isAdmin }:
                                     />
                                     {item.name}
                                 </span>
-                                <NewBadge route={item.href} />
+                                {badgeContent}
                             </Link>
                         )
 

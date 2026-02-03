@@ -15,6 +15,8 @@ interface NewBadgeProps {
     className?: string
     /** Show sparkle icon */
     showIcon?: boolean
+    /** Custom text to display instead of "New" */
+    customText?: string
 }
 
 /**
@@ -24,10 +26,13 @@ interface NewBadgeProps {
  * recently added. Automatically checks the feature registry to determine
  * if the badge should be shown.
  * 
+ * Can also display custom badge text (e.g., "Demo", "Beta") when customText is provided.
+ * 
  * Usage:
  * ```tsx
  * <NewBadge route="/settings" />
  * <NewBadge feature={someFeature} />
+ * <NewBadge customText="Demo" />
  * ```
  */
 export function NewBadge({ 
@@ -35,8 +40,28 @@ export function NewBadge({
     feature, 
     size = 'sm',
     className,
-    showIcon = false
+    showIcon = false,
+    customText
 }: NewBadgeProps) {
+    // If customText is provided, always show it
+    if (customText) {
+        return (
+            <span 
+                className={cn(
+                    "inline-flex items-center gap-0.5 font-semibold uppercase tracking-wider",
+                    "bg-gradient-to-r from-international-orange to-orange-500",
+                    "text-white rounded-full animate-pulse shadow-sm",
+                    size === 'sm' && "text-[9px] px-1.5 py-0.5",
+                    size === 'md' && "text-[10px] px-2 py-0.5",
+                    className
+                )}
+            >
+                {showIcon && <Sparkles className="h-2.5 w-2.5" />}
+                {customText}
+            </span>
+        )
+    }
+    
     // Determine if we should show the badge
     let shouldShow = false
     
