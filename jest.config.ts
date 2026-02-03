@@ -14,6 +14,10 @@ const config: Config = {
     moduleNameMapper: {
         '^@/(.*)$': '<rootDir>/src/$1',
     },
+    // Allow transforming ES modules from node_modules
+    transformIgnorePatterns: [
+        'node_modules/(?!(react-markdown|remark-.*|unified|bail|is-plain-obj|trough|vfile|unist-.*|mdast-.*|micromark.*|decode-named-character-reference|character-entities|property-information|hast-util-whitespace|space-separated-tokens|comma-separated-tokens|devlop|trim-lines)/)',
+    ],
     // Exclude e2e tests and test utilities - they run with Playwright, not Jest
     testPathIgnorePatterns: [
         '<rootDir>/node_modules/',
