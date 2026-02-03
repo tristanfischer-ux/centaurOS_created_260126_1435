@@ -297,29 +297,8 @@ export function MessageBubble({
           />
         )}
 
-        {/* Thread indicator */}
-        {replyCount && replyCount > 0 && (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleOpenThread}
-            className={cn(
-              'h-auto py-1 px-2 text-xs text-muted-foreground hover:text-foreground gap-1.5',
-              isOwn && 'ml-auto'
-            )}
-          >
-            <MessageSquare className="h-3.5 w-3.5" />
-            <span>{replyCount} {replyCount === 1 ? 'reply' : 'replies'}</span>
-            {lastReplyAt && (
-              <span className="text-muted-foreground/70">
-                · {formatDistanceToNow(new Date(lastReplyAt), { addSuffix: true })}
-              </span>
-            )}
-          </Button>
-        )}
-
-        {/* Thread indicator */}
-        {hasReplies && onOpenThread && (
+        {/* Thread indicator - shows reply count when message has replies */}
+        {replyCount > 0 && onOpenThread && (
           <Button
             variant="ghost"
             size="sm"
