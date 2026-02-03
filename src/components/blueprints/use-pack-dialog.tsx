@@ -288,8 +288,8 @@ export function UsePackDialog({ pack, trigger }: UsePackDialogProps) {
                 </Button>
               </div>
 
-              <div className="rounded-md border flex-1 overflow-y-auto">
-                <div className="p-2 space-y-2">
+              <div className="rounded-md border overflow-hidden">
+                <div className="max-h-[450px] overflow-y-auto p-2 space-y-2">
                   {pack.items?.map((item, idx) => {
                     const isExpanded = expandedTaskId === item.id
                     const isSelected = selectedTaskIds.includes(item.id)
@@ -316,83 +316,77 @@ export function UsePackDialog({ pack, trigger }: UsePackDialogProps) {
                             onCheckedChange={() => toggleTask(item.id)}
                             className="mt-0.5"
                           />
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-start justify-between gap-3 mb-2">
-                              <span className="text-sm font-medium flex-1">
+                          <div className="flex-1 min-w-0 space-y-2">
+                            <div className="flex items-start justify-between gap-2">
+                              <span className="text-sm font-medium flex-1 min-w-0">
                                 {idx + 1}. {item.title}
                               </span>
-                              <Select
-                                value={taskAssignees[item.id] || 'unassigned'}
-                                onValueChange={(value) => {
-                                  setTaskAssignees(prev => ({ ...prev, [item.id]: value }))
-                                }}
-                              >
-                                <SelectTrigger className="w-[140px] h-8 text-xs">
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="unassigned">
-                                    <div className="flex items-center gap-2">
-                                      <div className="h-6 w-6 rounded-full bg-muted flex items-center justify-center shrink-0">
-                                        <span className="text-[10px] font-medium text-muted-foreground">?</span>
+                              <div className="flex items-center gap-1 shrink-0">
+                                <Select
+                                  value={taskAssignees[item.id] || 'unassigned'}
+                                  onValueChange={(value) => {
+                                    setTaskAssignees(prev => ({ ...prev, [item.id]: value }))
+                                  }}
+                                >
+                                  <SelectTrigger className="w-[140px] h-8 text-xs">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent className="min-w-[180px]">
+                                    <SelectItem value="unassigned" className="cursor-pointer">
+                                      <div className="flex items-center gap-2">
+                                        <UserAvatar name="?" role="default" size="sm" />
+                                        <span>Unassigned</span>
                                       </div>
-                                      <span>Unassigned</span>
-                                    </div>
-                                  </SelectItem>
-                                  <SelectItem value="you">
-                                    <div className="flex items-center gap-2">
-                                      <UserAvatar name="You" role="Founder" size="sm" />
-                                      <span>You</span>
-                                    </div>
-                                  </SelectItem>
-                                  <SelectItem value="team">
-                                    <div className="flex items-center gap-2">
-                                      <UserAvatar name="Team" role="Executive" size="sm" />
-                                      <span>Team Member</span>
-                                    </div>
-                                  </SelectItem>
-                                  <SelectItem value="agent">
-                                    <div className="flex items-center gap-2">
-                                      <UserAvatar name="AI" role="AI_Agent" size="sm" />
-                                      <span>AI Agent</span>
-                                    </div>
-                                  </SelectItem>
-                                </SelectContent>
-                              </Select>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-6 w-6 p-0 shrink-0"
-                                data-expand-button
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  toggleTaskExpand(item.id)
-                                }}
-                              >
-                                {isExpanded ? (
-                                  <ChevronUp className="h-3.5 w-3.5" />
-                                ) : (
-                                  <ChevronDown className="h-3.5 w-3.5" />
-                                )}
-                              </Button>
+                                    </SelectItem>
+                                    <SelectItem value="you" className="cursor-pointer">
+                                      <div className="flex items-center gap-2">
+                                        <UserAvatar name="You" role="Founder" size="sm" />
+                                        <span>You</span>
+                                      </div>
+                                    </SelectItem>
+                                    <SelectItem value="team" className="cursor-pointer">
+                                      <div className="flex items-center gap-2">
+                                        <UserAvatar name="TM" role="Executive" size="sm" />
+                                        <span>Team Member</span>
+                                      </div>
+                                    </SelectItem>
+                                    <SelectItem value="agent" className="cursor-pointer">
+                                      <div className="flex items-center gap-2">
+                                        <UserAvatar name="AI" role="AI_Agent" size="sm" />
+                                        <span>AI Agent</span>
+                                      </div>
+                                    </SelectItem>
+                                  </SelectContent>
+                                </Select>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-6 w-6 p-0 shrink-0"
+                                  data-expand-button
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    toggleTaskExpand(item.id)
+                                  }}
+                                >
+                                  {isExpanded ? (
+                                    <ChevronUp className="h-3.5 w-3.5" />
+                                  ) : (
+                                    <ChevronDown className="h-3.5 w-3.5" />
+                                  )}
+                                </Button>
+                              </div>
                             </div>
-                            {!isExpanded && item.description && (
-                              <p className="text-xs text-muted-foreground line-clamp-1">
+                            
+                            {item.description && (
+                              <div className={cn(
+                                "text-xs text-muted-foreground leading-relaxed transition-all",
+                                !isExpanded && "line-clamp-1"
+                              )}>
                                 {item.description}
-                              </p>
+                              </div>
                             )}
                           </div>
                         </div>
-                        
-                        {isExpanded && item.description && (
-                          <div className="px-3 pb-3 pt-0">
-                            <div className="pl-7">
-                              <p className="text-sm text-muted-foreground leading-relaxed">
-                                {item.description}
-                              </p>
-                            </div>
-                          </div>
-                        )}
                       </div>
                     )
                   })}
