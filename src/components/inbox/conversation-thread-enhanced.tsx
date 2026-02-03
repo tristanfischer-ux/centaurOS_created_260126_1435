@@ -12,7 +12,7 @@ import { useConversation } from '@/hooks/useConversation'
 import { useMessagingShortcuts } from '@/hooks/useMessagingShortcuts'
 import type { MessageWithSender } from '@/lib/messaging/service'
 import type { MessageWithContext } from '@/types/messaging'
-import { sendMessageWithTaskSync } from '@/lib/messaging/service'
+import { sendMessageWithContext } from '@/lib/messaging/service'
 import { createClient } from '@/lib/supabase/client'
 import { 
   MoreVertical, 
@@ -262,7 +262,7 @@ export function ConversationThreadEnhanced({
     }
   }, [])
 
-  // Handle send message with context and task sync (for CommandInput)
+  // Handle send message with context (for CommandInput)
   const handleSend = useCallback(async (content: string): Promise<boolean> => {
     if (!content.trim() || isSending || !conversationId) return false
 
@@ -271,15 +271,15 @@ export function ConversationThreadEnhanced({
     try {
       const supabase = createClient()
       
-      // Use sendMessageWithTaskSync to handle #123 task references in content
-      await sendMessageWithTaskSync(supabase, {
+      // Send message with optional task/objective context
+      await sendMessageWithContext(supabase, {
         conversationId,
         senderId: currentUserId,
         content: content.trim(),
         taskId: currentContext?.taskId,
         objectiveId: currentContext?.objectiveId,
         messageType: 'text'
-      }, foundryId)
+      })
       
       // Success - message will appear via real-time subscription
       return true
@@ -290,7 +290,7 @@ export function ConversationThreadEnhanced({
     } finally {
       setIsSending(false)
     }
-  }, [isSending, conversationId, currentUserId, currentContext, foundryId])
+  }, [isSending, conversationId, currentUserId, currentContext])
 
   // Handle archive/unarchive
   const handleArchive = async () => {

@@ -1210,6 +1210,8 @@ export async function findTaskIdsByNumbers(
  * 1. Associates the message with the first referenced task (if no explicit taskId)
  * 2. sendMessageWithContext handles bridging to task_comments automatically
  * 
+ * Falls back to sending without task context if task lookup fails.
+ * 
  * @param supabase - Supabase client  
  * @param params - Message parameters including content and conversation info
  * @param foundryId - The foundry ID for task lookup
@@ -1222,15 +1224,23 @@ export async function sendMessageWithTaskSync(
 ): Promise<Message> {
   const { content } = params
   
-  // Parse task references from content (e.g., #123, #456)
-  const taskNumbers = parseTaskReferences(content)
-  
-  // If no explicit taskId but task references found, use the first one
+  // Start with explicit taskId if provided
   let taskIdToUse = params.taskId
-  if (!taskIdToUse && taskNumbers.length > 0) {
-    const taskIds = await findTaskIdsByNumbers(supabase, taskNumbers, foundryId)
-    if (taskIds.length > 0) {
-      taskIdToUse = taskIds[0] // Use first referenced task
+  
+  // Try to parse task references from content (e.g., #123, #456)
+  // If task lookup fails, we still send the message without task context
+  if (!taskIdToUse) {
+    try {
+      const taskNumbers = parseTaskReferences(content)
+      if (taskNumbers.length > 0) {
+        const taskIds = await findTaskIdsByNumbers(supabase, taskNumbers, foundryId)
+        if (taskIds.length > 0) {
+          taskIdToUse = taskIds[0] // Use first referenced task
+        }
+      }
+    } catch (error) {
+      // Task lookup failed, proceed without task context
+      console.warn('[MessagingService] Failed to look up task references:', error)
     }
   }
   
