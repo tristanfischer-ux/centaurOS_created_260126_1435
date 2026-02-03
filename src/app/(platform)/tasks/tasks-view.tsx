@@ -27,6 +27,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select"
+import { Label } from "@/components/ui/label"
 import {
     Popover,
     PopoverContent,
@@ -104,7 +105,6 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
     const [statusFilter, setStatusFilter] = useState<string[]>([])
     const [assigneeFilter, setAssigneeFilter] = useState<string | 'unassigned' | 'all'>('all')
     const [sortBy, setSortBy] = useState<'due_date_asc' | 'due_date_desc' | 'created_desc'>('due_date_asc')
-    const [filtersOpen, setFiltersOpen] = useState(true)
 
     // Filter Presets State
     const [activePreset, setActivePreset] = useState<string | null>(null)
@@ -414,9 +414,9 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                             </div>
                             <p className="text-muted-foreground mt-1 text-sm font-medium pl-4">Create and delegate tasks</p>
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
                             {isSelectionMode ? (
-                                <div className="flex items-center gap-2 mr-2">
+                                <div className="flex items-center gap-2">
                                     <Button variant="destructive" size="sm" onClick={handleBulkDeleteClick} disabled={selectedTaskIds.size === 0 || isBulkDeleting}>
                                         {isBulkDeleting ? (
                                             <>
@@ -436,177 +436,70 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                                 </div>
                             ) : (
                                 <>
-                                    <RefreshButton />
-                                    <Button variant="secondary" size="sm" onClick={toggleSelectionMode} className="mr-2">
-                                        <CheckSquare className="w-4 h-4 mr-2 text-muted-foreground" />
-                                        Select
-                                    </Button>
-                                </>
-                            )}
-                            {viewMode === 'grid' && hasExpandedCard && (
-                                <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={collapseAll}
-                                    className="text-xs text-muted-foreground hover:text-foreground mr-2"
-                                >
-                                    Collapse
-                                </Button>
-                            )}
-                            <div className="bg-muted p-1 rounded-lg flex items-center mr-2">
-                                <Button
-                                    variant={viewMode === 'grid' ? 'default' : 'ghost'}
-                                    size="sm"
-                                    onClick={() => setViewMode('grid')}
-                                    className={viewMode === 'grid' ? 'shadow-sm' : ''}
-                                    aria-label="Grid view"
-                                >
-                                    <LayoutGrid className="h-4 w-4" />
-                                </Button>
-                                <Button
-                                    variant={viewMode === 'list' ? 'default' : 'ghost'}
-                                    size="sm"
-                                    onClick={() => setViewMode('list')}
-                                    className={viewMode === 'list' ? 'shadow-sm' : ''}
-                                    aria-label="List view"
-                                >
-                                    <List className="h-4 w-4" />
-                                </Button>
-                                <TooltipProvider>
-                                    <Tooltip>
-                                        <TooltipTrigger asChild>
-                                            <Button
-                                                variant={viewMode === 'timeline' ? 'default' : 'ghost'}
-                                                size="sm"
-                                                onClick={() => setViewMode('timeline')}
-                                                className={viewMode === 'timeline' ? 'shadow-sm' : ''}
-                                                aria-label="Timeline view"
-                                            >
-                                                <CalendarDays className="h-4 w-4" />
+                                    {/* Preset Dropdown */}
+                                    <Select 
+                                        value={activePreset || 'all-tasks'} 
+                                        onValueChange={(val) => setActivePreset(val === 'all-tasks' ? null : val)}
+                                    >
+                                        <SelectTrigger className="h-9 w-[160px] sm:w-[180px]">
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {filterPresets.map(preset => {
+                                                const count = tasks.filter(preset.filter).length
+                                                return (
+                                                    <SelectItem key={preset.id} value={preset.id}>
+                                                        {preset.label} ({count})
+                                                    </SelectItem>
+                                                )
+                                            })}
+                                        </SelectContent>
+                                    </Select>
+
+                                    {/* Filters Popover */}
+                                    <Popover>
+                                        <PopoverTrigger asChild>
+                                            <Button variant="secondary" size="sm" className="h-9">
+                                                <Filter className="h-4 w-4 mr-2" />
+                                                Filters
+                                                {(() => {
+                                                    const activeFilterCount = statusFilter.length + (assigneeFilter !== 'all' ? 1 : 0)
+                                                    return activeFilterCount > 0 ? (
+                                                        <Badge className="ml-2 bg-international-orange text-white">{activeFilterCount}</Badge>
+                                                    ) : null
+                                                })()}
                                             </Button>
-                                        </TooltipTrigger>
-                                        <TooltipContent>
-                                            <p>Timeline (Gantt chart view)</p>
-                                        </TooltipContent>
-                                    </Tooltip>
-                                </TooltipProvider>
-                            </div>
-                            {(activePreset || statusFilter.length > 0 || assigneeFilter !== 'all') && (
-                                <div className="flex items-center gap-2 px-3 py-1.5 bg-orange-50 border border-orange-200 rounded-lg">
-                                    <Filter className="h-3.5 w-3.5 text-orange-600" />
-                                    <span className="text-xs font-medium text-orange-700">
-                                        Showing {sortedTasks.length} of {tasks.length} tasks
-                                    </span>
-                                    <button
-                                        onClick={() => {
-                                            setActivePreset(null)
-                                            setStatusFilter([])
-                                            setAssigneeFilter('all')
-                                        }}
-                                        className="text-orange-600 hover:text-orange-800 transition-colors"
-                                        aria-label="Clear all filters"
-                                    >
-                                        <X className="h-3.5 w-3.5" />
-                                    </button>
-                                </div>
-                            )}
-                            <FeatureTip
-                                id="tasks-create"
-                                title="Create Tasks"
-                                description="Break down objectives into actionable tasks. Assign them to team members or AI agents, set deadlines, and track completion."
-                                align="right"
-                            >
-                                <CreateTaskDialog
-                                    objectives={objectives}
-                                    members={members}
-                                    teams={teams}
-                                    currentUserId={currentUserId}
-                                />
-                            </FeatureTip>
-                        </div>
-                    </div>
-
-                    {/* Filter Presets */}
-                    <div className="flex gap-3 mb-4">
-                        {filterPresets.map(preset => {
-                            const count = tasks.filter(preset.filter).length
-                            return (
-                                <button
-                                    key={preset.id}
-                                    onClick={() => setActivePreset(activePreset === preset.id ? null : preset.id)}
-                                    className={cn(
-                                        "px-3 py-1.5 rounded-full text-sm font-medium transition-all duration-200",
-                                        activePreset === preset.id
-                                            ? "bg-foreground text-background"
-                                            : "bg-muted text-muted-foreground hover:bg-secondary"
-                                    )}
-                                >
-                                    {preset.label} <span className="ml-1 opacity-70">({count})</span>
-                                </button>
-                            )
-                        })}
-                    </div>
-
-                    {/* Task Count Display */}
-                    <div className="flex items-center justify-between mb-2">
-                        <div className="text-sm text-muted-foreground">
-                            {activePreset || statusFilter.length > 0 || assigneeFilter !== 'all' ? (
-                                <>
-                                    Showing <span className="font-semibold text-foreground">{sortedTasks.length}</span> of {tasks.length} tasks
-                                </>
-                            ) : (
-                                <>Showing all {tasks.length} tasks</>
-                            )}
-                        </div>
-                    </div>
-
-                    {/* Collapsible Filter Bar */}
-                    <div className="mb-4">
-                        {(() => {
-                            const activeFilterCount = statusFilter.length + (assigneeFilter !== 'all' ? 1 : 0)
-                            return (
-                                <>
-                                    <Button
-                                        variant="secondary"
-                                        onClick={() => setFiltersOpen(!filtersOpen)}
-                                        className="mb-2"
-                                    >
-                                        <Filter className="w-4 h-4 mr-2" />
-                                        Filters
-                                        {activeFilterCount > 0 && (
-                                            <Badge className="ml-2 bg-status-warning text-white">{activeFilterCount}</Badge>
-                                        )}
-                                        <ChevronDown className={cn("w-4 h-4 ml-2 transition-transform", filtersOpen && "rotate-180")} />
-                                    </Button>
-
-                                    {filtersOpen && (
-                                        <div className="p-4 border rounded-lg bg-muted space-y-4">
-                                            <div className="flex flex-wrap items-center gap-3">
-                                                <div className="flex items-center gap-2 pr-4 border-r">
-                                                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Status:</span>
-                                                    {['Pending', 'Accepted', 'Completed', 'Rejected'].map(status => (
-                                                        <Badge
-                                                            key={status}
-                                                            variant={statusFilter.includes(status) ? 'default' : 'secondary'}
-                                                            className={cn(
-                                                                "cursor-pointer hover:opacity-80 active:opacity-70 transition-all duration-200",
-                                                                statusFilter.includes(status)
-                                                                    ? getStatusBadgeClass(status)
-                                                                    : "text-muted-foreground bg-background hover:bg-muted active:bg-muted"
-                                                            )}
-                                                            onClick={() => toggleStatusFilter(status)}
-                                                        >
-                                                            {status}
-                                                        </Badge>
-                                                    ))}
+                                        </PopoverTrigger>
+                                        <PopoverContent className="w-[320px] sm:w-[400px]" align="end">
+                                            <div className="space-y-4">
+                                                <div>
+                                                    <Label className="text-sm font-medium mb-2 block">Status</Label>
+                                                    <div className="flex flex-wrap gap-2">
+                                                        {['Pending', 'Accepted', 'Completed', 'Rejected'].map(status => (
+                                                            <Badge
+                                                                key={status}
+                                                                variant={statusFilter.includes(status) ? 'default' : 'secondary'}
+                                                                className={cn(
+                                                                    "cursor-pointer hover:opacity-80 active:opacity-70 transition-all duration-200",
+                                                                    statusFilter.includes(status)
+                                                                        ? getStatusBadgeClass(status)
+                                                                        : "text-muted-foreground bg-background hover:bg-muted active:bg-muted"
+                                                                )}
+                                                                onClick={() => toggleStatusFilter(status)}
+                                                            >
+                                                                {status}
+                                                            </Badge>
+                                                        ))}
+                                                    </div>
                                                 </div>
 
-                                                <div className="flex items-center gap-2">
+                                                <div>
+                                                    <Label className="text-sm font-medium mb-2 block">Assignee</Label>
                                                     <Select
                                                         value={assigneeFilter}
                                                         onValueChange={(val) => setAssigneeFilter(val as string)}
                                                     >
-                                                        <SelectTrigger className="h-8 w-[180px] text-xs bg-background">
+                                                        <SelectTrigger className="w-full">
                                                             <SelectValue placeholder="All Assignees" />
                                                         </SelectTrigger>
                                                         <SelectContent>
@@ -626,12 +519,15 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                                                             ))}
                                                         </SelectContent>
                                                     </Select>
+                                                </div>
 
+                                                <div>
+                                                    <Label className="text-sm font-medium mb-2 block">Sort By</Label>
                                                     <Select
                                                         value={sortBy}
                                                         onValueChange={(val) => setSortBy(val as 'due_date_asc' | 'due_date_desc' | 'created_desc')}
                                                     >
-                                                        <SelectTrigger className="h-8 w-[160px] text-xs bg-background">
+                                                        <SelectTrigger className="w-full">
                                                             <SelectValue placeholder="Sort by" />
                                                         </SelectTrigger>
                                                         <SelectContent>
@@ -640,28 +536,123 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                                                             <SelectItem value="created_desc">Newest Created</SelectItem>
                                                         </SelectContent>
                                                     </Select>
+                                                </div>
 
-                                                    {(statusFilter.length > 0 || assigneeFilter !== 'all') && (
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="sm"
-                                                            onClick={() => {
-                                                                setStatusFilter([])
-                                                                setAssigneeFilter('all')
-                                                                setSortBy('due_date_asc')
-                                                            }}
-                                                            className="text-muted-foreground hover:text-destructive active:text-destructive h-8 ml-2 transition-colors duration-200"
-                                                        >
-                                                        <X className="w-3 h-3 mr-1" /> Clear
+                                                {(statusFilter.length > 0 || assigneeFilter !== 'all') && (
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        onClick={() => {
+                                                            setStatusFilter([])
+                                                            setAssigneeFilter('all')
+                                                            setSortBy('due_date_asc')
+                                                        }}
+                                                        className="w-full"
+                                                    >
+                                                        <X className="w-4 h-4 mr-2" /> Clear Filters
                                                     </Button>
                                                 )}
                                             </div>
-                                        </div>
+                                        </PopoverContent>
+                                    </Popover>
+
+                                    {/* View Mode Switcher */}
+                                    <div className="bg-muted p-1 rounded-lg flex items-center">
+                                        <Button
+                                            variant={viewMode === 'grid' ? 'default' : 'ghost'}
+                                            size="sm"
+                                            onClick={() => setViewMode('grid')}
+                                            className={viewMode === 'grid' ? 'shadow-sm' : ''}
+                                            aria-label="Grid view"
+                                        >
+                                            <LayoutGrid className="h-4 w-4" />
+                                        </Button>
+                                        <Button
+                                            variant={viewMode === 'list' ? 'default' : 'ghost'}
+                                            size="sm"
+                                            onClick={() => setViewMode('list')}
+                                            className={viewMode === 'list' ? 'shadow-sm' : ''}
+                                            aria-label="List view"
+                                        >
+                                            <List className="h-4 w-4" />
+                                        </Button>
+                                        <TooltipProvider>
+                                            <Tooltip>
+                                                <TooltipTrigger asChild>
+                                                    <Button
+                                                        variant={viewMode === 'timeline' ? 'default' : 'ghost'}
+                                                        size="sm"
+                                                        onClick={() => setViewMode('timeline')}
+                                                        className={viewMode === 'timeline' ? 'shadow-sm' : ''}
+                                                        aria-label="Timeline view"
+                                                    >
+                                                        <CalendarDays className="h-4 w-4" />
+                                                    </Button>
+                                                </TooltipTrigger>
+                                                <TooltipContent>
+                                                    <p>Timeline (Gantt chart view)</p>
+                                                </TooltipContent>
+                                            </Tooltip>
+                                        </TooltipProvider>
+                                    </div>
+
+                                    {/* Collapse All (for grid view) */}
+                                    {viewMode === 'grid' && hasExpandedCard && (
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={collapseAll}
+                                            className="text-xs text-muted-foreground hover:text-foreground"
+                                        >
+                                            Collapse
+                                        </Button>
+                                    )}
+
+                                    {/* Active Filter Indicator */}
+                                    {(activePreset || statusFilter.length > 0 || assigneeFilter !== 'all') && (
+                                        <div className="flex items-center gap-2 px-3 py-1.5 bg-orange-50 border border-orange-200 rounded-lg">
+                                            <Filter className="h-3.5 w-3.5 text-orange-600" />
+                                            <span className="text-xs font-medium text-orange-700">
+                                                Showing {sortedTasks.length} of {tasks.length}
+                                            </span>
+                                            <button
+                                                onClick={() => {
+                                                    setActivePreset(null)
+                                                    setStatusFilter([])
+                                                    setAssigneeFilter('all')
+                                                }}
+                                                className="text-orange-600 hover:text-orange-800 transition-colors"
+                                                aria-label="Clear all filters"
+                                            >
+                                                <X className="h-3.5 w-3.5" />
+                                            </button>
                                         </div>
                                     )}
+
+                                    {/* Refresh and Select */}
+                                    <RefreshButton />
+                                    <Button variant="secondary" size="sm" onClick={toggleSelectionMode}>
+                                        <CheckSquare className="w-4 h-4 mr-2 text-muted-foreground" />
+                                        Select
+                                    </Button>
+
+                                    {/* Create Task */}
+                                    <FeatureTip
+                                        id="tasks-create"
+                                        title="Create Tasks"
+                                        description="Break down objectives into actionable tasks. Assign them to team members or AI agents, set deadlines, and track completion."
+                                        align="right"
+                                    >
+                                        <CreateTaskDialog
+                                            objectives={objectives}
+                                            members={members}
+                                            teams={teams}
+                                            currentUserId={currentUserId}
+                                        />
+                                    </FeatureTip>
                                 </>
-                            )
-                        })()}
+                            )}
+                        </div>
                     </div>
                 </div>
 
