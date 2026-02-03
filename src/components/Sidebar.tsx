@@ -42,7 +42,7 @@ const workNavigation = [
 
 // Discovery: finding help and resources
 const discoveryNavigation = [
-    { name: "Inspiration", href: "/blueprints", icon: Lightbulb, tooltip: "Get ideas on what to do next and discover opportunities" },
+    { name: "Inspiration", href: "/inspiration", icon: Lightbulb, tooltip: "Get ideas on what to do next and discover opportunities" },
     { name: "Marketplace", href: "/marketplace", icon: Store, tooltip: "Find experts, suppliers, products, and services" },
 ]
 

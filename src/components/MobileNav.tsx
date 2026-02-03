@@ -32,7 +32,7 @@ const mainNavigation = [
 // Items in the "More" dropdown (Objectives + Discovery + Settings)
 const moreNavigation = [
     { name: "Objectives", href: "/objectives", icon: Target },
-    { name: "Inspiration", href: "/blueprints", icon: Lightbulb },
+    { name: "Inspiration", href: "/inspiration", icon: Lightbulb },
     { name: "Marketplace", href: "/marketplace", icon: Store },
     { name: "Settings", href: "/settings", icon: Settings },
 ]
