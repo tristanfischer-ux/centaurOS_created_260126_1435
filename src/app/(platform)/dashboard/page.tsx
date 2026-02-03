@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation"
 
-// Redirect /dashboard to /home - the unified home view
+// Redirect /dashboard to /timeline - the Gantt view is the primary workspace
 export default async function DashboardPage() {
-    redirect("/home")
+    redirect("/timeline")
 }
