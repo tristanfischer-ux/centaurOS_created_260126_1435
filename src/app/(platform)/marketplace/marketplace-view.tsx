@@ -758,14 +758,22 @@ export function MarketplaceView({
     }, [filteredItems, topTab])
 
     // Build selected items for comparison, ensuring all have valid attributes
+    // Include both initialListings and savedListings so comparison works from Saved tab
     const selectedItems = useMemo(() => {
-        return initialListings
+        // Combine both sources, dedupe by id
+        const allListings = [...initialListings]
+        savedListings.forEach(saved => {
+            if (!allListings.some(item => item.id === saved.id)) {
+                allListings.push(saved)
+            }
+        })
+        return allListings
             .filter(item => selectedIds.has(item.id))
             .map(item => ({
                 ...item,
                 attributes: item.attributes || {}
             }))
-    }, [initialListings, selectedIds])
+    }, [initialListings, savedListings, selectedIds])
 
     const getSearchPlaceholder = () => {
         switch (activeTab) {
@@ -1775,21 +1783,6 @@ export function MarketplaceView({
                 </div>
             </div>
 
-            {/* Comparison Bar - hides when modal opens */}
-            {!isComparisonOpen && (
-                <ComparisonBar
-                    selectedItems={selectedItems}
-                    onClear={clearSelection}
-                    onCompare={() => setIsComparisonOpen(true)}
-                    onRemove={(id) => toggleSelect(id)}
-                />
-            )}
-
-            <ComparisonModal
-                open={isComparisonOpen}
-                onOpenChange={setIsComparisonOpen}
-                items={selectedItems}
-            />
                 </TabsContent>
 
                 {/* My RFQs Tab */}
@@ -1925,6 +1918,22 @@ export function MarketplaceView({
                     </div>
                 </TabsContent>
             </Tabs>
+
+            {/* Comparison Bar - available for all tabs, hides when modal opens */}
+            {!isComparisonOpen && (
+                <ComparisonBar
+                    selectedItems={selectedItems}
+                    onClear={clearSelection}
+                    onCompare={() => setIsComparisonOpen(true)}
+                    onRemove={(id) => toggleSelect(id)}
+                />
+            )}
+
+            <ComparisonModal
+                open={isComparisonOpen}
+                onOpenChange={setIsComparisonOpen}
+                items={selectedItems}
+            />
         </div>
     )
 }

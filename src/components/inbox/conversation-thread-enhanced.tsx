@@ -264,12 +264,29 @@ export function ConversationThreadEnhanced({
 
   // Handle send message with context (for CommandInput)
   const handleSend = useCallback(async (content: string): Promise<boolean> => {
-    if (!content.trim() || isSending || !conversationId) return false
+    console.log('[handleSend] Called with:', { content, conversationId, currentUserId, isSending })
+    
+    if (!content.trim()) {
+      console.log('[handleSend] Empty content, returning false')
+      return false
+    }
+    
+    if (isSending) {
+      console.log('[handleSend] Already sending, returning false')
+      return false
+    }
+    
+    if (!conversationId) {
+      console.log('[handleSend] No conversationId, returning false')
+      toast.error('No conversation selected')
+      return false
+    }
 
     setIsSending(true)
 
     try {
       const supabase = createClient()
+      console.log('[handleSend] Calling sendMessageWithContext...')
       
       // Send message with optional task/objective context
       await sendMessageWithContext(supabase, {
@@ -281,10 +298,11 @@ export function ConversationThreadEnhanced({
         messageType: 'text'
       })
       
+      console.log('[handleSend] Message sent successfully')
       // Success - message will appear via real-time subscription
       return true
     } catch (error) {
-      console.error('Failed to send message:', error)
+      console.error('[handleSend] Failed to send message:', error)
       toast.error('Failed to send message')
       return false
     } finally {

@@ -378,9 +378,13 @@ export function CommandInput({
   // Handle form submit
   const handleSubmit = useCallback(async (e: FormEvent) => {
     e.preventDefault()
+    console.log('[CommandInput.handleSubmit] Called', { inputValue, isSending, disabled })
     
     const content = inputValue.trim()
-    if (!content || isSending || disabled) return
+    if (!content || isSending || disabled) {
+      console.log('[CommandInput.handleSubmit] Early return', { content: !!content, isSending, disabled })
+      return
+    }
     
     // Check if it's a slash command
     if (shouldExecuteAsCommand(content)) {
@@ -435,15 +439,20 @@ export function CommandInput({
     }
     
     // Regular message
+    console.log('[CommandInput.handleSubmit] Sending regular message:', content)
     setIsSending(true)
     
     try {
+      console.log('[CommandInput.handleSubmit] Calling onSend...')
       const success = await onSend(content)
+      console.log('[CommandInput.handleSubmit] onSend returned:', success)
       if (success) {
         setInputValue('')
         clearDraft()
         addToHistory()
       }
+    } catch (error) {
+      console.error('[CommandInput.handleSubmit] onSend threw error:', error)
     } finally {
       setIsSending(false)
       textareaRef.current?.focus()
