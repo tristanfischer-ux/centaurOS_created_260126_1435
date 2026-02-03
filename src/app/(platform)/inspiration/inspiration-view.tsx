@@ -33,8 +33,13 @@ import {
   Users2,
   Truck,
   Sparkles,
-  ExternalLink
+  ExternalLink,
+  Search,
+  X,
+  SlidersHorizontal,
+  Heart
 } from 'lucide-react'
+import { Input } from '@/components/ui/input'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -42,6 +47,7 @@ import { typography, spacing } from '@/lib/design-system'
 import { cn } from '@/lib/utils'
 import type { BlueprintTemplate, KnowledgeDomain, DomainCategory } from '@/types/blueprints'
 import type { ObjectivePack } from '@/actions/packs'
+import { savePack, unsavePack } from '@/actions/packs'
 import { getTemplateDomains } from '@/actions/blueprints'
 import { toast } from 'sonner'
 import { UsePackDialog } from '@/components/blueprints/use-pack-dialog'
@@ -829,13 +835,30 @@ function IndustryDetailView({
  */
 function IndustryPacksView({ 
   selectedIndustry, 
-  onBack 
+  onBack,
+  savedPackIds,
+  onSaveToggle
 }: { 
   selectedIndustry: BlueprintTemplate
-  onBack: () => void 
+  onBack: () => void
+  savedPackIds: Set<string>
+  onSaveToggle: (packId: string, isSaved: boolean) => void
 }) {
   const [industryPacks, setIndustryPacks] = useState<ObjectivePack[]>([])
   const [loadingPacks, setLoadingPacks] = useState(true)
+  
+  // Search state
+  const [searchQuery, setSearchQuery] = useState('')
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('')
+  const [difficultyFilter, setDifficultyFilter] = useState<string>('all')
+  
+  // Debounce search query
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery)
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [searchQuery])
   
   // Card size state - same pattern as main InspirationView
   const [defaultCardSize, setDefaultCardSize] = useState<PackCardSize>('medium')
@@ -850,6 +873,13 @@ function IndustryPacksView({
   const setAllCardsSize = useCallback((size: PackCardSize) => {
     setDefaultCardSize(size)
     setCardSizes({}) // Clear individual overrides
+  }, [])
+  
+  // Clear all filters
+  const clearFilters = useCallback(() => {
+    setSearchQuery('')
+    setDebouncedSearchQuery('')
+    setDifficultyFilter('all')
   }, [])
 
   // Fetch packs filtered by industry product_category
@@ -1013,7 +1043,7 @@ function IndustryPacksView({
             ? "grid-cols-1 lg:grid-cols-2" 
             : "grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
         )}>
-          {industryPacks.map(pack => (
+          {filteredPacks.map(pack => (
             <PackCard
               key={pack.id}
               pack={pack}
@@ -1037,12 +1067,58 @@ interface PackCardProps {
   pack: ObjectivePack
   size?: PackCardSize
   onSizeChange?: (id: string, size: PackCardSize) => void
+  isSaved?: boolean
+  onSaveToggle?: (id: string, isSaved: boolean) => void
 }
 
-function PackCard({ pack, size = 'medium', onSizeChange }: PackCardProps) {
+function PackCard({ pack, size = 'medium', onSizeChange, isSaved = false, onSaveToggle }: PackCardProps) {
   const Icon = getPackIcon(pack.icon_name)
   const taskCount = pack.items?.length || 0
   const displayTasks = pack.items?.slice(0, 3) || []
+  const [isHovered, setIsHovered] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
+  const [localSavedState, setLocalSavedState] = useState(isSaved)
+
+  // Sync local state with prop
+  useEffect(() => {
+    setLocalSavedState(isSaved)
+  }, [isSaved])
+
+  // Handle save/unsave
+  const handleSaveToggle = useCallback(async (e: React.MouseEvent) => {
+    e.stopPropagation()
+    setIsSaving(true)
+    
+    const newSavedState = !localSavedState
+    
+    // Optimistic update
+    setLocalSavedState(newSavedState)
+    
+    try {
+      const result = newSavedState 
+        ? await savePack(pack.id)
+        : await unsavePack(pack.id)
+      
+      if (result.error) {
+        // Revert on error
+        setLocalSavedState(!newSavedState)
+        toast.error(result.error)
+      } else {
+        toast.success(newSavedState ? 'Saved to favorites' : 'Removed from favorites')
+        // Notify parent if callback provided
+        if (onSaveToggle) {
+          onSaveToggle(pack.id, newSavedState)
+        }
+      }
+    } catch (error) {
+      // Revert on exception
+      setLocalSavedState(!newSavedState)
+      toast.error('Failed to update saved status')
+      console.error('[PackCard] Save toggle error:', error)
+    } finally {
+      setIsSaving(false)
+    }
+  }, [pack.id, localSavedState, onSaveToggle])
   
   // Cycle through sizes on click
   const handleCardClick = useCallback((e: React.MouseEvent) => {
@@ -1080,11 +1156,35 @@ function PackCard({ pack, size = 'medium', onSizeChange }: PackCardProps) {
         trigger={
           <Card 
             className={cn(
-              "flex flex-col transition-all duration-200 hover:shadow-md cursor-pointer",
+              "group relative flex flex-col transition-all duration-200 hover:shadow-md cursor-pointer",
               "col-span-1 md:col-span-2"
             )}
+            onMouseEnter={() => setIsHovered(true)}
+            onMouseLeave={() => setIsHovered(false)}
           >
-            <CardHeader>
+            {/* Save/Heart button - top right */}
+            <div className="absolute top-3 right-3 z-20">
+              <button
+                onClick={handleSaveToggle}
+                disabled={isSaving}
+                className={cn(
+                  "w-8 h-8 rounded-full flex items-center justify-center transition-all duration-200",
+                  localSavedState
+                    ? "bg-red-500 text-white shadow-md"
+                    : isHovered
+                      ? "bg-background text-muted-foreground shadow-md border opacity-100"
+                      : "opacity-0 group-hover:opacity-100"
+                )}
+                title={localSavedState ? "Remove from saved" : "Save for later"}
+              >
+                <Heart className={cn(
+                  "w-4 h-4 transition-all",
+                  localSavedState && "fill-current"
+                )} />
+              </button>
+            </div>
+
+            <CardHeader className="pr-14">
               <div className="flex items-start justify-between gap-4 mb-2">
                 <div className="p-3 rounded-lg bg-electric-blue/10">
                   <Icon className="h-6 w-6 text-electric-blue" />
@@ -1148,15 +1248,39 @@ function PackCard({ pack, size = 'medium', onSizeChange }: PackCardProps) {
   return (
     <Card 
       className={cn(
-        "flex flex-col transition-all duration-200 hover:shadow-md cursor-pointer",
+        "group relative flex flex-col transition-all duration-200 hover:shadow-md cursor-pointer",
         size === 'small' && "hover:border-electric-blue/50"
       )}
       onClick={handleCardClick}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
     >
+      {/* Save/Heart button - top right */}
+      <div className="absolute top-3 right-3 z-20">
+        <button
+          onClick={handleSaveToggle}
+          disabled={isSaving}
+          className={cn(
+            "w-8 h-8 rounded-full flex items-center justify-center transition-all duration-200",
+            localSavedState
+              ? "bg-red-500 text-white shadow-md"
+              : isHovered
+                ? "bg-background text-muted-foreground shadow-md border opacity-100"
+                : "opacity-0 group-hover:opacity-100"
+          )}
+          title={localSavedState ? "Remove from saved" : "Save for later"}
+        >
+          <Heart className={cn(
+            "w-4 h-4 transition-all",
+            localSavedState && "fill-current"
+          )} />
+        </button>
+      </div>
+
       {/* === SMALL SIZE: Compact view === */}
       {size === 'small' && (
         <>
-          <CardContent className="p-3">
+          <CardContent className="p-3 pr-14">
             <div className="flex items-center gap-3">
               {/* Small Avatar */}
               <div className="w-10 h-10 rounded-lg bg-electric-blue/10 flex items-center justify-center shrink-0">
@@ -1205,7 +1329,7 @@ function PackCard({ pack, size = 'medium', onSizeChange }: PackCardProps) {
       {/* === MEDIUM SIZE: Standard view === */}
       {size === 'medium' && (
         <>
-          <CardHeader>
+          <CardHeader className="pr-14">
             <div className="flex items-start justify-between gap-4 mb-2">
               <div className="p-2.5 rounded-lg bg-electric-blue/10">
                 <Icon className="h-5 w-5 text-electric-blue" />
@@ -1293,13 +1417,43 @@ function PackCard({ pack, size = 'medium', onSizeChange }: PackCardProps) {
 interface InspirationViewProps {
   templates?: BlueprintTemplate[]
   packs?: ObjectivePack[]
+  initialSavedPackIds?: string[]
 }
 
-export function InspirationView({ templates = [], packs = [] }: InspirationViewProps) {
+export function InspirationView({ templates = [], packs = [], initialSavedPackIds = [] }: InspirationViewProps) {
   const router = useRouter()
   // Default to 'business' category so packs show immediately
   const [selectedCategory, setSelectedCategory] = useState<CategoryId>('business')
   const [selectedIndustry, setSelectedIndustry] = useState<BlueprintTemplate | null>(null)
+  
+  // Saved packs state
+  const [savedPackIds, setSavedPackIds] = useState<Set<string>>(new Set(initialSavedPackIds))
+  
+  // Handle save toggle callback from PackCard
+  const handleSaveToggle = useCallback((packId: string, isSaved: boolean) => {
+    setSavedPackIds(prev => {
+      const newSet = new Set(prev)
+      if (isSaved) {
+        newSet.add(packId)
+      } else {
+        newSet.delete(packId)
+      }
+      return newSet
+    })
+  }, [])
+  
+  // Search state
+  const [searchQuery, setSearchQuery] = useState('')
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('')
+  const [difficultyFilter, setDifficultyFilter] = useState<string>('all')
+  
+  // Debounce search query
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery)
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [searchQuery])
   
   // Card size state
   const [defaultCardSize, setDefaultCardSize] = useState<PackCardSize>('medium')
@@ -1315,15 +1469,49 @@ export function InspirationView({ templates = [], packs = [] }: InspirationViewP
     setDefaultCardSize(size)
     setCardSizes({}) // Clear individual overrides
   }, [])
+  
+  // Clear all filters
+  const clearFilters = useCallback(() => {
+    setSearchQuery('')
+    setDebouncedSearchQuery('')
+    setDifficultyFilter('all')
+  }, [])
 
-  // Filter packs by selected category using CATEGORY_FILTERS
+  // Filter packs by selected category, search query, and difficulty
   const filteredPacks = selectedCategory && selectedCategory !== 'industry'
     ? packs.filter(pack => {
+        // Category filter
         const packCategory = pack.category?.toLowerCase() || ''
         const filters = CATEGORY_FILTERS[selectedCategory as keyof typeof CATEGORY_FILTERS] || []
-        return filters.some(filter => packCategory.includes(filter))
+        const matchesCategory = filters.some(filter => packCategory.includes(filter))
+        if (!matchesCategory) return false
+        
+        // Search filter
+        if (debouncedSearchQuery.trim()) {
+          const query = debouncedSearchQuery.toLowerCase().trim()
+          const matchesTitle = pack.title?.toLowerCase().includes(query)
+          const matchesDescription = pack.description?.toLowerCase().includes(query)
+          const matchesTasks = pack.items?.some(item => 
+            item.title?.toLowerCase().includes(query) || 
+            item.description?.toLowerCase().includes(query)
+          )
+          if (!matchesTitle && !matchesDescription && !matchesTasks) return false
+        }
+        
+        // Difficulty filter
+        if (difficultyFilter !== 'all') {
+          if (pack.difficulty?.toLowerCase() !== difficultyFilter.toLowerCase()) return false
+        }
+        
+        return true
       })
     : []
+  
+  // Check if any filters are active
+  const hasActiveFilters = searchQuery.trim() !== '' || difficultyFilter !== 'all'
+  
+  // Get unique difficulties from packs
+  const availableDifficulties = [...new Set(packs.map(p => p.difficulty).filter(Boolean))]
   
   // Get category count dynamically
   const getCategoryPackCount = (categoryId: string): number => {
@@ -1603,10 +1791,88 @@ export function InspirationView({ templates = [], packs = [] }: InspirationViewP
       ) : (
         // Business or Subsystems - show pack grid
         <div>
+          {/* Search bar and filters */}
+          <div className="flex flex-col sm:flex-row gap-4 mb-6">
+            {/* Search input */}
+            <div className="flex-1 flex gap-2">
+              <div className="relative flex-1 max-w-lg">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  type="text"
+                  placeholder="Search by title, description, or task..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && e.preventDefault()}
+                  className="pl-10 pr-10"
+                />
+                {searchQuery && (
+                  <button
+                    onClick={() => setSearchQuery('')}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
+              <Button onClick={() => setDebouncedSearchQuery(searchQuery)}>
+                <Search className="h-4 w-4 mr-2" />
+                Search
+              </Button>
+            </div>
+            
+            {/* Difficulty filter dropdown */}
+            <div className="flex items-center gap-2">
+              <select
+                value={difficultyFilter}
+                onChange={(e) => setDifficultyFilter(e.target.value)}
+                className="h-10 px-3 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+              >
+                <option value="all">All Difficulties</option>
+                {availableDifficulties.map(diff => (
+                  <option key={diff} value={diff}>{diff}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+          
+          {/* Active filter badges */}
+          {hasActiveFilters && (
+            <div className="flex flex-wrap items-center gap-2 mb-4">
+              <span className="text-sm text-muted-foreground">Filter:</span>
+              {searchQuery.trim() && (
+                <Badge variant="secondary" className="gap-1">
+                  &quot;{searchQuery}&quot;
+                  <X 
+                    className="h-3 w-3 cursor-pointer" 
+                    onClick={() => {
+                      setSearchQuery('')
+                      setDebouncedSearchQuery('')
+                    }} 
+                  />
+                </Badge>
+              )}
+              {difficultyFilter !== 'all' && (
+                <Badge variant="secondary" className="gap-1">
+                  {difficultyFilter}
+                  <X 
+                    className="h-3 w-3 cursor-pointer" 
+                    onClick={() => setDifficultyFilter('all')} 
+                  />
+                </Badge>
+              )}
+              <button
+                onClick={clearFilters}
+                className="text-xs text-muted-foreground hover:text-foreground underline"
+              >
+                Clear all
+              </button>
+            </div>
+          )}
+          
           {/* Results count and size controls */}
           <div className="flex items-center justify-between mb-4">
             <p className="text-sm text-muted-foreground">
-              Showing {filteredPacks.length} packs
+              Showing {filteredPacks.length} packs{hasActiveFilters && ' (filtered)'}
             </p>
             <div className="flex items-center gap-3">
               {/* Card size controls */}
@@ -1656,7 +1922,9 @@ export function InspirationView({ templates = [], packs = [] }: InspirationViewP
             <Card>
               <CardContent className="pt-6">
                 <p className="text-muted-foreground text-center">
-                  No objective packs available for this category yet.
+                  {hasActiveFilters 
+                    ? 'No packs match your search criteria. Try adjusting your filters.'
+                    : 'No objective packs available for this category yet.'}
                 </p>
               </CardContent>
             </Card>
@@ -1673,6 +1941,8 @@ export function InspirationView({ templates = [], packs = [] }: InspirationViewP
                   pack={pack}
                   size={cardSizes[pack.id] || defaultCardSize}
                   onSizeChange={handleCardSizeChange}
+                  isSaved={savedPackIds.has(pack.id)}
+                  onSaveToggle={handleSaveToggle}
                 />
               ))}
             </div>
