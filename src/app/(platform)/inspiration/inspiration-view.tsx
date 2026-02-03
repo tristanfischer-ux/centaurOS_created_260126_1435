@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { 
   Lightbulb, 
@@ -43,6 +43,7 @@ import { Input } from '@/components/ui/input'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { typography, spacing } from '@/lib/design-system'
 import { cn } from '@/lib/utils'
 import type { BlueprintTemplate, KnowledgeDomain, DomainCategory } from '@/types/blueprints'
@@ -1448,6 +1449,8 @@ export function InspirationView({ templates = [], packs = [], initialSavedPackId
   const [searchQuery, setSearchQuery] = useState('')
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('')
   const [difficultyFilter, setDifficultyFilter] = useState<string>('all')
+  const [showFilters, setShowFilters] = useState(false)
+  const [sortBy, setSortBy] = useState<'relevance' | 'name' | 'difficulty' | 'duration'>('relevance')
   
   // Debounce search query
   useEffect(() => {
@@ -1480,34 +1483,72 @@ export function InspirationView({ templates = [], packs = [], initialSavedPackId
   }, [])
 
   // Filter packs by selected category, search query, and difficulty
-  const filteredPacks = selectedCategory && selectedCategory !== 'industry'
-    ? packs.filter(pack => {
-        // Category filter
-        const packCategory = pack.category?.toLowerCase() || ''
-        const filters = CATEGORY_FILTERS[selectedCategory as keyof typeof CATEGORY_FILTERS] || []
-        const matchesCategory = filters.some(filter => packCategory.includes(filter))
-        if (!matchesCategory) return false
-        
-        // Search filter
-        if (debouncedSearchQuery.trim()) {
-          const query = debouncedSearchQuery.toLowerCase().trim()
-          const matchesTitle = pack.title?.toLowerCase().includes(query)
-          const matchesDescription = pack.description?.toLowerCase().includes(query)
-          const matchesTasks = pack.items?.some(item => 
-            item.title?.toLowerCase().includes(query) || 
-            item.description?.toLowerCase().includes(query)
-          )
-          if (!matchesTitle && !matchesDescription && !matchesTasks) return false
-        }
-        
-        // Difficulty filter
-        if (difficultyFilter !== 'all') {
-          if (pack.difficulty?.toLowerCase() !== difficultyFilter.toLowerCase()) return false
-        }
-        
-        return true
-      })
-    : []
+  const filteredAndSortedPacks = useMemo(() => {
+    if (!selectedCategory || selectedCategory === 'industry') return []
+    
+    const filtered = packs.filter(pack => {
+      // Category filter
+      const packCategory = pack.category?.toLowerCase() || ''
+      const filters = CATEGORY_FILTERS[selectedCategory as keyof typeof CATEGORY_FILTERS] || []
+      const matchesCategory = filters.some(filter => packCategory.includes(filter))
+      if (!matchesCategory) return false
+      
+      // Search filter
+      if (debouncedSearchQuery.trim()) {
+        const query = debouncedSearchQuery.toLowerCase().trim()
+        const matchesTitle = pack.title?.toLowerCase().includes(query)
+        const matchesDescription = pack.description?.toLowerCase().includes(query)
+        const matchesTasks = pack.items?.some(item => 
+          item.title?.toLowerCase().includes(query) || 
+          item.description?.toLowerCase().includes(query)
+        )
+        if (!matchesTitle && !matchesDescription && !matchesTasks) return false
+      }
+      
+      // Difficulty filter
+      if (difficultyFilter !== 'all') {
+        if (pack.difficulty?.toLowerCase() !== difficultyFilter.toLowerCase()) return false
+      }
+      
+      return true
+    })
+    
+    // Sort results (create copy to avoid mutating)
+    const result = [...filtered]
+    switch (sortBy) {
+      case 'name':
+        result.sort((a, b) => (a.title || '').localeCompare(b.title || ''))
+        break
+      case 'difficulty':
+        const diffOrder = { 'Easy': 1, 'Medium': 2, 'Hard': 3 }
+        result.sort((a, b) => {
+          const aVal = diffOrder[a.difficulty as keyof typeof diffOrder] || 2
+          const bVal = diffOrder[b.difficulty as keyof typeof diffOrder] || 2
+          return aVal - bVal
+        })
+        break
+      case 'duration':
+        // Sort by estimated duration (extract number from string like "2-4 weeks")
+        result.sort((a, b) => {
+          const extractDuration = (str: string | null | undefined): number => {
+            if (!str) return 999
+            const match = str.match(/(\d+)/)
+            return match ? parseInt(match[1]) : 999
+          }
+          return extractDuration(a.estimated_duration) - extractDuration(b.estimated_duration)
+        })
+        break
+      case 'relevance':
+      default:
+        // Keep original order (already sorted by relevance)
+        break
+    }
+    
+    return result
+  }, [packs, selectedCategory, debouncedSearchQuery, difficultyFilter, sortBy])
+  
+  // Keep old name for backward compatibility
+  const filteredPacks = filteredAndSortedPacks
   
   // Check if any filters are active
   const hasActiveFilters = searchQuery.trim() !== '' || difficultyFilter !== 'all'
@@ -1795,9 +1836,9 @@ export function InspirationView({ templates = [], packs = [], initialSavedPackId
       ) : (
         // Business or Subsystems - show pack grid
         <div>
-          {/* Search bar and filters */}
-          <div className="flex flex-col sm:flex-row gap-4 mb-6">
-            {/* Search input */}
+          {/* Search bar and filters - Enhanced UI matching marketplace */}
+          <div className="flex flex-col sm:flex-row gap-3 mb-6">
+            {/* Search input with icon */}
             <div className="flex-1 flex gap-2">
               <div className="relative flex-1 max-w-lg">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -1812,72 +1853,130 @@ export function InspirationView({ templates = [], packs = [], initialSavedPackId
                 {searchQuery && (
                   <button
                     onClick={() => setSearchQuery('')}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
                   >
                     <X className="h-4 w-4" />
                   </button>
                 )}
               </div>
-              <Button onClick={() => setDebouncedSearchQuery(searchQuery)}>
-                <Search className="h-4 w-4 mr-2" />
-                Search
-              </Button>
             </div>
             
-            {/* Difficulty filter dropdown */}
             <div className="flex items-center gap-2">
-              <select
-                value={difficultyFilter}
-                onChange={(e) => setDifficultyFilter(e.target.value)}
-                className="h-10 px-3 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+              {/* Sort dropdown */}
+              <Select value={sortBy} onValueChange={(val) => setSortBy(val as typeof sortBy)}>
+                <SelectTrigger className="w-[160px]">
+                  <SelectValue placeholder="Sort by" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="relevance">Most Relevant</SelectItem>
+                  <SelectItem value="name">Name (A-Z)</SelectItem>
+                  <SelectItem value="difficulty">Difficulty</SelectItem>
+                  <SelectItem value="duration">Duration</SelectItem>
+                </SelectContent>
+              </Select>
+              
+              {/* Filters button */}
+              <Button 
+                variant="secondary" 
+                size="default"
+                onClick={() => setShowFilters(!showFilters)}
+                className={cn(
+                  "gap-2",
+                  showFilters && 'bg-muted'
+                )}
               >
-                <option value="all">All Difficulties</option>
-                {availableDifficulties.map(diff => (
-                  <option key={diff} value={diff}>{diff}</option>
-                ))}
-              </select>
+                <SlidersHorizontal className="h-4 w-4" />
+                Filters
+                {hasActiveFilters && (
+                  <Badge className="ml-1 h-5 w-5 p-0 flex items-center justify-center text-[10px]">
+                    !
+                  </Badge>
+                )}
+              </Button>
             </div>
           </div>
           
-          {/* Active filter badges */}
+          {/* Filters Panel */}
+          {showFilters && (
+            <div className="bg-muted rounded-lg border border-border p-4 space-y-4 mb-6">
+              <div className="flex items-center justify-between">
+                <h3 className="font-medium text-sm">Filter Packs</h3>
+                {hasActiveFilters && (
+                  <Button variant="ghost" size="sm" onClick={clearFilters} className="h-8 text-xs">
+                    <X className="h-3 w-3 mr-1" /> Clear all
+                  </Button>
+                )}
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-muted-foreground">Difficulty</label>
+                  <Select value={difficultyFilter} onValueChange={setDifficultyFilter}>
+                    <SelectTrigger className="h-9">
+                      <SelectValue placeholder="All difficulties" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Difficulties</SelectItem>
+                      {availableDifficulties.map(diff => (
+                        <SelectItem key={diff} value={diff}>{diff}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </div>
+          )}
+          
+          {/* Active filter badges - Enhanced design */}
           {hasActiveFilters && (
-            <div className="flex flex-wrap items-center gap-2 mb-4">
-              <span className="text-sm text-muted-foreground">Filter:</span>
+            <div className="flex flex-wrap items-center gap-2 mb-6 p-3 bg-muted/50 rounded-lg border border-border">
+              <span className="text-xs font-medium text-muted-foreground">Active filters:</span>
               {searchQuery.trim() && (
-                <Badge variant="secondary" className="gap-1">
+                <Badge variant="secondary" className="gap-1.5 px-2.5 py-1">
+                  <Search className="h-3 w-3" />
                   &quot;{searchQuery}&quot;
-                  <X 
-                    className="h-3 w-3 cursor-pointer" 
+                  <button 
+                    className="ml-1 hover:text-destructive transition-colors" 
                     onClick={() => {
                       setSearchQuery('')
                       setDebouncedSearchQuery('')
-                    }} 
-                  />
+                    }}
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
                 </Badge>
               )}
               {difficultyFilter !== 'all' && (
-                <Badge variant="secondary" className="gap-1">
+                <Badge variant="secondary" className="gap-1.5 px-2.5 py-1">
                   {difficultyFilter}
-                  <X 
-                    className="h-3 w-3 cursor-pointer" 
-                    onClick={() => setDifficultyFilter('all')} 
-                  />
+                  <button
+                    className="ml-1 hover:text-destructive transition-colors"
+                    onClick={() => setDifficultyFilter('all')}
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
                 </Badge>
               )}
               <button
                 onClick={clearFilters}
-                className="text-xs text-muted-foreground hover:text-foreground underline"
+                className="text-xs font-medium text-muted-foreground hover:text-foreground underline ml-auto transition-colors"
               >
-                Clear all
+                Clear all filters
               </button>
             </div>
           )}
           
           {/* Results count and size controls */}
-          <div className="flex items-center justify-between mb-4">
-            <p className="text-sm text-muted-foreground">
-              Showing {filteredPacks.length} packs{hasActiveFilters && ' (filtered)'}
-            </p>
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-2">
+              <p className="text-sm font-medium text-foreground">
+                {filteredPacks.length} {filteredPacks.length === 1 ? 'pack' : 'packs'}
+              </p>
+              {hasActiveFilters && (
+                <Badge variant="secondary" className="text-xs">
+                  Filtered
+                </Badge>
+              )}
+            </div>
             <div className="flex items-center gap-3">
               {/* Card size controls */}
               <div className="bg-muted p-1 rounded-md flex items-center" title="Card detail level">
@@ -1923,13 +2022,26 @@ export function InspirationView({ templates = [], packs = [], initialSavedPackId
 
           {/* Pack grid */}
           {filteredPacks.length === 0 ? (
-            <Card>
-              <CardContent className="pt-6">
-                <p className="text-muted-foreground text-center">
+            <Card className="border-dashed">
+              <CardContent className="pt-12 pb-12 flex flex-col items-center text-center">
+                <Search className="h-12 w-12 text-muted-foreground mb-4 opacity-50" />
+                <h3 className="text-lg font-semibold mb-2">No packs found</h3>
+                <p className="text-sm text-muted-foreground max-w-md mb-4">
                   {hasActiveFilters 
-                    ? 'No packs match your search criteria. Try adjusting your filters.'
+                    ? 'No packs match your search criteria. Try adjusting your filters or search terms.'
                     : 'No objective packs available for this category yet.'}
                 </p>
+                {hasActiveFilters && (
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={clearFilters}
+                    className="gap-2"
+                  >
+                    <X className="h-4 w-4" />
+                    Clear all filters
+                  </Button>
+                )}
               </CardContent>
             </Card>
           ) : (

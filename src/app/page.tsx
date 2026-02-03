@@ -33,8 +33,8 @@ export default function MarketingPage() {
           
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center gap-8">
-            <a href="#centaurs" className="text-sm text-muted-foreground hover:text-foreground uppercase tracking-wider">
-              The Centaurs
+            <a href="#people" className="text-sm text-muted-foreground hover:text-foreground uppercase tracking-wider">
+              The People
             </a>
             <a href="#network" className="text-sm text-muted-foreground hover:text-foreground uppercase tracking-wider">
               The Network
@@ -70,11 +70,11 @@ export default function MarketingPage() {
           <div className="md:hidden border-t border bg-background">
             <div className="px-6 py-4 flex flex-col gap-4">
               <a 
-                href="#centaurs" 
+                href="#people" 
                 className="text-sm text-muted-foreground hover:text-foreground uppercase tracking-wider py-2"
                 onClick={() => setMobileMenuOpen(false)}
               >
-                The Centaurs
+                The People
               </a>
               <a 
                 href="#network" 

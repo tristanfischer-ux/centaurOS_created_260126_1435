@@ -24,7 +24,7 @@ function isRouteActive(pathname: string, href: string): boolean {
 
 // Simplified navigation - Primary nav items shown in bottom bar
 const mainNavigation = [
-    { name: "Inbox", shortName: "Inbox", href: "/inbox", icon: Inbox },
+    { name: "Inbox", shortName: "Inbox", href: "/home", icon: Inbox },
     { name: "Tasks", shortName: "Tasks", href: "/tasks", icon: CheckSquare },
     { name: "Team", shortName: "Team", href: "/team", icon: Users },
 ]

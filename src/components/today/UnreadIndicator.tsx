@@ -60,7 +60,7 @@ export function UnreadIndicator({ className }: UnreadIndicatorProps) {
 
     return (
         <Link
-            href="/inbox"
+            href="/home"
             className={cn(
                 "flex items-center gap-2 px-3 py-1.5 rounded-full transition-colors",
                 "bg-status-info-light border border-status-info",
