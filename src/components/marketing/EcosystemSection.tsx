@@ -12,7 +12,7 @@ const osComponents = [
     {
         label: "THE SYSTEM",
         title: "THE OPERATING SYSTEM.",
-        description: "The Hive Mind. Centaur OS coordinates Founders, Execs, and Apprentices. It grants the 'Digital Body' instant access to AI Agents, global manufacturing, and Guild intelligence.",
+        description: "Our operating system coordinates Founders, Executives and Apprentices. It gives them access to a rich marketplace of additional experts and outsourced manufacturing capability.",
         image: "/images/ecosystem-os.png",
     },
     {

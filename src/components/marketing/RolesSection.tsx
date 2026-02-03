@@ -21,7 +21,7 @@ const roles = [
     {
         title: "APPRENTICES DO",
         subtitle: "THE DIGITAL BODY.",
-        description: "\"We equip you with the Centaur OS—a 'Digital Body' multiplying your output tenfold. You aren't a junior. You are a Founder-in-Training.\"",
+        description: "\"We pair you with a seasoned executive and teach you the latest AI skills, multiplying your output tenfold. You aren't a junior. You are a Founder-in-Training.\"",
         image: "/images/os_chip.jpg",
         joinLink: "/join/apprentice"
     }

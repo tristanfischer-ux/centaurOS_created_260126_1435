@@ -21,7 +21,7 @@ const networkPartners = [
     {
         title: "UNIVERSITIES",
         subtitle: "THE FOUNDER PIPELINE.",
-        description: "\"Universities are IP-rich but execution-constrained. We provide the commercialization engine to transform research into venture-backed startups and students into Centaur Apprentices.\"",
+        description: "\"Universities are IP-rich but execution-constrained. We provide the commercialization engine to transform research into venture-backed startups and students into Apprentices.\"",
         image: "/images/network_pipeline.jpg",
         joinLink: "/join/network"
     }

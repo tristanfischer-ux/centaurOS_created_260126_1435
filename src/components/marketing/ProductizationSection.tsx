@@ -16,7 +16,7 @@ const network = [
     {
         label: "UNIVERSITIES",
         title: "THE FOUNDER PIPELINE.",
-        description: "Universities are IP-rich but execution-constrained. We provide the commercialization engine to transform research into venture-backed startups and students into Centaur Apprentices.",
+        description: "Universities are IP-rich but execution-constrained. We provide the commercialization engine to transform research into venture-backed startups and students into Apprentices.",
         gradient: "from-blue-900/20 to-transparent",
     },
 ];

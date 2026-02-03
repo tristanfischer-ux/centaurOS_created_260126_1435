@@ -204,7 +204,7 @@ export default function MarketingPage() {
               </span>
               <h3 className="text-xl md:text-2xl font-bold mb-3 md:mb-4">THE DIGITAL BODY.</h3>
               <p className="text-muted-foreground text-sm leading-relaxed flex-1">
-                &ldquo;We equip you with the Centaur OS—a &apos;Digital Body&apos; multiplying your output tenfold. You aren&apos;t a junior. You are a Founder-in-Training.&rdquo;
+                &ldquo;We pair you with a seasoned executive and teach you the latest AI skills, multiplying your output tenfold. You aren&apos;t a junior. You are a Founder-in-Training.&rdquo;
               </p>
               {/* Action Buttons */}
               <div className="pt-4 md:pt-6 mt-4 border-t border-muted flex gap-2 md:gap-3">
@@ -329,7 +329,7 @@ export default function MarketingPage() {
               </span>
               <h3 className="text-xl md:text-2xl font-bold mb-3 md:mb-4">THE FOUNDER PIPELINE.</h3>
               <p className="text-muted-foreground text-sm leading-relaxed flex-1">
-                &ldquo;Universities are IP-rich but execution-constrained. We provide the commercialization engine to transform research into venture-backed startups and students into Centaur Apprentices.&rdquo;
+                &ldquo;Universities are IP-rich but execution-constrained. We provide the commercialization engine to transform research into venture-backed startups and students into Apprentices.&rdquo;
               </p>
               {/* Action Buttons */}
               <div className="pt-4 md:pt-6 mt-4 border-t border-muted flex gap-2 md:gap-3">
@@ -397,7 +397,7 @@ export default function MarketingPage() {
               </span>
               <h3 className="text-xl md:text-2xl font-bold mb-3 md:mb-4">THE OPERATING SYSTEM.</h3>
               <p className="text-muted-foreground text-sm leading-relaxed">
-                &ldquo;The Hive Mind. Centaur OS coordinates Founders, Execs, and Apprentices. It grants the &apos;Digital Body&apos; instant access to AI Agents, global manufacturing, and Guild intelligence.&rdquo;
+                &ldquo;Our operating system coordinates Founders, Executives and Apprentices. It gives them access to a rich marketplace of additional experts and outsourced manufacturing capability.&rdquo;
               </p>
             </AnimatedCard>
 
