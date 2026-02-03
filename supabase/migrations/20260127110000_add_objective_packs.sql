@@ -49,8 +49,8 @@ CREATE POLICY "Authenticated users can manage pack items" ON public.pack_items
 -- 5. Seed Initial Data (Optional but helpful for "Playbook" feature)
 INSERT INTO public.objective_packs (title, description, category, difficulty, estimated_duration, icon_name)
 VALUES 
-('Launch MVP', 'Standard startup launch protocol with AI support.', 'Product', 'Hard', '4 Weeks', 'Rocket'),
-('Content Marketing Sprint', 'Generate 1 month of content in 3 days.', 'Marketing', 'Medium', '3 Days', 'Pencil');
+('Launch MVP', 'Ship your product to market in 4 weeks with surgical precision. This battle-tested launch protocol combines AI-powered market research, rapid prototyping, and zero-friction deployment pipelines to compress months of work into weeks. You''ll move from concept to deployed MVP with user validation, competitor insights, and production infrastructure—all while maintaining quality and avoiding costly pivots. Perfect for founders who need to prove product-market fit fast, capture early adopters before competitors move, and establish market presence while capital runway matters most. Speed is your competitive advantage.', 'Product', 'Hard', '4 Weeks', 'Rocket'),
+('Content Marketing Sprint', 'Flood your channels with 30 days of professional content in just 72 hours. This AI-accelerated sprint leverages keyword intelligence, competitor gap analysis, and automated content frameworks to generate blog posts, social media threads, email sequences, and SEO-optimized articles that actually drive traffic. You''ll build a content engine that establishes thought leadership, captures organic search traffic, and keeps your brand visible while you focus on building product. Essential for early-stage startups that need to own their narrative, dominate search rankings in their niche, and generate inbound leads without hiring a content team or waiting months for organic growth.', 'Marketing', 'Medium', '3 Days', 'Pencil');
 
 -- Get IDs for seeding items (using DO block)
 DO $$
