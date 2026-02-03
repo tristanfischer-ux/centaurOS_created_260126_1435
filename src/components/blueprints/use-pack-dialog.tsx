@@ -132,28 +132,28 @@ export function UsePackDialog({ pack, trigger }: UsePackDialogProps) {
           </Button>
         )}
       </DialogTrigger>
-      <DialogContent size="lg" className="max-w-3xl max-h-[90vh] overflow-hidden p-0 flex flex-col">
-        <DialogHeader className="px-6 pt-6 pb-4 border-b shrink-0">
+      <DialogContent size="lg" className="max-w-3xl max-h-[85vh]">
+        <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Package className="h-5 w-5 text-electric-blue" />
             {pack.title}
           </DialogTitle>
         </DialogHeader>
 
-        <Tabs defaultValue="overview" className="flex-1 flex flex-col overflow-hidden min-h-0">
-          <TabsList className="grid w-full grid-cols-2 rounded-none border-b shrink-0">
-            <TabsTrigger value="overview" className="gap-2 rounded-none">
+        <Tabs defaultValue="overview" className="mt-4">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="overview" className="gap-2">
               <Info className="h-4 w-4" />
               Overview
             </TabsTrigger>
-            <TabsTrigger value="tasks" className="gap-2 rounded-none">
+            <TabsTrigger value="tasks" className="gap-2">
               <CheckCircle2 className="h-4 w-4" />
               Select Tasks
             </TabsTrigger>
           </TabsList>
 
           {/* OVERVIEW TAB - with proper scroll */}
-          <TabsContent value="overview" className="flex-1 overflow-y-auto p-6 m-0 space-y-4 data-[state=active]:block min-h-0">
+          <TabsContent value="overview" className="mt-4 max-h-[55vh] overflow-y-auto space-y-4">
             {/* What is this pack? */}
             <Card className="bg-blue-50/50 border-blue-100">
               <CardContent className="pt-6">
@@ -256,7 +256,7 @@ export function UsePackDialog({ pack, trigger }: UsePackDialogProps) {
           </TabsContent>
 
             {/* TASKS TAB - with proper scroll */}
-            <TabsContent value="tasks" className="flex-1 overflow-y-auto p-6 m-0 flex flex-col space-y-4 min-h-0 data-[state=active]:flex">
+            <TabsContent value="tasks" className="mt-4 max-h-[55vh] overflow-y-auto space-y-4">
             {/* Objective Title */}
             <div className="space-y-2">
               <Label htmlFor="objective-title">Objective Title</Label>
@@ -403,7 +403,7 @@ export function UsePackDialog({ pack, trigger }: UsePackDialogProps) {
           </TabsContent>
         </Tabs>
 
-        <DialogFooter className="px-6 py-4 border-t bg-muted/30 shrink-0">
+        <DialogFooter className="mt-4">
           <Button variant="outline" onClick={() => setOpen(false)} disabled={isCreating}>
             Cancel
           </Button>
