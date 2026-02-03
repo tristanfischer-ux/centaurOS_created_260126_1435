@@ -824,6 +824,200 @@ function IndustryDetailView({
 }
 
 /**
+ * IndustryPacksView - Shows objective packs filtered by industry
+ * Uses the same PackCard/UsePackDialog pattern as Business Objectives for consistency
+ */
+function IndustryPacksView({ 
+  selectedIndustry, 
+  onBack 
+}: { 
+  selectedIndustry: BlueprintTemplate
+  onBack: () => void 
+}) {
+  const [industryPacks, setIndustryPacks] = useState<ObjectivePack[]>([])
+  const [loadingPacks, setLoadingPacks] = useState(true)
+  
+  // Card size state - same pattern as main InspirationView
+  const [defaultCardSize, setDefaultCardSize] = useState<PackCardSize>('medium')
+  const [cardSizes, setCardSizes] = useState<Record<string, PackCardSize>>({})
+  
+  // Handle individual card size changes
+  const handleCardSizeChange = useCallback((id: string, size: PackCardSize) => {
+    setCardSizes(prev => ({ ...prev, [id]: size }))
+  }, [])
+  
+  // Set all cards to a specific size
+  const setAllCardsSize = useCallback((size: PackCardSize) => {
+    setDefaultCardSize(size)
+    setCardSizes({}) // Clear individual overrides
+  }, [])
+
+  // Fetch packs filtered by industry product_category
+  useEffect(() => {
+    let mounted = true
+    
+    async function fetchIndustryPacks() {
+      setLoadingPacks(true)
+      try {
+        // Dynamic import to avoid circular dependencies
+        const { getObjectivePacks } = await import('@/actions/packs')
+        const result = await getObjectivePacks({ 
+          productCategory: selectedIndustry.product_category 
+        })
+        
+        if (!mounted) return
+        
+        if (result.error) {
+          toast.error('Failed to load objective packs for this industry')
+          setLoadingPacks(false)
+          return
+        }
+        
+        setIndustryPacks(result.packs)
+      } catch (error) {
+        if (mounted) {
+          console.error('[IndustryPacksView] Error fetching packs:', error)
+          toast.error('Failed to load objective packs')
+        }
+      } finally {
+        if (mounted) {
+          setLoadingPacks(false)
+        }
+      }
+    }
+    
+    fetchIndustryPacks()
+    
+    return () => {
+      mounted = false
+    }
+  }, [selectedIndustry.product_category])
+  
+  // Get icon for the industry
+  const IndustryIcon = getTemplateIcon(selectedIndustry.icon)
+  
+  return (
+    <div>
+      {/* Back button and header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-slate-100">
+        <div className="min-w-0 flex-1">
+          <Button
+            variant="ghost"
+            onClick={onBack}
+            className="mb-4 -ml-2"
+          >
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back to Industries
+          </Button>
+          
+          <div className={typography.pageHeader}>
+            <div className={typography.pageHeaderAccent} />
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-purple-100">
+                <IndustryIcon className="h-6 w-6 text-purple-600" />
+              </div>
+              <h1 className={typography.h1}>
+                {selectedIndustry.name}
+              </h1>
+            </div>
+          </div>
+          <p className={typography.pageSubtitle}>
+            {selectedIndustry.description}
+          </p>
+        </div>
+      </div>
+
+      {/* Objective Packs Grid */}
+      <div className="mt-8">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h2 className="text-2xl font-semibold">Objective Packs</h2>
+            <p className="text-sm text-muted-foreground mt-1">
+              {loadingPacks ? 'Loading...' : `${industryPacks.length} packs available for ${selectedIndustry.name}`}
+            </p>
+          </div>
+          
+          {/* Size toggle for pack cards - same controls as Business Objectives */}
+          <div className="bg-muted p-1 rounded-md flex items-center" title="Card detail level">
+            <Button
+              variant={defaultCardSize === 'small' ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => setAllCardsSize('small')}
+              className={cn("h-8 w-8 p-0", defaultCardSize === 'small' && 'shadow-sm')}
+              title="Compact cards"
+            >
+              <Minus className="h-4 w-4" />
+            </Button>
+            <Button
+              variant={defaultCardSize === 'medium' ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => setAllCardsSize('medium')}
+              className={cn("h-8 w-8 p-0", defaultCardSize === 'medium' && 'shadow-sm')}
+              title="Standard cards"
+            >
+              <Square className="h-4 w-4" />
+            </Button>
+            <Button
+              variant={defaultCardSize === 'full' ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => setAllCardsSize('full')}
+              className={cn("h-8 w-8 p-0", defaultCardSize === 'full' && 'shadow-sm')}
+              title="Detailed cards (opens modal)"
+            >
+              <AlignJustify className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+        
+        {loadingPacks ? (
+          // Loading skeleton - same as Business Objectives
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {[1, 2, 3, 4].map((i) => (
+              <Card key={i} className="animate-pulse">
+                <CardHeader>
+                  <div className="h-6 w-48 bg-muted rounded" />
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    <div className="h-4 w-full bg-muted rounded" />
+                    <div className="h-4 w-3/4 bg-muted rounded" />
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        ) : industryPacks.length === 0 ? (
+          <Card>
+            <CardContent className="pt-6">
+              <p className="text-muted-foreground text-center">
+                No objective packs available for {selectedIndustry.name} yet.
+              </p>
+            </CardContent>
+          </Card>
+        ) : (
+          // Pack grid - exactly same as Business Objectives
+          <div className={cn(
+            "grid gap-4 lg:gap-6 animate-fade-in",
+            defaultCardSize === 'full' 
+              ? "grid-cols-1 lg:grid-cols-2" 
+              : "grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+          )}>
+            {industryPacks.map((pack) => (
+              <PackCard
+                key={pack.id}
+                pack={pack}
+                size={cardSizes[pack.id] || defaultCardSize}
+                onSizeChange={handleCardSizeChange}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+/**
  * PackCard - Card for objective packs with three size variants:
  * - Small: Compact row - icon, title, difficulty badge, task count, duration
  * - Medium: Standard card with description and sample tasks
@@ -1340,7 +1534,7 @@ export function InspirationView({ templates = [], packs = [] }: InspirationViewP
       {/* Content based on selected category */}
       {selectedCategory === 'industry' ? (
         selectedIndustry ? (
-          <IndustryDetailView 
+          <IndustryPacksView 
             selectedIndustry={selectedIndustry} 
             onBack={() => setSelectedIndustry(null)} 
           />
@@ -1348,7 +1542,7 @@ export function InspirationView({ templates = [], packs = [] }: InspirationViewP
           // Industry template grid - simple selection (no size toggle)
           <div>
             <p className="text-sm text-muted-foreground mb-4">
-              Select an industry to explore its technical domains
+              Select an industry to explore its objective packs
             </p>
 
             {/* Simple industry selection grid */}
@@ -1376,7 +1570,7 @@ export function InspirationView({ templates = [], packs = [] }: InspirationViewP
                                 {difficulty}
                               </Badge>
                               <span className="text-xs text-muted-foreground">
-                                {template.estimated_domains} domains
+                                Objective packs
                               </span>
                             </div>
                             <h3 className="font-semibold text-sm truncate">{template.name}</h3>
@@ -1387,7 +1581,7 @@ export function InspirationView({ templates = [], packs = [] }: InspirationViewP
                         </p>
                         <div className="flex items-center gap-1 mt-3 pt-3 border-t border-muted text-xs text-purple-600 font-medium">
                           <Eye className="h-3 w-3" />
-                          <span>Click to explore</span>
+                          <span>View objective packs</span>
                         </div>
                       </CardContent>
                     </Card>

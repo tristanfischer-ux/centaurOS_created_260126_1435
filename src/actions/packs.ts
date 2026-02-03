@@ -17,10 +17,20 @@ export type ObjectivePack = {
     title: string
     description: string | null
     category: string | null
+    /** Industry category slug (e.g., 'robotics', 'rockets') for filtering by industry */
+    product_category?: string | null
     difficulty: string | null
     estimated_duration: string | null
     icon_name: string | null
     items?: PackItem[]
+}
+
+/**
+ * Options for filtering objective packs
+ */
+export type GetObjectivePacksOptions = {
+    /** Filter by product category (industry slug like 'robotics', 'rockets', etc.) */
+    productCategory?: string
 }
 
 // Type for subsystem pack task from JSONB
@@ -34,47 +44,70 @@ type SubsystemTask = {
 }
 
 /**
- * Fetches all objective packs from both objective_packs and subsystem_objective_packs tables.
+ * Fetches objective packs from both objective_packs and subsystem_objective_packs tables.
  * Combines and normalizes the data into a unified ObjectivePack format.
+ * 
+ * @param options - Optional filtering options
+ * @param options.productCategory - Filter by product category (industry slug like 'robotics', 'rockets', etc.)
+ * @returns Promise with packs array and optional error
  */
-export async function getObjectivePacks(): Promise<{ packs: ObjectivePack[], error?: string }> {
+export async function getObjectivePacks(options?: GetObjectivePacksOptions): Promise<{ packs: ObjectivePack[], error?: string }> {
     noStore()
     const supabase = await createClient()
 
-    // Fetch from original objective_packs table
-    const { data: originalPacks, error: originalError } = await supabase
+    // Build query for original objective_packs table
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let originalQuery: any = supabase
         .from('objective_packs')
         .select('*, items:pack_items(*)')
-        .order('title')
+    
+    // Filter by product_category if specified
+    // Note: product_category column added via migration, may not be in generated types yet
+    if (options?.productCategory) {
+        originalQuery = originalQuery.eq('product_category', options.productCategory)
+    }
+    
+    const { data: originalPacks, error: originalError } = await originalQuery.order('title')
 
     if (originalError) {
         console.error('Error fetching objective packs:', originalError)
         return { packs: [], error: originalError.message }
     }
 
-    // Fetch from subsystem_objective_packs table with subsystem category
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: subsystemPacks, error: subsystemError } = await (supabase as any)
-        .from('subsystem_objective_packs')
-        .select(`
-            id,
-            title,
-            summary,
-            extended_description,
-            difficulty,
-            estimated_duration,
-            tasks,
-            subsystem:universal_subsystems(category, icon_name)
-        `)
-        .order('title')
-
-    if (subsystemError) {
-        console.error('Error fetching subsystem packs:', subsystemError)
-        // Don't fail completely, just return original packs
+    // Skip subsystem packs when filtering by productCategory (they don't have product_category)
+    // Only fetch from subsystem_objective_packs when not filtering by industry
+    let subsystemPacks: unknown[] | null = null
+    let subsystemError: Error | null = null
+    
+    if (!options?.productCategory) {
+        // Fetch from subsystem_objective_packs table with subsystem category
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const result = await (supabase as any)
+            .from('subsystem_objective_packs')
+            .select(`
+                id,
+                title,
+                summary,
+                extended_description,
+                difficulty,
+                estimated_duration,
+                tasks,
+                subsystem:universal_subsystems(category, icon_name)
+            `)
+            .order('title')
+        
+        subsystemPacks = result.data
+        subsystemError = result.error
+        
+        if (subsystemError) {
+            console.error('Error fetching subsystem packs:', subsystemError)
+            // Don't fail completely, just return original packs
+        }
     }
 
     // Transform subsystem packs to match ObjectivePack format
-    const transformedSubsystemPacks: ObjectivePack[] = (subsystemPacks || []).map((pack: {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const transformedSubsystemPacks: ObjectivePack[] = ((subsystemPacks || []) as any[]).map((pack: {
         id: string
         title: string
         summary: string | null
@@ -112,6 +145,7 @@ export async function getObjectivePacks(): Promise<{ packs: ObjectivePack[], err
             title: pack.title,
             description: pack.summary || pack.extended_description,
             category: mappedCategory,
+            product_category: null, // Subsystem packs don't have product_category
             difficulty: pack.difficulty ? pack.difficulty.charAt(0).toUpperCase() + pack.difficulty.slice(1) : null,
             estimated_duration: pack.estimated_duration,
             icon_name: pack.subsystem?.icon_name || 'boxes',
@@ -120,7 +154,8 @@ export async function getObjectivePacks(): Promise<{ packs: ObjectivePack[], err
     })
 
     // Combine both sources
-    const allPacks = [...(originalPacks as ObjectivePack[]), ...transformedSubsystemPacks]
+    // Cast through unknown to handle the product_category field which may not be in generated types yet
+    const allPacks = [...(originalPacks as unknown as ObjectivePack[]), ...transformedSubsystemPacks]
 
     // Sort combined results by title
     allPacks.sort((a, b) => a.title.localeCompare(b.title))
@@ -154,9 +189,10 @@ export async function getPackDetails(packId: string): Promise<{ pack: ObjectiveP
         return { pack: null, error: itemsError.message }
     }
 
+    // Cast through unknown to handle the product_category field which may not be in generated types yet
     return {
         pack: {
-            ...pack,
+            ...(pack as unknown as ObjectivePack),
             items: items as PackItem[]
         }
     }
