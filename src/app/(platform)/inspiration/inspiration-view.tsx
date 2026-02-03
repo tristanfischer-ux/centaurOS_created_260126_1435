@@ -691,12 +691,31 @@ function PackCard({ pack, size = 'medium', onSizeChange }: PackCardProps) {
               </div>
               <CardTitle className="text-xl">{pack.title}</CardTitle>
               {pack.description && (
-                <p className="text-sm text-muted-foreground mt-2 line-clamp-2">
+                <p className="text-sm text-muted-foreground mt-2 line-clamp-3">
                   {pack.description}
                 </p>
               )}
             </CardHeader>
-            <CardContent className="pt-0">
+            <CardContent className="pt-0 flex flex-col gap-4">
+              {/* Sample tasks */}
+              {displayTasks.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-xs font-medium text-foreground">Tasks included:</p>
+                  {displayTasks.map((item, idx) => (
+                    <div key={idx} className="flex items-start gap-2 text-sm">
+                      <CheckCircle2 className="h-4 w-4 text-status-success shrink-0 mt-0.5" />
+                      <span className="text-muted-foreground line-clamp-1">{item.title}</span>
+                    </div>
+                  ))}
+                  {taskCount > 3 && (
+                    <p className="text-xs text-muted-foreground italic">
+                      +{taskCount - 3} more tasks
+                    </p>
+                  )}
+                </div>
+              )}
+              
+              {/* View button */}
               <div className="flex items-center gap-2 text-sm text-electric-blue font-medium">
                 <Eye className="h-4 w-4" />
                 Click to view full details
@@ -927,39 +946,6 @@ export function InspirationView({ templates = [], packs = [] }: InspirationViewP
         </div>
       </div>
 
-      {/* What are Objective Packs? */}
-      <Card className="mt-8 bg-electric-blue/5 border-electric-blue/20">
-        <CardContent className="pt-6">
-          <div className="flex items-start gap-4">
-            <div className="p-3 rounded-lg bg-electric-blue/10 shrink-0">
-              <Target className="h-6 w-6 text-electric-blue" />
-            </div>
-            <div>
-              <h3 className="font-semibold text-lg mb-2">What are Objective Packs?</h3>
-              <p className="text-muted-foreground mb-4">
-                Pre-built objectives with tasks designed by experienced founders. Pick a pack, customize it, 
-                and start executing. Each pack includes tasks assigned to the right roles—you, your apprentice, 
-                or an expert.
-              </p>
-              <div className="flex flex-wrap gap-4 text-sm">
-                <div className="flex items-center gap-2">
-                  <div className="h-2 w-2 rounded-full bg-international-orange" />
-                  <span className="text-foreground font-medium">Creates objectives with tasks</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="h-2 w-2 rounded-full bg-electric-blue" />
-                  <span className="text-foreground font-medium">Role-assigned tasks</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="h-2 w-2 rounded-full bg-status-success" />
-                  <span className="text-foreground font-medium">Links to marketplace experts</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
       {/* Hero Category Cards - Marketplace Style */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-8 mb-8">
         {/* Business Objectives Card - Electric Blue */}
@@ -1147,48 +1133,194 @@ export function InspirationView({ templates = [], packs = [] }: InspirationViewP
         ) : (
           // Industry template grid
           <div>
-            <h2 className="text-2xl font-semibold mb-6">Industry Templates</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {/* Results count and size controls */}
+            <div className="flex items-center justify-between mb-4">
+              <p className="text-sm text-muted-foreground">
+                Showing {templates.filter(t => ['robotics', 'rockets', 'satellites', 'ai-datacentre', 'pharmaceuticals', 'consumer-electronics', 'saas', 'mobile'].includes(t.product_category)).length} templates
+              </p>
+              <div className="flex items-center gap-3">
+                {/* Card size controls */}
+                <div className="bg-muted p-1 rounded-md flex items-center" title="Card detail level">
+                  <Button
+                    variant={defaultCardSize === 'small' ? 'default' : 'ghost'}
+                    size="sm"
+                    onClick={() => setAllCardsSize('small')}
+                    className={cn(
+                      "h-8 w-8 p-0",
+                      defaultCardSize === 'small' && 'shadow-sm'
+                    )}
+                    title="Compact cards"
+                  >
+                    <Minus className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant={defaultCardSize === 'medium' ? 'default' : 'ghost'}
+                    size="sm"
+                    onClick={() => setAllCardsSize('medium')}
+                    className={cn(
+                      "h-8 w-8 p-0",
+                      defaultCardSize === 'medium' && 'shadow-sm'
+                    )}
+                    title="Standard cards"
+                  >
+                    <Square className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant={defaultCardSize === 'full' ? 'default' : 'ghost'}
+                    size="sm"
+                    onClick={() => setAllCardsSize('full')}
+                    className={cn(
+                      "h-8 w-8 p-0",
+                      defaultCardSize === 'full' && 'shadow-sm'
+                    )}
+                    title="Detailed cards"
+                  >
+                    <AlignJustify className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            </div>
+
+            {/* Template grid */}
+            <div className={cn(
+              "grid gap-4 lg:gap-6 animate-fade-in",
+              defaultCardSize === 'full' 
+                ? "grid-cols-1 lg:grid-cols-2" 
+                : "grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+            )}>
               {templates
                 .filter(t => ['robotics', 'rockets', 'satellites', 'ai-datacentre', 'pharmaceuticals', 'consumer-electronics', 'saas', 'mobile'].includes(t.product_category))
                 .map((template) => {
                   const Icon = getTemplateIcon(template.icon)
                   const difficulty = getDifficultyFromMetadata(template.metadata)
+                  const size = defaultCardSize
                   
+                  // Render full-size card with detail modal
+                  if (size === 'full') {
+                    return (
+                      <Card 
+                        key={template.id}
+                        className="flex flex-col transition-all duration-200 hover:shadow-md cursor-pointer col-span-1 md:col-span-2"
+                        onClick={() => setSelectedIndustry(template)}
+                      >
+                        <CardHeader>
+                          <div className="flex items-start justify-between gap-4 mb-2">
+                            <div className="p-3 rounded-lg bg-purple-100">
+                              <Icon className="h-6 w-6 text-purple-600" />
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Badge className={cn("text-xs", getDifficultyColor(difficulty))}>
+                                {difficulty}
+                              </Badge>
+                              <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                <Layers className="h-3.5 w-3.5" />
+                                <span>{template.estimated_domains} domains</span>
+                              </div>
+                              <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                <CheckSquare className="h-3.5 w-3.5" />
+                                <span>{template.estimated_questions} questions</span>
+                              </div>
+                            </div>
+                          </div>
+                          <CardTitle className="text-xl">{template.name}</CardTitle>
+                          <p className="text-sm text-muted-foreground mt-2 line-clamp-3">
+                            {template.description}
+                          </p>
+                        </CardHeader>
+                        <CardContent className="pt-0">
+                          <div className="flex items-center gap-2 text-sm text-purple-600 font-medium">
+                            <Eye className="h-4 w-4" />
+                            Click to view blueprint details
+                          </div>
+                        </CardContent>
+                      </Card>
+                    )
+                  }
+
+                  // Render small/medium card
                   return (
                     <Card 
-                      key={template.id} 
-                      className="cursor-pointer transition-all hover:shadow-lg hover:border-purple-500/50 group"
+                      key={template.id}
+                      className="flex flex-col transition-all duration-200 hover:shadow-md cursor-pointer hover:border-purple-500/50"
                       onClick={() => setSelectedIndustry(template)}
                     >
-                      <CardHeader>
-                        <div className="flex items-start justify-between gap-4 mb-4">
-                          <div className="p-3 rounded-lg bg-chart-5/10">
-                            <Icon className="h-6 w-6 text-chart-5" />
+                      {size === 'small' && (
+                        <CardContent className="p-3">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-lg bg-purple-100 flex items-center justify-center shrink-0">
+                              <Icon className="h-5 w-5 text-purple-600" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 mb-0.5">
+                                <Badge className={cn("text-[9px] px-1.5 py-0", getDifficultyColor(difficulty))}>
+                                  {difficulty}
+                                </Badge>
+                                <span className="text-xs text-muted-foreground">
+                                  {template.estimated_domains} domains
+                                </span>
+                              </div>
+                              <h3 className="text-sm font-bold text-foreground truncate">
+                                {template.name}
+                              </h3>
+                            </div>
+                            <span className="text-xs text-muted-foreground shrink-0">
+                              {template.estimated_questions} Q
+                            </span>
                           </div>
-                          <Badge className={getDifficultyColor(difficulty)}>
-                            {difficulty}
-                          </Badge>
-                        </div>
-                        <CardTitle className="text-xl group-hover:text-purple-600 transition-colors">
-                          {template.name}
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <p className="text-sm text-muted-foreground mb-6">
-                          {template.description}
-                        </p>
-                        <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                          <div className="flex items-center gap-1.5">
-                            <Layers className="h-4 w-4" />
-                            <span>{template.estimated_domains} domains</span>
+                          <div className="flex justify-center mt-2 pt-2 border-t border-muted">
+                            <span className="text-[10px] text-muted-foreground flex items-center gap-1">
+                              <ChevronDown className="w-3 h-3" />
+                              More info
+                            </span>
                           </div>
-                          <div className="flex items-center gap-1.5">
-                            <CheckSquare className="h-4 w-4" />
-                            <span>{template.estimated_questions} questions</span>
-                          </div>
-                        </div>
-                      </CardContent>
+                        </CardContent>
+                      )}
+
+                      {size === 'medium' && (
+                        <>
+                          <CardHeader>
+                            <div className="flex items-start justify-between gap-4 mb-2">
+                              <div className="p-2.5 rounded-lg bg-purple-100">
+                                <Icon className="h-5 w-5 text-purple-600" />
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <Badge className={cn("text-xs", getDifficultyColor(difficulty))}>
+                                  {difficulty}
+                                </Badge>
+                                <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                  <Layers className="h-3.5 w-3.5" />
+                                  <span>{template.estimated_domains}</span>
+                                </div>
+                                <button className="h-6 w-6 p-0 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors">
+                                  <ChevronDown className="h-4 w-4" />
+                                </button>
+                              </div>
+                            </div>
+                            <CardTitle className="text-lg leading-tight">{template.name}</CardTitle>
+                            <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-1">
+                              <CheckSquare className="h-3.5 w-3.5" />
+                              <span>{template.estimated_questions} questions</span>
+                            </div>
+                          </CardHeader>
+                          
+                          <CardContent className="flex-1 flex flex-col pt-0">
+                            <p className="text-sm text-muted-foreground mb-4 line-clamp-2">
+                              {template.description}
+                            </p>
+
+                            <div className="flex items-center justify-between pt-3 border-t border-muted mt-auto">
+                              <button className="text-[10px] text-muted-foreground hover:text-foreground flex items-center gap-0.5 transition-colors">
+                                <ChevronUp className="w-3 h-3" />
+                              </button>
+                              
+                              <Button size="sm" className="h-8 text-xs shadow-sm bg-purple-600 hover:bg-purple-700">
+                                <Eye className="w-3 h-3 mr-1" />
+                                View
+                              </Button>
+                            </div>
+                          </CardContent>
+                        </>
+                      )}
                     </Card>
                   )
                 })}
