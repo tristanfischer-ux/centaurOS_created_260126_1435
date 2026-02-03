@@ -78,6 +78,7 @@ export function CreateTaskDialog({ objectives, members, teams = [], currentUserI
     const [titleError, setTitleError] = useState<string | null>(null)
     const [descriptionError, setDescriptionError] = useState<string | null>(null)
     const [assigneeError, setAssigneeError] = useState<string | null>(null)
+    const [objectiveError, setObjectiveError] = useState<string | null>(null)
     const [submitError, setSubmitError] = useState<string | null>(null)
     const [description, setDescription] = useState("")
 
@@ -127,6 +128,7 @@ export function CreateTaskDialog({ objectives, members, teams = [], currentUserI
         setTitleError(null)
         setDescriptionError(null)
         setAssigneeError(null)
+        setObjectiveError(null)
         setSubmitError(null)
         
         // Get form values
@@ -143,6 +145,12 @@ export function CreateTaskDialog({ objectives, members, teams = [], currentUserI
         // Validate assignees
         if (selectedAssignees.length === 0) {
             setAssigneeError("At least one assignee is required")
+            return
+        }
+        
+        // Validate objective
+        if (!selectedObjective) {
+            setObjectiveError("Objective is required")
             return
         }
         
@@ -185,6 +193,7 @@ export function CreateTaskDialog({ objectives, members, teams = [], currentUserI
                 setTitleError(null)
                 setDescriptionError(null)
                 setAssigneeError(null)
+                setObjectiveError(null)
                 setSubmitError(null)
             }
         } catch (error) {
@@ -372,51 +381,65 @@ export function CreateTaskDialog({ objectives, members, teams = [], currentUserI
 
                         {/* Objective */}
                         <div className="grid gap-2">
-                            <Label htmlFor="objective">Objective</Label>
-                            <Popover open={objectiveOpen} onOpenChange={setObjectiveOpen}>
-                                <PopoverTrigger asChild>
-                                    <Button
-                                        variant="secondary"
-                                        role="combobox"
-                                        aria-expanded={objectiveOpen}
-                                        className="w-full justify-between bg-background border-slate-200"
-                                        id="objective"
-                                    >
-                                        {selectedObjective
-                                            ? objectives.find((o) => o.id === selectedObjective)?.title
-                                            : "Select objective..."}
-                                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                                    </Button>
-                                </PopoverTrigger>
-                                <PopoverContent className="w-full p-0" align="start">
-                                    <Command>
-                                        <CommandInput placeholder="Search objectives..." />
-                                        <CommandList>
-                                            <CommandEmpty>No objective found.</CommandEmpty>
-                                            <CommandGroup>
-                                                {objectives.map((obj) => (
-                                                    <CommandItem
-                                                        key={obj.id}
-                                                        value={obj.title}
-                                                        onSelect={() => {
-                                                            setSelectedObjective(obj.id)
-                                                            setObjectiveOpen(false)
-                                                        }}
-                                                    >
-                                                        <Check
-                                                            className={cn(
-                                                                "mr-2 h-4 w-4",
-                                                                selectedObjective === obj.id ? "opacity-100" : "opacity-0"
-                                                            )}
-                                                        />
-                                                        {obj.title}
-                                                    </CommandItem>
-                                                ))}
-                                            </CommandGroup>
-                                        </CommandList>
-                                    </Command>
-                                </PopoverContent>
-                            </Popover>
+                            <Label htmlFor="objective">
+                                Objective <span className="text-destructive ml-1" aria-label="required">*</span>
+                            </Label>
+                            <div aria-describedby={objectiveError ? "objective-error" : undefined}>
+                                <Popover open={objectiveOpen} onOpenChange={setObjectiveOpen}>
+                                    <PopoverTrigger asChild>
+                                        <Button
+                                            variant="secondary"
+                                            role="combobox"
+                                            aria-expanded={objectiveOpen}
+                                            aria-invalid={!!objectiveError}
+                                            className={cn(
+                                                "w-full justify-between bg-background border-slate-200",
+                                                objectiveError && "border-destructive"
+                                            )}
+                                            id="objective"
+                                        >
+                                            {selectedObjective
+                                                ? objectives.find((o) => o.id === selectedObjective)?.title
+                                                : "Select objective..."}
+                                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                        </Button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-full p-0" align="start">
+                                        <Command>
+                                            <CommandInput placeholder="Search objectives..." />
+                                            <CommandList>
+                                                <CommandEmpty>No objective found.</CommandEmpty>
+                                                <CommandGroup>
+                                                    {objectives.map((obj) => (
+                                                        <CommandItem
+                                                            key={obj.id}
+                                                            value={obj.title}
+                                                            onSelect={() => {
+                                                                setSelectedObjective(obj.id)
+                                                                setObjectiveError(null)
+                                                                setObjectiveOpen(false)
+                                                            }}
+                                                        >
+                                                            <Check
+                                                                className={cn(
+                                                                    "mr-2 h-4 w-4",
+                                                                    selectedObjective === obj.id ? "opacity-100" : "opacity-0"
+                                                                )}
+                                                            />
+                                                            {obj.title}
+                                                        </CommandItem>
+                                                    ))}
+                                                </CommandGroup>
+                                            </CommandList>
+                                        </Command>
+                                    </PopoverContent>
+                                </Popover>
+                            </div>
+                            {objectiveError && (
+                                <p id="objective-error" className="text-sm text-destructive mt-1" role="alert">
+                                    {objectiveError}
+                                </p>
+                            )}
                             <input
                                 type="hidden"
                                 name="objective_id"

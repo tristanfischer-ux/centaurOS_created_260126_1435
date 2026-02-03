@@ -472,6 +472,18 @@ describe('Task Actions', () => {
             // Function should handle gracefully
             expect(result2).toBeDefined()
         })
+
+        it('should require objective_id', async () => {
+            const noObjectiveFormData = createMockFormData({ objective_id: '' })
+            const result = await createTask(noObjectiveFormData)
+            expect(result.error).toContain('Objective')
+        })
+
+        it('should validate objective_id is a valid UUID', async () => {
+            const invalidUuidFormData = createMockFormData({ objective_id: 'not-a-uuid' })
+            const result = await createTask(invalidUuidFormData)
+            expect(result.error).toContain('objective')
+        })
     })
 
     describe('updateTaskDates validation', () => {

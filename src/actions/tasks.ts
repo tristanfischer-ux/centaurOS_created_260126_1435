@@ -163,7 +163,7 @@ export async function createTask(formData: FormData) {
     const rawData = {
         title: title || '',
         description: description?.trim() || undefined,
-        objectiveId: objectiveId?.trim() || undefined,
+        objectiveId: objectiveId?.trim() || '',
         assigneeIds: assigneeIds.filter(id => id), // Filter out empty strings
         deadline: endDate?.trim() ? endDate.trim() : null,
         riskLevel: (riskLevelRaw as RiskLevel) || 'Medium',
@@ -190,7 +190,7 @@ export async function createTask(formData: FormData) {
                 foundry_id,
                 title: validatedTitle.trim(),
                 description: validatedDescription || null,
-                objective_id: validatedObjectiveId || null,
+                objective_id: validatedObjectiveId,
                 creator_id: user.id,
                 assignee_id: validatedAssigneeIds[0], // Primary assignee
                 start_date: startDate || null,

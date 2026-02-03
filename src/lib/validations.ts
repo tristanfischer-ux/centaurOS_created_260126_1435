@@ -8,7 +8,7 @@ export const createTaskSchema = z.object({
   description: z.string()
     .max(10000, 'Description must be 10,000 characters or less')
     .optional(),
-  objectiveId: z.string().uuid('Invalid objective ID').optional().nullable(),
+  objectiveId: z.string().uuid('Invalid objective ID').min(1, 'Objective is required'),
   assigneeIds: z.array(z.string().uuid('Invalid assignee ID')).min(1, 'At least one assignee is required'),
   deadline: z.union([
     z.string().datetime('Invalid date format'),

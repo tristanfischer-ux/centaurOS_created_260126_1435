@@ -295,6 +295,23 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
 
     const hasExpandedCard = expandedCardId !== null
 
+    // Objective expansion state for list view - all objectives expanded by default
+    const [expandedObjectives, setExpandedObjectives] = useState<Set<string>>(
+        new Set([...objectives.map(o => o.id), 'orphaned'])
+    )
+
+    const toggleObjectiveExpanded = useCallback((objectiveId: string) => {
+        setExpandedObjectives(prev => {
+            const newSet = new Set(prev)
+            if (newSet.has(objectiveId)) {
+                newSet.delete(objectiveId)
+            } else {
+                newSet.add(objectiveId)
+            }
+            return newSet
+        })
+    }, [])
+
     // Selection Handlers
     const toggleSelectionMode = () => {
         setIsSelectionMode(prev => !prev)
@@ -850,10 +867,14 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                         {objectives.map(objective => {
                             const objectiveTasks = tasksByObjective[objective.id] || []
                             if (objectiveTasks.length === 0) return null
+                            const isExpanded = expandedObjectives.has(objective.id)
 
                             return (
                                 <div key={objective.id} className="border rounded-lg overflow-hidden bg-background">
-                                    <div className="bg-muted px-4 py-3 border-b flex justify-between items-center">
+                                    <div 
+                                        className="bg-muted px-4 py-3 border-b flex justify-between items-center cursor-pointer hover:bg-muted/80 transition-colors"
+                                        onClick={() => toggleObjectiveExpanded(objective.id)}
+                                    >
                                         <h3 className="font-semibold text-foreground flex items-center gap-2">
                                             {isSelectionMode && (
                                                 <Checkbox
@@ -867,8 +888,14 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                                                         }
                                                         setSelectedTaskIds(newSelection)
                                                     }}
+                                                    onClick={(e) => e.stopPropagation()}
                                                     aria-label={`Select all tasks in ${objective.title}`}
                                                 />
+                                            )}
+                                            {isExpanded ? (
+                                                <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                                            ) : (
+                                                <ChevronUp className="h-4 w-4 text-muted-foreground" />
                                             )}
                                             <div className="bg-electric-blue w-2 h-2 rounded-full" />
                                             {objective.title}
@@ -877,8 +904,9 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                                             </Badge>
                                         </h3>
                                     </div>
-                                    <div>
-                                        {objectiveTasks.map(task => (
+                                    {isExpanded && (
+                                        <div>
+                                            {objectiveTasks.map(task => (
                                             <div
                                                 key={task.id}
                                                 className={cn(
@@ -944,14 +972,18 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                                                 </div>
                                             </div>
                                         ))}
-                                    </div>
+                                        </div>
+                                    )}
                                 </div>
                             )
                         })}
 
                         {orphanedTasks.length > 0 && (
                             <div className="border rounded-lg overflow-hidden bg-background">
-                                <div className="bg-muted px-4 py-3 border-b">
+                                <div 
+                                    className="bg-muted px-4 py-3 border-b cursor-pointer hover:bg-muted/80 transition-colors"
+                                    onClick={() => toggleObjectiveExpanded('orphaned')}
+                                >
                                     <h3 className="font-semibold text-muted-foreground flex items-center gap-2">
                                         {isSelectionMode && (
                                             <Checkbox
@@ -965,14 +997,21 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                                                     }
                                                     setSelectedTaskIds(newSelection)
                                                 }}
+                                                onClick={(e) => e.stopPropagation()}
                                                 aria-label="Select all general tasks"
                                             />
+                                        )}
+                                        {expandedObjectives.has('orphaned') ? (
+                                            <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                                        ) : (
+                                            <ChevronUp className="h-4 w-4 text-muted-foreground" />
                                         )}
                                         <div className="bg-muted-foreground w-2 h-2 rounded-full" />
                                         General Tasks (No Objective)
                                     </h3>
                                 </div>
-                                <div>
+                                {expandedObjectives.has('orphaned') && (
+                                    <div>
                                     {orphanedTasks.map(task => (
                                         <div
                                             key={task.id}
@@ -1035,7 +1074,8 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                                             </div>
                                         </div>
                                     ))}
-                                </div>
+                                    </div>
+                                )}
                             </div>
                         )}
                     </div>
