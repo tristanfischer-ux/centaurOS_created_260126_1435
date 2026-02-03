@@ -17,6 +17,8 @@ import { RetainerCard } from '@/components/retainers'
 import { getMyRetainers, getRetainerStatistics } from '@/actions/retainers'
 import { RetainerStatus } from '@/types/retainers'
 
+export const dynamic = 'force-dynamic'
+
 export const metadata: Metadata = {
   title: 'Retainers | CentaurOS',
   description: 'Manage your retainer agreements',

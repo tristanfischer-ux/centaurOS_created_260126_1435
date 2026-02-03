@@ -18,6 +18,8 @@ import {
     RefreshCw
 } from "lucide-react"
 
+export const dynamic = 'force-dynamic'
+
 function MigrationSkeleton() {
     return (
         <div className="space-y-6">
