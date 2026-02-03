@@ -164,28 +164,29 @@ export function UsePackDialog({ pack, trigger }: UsePackDialogProps) {
           </Button>
         )}
       </DialogTrigger>
-      <DialogContent size="lg" className="!flex flex-col gap-4 p-6 max-h-[90vh] overflow-hidden">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Package className="h-5 w-5 text-electric-blue" />
-            {pack.title}
-          </DialogTitle>
-        </DialogHeader>
+      <DialogContent size="lg" className="max-w-3xl max-h-[85vh] overflow-hidden p-0">
+        <div className="flex flex-col h-full">
+          <DialogHeader className="px-6 pt-6 pb-4 border-b">
+            <DialogTitle className="flex items-center gap-2">
+              <Package className="h-5 w-5 text-electric-blue" />
+              {pack.title}
+            </DialogTitle>
+          </DialogHeader>
 
-        <Tabs defaultValue="overview" className="flex-1 min-h-0 flex flex-col">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="overview" className="gap-2">
-              <Info className="h-4 w-4" />
-              Overview
-            </TabsTrigger>
-            <TabsTrigger value="tasks" className="gap-2">
-              <CheckCircle2 className="h-4 w-4" />
-              Select Tasks
-            </TabsTrigger>
-          </TabsList>
+          <Tabs defaultValue="overview" className="flex-1 flex flex-col overflow-hidden">
+            <TabsList className="grid w-full grid-cols-2 rounded-none border-b">
+              <TabsTrigger value="overview" className="gap-2 rounded-none">
+                <Info className="h-4 w-4" />
+                Overview
+              </TabsTrigger>
+              <TabsTrigger value="tasks" className="gap-2 rounded-none">
+                <CheckCircle2 className="h-4 w-4" />
+                Select Tasks
+              </TabsTrigger>
+            </TabsList>
 
-          {/* OVERVIEW TAB */}
-          <TabsContent value="overview" className="flex-1 min-h-0 overflow-y-auto mt-4 space-y-4 data-[state=active]:flex data-[state=active]:flex-col">
+            {/* OVERVIEW TAB */}
+            <TabsContent value="overview" className="flex-1 overflow-y-auto p-6 m-0 space-y-4">
             {/* What is this pack? */}
             <Card className="bg-blue-50/50 border-blue-100">
               <CardContent className="pt-6">
@@ -338,8 +339,8 @@ export function UsePackDialog({ pack, trigger }: UsePackDialogProps) {
             </Card>
           </TabsContent>
 
-          {/* TASKS TAB */}
-          <TabsContent value="tasks" className="flex-1 min-h-0 overflow-hidden data-[state=active]:flex data-[state=active]:flex-col mt-4 space-y-4">
+            {/* TASKS TAB */}
+            <TabsContent value="tasks" className="flex-1 overflow-hidden p-6 m-0 flex flex-col space-y-4">
             {/* Objective Title */}
             <div className="space-y-2">
               <Label htmlFor="objective-title">Objective Title</Label>
@@ -469,30 +470,31 @@ export function UsePackDialog({ pack, trigger }: UsePackDialogProps) {
               </div>
             </div>
           </TabsContent>
-        </Tabs>
+          </Tabs>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={() => setOpen(false)} disabled={isCreating}>
-            Cancel
-          </Button>
-          <Button
-            onClick={handleCreate}
-            disabled={isCreating || !objectiveTitle.trim() || selectedTaskIds.length === 0}
-            className="bg-international-orange hover:bg-international-orange/90"
-          >
-            {isCreating ? (
-              <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Creating...
-              </>
-            ) : (
-              <>
-                <Target className="h-4 w-4 mr-2" />
-                Create Objective ({selectedTaskIds.length} {selectedTaskIds.length === 1 ? 'task' : 'tasks'})
-              </>
-            )}
-          </Button>
-        </DialogFooter>
+          <DialogFooter className="px-6 py-4 border-t bg-muted/30">
+            <Button variant="outline" onClick={() => setOpen(false)} disabled={isCreating}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleCreate}
+              disabled={isCreating || !objectiveTitle.trim() || selectedTaskIds.length === 0}
+              className="bg-international-orange hover:bg-international-orange/90"
+            >
+              {isCreating ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Creating...
+                </>
+              ) : (
+                <>
+                  <Target className="h-4 w-4 mr-2" />
+                  Create Objective ({selectedTaskIds.length} {selectedTaskIds.length === 1 ? 'task' : 'tasks'})
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </div>
       </DialogContent>
     </Dialog>
   )

@@ -803,6 +803,23 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                                             {/* We can reproduce the button trigger here if needed, or guide user to the quick add */}
                                         </div>
                                     </div>
+                                ) : activeTab === 'history' && historyCount === 0 ? (
+                                    <div className="col-span-full border-2 border-dashed border rounded-lg bg-muted/50">
+                                        <EmptyState
+                                            icon={<History className="h-8 w-8" />}
+                                            title="No task history yet"
+                                            description="Completed and rejected tasks will appear here as a record of what your team has accomplished."
+                                            action={
+                                                <Button
+                                                    variant="link"
+                                                    onClick={() => setActiveTab('active')}
+                                                    className="text-status-info"
+                                                >
+                                                    View Active Tasks
+                                                </Button>
+                                            }
+                                        />
+                                    </div>
                                 ) : (
                                     <div className="col-span-full border-2 border-dashed border rounded-lg bg-muted/50">
                                         <EmptyState

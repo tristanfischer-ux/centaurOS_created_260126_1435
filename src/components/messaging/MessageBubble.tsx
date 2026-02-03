@@ -191,6 +191,16 @@ export function MessageBubble({
   const isFile = message.message_type === 'file'
   const hasReplies = replyCount > 0
   
+  // Debug: Log message data to see if read_at is present
+  if (isOwn) {
+    console.log('Message data:', {
+      id: message.id,
+      is_read: message.is_read,
+      read_at: message.read_at,
+      created_at: message.created_at
+    })
+  }
+  
   const handleToggleReaction = (emoji: string) => {
     onToggleReaction?.(emoji)
   }
