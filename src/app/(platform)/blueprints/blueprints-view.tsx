@@ -7,7 +7,6 @@ import { typography } from '@/lib/design-system'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -29,7 +28,7 @@ import {
   UsePackDialog,
 } from '@/components/blueprints'
 import { UniversalSubsystemsGrid } from '@/components/blueprints/universal-subsystems-grid'
-import { SubsystemDetailSheet } from '@/components/blueprints/subsystem-detail-sheet'
+import { SubsystemDetailDialog } from '@/components/blueprints/subsystem-detail-dialog'
 import { CreateSubsystemObjectiveDialog } from '@/components/blueprints/create-subsystem-objective-dialog'
 import { archiveBlueprint, deleteBlueprint } from '@/actions/blueprints'
 import { getSubsystemObjectivePack } from '@/actions/universal-subsystems'
@@ -99,7 +98,6 @@ export function BlueprintsView({
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [isDeleting, setIsDeleting] = useState<string | null>(null)
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
-  const [activeTab, setActiveTab] = useState<'business' | 'product'>('business')
   
   // Q&A State
   const [isQAOpen, setIsQAOpen] = useState(true)
@@ -108,7 +106,7 @@ export function BlueprintsView({
   // Universal Subsystems State
   const [selectedSubsystem, setSelectedSubsystem] = useState<UniversalSubsystem | null>(null)
   const [selectedSubsystemPack, setSelectedSubsystemPack] = useState<SubsystemObjectivePack | null>(null)
-  const [isSubsystemSheetOpen, setIsSubsystemSheetOpen] = useState(false)
+  const [isSubsystemDialogOpen, setIsSubsystemDialogOpen] = useState(false)
   const [isCreateObjectiveOpen, setIsCreateObjectiveOpen] = useState(false)
   
   // Fetch objective pack when subsystem is selected
@@ -127,14 +125,14 @@ export function BlueprintsView({
   // Handle subsystem click
   const handleSubsystemClick = (subsystem: UniversalSubsystem) => {
     setSelectedSubsystem(subsystem)
-    setIsSubsystemSheetOpen(true)
+    setIsSubsystemDialogOpen(true)
   }
   
   // Handle create objective from subsystem
   const handleCreateObjective = (subsystem: UniversalSubsystem, pack: SubsystemObjectivePack) => {
     setSelectedSubsystem(subsystem)
     setSelectedSubsystemPack(pack)
-    setIsSubsystemSheetOpen(false)
+    setIsSubsystemDialogOpen(false)
     setIsCreateObjectiveOpen(true)
   }
   
@@ -241,21 +239,8 @@ export function BlueprintsView({
         </div>
       </div>
 
-      {/* Main Tabs: Business vs Product Guidance */}
-      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'business' | 'product')} className="w-full">
-        <TabsList className="grid w-full max-w-md grid-cols-2 mb-6">
-          <TabsTrigger value="business" className="gap-2">
-            <Briefcase className="h-4 w-4" />
-            Business Guidance
-          </TabsTrigger>
-          <TabsTrigger value="product" className="gap-2">
-            <Cpu className="h-4 w-4" />
-            Product Guidance
-          </TabsTrigger>
-        </TabsList>
-
-        {/* ===== BUSINESS GUIDANCE TAB ===== */}
-        <TabsContent value="business" className="space-y-8">
+      {/* ===== BUSINESS GUIDANCE SECTION ===== */}
+      <section className="space-y-8">
           {/* Business Guidance Intro */}
           <Card className="bg-gradient-to-r from-blue-50 to-background border-blue-100">
             <CardContent className="pt-6">
@@ -352,10 +337,10 @@ export function BlueprintsView({
               </div>
             </CardContent>
           </Card>
-        </TabsContent>
+      </section>
 
-        {/* ===== PRODUCT GUIDANCE TAB ===== */}
-        <TabsContent value="product" className="space-y-8">
+      {/* ===== PRODUCT GUIDANCE SECTION ===== */}
+      <section className="space-y-8">
           {/* Product Tab Header Actions */}
           <div className="flex items-center justify-end gap-2">
             <Button asChild variant="outline">
@@ -944,10 +929,9 @@ export function BlueprintsView({
               </Button>
             </div>
           </div>
-        </CardContent>
-      </Card>
-        </TabsContent>
-      </Tabs>
+            </CardContent>
+          </Card>
+      </section>
 
       {/* ADVISORY Q&A SECTION */}
       <section className="space-y-4 mt-8 pt-8 border-t border-muted">
@@ -1082,12 +1066,12 @@ export function BlueprintsView({
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Subsystem Detail Sheet */}
-      <SubsystemDetailSheet
+      {/* Subsystem Detail Dialog */}
+      <SubsystemDetailDialog
         subsystem={selectedSubsystem}
         objectivePack={selectedSubsystemPack}
-        open={isSubsystemSheetOpen}
-        onOpenChange={setIsSubsystemSheetOpen}
+        open={isSubsystemDialogOpen}
+        onOpenChange={setIsSubsystemDialogOpen}
         onCreateObjective={handleCreateObjective}
       />
 

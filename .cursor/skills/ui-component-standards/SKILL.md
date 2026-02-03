@@ -157,6 +157,75 @@ Based on a comprehensive audit, these patterns are the **MOST FREQUENTLY VIOLATE
 
 ---
 
+## CRITICAL: NEVER Use Sheet/Side Panels
+
+### ALWAYS Use Centered Dialog Instead of Sheet
+
+**Side panels that slide in from the right or left are FORBIDDEN in CentaurOS.**
+
+Users find side panels disruptive and jarring. Always use centered `Dialog` components instead.
+
+```tsx
+// ❌ WRONG - NEVER use Sheet components
+import { Sheet, SheetContent } from '@/components/ui/sheet'
+
+<Sheet>
+  <SheetContent side="right" className="w-[480px]">
+    {/* Content */}
+  </SheetContent>
+</Sheet>
+
+// ✅ CORRECT - Always use centered Dialog
+import { Dialog, DialogContent } from '@/components/ui/dialog'
+
+<Dialog>
+  <DialogContent size="lg">
+    {/* Content */}
+  </DialogContent>
+</Dialog>
+```
+
+### Why Dialogs Are Better Than Sheets
+
+| Sheet Problems | Dialog Benefits |
+|----------------|-----------------|
+| Slides in from side (jarring) | Appears centered (smooth) |
+| Disrupts spatial orientation | Maintains focus on center |
+| Feels like a separate UI context | Feels like natural flow |
+| Users hate them | Users prefer them |
+
+### When Converting Sheet to Dialog
+
+If you find existing Sheet components, convert them to Dialog:
+
+1. Replace `Sheet` → `Dialog`
+2. Replace `SheetContent` → `DialogContent`
+3. Replace `SheetHeader` → `DialogHeader`
+4. Replace `SheetTitle` → `DialogTitle`
+5. Remove `side="right"` prop (not needed)
+6. Add appropriate `size` prop (`sm`, `md`, or `lg`)
+7. Update state variable names from `isSheetOpen` → `isDialogOpen`
+
+```tsx
+// ✅ CORRECT - Converted from Sheet to Dialog
+const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false)
+
+<Dialog open={isDetailDialogOpen} onOpenChange={setIsDetailDialogOpen}>
+  <DialogContent size="lg" className="max-h-[90vh] flex flex-col">
+    <ScrollArea className="max-h-[85vh]">
+      <div className="p-6">
+        <DialogHeader>
+          <DialogTitle>Detail View</DialogTitle>
+        </DialogHeader>
+        {/* Content */}
+      </div>
+    </ScrollArea>
+  </DialogContent>
+</Dialog>
+```
+
+---
+
 ## Status Indicators: Badge vs StatusBadge
 
 ### Use `StatusBadge` for Status Indicators
@@ -593,6 +662,7 @@ This automatically checks for color violations. If it fails, fix all issues befo
 - [ ] Error styling uses `text-destructive`, `border-destructive`
 
 ### Components
+- [ ] **CRITICAL: No Sheet/side panels** - Use Dialog instead
 - [ ] Status indicators use `StatusBadge` (not Badge with colors)
 - [ ] Cards use `Card` component (not custom divs)
 - [ ] Dialogs have solid backgrounds (no opacity < 100%)

@@ -1,7 +1,7 @@
 'use client'
 
 /**
- * SubsystemDetailSheet - Full detail view of a universal subsystem
+ * SubsystemDetailDialog - Full detail view of a universal subsystem
  * 
  * @description Shows comprehensive information about a subsystem including
  * its primer, key questions, learning resources, and action buttons for
@@ -14,11 +14,11 @@ import { useState } from 'react'
 import Link from 'next/link'
 import * as LucideIcons from 'lucide-react'
 import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-} from '@/components/ui/sheet'
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -46,14 +46,14 @@ import { cn } from '@/lib/utils'
 import type { UniversalSubsystem, SubsystemObjectivePack } from '@/types/blueprints'
 import { DOMAIN_CATEGORY_COLORS } from '@/types/blueprints'
 
-interface SubsystemDetailSheetProps {
+interface SubsystemDetailDialogProps {
   /** The subsystem to display */
   subsystem: UniversalSubsystem | null
   /** The default objective pack for this subsystem */
   objectivePack: SubsystemObjectivePack | null
-  /** Whether the sheet is open */
+  /** Whether the dialog is open */
   open: boolean
-  /** Called when sheet is closed */
+  /** Called when dialog is closed */
   onOpenChange: (open: boolean) => void
   /** Called when user wants to create an objective */
   onCreateObjective: (subsystem: UniversalSubsystem, pack: SubsystemObjectivePack) => void
@@ -84,13 +84,13 @@ function DifficultyBadge({ difficulty }: { difficulty: string }) {
   )
 }
 
-export function SubsystemDetailSheet({
+export function SubsystemDetailDialog({
   subsystem,
   objectivePack,
   open,
   onOpenChange,
   onCreateObjective,
-}: SubsystemDetailSheetProps) {
+}: SubsystemDetailDialogProps) {
   const [expandedSections, setExpandedSections] = useState<string[]>(['overview', 'questions'])
   
   if (!subsystem) return null
@@ -104,11 +104,11 @@ export function SubsystemDetailSheet({
   const supplierMarketplaceUrl = `/marketplace?category=${subsystem.marketplace_categories[0] || 'general'}&type=supplier`
   
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full sm:max-w-2xl p-0">
-        <ScrollArea className="h-full">
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent size="lg" className="max-h-[90vh] flex flex-col p-0">
+        <ScrollArea className="max-h-[85vh]">
           <div className="p-6">
-            <SheetHeader className="mb-6">
+            <DialogHeader className="mb-6">
               <div className="flex items-start gap-4">
                 <div
                   className={cn(
@@ -120,9 +120,9 @@ export function SubsystemDetailSheet({
                 </div>
                 
                 <div className="flex-1 min-w-0">
-                  <SheetTitle className="text-xl font-bold text-foreground">
+                  <DialogTitle className="text-xl font-bold text-foreground">
                     {subsystem.name}
-                  </SheetTitle>
+                  </DialogTitle>
                   <p className="text-muted-foreground mt-1">{subsystem.tagline}</p>
                   <div className="flex items-center gap-2 mt-2">
                     <Badge variant="secondary">{subsystem.category}</Badge>
@@ -132,7 +132,7 @@ export function SubsystemDetailSheet({
                   </div>
                 </div>
               </div>
-            </SheetHeader>
+            </DialogHeader>
             
             {/* Quick Actions */}
             <Card className="mb-6 bg-muted/30 border-dashed">
@@ -539,7 +539,7 @@ export function SubsystemDetailSheet({
             </div>
           </div>
         </ScrollArea>
-      </SheetContent>
-    </Sheet>
+      </DialogContent>
+    </Dialog>
   )
 }
