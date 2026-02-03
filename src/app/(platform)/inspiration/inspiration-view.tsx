@@ -1237,14 +1237,14 @@ export function InspirationView({ templates = [], packs = [] }: InspirationViewP
                     )
                   }
 
-                  // Render small/medium card
-                  return (
-                    <Card 
-                      key={template.id}
-                      className="flex flex-col transition-all duration-200 hover:shadow-md cursor-pointer hover:border-purple-500/50"
-                      onClick={() => setSelectedIndustry(template)}
-                    >
-                      {size === 'small' && (
+                  // Render small card
+                  if (size === 'small') {
+                    return (
+                      <Card 
+                        key={template.id}
+                        className="flex flex-col transition-all duration-200 hover:shadow-md cursor-pointer hover:border-purple-500/50"
+                        onClick={() => setSelectedIndustry(template)}
+                      >
                         <CardContent className="p-3">
                           <div className="flex items-center gap-3">
                             <div className="w-10 h-10 rounded-lg bg-purple-100 flex items-center justify-center shrink-0">
@@ -1274,53 +1274,58 @@ export function InspirationView({ templates = [], packs = [] }: InspirationViewP
                             </span>
                           </div>
                         </CardContent>
-                      )}
+                      </Card>
+                    )
+                  }
 
-                      {size === 'medium' && (
-                        <>
-                          <CardHeader>
-                            <div className="flex items-start justify-between gap-4 mb-2">
-                              <div className="p-2.5 rounded-lg bg-purple-100">
-                                <Icon className="h-5 w-5 text-purple-600" />
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <Badge className={cn("text-xs", getDifficultyColor(difficulty))}>
-                                  {difficulty}
-                                </Badge>
-                                <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                                  <Layers className="h-3.5 w-3.5" />
-                                  <span>{template.estimated_domains}</span>
-                                </div>
-                                <button className="h-6 w-6 p-0 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors">
-                                  <ChevronDown className="h-4 w-4" />
-                                </button>
-                              </div>
+                  // Render medium card (default)
+                  return (
+                    <Card 
+                      key={template.id}
+                      className="flex flex-col transition-all duration-200 hover:shadow-md cursor-pointer hover:border-purple-500/50"
+                      onClick={() => setSelectedIndustry(template)}
+                    >
+                      <CardHeader>
+                        <div className="flex items-start justify-between gap-4 mb-2">
+                          <div className="p-2.5 rounded-lg bg-purple-100">
+                            <Icon className="h-5 w-5 text-purple-600" />
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Badge className={cn("text-xs", getDifficultyColor(difficulty))}>
+                              {difficulty}
+                            </Badge>
+                            <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                              <Layers className="h-3.5 w-3.5" />
+                              <span>{template.estimated_domains}</span>
                             </div>
-                            <CardTitle className="text-lg leading-tight">{template.name}</CardTitle>
-                            <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-1">
-                              <CheckSquare className="h-3.5 w-3.5" />
-                              <span>{template.estimated_questions} questions</span>
-                            </div>
-                          </CardHeader>
+                            <button className="h-6 w-6 p-0 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors">
+                              <ChevronDown className="h-4 w-4" />
+                            </button>
+                          </div>
+                        </div>
+                        <CardTitle className="text-lg leading-tight">{template.name}</CardTitle>
+                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-1">
+                          <CheckSquare className="h-3.5 w-3.5" />
+                          <span>{template.estimated_questions} questions</span>
+                        </div>
+                      </CardHeader>
+                      
+                      <CardContent className="flex-1 flex flex-col pt-0">
+                        <p className="text-sm text-muted-foreground mb-4 line-clamp-2">
+                          {template.description}
+                        </p>
+
+                        <div className="flex items-center justify-between pt-3 border-t border-muted mt-auto">
+                          <button className="text-[10px] text-muted-foreground hover:text-foreground flex items-center gap-0.5 transition-colors">
+                            <ChevronUp className="w-3 h-3" />
+                          </button>
                           
-                          <CardContent className="flex-1 flex flex-col pt-0">
-                            <p className="text-sm text-muted-foreground mb-4 line-clamp-2">
-                              {template.description}
-                            </p>
-
-                            <div className="flex items-center justify-between pt-3 border-t border-muted mt-auto">
-                              <button className="text-[10px] text-muted-foreground hover:text-foreground flex items-center gap-0.5 transition-colors">
-                                <ChevronUp className="w-3 h-3" />
-                              </button>
-                              
-                              <Button size="sm" className="h-8 text-xs shadow-sm bg-purple-600 hover:bg-purple-700">
-                                <Eye className="w-3 h-3 mr-1" />
-                                View
-                              </Button>
-                            </div>
-                          </CardContent>
-                        </>
-                      )}
+                          <Button size="sm" className="h-8 text-xs shadow-sm bg-purple-600 hover:bg-purple-700">
+                            <Eye className="w-3 h-3 mr-1" />
+                            View
+                          </Button>
+                        </div>
+                      </CardContent>
                     </Card>
                   )
                 })}
