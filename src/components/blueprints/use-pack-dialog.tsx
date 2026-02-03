@@ -32,6 +32,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog'
+import { UserAvatar } from '@/components/ui/user-avatar'
 import {
   Select,
   SelectContent,
@@ -154,7 +155,7 @@ export function UsePackDialog({ pack, trigger }: UsePackDialogProps) {
             </TabsList>
 
             {/* OVERVIEW TAB */}
-            <TabsContent value="overview" className="flex-1 overflow-y-auto p-6 m-0 space-y-4">
+            <TabsContent value="overview" className="flex-1 overflow-y-auto p-6 m-0 space-y-4 data-[state=active]:block">
             {/* What is this pack? */}
             <Card className="bg-blue-50/50 border-blue-100">
               <CardContent className="pt-6">
@@ -334,7 +335,7 @@ export function UsePackDialog({ pack, trigger }: UsePackDialogProps) {
                                   <SelectContent className="min-w-[180px]">
                                     <SelectItem value="unassigned" className="cursor-pointer">
                                       <div className="flex items-center gap-2">
-                                        <UserAvatar name="?" role="default" size="sm" />
+                                        <UserAvatar name="Unassigned" role="default" size="sm" />
                                         <span>Unassigned</span>
                                       </div>
                                     </SelectItem>
@@ -346,13 +347,13 @@ export function UsePackDialog({ pack, trigger }: UsePackDialogProps) {
                                     </SelectItem>
                                     <SelectItem value="team" className="cursor-pointer">
                                       <div className="flex items-center gap-2">
-                                        <UserAvatar name="TM" role="Executive" size="sm" />
+                                        <UserAvatar name="Team" role="Executive" size="sm" />
                                         <span>Team Member</span>
                                       </div>
                                     </SelectItem>
                                     <SelectItem value="agent" className="cursor-pointer">
                                       <div className="flex items-center gap-2">
-                                        <UserAvatar name="AI" role="AI_Agent" size="sm" />
+                                        <UserAvatar name="AI Agent" role="AI_Agent" size="sm" />
                                         <span>AI Agent</span>
                                       </div>
                                     </SelectItem>
