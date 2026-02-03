@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { typography } from '@/lib/design-system'
@@ -28,9 +28,13 @@ import {
   CreateBlueprintDialog,
   UsePackDialog,
 } from '@/components/blueprints'
+import { UniversalSubsystemsGrid } from '@/components/blueprints/universal-subsystems-grid'
+import { SubsystemDetailSheet } from '@/components/blueprints/subsystem-detail-sheet'
+import { CreateSubsystemObjectiveDialog } from '@/components/blueprints/create-subsystem-objective-dialog'
 import { archiveBlueprint, deleteBlueprint } from '@/actions/blueprints'
+import { getSubsystemObjectivePack } from '@/actions/universal-subsystems'
 import { createAdvisoryQuestion } from '@/actions/advisory'
-import type { Blueprint, BlueprintTemplate } from '@/types/blueprints'
+import type { Blueprint, BlueprintTemplate, UniversalSubsystem, SubsystemObjectivePack } from '@/types/blueprints'
 import type { ObjectivePack } from '@/actions/packs'
 import { QuestionCard, Question } from '@/components/advisory/question-card'
 import { AskModal } from '@/components/advisory/ask-modal'
@@ -76,6 +80,7 @@ interface BlueprintsViewProps {
   templates: BlueprintTemplate[]
   questions?: Question[]
   packs?: ObjectivePack[]
+  universalSubsystems?: UniversalSubsystem[]
   currentUserId?: string
   currentUserRole?: string
 }
@@ -85,6 +90,7 @@ export function BlueprintsView({
   templates,
   questions = [],
   packs = [],
+  universalSubsystems = [],
   currentUserId: _currentUserId = '',
   currentUserRole: _currentUserRole,
 }: BlueprintsViewProps) {
@@ -98,6 +104,39 @@ export function BlueprintsView({
   // Q&A State
   const [isQAOpen, setIsQAOpen] = useState(true)
   const [qaSearchQuery, setQaSearchQuery] = useState('')
+  
+  // Universal Subsystems State
+  const [selectedSubsystem, setSelectedSubsystem] = useState<UniversalSubsystem | null>(null)
+  const [selectedSubsystemPack, setSelectedSubsystemPack] = useState<SubsystemObjectivePack | null>(null)
+  const [isSubsystemSheetOpen, setIsSubsystemSheetOpen] = useState(false)
+  const [isCreateObjectiveOpen, setIsCreateObjectiveOpen] = useState(false)
+  
+  // Fetch objective pack when subsystem is selected
+  useEffect(() => {
+    async function fetchPack() {
+      if (selectedSubsystem) {
+        const pack = await getSubsystemObjectivePack(selectedSubsystem.id)
+        setSelectedSubsystemPack(pack)
+      } else {
+        setSelectedSubsystemPack(null)
+      }
+    }
+    fetchPack()
+  }, [selectedSubsystem])
+  
+  // Handle subsystem click
+  const handleSubsystemClick = (subsystem: UniversalSubsystem) => {
+    setSelectedSubsystem(subsystem)
+    setIsSubsystemSheetOpen(true)
+  }
+  
+  // Handle create objective from subsystem
+  const handleCreateObjective = (subsystem: UniversalSubsystem, pack: SubsystemObjectivePack) => {
+    setSelectedSubsystem(subsystem)
+    setSelectedSubsystemPack(pack)
+    setIsSubsystemSheetOpen(false)
+    setIsCreateObjectiveOpen(true)
+  }
   
   // Group packs by category
   const packsByCategory = useMemo(() => {
@@ -333,6 +372,59 @@ export function BlueprintsView({
               New Product Map
             </Button>
           </div>
+
+          {/* ===== UNIVERSAL SUBSYSTEMS SECTION ===== */}
+          {universalSubsystems.length > 0 && (
+            <section className="space-y-4">
+              {/* Section Header */}
+              <Card className="bg-gradient-to-r from-orange-50 to-background border-orange-100">
+                <CardContent className="pt-6">
+                  <div className="flex items-start gap-4">
+                    <div className="p-3 bg-orange-100 rounded-xl shrink-0">
+                      <Cpu className="h-6 w-6 text-international-orange" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-semibold text-foreground mb-1">Universal Subsystems</h3>
+                      <p className="text-sm text-muted-foreground mb-3">
+                        Technical domains that apply to any hardware or software product. Get detailed guidance,
+                        key questions to answer, and create objectives with pre-built tasks. Every objective includes
+                        tasks to find relevant experts and suppliers on the marketplace.
+                      </p>
+                      <div className="flex flex-wrap gap-3 text-xs">
+                        <div className="flex items-center gap-1.5 text-muted-foreground">
+                          <Target className="h-3.5 w-3.5 text-international-orange" />
+                          <span>Create objectives with 5-6 pre-built tasks</span>
+                        </div>
+                        <div className="flex items-center gap-1.5 text-muted-foreground">
+                          <Users className="h-3.5 w-3.5 text-electric-blue" />
+                          <span>Auto-includes marketplace discovery tasks</span>
+                        </div>
+                        <div className="flex items-center gap-1.5 text-muted-foreground">
+                          <Lightbulb className="h-3.5 w-3.5 text-status-success" />
+                          <span>Detailed primers & key questions</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Subsystems Grid */}
+              <UniversalSubsystemsGrid
+                subsystems={universalSubsystems}
+                onSubsystemClick={handleSubsystemClick}
+              />
+            </section>
+          )}
+
+          {/* Section Divider */}
+          {universalSubsystems.length > 0 && (
+            <div className="flex items-center gap-4 py-4">
+              <div className="flex-1 h-px bg-border" />
+              <span className="text-sm text-muted-foreground font-medium">Company Blueprints</span>
+              <div className="flex-1 h-px bg-border" />
+            </div>
+          )}
 
           {/* HERO: Visual Technology Tree Preview - Always Visible */}
       <Card className="overflow-hidden border-2 border shadow-xl">
@@ -989,6 +1081,23 @@ export function BlueprintsView({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Subsystem Detail Sheet */}
+      <SubsystemDetailSheet
+        subsystem={selectedSubsystem}
+        objectivePack={selectedSubsystemPack}
+        open={isSubsystemSheetOpen}
+        onOpenChange={setIsSubsystemSheetOpen}
+        onCreateObjective={handleCreateObjective}
+      />
+
+      {/* Create Objective from Subsystem Dialog */}
+      <CreateSubsystemObjectiveDialog
+        subsystem={selectedSubsystem}
+        objectivePack={selectedSubsystemPack}
+        open={isCreateObjectiveOpen}
+        onOpenChange={setIsCreateObjectiveOpen}
+      />
     </div>
   )
 }

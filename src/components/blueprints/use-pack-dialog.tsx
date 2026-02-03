@@ -16,6 +16,10 @@ import {
   ChevronDown,
   ChevronUp,
   Info,
+  User,
+  Users,
+  Bot,
+  UserX,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -330,10 +334,38 @@ export function UsePackDialog({ pack, trigger }: UsePackDialogProps) {
                                   <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
-                                  <SelectItem value="unassigned">Unassigned</SelectItem>
-                                  <SelectItem value="you">You</SelectItem>
-                                  <SelectItem value="team">Team Member</SelectItem>
-                                  <SelectItem value="agent">AI Agent</SelectItem>
+                                  <SelectItem value="unassigned">
+                                    <div className="flex items-center gap-2">
+                                      <div className="h-5 w-5 rounded-full bg-muted flex items-center justify-center shrink-0">
+                                        <UserX className="h-3 w-3 text-muted-foreground" />
+                                      </div>
+                                      <span>Unassigned</span>
+                                    </div>
+                                  </SelectItem>
+                                  <SelectItem value="you">
+                                    <div className="flex items-center gap-2">
+                                      <div className="h-5 w-5 rounded-full bg-orange-100 flex items-center justify-center shrink-0">
+                                        <User className="h-3 w-3 text-orange-700" />
+                                      </div>
+                                      <span>You</span>
+                                    </div>
+                                  </SelectItem>
+                                  <SelectItem value="team">
+                                    <div className="flex items-center gap-2">
+                                      <div className="h-5 w-5 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
+                                        <Users className="h-3 w-3 text-blue-700" />
+                                      </div>
+                                      <span>Team Member</span>
+                                    </div>
+                                  </SelectItem>
+                                  <SelectItem value="agent">
+                                    <div className="flex items-center gap-2">
+                                      <div className="h-5 w-5 rounded-full bg-purple-100 flex items-center justify-center shrink-0">
+                                        <Bot className="h-3 w-3 text-purple-700" />
+                                      </div>
+                                      <span>AI Agent</span>
+                                    </div>
+                                  </SelectItem>
                                 </SelectContent>
                               </Select>
                               <Button

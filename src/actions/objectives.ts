@@ -484,3 +484,153 @@ export async function deleteObjectives(ids: string[]) {
     revalidatePath('/objectives')
     return { success: true }
 }
+
+/**
+ * Creates an objective from a universal subsystem objective pack
+ * 
+ * @description Creates an objective with pre-built tasks from a subsystem pack.
+ * Tasks are created with proper role assignments and marketplace task markers.
+ * 
+ * @param input - The subsystem objective creation input
+ * @returns The created objective ID or an error
+ * 
+ * @security Requires authenticated user with foundry membership
+ */
+export async function createObjectiveFromSubsystem(input: {
+    subsystemId: string
+    subsystemName: string
+    packId: string
+    packTitle: string
+    packSummary: string | null
+    packDescription: string | null
+    selectedTaskIndices: number[]
+    tasks: Array<{
+        order: number
+        title: string
+        description: string
+        role: 'Executive' | 'Apprentice' | 'AI_Agent'
+        estimated_hours?: number
+        is_marketplace_task?: boolean
+        marketplace_filter?: {
+            categories?: string[]
+            type?: 'advice' | 'supplier'
+            subcategory?: string
+        }
+    }>
+}): Promise<{ objectiveId?: string; error?: string }> {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+
+    if (!user) return { error: 'Unauthorized' }
+
+    // AUTH: Get foundry_id for multi-tenant isolation
+    const foundry_id = await getFoundryIdCached()
+    if (!foundry_id) return { error: 'User not in a foundry' }
+
+    // VALIDATION: Ensure we have tasks to create
+    if (input.selectedTaskIndices.length === 0) {
+        return { error: 'Please select at least one task' }
+    }
+
+    // Get selected tasks
+    const selectedTasks = input.tasks.filter((_, index) => 
+        input.selectedTaskIndices.includes(index)
+    )
+
+    // Get AI Agent profile for AI_Agent role assignments
+    const { data: aiAgent } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('email', 'ai-agent@centauros.ai')
+        .single()
+
+    // Create the objective
+    const objectiveTitle = input.packTitle
+    const objectiveDescription = input.packSummary || `Objective pack for ${input.subsystemName}`
+    const extendedDescription = input.packDescription || null
+
+    try {
+        // 1. Create the objective
+        const { data: objective, error: objError } = await supabase
+            .from('objectives')
+            .insert({
+                title: objectiveTitle,
+                description: objectiveDescription,
+                extended_description: extendedDescription,
+                creator_id: user.id,
+                foundry_id,
+            })
+            .select()
+            .single()
+
+        if (objError || !objective) {
+            console.error('[CreateSubsystemObjective] Failed to create objective:', objError)
+            return { error: objError?.message || 'Failed to create objective' }
+        }
+
+        // 2. Create tasks from the selected pack tasks
+        const tasksToInsert = selectedTasks.map((task) => {
+            // Determine assignee based on role
+            let assignee_id: string | null = null
+            if (task.role === 'AI_Agent' && aiAgent?.id) {
+                assignee_id = aiAgent.id
+            } else if (task.role === 'Executive') {
+                // Assign to creator (typically the executive/founder)
+                assignee_id = user.id
+            }
+            // Apprentice tasks left unassigned for team assignment
+
+            // Add marketplace context to description if it's a marketplace task
+            let description = task.description
+            if (task.is_marketplace_task && task.marketplace_filter) {
+                const filterType = task.marketplace_filter.type === 'advice' 
+                    ? 'experts and advisors' 
+                    : 'suppliers and service providers'
+                const categories = task.marketplace_filter.categories?.join(', ') || 'relevant categories'
+                description += `\n\n---\n**Marketplace Discovery Task**\nSearch the CentaurOS marketplace for ${filterType} in: ${categories}`
+            }
+
+            return {
+                title: task.title,
+                description,
+                objective_id: objective.id,
+                creator_id: user.id,
+                assignee_id,
+                foundry_id,
+                status: 'Pending' as const,
+                start_date: new Date().toISOString(),
+                end_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // +7 days
+            }
+        })
+
+        if (tasksToInsert.length > 0) {
+            const { error: tasksError } = await supabase
+                .from('tasks')
+                .insert(tasksToInsert)
+
+            if (tasksError) {
+                console.error('[CreateSubsystemObjective] Failed to create tasks:', tasksError)
+                // Clean up the objective if task creation fails
+                await supabase.from('objectives').delete().eq('id', objective.id)
+                return { error: `Failed to create tasks: ${tasksError.message}` }
+            }
+        }
+
+        // AUDIT: Log the objective creation
+        console.info('[CreateSubsystemObjective] Created objective:', {
+            objectiveId: objective.id,
+            subsystemId: input.subsystemId,
+            subsystemName: input.subsystemName,
+            taskCount: tasksToInsert.length,
+            userId: user.id,
+            foundryId: foundry_id,
+        })
+
+        revalidatePath('/objectives')
+        return { objectiveId: objective.id }
+
+    } catch (error) {
+        console.error('[CreateSubsystemObjective] Unexpected error:', error)
+        return { error: error instanceof Error ? error.message : 'Failed to create objective' }
+    }
+}
