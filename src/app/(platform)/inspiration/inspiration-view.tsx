@@ -20,7 +20,9 @@ import {
   Pill,
   Smartphone,
   Server,
-  Layers
+  Layers,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -180,6 +182,126 @@ const getCriticalityColor = (criticality: string) => {
     default:
       return 'bg-muted text-muted-foreground'
   }
+}
+
+/**
+ * PackCard - Collapsible card for objective packs with three states:
+ * - Collapsed (default): Title, icon, difficulty, task count
+ * - Expanded (click): Adds description and sample tasks
+ * - Full modal: Via UsePackDialog button
+ */
+function PackCard({ pack }: { pack: ObjectivePack }) {
+  const [isExpanded, setIsExpanded] = useState(false)
+  const Icon = getPackIcon(pack.icon_name)
+  const taskCount = pack.items?.length || 0
+  const displayTasks = pack.items?.slice(0, 3) || []
+  
+  return (
+    <Card className="flex flex-col transition-all duration-200 hover:shadow-md">
+      {/* Collapsed header - always visible */}
+      <CardHeader 
+        className="cursor-pointer" 
+        onClick={() => setIsExpanded(!isExpanded)}
+      >
+        <div className="flex items-start justify-between gap-4 mb-2">
+          <div className={cn(
+            "p-2.5 rounded-lg",
+            "bg-electric-blue/10"
+          )}>
+            <Icon className="h-5 w-5 text-electric-blue" />
+          </div>
+          <div className="flex items-center gap-2">
+            {pack.difficulty && (
+              <Badge className={cn("text-xs", getDifficultyColor(pack.difficulty))}>
+                {pack.difficulty}
+              </Badge>
+            )}
+            <div className="flex items-center gap-1 text-xs text-muted-foreground">
+              <CheckSquare className="h-3.5 w-3.5" />
+              <span>{taskCount}</span>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 w-6 p-0 shrink-0"
+              onClick={(e) => {
+                e.stopPropagation()
+                setIsExpanded(!isExpanded)
+              }}
+            >
+              {isExpanded ? (
+                <ChevronUp className="h-4 w-4" />
+              ) : (
+                <ChevronDown className="h-4 w-4" />
+              )}
+            </Button>
+          </div>
+        </div>
+        <CardTitle className="text-lg leading-tight">{pack.title}</CardTitle>
+        
+        {/* Duration - shown in collapsed state */}
+        {pack.estimated_duration && (
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-1">
+            <Clock className="h-3.5 w-3.5" />
+            <span>{pack.estimated_duration}</span>
+          </div>
+        )}
+      </CardHeader>
+      
+      {/* Expanded content - only visible when expanded */}
+      {isExpanded && (
+        <CardContent className="flex-1 flex flex-col pt-0">
+          {/* Description */}
+          {pack.description && (
+            <p className="text-sm text-muted-foreground mb-4">
+              {pack.description}
+            </p>
+          )}
+
+          {/* Sample tasks */}
+          {displayTasks.length > 0 && (
+            <div className="space-y-1.5 mb-4">
+              <p className="text-xs font-medium text-foreground mb-1">Tasks included:</p>
+              {displayTasks.map((item, idx) => (
+                <div key={idx} className="flex items-start gap-2 text-sm">
+                  <span className="text-muted-foreground">•</span>
+                  <span className="text-muted-foreground">{item.title}</span>
+                </div>
+              ))}
+              {taskCount > 3 && (
+                <p className="text-xs text-muted-foreground italic">
+                  +{taskCount - 3} more tasks
+                </p>
+              )}
+            </div>
+          )}
+
+          <UsePackDialog 
+            pack={pack}
+            trigger={
+              <Button className="w-full mt-auto">
+                Use This Pack
+              </Button>
+            }
+          />
+        </CardContent>
+      )}
+      
+      {/* Collapsed footer - Use Pack button always visible */}
+      {!isExpanded && (
+        <CardContent className="pt-0">
+          <UsePackDialog 
+            pack={pack}
+            trigger={
+              <Button variant="outline" className="w-full" size="sm">
+                View Pack
+              </Button>
+            }
+          />
+        </CardContent>
+      )}
+    </Card>
+  )
 }
 
 interface InspirationViewProps {
@@ -556,77 +678,9 @@ export function InspirationView({ templates = [], packs = [] }: InspirationViewP
 
         {/* Objective packs grid */}
         <div className="mt-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredPacks.map((pack) => {
-            const Icon = getPackIcon(pack.icon_name)
-            const taskCount = pack.items?.length || 0
-            const displayTasks = pack.items?.slice(0, 3) || []
-            
-            return (
-              <Card key={pack.id} className="flex flex-col">
-                <CardHeader>
-                  <div className="flex items-start justify-between gap-4 mb-4">
-                    <div className={cn(
-                      "p-3 rounded-lg",
-                      "bg-electric-blue/10"
-                    )}>
-                      <Icon className="h-6 w-6 text-electric-blue" />
-                    </div>
-                    {pack.difficulty && (
-                      <Badge className={getDifficultyColor(pack.difficulty)}>
-                        {pack.difficulty}
-                      </Badge>
-                    )}
-                  </div>
-                  <CardTitle className="text-xl">{pack.title}</CardTitle>
-                </CardHeader>
-                <CardContent className="flex-1 flex flex-col">
-                  <p className="text-sm text-muted-foreground mb-6">
-                    {pack.description}
-                  </p>
-
-                  {/* Stats */}
-                  <div className="flex items-center gap-4 text-sm text-muted-foreground mb-6">
-                    {pack.estimated_duration && (
-                      <div className="flex items-center gap-1.5">
-                        <Clock className="h-4 w-4" />
-                        <span>{pack.estimated_duration}</span>
-                      </div>
-                    )}
-                    <div className="flex items-center gap-1.5">
-                      <CheckSquare className="h-4 w-4" />
-                      <span>{taskCount} tasks</span>
-                    </div>
-                  </div>
-
-                  {/* Sample tasks */}
-                  {displayTasks.length > 0 && (
-                    <div className="space-y-2 mb-6">
-                      {displayTasks.map((item, idx) => (
-                        <div key={idx} className="flex items-start gap-2 text-sm">
-                          <span className="text-muted-foreground">•</span>
-                          <span className="text-muted-foreground">{item.title}</span>
-                        </div>
-                      ))}
-                      {taskCount > 3 && (
-                        <p className="text-sm text-muted-foreground font-medium">
-                          +{taskCount - 3} more tasks
-                        </p>
-                      )}
-                    </div>
-                  )}
-
-                  <UsePackDialog 
-                    pack={pack}
-                    trigger={
-                      <Button className="w-full mt-auto">
-                        Use This Pack
-                      </Button>
-                    }
-                  />
-                </CardContent>
-              </Card>
-            )
-          })}
+          {filteredPacks.map((pack) => (
+            <PackCard key={pack.id} pack={pack} />
+          ))}
         </div>
       </div>
     )

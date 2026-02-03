@@ -288,8 +288,8 @@ export function UsePackDialog({ pack, trigger }: UsePackDialogProps) {
                 </Button>
               </div>
 
-              <div className="rounded-md border overflow-hidden">
-                <div className="max-h-[450px] overflow-y-auto p-2 space-y-2">
+              <div className="rounded-md border overflow-hidden flex-1 min-h-0 flex flex-col">
+                <div className="flex-1 overflow-y-auto p-2 space-y-2">
                   {pack.items?.map((item, idx) => {
                     const isExpanded = expandedTaskId === item.id
                     const isSelected = selectedTaskIds.includes(item.id)
@@ -332,48 +332,50 @@ export function UsePackDialog({ pack, trigger }: UsePackDialogProps) {
                                     <SelectValue />
                                   </SelectTrigger>
                                   <SelectContent className="min-w-[180px]">
-                                    <SelectItem value="unassigned" className="cursor-pointer">
+                                    <SelectItem value="unassigned" className="cursor-pointer py-2">
                                       <div className="flex items-center gap-2">
-                                        <UserAvatar name="Unassigned" role="default" size="sm" />
+                                        <UserAvatar name="Unassigned" role="default" size="xs" />
                                         <span>Unassigned</span>
                                       </div>
                                     </SelectItem>
-                                    <SelectItem value="you" className="cursor-pointer">
+                                    <SelectItem value="you" className="cursor-pointer py-2">
                                       <div className="flex items-center gap-2">
-                                        <UserAvatar name="You" role="Founder" size="sm" />
+                                        <UserAvatar name="You" role="Founder" size="xs" />
                                         <span>You</span>
                                       </div>
                                     </SelectItem>
-                                    <SelectItem value="team" className="cursor-pointer">
+                                    <SelectItem value="team" className="cursor-pointer py-2">
                                       <div className="flex items-center gap-2">
-                                        <UserAvatar name="Team" role="Executive" size="sm" />
+                                        <UserAvatar name="Team" role="Executive" size="xs" />
                                         <span>Team Member</span>
                                       </div>
                                     </SelectItem>
-                                    <SelectItem value="agent" className="cursor-pointer">
+                                    <SelectItem value="agent" className="cursor-pointer py-2">
                                       <div className="flex items-center gap-2">
-                                        <UserAvatar name="AI Agent" role="AI_Agent" size="sm" />
+                                        <UserAvatar name="AI Agent" role="AI_Agent" size="xs" />
                                         <span>AI Agent</span>
                                       </div>
                                     </SelectItem>
                                   </SelectContent>
                                 </Select>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="h-6 w-6 p-0 shrink-0"
-                                  data-expand-button
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    toggleTaskExpand(item.id)
-                                  }}
-                                >
-                                  {isExpanded ? (
-                                    <ChevronUp className="h-3.5 w-3.5" />
-                                  ) : (
-                                    <ChevronDown className="h-3.5 w-3.5" />
-                                  )}
-                                </Button>
+                                {item.description && (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-6 w-6 p-0 shrink-0"
+                                    data-expand-button
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      toggleTaskExpand(item.id)
+                                    }}
+                                  >
+                                    {isExpanded ? (
+                                      <ChevronUp className="h-3.5 w-3.5" />
+                                    ) : (
+                                      <ChevronDown className="h-3.5 w-3.5" />
+                                    )}
+                                  </Button>
+                                )}
                               </div>
                             </div>
                             
@@ -396,9 +398,6 @@ export function UsePackDialog({ pack, trigger }: UsePackDialogProps) {
               <div className="flex items-center justify-between text-xs mt-3">
                 <p className="text-muted-foreground">
                   {selectedTaskIds.length} of {pack.items?.length || 0} tasks selected
-                </p>
-                <p className="text-muted-foreground">
-                  Click <ChevronDown className="h-3 w-3 inline" /> to see full task details
                 </p>
               </div>
             </div>
