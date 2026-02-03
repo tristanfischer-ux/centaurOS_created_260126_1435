@@ -1382,9 +1382,26 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
             <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
                 <AlertDialogContent>
                     <AlertDialogHeader>
-                        <AlertDialogTitle>Delete {selectedTaskIds.size} task{selectedTaskIds.size > 1 ? 's' : ''}?</AlertDialogTitle>
+                        <AlertDialogTitle>
+                            Delete {(() => {
+                                const parts: string[] = []
+                                if (selectedTaskIds.size > 0) parts.push(`${selectedTaskIds.size} task${selectedTaskIds.size > 1 ? 's' : ''}`)
+                                if (selectedObjectiveIds.size > 0) parts.push(`${selectedObjectiveIds.size} objective${selectedObjectiveIds.size > 1 ? 's' : ''}`)
+                                return parts.join(' and ')
+                            })()}?
+                        </AlertDialogTitle>
                         <AlertDialogDescription>
-                            This action cannot be undone. The selected task{selectedTaskIds.size > 1 ? 's' : ''} will be permanently deleted.
+                            This action cannot be undone.
+                            {selectedTaskIds.size > 0 && (
+                                <span className="block mt-1">
+                                    • {selectedTaskIds.size} task{selectedTaskIds.size > 1 ? 's' : ''} will be permanently deleted.
+                                </span>
+                            )}
+                            {selectedObjectiveIds.size > 0 && (
+                                <span className="block mt-1">
+                                    • {selectedObjectiveIds.size} objective{selectedObjectiveIds.size > 1 ? 's' : ''} and all their associated tasks will be permanently deleted.
+                                </span>
+                            )}
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
