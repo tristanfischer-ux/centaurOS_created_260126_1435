@@ -17,6 +17,7 @@ import { TasksList } from '@/components/inbox/tasks-list'
 import { ConversationThread } from '@/components/messaging/ConversationThread'
 import { ConversationThreadEnhanced } from '@/components/inbox/conversation-thread-enhanced'
 import { HomeSummaryPanel } from '@/components/home'
+import { FullTaskView } from '@/components/tasks/full-task-view'
 
 // Type aliases
 type Profile = Database['public']['Tables']['profiles']['Row']
@@ -154,6 +155,11 @@ export function HomeLayoutClient({
   const [listPanelOpen, setListPanelOpen] = useState(false)
   const [showConversation, setShowConversation] = useState(!!initialSelectedPersonId)
   
+  // Task modal state
+  const [selectedTaskForModal, setSelectedTaskForModal] = useState<string | null>(null)
+  const [fullTaskData, setFullTaskData] = useState<any>(null)
+  const [isLoadingTask, setIsLoadingTask] = useState(false)
+  
   // Preference update debouncing
   const preferenceUpdateTimeout = useRef<NodeJS.Timeout | null>(null)
   const supabase = createClient()
@@ -237,12 +243,54 @@ export function HomeLayoutClient({
     setCurrentContext(null)
   }, [])
   
+  // Handle task modal open
+  const handleOpenTaskModal = useCallback(async (taskId: string) => {
+    setIsLoadingTask(true)
+    setSelectedTaskForModal(taskId)
+    
+    try {
+      // Fetch full task details (TaskDue only has partial data)
+      const { data: task, error } = await supabase
+        .from('tasks')
+        .select(`
+          *,
+          assignee:profiles!tasks_assignee_id_fkey(id, full_name, role, email, avatar_url),
+          objective:objectives(id, title)
+        `)
+        .eq('id', taskId)
+        .single()
+      
+      if (error) {
+        console.error('Error fetching task:', error)
+        toast.error('Failed to load task details')
+        setSelectedTaskForModal(null)
+        return
+      }
+      
+      setFullTaskData(task)
+    } catch (error) {
+      console.error('Error loading task:', error)
+      toast.error('Failed to load task details')
+      setSelectedTaskForModal(null)
+    } finally {
+      setIsLoadingTask(false)
+    }
+  }, [supabase])
+  
   // Calculate unread counts
   const totalUnreadPeople = members.reduce((sum, m) => sum + (m.unread_count || 0), 0)
   const totalUnreadTasks = tasks.reduce((sum, t) => sum + (t.unread_message_count || 0), 0)
   
   // Check if anything is selected
   const hasSelection = selectedPersonId !== null || selectedTaskId !== null
+  
+  // Prepare members list for FullTaskView
+  const membersList = members.map(m => ({
+    id: m.id,
+    full_name: m.full_name || m.email,
+    role: m.role,
+    email: m.email
+  }))
   
   // List panel content (reused in both inline and sheet)
   const listContent = (
@@ -308,92 +356,15 @@ export function HomeLayoutClient({
   // LARGE SCREEN: 3 columns
   if (screenSize === 'large') {
     return (
-      <div className="flex h-full">
-        {/* Left Panel - List */}
-        <div className="w-[320px] lg:w-[360px] border-r border-slate-200 flex flex-col">
-          {listContent}
-        </div>
-        
-        {/* Middle Panel - Conversation */}
-        <div className="flex-1 flex flex-col min-w-0">
-          {selectedPersonId ? (
-            <DirectConversationView
-              personId={selectedPersonId}
-              currentUserId={currentUserId}
-              foundryId={foundryId}
-              members={members}
-              tasks={tasks}
-              objectives={objectives}
-            />
-          ) : selectedTaskId ? (
-            <TaskConversationView
-              taskId={selectedTaskId}
-              context={currentContext}
-              currentUserId={currentUserId}
-              foundryId={foundryId}
-              members={members}
-            />
-          ) : (
-            <EmptyState viewMode={viewMode} />
-          )}
-        </div>
-        
-        {/* Right Panel - Summary */}
-        <div className="w-[350px] border-l border-slate-200 bg-muted/30">
-          <HomeSummaryPanel
-            overdueTasks={overdueTasks}
-            pendingDecisions={pendingDecisions}
-            blockers={blockers}
-            tasksDueToday={tasksDueToday}
-            tasksDueThisWeek={tasksDueThisWeek}
-            teamMembers={teamMembers}
-            userId={currentUserId}
-            userRole={userRole}
-            foundryId={foundryId}
-            isExecutiveOrFounder={isExecutiveOrFounder}
-          />
-        </div>
-      </div>
-    )
-  }
-  
-  // MEDIUM SCREEN: 2 columns with slide-out list
-  if (screenSize === 'medium') {
-    return (
-      <div className="flex h-full">
-        {/* Main Content - Messages with slide-out list */}
-        <div className="flex-1 flex flex-col min-w-0">
-          {/* Header with list toggle */}
-          <div className="flex items-center gap-2 p-2 border-b border-slate-200">
-            <Sheet open={listPanelOpen} onOpenChange={setListPanelOpen}>
-              <SheetTrigger asChild>
-                <Button variant="ghost" size="sm" className="gap-2">
-                  <PanelLeftOpen className="h-4 w-4" />
-                  {viewMode === 'people' ? 'People' : 'Tasks'}
-                  {(totalUnreadPeople + totalUnreadTasks) > 0 && (
-                    <Badge className="bg-international-orange text-white text-xs">
-                      {totalUnreadPeople + totalUnreadTasks}
-                    </Badge>
-                  )}
-                </Button>
-              </SheetTrigger>
-              <SheetContent side="left" className="w-[320px] p-0">
-                <div className="flex flex-col h-full">
-                  {listContent}
-                </div>
-              </SheetContent>
-            </Sheet>
-            
-            {hasSelection && (
-              <Button variant="ghost" size="sm" onClick={handleBack} className="gap-2">
-                <ArrowLeft className="h-4 w-4" />
-                Back
-              </Button>
-            )}
+      <>
+        <div className="flex h-full">
+          {/* Left Panel - List */}
+          <div className="w-[320px] lg:w-[360px] border-r border-slate-200 flex flex-col">
+            {listContent}
           </div>
           
-          {/* Conversation content */}
-          <div className="flex-1 min-h-0">
+          {/* Middle Panel - Conversation */}
+          <div className="flex-1 flex flex-col min-w-0">
             {selectedPersonId ? (
               <DirectConversationView
                 personId={selectedPersonId}
@@ -415,120 +386,254 @@ export function HomeLayoutClient({
               <EmptyState viewMode={viewMode} />
             )}
           </div>
+          
+          {/* Right Panel - Summary */}
+          <div className="w-[350px] border-l border-slate-200 bg-muted/30">
+            <HomeSummaryPanel
+              overdueTasks={overdueTasks}
+              pendingDecisions={pendingDecisions}
+              blockers={blockers}
+              tasksDueToday={tasksDueToday}
+              tasksDueThisWeek={tasksDueThisWeek}
+              teamMembers={teamMembers}
+              userId={currentUserId}
+              userRole={userRole}
+              foundryId={foundryId}
+              isExecutiveOrFounder={isExecutiveOrFounder}
+              onTaskClick={handleOpenTaskModal}
+            />
+          </div>
         </div>
         
-        {/* Right Panel - Summary */}
-        <div className="w-[320px] border-l border-slate-200 bg-muted/30">
-          <HomeSummaryPanel
-            overdueTasks={overdueTasks}
-            pendingDecisions={pendingDecisions}
-            blockers={blockers}
-            tasksDueToday={tasksDueToday}
-            tasksDueThisWeek={tasksDueThisWeek}
-            teamMembers={teamMembers}
-            userId={currentUserId}
-            userRole={userRole}
-            foundryId={foundryId}
-            isExecutiveOrFounder={isExecutiveOrFounder}
+        {/* Task Detail Modal */}
+        {selectedTaskForModal && fullTaskData && (
+          <FullTaskView
+            open={!!selectedTaskForModal}
+            onOpenChange={(open) => {
+              if (!open) {
+                setSelectedTaskForModal(null)
+                setFullTaskData(null)
+              }
+            }}
+            task={fullTaskData}
+            members={membersList}
+            currentUserId={currentUserId}
           />
+        )}
+      </>
+    )
+  }
+  
+  // MEDIUM SCREEN: 2 columns with slide-out list
+  if (screenSize === 'medium') {
+    return (
+      <>
+        <div className="flex h-full">
+          {/* Main Content - Messages with slide-out list */}
+          <div className="flex-1 flex flex-col min-w-0">
+            {/* Header with list toggle */}
+            <div className="flex items-center gap-2 p-2 border-b border-slate-200">
+              <Sheet open={listPanelOpen} onOpenChange={setListPanelOpen}>
+                <SheetTrigger asChild>
+                  <Button variant="ghost" size="sm" className="gap-2">
+                    <PanelLeftOpen className="h-4 w-4" />
+                    {viewMode === 'people' ? 'People' : 'Tasks'}
+                    {(totalUnreadPeople + totalUnreadTasks) > 0 && (
+                      <Badge className="bg-international-orange text-white text-xs">
+                        {totalUnreadPeople + totalUnreadTasks}
+                      </Badge>
+                    )}
+                  </Button>
+                </SheetTrigger>
+                <SheetContent side="left" className="w-[320px] p-0">
+                  <div className="flex flex-col h-full">
+                    {listContent}
+                  </div>
+                </SheetContent>
+              </Sheet>
+              
+              {hasSelection && (
+                <Button variant="ghost" size="sm" onClick={handleBack} className="gap-2">
+                  <ArrowLeft className="h-4 w-4" />
+                  Back
+                </Button>
+              )}
+            </div>
+            
+            {/* Conversation content */}
+            <div className="flex-1 min-h-0">
+              {selectedPersonId ? (
+                <DirectConversationView
+                  personId={selectedPersonId}
+                  currentUserId={currentUserId}
+                  foundryId={foundryId}
+                  members={members}
+                  tasks={tasks}
+                  objectives={objectives}
+                />
+              ) : selectedTaskId ? (
+                <TaskConversationView
+                  taskId={selectedTaskId}
+                  context={currentContext}
+                  currentUserId={currentUserId}
+                  foundryId={foundryId}
+                  members={members}
+                />
+              ) : (
+                <EmptyState viewMode={viewMode} />
+              )}
+            </div>
+          </div>
+          
+          {/* Right Panel - Summary */}
+          <div className="w-[320px] border-l border-slate-200 bg-muted/30">
+            <HomeSummaryPanel
+              overdueTasks={overdueTasks}
+              pendingDecisions={pendingDecisions}
+              blockers={blockers}
+              tasksDueToday={tasksDueToday}
+              tasksDueThisWeek={tasksDueThisWeek}
+              teamMembers={teamMembers}
+              userId={currentUserId}
+              userRole={userRole}
+              foundryId={foundryId}
+              isExecutiveOrFounder={isExecutiveOrFounder}
+              onTaskClick={handleOpenTaskModal}
+            />
+          </div>
         </div>
-      </div>
+        
+        {/* Task Detail Modal */}
+        {selectedTaskForModal && fullTaskData && (
+          <FullTaskView
+            open={!!selectedTaskForModal}
+            onOpenChange={(open) => {
+              if (!open) {
+                setSelectedTaskForModal(null)
+                setFullTaskData(null)
+              }
+            }}
+            task={fullTaskData}
+            members={membersList}
+            currentUserId={currentUserId}
+          />
+        )}
+      </>
     )
   }
   
   // SMALL SCREEN (Mobile): Tabbed view
   return (
-    <div className="flex flex-col h-full">
-      {/* Mobile Tab Bar */}
-      <div className="flex border-b border-slate-200 bg-background">
-        <button
-          onClick={() => setMobileView('messages')}
-          className={cn(
-            "flex-1 flex items-center justify-center gap-2 py-3 text-sm font-medium transition-colors",
-            mobileView === 'messages' 
-              ? "text-international-orange border-b-2 border-international-orange" 
-              : "text-muted-foreground"
+    <>
+      <div className="flex flex-col h-full">
+        {/* Mobile Tab Bar */}
+        <div className="flex border-b border-slate-200 bg-background">
+          <button
+            onClick={() => setMobileView('messages')}
+            className={cn(
+              "flex-1 flex items-center justify-center gap-2 py-3 text-sm font-medium transition-colors",
+              mobileView === 'messages' 
+                ? "text-international-orange border-b-2 border-international-orange" 
+                : "text-muted-foreground"
+            )}
+          >
+            <MessageSquare className="h-4 w-4" />
+            Messages
+            {(totalUnreadPeople + totalUnreadTasks) > 0 && (
+              <Badge className="bg-international-orange text-white text-xs">
+                {totalUnreadPeople + totalUnreadTasks}
+              </Badge>
+            )}
+          </button>
+          <button
+            onClick={() => setMobileView('summary')}
+            className={cn(
+              "flex-1 flex items-center justify-center gap-2 py-3 text-sm font-medium transition-colors",
+              mobileView === 'summary' 
+                ? "text-international-orange border-b-2 border-international-orange" 
+                : "text-muted-foreground"
+            )}
+          >
+            <LayoutDashboard className="h-4 w-4" />
+            Overview
+          </button>
+        </div>
+        
+        {/* Mobile Content */}
+        <div className="flex-1 min-h-0">
+          {mobileView === 'messages' ? (
+            // Messages view
+            showConversation && hasSelection ? (
+              // Show conversation
+              <div className="flex flex-col h-full">
+                <div className="p-2 border-b border-slate-200">
+                  <Button variant="ghost" size="sm" onClick={handleBack} className="gap-2">
+                    <ArrowLeft className="h-4 w-4" />
+                    Back
+                  </Button>
+                </div>
+                <div className="flex-1 min-h-0">
+                  {selectedPersonId ? (
+                    <DirectConversationView
+                      personId={selectedPersonId}
+                      currentUserId={currentUserId}
+                      foundryId={foundryId}
+                      members={members}
+                      tasks={tasks}
+                      objectives={objectives}
+                    />
+                  ) : selectedTaskId ? (
+                    <TaskConversationView
+                      taskId={selectedTaskId}
+                      context={currentContext}
+                      currentUserId={currentUserId}
+                      foundryId={foundryId}
+                      members={members}
+                    />
+                  ) : null}
+                </div>
+              </div>
+            ) : (
+              // Show list
+              <div className="flex flex-col h-full">
+                {listContent}
+              </div>
+            )
+          ) : (
+            // Summary view
+            <HomeSummaryPanel
+              overdueTasks={overdueTasks}
+              pendingDecisions={pendingDecisions}
+              blockers={blockers}
+              tasksDueToday={tasksDueToday}
+              tasksDueThisWeek={tasksDueThisWeek}
+              teamMembers={teamMembers}
+              userId={currentUserId}
+              userRole={userRole}
+              foundryId={foundryId}
+              isExecutiveOrFounder={isExecutiveOrFounder}
+              onTaskClick={handleOpenTaskModal}
+            />
           )}
-        >
-          <MessageSquare className="h-4 w-4" />
-          Messages
-          {(totalUnreadPeople + totalUnreadTasks) > 0 && (
-            <Badge className="bg-international-orange text-white text-xs">
-              {totalUnreadPeople + totalUnreadTasks}
-            </Badge>
-          )}
-        </button>
-        <button
-          onClick={() => setMobileView('summary')}
-          className={cn(
-            "flex-1 flex items-center justify-center gap-2 py-3 text-sm font-medium transition-colors",
-            mobileView === 'summary' 
-              ? "text-international-orange border-b-2 border-international-orange" 
-              : "text-muted-foreground"
-          )}
-        >
-          <LayoutDashboard className="h-4 w-4" />
-          Overview
-        </button>
+        </div>
       </div>
       
-      {/* Mobile Content */}
-      <div className="flex-1 min-h-0">
-        {mobileView === 'messages' ? (
-          // Messages view
-          showConversation && hasSelection ? (
-            // Show conversation
-            <div className="flex flex-col h-full">
-              <div className="p-2 border-b border-slate-200">
-                <Button variant="ghost" size="sm" onClick={handleBack} className="gap-2">
-                  <ArrowLeft className="h-4 w-4" />
-                  Back
-                </Button>
-              </div>
-              <div className="flex-1 min-h-0">
-                {selectedPersonId ? (
-                  <DirectConversationView
-                    personId={selectedPersonId}
-                    currentUserId={currentUserId}
-                    foundryId={foundryId}
-                    members={members}
-                    tasks={tasks}
-                    objectives={objectives}
-                  />
-                ) : selectedTaskId ? (
-                  <TaskConversationView
-                    taskId={selectedTaskId}
-                    context={currentContext}
-                    currentUserId={currentUserId}
-                    foundryId={foundryId}
-                    members={members}
-                  />
-                ) : null}
-              </div>
-            </div>
-          ) : (
-            // Show list
-            <div className="flex flex-col h-full">
-              {listContent}
-            </div>
-          )
-        ) : (
-          // Summary view
-          <HomeSummaryPanel
-            overdueTasks={overdueTasks}
-            pendingDecisions={pendingDecisions}
-            blockers={blockers}
-            tasksDueToday={tasksDueToday}
-            tasksDueThisWeek={tasksDueThisWeek}
-            teamMembers={teamMembers}
-            userId={currentUserId}
-            userRole={userRole}
-            foundryId={foundryId}
-            isExecutiveOrFounder={isExecutiveOrFounder}
-          />
-        )}
-      </div>
-    </div>
+      {/* Task Detail Modal */}
+      {selectedTaskForModal && fullTaskData && (
+        <FullTaskView
+          open={!!selectedTaskForModal}
+          onOpenChange={(open) => {
+            if (!open) {
+              setSelectedTaskForModal(null)
+              setFullTaskData(null)
+            }
+          }}
+          task={fullTaskData}
+          members={membersList}
+          currentUserId={currentUserId}
+        />
+      )}
+    </>
   )
 }
 

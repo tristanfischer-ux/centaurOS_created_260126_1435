@@ -98,6 +98,9 @@ export interface HomeSummaryPanelProps {
   foundryId: string
   isExecutiveOrFounder: boolean
   
+  // Callbacks
+  onTaskClick?: (taskId: string) => void
+  
   // Layout
   className?: string
 }
@@ -116,6 +119,7 @@ export function HomeSummaryPanel({
   userRole,
   foundryId,
   isExecutiveOrFounder,
+  onTaskClick,
   className
 }: HomeSummaryPanelProps) {
   return (
@@ -134,6 +138,7 @@ export function HomeSummaryPanel({
         <TasksDueSection
           tasksDueToday={tasksDueToday}
           tasksDueThisWeek={tasksDueThisWeek}
+          onTaskClick={onTaskClick}
         />
         
         {/* Team Activity */}

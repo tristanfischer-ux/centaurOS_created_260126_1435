@@ -39,19 +39,20 @@ interface TaskDue {
 interface TasksDueSectionProps {
   tasksDueToday: TaskDue[]
   tasksDueThisWeek: TaskDue[]
+  onTaskClick?: (taskId: string) => void
   className?: string
 }
 
 /**
  * Compact task item for the summary panel
  */
-function TaskItem({ task }: { task: TaskDue }) {
+function TaskItem({ task, onTaskClick }: { task: TaskDue; onTaskClick?: (taskId: string) => void }) {
   const dueDate = new Date(task.end_date)
   
   return (
-    <Link 
-      href={`/tasks?taskId=${task.id}`}
-      className="flex items-center gap-3 p-2 rounded-md hover:bg-muted transition-colors group"
+    <div 
+      onClick={() => onTaskClick?.(task.id)}
+      className="flex items-center gap-3 p-2 rounded-md hover:bg-muted transition-colors group cursor-pointer"
     >
       {/* Assignee avatar */}
       <Avatar className="h-6 w-6 flex-shrink-0">
@@ -91,7 +92,7 @@ function TaskItem({ task }: { task: TaskDue }) {
       >
         {formatStatus(task.status)}
       </Badge>
-    </Link>
+    </div>
   )
 }
 
@@ -101,6 +102,7 @@ function TaskItem({ task }: { task: TaskDue }) {
 export function TasksDueSection({
   tasksDueToday,
   tasksDueThisWeek,
+  onTaskClick,
   className
 }: TasksDueSectionProps) {
   const hasNoTasks = tasksDueToday.length === 0 && tasksDueThisWeek.length === 0
@@ -139,7 +141,7 @@ export function TasksDueSection({
           <CardContent className="px-2 pb-2 pt-0">
             <div className="space-y-1">
               {tasksDueToday.slice(0, 5).map((task) => (
-                <TaskItem key={task.id} task={task} />
+                <TaskItem key={task.id} task={task} onTaskClick={onTaskClick} />
               ))}
               {tasksDueToday.length > 5 && (
                 <Link 
@@ -172,7 +174,7 @@ export function TasksDueSection({
           <CardContent className="px-2 pb-2 pt-0">
             <div className="space-y-1">
               {tasksDueThisWeek.slice(0, 5).map((task) => (
-                <TaskItem key={task.id} task={task} />
+                <TaskItem key={task.id} task={task} onTaskClick={onTaskClick} />
               ))}
               {tasksDueThisWeek.length > 5 && (
                 <Link 
