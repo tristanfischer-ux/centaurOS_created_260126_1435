@@ -7,7 +7,7 @@ test.describe('Marketplace Comparison', () => {
     await page.waitForLoadState('networkidle')
   })
 
-  test('can select and compare marketplace listings', async ({ page }) => {
+  test('@critical: can select and compare marketplace listings', async ({ page }) => {
     // Wait for marketplace to load
     await expect(page.locator('text=Browse')).toBeVisible()
 

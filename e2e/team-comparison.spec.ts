@@ -7,7 +7,7 @@ test.describe('Team Member Comparison', () => {
     await page.waitForLoadState('networkidle')
   })
 
-  test('can select and compare team members', async ({ page }) => {
+  test('@critical: can select and compare team members', async ({ page }) => {
     // Wait for team page to load
     await expect(page.locator('text=Team')).toBeVisible()
 
