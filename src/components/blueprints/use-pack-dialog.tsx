@@ -32,7 +32,6 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog'
-import { UserAvatar } from '@/components/ui/user-avatar'
 import {
   Select,
   SelectContent,
