@@ -8,7 +8,7 @@ import { RefreshButton } from "@/components/RefreshButton"
 import { TaskCard } from "./task-card"
 import { Button } from "@/components/ui/button"
 import { LayoutGrid, List, X, Trash2, CheckSquare, Loader2, Check, UserPlus, Filter, ChevronDown, ChevronRight, CalendarDays, Inbox, History } from "lucide-react"
-import { UserAvatar } from "@/components/ui/user-avatar"
+import { UserAvatar, UserAvatarStack } from "@/components/ui/user-avatar"
 import { deleteTasks, acceptTask, completeTask, updateTaskAssignees } from "@/actions/tasks"
 import { toast } from "sonner"
 import { CreateTaskDialog } from "./create-task-dialog"
@@ -64,14 +64,19 @@ import {
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { EmptyState } from "@/components/ui/empty-state"
+import { Progress } from "@/components/ui/progress"
 import { getStatusBadgeClass } from "@/lib/status-colors"
 import { GanttView, JoinedTask } from "@/components/timeline/GanttView"
 
-// Task type update
+// Task type - extended from database type with joined relations
+// Must match TaskCard's Task type for compatibility
 type Task = Database["public"]["Tables"]["tasks"]["Row"] & {
-    assignee?: { id: string, full_name: string | null, role: string, email: string }
+    assignee?: { id: string, full_name: string | null, role: string, email: string, avatar_url?: string | null } | null
+    assignees?: { id: string, full_name: string | null, role: string, email: string, avatar_url?: string | null }[]
     task_number?: number
     task_files?: { id: string }[]
+    objective?: { id: string, title: string } | null
+    message_count?: number
 }
 
 type Objective = {
@@ -300,6 +305,10 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
         new Set([...objectives.map(o => o.id), 'orphaned'])
     )
 
+    // Inline assignee picker state for list view
+    const [assigneePickerTaskId, setAssigneePickerTaskId] = useState<string | null>(null)
+    const [isUpdatingAssignees, setIsUpdatingAssignees] = useState(false)
+
     const toggleObjectiveExpanded = useCallback((objectiveId: string) => {
         setExpandedObjectives(prev => {
             const newSet = new Set(prev)
@@ -439,6 +448,22 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
             setSelectedAssigneeId("")
         } finally {
             setIsBulkOperating(false)
+        }
+    }
+
+    // Handle inline assignee update for list view
+    const handleInlineAssigneeUpdate = async (taskId: string, assigneeIds: string[]) => {
+        setIsUpdatingAssignees(true)
+        try {
+            const result = await updateTaskAssignees(taskId, assigneeIds)
+            if (result?.error) {
+                toast.error(result.error)
+            } else {
+                toast.success('Assignees updated')
+            }
+        } finally {
+            setIsUpdatingAssignees(false)
+            setAssigneePickerTaskId(null)
         }
     }
 
@@ -868,6 +893,8 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                             const objectiveTasks = tasksByObjective[objective.id] || []
                             if (objectiveTasks.length === 0) return null
                             const isExpanded = expandedObjectives.has(objective.id)
+                            const completedCount = objectiveTasks.filter(t => t.status === 'Completed').length
+                            const progressPercent = objectiveTasks.length > 0 ? Math.round((completedCount / objectiveTasks.length) * 100) : 0
 
                             return (
                                 <div key={objective.id} className="border rounded-lg overflow-hidden bg-background">
@@ -903,6 +930,15 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                                                 {objectiveTasks.length} Tasks
                                             </Badge>
                                         </h3>
+                                        <div className="flex items-center gap-3">
+                                            <span className="text-sm text-muted-foreground">
+                                                {completedCount}/{objectiveTasks.length} completed
+                                            </span>
+                                            <Progress value={progressPercent} className="w-24 h-2" />
+                                            <span className="text-sm font-medium text-muted-foreground w-10 text-right">
+                                                {progressPercent}%
+                                            </span>
+                                        </div>
                                     </div>
                                     {isExpanded && (
                                         <div>
@@ -951,21 +987,62 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                                                 </div>
 
                                                 <div className="flex items-center gap-6 flex-shrink-0 text-sm">
-                                                    <div className="flex items-center gap-1 text-muted-foreground w-32">
-                                                        {task.assignee ? (
-                                                            <>
-                                                                <UserAvatar
-                                                                    name={task.assignee.full_name}
-                                                                    role={task.assignee.role}
-                                                                    size="xs"
-                                                                    className="border border-white"
-                                                                />
-                                                                <span className={cn("truncate", task.assignee.role === "AI_Agent" && "text-accent font-medium")}>{task.assignee.full_name}</span>
-                                                            </>
-                                                        ) : (
-                                                            <span className="text-muted-foreground italic">Unassigned</span>
-                                                        )}
-                                                    </div>
+                                                    <Popover 
+                                                        open={assigneePickerTaskId === task.id} 
+                                                        onOpenChange={(open) => {
+                                                            if (!open) setAssigneePickerTaskId(null)
+                                                        }}
+                                                    >
+                                                        <PopoverTrigger asChild>
+                                                            <button
+                                                                className="flex items-center gap-1 text-muted-foreground w-36 hover:bg-muted rounded-md px-2 py-1 -mx-2 transition-colors"
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation()
+                                                                    setAssigneePickerTaskId(task.id)
+                                                                }}
+                                                                disabled={isSelectionMode}
+                                                            >
+                                                                {(task.assignees && task.assignees.length > 0) ? (
+                                                                    <>
+                                                                        <UserAvatarStack
+                                                                            users={task.assignees.map(a => ({
+                                                                                id: a.id,
+                                                                                name: a.full_name,
+                                                                                role: a.role
+                                                                            }))}
+                                                                            size="xs"
+                                                                            max={3}
+                                                                        />
+                                                                        {task.assignees.length === 1 && (
+                                                                            <span className={cn("truncate ml-1", task.assignees[0].role === "AI_Agent" && "text-accent font-medium")}>
+                                                                                {task.assignees[0].full_name}
+                                                                            </span>
+                                                                        )}
+                                                                    </>
+                                                                ) : task.assignee ? (
+                                                                    <>
+                                                                        <UserAvatar
+                                                                            name={task.assignee.full_name}
+                                                                            role={task.assignee.role}
+                                                                            size="xs"
+                                                                            className="border border-white"
+                                                                        />
+                                                                        <span className={cn("truncate", task.assignee.role === "AI_Agent" && "text-accent font-medium")}>{task.assignee.full_name}</span>
+                                                                    </>
+                                                                ) : (
+                                                                    <span className="text-muted-foreground italic">Unassigned</span>
+                                                                )}
+                                                            </button>
+                                                        </PopoverTrigger>
+                                                        <PopoverContent className="w-[280px] p-0" align="start" onClick={(e) => e.stopPropagation()}>
+                                                            <InlineAssigneePicker
+                                                                task={task}
+                                                                members={members}
+                                                                onUpdate={(assigneeIds) => handleInlineAssigneeUpdate(task.id, assigneeIds)}
+                                                                isUpdating={isUpdatingAssignees}
+                                                            />
+                                                        </PopoverContent>
+                                                    </Popover>
                                                     <div className="text-muted-foreground w-24 text-right">
                                                         {task.end_date ? format(new Date(task.end_date), 'MMM d') : '-'}
                                                     </div>
@@ -1053,21 +1130,62 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                                             </div>
 
                                             <div className="flex items-center gap-6 flex-shrink-0 text-sm">
-                                                <div className="flex items-center gap-1 text-muted-foreground w-32">
-                                                    {task.assignee ? (
-                                                        <>
-                                                            <UserAvatar
-                                                                name={task.assignee.full_name}
-                                                                role={task.assignee.role}
-                                                                size="xs"
-                                                                className="border border-white"
-                                                            />
-                                                            <span className={cn("truncate", task.assignee.role === "AI_Agent" && "text-accent font-medium")}>{task.assignee.full_name}</span>
-                                                        </>
-                                                    ) : (
-                                                        <span className="text-muted-foreground italic">Unassigned</span>
-                                                    )}
-                                                </div>
+                                                <Popover 
+                                                    open={assigneePickerTaskId === task.id} 
+                                                    onOpenChange={(open) => {
+                                                        if (!open) setAssigneePickerTaskId(null)
+                                                    }}
+                                                >
+                                                    <PopoverTrigger asChild>
+                                                        <button
+                                                            className="flex items-center gap-1 text-muted-foreground w-36 hover:bg-muted rounded-md px-2 py-1 -mx-2 transition-colors"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation()
+                                                                setAssigneePickerTaskId(task.id)
+                                                            }}
+                                                            disabled={isSelectionMode}
+                                                        >
+                                                            {(task.assignees && task.assignees.length > 0) ? (
+                                                                <>
+                                                                    <UserAvatarStack
+                                                                        users={task.assignees.map(a => ({
+                                                                            id: a.id,
+                                                                            name: a.full_name,
+                                                                            role: a.role
+                                                                        }))}
+                                                                        size="xs"
+                                                                        max={3}
+                                                                    />
+                                                                    {task.assignees.length === 1 && (
+                                                                        <span className={cn("truncate ml-1", task.assignees[0].role === "AI_Agent" && "text-accent font-medium")}>
+                                                                            {task.assignees[0].full_name}
+                                                                        </span>
+                                                                    )}
+                                                                </>
+                                                            ) : task.assignee ? (
+                                                                <>
+                                                                    <UserAvatar
+                                                                        name={task.assignee.full_name}
+                                                                        role={task.assignee.role}
+                                                                        size="xs"
+                                                                        className="border border-white"
+                                                                    />
+                                                                    <span className={cn("truncate", task.assignee.role === "AI_Agent" && "text-accent font-medium")}>{task.assignee.full_name}</span>
+                                                                </>
+                                                            ) : (
+                                                                <span className="text-muted-foreground italic">Unassigned</span>
+                                                            )}
+                                                        </button>
+                                                    </PopoverTrigger>
+                                                    <PopoverContent className="w-[280px] p-0" align="start" onClick={(e) => e.stopPropagation()}>
+                                                        <InlineAssigneePicker
+                                                            task={task}
+                                                            members={members}
+                                                            onUpdate={(assigneeIds) => handleInlineAssigneeUpdate(task.id, assigneeIds)}
+                                                            isUpdating={isUpdatingAssignees}
+                                                        />
+                                                    </PopoverContent>
+                                                </Popover>
                                                 <div className="text-muted-foreground w-24 text-right">
                                                     {task.end_date ? format(new Date(task.end_date), 'MMM d') : '-'}
                                                 </div>
@@ -1208,6 +1326,131 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                 </AlertDialogContent>
             </AlertDialog>
         </>
+    )
+}
+
+/**
+ * InlineAssigneePicker - Multi-select assignee picker for list view
+ * 
+ * @description Allows selecting multiple assignees for a task inline.
+ * Uses checkboxes for multi-select with search functionality.
+ */
+function InlineAssigneePicker({ 
+    task, 
+    members, 
+    onUpdate, 
+    isUpdating 
+}: { 
+    task: Task
+    members: Member[]
+    onUpdate: (assigneeIds: string[]) => void
+    isUpdating: boolean
+}) {
+    // Get current assignee IDs from task
+    const currentAssigneeIds = useMemo(() => {
+        if (task.assignees && task.assignees.length > 0) {
+            return task.assignees.map(a => a.id)
+        }
+        if (task.assignee_id) {
+            return [task.assignee_id]
+        }
+        return []
+    }, [task.assignees, task.assignee_id])
+
+    const [selectedIds, setSelectedIds] = useState<string[]>(currentAssigneeIds)
+    const [searchQuery, setSearchQuery] = useState('')
+
+    const filteredMembers = useMemo(() => {
+        if (!searchQuery) return members
+        const query = searchQuery.toLowerCase()
+        return members.filter(m => 
+            m.full_name?.toLowerCase().includes(query) ||
+            m.email?.toLowerCase().includes(query)
+        )
+    }, [members, searchQuery])
+
+    const toggleMember = (memberId: string) => {
+        setSelectedIds(prev => 
+            prev.includes(memberId)
+                ? prev.filter(id => id !== memberId)
+                : [...prev, memberId]
+        )
+    }
+
+    const hasChanges = useMemo(() => {
+        if (selectedIds.length !== currentAssigneeIds.length) return true
+        return !selectedIds.every(id => currentAssigneeIds.includes(id))
+    }, [selectedIds, currentAssigneeIds])
+
+    return (
+        <div className="flex flex-col">
+            <div className="p-2 border-b">
+                <input
+                    type="text"
+                    placeholder="Search members..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full px-3 py-2 text-sm border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+                />
+            </div>
+            <div className="max-h-[250px] overflow-y-auto p-2 space-y-1">
+                {filteredMembers.length === 0 ? (
+                    <p className="text-sm text-muted-foreground text-center py-4">No members found</p>
+                ) : (
+                    filteredMembers.map((member) => (
+                        <div
+                            key={member.id}
+                            className={cn(
+                                "flex items-center gap-3 p-2 rounded-md cursor-pointer hover:bg-muted transition-colors",
+                                selectedIds.includes(member.id) && "bg-muted"
+                            )}
+                            onClick={() => toggleMember(member.id)}
+                        >
+                            <Checkbox
+                                checked={selectedIds.includes(member.id)}
+                                onCheckedChange={() => toggleMember(member.id)}
+                                aria-label={`Select ${member.full_name}`}
+                            />
+                            <UserAvatar
+                                name={member.full_name}
+                                role={member.role}
+                                size="xs"
+                            />
+                            <div className="flex-1 min-w-0">
+                                <span className={cn(
+                                    "text-sm truncate block",
+                                    member.role === "AI_Agent" && "text-accent font-medium"
+                                )}>
+                                    {member.full_name}
+                                </span>
+                                {member.role && (
+                                    <span className="text-xs text-muted-foreground">{member.role}</span>
+                                )}
+                            </div>
+                        </div>
+                    ))
+                )}
+            </div>
+            <div className="p-2 border-t flex justify-between items-center">
+                <span className="text-xs text-muted-foreground">
+                    {selectedIds.length} selected
+                </span>
+                <Button
+                    size="sm"
+                    onClick={() => onUpdate(selectedIds)}
+                    disabled={!hasChanges || isUpdating}
+                >
+                    {isUpdating ? (
+                        <>
+                            <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                            Saving...
+                        </>
+                    ) : (
+                        'Save'
+                    )}
+                </Button>
+            </div>
+        </div>
     )
 }
 
