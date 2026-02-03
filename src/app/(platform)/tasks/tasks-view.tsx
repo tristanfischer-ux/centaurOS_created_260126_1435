@@ -7,7 +7,7 @@ import { useAutoRefresh } from "@/hooks/useAutoRefresh"
 import { RefreshButton } from "@/components/RefreshButton"
 import { TaskCard } from "./task-card"
 import { Button } from "@/components/ui/button"
-import { LayoutGrid, List, X, Trash2, CheckSquare, Loader2, Check, UserPlus, Filter, ChevronDown, ChevronUp, CalendarDays, Inbox, History } from "lucide-react"
+import { LayoutGrid, List, X, Trash2, CheckSquare, Loader2, Check, UserPlus, Filter, ChevronDown, ChevronRight, CalendarDays, Inbox, History } from "lucide-react"
 import { UserAvatar } from "@/components/ui/user-avatar"
 import { deleteTasks, acceptTask, completeTask, updateTaskAssignees } from "@/actions/tasks"
 import { toast } from "sonner"
@@ -895,7 +895,7 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                                             {isExpanded ? (
                                                 <ChevronDown className="h-4 w-4 text-muted-foreground" />
                                             ) : (
-                                                <ChevronUp className="h-4 w-4 text-muted-foreground" />
+                                                <ChevronRight className="h-4 w-4 text-muted-foreground" />
                                             )}
                                             <div className="bg-electric-blue w-2 h-2 rounded-full" />
                                             {objective.title}
@@ -1004,7 +1004,7 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                                         {expandedObjectives.has('orphaned') ? (
                                             <ChevronDown className="h-4 w-4 text-muted-foreground" />
                                         ) : (
-                                            <ChevronUp className="h-4 w-4 text-muted-foreground" />
+                                            <ChevronRight className="h-4 w-4 text-muted-foreground" />
                                         )}
                                         <div className="bg-muted-foreground w-2 h-2 rounded-full" />
                                         General Tasks (No Objective)

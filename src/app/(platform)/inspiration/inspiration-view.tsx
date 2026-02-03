@@ -61,10 +61,10 @@ const getPackIcon = (iconName: string | null) => {
   return iconMap[iconName || 'target'] || Target
 }
 
-const getCategoryStats = (packs: ObjectivePack[], categoryFilter: string) => {
+const getCategoryStats = (packs: ObjectivePack[], categoryFilters: string[]) => {
   const count = packs.filter(p => {
     const packCategory = p.category?.toLowerCase() || ''
-    return packCategory.includes(categoryFilter)
+    return categoryFilters.some(filter => packCategory.includes(filter))
   }).length
   return count.toString()
 }
@@ -78,7 +78,7 @@ const categories = (packs: ObjectivePack[]): Category[] => [
     color: 'bg-electric-blue text-white',
     stats: {
       label: 'packs available',
-      value: getCategoryStats(packs, 'business'),
+      value: getCategoryStats(packs, ['sales', 'legal', 'compliance', 'hr', 'operations']),
     },
   },
   {
@@ -89,7 +89,7 @@ const categories = (packs: ObjectivePack[]): Category[] => [
     color: 'bg-international-orange text-white',
     stats: {
       label: 'packs available',
-      value: getCategoryStats(packs, 'product'),
+      value: getCategoryStats(packs, ['product', 'marketing']),
     },
   },
   {
@@ -100,7 +100,7 @@ const categories = (packs: ObjectivePack[]): Category[] => [
     color: 'bg-status-success text-white',
     stats: {
       label: 'packs available',
-      value: getCategoryStats(packs, 'subsystems'),
+      value: getCategoryStats(packs, ['engineering', 'security', 'infrastructure']),
     },
   },
   {
@@ -194,11 +194,19 @@ export function InspirationView({ templates = [], packs = [] }: InspirationViewP
   const [domains, setDomains] = useState<KnowledgeDomain[]>([])
   const [loadingDomains, setLoadingDomains] = useState(false)
 
+  // Category to database category mapping
+  const categoryFilterMap: Record<string, string[]> = {
+    business: ['sales', 'legal', 'compliance', 'hr', 'operations'],
+    product: ['product', 'marketing'],
+    subsystems: ['engineering', 'security', 'infrastructure'],
+  }
+
   // Filter packs by selected category
   const filteredPacks = selectedCategory && selectedCategory !== 'industry'
     ? packs.filter(pack => {
         const packCategory = pack.category?.toLowerCase() || ''
-        return packCategory.includes(selectedCategory)
+        const filters = categoryFilterMap[selectedCategory] || []
+        return filters.some(filter => packCategory.includes(filter))
       })
     : []
 
