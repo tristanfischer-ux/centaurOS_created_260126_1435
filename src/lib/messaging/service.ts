@@ -55,6 +55,7 @@ export interface Message {
   message_type: MessageType
   file_url: string | null
   is_read: boolean
+  read_at: string | null
   created_at: string
   // Thread support
   parent_message_id: string | null
@@ -293,9 +294,14 @@ export async function markAsRead(
   conversationId: string,
   userId: string
 ): Promise<number> {
+  const now = new Date().toISOString()
+  
   const { data, error } = await supabase
     .from('messages')
-    .update({ is_read: true })
+    .update({ 
+      is_read: true,
+      read_at: now
+    })
     .eq('conversation_id', conversationId)
     .neq('sender_id', userId)
     .eq('is_read', false)

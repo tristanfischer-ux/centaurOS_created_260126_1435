@@ -1543,39 +1543,6 @@ export type Database = {
           },
         ]
       }
-      business_functions: {
-        Row: {
-          category: string
-          created_at: string | null
-          description: string | null
-          display_order: number | null
-          id: string
-          is_critical: boolean | null
-          name: string
-          typical_roles: string[] | null
-        }
-        Insert: {
-          category: string
-          created_at?: string | null
-          description?: string | null
-          display_order?: number | null
-          id?: string
-          is_critical?: boolean | null
-          name: string
-          typical_roles?: string[] | null
-        }
-        Update: {
-          category?: string
-          created_at?: string | null
-          description?: string | null
-          display_order?: number | null
-          id?: string
-          is_critical?: boolean | null
-          name?: string
-          typical_roles?: string[] | null
-        }
-        Relationships: []
-      }
       case_studies: {
         Row: {
           approach: string
@@ -2881,67 +2848,6 @@ export type Database = {
           },
         ]
       }
-      foundry_function_coverage: {
-        Row: {
-          assessed_at: string | null
-          assessed_by: string | null
-          coverage_status: string
-          covered_by: string | null
-          created_at: string | null
-          foundry_id: string
-          function_id: string
-          id: string
-          notes: string | null
-          updated_at: string | null
-        }
-        Insert: {
-          assessed_at?: string | null
-          assessed_by?: string | null
-          coverage_status?: string
-          covered_by?: string | null
-          created_at?: string | null
-          foundry_id: string
-          function_id: string
-          id?: string
-          notes?: string | null
-          updated_at?: string | null
-        }
-        Update: {
-          assessed_at?: string | null
-          assessed_by?: string | null
-          coverage_status?: string
-          covered_by?: string | null
-          created_at?: string | null
-          foundry_id?: string
-          function_id?: string
-          id?: string
-          notes?: string | null
-          updated_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "foundry_function_coverage_assessed_by_fkey"
-            columns: ["assessed_by"]
-            isOneToOne: false
-            referencedRelation: "buyer_stats"
-            referencedColumns: ["buyer_id"]
-          },
-          {
-            foreignKeyName: "foundry_function_coverage_assessed_by_fkey"
-            columns: ["assessed_by"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "foundry_function_coverage_function_id_fkey"
-            columns: ["function_id"]
-            isOneToOne: false
-            referencedRelation: "business_functions"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       foundry_integrations: {
         Row: {
           config: Json
@@ -3735,6 +3641,7 @@ export type Database = {
           message_type: string | null
           objective_id: string | null
           parent_message_id: string | null
+          read_at: string | null
           reply_count: number | null
           sender_id: string
           task_id: string | null
@@ -3750,6 +3657,7 @@ export type Database = {
           message_type?: string | null
           objective_id?: string | null
           parent_message_id?: string | null
+          read_at?: string | null
           reply_count?: number | null
           sender_id: string
           task_id?: string | null
@@ -3765,6 +3673,7 @@ export type Database = {
           message_type?: string | null
           objective_id?: string | null
           parent_message_id?: string | null
+          read_at?: string | null
           reply_count?: number | null
           sender_id?: string
           task_id?: string | null
@@ -4594,7 +4503,6 @@ export type Database = {
       }
       orders: {
         Row: {
-          business_function_id: string | null
           buyer_id: string
           completed_at: string | null
           converted_from_trial_id: string | null
@@ -4620,7 +4528,6 @@ export type Database = {
           vat_rate: number | null
         }
         Insert: {
-          business_function_id?: string | null
           buyer_id: string
           completed_at?: string | null
           converted_from_trial_id?: string | null
@@ -4646,7 +4553,6 @@ export type Database = {
           vat_rate?: number | null
         }
         Update: {
-          business_function_id?: string | null
           buyer_id?: string
           completed_at?: string | null
           converted_from_trial_id?: string | null
@@ -4672,13 +4578,6 @@ export type Database = {
           vat_rate?: number | null
         }
         Relationships: [
-          {
-            foreignKeyName: "orders_business_function_id_fkey"
-            columns: ["business_function_id"]
-            isOneToOne: false
-            referencedRelation: "business_functions"
-            referencedColumns: ["id"]
-          },
           {
             foreignKeyName: "orders_buyer_id_fkey"
             columns: ["buyer_id"]
@@ -6581,6 +6480,13 @@ export type Database = {
           summary_text?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "report_snapshots_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "report_snapshots_profile_id_fkey"
             columns: ["profile_id"]
@@ -9024,6 +8930,10 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      extract_mentioned_user_ids: {
+        Args: { foundry_id_param: string; message_text: string }
+        Returns: string[]
+      }
       generate_gap_recommendations: {
         Args: { p_foundry_id: string }
         Returns: number
@@ -9129,17 +9039,6 @@ export type Database = {
           available_balance: number
           total_held: number
           total_released: number
-        }[]
-      }
-      get_foundry_coverage_summary: {
-        Args: { p_foundry_id: string }
-        Returns: {
-          category: string
-          covered: number
-          gaps: number
-          not_needed: number
-          partial: number
-          total_functions: number
         }[]
       }
       get_marketplace_recommendations: {

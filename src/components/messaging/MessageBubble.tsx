@@ -326,19 +326,29 @@ export function MessageBubble({
         {/* Timestamp and read status */}
         {showTimestamp && (
           <div className={cn(
-            'flex items-center gap-1 px-1',
-            isOwn ? 'flex-row-reverse' : 'flex-row'
+            'flex flex-col gap-0.5 px-1',
+            isOwn ? 'items-end' : 'items-start'
           )}>
-            <span className="text-[10px] text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity">
-              {formatTime(message.created_at)}
-            </span>
-            {isOwn && (
-              <span className="text-muted-foreground">
-                {message.is_read ? (
-                  <CheckCheck className="w-3 h-3 text-electric-blue" />
-                ) : (
-                  <Check className="w-3 h-3" />
-                )}
+            <div className={cn(
+              'flex items-center gap-1',
+              isOwn ? 'flex-row-reverse' : 'flex-row'
+            )}>
+              <span className="text-[10px] text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity">
+                Sent {formatTime(message.created_at)}
+              </span>
+              {isOwn && (
+                <span className="text-muted-foreground">
+                  {message.is_read ? (
+                    <CheckCheck className="w-3 h-3 text-electric-blue" />
+                  ) : (
+                    <Check className="w-3 h-3" />
+                  )}
+                </span>
+              )}
+            </div>
+            {isOwn && message.read_at && (
+              <span className="text-[10px] text-electric-blue opacity-0 group-hover:opacity-100 transition-opacity">
+                Seen {formatTime(message.read_at)}
               </span>
             )}
           </div>

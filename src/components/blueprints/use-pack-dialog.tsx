@@ -16,6 +16,9 @@ import {
   User,
   Store,
   Clock,
+  ChevronDown,
+  ChevronUp,
+  Info,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -32,6 +35,8 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Card, CardContent } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
 import Link from 'next/link'
 
@@ -48,6 +53,7 @@ export function UsePackDialog({ pack, trigger }: UsePackDialogProps) {
   const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>(
     pack.items?.map(item => item.id) || []
   )
+  const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null)
 
   const handleCreate = async () => {
     if (!objectiveTitle.trim()) {
@@ -144,6 +150,10 @@ export function UsePackDialog({ pack, trigger }: UsePackDialogProps) {
     }
   }
 
+  const toggleTaskExpand = (taskId: string) => {
+    setExpandedTaskId(expandedTaskId === taskId ? null : taskId)
+  }
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
@@ -154,123 +164,312 @@ export function UsePackDialog({ pack, trigger }: UsePackDialogProps) {
           </Button>
         )}
       </DialogTrigger>
-      <DialogContent className="max-w-lg max-h-[90vh] flex flex-col">
+      <DialogContent size="lg" className="max-h-[90vh] flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Package className="h-5 w-5 text-electric-blue" />
             {pack.title}
           </DialogTitle>
-          <DialogDescription>
-            {pack.description || 'Create an objective with pre-defined tasks'}
-          </DialogDescription>
         </DialogHeader>
 
-        <div className="flex-1 overflow-hidden flex flex-col gap-4 py-4">
-          {/* Objective Title */}
-          <div className="space-y-2">
-            <Label htmlFor="objective-title">Objective Title</Label>
-            <Input
-              id="objective-title"
-              value={objectiveTitle}
-              onChange={(e) => setObjectiveTitle(e.target.value)}
-              placeholder="Enter objective title..."
-            />
-          </div>
+        <Tabs defaultValue="overview" className="flex-1 overflow-hidden flex flex-col">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="overview" className="gap-2">
+              <Info className="h-4 w-4" />
+              Overview
+            </TabsTrigger>
+            <TabsTrigger value="tasks" className="gap-2">
+              <CheckCircle2 className="h-4 w-4" />
+              Select Tasks
+            </TabsTrigger>
+          </TabsList>
 
-          {/* Pack metadata */}
-          <div className="flex items-center gap-3 text-sm text-muted-foreground">
-            {pack.estimated_duration && (
-              <div className="flex items-center gap-1">
-                <Clock className="h-4 w-4" />
-                <span>{pack.estimated_duration}</span>
-              </div>
-            )}
-            {pack.difficulty && (
-              <Badge variant="secondary" className="text-xs">
-                {pack.difficulty}
-              </Badge>
-            )}
-          </div>
+          {/* OVERVIEW TAB */}
+          <TabsContent value="overview" className="flex-1 overflow-auto mt-4 space-y-4">
+            {/* What is this pack? */}
+            <Card className="bg-blue-50/50 border-blue-100">
+              <CardContent className="pt-6">
+                <h3 className="font-semibold text-foreground mb-2 flex items-center gap-2">
+                  <Package className="h-4 w-4 text-electric-blue" />
+                  What is this pack?
+                </h3>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  {pack.description || 
+                    'This objective pack contains pre-built tasks designed by experienced founders to help you execute efficiently. Each task is assigned to the appropriate role (you, your team, or an AI agent) to optimize workflow.'}
+                </p>
+              </CardContent>
+            </Card>
 
-          {/* Task Selection */}
-          <div className="flex-1 min-h-0 space-y-2">
-            <div className="flex items-center justify-between">
-              <Label>Tasks to Create</Label>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={toggleAll}
-                className="h-auto py-1 px-2 text-xs"
-              >
-                {selectedTaskIds.length === (pack.items?.length || 0)
-                  ? 'Deselect All'
-                  : 'Select All'}
-              </Button>
+            {/* Pack Details */}
+            <div className="grid grid-cols-2 gap-3">
+              {pack.estimated_duration && (
+                <Card>
+                  <CardContent className="pt-6">
+                    <div className="flex items-center gap-2 mb-1">
+                      <Clock className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-xs font-medium text-muted-foreground uppercase">Duration</span>
+                    </div>
+                    <p className="text-base font-semibold text-foreground">{pack.estimated_duration}</p>
+                  </CardContent>
+                </Card>
+              )}
+              {pack.difficulty && (
+                <Card>
+                  <CardContent className="pt-6">
+                    <div className="flex items-center gap-2 mb-1">
+                      <Target className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-xs font-medium text-muted-foreground uppercase">Difficulty</span>
+                    </div>
+                    <Badge variant="secondary" className="text-sm">
+                      {pack.difficulty}
+                    </Badge>
+                  </CardContent>
+                </Card>
+              )}
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="flex items-center gap-2 mb-1">
+                    <CheckCircle2 className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-xs font-medium text-muted-foreground uppercase">Tasks</span>
+                  </div>
+                  <p className="text-base font-semibold text-foreground">
+                    {pack.items?.length || 0} tasks
+                  </p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Users className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-xs font-medium text-muted-foreground uppercase">Roles</span>
+                  </div>
+                  <div className="flex gap-1 flex-wrap">
+                    {Array.from(new Set(pack.items?.map(i => i.role) || [])).map(role => (
+                      <Badge key={role} variant="outline" className={cn('text-xs', getRoleColor(role))}>
+                        {getRoleLabel(role)}
+                      </Badge>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
             </div>
 
-            <ScrollArea className="h-[200px] rounded-md border">
-              <div className="p-2 space-y-1">
-                {pack.items?.map((item, idx) => (
-                  <div
-                    key={item.id}
-                    className={cn(
-                      'flex items-start gap-3 p-2 rounded-md cursor-pointer transition-colors',
-                      selectedTaskIds.includes(item.id)
-                        ? 'bg-muted'
-                        : 'hover:bg-muted/50'
-                    )}
-                    onClick={() => toggleTask(item.id)}
-                  >
-                    <Checkbox
-                      checked={selectedTaskIds.includes(item.id)}
-                      onCheckedChange={() => toggleTask(item.id)}
-                      className="mt-0.5"
-                    />
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium truncate">
-                          {item.title}
-                        </span>
-                        <Badge
-                          variant="outline"
-                          className={cn('text-[10px] shrink-0', getRoleColor(item.role))}
-                        >
-                          {getRoleIcon(item.role)}
-                          <span className="ml-1">{getRoleLabel(item.role)}</span>
-                        </Badge>
+            {/* What you'll accomplish */}
+            <Card className="bg-orange-50/50 border-orange-100">
+              <CardContent className="pt-6">
+                <h3 className="font-semibold text-foreground mb-3 flex items-center gap-2">
+                  <Target className="h-4 w-4 text-international-orange" />
+                  What you&apos;ll accomplish
+                </h3>
+                <p className="text-sm text-muted-foreground leading-relaxed mb-3">
+                  By completing the tasks in this pack, you will:
+                </p>
+                <ul className="space-y-2">
+                  {pack.items?.slice(0, 4).map((item, idx) => (
+                    <li key={idx} className="flex items-start gap-2 text-sm text-muted-foreground">
+                      <CheckCircle2 className="h-4 w-4 text-status-success shrink-0 mt-0.5" />
+                      <span>{item.title}</span>
+                    </li>
+                  ))}
+                  {pack.items && pack.items.length > 4 && (
+                    <li className="text-xs text-muted-foreground pl-6">
+                      ...and {pack.items.length - 4} more tasks
+                    </li>
+                  )}
+                </ul>
+              </CardContent>
+            </Card>
+
+            {/* Task Breakdown by Role */}
+            <Card>
+              <CardContent className="pt-6">
+                <h3 className="font-semibold text-foreground mb-3 flex items-center gap-2">
+                  <Users className="h-4 w-4" />
+                  Task breakdown by role
+                </h3>
+                <div className="space-y-3">
+                  {[
+                    { role: 'Executive', label: 'You', icon: User, description: 'Tasks requiring your direct involvement and decision-making' },
+                    { role: 'Apprentice', label: 'Team', icon: Users, description: 'Tasks that can be delegated to team members' },
+                    { role: 'AI_Agent', label: 'AI', icon: Bot, description: 'Tasks that AI agents can handle autonomously' },
+                  ].map(({ role, label, icon: Icon, description }) => {
+                    const count = pack.items?.filter(i => i.role === role).length || 0
+                    if (count === 0) return null
+                    return (
+                      <div key={role} className="flex items-start gap-3 p-3 bg-muted rounded-lg">
+                        <div className={cn('h-10 w-10 rounded-lg flex items-center justify-center shrink-0', getRoleColor(role))}>
+                          <Icon className="h-5 w-5" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="font-medium text-foreground">{label}</span>
+                            <Badge variant="secondary" className="text-xs">
+                              {count} {count === 1 ? 'task' : 'tasks'}
+                            </Badge>
+                          </div>
+                          <p className="text-xs text-muted-foreground">{description}</p>
+                        </div>
                       </div>
-                      {item.description && (
-                        <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">
-                          {item.description}
-                        </p>
-                      )}
-                    </div>
+                    )
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Marketplace upsell */}
+            <Card className="bg-gradient-to-r from-orange-50 to-background border-orange-100">
+              <CardContent className="pt-6">
+                <div className="flex items-start gap-3">
+                  <Store className="h-5 w-5 text-international-orange shrink-0 mt-0.5" />
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-semibold text-foreground mb-1">Need expert help?</h3>
+                    <p className="text-sm text-muted-foreground mb-3">
+                      Connect with advisors and suppliers in the marketplace who can help you execute these tasks faster.
+                    </p>
+                    <Button asChild variant="outline" size="sm" className="border-international-orange text-international-orange">
+                      <Link href="/marketplace">
+                        Browse marketplace
+                        <ArrowRight className="ml-2 h-3.5 w-3.5" />
+                      </Link>
+                    </Button>
                   </div>
-                ))}
-              </div>
-            </ScrollArea>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
 
-            <p className="text-xs text-muted-foreground">
-              {selectedTaskIds.length} of {pack.items?.length || 0} tasks selected
-            </p>
-          </div>
-
-          {/* Marketplace upsell */}
-          <div className="bg-orange-50 border border-orange-100 rounded-lg p-3 flex items-center gap-3">
-            <Store className="h-5 w-5 text-international-orange shrink-0" />
-            <div className="flex-1 min-w-0">
+          {/* TASKS TAB */}
+          <TabsContent value="tasks" className="flex-1 overflow-hidden flex flex-col mt-4 space-y-4">
+            {/* Objective Title */}
+            <div className="space-y-2">
+              <Label htmlFor="objective-title">Objective Title</Label>
+              <Input
+                id="objective-title"
+                value={objectiveTitle}
+                onChange={(e) => setObjectiveTitle(e.target.value)}
+                placeholder="Enter objective title..."
+              />
               <p className="text-xs text-muted-foreground">
-                Need expert help executing these tasks?{' '}
-                <Link
-                  href="/marketplace"
-                  className="text-international-orange hover:underline font-medium"
-                >
-                  Browse marketplace
-                </Link>
+                Customize the objective title to fit your specific needs
               </p>
             </div>
-          </div>
-        </div>
+
+            {/* Task Selection */}
+            <div className="flex-1 min-h-0 space-y-2">
+              <div className="flex items-center justify-between">
+                <Label>Select tasks to include</Label>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={toggleAll}
+                  className="h-auto py-1 px-2 text-xs"
+                >
+                  {selectedTaskIds.length === (pack.items?.length || 0)
+                    ? 'Deselect All'
+                    : 'Select All'}
+                </Button>
+              </div>
+
+              <ScrollArea className="h-[320px] rounded-md border">
+                <div className="p-2 space-y-2">
+                  {pack.items?.map((item, idx) => {
+                    const isExpanded = expandedTaskId === item.id
+                    const isSelected = selectedTaskIds.includes(item.id)
+                    
+                    return (
+                      <div
+                        key={item.id}
+                        className={cn(
+                          'rounded-md border transition-colors',
+                          isSelected ? 'bg-muted border-electric-blue' : 'bg-background hover:bg-muted/50'
+                        )}
+                      >
+                        <div
+                          className="flex items-start gap-3 p-3 cursor-pointer"
+                          onClick={(e) => {
+                            // Only toggle checkbox if clicking on the row, not the expand button
+                            if (!(e.target as HTMLElement).closest('[data-expand-button]')) {
+                              toggleTask(item.id)
+                            }
+                          }}
+                        >
+                          <Checkbox
+                            checked={isSelected}
+                            onCheckedChange={() => toggleTask(item.id)}
+                            className="mt-0.5"
+                          />
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-start justify-between gap-2 mb-1">
+                              <div className="flex items-center gap-2 flex-1 min-w-0">
+                                <span className="text-sm font-medium">
+                                  {idx + 1}. {item.title}
+                                </span>
+                                <Badge
+                                  variant="outline"
+                                  className={cn('text-[10px] shrink-0', getRoleColor(item.role))}
+                                >
+                                  {getRoleIcon(item.role)}
+                                  <span className="ml-1">{getRoleLabel(item.role)}</span>
+                                </Badge>
+                              </div>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-6 w-6 p-0 shrink-0"
+                                data-expand-button
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  toggleTaskExpand(item.id)
+                                }}
+                              >
+                                {isExpanded ? (
+                                  <ChevronUp className="h-3.5 w-3.5" />
+                                ) : (
+                                  <ChevronDown className="h-3.5 w-3.5" />
+                                )}
+                              </Button>
+                            </div>
+                            {!isExpanded && item.description && (
+                              <p className="text-xs text-muted-foreground line-clamp-1">
+                                {item.description}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                        
+                        {isExpanded && item.description && (
+                          <div className="px-3 pb-3 pt-0">
+                            <div className="pl-7 space-y-2">
+                              <p className="text-sm text-muted-foreground leading-relaxed">
+                                {item.description}
+                              </p>
+                              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                <span className="font-medium">Assigned to:</span>
+                                <Badge variant="outline" className={cn('text-xs', getRoleColor(item.role))}>
+                                  {getRoleIcon(item.role)}
+                                  <span className="ml-1">{getRoleLabel(item.role)}</span>
+                                </Badge>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              </ScrollArea>
+
+              <div className="flex items-center justify-between text-xs">
+                <p className="text-muted-foreground">
+                  {selectedTaskIds.length} of {pack.items?.length || 0} tasks selected
+                </p>
+                <p className="text-muted-foreground">
+                  Click <ChevronDown className="h-3 w-3 inline" /> to see full task details
+                </p>
+              </div>
+            </div>
+          </TabsContent>
+        </Tabs>
 
         <DialogFooter>
           <Button variant="outline" onClick={() => setOpen(false)} disabled={isCreating}>
@@ -289,7 +488,7 @@ export function UsePackDialog({ pack, trigger }: UsePackDialogProps) {
             ) : (
               <>
                 <Target className="h-4 w-4 mr-2" />
-                Create Objective
+                Create Objective ({selectedTaskIds.length} {selectedTaskIds.length === 1 ? 'task' : 'tasks'})
               </>
             )}
           </Button>
