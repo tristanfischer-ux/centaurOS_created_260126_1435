@@ -12,6 +12,8 @@ import {
 } from "lucide-react"
 import { formatDistanceToNow } from "date-fns"
 
+export const dynamic = 'force-dynamic'
+
 export default async function PlatformHealthPage() {
     const { data: health, error } = await getPlatformHealth()
     

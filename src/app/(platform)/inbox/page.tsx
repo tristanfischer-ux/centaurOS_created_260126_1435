@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { getFoundryIdCached } from '@/lib/supabase/foundry-context'
 import { getOrCreateUserPreferences } from '@/lib/preferences/service'
 import { InboxLayoutClient } from './inbox-layout-client'
+import { InboxHeader } from './inbox-header'
 import { redirect } from 'next/navigation'
 import type { MemberWithStatus, TaskWithContext } from './inbox-layout-client'
 import type { Database } from '@/types/database.types'
@@ -50,16 +51,29 @@ export default async function InboxPage() {
     getOrCreateUserPreferences(supabase, user.id, foundryId)
   ])
   
+  // Calculate total unread counts for the header
+  const totalUnreadPeople = membersResult.reduce((sum, m) => sum + (m.unread_count || 0), 0)
+  const totalUnreadTasks = tasksResult.reduce((sum, t) => sum + (t.unread_message_count || 0), 0)
+  const totalUnread = totalUnreadPeople + totalUnreadTasks
+  
   return (
-    <div className="h-[calc(100vh-4rem)] md:h-[calc(100vh-3rem)] -m-4 sm:-m-6 lg:-m-8">
-      <InboxLayoutClient
-        members={membersResult}
-        tasks={tasksResult}
-        objectives={objectivesResult}
-        currentUserId={user.id}
-        foundryId={foundryId}
-        initialPreferences={preferences}
-      />
+    <div className="flex flex-col h-[calc(100vh-4rem)] md:h-[calc(100vh-3rem)] -m-4 sm:-m-6 lg:-m-8">
+      {/* Page Header */}
+      <div className="px-4 sm:px-6 lg:px-8 pt-4 sm:pt-6 lg:pt-8 pb-4 border-b border-slate-100 flex-shrink-0">
+        <InboxHeader totalUnread={totalUnread} />
+      </div>
+      
+      {/* Messaging Panels */}
+      <div className="flex-1 min-h-0">
+        <InboxLayoutClient
+          members={membersResult}
+          tasks={tasksResult}
+          objectives={objectivesResult}
+          currentUserId={user.id}
+          foundryId={foundryId}
+          initialPreferences={preferences}
+        />
+      </div>
     </div>
   )
 }

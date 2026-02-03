@@ -1,0 +1,25 @@
+#!/bin/sh
+
+echo "🧪 Running pre-push checks..."
+echo ""
+
+# Run linter
+echo "→ Running lint..."
+npm run lint || {
+  echo "❌ Lint failed. Fix errors before pushing."
+  exit 1
+}
+
+# Run unit tests
+echo "→ Running unit tests..."
+npm run test || {
+  echo "❌ Tests failed. Fix before pushing."
+  exit 1
+}
+
+echo ""
+echo "✅ Pre-push checks passed!"
+echo ""
+echo "⚠️  REMINDER: CI will run E2E tests."
+echo "   If you modified UI, test manually before deploying!"
+echo "   See: .cursor/rules/testing-before-deployment.mdc"

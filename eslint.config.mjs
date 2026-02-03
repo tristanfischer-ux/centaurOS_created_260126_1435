@@ -16,6 +16,11 @@ const eslintConfig = defineConfig([
     "scripts/**",
     "ollama-proxy.js",
     "duplicate_routes_backup/**",
+    // Test scripts and one-off utilities using CommonJS
+    "quick-fix-dp.js",
+    "test-daily-pulse.js",
+    "test-daily-pulse-e2e.js",
+    "src/actions/__tests__/activity.test.ts",
   ]),
   // Downgrade non-critical rules to warnings for CI to pass
   {

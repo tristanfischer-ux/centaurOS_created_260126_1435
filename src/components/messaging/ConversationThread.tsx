@@ -27,7 +27,8 @@ import {
   ChevronUp,
   ExternalLink,
   Target,
-  CheckSquare
+  CheckSquare,
+  X
 } from 'lucide-react'
 import Link from 'next/link'
 import { Badge } from '@/components/ui/badge'
@@ -510,19 +511,6 @@ export function ConversationThread({
         </div>
       )}
 
-      {/* Context Selector for linking messages to tasks/objectives */}
-      {showContextSelector && (
-        <div className="px-4 py-2 border-b border-border bg-muted/30">
-          <ContextSelector
-            tasks={tasks}
-            objectives={objectives}
-            currentContext={currentContext}
-            onContextChange={handleContextChange}
-            recentContexts={recentContexts}
-          />
-        </div>
-      )}
-
       {/* Messages area - scrollable with min-h-0 for proper flexbox overflow */}
       <ScrollArea className="flex-1 min-h-0" ref={scrollRef}>
         <div className="p-4 space-y-1">
@@ -600,6 +588,64 @@ export function ConversationThread({
           <div ref={bottomRef} />
         </div>
       </ScrollArea>
+
+      {/* Compact Context Indicator - above input area */}
+      {showContextSelector && (
+        <div className="px-4 py-2 border-t border-border bg-muted/20 flex-shrink-0">
+          <div className="flex items-center gap-2">
+            {currentContext ? (
+              // Show selected context as a chip with clear button
+              <>
+                <div className="flex items-center gap-2 flex-1 min-w-0">
+                  <span className="text-xs text-muted-foreground">Linked to:</span>
+                  {currentContext.taskId && (
+                    <Badge 
+                      variant="secondary" 
+                      className="text-xs gap-1 bg-international-orange-light text-international-orange-dark border border-international-orange/30"
+                    >
+                      <CheckSquare className="w-3 h-3" />
+                      <span className="truncate max-w-[200px]">
+                        #{tasks.find(t => t.id === currentContext.taskId)?.task_number || '??'}: {tasks.find(t => t.id === currentContext.taskId)?.title || 'Task'}
+                      </span>
+                    </Badge>
+                  )}
+                  {currentContext.objectiveId && (
+                    <Badge 
+                      variant="secondary" 
+                      className="text-xs gap-1 bg-electric-blue-light text-electric-blue border border-electric-blue/30"
+                    >
+                      <Target className="w-3 h-3" />
+                      <span className="truncate max-w-[200px]">
+                        {objectives.find(o => o.id === currentContext.objectiveId)?.title || 'Objective'}
+                      </span>
+                    </Badge>
+                  )}
+                </div>
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                  onClick={() => handleContextChange(null)}
+                  aria-label="Clear context link"
+                >
+                  <X className="w-4 h-4" />
+                </Button>
+              </>
+            ) : (
+              // Show compact selector when no context
+              <div className="w-full">
+                <ContextSelector
+                  tasks={tasks}
+                  objectives={objectives}
+                  currentContext={currentContext}
+                  onContextChange={handleContextChange}
+                  recentContexts={recentContexts}
+                />
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Input area */}
       {useEnhancedInput ? (

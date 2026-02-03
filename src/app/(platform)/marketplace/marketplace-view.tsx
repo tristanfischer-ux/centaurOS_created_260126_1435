@@ -17,6 +17,7 @@ import { toast } from "sonner"
 import { Card, CardContent } from "@/components/ui/card"
 import { cn } from "@/lib/utils"
 import { useSearchParams, useRouter, usePathname } from "next/navigation"
+import Link from "next/link"
 import { SearchBar, ActiveFilterBadges } from "@/components/search"
 import { SaveSearchDialog } from "@/components/search/SavedSearches"
 import { 
@@ -1815,10 +1816,10 @@ export function MarketplaceView({
                                     <span className="ml-2">Refresh</span>
                                 </Button>
                                 <Button asChild>
-                                    <a href="/rfq/new">
+                                    <Link href="/rfq/new">
                                         <FileText className="h-4 w-4 mr-2" />
                                         New RFQ
-                                    </a>
+                                    </Link>
                                 </Button>
                             </div>
                         </div>
@@ -1838,7 +1839,7 @@ export function MarketplaceView({
                                 description="Create a Request for Quote to get competitive bids from suppliers in the marketplace."
                                 action={
                                     <Button asChild>
-                                        <a href="/rfq/new">Create Your First RFQ</a>
+                                        <Link href="/rfq/new">Create Your First RFQ</Link>
                                     </Button>
                                 }
                             />
