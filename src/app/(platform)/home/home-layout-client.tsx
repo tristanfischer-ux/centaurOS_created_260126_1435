@@ -5,7 +5,8 @@ import { cn } from '@/lib/utils'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { ArrowLeft, Users, CheckSquare, MessageSquare } from 'lucide-react'
+import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet'
+import { ArrowLeft, Users, CheckSquare, MessageSquare, PanelLeftOpen, LayoutDashboard } from 'lucide-react'
 import { updateUserPreferences } from '@/lib/preferences/service'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
@@ -15,8 +16,9 @@ import { PeopleList } from '@/components/inbox/people-list'
 import { TasksList } from '@/components/inbox/tasks-list'
 import { ConversationThread } from '@/components/messaging/ConversationThread'
 import { ConversationThreadEnhanced } from '@/components/inbox/conversation-thread-enhanced'
+import { HomeSummaryPanel } from '@/components/home'
 
-// Type aliases for cleaner code
+// Type aliases
 type Profile = Database['public']['Tables']['profiles']['Row']
 type Task = Database['public']['Tables']['tasks']['Row']
 type Objective = Database['public']['Tables']['objectives']['Row']
@@ -35,7 +37,7 @@ export interface MemberWithStatus extends Profile {
  * Extended task with objective and messaging metadata
  */
 export interface TaskWithContext extends Task {
-  objective?: Objective | null
+  objective?: { id: string; title: string } | null
   assignee?: {
     id: string
     full_name: string | null
@@ -54,74 +56,134 @@ interface ConversationContext {
   objectiveId?: string
 }
 
-export interface InboxLayoutClientProps {
+// Summary panel types
+interface ActionTask {
+  id: string
+  title: string
+  status: string
+  end_date: string | null
+  created_at: string
+  assignee?: { id: string; full_name: string | null; role: string | null } | null
+  creator?: { id: string; full_name: string | null } | null
+}
+
+interface BlockerStandup {
+  id: string
+  blockers: string
+  blocker_severity: string | null
+  needs_help: boolean
+  user: { id: string; full_name: string | null; role: string | null }
+}
+
+interface TaskDue {
+  id: string
+  title: string
+  status: string
+  end_date: string
+  task_number?: number
+  assignee?: { id: string; full_name: string | null; avatar_url?: string | null } | null
+  objective?: { id: string; title: string } | null
+}
+
+interface TeamMemberActivity {
+  id: string
+  full_name: string | null
+  avatar_url?: string | null
+  role: string | null
+  presence_status?: 'online' | 'away' | 'focus' | 'offline'
+  current_task?: { id: string; title: string } | null
+  tasks_this_week: { id: string; title: string; end_date: string | null }[]
+}
+
+export interface HomeLayoutClientProps {
   members: MemberWithStatus[]
   tasks: TaskWithContext[]
-  objectives: Objective[]
+  objectives: { id: string; title: string }[]
   currentUserId: string
   foundryId: string
   initialPreferences: UserPreferences
+  // Summary panel props
+  overdueTasks: ActionTask[]
+  pendingDecisions: ActionTask[]
+  blockers: BlockerStandup[]
+  tasksDueToday: TaskDue[]
+  tasksDueThisWeek: TaskDue[]
+  teamMembers: TeamMemberActivity[]
+  userRole?: string
+  isExecutiveOrFounder: boolean
 }
 
+// Breakpoints
+const LARGE_BREAKPOINT = 1280
+const MEDIUM_BREAKPOINT = 768
+
 /**
- * Main inbox layout component with WhatsApp-style two-panel layout
- * 
- * Features:
- * - Toggle between "People" and "Tasks" views
- * - Mobile responsive with slide-over panels
- * - State management for selected conversation/task
- * - Syncs view preferences to database
+ * Main home layout component with responsive 3-column/2-column layout
  */
-export function InboxLayoutClient({
+export function HomeLayoutClient({
   members,
   tasks,
   objectives,
   currentUserId,
   foundryId,
-  initialPreferences
-}: InboxLayoutClientProps) {
+  initialPreferences,
+  overdueTasks,
+  pendingDecisions,
+  blockers,
+  tasksDueToday,
+  tasksDueThisWeek,
+  teamMembers,
+  userRole,
+  isExecutiveOrFounder
+}: HomeLayoutClientProps) {
   // View mode state
   const [viewMode, setViewMode] = useState<'people' | 'tasks'>(initialPreferences.inbox_view)
   const [taskFilter, setTaskFilter] = useState<'my_tasks' | 'all_tasks'>(initialPreferences.inbox_task_filter)
+  const [mobileView, setMobileView] = useState<'messages' | 'summary'>('messages')
   
   // Selection state
   const [selectedPersonId, setSelectedPersonId] = useState<string | null>(null)
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null)
   const [currentContext, setCurrentContext] = useState<ConversationContext | null>(null)
   
-  // Mobile responsive state
-  const [isMobile, setIsMobile] = useState(false)
-  const [showRightPanel, setShowRightPanel] = useState(false)
+  // Layout state
+  const [screenSize, setScreenSize] = useState<'large' | 'medium' | 'small'>('large')
+  const [listPanelOpen, setListPanelOpen] = useState(false)
+  const [showConversation, setShowConversation] = useState(false)
   
   // Preference update debouncing
   const preferenceUpdateTimeout = useRef<NodeJS.Timeout | null>(null)
   const supabase = createClient()
   
-  // Detect mobile on mount and window resize
+  // Detect screen size on mount and resize
   useEffect(() => {
-    const checkMobile = () => {
-      setIsMobile(window.innerWidth < 768) // md breakpoint
+    const checkScreenSize = () => {
+      const width = window.innerWidth
+      if (width >= LARGE_BREAKPOINT) {
+        setScreenSize('large')
+      } else if (width >= MEDIUM_BREAKPOINT) {
+        setScreenSize('medium')
+      } else {
+        setScreenSize('small')
+      }
     }
     
-    checkMobile()
-    window.addEventListener('resize', checkMobile)
-    return () => window.removeEventListener('resize', checkMobile)
+    checkScreenSize()
+    window.addEventListener('resize', checkScreenSize)
+    return () => window.removeEventListener('resize', checkScreenSize)
   }, [])
   
   // Debounced preference update
   const updatePreferences = useCallback(async (updates: Partial<UserPreferences>) => {
-    // Clear existing timeout
     if (preferenceUpdateTimeout.current) {
       clearTimeout(preferenceUpdateTimeout.current)
     }
     
-    // Schedule update after 1 second of inactivity
     preferenceUpdateTimeout.current = setTimeout(async () => {
       try {
         await updateUserPreferences(supabase, currentUserId, foundryId, updates)
       } catch (error) {
         console.error('Failed to update preferences:', error)
-        // Don't show toast for preference updates - it's not critical
       }
     }, 1000)
   }, [supabase, currentUserId, foundryId])
@@ -129,14 +191,10 @@ export function InboxLayoutClient({
   // Handle view mode change
   const handleViewModeChange = useCallback((newMode: 'people' | 'tasks') => {
     setViewMode(newMode)
-    
-    // Clear selection when switching views
     setSelectedPersonId(null)
     setSelectedTaskId(null)
     setCurrentContext(null)
-    setShowRightPanel(false)
-    
-    // Update preferences
+    setShowConversation(false)
     updatePreferences({ inbox_view: newMode })
   }, [updatePreferences])
   
@@ -151,31 +209,26 @@ export function InboxLayoutClient({
     setSelectedPersonId(personId)
     setSelectedTaskId(null)
     setCurrentContext(null)
-    
-    if (isMobile) {
-      setShowRightPanel(true)
-    }
-  }, [isMobile])
+    setShowConversation(true)
+    setListPanelOpen(false)
+  }, [])
   
   // Handle task selection
   const handleSelectTask = useCallback((taskId: string) => {
     const task = tasks.find(t => t.id === taskId)
-    
     setSelectedTaskId(taskId)
     setSelectedPersonId(null)
     setCurrentContext({
       taskId,
       objectiveId: task?.objective_id || undefined
     })
-    
-    if (isMobile) {
-      setShowRightPanel(true)
-    }
-  }, [tasks, isMobile])
+    setShowConversation(true)
+    setListPanelOpen(false)
+  }, [tasks])
   
-  // Handle back button (mobile)
+  // Handle back button
   const handleBack = useCallback(() => {
-    setShowRightPanel(false)
+    setShowConversation(false)
     setSelectedPersonId(null)
     setSelectedTaskId(null)
     setCurrentContext(null)
@@ -185,125 +238,291 @@ export function InboxLayoutClient({
   const totalUnreadPeople = members.reduce((sum, m) => sum + (m.unread_count || 0), 0)
   const totalUnreadTasks = tasks.reduce((sum, t) => sum + (t.unread_message_count || 0), 0)
   
-  // Filter tasks based on filter setting
-  const filteredTasks = taskFilter === 'my_tasks'
-    ? tasks.filter(t => t.assignee_id === currentUserId)
-    : tasks
-  
   // Check if anything is selected
   const hasSelection = selectedPersonId !== null || selectedTaskId !== null
   
-  return (
-    <div className="flex h-full">
-      {/* Left Panel - List View */}
-      <div 
-        className={cn(
-          "w-full md:w-[320px] lg:w-[360px] border-r border-slate-200 flex flex-col",
-          // Hide on mobile when right panel is shown
-          isMobile && showRightPanel && "hidden"
-        )}
-      >
-        {/* View Toggle */}
-        <div className="p-4 border-b border-slate-200">
-          <Tabs value={viewMode} onValueChange={(v) => handleViewModeChange(v as 'people' | 'tasks')}>
-            <TabsList className="w-full grid grid-cols-2">
-              <TabsTrigger value="people" className="gap-2">
-                <Users className="h-4 w-4" />
-                People
-                {totalUnreadPeople > 0 && (
-                  <Badge 
-                    variant="secondary" 
-                    className="ml-1 h-5 px-1.5 text-xs bg-international-orange text-white"
-                  >
-                    {totalUnreadPeople}
-                  </Badge>
-                )}
-              </TabsTrigger>
-              <TabsTrigger value="tasks" className="gap-2">
-                <CheckSquare className="h-4 w-4" />
-                Tasks
-                {totalUnreadTasks > 0 && (
-                  <Badge 
-                    variant="secondary" 
-                    className="ml-1 h-5 px-1.5 text-xs bg-electric-blue text-white"
-                  >
-                    {totalUnreadTasks}
-                  </Badge>
-                )}
-              </TabsTrigger>
-            </TabsList>
-          </Tabs>
-        </div>
-        
-        {/* List Content */}
-        <div className="flex-1 overflow-y-auto">
-          {viewMode === 'people' ? (
-            <PeopleList
-              members={members.map(m => ({
-                id: m.id,
-                full_name: m.full_name || m.email,
-                avatar_url: m.avatar_url,
-                role: m.role,
-                online_status: m.online_status as 'online' | 'away' | 'offline' | undefined,
-                last_message: m.last_message,
-                last_message_at: m.last_message_at,
-                unread_count: m.unread_count
-              }))}
-              selectedPersonId={selectedPersonId || undefined}
-              onSelectPerson={handleSelectPerson}
-            />
-          ) : (
-            <TasksList
-              tasks={tasks}
-              objectives={objectives}
-              currentUserId={currentUserId}
-              taskFilter={taskFilter}
-              onTaskFilterChange={handleTaskFilterChange}
-              selectedTaskId={selectedTaskId || undefined}
-              onSelectTask={handleSelectTask}
-            />
-          )}
-        </div>
+  // List panel content (reused in both inline and sheet)
+  const listContent = (
+    <>
+      {/* View Toggle */}
+      <div className="p-4 border-b border-slate-200">
+        <Tabs value={viewMode} onValueChange={(v) => handleViewModeChange(v as 'people' | 'tasks')}>
+          <TabsList className="w-full grid grid-cols-2">
+            <TabsTrigger value="people" className="gap-2">
+              <Users className="h-4 w-4" />
+              People
+              {totalUnreadPeople > 0 && (
+                <Badge variant="secondary" className="ml-1 h-5 px-1.5 text-xs bg-international-orange text-white">
+                  {totalUnreadPeople}
+                </Badge>
+              )}
+            </TabsTrigger>
+            <TabsTrigger value="tasks" className="gap-2">
+              <CheckSquare className="h-4 w-4" />
+              Tasks
+              {totalUnreadTasks > 0 && (
+                <Badge variant="secondary" className="ml-1 h-5 px-1.5 text-xs bg-electric-blue text-white">
+                  {totalUnreadTasks}
+                </Badge>
+              )}
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
       </div>
       
-      {/* Right Panel - Conversation/Detail View */}
-      <div 
-        className={cn(
-          "flex-1 flex flex-col",
-          // Full screen on mobile when shown
-          isMobile && !showRightPanel && "hidden"
-        )}
-      >
-        {/* Mobile back button */}
-        {isMobile && hasSelection && (
-          <div className="p-2 border-b border-slate-200">
-            <Button variant="ghost" size="sm" onClick={handleBack} className="gap-2">
-              <ArrowLeft className="h-4 w-4" />
-              Back
-            </Button>
-          </div>
-        )}
-        
-        {/* Content Area */}
-        {selectedPersonId ? (
-          <DirectConversationView
-            personId={selectedPersonId}
-            currentUserId={currentUserId}
-            foundryId={foundryId}
-            members={members}
-            tasks={tasks}
-            objectives={objectives}
-          />
-        ) : selectedTaskId ? (
-          <TaskConversationView
-            taskId={selectedTaskId}
-            context={currentContext}
-            currentUserId={currentUserId}
-            foundryId={foundryId}
-            members={members}
+      {/* List Content */}
+      <div className="flex-1 overflow-y-auto">
+        {viewMode === 'people' ? (
+          <PeopleList
+            members={members.map(m => ({
+              id: m.id,
+              full_name: m.full_name || m.email,
+              avatar_url: m.avatar_url,
+              role: m.role,
+              online_status: m.online_status as 'online' | 'away' | 'offline' | undefined,
+              last_message: m.last_message,
+              last_message_at: m.last_message_at,
+              unread_count: m.unread_count
+            }))}
+            selectedPersonId={selectedPersonId || undefined}
+            onSelectPerson={handleSelectPerson}
           />
         ) : (
-          <EmptyState viewMode={viewMode} />
+          <TasksList
+            tasks={tasks}
+            objectives={objectives}
+            currentUserId={currentUserId}
+            taskFilter={taskFilter}
+            onTaskFilterChange={handleTaskFilterChange}
+            selectedTaskId={selectedTaskId || undefined}
+            onSelectTask={handleSelectTask}
+          />
+        )}
+      </div>
+    </>
+  )
+  
+  // LARGE SCREEN: 3 columns
+  if (screenSize === 'large') {
+    return (
+      <div className="flex h-full">
+        {/* Left Panel - List */}
+        <div className="w-[320px] lg:w-[360px] border-r border-slate-200 flex flex-col">
+          {listContent}
+        </div>
+        
+        {/* Middle Panel - Conversation */}
+        <div className="flex-1 flex flex-col min-w-0">
+          {selectedPersonId ? (
+            <DirectConversationView
+              personId={selectedPersonId}
+              currentUserId={currentUserId}
+              foundryId={foundryId}
+              members={members}
+              tasks={tasks}
+              objectives={objectives}
+            />
+          ) : selectedTaskId ? (
+            <TaskConversationView
+              taskId={selectedTaskId}
+              context={currentContext}
+              currentUserId={currentUserId}
+              foundryId={foundryId}
+              members={members}
+            />
+          ) : (
+            <EmptyState viewMode={viewMode} />
+          )}
+        </div>
+        
+        {/* Right Panel - Summary */}
+        <div className="w-[350px] border-l border-slate-200 bg-muted/30">
+          <HomeSummaryPanel
+            overdueTasks={overdueTasks}
+            pendingDecisions={pendingDecisions}
+            blockers={blockers}
+            tasksDueToday={tasksDueToday}
+            tasksDueThisWeek={tasksDueThisWeek}
+            teamMembers={teamMembers}
+            userId={currentUserId}
+            userRole={userRole}
+            foundryId={foundryId}
+            isExecutiveOrFounder={isExecutiveOrFounder}
+          />
+        </div>
+      </div>
+    )
+  }
+  
+  // MEDIUM SCREEN: 2 columns with slide-out list
+  if (screenSize === 'medium') {
+    return (
+      <div className="flex h-full">
+        {/* Main Content - Messages with slide-out list */}
+        <div className="flex-1 flex flex-col min-w-0">
+          {/* Header with list toggle */}
+          <div className="flex items-center gap-2 p-2 border-b border-slate-200">
+            <Sheet open={listPanelOpen} onOpenChange={setListPanelOpen}>
+              <SheetTrigger asChild>
+                <Button variant="ghost" size="sm" className="gap-2">
+                  <PanelLeftOpen className="h-4 w-4" />
+                  {viewMode === 'people' ? 'People' : 'Tasks'}
+                  {(totalUnreadPeople + totalUnreadTasks) > 0 && (
+                    <Badge className="bg-international-orange text-white text-xs">
+                      {totalUnreadPeople + totalUnreadTasks}
+                    </Badge>
+                  )}
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="left" className="w-[320px] p-0">
+                <div className="flex flex-col h-full">
+                  {listContent}
+                </div>
+              </SheetContent>
+            </Sheet>
+            
+            {hasSelection && (
+              <Button variant="ghost" size="sm" onClick={handleBack} className="gap-2">
+                <ArrowLeft className="h-4 w-4" />
+                Back
+              </Button>
+            )}
+          </div>
+          
+          {/* Conversation content */}
+          <div className="flex-1 min-h-0">
+            {selectedPersonId ? (
+              <DirectConversationView
+                personId={selectedPersonId}
+                currentUserId={currentUserId}
+                foundryId={foundryId}
+                members={members}
+                tasks={tasks}
+                objectives={objectives}
+              />
+            ) : selectedTaskId ? (
+              <TaskConversationView
+                taskId={selectedTaskId}
+                context={currentContext}
+                currentUserId={currentUserId}
+                foundryId={foundryId}
+                members={members}
+              />
+            ) : (
+              <EmptyState viewMode={viewMode} />
+            )}
+          </div>
+        </div>
+        
+        {/* Right Panel - Summary */}
+        <div className="w-[320px] border-l border-slate-200 bg-muted/30">
+          <HomeSummaryPanel
+            overdueTasks={overdueTasks}
+            pendingDecisions={pendingDecisions}
+            blockers={blockers}
+            tasksDueToday={tasksDueToday}
+            tasksDueThisWeek={tasksDueThisWeek}
+            teamMembers={teamMembers}
+            userId={currentUserId}
+            userRole={userRole}
+            foundryId={foundryId}
+            isExecutiveOrFounder={isExecutiveOrFounder}
+          />
+        </div>
+      </div>
+    )
+  }
+  
+  // SMALL SCREEN (Mobile): Tabbed view
+  return (
+    <div className="flex flex-col h-full">
+      {/* Mobile Tab Bar */}
+      <div className="flex border-b border-slate-200 bg-background">
+        <button
+          onClick={() => setMobileView('messages')}
+          className={cn(
+            "flex-1 flex items-center justify-center gap-2 py-3 text-sm font-medium transition-colors",
+            mobileView === 'messages' 
+              ? "text-international-orange border-b-2 border-international-orange" 
+              : "text-muted-foreground"
+          )}
+        >
+          <MessageSquare className="h-4 w-4" />
+          Messages
+          {(totalUnreadPeople + totalUnreadTasks) > 0 && (
+            <Badge className="bg-international-orange text-white text-xs">
+              {totalUnreadPeople + totalUnreadTasks}
+            </Badge>
+          )}
+        </button>
+        <button
+          onClick={() => setMobileView('summary')}
+          className={cn(
+            "flex-1 flex items-center justify-center gap-2 py-3 text-sm font-medium transition-colors",
+            mobileView === 'summary' 
+              ? "text-international-orange border-b-2 border-international-orange" 
+              : "text-muted-foreground"
+          )}
+        >
+          <LayoutDashboard className="h-4 w-4" />
+          Overview
+        </button>
+      </div>
+      
+      {/* Mobile Content */}
+      <div className="flex-1 min-h-0">
+        {mobileView === 'messages' ? (
+          // Messages view
+          showConversation && hasSelection ? (
+            // Show conversation
+            <div className="flex flex-col h-full">
+              <div className="p-2 border-b border-slate-200">
+                <Button variant="ghost" size="sm" onClick={handleBack} className="gap-2">
+                  <ArrowLeft className="h-4 w-4" />
+                  Back
+                </Button>
+              </div>
+              <div className="flex-1 min-h-0">
+                {selectedPersonId ? (
+                  <DirectConversationView
+                    personId={selectedPersonId}
+                    currentUserId={currentUserId}
+                    foundryId={foundryId}
+                    members={members}
+                    tasks={tasks}
+                    objectives={objectives}
+                  />
+                ) : selectedTaskId ? (
+                  <TaskConversationView
+                    taskId={selectedTaskId}
+                    context={currentContext}
+                    currentUserId={currentUserId}
+                    foundryId={foundryId}
+                    members={members}
+                  />
+                ) : null}
+              </div>
+            </div>
+          ) : (
+            // Show list
+            <div className="flex flex-col h-full">
+              {listContent}
+            </div>
+          )
+        ) : (
+          // Summary view
+          <HomeSummaryPanel
+            overdueTasks={overdueTasks}
+            pendingDecisions={pendingDecisions}
+            blockers={blockers}
+            tasksDueToday={tasksDueToday}
+            tasksDueThisWeek={tasksDueThisWeek}
+            teamMembers={teamMembers}
+            userId={currentUserId}
+            userRole={userRole}
+            foundryId={foundryId}
+            isExecutiveOrFounder={isExecutiveOrFounder}
+          />
         )}
       </div>
     </div>
@@ -311,7 +530,7 @@ export function InboxLayoutClient({
 }
 
 /**
- * Direct conversation view - fetches or creates a conversation with the selected person
+ * Direct conversation view
  */
 function DirectConversationView({
   personId,
@@ -326,7 +545,7 @@ function DirectConversationView({
   foundryId: string
   members: MemberWithStatus[]
   tasks: Task[]
-  objectives: Objective[]
+  objectives: { id: string; title: string }[]
 }) {
   const [conversationId, setConversationId] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -337,7 +556,6 @@ function DirectConversationView({
       setIsLoading(true)
       
       try {
-        // Try to find existing direct conversation
         const { data: existing } = await supabase
           .from('conversations')
           .select('id')
@@ -348,7 +566,6 @@ function DirectConversationView({
         if (existing) {
           setConversationId(existing.id)
         } else {
-          // Create new conversation
           const { data: newConv, error } = await supabase
             .from('conversations')
             .insert({
@@ -367,18 +584,11 @@ function DirectConversationView({
           }
           
           if (newConv) {
-            // Create participant records
             await supabase
               .from('conversation_participants')
               .insert([
-                {
-                  conversation_id: newConv.id,
-                  profile_id: currentUserId
-                },
-                {
-                  conversation_id: newConv.id,
-                  profile_id: personId
-                }
+                { conversation_id: newConv.id, profile_id: currentUserId },
+                { conversation_id: newConv.id, profile_id: personId }
               ])
             
             setConversationId(newConv.id)
@@ -417,7 +627,6 @@ function DirectConversationView({
     )
   }
   
-  // Find the person details
   const person = members.find(m => m.id === personId)
   
   if (!person) {
@@ -446,7 +655,7 @@ function DirectConversationView({
 }
 
 /**
- * Task conversation view - shows messages related to a specific task
+ * Task conversation view
  */
 function TaskConversationView({
   taskId,
@@ -471,7 +680,6 @@ function TaskConversationView({
       setIsLoading(true)
       
       try {
-        // Fetch task details
         const { data: task } = await supabase
           .from('tasks')
           .select('title, task_number')
@@ -482,7 +690,6 @@ function TaskConversationView({
           setTaskDetails(task)
         }
         
-        // Try to find existing task conversation
         const { data: existing } = await supabase
           .from('conversations')
           .select('id')
@@ -493,7 +700,6 @@ function TaskConversationView({
         if (existing) {
           setConversationId(existing.id)
         } else {
-          // Create new task conversation
           const { data: newConv, error } = await supabase
             .from('conversations')
             .insert({
@@ -502,8 +708,8 @@ function TaskConversationView({
               objective_id: context?.objectiveId || null,
               is_group: true,
               creator_id: currentUserId,
-              buyer_id: currentUserId, // Required legacy field
-              seller_id: currentUserId, // Required legacy field
+              buyer_id: currentUserId,
+              seller_id: currentUserId,
               status: 'active',
               title: task?.title ? `Task: ${task.title}` : 'Task Discussion'
             })
@@ -517,13 +723,9 @@ function TaskConversationView({
           }
           
           if (newConv) {
-            // Add current user as participant
             await supabase
               .from('conversation_participants')
-              .insert({
-                conversation_id: newConv.id,
-                profile_id: currentUserId
-              })
+              .insert({ conversation_id: newConv.id, profile_id: currentUserId })
             
             setConversationId(newConv.id)
           }
@@ -563,7 +765,6 @@ function TaskConversationView({
   
   return (
     <div className="flex flex-col h-full">
-      {/* Task header */}
       {taskDetails && (
         <div className="border-b border-border px-4 py-3 bg-muted/30 flex-shrink-0">
           <div className="flex items-center gap-2">
@@ -578,7 +779,6 @@ function TaskConversationView({
         </div>
       )}
       
-      {/* Conversation - takes remaining space */}
       <div className="flex-1 min-h-0">
         <ConversationThread
           conversationId={conversationId}

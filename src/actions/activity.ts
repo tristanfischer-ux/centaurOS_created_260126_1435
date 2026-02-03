@@ -135,7 +135,7 @@ export async function replyToActivity(
         
         revalidatePath('/tasks')
         revalidatePath('/messages')
-        revalidatePath('/today')
+        revalidatePath('/home')
         return { success: true }
       }
 
@@ -168,7 +168,7 @@ export async function replyToActivity(
         
         revalidatePath('/objectives')
         revalidatePath('/messages')
-        revalidatePath('/today')
+        revalidatePath('/home')
         return { success: true }
       }
 
@@ -192,7 +192,7 @@ export async function replyToActivity(
           .eq('id', sourceId)
         
         revalidatePath('/messages')
-        revalidatePath('/today')
+        revalidatePath('/home')
         return { success: true }
       }
 
@@ -531,7 +531,7 @@ export async function addObjectiveComment(
 
     revalidatePath('/objectives')
     revalidatePath('/messages')
-    revalidatePath('/today')
+    revalidatePath('/home')
 
     return { success: true, commentId: comment?.id }
   } catch (error) {

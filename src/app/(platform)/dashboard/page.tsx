@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation"
 
-// Redirect /dashboard to /today - the new daily focus view
+// Redirect /dashboard to /home - the unified home view
 export default async function DashboardPage() {
-    redirect("/today")
+    redirect("/home")
 }
