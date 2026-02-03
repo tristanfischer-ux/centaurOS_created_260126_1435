@@ -4,8 +4,9 @@ import React from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
-import { Users, CheckSquare, Store, Target, ShieldAlert, Settings, Map, Home } from "lucide-react"
+import { Users, CheckSquare, Store, Target, ShieldAlert, Settings, Map, Home, GanttChart } from "lucide-react"
 import { NotificationCenter } from "@/components/NotificationCenter"
+import { UnreadIndicator } from "@/components/today/UnreadIndicator"
 // ThemeToggle removed - CentaurOS enforces light mode per design philosophy
 import { FocusModeToggle } from "@/components/FocusModeToggle"
 import { ZoomControl } from "@/components/ZoomControl"
@@ -34,6 +35,7 @@ const APP_VERSION = "1.0.3"
 // Work: day-to-day operations
 const workNavigation = [
     { name: "Home", href: "/home", icon: Home, tooltip: "Messages, tasks, and daily overview" },
+    { name: "Timeline", href: "/timeline", icon: GanttChart, tooltip: "Gantt view of tasks and objectives" },
     { name: "Objectives", href: "/objectives", icon: Target, tooltip: "Set and track high-level strategic goals" },
     { name: "Tasks", href: "/tasks", icon: CheckSquare, tooltip: "Manage and assign actionable items" },
     { name: "Team", href: "/team", icon: Users, tooltip: "Team members, roles, and capacity" },
@@ -88,6 +90,10 @@ export function Sidebar({ foundryName, foundryId, userName, userRole, isAdmin }:
                         {userRole || "Member"}
                     </span>
                 </div>
+                {/* Unread messages indicator */}
+                <div className="mt-3">
+                    <UnreadIndicator />
+                </div>
             </div>
 
             <nav className="flex-1 space-y-1.5 px-3 py-3">
@@ -137,7 +143,7 @@ export function Sidebar({ foundryName, foundryId, userName, userRole, isAdmin }:
 
                     return (
                         <>
-                            {/* Work: Inbox, Objectives, Tasks, Team */}
+                            {/* Work: Home, Timeline, Objectives, Tasks, Team */}
                             {workNavigation.map(renderNavItem)}
                             
                             {/* Spacer */}
