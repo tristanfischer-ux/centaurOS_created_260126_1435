@@ -185,6 +185,255 @@ const getCriticalityColor = (criticality: string) => {
 }
 
 /**
+ * DomainCard - Displays a single knowledge domain with its details
+ */
+function DomainCard({ domain, templateId }: { domain: KnowledgeDomain; templateId: string }) {
+  const router = useRouter()
+  const categoryColors = getDomainCategoryColor(domain.category)
+  const criticalityColor = getCriticalityColor(domain.criticality)
+  
+  // Count sub-domains (children)
+  const subDomainCount = domain.children?.length || 0
+  
+  // Show first 3 key questions
+  const displayQuestions = domain.key_questions?.slice(0, 3) || []
+  
+  return (
+    <Card className="hover:shadow-md transition-shadow">
+      <CardHeader>
+        <div className="flex items-start justify-between gap-4 mb-2">
+          <div className="flex items-center gap-3 flex-1">
+            <Badge className={cn(categoryColors.bg, categoryColors.text)}>
+              {domain.category || 'General'}
+            </Badge>
+            {domain.criticality && (
+              <Badge className={criticalityColor}>
+                {domain.criticality}
+              </Badge>
+            )}
+          </div>
+        </div>
+        <CardTitle className="text-xl">{domain.name}</CardTitle>
+        {domain.description && (
+          <p className="text-sm text-muted-foreground mt-2">
+            {domain.description}
+          </p>
+        )}
+      </CardHeader>
+      <CardContent>
+        {/* Sub-domains count */}
+        {subDomainCount > 0 && (
+          <div className="flex items-center gap-2 text-sm text-muted-foreground mb-4">
+            <Layers className="h-4 w-4" />
+            <span>{subDomainCount} sub-domains</span>
+          </div>
+        )}
+        
+        {/* Key questions */}
+        {displayQuestions.length > 0 && (
+          <div className="mb-6">
+            <h4 className="text-sm font-semibold mb-3">Key Questions:</h4>
+            <div className="space-y-2">
+              {displayQuestions.map((q, idx) => (
+                <div key={idx} className="flex items-start gap-2 text-sm">
+                  <span className="text-muted-foreground mt-1">•</span>
+                  <span className="text-muted-foreground">{q.question}</span>
+                </div>
+              ))}
+              {domain.key_questions && domain.key_questions.length > 3 && (
+                <p className="text-sm text-muted-foreground font-medium">
+                  +{domain.key_questions.length - 3} more questions
+                </p>
+              )}
+            </div>
+          </div>
+        )}
+        
+        {/* Typical roles */}
+        {domain.typical_roles && domain.typical_roles.length > 0 && (
+          <div className="mb-6">
+            <h4 className="text-sm font-semibold mb-2">Typical Roles:</h4>
+            <div className="flex flex-wrap gap-2">
+              {domain.typical_roles.slice(0, 3).map((role, idx) => (
+                <Badge key={idx} variant="secondary" className="text-xs">
+                  {role}
+                </Badge>
+              ))}
+              {domain.typical_roles.length > 3 && (
+                <Badge variant="secondary" className="text-xs">
+                  +{domain.typical_roles.length - 3} more
+                </Badge>
+              )}
+            </div>
+          </div>
+        )}
+        
+        {/* Learning time estimate */}
+        {domain.learning_time_estimate && (
+          <div className="flex items-center gap-2 text-sm text-muted-foreground mb-6">
+            <Clock className="h-4 w-4" />
+            <span>Learning time: {domain.learning_time_estimate}</span>
+          </div>
+        )}
+        
+        {/* Action button */}
+        <Button 
+          variant="outline"
+          className="w-full"
+          onClick={() => router.push(`/blueprints/explore?template=${templateId}&domain=${domain.id}`)}
+        >
+          Explore Domain Tree
+          <ArrowLeft className="h-4 w-4 ml-2 rotate-180" />
+        </Button>
+      </CardContent>
+    </Card>
+  )
+}
+
+/**
+ * IndustryDetailView - Shows knowledge domains for a selected industry template
+ */
+function IndustryDetailView({ 
+  selectedIndustry, 
+  onBack 
+}: { 
+  selectedIndustry: BlueprintTemplate
+  onBack: () => void 
+}) {
+  const router = useRouter()
+  const [domains, setDomains] = useState<KnowledgeDomain[]>([])
+  const [loadingDomains, setLoadingDomains] = useState(true)
+
+  useEffect(() => {
+    let mounted = true
+    
+    async function fetchDomains() {
+      setLoadingDomains(true)
+      try {
+        const result = await getTemplateDomains(selectedIndustry.id)
+        if (!mounted) return
+        
+        if (result.error) {
+          toast.error('Failed to load knowledge domains')
+          setLoadingDomains(false)
+          return
+        }
+        // Show only top-level domains (depth = 0)
+        const topLevel = result.data?.filter(d => d.depth === 0) || []
+        setDomains(topLevel)
+      } catch (error) {
+        if (mounted) {
+          toast.error('Failed to load knowledge domains')
+        }
+      } finally {
+        if (mounted) {
+          setLoadingDomains(false)
+        }
+      }
+    }
+    
+    fetchDomains()
+    
+    return () => {
+      mounted = false
+    }
+  }, [selectedIndustry.id])
+  
+  return (
+    <div>
+      {/* Back button and header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-slate-100">
+        <div className="min-w-0 flex-1">
+          <Button
+            variant="ghost"
+            onClick={onBack}
+            className="mb-4 -ml-2"
+          >
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back to Industries
+          </Button>
+          
+          <div className={typography.pageHeader}>
+            <div className={typography.pageHeaderAccent} />
+            <h1 className={typography.h1}>
+              {selectedIndustry.name}
+            </h1>
+          </div>
+          <p className={typography.pageSubtitle}>
+            {selectedIndustry.description}
+          </p>
+        </div>
+      </div>
+
+      {/* Knowledge Domains */}
+      <div className="mt-8">
+        <h2 className="text-2xl font-semibold mb-6">Key Technical Domains</h2>
+        
+        {loadingDomains ? (
+          <div className="grid grid-cols-1 gap-6">
+            {[1, 2, 3].map((i) => (
+              <Card key={i} className="animate-pulse">
+                <CardHeader>
+                  <div className="h-6 w-48 bg-muted rounded" />
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    <div className="h-4 w-full bg-muted rounded" />
+                    <div className="h-4 w-3/4 bg-muted rounded" />
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        ) : domains.length === 0 ? (
+          <Card>
+            <CardContent className="pt-6">
+              <p className="text-muted-foreground text-center">
+                No knowledge domains available for this industry yet.
+              </p>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="grid grid-cols-1 gap-6">
+            {domains.map((domain) => (
+              <DomainCard 
+                key={domain.id} 
+                domain={domain} 
+                templateId={selectedIndustry.id}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Call to action */}
+      <div className="mt-12">
+        <Card className="bg-electric-blue/5 border-electric-blue/20">
+          <CardContent className="pt-6">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div>
+                <h3 className="font-semibold text-lg mb-2">
+                  Ready to build with {selectedIndustry.name}?
+                </h3>
+                <p className="text-muted-foreground">
+                  Create a blueprint to track your knowledge coverage and get expert guidance.
+                </p>
+              </div>
+              <Button 
+                className="shrink-0"
+                onClick={() => router.push(`/blueprints?template=${selectedIndustry.id}`)}
+              >
+                Create Blueprint
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  )
+}
+
+/**
  * PackCard - Collapsible card for objective packs with three states:
  * - Collapsed (default): Title, icon, difficulty, task count
  * - Expanded (click): Adds description and sample tasks
@@ -313,8 +562,6 @@ export function InspirationView({ templates = [], packs = [] }: InspirationViewP
   const router = useRouter()
   const [selectedCategory, setSelectedCategory] = useState<CategoryId>(null)
   const [selectedIndustry, setSelectedIndustry] = useState<BlueprintTemplate | null>(null)
-  const [domains, setDomains] = useState<KnowledgeDomain[]>([])
-  const [loadingDomains, setLoadingDomains] = useState(false)
 
   // Category to database category mapping
   const categoryFilterMap: Record<string, string[]> = {
@@ -415,234 +662,11 @@ export function InspirationView({ templates = [], packs = [] }: InspirationViewP
     }
     
     // Industry detail view - show knowledge domains
-    return <IndustryDetailView />
-  }
-  
-  // Industry Detail View Component
-  function IndustryDetailView() {
-    useEffect(() => {
-      if (!selectedIndustry) return
-      
-      async function fetchDomains() {
-        setLoadingDomains(true)
-        try {
-          const result = await getTemplateDomains(selectedIndustry!.id)
-          if (result.error) {
-            toast.error('Failed to load knowledge domains')
-            return
-          }
-          // Show only top-level domains (depth = 0)
-          const topLevel = result.data?.filter(d => d.depth === 0) || []
-          setDomains(topLevel)
-        } catch (error) {
-          toast.error('Failed to load knowledge domains')
-        } finally {
-          setLoadingDomains(false)
-        }
-      }
-      
-      fetchDomains()
-    }, [selectedIndustry])
-    
-    if (!selectedIndustry) return null
-    
     return (
-      <div>
-        {/* Back button and header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-slate-100">
-          <div className="min-w-0 flex-1">
-            <Button
-              variant="ghost"
-              onClick={() => {
-                setSelectedIndustry(null)
-                setDomains([])
-              }}
-              className="mb-4 -ml-2"
-            >
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Industries
-            </Button>
-            
-            <div className={typography.pageHeader}>
-              <div className={typography.pageHeaderAccent} />
-              <h1 className={typography.h1}>
-                {selectedIndustry.name}
-              </h1>
-            </div>
-            <p className={typography.pageSubtitle}>
-              {selectedIndustry.description}
-            </p>
-          </div>
-        </div>
-
-        {/* Knowledge Domains */}
-        <div className="mt-8">
-          <h2 className="text-2xl font-semibold mb-6">Key Technical Domains</h2>
-          
-          {loadingDomains ? (
-            <div className="grid grid-cols-1 gap-6">
-              {[1, 2, 3].map((i) => (
-                <Card key={i} className="animate-pulse">
-                  <CardHeader>
-                    <div className="h-6 w-48 bg-muted rounded" />
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-2">
-                      <div className="h-4 w-full bg-muted rounded" />
-                      <div className="h-4 w-3/4 bg-muted rounded" />
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          ) : domains.length === 0 ? (
-            <Card>
-              <CardContent className="pt-6">
-                <p className="text-muted-foreground text-center">
-                  No knowledge domains available for this industry yet.
-                </p>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="grid grid-cols-1 gap-6">
-              {domains.map((domain) => (
-                <DomainCard 
-                  key={domain.id} 
-                  domain={domain} 
-                  templateId={selectedIndustry.id}
-                />
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Call to action */}
-        <div className="mt-12">
-          <Card className="bg-electric-blue/5 border-electric-blue/20">
-            <CardContent className="pt-6">
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                <div>
-                  <h3 className="font-semibold text-lg mb-2">
-                    Ready to build with {selectedIndustry.name}?
-                  </h3>
-                  <p className="text-muted-foreground">
-                    Create a blueprint to track your knowledge coverage and get expert guidance.
-                  </p>
-                </div>
-                <Button 
-                  className="shrink-0"
-                  onClick={() => router.push(`/blueprints?template=${selectedIndustry.id}`)}
-                >
-                  Create Blueprint
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-    )
-  }
-  
-  // Domain Card Component
-  function DomainCard({ domain, templateId }: { domain: KnowledgeDomain; templateId: string }) {
-    const categoryColors = getDomainCategoryColor(domain.category)
-    const criticalityColor = getCriticalityColor(domain.criticality)
-    
-    // Count sub-domains (children)
-    const subDomainCount = domain.children?.length || 0
-    
-    // Show first 3 key questions
-    const displayQuestions = domain.key_questions?.slice(0, 3) || []
-    
-    return (
-      <Card className="hover:shadow-md transition-shadow">
-        <CardHeader>
-          <div className="flex items-start justify-between gap-4 mb-2">
-            <div className="flex items-center gap-3 flex-1">
-              <Badge className={cn(categoryColors.bg, categoryColors.text)}>
-                {domain.category || 'General'}
-              </Badge>
-              {domain.criticality && (
-                <Badge className={criticalityColor}>
-                  {domain.criticality}
-                </Badge>
-              )}
-            </div>
-          </div>
-          <CardTitle className="text-xl">{domain.name}</CardTitle>
-          {domain.description && (
-            <p className="text-sm text-muted-foreground mt-2">
-              {domain.description}
-            </p>
-          )}
-        </CardHeader>
-        <CardContent>
-          {/* Sub-domains count */}
-          {subDomainCount > 0 && (
-            <div className="flex items-center gap-2 text-sm text-muted-foreground mb-4">
-              <Layers className="h-4 w-4" />
-              <span>{subDomainCount} sub-domains</span>
-            </div>
-          )}
-          
-          {/* Key questions */}
-          {displayQuestions.length > 0 && (
-            <div className="mb-6">
-              <h4 className="text-sm font-semibold mb-3">Key Questions:</h4>
-              <div className="space-y-2">
-                {displayQuestions.map((q, idx) => (
-                  <div key={idx} className="flex items-start gap-2 text-sm">
-                    <span className="text-muted-foreground mt-1">•</span>
-                    <span className="text-muted-foreground">{q.question}</span>
-                  </div>
-                ))}
-                {domain.key_questions && domain.key_questions.length > 3 && (
-                  <p className="text-sm text-muted-foreground font-medium">
-                    +{domain.key_questions.length - 3} more questions
-                  </p>
-                )}
-              </div>
-            </div>
-          )}
-          
-          {/* Typical roles */}
-          {domain.typical_roles && domain.typical_roles.length > 0 && (
-            <div className="mb-6">
-              <h4 className="text-sm font-semibold mb-2">Typical Roles:</h4>
-              <div className="flex flex-wrap gap-2">
-                {domain.typical_roles.slice(0, 3).map((role, idx) => (
-                  <Badge key={idx} variant="secondary" className="text-xs">
-                    {role}
-                  </Badge>
-                ))}
-                {domain.typical_roles.length > 3 && (
-                  <Badge variant="secondary" className="text-xs">
-                    +{domain.typical_roles.length - 3} more
-                  </Badge>
-                )}
-              </div>
-            </div>
-          )}
-          
-          {/* Learning time estimate */}
-          {domain.learning_time_estimate && (
-            <div className="flex items-center gap-2 text-sm text-muted-foreground mb-6">
-              <Clock className="h-4 w-4" />
-              <span>Learning time: {domain.learning_time_estimate}</span>
-            </div>
-          )}
-          
-          {/* Action button */}
-          <Button 
-            variant="outline"
-            className="w-full"
-            onClick={() => router.push(`/blueprints/explore?template=${templateId}&domain=${domain.id}`)}
-          >
-            Explore Domain Tree
-            <ArrowLeft className="h-4 w-4 ml-2 rotate-180" />
-          </Button>
-        </CardContent>
-      </Card>
+      <IndustryDetailView 
+        selectedIndustry={selectedIndustry} 
+        onBack={() => setSelectedIndustry(null)} 
+      />
     )
   }
 
