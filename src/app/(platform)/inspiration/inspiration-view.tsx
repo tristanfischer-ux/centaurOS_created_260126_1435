@@ -1200,7 +1200,7 @@ export function InspirationView({ templates = [], packs = [] }: InspirationViewP
                     return (
                       <Card 
                         key={template.id}
-                        className="flex flex-col transition-all duration-200 hover:shadow-md cursor-pointer col-span-1 md:col-span-2"
+                        className="flex flex-col transition-all duration-200 hover:shadow-md cursor-pointer"
                         onClick={() => setSelectedIndustry(template)}
                       >
                         <CardHeader>

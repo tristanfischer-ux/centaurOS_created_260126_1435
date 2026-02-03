@@ -132,7 +132,7 @@ export function UsePackDialog({ pack, trigger }: UsePackDialogProps) {
           </Button>
         )}
       </DialogTrigger>
-      <DialogContent size="lg" className="max-w-3xl max-h-[85vh]">
+      <DialogContent size="lg" className="max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Package className="h-5 w-5 text-electric-blue" />
@@ -152,8 +152,8 @@ export function UsePackDialog({ pack, trigger }: UsePackDialogProps) {
             </TabsTrigger>
           </TabsList>
 
-          {/* OVERVIEW TAB - with proper scroll */}
-          <TabsContent value="overview" className="mt-4 max-h-[55vh] overflow-y-auto space-y-4">
+          {/* OVERVIEW TAB */}
+          <TabsContent value="overview" className="mt-4 space-y-4">
             {/* What is this pack? */}
             <Card className="bg-blue-50/50 border-blue-100">
               <CardContent className="pt-6">
@@ -255,8 +255,8 @@ export function UsePackDialog({ pack, trigger }: UsePackDialogProps) {
             </Card>
           </TabsContent>
 
-            {/* TASKS TAB - with proper scroll */}
-            <TabsContent value="tasks" className="mt-4 max-h-[55vh] overflow-y-auto space-y-4">
+            {/* TASKS TAB */}
+            <TabsContent value="tasks" className="mt-4 space-y-4">
             {/* Objective Title */}
             <div className="space-y-2">
               <Label htmlFor="objective-title">Objective Title</Label>
@@ -330,31 +330,11 @@ export function UsePackDialog({ pack, trigger }: UsePackDialogProps) {
                                   <SelectTrigger className="w-[140px] h-8 text-xs">
                                     <SelectValue />
                                   </SelectTrigger>
-                                  <SelectContent className="min-w-[180px]">
-                                    <SelectItem value="unassigned" className="cursor-pointer py-2">
-                                      <div className="flex items-center gap-2">
-                                        <UserAvatar name="Unassigned" role="default" size="xs" />
-                                        <span>Unassigned</span>
-                                      </div>
-                                    </SelectItem>
-                                    <SelectItem value="you" className="cursor-pointer py-2">
-                                      <div className="flex items-center gap-2">
-                                        <UserAvatar name="You" role="Founder" size="xs" />
-                                        <span>You</span>
-                                      </div>
-                                    </SelectItem>
-                                    <SelectItem value="team" className="cursor-pointer py-2">
-                                      <div className="flex items-center gap-2">
-                                        <UserAvatar name="Team" role="Executive" size="xs" />
-                                        <span>Team Member</span>
-                                      </div>
-                                    </SelectItem>
-                                    <SelectItem value="agent" className="cursor-pointer py-2">
-                                      <div className="flex items-center gap-2">
-                                        <UserAvatar name="AI Agent" role="AI_Agent" size="xs" />
-                                        <span>AI Agent</span>
-                                      </div>
-                                    </SelectItem>
+                                  <SelectContent className="min-w-[140px]">
+                                    <SelectItem value="unassigned">Unassigned</SelectItem>
+                                    <SelectItem value="you">You (Founder)</SelectItem>
+                                    <SelectItem value="team">Team Member</SelectItem>
+                                    <SelectItem value="agent">AI Agent</SelectItem>
                                   </SelectContent>
                                 </Select>
                                 {item.description && (
