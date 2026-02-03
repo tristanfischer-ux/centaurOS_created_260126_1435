@@ -164,7 +164,7 @@ export function UsePackDialog({ pack, trigger }: UsePackDialogProps) {
           </Button>
         )}
       </DialogTrigger>
-      <DialogContent size="lg" className="max-h-[90vh] flex flex-col">
+      <DialogContent size="lg" className="!flex flex-col gap-4 p-6 max-h-[90vh] overflow-hidden">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Package className="h-5 w-5 text-electric-blue" />
@@ -172,7 +172,7 @@ export function UsePackDialog({ pack, trigger }: UsePackDialogProps) {
           </DialogTitle>
         </DialogHeader>
 
-        <Tabs defaultValue="overview" className="flex-1 overflow-hidden flex flex-col">
+        <Tabs defaultValue="overview" className="flex-1 min-h-0 flex flex-col">
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="overview" className="gap-2">
               <Info className="h-4 w-4" />
@@ -185,7 +185,7 @@ export function UsePackDialog({ pack, trigger }: UsePackDialogProps) {
           </TabsList>
 
           {/* OVERVIEW TAB */}
-          <TabsContent value="overview" className="flex-1 overflow-auto mt-4 space-y-4">
+          <TabsContent value="overview" className="flex-1 min-h-0 overflow-y-auto mt-4 space-y-4 data-[state=active]:flex data-[state=active]:flex-col">
             {/* What is this pack? */}
             <Card className="bg-blue-50/50 border-blue-100">
               <CardContent className="pt-6">
@@ -339,7 +339,7 @@ export function UsePackDialog({ pack, trigger }: UsePackDialogProps) {
           </TabsContent>
 
           {/* TASKS TAB */}
-          <TabsContent value="tasks" className="flex-1 overflow-hidden flex flex-col mt-4 space-y-4">
+          <TabsContent value="tasks" className="flex-1 min-h-0 overflow-hidden data-[state=active]:flex data-[state=active]:flex-col mt-4 space-y-4">
             {/* Objective Title */}
             <div className="space-y-2">
               <Label htmlFor="objective-title">Objective Title</Label>

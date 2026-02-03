@@ -8,7 +8,7 @@ import { Separator } from "@/components/ui/separator"
 import { UserAvatar, UserAvatarStack } from "@/components/ui/user-avatar"
 import { Markdown } from "@/components/ui/markdown"
 import { format } from "date-fns"
-import { Calendar as CalendarIcon, Check, Bot, ChevronDown, ChevronUp, ShieldAlert, Eye, EyeOff, ShieldCheck, Paperclip, Plus, CheckCircle2, XCircle } from "lucide-react"
+import { Calendar as CalendarIcon, Check, Bot, ChevronDown, ChevronUp, ShieldAlert, Eye, EyeOff, ShieldCheck, Paperclip, Plus, CheckCircle2, XCircle, Clock } from "lucide-react"
 import { Calendar } from "@/components/ui/calendar"
 import {
     Popover,
@@ -62,10 +62,12 @@ interface TaskCardProps {
     isSelectionMode?: boolean
     isSelected?: boolean
     onToggleSelection?: () => void
+    /** When true, shows completion/rejection date prominently (for history view) */
+    isHistoryView?: boolean
 }
 
 export const TaskCard = memo(function TaskCard(props: TaskCardProps) {
-    const { task, currentUserId, userRole, members } = props
+    const { task, currentUserId, userRole, members, isHistoryView } = props
     const isAssignee = task.assignees?.some(a => a.id === currentUserId) || task.assignee_id === currentUserId
     const isCreator = currentUserId === task.creator_id
     const isAITask = task.assignees?.some(a => a.role === 'AI_Agent') || task.assignee?.role === 'AI_Agent'
@@ -259,6 +261,13 @@ export const TaskCard = memo(function TaskCard(props: TaskCardProps) {
                                 <Badge variant="warning" className="ml-2">
                                     ⏰ Due Soon
                                 </Badge>
+                            )}
+                            {/* Completion date for history view */}
+                            {isHistoryView && task.updated_at && (
+                                <span className="flex items-center gap-1 text-xs text-muted-foreground ml-2">
+                                    <Clock className="w-3 h-3" />
+                                    {task.status === 'Completed' ? 'Completed' : 'Closed'} {format(new Date(task.updated_at), "MMM d, yyyy")}
+                                </span>
                             )}
                         </div>
                         {task.objective && (

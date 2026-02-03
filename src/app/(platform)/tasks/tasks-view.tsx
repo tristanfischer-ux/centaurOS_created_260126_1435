@@ -7,7 +7,7 @@ import { useAutoRefresh } from "@/hooks/useAutoRefresh"
 import { RefreshButton } from "@/components/RefreshButton"
 import { TaskCard } from "./task-card"
 import { Button } from "@/components/ui/button"
-import { LayoutGrid, List, X, Trash2, CheckSquare, Loader2, Check, UserPlus, Filter, ChevronDown, ChevronUp, CalendarDays, Inbox } from "lucide-react"
+import { LayoutGrid, List, X, Trash2, CheckSquare, Loader2, Check, UserPlus, Filter, ChevronDown, ChevronUp, CalendarDays, Inbox, History } from "lucide-react"
 import { UserAvatar } from "@/components/ui/user-avatar"
 import { deleteTasks, acceptTask, completeTask, updateTaskAssignees } from "@/actions/tasks"
 import { toast } from "sonner"
@@ -20,6 +20,12 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { format, isThisWeek } from "date-fns"
 import { FullTaskView } from "@/components/tasks/full-task-view"
 import { cn } from "@/lib/utils"
+import {
+    Tabs,
+    TabsList,
+    TabsTrigger,
+    TabsContent,
+} from "@/components/ui/tabs"
 import {
     Select,
     SelectContent,
@@ -105,6 +111,13 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
     const [statusFilter, setStatusFilter] = useState<string[]>([])
     const [assigneeFilter, setAssigneeFilter] = useState<string | 'unassigned' | 'all'>('all')
     const [sortBy, setSortBy] = useState<'due_date_asc' | 'due_date_desc' | 'created_desc'>('due_date_asc')
+
+    // Tab State for Active/History/All
+    const [activeTab, setActiveTab] = useState<'active' | 'history' | 'all'>('active')
+
+    // Status categories for tabs
+    const ACTIVE_STATUSES = ['Pending', 'Accepted', 'Pending_Peer_Review', 'Pending_Executive_Approval', 'Amended', 'Amended_Pending_Approval']
+    const HISTORY_STATUSES = ['Completed', 'Rejected']
 
     // Filter Presets State
     const [activePreset, setActivePreset] = useState<string | null>(null)
@@ -226,14 +239,30 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
         return 0
     })
 
+    // Separate tasks by tab (active vs history)
+    const activeTasks = sortedTasks.filter(task => ACTIVE_STATUSES.includes(task.status || 'Pending'))
+    const historyTasks = sortedTasks.filter(task => HISTORY_STATUSES.includes(task.status || ''))
+    
+    // Sort history tasks by completion date (most recent first)
+    const sortedHistoryTasks = [...historyTasks].sort((a, b) => {
+        return new Date(b.updated_at ?? 0).getTime() - new Date(a.updated_at ?? 0).getTime()
+    })
+
+    // Get tasks for current tab
+    const tabTasks = activeTab === 'active' ? activeTasks : activeTab === 'history' ? sortedHistoryTasks : sortedTasks
+
+    // Tab counts (from all tasks, not filtered)
+    const activeCount = tasks.filter(task => ACTIVE_STATUSES.includes(task.status || 'Pending')).length
+    const historyCount = tasks.filter(task => HISTORY_STATUSES.includes(task.status || '')).length
+
     // Timeline view uses the same filtered tasks as grid/list views for consistency
     // (Removed separate timelineTasks variable - timeline now respects all filters)
 
-    // Group tasks by objective (using sorted tasks)
+    // Group tasks by objective (using tab-filtered tasks)
     const tasksByObjective: Record<string, Task[]> = {}
     const orphanedTasks: Task[] = []
 
-    sortedTasks.forEach(task => {
+    tabTasks.forEach(task => {
         if (task.objective_id) {
             if (!tasksByObjective[task.objective_id]) {
                 tasksByObjective[task.objective_id] = []
@@ -413,6 +442,37 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                                 </h1>
                             </div>
                             <p className="text-muted-foreground mt-1 text-sm font-medium pl-4">Create and delegate tasks</p>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-3">
+                            {/* Tab Switcher - Desktop */}
+                            <Tabs value={activeTab} onValueChange={(val) => setActiveTab(val as 'active' | 'history' | 'all')} className="hidden sm:block">
+                                <TabsList className="h-9">
+                                    <TabsTrigger value="active" className="text-xs px-3">
+                                        Active
+                                        <span className="ml-1.5 text-muted-foreground">({activeCount})</span>
+                                    </TabsTrigger>
+                                    <TabsTrigger value="history" className="text-xs px-3">
+                                        History
+                                        <span className="ml-1.5 text-muted-foreground">({historyCount})</span>
+                                    </TabsTrigger>
+                                    <TabsTrigger value="all" className="text-xs px-3">
+                                        All
+                                        <span className="ml-1.5 text-muted-foreground">({tasks.length})</span>
+                                    </TabsTrigger>
+                                </TabsList>
+                            </Tabs>
+                            
+                            {/* Tab Switcher - Mobile */}
+                            <Select value={activeTab} onValueChange={(val) => setActiveTab(val as 'active' | 'history' | 'all')}>
+                                <SelectTrigger className="h-9 w-[130px] sm:hidden">
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="active">Active ({activeCount})</SelectItem>
+                                    <SelectItem value="history">History ({historyCount})</SelectItem>
+                                    <SelectItem value="all">All ({tasks.length})</SelectItem>
+                                </SelectContent>
+                            </Select>
                         </div>
                         <div className="flex flex-wrap items-center gap-2">
                             {isSelectionMode ? (
@@ -671,7 +731,7 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
 
                 {viewMode === 'timeline' ? (
                     <GanttView
-                        tasks={sortedTasks.map(task => ({
+                        tasks={tabTasks.map(task => ({
                             ...task,
                             profiles: task.assignee ? {
                                 id: task.assignee.id,
@@ -701,7 +761,7 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                     />
                 ) : viewMode === 'grid' ? (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {sortedTasks.map((task) => (
+                        {tabTasks.map((task) => (
                             <div key={task.id} className="h-full">
                                 <TaskCard
                                     task={task}
@@ -713,10 +773,11 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                                     isSelectionMode={isSelectionMode}
                                     isSelected={selectedTaskIds.has(task.id)}
                                     onToggleSelection={() => toggleTaskSelection(task.id)}
+                                    isHistoryView={activeTab === 'history'}
                                 />
                             </div>
                         ))}
-                        {sortedTasks.length === 0 && (
+                        {tabTasks.length === 0 && (
                             <>
                                 {tasks.length === 0 ? (
                                     <div className="col-span-full border border-muted rounded-xl bg-muted p-12 flex flex-col items-center justify-center text-center relative overflow-hidden group min-h-[500px]">
