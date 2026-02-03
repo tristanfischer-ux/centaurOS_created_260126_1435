@@ -1,14 +1,16 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { 
   Lightbulb, 
   Target, 
   Boxes, 
   ArrowLeft,
+  ArrowRight,
   Clock,
   CheckSquare,
+  CheckCircle2,
   Rocket,
   Users,
   BarChart3,
@@ -22,7 +24,16 @@ import {
   Server,
   Layers,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Minus,
+  Square,
+  AlignJustify,
+  Eye,
+  BookOpen,
+  Users2,
+  Truck,
+  Sparkles,
+  ExternalLink
 } from 'lucide-react'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -34,8 +45,11 @@ import type { ObjectivePack } from '@/actions/packs'
 import { getTemplateDomains } from '@/actions/blueprints'
 import { toast } from 'sonner'
 import { UsePackDialog } from '@/components/blueprints/use-pack-dialog'
+import Link from 'next/link'
 
-type CategoryId = 'business' | 'product' | 'subsystems' | 'industry' | null
+type CategoryId = 'business' | 'subsystems' | 'industry' | null
+
+export type PackCardSize = 'small' | 'medium' | 'full'
 
 interface Category {
   id: CategoryId
@@ -71,52 +85,53 @@ const getCategoryStats = (packs: ObjectivePack[], categoryFilters: string[]) => 
   return count.toString()
 }
 
-const categories = (packs: ObjectivePack[]): Category[] => [
-  {
-    id: 'business',
-    title: 'Business Objectives Packs',
-    description: 'Strategic objectives to grow your business, from operations and sales to legal and finance.',
-    icon: Target,
-    color: 'bg-electric-blue text-white',
-    stats: {
-      label: 'packs available',
-      value: getCategoryStats(packs, ['sales', 'legal', 'compliance', 'hr', 'operations']),
+// Category filter mapping - includes all database categories
+const CATEGORY_FILTERS = {
+  business: ['sales', 'legal', 'compliance', 'hr', 'operations', 'finance', 'growth', 'startup', 'product', 'marketing'],
+  subsystems: ['engineering', 'security', 'infrastructure'],
+} as const
+
+const categories = (packs: ObjectivePack[], templates: BlueprintTemplate[] = []): Category[] => {
+  const industryCount = templates.filter(t => 
+    ['robotics', 'rockets', 'satellites', 'ai-datacentre', 'pharmaceuticals', 'consumer-electronics', 'saas', 'mobile'].includes(t.product_category)
+  ).length
+
+  return [
+    {
+      id: 'business',
+      title: 'Business Objectives Packs',
+      description: 'Strategic objectives to grow your business, from operations and sales to legal and finance.',
+      icon: Target,
+      color: 'bg-electric-blue text-white',
+      stats: {
+        label: 'packs available',
+        value: getCategoryStats(packs, [...CATEGORY_FILTERS.business]),
+      },
     },
-  },
-  {
-    id: 'product',
-    title: 'Product Development',
-    description: 'Launch products, run experiments, and build what customers actually want.',
-    icon: Rocket,
-    color: 'bg-international-orange text-white',
-    stats: {
-      label: 'packs available',
-      value: getCategoryStats(packs, ['product', 'marketing']),
+    {
+      id: 'subsystems',
+      title: 'Subsystems & Infrastructure',
+      description: 'Build the foundations: hiring, accounting, tech stack, and operational systems.',
+      icon: Boxes,
+      color: 'bg-status-success text-white',
+      stats: {
+        label: 'packs available',
+        value: getCategoryStats(packs, [...CATEGORY_FILTERS.subsystems]),
+      },
     },
-  },
-  {
-    id: 'subsystems',
-    title: 'Subsystems & Infrastructure',
-    description: 'Build the foundations: hiring, accounting, tech stack, and operational systems.',
-    icon: Boxes,
-    color: 'bg-status-success text-white',
-    stats: {
-      label: 'packs available',
-      value: getCategoryStats(packs, ['engineering', 'security', 'infrastructure']),
+    {
+      id: 'industry',
+      title: 'Industry Sector',
+      description: 'Technical knowledge domains and packs for specific industries: Robotics, Rockets, AI Infrastructure, Pharmaceuticals, and more.',
+      icon: CircuitBoard,
+      color: 'bg-chart-5 text-white',
+      stats: {
+        label: 'industries available',
+        value: industryCount.toString(),
+      },
     },
-  },
-  {
-    id: 'industry',
-    title: 'Industry Sector',
-    description: 'Technical knowledge domains and packs for specific industries: Robotics, Rockets, AI Infrastructure, Pharmaceuticals, and more.',
-    icon: CircuitBoard,
-    color: 'bg-chart-5 text-white',
-    stats: {
-      label: 'industries available',
-      value: '8',
-    },
-  },
-]
+  ]
+}
 
 const getDifficultyColor = (difficulty: string) => {
   switch (difficulty) {
@@ -186,9 +201,11 @@ const getCriticalityColor = (criticality: string) => {
 
 /**
  * DomainCard - Displays a single knowledge domain with its details
+ * Enhanced with learning resources, marketplace links, and AI summary
  */
 function DomainCard({ domain, templateId }: { domain: KnowledgeDomain; templateId: string }) {
   const router = useRouter()
+  const [showResources, setShowResources] = useState(false)
   const categoryColors = getDomainCategoryColor(domain.category)
   const criticalityColor = getCriticalityColor(domain.criticality)
   
@@ -197,6 +214,22 @@ function DomainCard({ domain, templateId }: { domain: KnowledgeDomain; templateI
   
   // Show first 3 key questions
   const displayQuestions = domain.key_questions?.slice(0, 3) || []
+  
+  // Check if learning resources exist
+  const hasLearningResources = domain.learning_resources && (
+    (domain.learning_resources.courses?.length ?? 0) > 0 ||
+    (domain.learning_resources.books?.length ?? 0) > 0 ||
+    (domain.learning_resources.communities?.length ?? 0) > 0 ||
+    (domain.learning_resources.tools?.length ?? 0) > 0
+  )
+  
+  // Get marketplace links
+  const expertSearchUrl = domain.marketplace_categories?.length > 0
+    ? `/marketplace?category=${encodeURIComponent(domain.marketplace_categories[0])}&type=advice`
+    : '/marketplace?category=People'
+  const supplierSearchUrl = domain.supplier_categories?.length > 0
+    ? `/marketplace?category=${encodeURIComponent(domain.supplier_categories[0])}&type=supplier`
+    : '/marketplace?category=Products'
   
   return (
     <Card className="hover:shadow-md transition-shadow">
@@ -221,6 +254,17 @@ function DomainCard({ domain, templateId }: { domain: KnowledgeDomain; templateI
         )}
       </CardHeader>
       <CardContent>
+        {/* AI Summary */}
+        {domain.ai_summary && (
+          <div className="mb-6 p-4 rounded-lg bg-chart-5/5 border border-chart-5/20">
+            <div className="flex items-center gap-2 mb-2">
+              <Sparkles className="h-4 w-4 text-chart-5" />
+              <h4 className="text-sm font-semibold text-chart-5">AI Summary</h4>
+            </div>
+            <p className="text-sm text-muted-foreground">{domain.ai_summary}</p>
+          </div>
+        )}
+        
         {/* Sub-domains count */}
         {subDomainCount > 0 && (
           <div className="flex items-center gap-2 text-sm text-muted-foreground mb-4">
@@ -276,14 +320,146 @@ function DomainCard({ domain, templateId }: { domain: KnowledgeDomain; templateI
           </div>
         )}
         
-        {/* Action button */}
+        {/* Learning Resources - Collapsible */}
+        {hasLearningResources && (
+          <div className="mb-6">
+            <button
+              onClick={() => setShowResources(!showResources)}
+              className="flex items-center gap-2 text-sm font-semibold mb-3 hover:text-electric-blue transition-colors"
+            >
+              <BookOpen className="h-4 w-4" />
+              Learning Resources
+              {showResources ? (
+                <ChevronUp className="h-4 w-4" />
+              ) : (
+                <ChevronDown className="h-4 w-4" />
+              )}
+            </button>
+            
+            {showResources && (
+              <div className="space-y-4 pl-6 border-l-2 border-muted">
+                {/* Courses */}
+                {domain.learning_resources.courses && domain.learning_resources.courses.length > 0 && (
+                  <div>
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">Courses</p>
+                    <div className="space-y-1">
+                      {domain.learning_resources.courses.slice(0, 3).map((resource, idx) => (
+                        <a
+                          key={idx}
+                          href={resource.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-2 text-sm text-electric-blue hover:underline"
+                        >
+                          <ExternalLink className="h-3 w-3" />
+                          {resource.title}
+                        </a>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                
+                {/* Books */}
+                {domain.learning_resources.books && domain.learning_resources.books.length > 0 && (
+                  <div>
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">Books</p>
+                    <div className="space-y-1">
+                      {domain.learning_resources.books.slice(0, 3).map((resource, idx) => (
+                        <a
+                          key={idx}
+                          href={resource.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-2 text-sm text-electric-blue hover:underline"
+                        >
+                          <ExternalLink className="h-3 w-3" />
+                          {resource.title}
+                        </a>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                
+                {/* Communities */}
+                {domain.learning_resources.communities && domain.learning_resources.communities.length > 0 && (
+                  <div>
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">Communities</p>
+                    <div className="space-y-1">
+                      {domain.learning_resources.communities.slice(0, 3).map((resource, idx) => (
+                        <a
+                          key={idx}
+                          href={resource.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-2 text-sm text-electric-blue hover:underline"
+                        >
+                          <ExternalLink className="h-3 w-3" />
+                          {resource.title}
+                        </a>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                
+                {/* Tools */}
+                {domain.learning_resources.tools && domain.learning_resources.tools.length > 0 && (
+                  <div>
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">Tools</p>
+                    <div className="space-y-1">
+                      {domain.learning_resources.tools.slice(0, 3).map((resource, idx) => (
+                        <a
+                          key={idx}
+                          href={resource.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-2 text-sm text-electric-blue hover:underline"
+                        >
+                          <ExternalLink className="h-3 w-3" />
+                          {resource.title}
+                        </a>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+        
+        {/* Marketplace Action Buttons */}
+        <div className="flex flex-col sm:flex-row gap-2 mb-4">
+          <Button 
+            variant="outline"
+            size="sm"
+            className="flex-1"
+            asChild
+          >
+            <Link href={expertSearchUrl}>
+              <Users2 className="h-4 w-4 mr-2" />
+              Find Expert
+            </Link>
+          </Button>
+          <Button 
+            variant="outline"
+            size="sm"
+            className="flex-1"
+            asChild
+          >
+            <Link href={supplierSearchUrl}>
+              <Truck className="h-4 w-4 mr-2" />
+              Find Supplier
+            </Link>
+          </Button>
+        </div>
+        
+        {/* Explore Domain Tree button */}
         <Button 
-          variant="outline"
+          variant="default"
           className="w-full"
           onClick={() => router.push(`/blueprints/explore?template=${templateId}&domain=${domain.id}`)}
         >
           Explore Domain Tree
-          <ArrowLeft className="h-4 w-4 ml-2 rotate-180" />
+          <ArrowRight className="h-4 w-4 ml-2" />
         </Button>
       </CardContent>
     </Card>
@@ -434,120 +610,244 @@ function IndustryDetailView({
 }
 
 /**
- * PackCard - Collapsible card for objective packs with three states:
- * - Collapsed (default): Title, icon, difficulty, task count
- * - Expanded (click): Adds description and sample tasks
- * - Full modal: Via UsePackDialog button
+ * PackCard - Card for objective packs with three size variants:
+ * - Small: Compact row - icon, title, difficulty badge, task count, duration
+ * - Medium: Standard card with description and sample tasks
+ * - Full: Opens UsePackDialog modal
  */
-function PackCard({ pack }: { pack: ObjectivePack }) {
-  const [isExpanded, setIsExpanded] = useState(false)
+interface PackCardProps {
+  pack: ObjectivePack
+  size?: PackCardSize
+  onSizeChange?: (id: string, size: PackCardSize) => void
+}
+
+function PackCard({ pack, size = 'medium', onSizeChange }: PackCardProps) {
   const Icon = getPackIcon(pack.icon_name)
   const taskCount = pack.items?.length || 0
   const displayTasks = pack.items?.slice(0, 3) || []
   
-  return (
-    <Card className="flex flex-col transition-all duration-200 hover:shadow-md">
-      {/* Collapsed header - always visible */}
-      <CardHeader 
-        className="cursor-pointer" 
-        onClick={() => setIsExpanded(!isExpanded)}
-      >
-        <div className="flex items-start justify-between gap-4 mb-2">
-          <div className={cn(
-            "p-2.5 rounded-lg",
-            "bg-electric-blue/10"
-          )}>
-            <Icon className="h-5 w-5 text-electric-blue" />
-          </div>
-          <div className="flex items-center gap-2">
-            {pack.difficulty && (
-              <Badge className={cn("text-xs", getDifficultyColor(pack.difficulty))}>
-                {pack.difficulty}
-              </Badge>
+  // Cycle through sizes on click
+  const handleCardClick = useCallback((e: React.MouseEvent) => {
+    // Don't expand if clicking on buttons or links
+    if ((e.target as HTMLElement).closest('button, a')) return
+    
+    if (onSizeChange) {
+      const nextSize: Record<PackCardSize, PackCardSize> = {
+        'small': 'medium',
+        'medium': 'full',
+        'full': 'small'
+      }
+      onSizeChange(pack.id, nextSize[size])
+    }
+  }, [size, onSizeChange, pack.id])
+  
+  // Size toggle button
+  const handleSizeToggle = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (onSizeChange) {
+      const nextSize: Record<PackCardSize, PackCardSize> = {
+        'small': 'medium',
+        'medium': 'full',
+        'full': 'small'
+      }
+      onSizeChange(pack.id, nextSize[size])
+    }
+  }, [size, onSizeChange, pack.id])
+  
+  // For full size, render the modal trigger
+  if (size === 'full') {
+    return (
+      <UsePackDialog 
+        pack={pack}
+        trigger={
+          <Card 
+            className={cn(
+              "flex flex-col transition-all duration-200 hover:shadow-md cursor-pointer",
+              "col-span-1 md:col-span-2"
             )}
-            <div className="flex items-center gap-1 text-xs text-muted-foreground">
-              <CheckSquare className="h-3.5 w-3.5" />
-              <span>{taskCount}</span>
-            </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-6 w-6 p-0 shrink-0"
-              onClick={(e) => {
-                e.stopPropagation()
-                setIsExpanded(!isExpanded)
-              }}
-            >
-              {isExpanded ? (
-                <ChevronUp className="h-4 w-4" />
-              ) : (
-                <ChevronDown className="h-4 w-4" />
-              )}
-            </Button>
-          </div>
-        </div>
-        <CardTitle className="text-lg leading-tight">{pack.title}</CardTitle>
-        
-        {/* Duration - shown in collapsed state */}
-        {pack.estimated_duration && (
-          <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-1">
-            <Clock className="h-3.5 w-3.5" />
-            <span>{pack.estimated_duration}</span>
-          </div>
-        )}
-      </CardHeader>
-      
-      {/* Expanded content - only visible when expanded */}
-      {isExpanded && (
-        <CardContent className="flex-1 flex flex-col pt-0">
-          {/* Description */}
-          {pack.description && (
-            <p className="text-sm text-muted-foreground mb-4">
-              {pack.description}
-            </p>
-          )}
-
-          {/* Sample tasks */}
-          {displayTasks.length > 0 && (
-            <div className="space-y-1.5 mb-4">
-              <p className="text-xs font-medium text-foreground mb-1">Tasks included:</p>
-              {displayTasks.map((item, idx) => (
-                <div key={idx} className="flex items-start gap-2 text-sm">
-                  <span className="text-muted-foreground">•</span>
-                  <span className="text-muted-foreground">{item.title}</span>
+          >
+            <CardHeader>
+              <div className="flex items-start justify-between gap-4 mb-2">
+                <div className="p-3 rounded-lg bg-electric-blue/10">
+                  <Icon className="h-6 w-6 text-electric-blue" />
                 </div>
-              ))}
-              {taskCount > 3 && (
-                <p className="text-xs text-muted-foreground italic">
-                  +{taskCount - 3} more tasks
+                <div className="flex items-center gap-2">
+                  {pack.difficulty && (
+                    <Badge className={cn("text-xs", getDifficultyColor(pack.difficulty))}>
+                      {pack.difficulty}
+                    </Badge>
+                  )}
+                  <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                    <CheckSquare className="h-3.5 w-3.5" />
+                    <span>{taskCount} tasks</span>
+                  </div>
+                  {pack.estimated_duration && (
+                    <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                      <Clock className="h-3.5 w-3.5" />
+                      <span>{pack.estimated_duration}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+              <CardTitle className="text-xl">{pack.title}</CardTitle>
+              {pack.description && (
+                <p className="text-sm text-muted-foreground mt-2 line-clamp-2">
+                  {pack.description}
                 </p>
               )}
-            </div>
-          )}
-
-          <UsePackDialog 
-            pack={pack}
-            trigger={
-              <Button className="w-full mt-auto">
-                Use This Pack
-              </Button>
-            }
-          />
-        </CardContent>
+            </CardHeader>
+            <CardContent className="pt-0">
+              <div className="flex items-center gap-2 text-sm text-electric-blue font-medium">
+                <Eye className="h-4 w-4" />
+                Click to view full details
+              </div>
+            </CardContent>
+          </Card>
+        }
+      />
+    )
+  }
+  
+  return (
+    <Card 
+      className={cn(
+        "flex flex-col transition-all duration-200 hover:shadow-md cursor-pointer",
+        size === 'small' && "hover:border-electric-blue/50"
       )}
-      
-      {/* Collapsed footer - Use Pack button always visible */}
-      {!isExpanded && (
-        <CardContent className="pt-0">
-          <UsePackDialog 
-            pack={pack}
-            trigger={
-              <Button variant="outline" className="w-full" size="sm">
-                View Pack
-              </Button>
-            }
-          />
-        </CardContent>
+      onClick={handleCardClick}
+    >
+      {/* === SMALL SIZE: Compact view === */}
+      {size === 'small' && (
+        <>
+          <CardContent className="p-3">
+            <div className="flex items-center gap-3">
+              {/* Small Avatar */}
+              <div className="w-10 h-10 rounded-lg bg-electric-blue/10 flex items-center justify-center shrink-0">
+                <Icon className="h-5 w-5 text-electric-blue" />
+              </div>
+
+              {/* Title + Badges */}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-0.5">
+                  {pack.difficulty && (
+                    <Badge className={cn("text-[9px] px-1.5 py-0", getDifficultyColor(pack.difficulty))}>
+                      {pack.difficulty}
+                    </Badge>
+                  )}
+                  <span className="text-xs text-muted-foreground">
+                    {taskCount} tasks
+                  </span>
+                </div>
+                <h3 className="text-sm font-bold text-foreground truncate">
+                  {pack.title}
+                </h3>
+              </div>
+
+              {/* Duration */}
+              {pack.estimated_duration && (
+                <span className="text-xs text-muted-foreground shrink-0">
+                  {pack.estimated_duration}
+                </span>
+              )}
+            </div>
+            
+            {/* Expand indicator */}
+            <div className="flex justify-center mt-2 pt-2 border-t border-muted">
+              <button
+                onClick={handleSizeToggle}
+                className="text-[10px] text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors"
+              >
+                <ChevronDown className="w-3 h-3" />
+                More info
+              </button>
+            </div>
+          </CardContent>
+        </>
+      )}
+
+      {/* === MEDIUM SIZE: Standard view === */}
+      {size === 'medium' && (
+        <>
+          <CardHeader>
+            <div className="flex items-start justify-between gap-4 mb-2">
+              <div className="p-2.5 rounded-lg bg-electric-blue/10">
+                <Icon className="h-5 w-5 text-electric-blue" />
+              </div>
+              <div className="flex items-center gap-2">
+                {pack.difficulty && (
+                  <Badge className={cn("text-xs", getDifficultyColor(pack.difficulty))}>
+                    {pack.difficulty}
+                  </Badge>
+                )}
+                <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                  <CheckSquare className="h-3.5 w-3.5" />
+                  <span>{taskCount}</span>
+                </div>
+                <button
+                  onClick={handleSizeToggle}
+                  className="h-6 w-6 p-0 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  <ChevronDown className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+            <CardTitle className="text-lg leading-tight">{pack.title}</CardTitle>
+            
+            {pack.estimated_duration && (
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-1">
+                <Clock className="h-3.5 w-3.5" />
+                <span>{pack.estimated_duration}</span>
+              </div>
+            )}
+          </CardHeader>
+          
+          <CardContent className="flex-1 flex flex-col pt-0">
+            {/* Description - 2 lines max */}
+            {pack.description && (
+              <p className="text-sm text-muted-foreground mb-4 line-clamp-2">
+                {pack.description}
+              </p>
+            )}
+
+            {/* Sample tasks */}
+            {displayTasks.length > 0 && (
+              <div className="space-y-1.5 mb-4">
+                <p className="text-xs font-medium text-foreground mb-1">Tasks included:</p>
+                {displayTasks.map((item, idx) => (
+                  <div key={idx} className="flex items-start gap-2 text-sm">
+                    <CheckCircle2 className="h-3.5 w-3.5 text-status-success shrink-0 mt-0.5" />
+                    <span className="text-muted-foreground line-clamp-1">{item.title}</span>
+                  </div>
+                ))}
+                {taskCount > 3 && (
+                  <p className="text-xs text-muted-foreground italic">
+                    +{taskCount - 3} more tasks
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* Footer with price-style layout */}
+            <div className="flex items-center justify-between pt-3 border-t border-muted mt-auto">
+              <button
+                onClick={handleSizeToggle}
+                className="text-[10px] text-muted-foreground hover:text-foreground flex items-center gap-0.5 transition-colors"
+              >
+                <ChevronUp className="w-3 h-3" />
+              </button>
+              
+              <UsePackDialog 
+                pack={pack}
+                trigger={
+                  <Button size="sm" className="h-8 text-xs shadow-sm">
+                    <Eye className="w-3 h-3 mr-1" />
+                    View
+                  </Button>
+                }
+              />
+            </div>
+          </CardContent>
+        </>
       )}
     </Card>
   )
@@ -560,157 +860,55 @@ interface InspirationViewProps {
 
 export function InspirationView({ templates = [], packs = [] }: InspirationViewProps) {
   const router = useRouter()
-  const [selectedCategory, setSelectedCategory] = useState<CategoryId>(null)
+  // Default to 'business' category so packs show immediately
+  const [selectedCategory, setSelectedCategory] = useState<CategoryId>('business')
   const [selectedIndustry, setSelectedIndustry] = useState<BlueprintTemplate | null>(null)
+  
+  // Card size state
+  const [defaultCardSize, setDefaultCardSize] = useState<PackCardSize>('medium')
+  const [cardSizes, setCardSizes] = useState<Record<string, PackCardSize>>({})
+  
+  // Handle individual card size changes
+  const handleCardSizeChange = useCallback((id: string, size: PackCardSize) => {
+    setCardSizes(prev => ({ ...prev, [id]: size }))
+  }, [])
+  
+  // Set all cards to a specific size
+  const setAllCardsSize = useCallback((size: PackCardSize) => {
+    setDefaultCardSize(size)
+    setCardSizes({}) // Clear individual overrides
+  }, [])
 
-  // Category to database category mapping
-  const categoryFilterMap: Record<string, string[]> = {
-    business: ['sales', 'legal', 'compliance', 'hr', 'operations'],
-    product: ['product', 'marketing'],
-    subsystems: ['engineering', 'security', 'infrastructure'],
-  }
-
-  // Filter packs by selected category
+  // Filter packs by selected category using CATEGORY_FILTERS
   const filteredPacks = selectedCategory && selectedCategory !== 'industry'
     ? packs.filter(pack => {
         const packCategory = pack.category?.toLowerCase() || ''
-        const filters = categoryFilterMap[selectedCategory] || []
+        const filters = CATEGORY_FILTERS[selectedCategory as keyof typeof CATEGORY_FILTERS] || []
         return filters.some(filter => packCategory.includes(filter))
       })
     : []
-
-  // Handle industry category selection
-  if (selectedCategory === 'industry') {
-    if (!selectedIndustry) {
-      // Show industry template grid
-      const industryTemplates = templates.filter(t => 
-        ['robotics', 'rockets', 'satellites', 'ai-datacentre', 'pharmaceuticals', 'consumer-electronics', 'saas', 'mobile'].includes(t.product_category)
-      )
-      
-      return (
-        <div>
-          {/* Back button and header */}
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-slate-100">
-            <div className="min-w-0 flex-1">
-              <Button
-                variant="ghost"
-                onClick={() => setSelectedCategory(null)}
-                className="mb-4 -ml-2"
-              >
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                Back to Categories
-              </Button>
-              
-              <div className={typography.pageHeader}>
-                <div className={typography.pageHeaderAccent} />
-                <h1 className={typography.h1}>
-                  Industry Sector
-                </h1>
-              </div>
-              <p className={typography.pageSubtitle}>
-                Technical knowledge domains and packs for specific industries: Robotics, Rockets, AI Infrastructure, Pharmaceuticals, and more.
-              </p>
-            </div>
-          </div>
-
-          {/* Industry template grid */}
-          <div className="mt-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {industryTemplates.map((template) => {
-              const Icon = getTemplateIcon(template.icon)
-              const difficulty = getDifficultyFromMetadata(template.metadata)
-              
-              return (
-                <Card 
-                  key={template.id} 
-                  className="cursor-pointer transition-all hover:shadow-lg hover:border-international-orange/50 group"
-                  onClick={() => setSelectedIndustry(template)}
-                >
-                  <CardHeader>
-                    <div className="flex items-start justify-between gap-4 mb-4">
-                      <div className="p-3 rounded-lg bg-chart-5/10">
-                        <Icon className="h-6 w-6 text-chart-5" />
-                      </div>
-                      <Badge className={getDifficultyColor(difficulty)}>
-                        {difficulty}
-                      </Badge>
-                    </div>
-                    <CardTitle className="text-xl group-hover:text-international-orange transition-colors">
-                      {template.name}
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-sm text-muted-foreground mb-6">
-                      {template.description}
-                    </p>
-                    <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                      <div className="flex items-center gap-1.5">
-                        <Layers className="h-4 w-4" />
-                        <span>{template.estimated_domains} domains</span>
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        <CheckSquare className="h-4 w-4" />
-                        <span>{template.estimated_questions} questions</span>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              )
-            })}
-          </div>
-        </div>
-      )
-    }
-    
-    // Industry detail view - show knowledge domains
-    return (
-      <IndustryDetailView 
-        selectedIndustry={selectedIndustry} 
-        onBack={() => setSelectedIndustry(null)} 
-      />
-    )
+  
+  // Get category count dynamically
+  const getCategoryPackCount = (categoryId: string): number => {
+    const filters = CATEGORY_FILTERS[categoryId as keyof typeof CATEGORY_FILTERS] || []
+    return packs.filter(pack => {
+      const packCategory = pack.category?.toLowerCase() || ''
+      return filters.some(filter => packCategory.includes(filter))
+    }).length
+  }
+  
+  // Handle category click from hero cards
+  const handleCategoryClick = (categoryId: CategoryId) => {
+    setSelectedCategory(categoryId)
+    setSelectedIndustry(null)
   }
 
-  if (selectedCategory) {
-    const categoryList = categories(packs)
-    const category = categoryList.find(c => c.id === selectedCategory)
-    
-    return (
-      <div>
-        {/* Back button and header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-slate-100">
-          <div className="min-w-0 flex-1">
-            <Button
-              variant="ghost"
-              onClick={() => setSelectedCategory(null)}
-              className="mb-4 -ml-2"
-            >
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Categories
-            </Button>
-            
-            <div className={typography.pageHeader}>
-              <div className={typography.pageHeaderAccent} />
-              <h1 className={typography.h1}>
-                {category?.title}
-              </h1>
-            </div>
-            <p className={typography.pageSubtitle}>
-              {category?.description}
-            </p>
-          </div>
-        </div>
+  // Get industry template count
+  const industryTemplateCount = templates.filter(t => 
+    ['robotics', 'rockets', 'satellites', 'ai-datacentre', 'pharmaceuticals', 'consumer-electronics', 'saas', 'mobile'].includes(t.product_category)
+  ).length
 
-        {/* Objective packs grid */}
-        <div className="mt-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredPacks.map((pack) => (
-            <PackCard key={pack.id} pack={pack} />
-          ))}
-        </div>
-      </div>
-    )
-  }
-
-  // Category selection view
+  // Main view with hero cards and pack grid
   return (
     <div>
       {/* Page header */}
@@ -762,47 +960,320 @@ export function InspirationView({ templates = [], packs = [] }: InspirationViewP
         </CardContent>
       </Card>
 
-      {/* Category selection */}
-      <div className="mt-8">
-        <h2 className="text-2xl font-semibold mb-6">Choose a Category</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {categories(packs).map((category) => {
-            const Icon = category.icon
-            return (
-              <Card
-                key={category.id}
-                className="cursor-pointer transition-all hover:shadow-lg hover:border-international-orange/50 group"
-                onClick={() => setSelectedCategory(category.id)}
-              >
-                <CardHeader>
-                  <div className={cn(
-                    "w-16 h-16 rounded-lg mb-4 flex items-center justify-center",
-                    category.color
-                  )}>
-                    <Icon className="h-8 w-8" />
-                  </div>
-                  <CardTitle className="text-xl group-hover:text-international-orange transition-colors">
-                    {category.title}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-muted-foreground mb-6">
-                    {category.description}
-                  </p>
-                  <div className="flex items-baseline gap-2">
-                    <span className="text-3xl font-bold text-foreground">
-                      {category.stats.value}
-                    </span>
-                    <span className="text-sm text-muted-foreground">
-                      {category.stats.label}
-                    </span>
-                  </div>
-                </CardContent>
-              </Card>
-            )
-          })}
+      {/* Hero Category Cards - Marketplace Style */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-8 mb-8">
+        {/* Business Objectives Card - Electric Blue */}
+        <div 
+          onClick={() => handleCategoryClick('business')}
+          className={cn(
+            "group cursor-pointer transition-all duration-200 overflow-hidden rounded-xl border-2 bg-background",
+            selectedCategory === 'business'
+              ? "border-blue-500 shadow-lg bg-blue-50"
+              : "border-border shadow-sm hover:border-blue-400 hover:bg-blue-50 hover:shadow-lg hover:-translate-y-1"
+          )}
+        >
+          <div className="h-2 bg-blue-500" />
+          <div className="p-5 space-y-4">
+            <div className="flex items-start justify-between">
+              <div className={cn(
+                "w-12 h-12 rounded-xl flex items-center justify-center transition-all duration-200",
+                selectedCategory === 'business' ? "bg-blue-100" : "bg-muted group-hover:bg-blue-100 group-hover:scale-110"
+              )}>
+                <Target className={cn(
+                  "w-6 h-6 transition-colors duration-200",
+                  selectedCategory === 'business' ? "text-blue-600" : "text-muted-foreground group-hover:text-blue-600"
+                )} />
+              </div>
+              <Badge variant="secondary" className={cn("text-xs font-semibold", selectedCategory === 'business' && "bg-blue-100 text-blue-600")}>
+                {getCategoryPackCount('business')} available
+              </Badge>
+            </div>
+            <div>
+              <h3 className="text-lg font-bold text-foreground mb-1">Business Objectives</h3>
+              <p className={cn(
+                "text-sm font-semibold transition-colors",
+                selectedCategory === 'business' ? "text-blue-600" : "text-muted-foreground group-hover:text-blue-600"
+              )}>
+                Strategic Growth & Operations
+              </p>
+            </div>
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              Strategic objectives to grow your business, from operations and sales to legal, finance, and product development.
+            </p>
+            <ul className="space-y-2">
+              {['Sales playbooks and pricing strategy', 'Legal, compliance, and HR operations', 'Finance infrastructure and growth', 'Product launches and marketing'].map((benefit, idx) => (
+                <li key={idx} className="flex items-start gap-2 text-sm">
+                  <CheckCircle2 className={cn("w-4 h-4 mt-0.5 shrink-0", selectedCategory === 'business' ? "text-blue-600" : "text-status-success")} />
+                  <span className="text-muted-foreground">{benefit}</span>
+                </li>
+              ))}
+            </ul>
+            <button className={cn(
+              "w-full flex items-center justify-between px-4 py-2.5 rounded-lg font-medium text-sm transition-all duration-200",
+              selectedCategory === 'business'
+                ? "bg-blue-500 hover:bg-blue-600 text-white shadow-md"
+                : "bg-muted text-muted-foreground group-hover:bg-blue-500 group-hover:text-white"
+            )}>
+              {selectedCategory === 'business' ? 'Browsing Business' : 'Explore Business'}
+              <ArrowRight className="w-4 h-4 transition-transform duration-200 group-hover:translate-x-1" />
+            </button>
+          </div>
+        </div>
+
+        {/* Subsystems Card - Status Success Green */}
+        <div 
+          onClick={() => handleCategoryClick('subsystems')}
+          className={cn(
+            "group cursor-pointer transition-all duration-200 overflow-hidden rounded-xl border-2 bg-background",
+            selectedCategory === 'subsystems'
+              ? "border-emerald-500 shadow-lg bg-emerald-50"
+              : "border-border shadow-sm hover:border-emerald-400 hover:bg-emerald-50 hover:shadow-lg hover:-translate-y-1"
+          )}
+        >
+          <div className="h-2 bg-emerald-500" />
+          <div className="p-5 space-y-4">
+            <div className="flex items-start justify-between">
+              <div className={cn(
+                "w-12 h-12 rounded-xl flex items-center justify-center transition-all duration-200",
+                selectedCategory === 'subsystems' ? "bg-emerald-100" : "bg-muted group-hover:bg-emerald-100 group-hover:scale-110"
+              )}>
+                <Boxes className={cn(
+                  "w-6 h-6 transition-colors duration-200",
+                  selectedCategory === 'subsystems' ? "text-emerald-600" : "text-muted-foreground group-hover:text-emerald-600"
+                )} />
+              </div>
+              <Badge variant="secondary" className={cn("text-xs font-semibold", selectedCategory === 'subsystems' && "bg-emerald-100 text-emerald-600")}>
+                {getCategoryPackCount('subsystems')} available
+              </Badge>
+            </div>
+            <div>
+              <h3 className="text-lg font-bold text-foreground mb-1">Subsystems & Infrastructure</h3>
+              <p className={cn(
+                "text-sm font-semibold transition-colors",
+                selectedCategory === 'subsystems' ? "text-emerald-600" : "text-muted-foreground group-hover:text-emerald-600"
+              )}>
+                Technical Foundations
+              </p>
+            </div>
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              Build the technical foundations: engineering systems, security infrastructure, and operational subsystems.
+            </p>
+            <ul className="space-y-2">
+              {['Control systems and embedded software', 'AI/ML capabilities and compute', 'Manufacturing and assembly processes', 'Security audits and compliance'].map((benefit, idx) => (
+                <li key={idx} className="flex items-start gap-2 text-sm">
+                  <CheckCircle2 className={cn("w-4 h-4 mt-0.5 shrink-0", selectedCategory === 'subsystems' ? "text-emerald-600" : "text-status-success")} />
+                  <span className="text-muted-foreground">{benefit}</span>
+                </li>
+              ))}
+            </ul>
+            <button className={cn(
+              "w-full flex items-center justify-between px-4 py-2.5 rounded-lg font-medium text-sm transition-all duration-200",
+              selectedCategory === 'subsystems'
+                ? "bg-emerald-500 hover:bg-emerald-600 text-white shadow-md"
+                : "bg-muted text-muted-foreground group-hover:bg-emerald-500 group-hover:text-white"
+            )}>
+              {selectedCategory === 'subsystems' ? 'Browsing Subsystems' : 'Explore Subsystems'}
+              <ArrowRight className="w-4 h-4 transition-transform duration-200 group-hover:translate-x-1" />
+            </button>
+          </div>
+        </div>
+
+        {/* Industry Sector Card - Purple */}
+        <div 
+          onClick={() => handleCategoryClick('industry')}
+          className={cn(
+            "group cursor-pointer transition-all duration-200 overflow-hidden rounded-xl border-2 bg-background",
+            selectedCategory === 'industry'
+              ? "border-purple-500 shadow-lg bg-purple-50"
+              : "border-border shadow-sm hover:border-purple-400 hover:bg-purple-50 hover:shadow-lg hover:-translate-y-1"
+          )}
+        >
+          <div className="h-2 bg-purple-500" />
+          <div className="p-5 space-y-4">
+            <div className="flex items-start justify-between">
+              <div className={cn(
+                "w-12 h-12 rounded-xl flex items-center justify-center transition-all duration-200",
+                selectedCategory === 'industry' ? "bg-purple-100" : "bg-muted group-hover:bg-purple-100 group-hover:scale-110"
+              )}>
+                <CircuitBoard className={cn(
+                  "w-6 h-6 transition-colors duration-200",
+                  selectedCategory === 'industry' ? "text-purple-600" : "text-muted-foreground group-hover:text-purple-600"
+                )} />
+              </div>
+              <Badge variant="secondary" className={cn("text-xs font-semibold", selectedCategory === 'industry' && "bg-purple-100 text-purple-600")}>
+                {industryTemplateCount} industries
+              </Badge>
+            </div>
+            <div>
+              <h3 className="text-lg font-bold text-foreground mb-1">Industry Sector</h3>
+              <p className={cn(
+                "text-sm font-semibold transition-colors",
+                selectedCategory === 'industry' ? "text-purple-600" : "text-muted-foreground group-hover:text-purple-600"
+              )}>
+                Domain Knowledge & Expertise
+              </p>
+            </div>
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              Technical knowledge domains and blueprints for specific industries: Robotics, Rockets, AI Infrastructure, and more.
+            </p>
+            <ul className="space-y-2">
+              {['Robotics and autonomous systems', 'Rockets and aerospace engineering', 'AI infrastructure and compute', 'Pharmaceuticals and consumer electronics'].map((benefit, idx) => (
+                <li key={idx} className="flex items-start gap-2 text-sm">
+                  <CheckCircle2 className={cn("w-4 h-4 mt-0.5 shrink-0", selectedCategory === 'industry' ? "text-purple-600" : "text-status-success")} />
+                  <span className="text-muted-foreground">{benefit}</span>
+                </li>
+              ))}
+            </ul>
+            <button className={cn(
+              "w-full flex items-center justify-between px-4 py-2.5 rounded-lg font-medium text-sm transition-all duration-200",
+              selectedCategory === 'industry'
+                ? "bg-purple-500 hover:bg-purple-600 text-white shadow-md"
+                : "bg-muted text-muted-foreground group-hover:bg-purple-500 group-hover:text-white"
+            )}>
+              {selectedCategory === 'industry' ? 'Browsing Industries' : 'Explore Industries'}
+              <ArrowRight className="w-4 h-4 transition-transform duration-200 group-hover:translate-x-1" />
+            </button>
+          </div>
         </div>
       </div>
+
+      {/* Content based on selected category */}
+      {selectedCategory === 'industry' ? (
+        selectedIndustry ? (
+          <IndustryDetailView 
+            selectedIndustry={selectedIndustry} 
+            onBack={() => setSelectedIndustry(null)} 
+          />
+        ) : (
+          // Industry template grid
+          <div>
+            <h2 className="text-2xl font-semibold mb-6">Industry Templates</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {templates
+                .filter(t => ['robotics', 'rockets', 'satellites', 'ai-datacentre', 'pharmaceuticals', 'consumer-electronics', 'saas', 'mobile'].includes(t.product_category))
+                .map((template) => {
+                  const Icon = getTemplateIcon(template.icon)
+                  const difficulty = getDifficultyFromMetadata(template.metadata)
+                  
+                  return (
+                    <Card 
+                      key={template.id} 
+                      className="cursor-pointer transition-all hover:shadow-lg hover:border-purple-500/50 group"
+                      onClick={() => setSelectedIndustry(template)}
+                    >
+                      <CardHeader>
+                        <div className="flex items-start justify-between gap-4 mb-4">
+                          <div className="p-3 rounded-lg bg-chart-5/10">
+                            <Icon className="h-6 w-6 text-chart-5" />
+                          </div>
+                          <Badge className={getDifficultyColor(difficulty)}>
+                            {difficulty}
+                          </Badge>
+                        </div>
+                        <CardTitle className="text-xl group-hover:text-purple-600 transition-colors">
+                          {template.name}
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <p className="text-sm text-muted-foreground mb-6">
+                          {template.description}
+                        </p>
+                        <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                          <div className="flex items-center gap-1.5">
+                            <Layers className="h-4 w-4" />
+                            <span>{template.estimated_domains} domains</span>
+                          </div>
+                          <div className="flex items-center gap-1.5">
+                            <CheckSquare className="h-4 w-4" />
+                            <span>{template.estimated_questions} questions</span>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )
+                })}
+            </div>
+          </div>
+        )
+      ) : (
+        // Business or Subsystems - show pack grid
+        <div>
+          {/* Results count and size controls */}
+          <div className="flex items-center justify-between mb-4">
+            <p className="text-sm text-muted-foreground">
+              Showing {filteredPacks.length} packs
+            </p>
+            <div className="flex items-center gap-3">
+              {/* Card size controls */}
+              <div className="bg-muted p-1 rounded-md flex items-center" title="Card detail level">
+                <Button
+                  variant={defaultCardSize === 'small' ? 'default' : 'ghost'}
+                  size="sm"
+                  onClick={() => setAllCardsSize('small')}
+                  className={cn(
+                    "h-8 w-8 p-0",
+                    defaultCardSize === 'small' && 'shadow-sm'
+                  )}
+                  title="Compact cards"
+                >
+                  <Minus className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant={defaultCardSize === 'medium' ? 'default' : 'ghost'}
+                  size="sm"
+                  onClick={() => setAllCardsSize('medium')}
+                  className={cn(
+                    "h-8 w-8 p-0",
+                    defaultCardSize === 'medium' && 'shadow-sm'
+                  )}
+                  title="Standard cards"
+                >
+                  <Square className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant={defaultCardSize === 'full' ? 'default' : 'ghost'}
+                  size="sm"
+                  onClick={() => setAllCardsSize('full')}
+                  className={cn(
+                    "h-8 w-8 p-0",
+                    defaultCardSize === 'full' && 'shadow-sm'
+                  )}
+                  title="Detailed cards (opens modal)"
+                >
+                  <AlignJustify className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          </div>
+
+          {/* Pack grid */}
+          {filteredPacks.length === 0 ? (
+            <Card>
+              <CardContent className="pt-6">
+                <p className="text-muted-foreground text-center">
+                  No objective packs available for this category yet.
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className={cn(
+              "grid gap-4 lg:gap-6 animate-fade-in",
+              defaultCardSize === 'full' 
+                ? "grid-cols-1 lg:grid-cols-2" 
+                : "grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+            )}>
+              {filteredPacks.map(pack => (
+                <PackCard
+                  key={pack.id}
+                  pack={pack}
+                  size={cardSizes[pack.id] || defaultCardSize}
+                  onSizeChange={handleCardSizeChange}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }
