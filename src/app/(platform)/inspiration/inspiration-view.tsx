@@ -203,15 +203,18 @@ const getCriticalityColor = (criticality: string) => {
  * DomainCard - Displays a single knowledge domain with its details
  * Enhanced with learning resources, marketplace links, and AI summary
  * Supports three sizes: small (compact row), medium (standard card), full (all details)
+ * Matches PackCard interaction patterns with click-to-expand and size toggles
  */
 function DomainCard({ 
   domain, 
   templateId,
-  size = 'medium'
+  size = 'medium',
+  onSizeChange
 }: { 
   domain: KnowledgeDomain
   templateId: string
   size?: 'small' | 'medium' | 'full'
+  onSizeChange?: (id: string, size: 'small' | 'medium' | 'full') => void
 }) {
   const router = useRouter()
   const [showResources, setShowResources] = useState(false)
@@ -240,10 +243,41 @@ function DomainCard({
     ? `/marketplace?category=${encodeURIComponent(domain.supplier_categories[0])}&type=supplier`
     : '/marketplace?category=Products'
   
-  // SMALL SIZE: Compact row
+  // Cycle through sizes on click (like PackCard)
+  const handleCardClick = useCallback((e: React.MouseEvent) => {
+    // Don't expand if clicking on buttons or links
+    if ((e.target as HTMLElement).closest('button, a')) return
+    
+    if (onSizeChange) {
+      const nextSize: Record<string, 'small' | 'medium' | 'full'> = {
+        'small': 'medium',
+        'medium': 'full',
+        'full': 'small'
+      }
+      onSizeChange(domain.id, nextSize[size])
+    }
+  }, [size, onSizeChange, domain.id])
+  
+  // Size toggle button (like PackCard)
+  const handleSizeToggle = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (onSizeChange) {
+      const nextSize: Record<string, 'small' | 'medium' | 'full'> = {
+        'small': 'medium',
+        'medium': 'full',
+        'full': 'small'
+      }
+      onSizeChange(domain.id, nextSize[size])
+    }
+  }, [size, onSizeChange, domain.id])
+  
+  // SMALL SIZE: Compact row (like PackCard small)
   if (size === 'small') {
     return (
-      <Card className="hover:shadow-sm transition-shadow">
+      <Card 
+        className="hover:shadow-sm transition-shadow cursor-pointer hover:border-purple-500/50"
+        onClick={handleCardClick}
+      >
         <CardContent className="p-3">
           <div className="flex items-center gap-3">
             <Badge className={cn(categoryColors.bg, categoryColors.text, "text-[9px] shrink-0")}>
@@ -261,25 +295,46 @@ function DomainCard({
               </span>
             )}
           </div>
+          {/* Expand indicator */}
+          <div className="flex justify-center mt-2 pt-2 border-t border-muted">
+            <button
+              onClick={handleSizeToggle}
+              className="text-[10px] text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors"
+            >
+              <ChevronDown className="w-3 h-3" />
+              More info
+            </button>
+          </div>
         </CardContent>
       </Card>
     )
   }
 
-  // MEDIUM SIZE: Standard card with key info
+  // MEDIUM SIZE: Standard card with key info (like PackCard medium)
   if (size === 'medium') {
     return (
-      <Card className="hover:shadow-md transition-shadow">
+      <Card 
+        className="flex flex-col hover:shadow-md transition-shadow cursor-pointer hover:border-purple-500/50"
+        onClick={handleCardClick}
+      >
         <CardHeader className="pb-3">
-          <div className="flex items-center gap-2 mb-2">
-            <Badge className={cn(categoryColors.bg, categoryColors.text)}>
-              {domain.category || 'General'}
-            </Badge>
-            {domain.criticality && (
-              <Badge className={criticalityColor}>
-                {domain.criticality}
+          <div className="flex items-start justify-between gap-4 mb-2">
+            <div className="flex items-center gap-2">
+              <Badge className={cn(categoryColors.bg, categoryColors.text)}>
+                {domain.category || 'General'}
               </Badge>
-            )}
+              {domain.criticality && (
+                <Badge className={criticalityColor}>
+                  {domain.criticality}
+                </Badge>
+              )}
+            </div>
+            <button
+              onClick={handleSizeToggle}
+              className="h-6 w-6 p-0 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <ChevronDown className="h-4 w-4" />
+            </button>
           </div>
           <CardTitle className="text-lg">{domain.name}</CardTitle>
           {domain.description && (
@@ -288,7 +343,7 @@ function DomainCard({
             </p>
           )}
         </CardHeader>
-        <CardContent className="pt-0">
+        <CardContent className="flex-1 flex flex-col pt-0">
           {/* Typical roles */}
           {domain.typical_roles && domain.typical_roles.length > 0 && (
             <div className="mb-4">
@@ -303,40 +358,38 @@ function DomainCard({
             </div>
           )}
           
-          {/* Action buttons */}
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" className="flex-1 text-xs" asChild>
-              <Link href={expertSearchUrl}>
-                <Users2 className="h-3 w-3 mr-1" />
-                Find Expert
-              </Link>
-            </Button>
-            <Button variant="outline" size="sm" className="flex-1 text-xs" asChild>
-              <Link href={supplierSearchUrl}>
-                <Truck className="h-3 w-3 mr-1" />
-                Find Supplier
-              </Link>
+          {/* Footer with actions */}
+          <div className="flex items-center justify-between pt-3 border-t border-muted mt-auto">
+            <button
+              onClick={handleSizeToggle}
+              className="text-[10px] text-muted-foreground hover:text-foreground flex items-center gap-0.5 transition-colors"
+            >
+              <ChevronUp className="w-3 h-3" />
+            </button>
+            
+            <Button 
+              size="sm" 
+              className="h-8 text-xs shadow-sm bg-purple-600 hover:bg-purple-700"
+              onClick={(e) => {
+                e.stopPropagation()
+                // Expand to full on View click
+                if (onSizeChange) {
+                  onSizeChange(domain.id, 'full')
+                }
+              }}
+            >
+              <Eye className="w-3 h-3 mr-1" />
+              View
             </Button>
           </div>
-          
-          {/* Explore button */}
-          <Button 
-            variant="default"
-            size="sm"
-            className="w-full mt-2 bg-purple-600 hover:bg-purple-700"
-            onClick={() => router.push(`/blueprints/explore?template=${templateId}&domain=${domain.id}`)}
-          >
-            Explore Domain Tree
-            <ArrowRight className="h-3 w-3 ml-1" />
-          </Button>
         </CardContent>
       </Card>
     )
   }
 
-  // FULL SIZE: All details (current implementation)
+  // FULL SIZE: All details (like PackCard full - expanded view)
   return (
-    <Card className="hover:shadow-md transition-shadow">
+    <Card className="hover:shadow-md transition-shadow col-span-1 md:col-span-2">
       <CardHeader>
         <div className="flex items-start justify-between gap-4 mb-2">
           <div className="flex items-center gap-3 flex-1">
@@ -583,7 +636,21 @@ function IndustryDetailView({
   const router = useRouter()
   const [domains, setDomains] = useState<KnowledgeDomain[]>([])
   const [loadingDomains, setLoadingDomains] = useState(true)
-  const [domainCardSize, setDomainCardSize] = useState<'small' | 'medium' | 'full'>('medium')
+  
+  // Card size state - matches PackCard pattern
+  const [defaultDomainSize, setDefaultDomainSize] = useState<'small' | 'medium' | 'full'>('medium')
+  const [domainSizes, setDomainSizes] = useState<Record<string, 'small' | 'medium' | 'full'>>({})
+  
+  // Handle individual card size changes
+  const handleDomainSizeChange = useCallback((id: string, size: 'small' | 'medium' | 'full') => {
+    setDomainSizes(prev => ({ ...prev, [id]: size }))
+  }, [])
+  
+  // Set all cards to a specific size
+  const setAllDomainSize = useCallback((size: 'small' | 'medium' | 'full') => {
+    setDefaultDomainSize(size)
+    setDomainSizes({}) // Clear individual overrides
+  }, [])
 
   useEffect(() => {
     let mounted = true
@@ -654,28 +721,28 @@ function IndustryDetailView({
           {/* Size toggle for domain cards */}
           <div className="bg-muted p-1 rounded-md flex items-center" title="Card detail level">
             <Button
-              variant={domainCardSize === 'small' ? 'default' : 'ghost'}
+              variant={defaultDomainSize === 'small' ? 'default' : 'ghost'}
               size="sm"
-              onClick={() => setDomainCardSize('small')}
-              className={cn("h-8 w-8 p-0", domainCardSize === 'small' && 'shadow-sm')}
+              onClick={() => setAllDomainSize('small')}
+              className={cn("h-8 w-8 p-0", defaultDomainSize === 'small' && 'shadow-sm')}
               title="Compact cards"
             >
               <Minus className="h-4 w-4" />
             </Button>
             <Button
-              variant={domainCardSize === 'medium' ? 'default' : 'ghost'}
+              variant={defaultDomainSize === 'medium' ? 'default' : 'ghost'}
               size="sm"
-              onClick={() => setDomainCardSize('medium')}
-              className={cn("h-8 w-8 p-0", domainCardSize === 'medium' && 'shadow-sm')}
+              onClick={() => setAllDomainSize('medium')}
+              className={cn("h-8 w-8 p-0", defaultDomainSize === 'medium' && 'shadow-sm')}
               title="Standard cards"
             >
               <Square className="h-4 w-4" />
             </Button>
             <Button
-              variant={domainCardSize === 'full' ? 'default' : 'ghost'}
+              variant={defaultDomainSize === 'full' ? 'default' : 'ghost'}
               size="sm"
-              onClick={() => setDomainCardSize('full')}
-              className={cn("h-8 w-8 p-0", domainCardSize === 'full' && 'shadow-sm')}
+              onClick={() => setAllDomainSize('full')}
+              className={cn("h-8 w-8 p-0", defaultDomainSize === 'full' && 'shadow-sm')}
               title="Detailed cards"
             >
               <AlignJustify className="h-4 w-4" />
@@ -710,18 +777,19 @@ function IndustryDetailView({
         ) : (
           <div className={cn(
             "grid gap-4 lg:gap-6",
-            domainCardSize === 'full' 
-              ? "grid-cols-1" 
-              : domainCardSize === 'medium'
-                ? "grid-cols-1 md:grid-cols-2"
-                : "grid-cols-1"
+            defaultDomainSize === 'full' 
+              ? "grid-cols-1 lg:grid-cols-2" 
+              : defaultDomainSize === 'medium'
+                ? "grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+                : "grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
           )}>
             {domains.map((domain) => (
               <DomainCard 
                 key={domain.id} 
                 domain={domain} 
                 templateId={selectedIndustry.id}
-                size={domainCardSize}
+                size={domainSizes[domain.id] || defaultDomainSize}
+                onSizeChange={handleDomainSizeChange}
               />
             ))}
           </div>

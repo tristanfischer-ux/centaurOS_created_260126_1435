@@ -3,6 +3,18 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
+import { motion, useScroll, useTransform } from "framer-motion";
+import {
+  fadeInUp,
+  fadeInScale,
+  heroHeadline,
+  heroTagline,
+  buttonHover,
+  buttonTap,
+  AnimatedHeader,
+  StaggerContainer,
+  AnimatedCard,
+} from "@/components/marketing/animations";
 
 // Domain configuration
 const APP_DOMAIN = process.env.NEXT_PUBLIC_APP_DOMAIN || 'https://centauros.io';
@@ -91,53 +103,18 @@ export default function MarketingPage() {
       </nav>
 
       {/* Hero Section */}
-      <section className="relative md:min-h-screen flex flex-col md:flex-row items-center justify-center overflow-hidden bg-background">
-        {/* Content */}
-        <div className="relative z-10 max-w-5xl mx-auto px-6 text-center pt-8 md:pt-0">
-          {/* System Online Badge */}
-          <div className="inline-flex items-center gap-2 mb-6 md:mb-8 px-4 py-2 border border-slate-200 bg-card">
-            <span className="w-2 h-2 rounded-full bg-electric-blue" />
-            <span className="text-electric-blue text-xs font-mono uppercase tracking-widest">
-              System Online
-            </span>
-          </div>
-
-          {/* Main Headline */}
-          <h1 className="text-4xl sm:text-5xl md:text-7xl lg:text-8xl font-black leading-tight mb-6 md:mb-8">
-            We build atoms at the{" "}
-            <span className="text-electric-blue">speed of bits.</span>
-          </h1>
-
-          {/* Tagline */}
-          <p className="text-foreground text-base md:text-xl max-w-3xl mx-auto leading-relaxed">
-            &ldquo;Build hardware at software speed. A fraction of the cost. A fraction of the time. A fraction of the headcount.&rdquo;
-          </p>
-        </div>
-
-        {/* Centaur Image - Inline on mobile, absolute on desktop */}
-        <div className="relative w-full h-[50vh] md:absolute md:inset-0 md:h-auto">
-          <Image
-            src="/images/hero-centaur-main.png"
-            alt="Centaur"
-            fill
-            className="object-contain object-center opacity-40"
-            priority
-            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 100vw, 100vw"
-          />
-          {/* Gradient overlay to fade edges */}
-          <div className="absolute inset-0 pointer-events-none bg-gradient-to-t from-background via-transparent to-background/80" />
-          <div className="absolute inset-0 pointer-events-none bg-gradient-to-r from-background via-transparent to-background" />
-        </div>
-      </section>
+      <HeroSection />
 
       {/* THE CENTAURS Section */}
       <section id="centaurs" className="py-12 md:py-24 bg-background">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
-          <h2 className="text-3xl sm:text-4xl md:text-5xl font-black mb-8 md:mb-16">THE CENTAURS.</h2>
+          <AnimatedHeader className="text-3xl sm:text-4xl md:text-5xl font-black mb-8 md:mb-16">
+            THE CENTAURS.
+          </AnimatedHeader>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-8">
+          <StaggerContainer className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-8">
             {/* Founders */}
-            <div className="border border-slate-200 bg-background p-4 sm:p-6 md:p-8 flex flex-col">
+            <AnimatedCard className="border border-slate-200 bg-background p-4 sm:p-6 md:p-8 flex flex-col">
               <div className="h-48 md:h-64 mb-4 md:mb-6 bg-muted border border-slate-200 relative overflow-hidden">
                 <Image
                   src="/images/founder-hologram.png"
@@ -155,23 +132,27 @@ export default function MarketingPage() {
               </p>
               {/* Action Buttons */}
               <div className="pt-4 md:pt-6 mt-4 border-t border-muted flex gap-2 md:gap-3">
-                <a
+                <motion.a
                   href={`${APP_DOMAIN}/login`}
+                  whileHover={buttonHover}
+                  whileTap={buttonTap}
                   className="flex-1 bg-muted hover:bg-secondary text-foreground py-2.5 md:py-3 text-center text-xs font-mono font-bold tracking-widest uppercase transition-colors"
                 >
                   Login
-                </a>
-                <Link
-                  href="/join/founder"
-                  className="flex-1 bg-foreground hover:bg-international-orange text-background py-2.5 md:py-3 text-center text-xs font-mono font-bold tracking-widest uppercase transition-colors"
-                >
-                  Begin Induction
-                </Link>
+                </motion.a>
+                <motion.div whileHover={buttonHover} whileTap={buttonTap} className="flex-1">
+                  <Link
+                    href="/join/founder"
+                    className="block bg-foreground hover:bg-international-orange text-background py-2.5 md:py-3 text-center text-xs font-mono font-bold tracking-widest uppercase transition-colors"
+                  >
+                    Begin Induction
+                  </Link>
+                </motion.div>
               </div>
-            </div>
+            </AnimatedCard>
 
             {/* Executives */}
-            <div className="border border-slate-200 bg-background p-4 sm:p-6 md:p-8 flex flex-col">
+            <AnimatedCard className="border border-slate-200 bg-background p-4 sm:p-6 md:p-8 flex flex-col">
               <div className="h-48 md:h-64 mb-4 md:mb-6 bg-muted border border-slate-200 relative overflow-hidden">
                 <Image
                   src="/images/executive-pilot.png"
@@ -189,23 +170,27 @@ export default function MarketingPage() {
               </p>
               {/* Action Buttons */}
               <div className="pt-4 md:pt-6 mt-4 border-t border-muted flex gap-2 md:gap-3">
-                <a
+                <motion.a
                   href={`${APP_DOMAIN}/login`}
+                  whileHover={buttonHover}
+                  whileTap={buttonTap}
                   className="flex-1 bg-muted hover:bg-secondary text-foreground py-2.5 md:py-3 text-center text-xs font-mono font-bold tracking-widest uppercase transition-colors"
                 >
                   Login
-                </a>
-                <Link
-                  href="/join/executive"
-                  className="flex-1 bg-foreground hover:bg-international-orange text-background py-2.5 md:py-3 text-center text-xs font-mono font-bold tracking-widest uppercase transition-colors"
-                >
-                  Join Cadre
-                </Link>
+                </motion.a>
+                <motion.div whileHover={buttonHover} whileTap={buttonTap} className="flex-1">
+                  <Link
+                    href="/join/executive"
+                    className="block bg-foreground hover:bg-international-orange text-background py-2.5 md:py-3 text-center text-xs font-mono font-bold tracking-widest uppercase transition-colors"
+                  >
+                    Join Cadre
+                  </Link>
+                </motion.div>
               </div>
-            </div>
+            </AnimatedCard>
 
             {/* Apprentices */}
-            <div className="border border-slate-200 bg-background p-4 sm:p-6 md:p-8 flex flex-col sm:col-span-2 lg:col-span-1">
+            <AnimatedCard className="border border-slate-200 bg-background p-4 sm:p-6 md:p-8 flex flex-col sm:col-span-2 lg:col-span-1">
               <div className="h-48 md:h-64 mb-4 md:mb-6 bg-muted border border-slate-200 relative overflow-hidden">
                 <Image
                   src="/images/apprentice-engineer.png"
@@ -223,32 +208,38 @@ export default function MarketingPage() {
               </p>
               {/* Action Buttons */}
               <div className="pt-4 md:pt-6 mt-4 border-t border-muted flex gap-2 md:gap-3">
-                <a
+                <motion.a
                   href={`${APP_DOMAIN}/login`}
+                  whileHover={buttonHover}
+                  whileTap={buttonTap}
                   className="flex-1 bg-muted hover:bg-secondary text-foreground py-2.5 md:py-3 text-center text-xs font-mono font-bold tracking-widest uppercase transition-colors"
                 >
                   Login
-                </a>
-                <Link
-                  href="/join/apprentice"
-                  className="flex-1 bg-foreground hover:bg-international-orange text-background py-2.5 md:py-3 text-center text-xs font-mono font-bold tracking-widest uppercase transition-colors"
-                >
-                  Enter Guild
-                </Link>
+                </motion.a>
+                <motion.div whileHover={buttonHover} whileTap={buttonTap} className="flex-1">
+                  <Link
+                    href="/join/apprentice"
+                    className="block bg-foreground hover:bg-international-orange text-background py-2.5 md:py-3 text-center text-xs font-mono font-bold tracking-widest uppercase transition-colors"
+                  >
+                    Enter Guild
+                  </Link>
+                </motion.div>
               </div>
-            </div>
-          </div>
+            </AnimatedCard>
+          </StaggerContainer>
         </div>
       </section>
 
       {/* THE NETWORK Section */}
       <section id="network" className="py-12 md:py-24 bg-background border-t border-muted">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
-          <h2 className="text-3xl sm:text-4xl md:text-5xl font-black mb-8 md:mb-16">THE NETWORK.</h2>
+          <AnimatedHeader className="text-3xl sm:text-4xl md:text-5xl font-black mb-8 md:mb-16">
+            THE NETWORK.
+          </AnimatedHeader>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-8">
+          <StaggerContainer className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-8">
             {/* VCs */}
-            <div className="border border-slate-200 bg-background p-4 sm:p-6 md:p-8 flex flex-col">
+            <AnimatedCard className="border border-slate-200 bg-background p-4 sm:p-6 md:p-8 flex flex-col">
               <div className="h-48 md:h-64 mb-4 md:mb-6 bg-muted border border-slate-200 relative overflow-hidden">
                 <Image
                   src="/images/vc-dashboard.png"
@@ -266,23 +257,27 @@ export default function MarketingPage() {
               </p>
               {/* Action Buttons */}
               <div className="pt-4 md:pt-6 mt-4 border-t border-muted flex gap-2 md:gap-3">
-                <a
+                <motion.a
                   href={`${APP_DOMAIN}/login`}
+                  whileHover={buttonHover}
+                  whileTap={buttonTap}
                   className="flex-1 bg-muted hover:bg-secondary text-foreground py-2.5 md:py-3 text-center text-xs font-mono font-bold tracking-widest uppercase transition-colors"
                 >
                   Login
-                </a>
-                <Link
-                  href="/join/vc"
-                  className="flex-1 bg-foreground hover:bg-international-orange text-background py-2.5 md:py-3 text-center text-xs font-mono font-bold tracking-widest uppercase transition-colors"
-                >
-                  Apply
-                </Link>
+                </motion.a>
+                <motion.div whileHover={buttonHover} whileTap={buttonTap} className="flex-1">
+                  <Link
+                    href="/join/vc"
+                    className="block bg-foreground hover:bg-international-orange text-background py-2.5 md:py-3 text-center text-xs font-mono font-bold tracking-widest uppercase transition-colors"
+                  >
+                    Apply
+                  </Link>
+                </motion.div>
               </div>
-            </div>
+            </AnimatedCard>
 
             {/* Suppliers / Factories */}
-            <div className="border border-slate-200 bg-background p-4 sm:p-6 md:p-8 flex flex-col">
+            <AnimatedCard className="border border-slate-200 bg-background p-4 sm:p-6 md:p-8 flex flex-col">
               <div className="h-48 md:h-64 mb-4 md:mb-6 bg-muted border border-slate-200 relative overflow-hidden">
                 <Image
                   src="/images/3d-printed-part.png"
@@ -300,23 +295,27 @@ export default function MarketingPage() {
               </p>
               {/* Action Buttons */}
               <div className="pt-4 md:pt-6 mt-4 border-t border-muted flex gap-2 md:gap-3">
-                <a
+                <motion.a
                   href={`${APP_DOMAIN}/login`}
+                  whileHover={buttonHover}
+                  whileTap={buttonTap}
                   className="flex-1 bg-muted hover:bg-secondary text-foreground py-2.5 md:py-3 text-center text-xs font-mono font-bold tracking-widest uppercase transition-colors"
                 >
                   Login
-                </a>
-                <Link
-                  href="/join/supplier"
-                  className="flex-1 bg-foreground hover:bg-international-orange text-background py-2.5 md:py-3 text-center text-xs font-mono font-bold tracking-widest uppercase transition-colors"
-                >
-                  Start Selling
-                </Link>
+                </motion.a>
+                <motion.div whileHover={buttonHover} whileTap={buttonTap} className="flex-1">
+                  <Link
+                    href="/join/supplier"
+                    className="block bg-foreground hover:bg-international-orange text-background py-2.5 md:py-3 text-center text-xs font-mono font-bold tracking-widest uppercase transition-colors"
+                  >
+                    Start Selling
+                  </Link>
+                </motion.div>
               </div>
-            </div>
+            </AnimatedCard>
 
             {/* Universities */}
-            <div className="border border-slate-200 bg-background p-4 sm:p-6 md:p-8 flex flex-col sm:col-span-2 lg:col-span-1">
+            <AnimatedCard className="border border-slate-200 bg-background p-4 sm:p-6 md:p-8 flex flex-col sm:col-span-2 lg:col-span-1">
               <div className="h-48 md:h-64 mb-4 md:mb-6 bg-muted border border-slate-200 relative overflow-hidden">
                 <Image
                   src="/images/university-lab.png"
@@ -334,32 +333,38 @@ export default function MarketingPage() {
               </p>
               {/* Action Buttons */}
               <div className="pt-4 md:pt-6 mt-4 border-t border-muted flex gap-2 md:gap-3">
-                <a
+                <motion.a
                   href={`${APP_DOMAIN}/login`}
+                  whileHover={buttonHover}
+                  whileTap={buttonTap}
                   className="flex-1 bg-muted hover:bg-secondary text-foreground py-2.5 md:py-3 text-center text-xs font-mono font-bold tracking-widest uppercase transition-colors"
                 >
                   Login
-                </a>
-                <Link
-                  href="/join/university"
-                  className="flex-1 bg-foreground hover:bg-international-orange text-background py-2.5 md:py-3 text-center text-xs font-mono font-bold tracking-widest uppercase transition-colors"
-                >
-                  Partner
-                </Link>
+                </motion.a>
+                <motion.div whileHover={buttonHover} whileTap={buttonTap} className="flex-1">
+                  <Link
+                    href="/join/university"
+                    className="block bg-foreground hover:bg-international-orange text-background py-2.5 md:py-3 text-center text-xs font-mono font-bold tracking-widest uppercase transition-colors"
+                  >
+                    Partner
+                  </Link>
+                </motion.div>
               </div>
-            </div>
-          </div>
+            </AnimatedCard>
+          </StaggerContainer>
         </div>
       </section>
 
       {/* THE OPERATING SYSTEM Section */}
       <section id="os" className="py-12 md:py-24 bg-background border-t border-muted">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
-          <h2 className="text-3xl sm:text-4xl md:text-5xl font-black mb-8 md:mb-16">THE OPERATING SYSTEM.</h2>
+          <AnimatedHeader className="text-3xl sm:text-4xl md:text-5xl font-black mb-8 md:mb-16">
+            THE OPERATING SYSTEM.
+          </AnimatedHeader>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-8">
+          <StaggerContainer className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-8">
             {/* The Entity */}
-            <div className="border border-slate-200 bg-background p-4 sm:p-6 md:p-8 flex flex-col">
+            <AnimatedCard className="border border-slate-200 bg-background p-4 sm:p-6 md:p-8 flex flex-col">
               <div className="h-48 md:h-64 mb-4 md:mb-6 bg-muted border border-slate-200 relative overflow-hidden">
                 <Image
                   src="/images/hero-centaur-alt.png"
@@ -375,10 +380,10 @@ export default function MarketingPage() {
               <p className="text-muted-foreground text-sm leading-relaxed">
                 &ldquo;The real-world manifestation of the system. We are the Operating Company (OpCo) that holds the contracts, manages the liability, and provides the legal fortress for the work to happen.&rdquo;
               </p>
-            </div>
+            </AnimatedCard>
 
             {/* The System */}
-            <div className="border border-slate-200 bg-background p-4 sm:p-6 md:p-8 flex flex-col">
+            <AnimatedCard className="border border-slate-200 bg-background p-4 sm:p-6 md:p-8 flex flex-col">
               <div className="h-48 md:h-64 mb-4 md:mb-6 bg-muted border border-slate-200 relative overflow-hidden">
                 <Image
                   src="/images/centaur-os-core.png"
@@ -394,10 +399,10 @@ export default function MarketingPage() {
               <p className="text-muted-foreground text-sm leading-relaxed">
                 &ldquo;The Hive Mind. Centaur OS coordinates Founders, Execs, and Apprentices. It grants the &apos;Digital Body&apos; instant access to AI Agents, global manufacturing, and Guild intelligence.&rdquo;
               </p>
-            </div>
+            </AnimatedCard>
 
             {/* The Community */}
-            <div className="border border-slate-200 bg-background p-4 sm:p-6 md:p-8 flex flex-col sm:col-span-2 lg:col-span-1">
+            <AnimatedCard className="border border-slate-200 bg-background p-4 sm:p-6 md:p-8 flex flex-col sm:col-span-2 lg:col-span-1">
               <div className="h-48 md:h-64 mb-4 md:mb-6 bg-muted border border-slate-200 relative overflow-hidden">
                 <Image
                   src="/images/guild-workshop-new.png"
@@ -413,8 +418,8 @@ export default function MarketingPage() {
               <p className="text-muted-foreground text-sm leading-relaxed">
                 &ldquo;Virtual connectivity, physical reality. The Guild is a network of collaborative workshops and digital spaces. It is the connective tissue that ensures knowledge scales as fast as the code.&rdquo;
               </p>
-            </div>
-          </div>
+            </AnimatedCard>
+          </StaggerContainer>
         </div>
       </section>
 
@@ -427,5 +432,82 @@ export default function MarketingPage() {
         </div>
       </footer>
     </div>
+  );
+}
+
+/**
+ * Hero Section with animated elements and parallax background.
+ * 
+ * @description Displays the main hero with badge, headline, tagline animations
+ * and a parallax centaur image background.
+ */
+function HeroSection() {
+  const { scrollY } = useScroll();
+  const parallaxY = useTransform(scrollY, [0, 500], [0, 150]);
+
+  return (
+    <section className="relative md:min-h-screen flex flex-col md:flex-row items-center justify-center overflow-hidden bg-background">
+      {/* Content */}
+      <div className="relative z-10 max-w-5xl mx-auto px-6 text-center pt-8 md:pt-0">
+        {/* System Online Badge - Animated */}
+        <motion.div
+          initial="hidden"
+          animate="visible"
+          variants={fadeInScale}
+          className="inline-flex items-center gap-2 mb-6 md:mb-8 px-4 py-2 border border-slate-200 bg-card"
+        >
+          <span className="w-2 h-2 rounded-full bg-electric-blue animate-pulse" />
+          <span className="text-electric-blue text-xs font-mono uppercase tracking-widest">
+            System Online
+          </span>
+        </motion.div>
+
+        {/* Main Headline - Animated */}
+        <motion.h1
+          initial="hidden"
+          animate="visible"
+          variants={heroHeadline}
+          className="text-4xl sm:text-5xl md:text-7xl lg:text-8xl font-black leading-tight mb-6 md:mb-8"
+        >
+          We build atoms at the{" "}
+          <motion.span
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, ease: "easeOut", delay: 0.3 }}
+            className="text-electric-blue"
+          >
+            speed of bits.
+          </motion.span>
+        </motion.h1>
+
+        {/* Tagline - Animated */}
+        <motion.p
+          initial="hidden"
+          animate="visible"
+          variants={heroTagline}
+          className="text-foreground text-base md:text-xl max-w-3xl mx-auto leading-relaxed"
+        >
+          &ldquo;Build hardware at software speed. A fraction of the cost. A fraction of the time. A fraction of the headcount.&rdquo;
+        </motion.p>
+      </div>
+
+      {/* Centaur Image - Parallax effect on desktop */}
+      <motion.div
+        style={{ y: parallaxY }}
+        className="relative w-full h-[50vh] md:absolute md:inset-0 md:h-auto will-change-transform"
+      >
+        <Image
+          src="/images/hero-centaur-main.png"
+          alt="Centaur"
+          fill
+          className="object-contain object-center opacity-40"
+          priority
+          sizes="(max-width: 768px) 100vw, (max-width: 1200px) 100vw, 100vw"
+        />
+        {/* Gradient overlay to fade edges */}
+        <div className="absolute inset-0 pointer-events-none bg-gradient-to-t from-background via-transparent to-background/80" />
+        <div className="absolute inset-0 pointer-events-none bg-gradient-to-r from-background via-transparent to-background" />
+      </motion.div>
+    </section>
   );
 }
