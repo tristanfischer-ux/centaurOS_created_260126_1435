@@ -10,6 +10,12 @@ jest.mock('@/actions/tasks', () => ({
     amendTask: jest.fn()
 }))
 
+// Mock attachments to avoid Next.js Request API issues
+jest.mock('@/actions/attachments', () => ({
+    uploadTaskAttachment: jest.fn(),
+    getTaskAttachments: jest.fn()
+}))
+
 const mockTask = {
     id: 'task-1',
     title: 'Test Task',

@@ -45,6 +45,7 @@ describe('Attachment Actions', () => {
             const mockTask = { foundry_id: VALID_FOUNDRY_ID }
             const mockStorage = {
                 upload: jest.fn().mockResolvedValue({ error: null }),
+                createSignedUrl: jest.fn().mockResolvedValue({ data: { signedUrl: 'https://example.com/file.pdf' } }),
                 getPublicUrl: jest.fn().mockReturnValue({ data: { publicUrl: 'https://example.com/file.pdf' } })
             }
 
@@ -218,6 +219,7 @@ describe('Attachment Actions', () => {
             const mockTask = { foundry_id: VALID_FOUNDRY_ID }
             const mockStorage = {
                 upload: jest.fn().mockResolvedValue({ error: null }),
+                createSignedUrl: jest.fn().mockResolvedValue({ data: { signedUrl: 'https://example.com/file.pdf' } }),
                 getPublicUrl: jest.fn().mockReturnValue({ data: { publicUrl: 'https://example.com/file.pdf' } })
             }
 
