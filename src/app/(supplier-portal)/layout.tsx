@@ -35,7 +35,7 @@ export default async function SupplierPortalLayout({
 
   // If user is not a supplier, redirect them to the main platform
   if (profile?.account_type !== "supplier") {
-    redirect("/today")
+    redirect("/timeline")
   }
 
   return (

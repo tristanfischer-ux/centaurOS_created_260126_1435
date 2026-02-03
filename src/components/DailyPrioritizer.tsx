@@ -1,22 +1,25 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useTransition } from 'react'
 import { differenceInDays } from 'date-fns'
 import { Badge } from '@/components/ui/badge'
-import { Target, Clock, AlertTriangle, RefreshCw } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Target, Clock, AlertTriangle, RefreshCw, Check, Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { FullTaskView } from '@/components/tasks/full-task-view'
+import { completeTask } from '@/actions/tasks'
+import { toast } from 'sonner'
 
 interface Task {
     id: string
     title: string
     description: string | null
-    status: string
+    status: string | null
     start_date: string | null
     end_date: string | null
     created_at: string
     updated_at: string
-    risk_level?: string | null
+    risk_level: string | null
     task_number?: number
     assignee?: {
         id: string
@@ -25,6 +28,8 @@ interface Task {
         email: string
         avatar_url?: string | null
     } | null
+    assignees?: { id: string; full_name: string | null; role: string | null; email: string; avatar_url?: string | null }[]
+    task_files?: { id: string }[]
     objective?: {
         id: string
         title: string
@@ -140,11 +145,45 @@ interface DailyPrioritizerProps {
     compact?: boolean
     members: Member[]
     currentUserId: string
+    /** Callback when a task is completed - parent should refresh data */
+    onTaskCompleted?: () => void
 }
 
-export function DailyPrioritizer({ tasks, maxTasks = 5, compact = false, members, currentUserId }: DailyPrioritizerProps) {
+export function DailyPrioritizer({ tasks, maxTasks = 5, compact = false, members, currentUserId, onTaskCompleted }: DailyPrioritizerProps) {
     const prioritizedTasks = prioritizeTasks(tasks, maxTasks)
     const [selectedTask, setSelectedTask] = useState<Task | null>(null)
+    const [completingTaskId, setCompletingTaskId] = useState<string | null>(null)
+    const [isPending, startTransition] = useTransition()
+
+    /**
+     * Quick-complete a task directly from the prioritizer
+     * Handles medium/high risk tasks that go to review
+     */
+    const handleQuickComplete = async (e: React.MouseEvent, taskId: string) => {
+        // Prevent opening the task detail modal
+        e.stopPropagation()
+        
+        setCompletingTaskId(taskId)
+        startTransition(async () => {
+            const result = await completeTask(taskId)
+            
+            if (result.error) {
+                toast.error(result.error)
+            } else {
+                // Show appropriate message based on what happened
+                const task = prioritizedTasks.find(t => t.id === taskId)
+                if (task?.risk_level === 'Medium') {
+                    toast.success('Task sent for peer review')
+                } else if (task?.risk_level === 'High') {
+                    toast.success('Task sent for executive approval')
+                } else {
+                    toast.success('Task completed!')
+                }
+                onTaskCompleted?.()
+            }
+            setCompletingTaskId(null)
+        })
+    }
 
     if (prioritizedTasks.length === 0) {
         return (
@@ -245,6 +284,27 @@ export function DailyPrioritizer({ tasks, maxTasks = 5, compact = false, members
                                     </div>
                                 )}
                             </div>
+
+                            {/* Quick complete button - only for completable tasks */}
+                            {!compact && task.status !== 'Pending_Executive_Approval' && task.status !== 'Pending_Peer_Review' && (
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className={cn(
+                                        "flex-shrink-0 h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity",
+                                        "hover:bg-status-success-light hover:text-status-success"
+                                    )}
+                                    onClick={(e) => handleQuickComplete(e, task.id)}
+                                    disabled={isPending && completingTaskId === task.id}
+                                    aria-label="Mark task complete"
+                                >
+                                    {isPending && completingTaskId === task.id ? (
+                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                    ) : (
+                                        <Check className="h-4 w-4" />
+                                    )}
+                                </Button>
+                            )}
                         </div>
                     </div>
                 </button>
