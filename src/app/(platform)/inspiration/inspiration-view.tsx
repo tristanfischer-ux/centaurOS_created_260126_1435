@@ -28,8 +28,10 @@ import { Badge } from '@/components/ui/badge'
 import { typography, spacing } from '@/lib/design-system'
 import { cn } from '@/lib/utils'
 import type { BlueprintTemplate, KnowledgeDomain, DomainCategory } from '@/types/blueprints'
+import type { ObjectivePack } from '@/actions/packs'
 import { getTemplateDomains } from '@/actions/blueprints'
 import { toast } from 'sonner'
+import { UsePackDialog } from '@/components/blueprints/use-pack-dialog'
 
 type CategoryId = 'business' | 'product' | 'subsystems' | 'industry' | null
 
@@ -45,19 +47,29 @@ interface Category {
   }
 }
 
-interface ObjectivePack {
-  id: string
-  title: string
-  description: string
-  difficulty: 'Easy' | 'Medium' | 'Hard'
-  duration: string
-  taskCount: number
-  category: 'business' | 'product' | 'subsystems'
-  icon: React.ElementType
-  tasks: string[]
+// Icon mapping for pack categories
+const getPackIcon = (iconName: string | null) => {
+  const iconMap: Record<string, React.ElementType> = {
+    'users': Users,
+    'rocket': Rocket,
+    'target': Target,
+    'chart': BarChart3,
+    'file': FileText,
+    'boxes': Boxes,
+    'check': CheckSquare,
+  }
+  return iconMap[iconName || 'target'] || Target
 }
 
-const categories: Category[] = [
+const getCategoryStats = (packs: ObjectivePack[], categoryFilter: string) => {
+  const count = packs.filter(p => {
+    const packCategory = p.category?.toLowerCase() || ''
+    return packCategory.includes(categoryFilter)
+  }).length
+  return count.toString()
+}
+
+const categories = (packs: ObjectivePack[]): Category[] => [
   {
     id: 'business',
     title: 'Business Objectives Packs',
@@ -66,7 +78,7 @@ const categories: Category[] = [
     color: 'bg-electric-blue text-white',
     stats: {
       label: 'packs available',
-      value: '8',
+      value: getCategoryStats(packs, 'business'),
     },
   },
   {
@@ -77,7 +89,7 @@ const categories: Category[] = [
     color: 'bg-international-orange text-white',
     stats: {
       label: 'packs available',
-      value: '5',
+      value: getCategoryStats(packs, 'product'),
     },
   },
   {
@@ -88,7 +100,7 @@ const categories: Category[] = [
     color: 'bg-status-success text-white',
     stats: {
       label: 'packs available',
-      value: '6',
+      value: getCategoryStats(packs, 'subsystems'),
     },
   },
   {
@@ -101,174 +113,6 @@ const categories: Category[] = [
       label: 'industries available',
       value: '8',
     },
-  },
-]
-
-const objectivePacks: ObjectivePack[] = [
-  // Business packs
-  {
-    id: 'hiring-pipeline',
-    title: 'Build Hiring Pipeline',
-    description: 'Stop making inconsistent hiring decisions that lead to bad hires and wasted resources. Get structured processes, battle-tested questions, and data-driven selection.',
-    difficulty: 'Medium',
-    duration: '3 Weeks',
-    taskCount: 8,
-    category: 'business',
-    icon: Users,
-    tasks: [
-      'Research Job Market and Salary Benchmarks',
-      'Draft Job Description and Interview Questions',
-      'Approve Job Posting and Hiring Budget',
-      '+5 more tasks'
-    ],
-  },
-  {
-    id: 'product-launch',
-    title: 'Product Launch',
-    description: 'Plan and execute a successful product launch including beta testing, marketing, documentation, and go-to-market strategy.',
-    difficulty: 'Hard',
-    duration: '6-8 Weeks',
-    taskCount: 11,
-    category: 'business',
-    icon: Rocket,
-    tasks: [
-      'Define Launch Goals and Success Metrics',
-      'Create Beta Testing Plan',
-      'Recruit Beta Testers',
-      '+8 more tasks'
-    ],
-  },
-  {
-    id: 'sales-playbook',
-    title: 'Build Sales Playbook',
-    description: 'Stop losing deals to inconsistent sales conversations. This pack helps you build a battle-tested sales process with proven methodologies.',
-    difficulty: 'Medium',
-    duration: '2-3 Weeks',
-    taskCount: 7,
-    category: 'business',
-    icon: BarChart3,
-    tasks: [
-      'Research Competitor Sales Methodologies',
-      'Define Ideal Customer Profile',
-      'Draft Qualification Framework',
-      '+4 more tasks'
-    ],
-  },
-  {
-    id: 'customer-discovery',
-    title: 'Customer Discovery',
-    description: 'Conduct systematic customer interviews to validate problems, understand user needs, and gather insights before building solutions.',
-    difficulty: 'Medium',
-    duration: '3-4 Weeks',
-    taskCount: 10,
-    category: 'business',
-    icon: Users,
-    tasks: [
-      'Define Research Objectives',
-      'Create Interview Discussion Guide',
-      'Identify Target Interview Segments',
-      '+7 more tasks'
-    ],
-  },
-  
-  // Product packs
-  {
-    id: 'mvp-validation',
-    title: 'MVP Validation Sprint',
-    description: 'Build and validate your minimum viable product with real users in 4 weeks.',
-    difficulty: 'Hard',
-    duration: '4 Weeks',
-    taskCount: 12,
-    category: 'product',
-    icon: Rocket,
-    tasks: [
-      'Define Core Value Proposition',
-      'Identify Must-Have Features',
-      'Create Low-Fidelity Prototypes',
-      '+9 more tasks'
-    ],
-  },
-  {
-    id: 'user-research',
-    title: 'User Research Program',
-    description: 'Establish ongoing user research practices to continuously learn from customers.',
-    difficulty: 'Medium',
-    duration: '3 Weeks',
-    taskCount: 9,
-    category: 'product',
-    icon: Users,
-    tasks: [
-      'Design Research Framework',
-      'Recruit Participant Pool',
-      'Create Interview Scripts',
-      '+6 more tasks'
-    ],
-  },
-  {
-    id: 'feature-prioritization',
-    title: 'Feature Prioritization',
-    description: 'Build a systematic approach to prioritizing features based on impact, effort, and strategic alignment.',
-    difficulty: 'Medium',
-    duration: '2 Weeks',
-    taskCount: 6,
-    category: 'product',
-    icon: CheckSquare,
-    tasks: [
-      'Define Prioritization Criteria',
-      'Score Existing Feature Requests',
-      'Create Product Roadmap',
-      '+3 more tasks'
-    ],
-  },
-  
-  // Subsystems packs
-  {
-    id: 'financial-systems',
-    title: 'Financial Systems Setup',
-    description: 'Establish bookkeeping, invoicing, and financial reporting systems for your startup.',
-    difficulty: 'Medium',
-    duration: '2-3 Weeks',
-    taskCount: 8,
-    category: 'subsystems',
-    icon: FileText,
-    tasks: [
-      'Choose Accounting Software',
-      'Set Up Chart of Accounts',
-      'Configure Invoicing Templates',
-      '+5 more tasks'
-    ],
-  },
-  {
-    id: 'hiring-infrastructure',
-    title: 'Hiring Infrastructure',
-    description: 'Build scalable hiring processes, applicant tracking, and onboarding systems.',
-    difficulty: 'Hard',
-    duration: '4 Weeks',
-    taskCount: 10,
-    category: 'subsystems',
-    icon: Users,
-    tasks: [
-      'Select ATS Platform',
-      'Create Interview Evaluation Forms',
-      'Build Onboarding Checklist',
-      '+7 more tasks'
-    ],
-  },
-  {
-    id: 'tech-stack',
-    title: 'Tech Stack Setup',
-    description: 'Make informed decisions about your core technology stack and development infrastructure.',
-    difficulty: 'Hard',
-    duration: '3-4 Weeks',
-    taskCount: 9,
-    category: 'subsystems',
-    icon: Boxes,
-    tasks: [
-      'Assess Technical Requirements',
-      'Research Platform Options',
-      'Evaluate Hosting Solutions',
-      '+6 more tasks'
-    ],
   },
 ]
 
@@ -340,17 +184,22 @@ const getCriticalityColor = (criticality: string) => {
 
 interface InspirationViewProps {
   templates?: BlueprintTemplate[]
+  packs?: ObjectivePack[]
 }
 
-export function InspirationView({ templates = [] }: InspirationViewProps) {
+export function InspirationView({ templates = [], packs = [] }: InspirationViewProps) {
   const router = useRouter()
   const [selectedCategory, setSelectedCategory] = useState<CategoryId>(null)
   const [selectedIndustry, setSelectedIndustry] = useState<BlueprintTemplate | null>(null)
   const [domains, setDomains] = useState<KnowledgeDomain[]>([])
   const [loadingDomains, setLoadingDomains] = useState(false)
 
+  // Filter packs by selected category
   const filteredPacks = selectedCategory && selectedCategory !== 'industry'
-    ? objectivePacks.filter(pack => pack.category === selectedCategory)
+    ? packs.filter(pack => {
+        const packCategory = pack.category?.toLowerCase() || ''
+        return packCategory.includes(selectedCategory)
+      })
     : []
 
   // Handle industry category selection
@@ -668,7 +517,8 @@ export function InspirationView({ templates = [] }: InspirationViewProps) {
   }
 
   if (selectedCategory) {
-    const category = categories.find(c => c.id === selectedCategory)
+    const categoryList = categories(packs)
+    const category = categoryList.find(c => c.id === selectedCategory)
     
     return (
       <div>
@@ -699,7 +549,10 @@ export function InspirationView({ templates = [] }: InspirationViewProps) {
         {/* Objective packs grid */}
         <div className="mt-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredPacks.map((pack) => {
-            const Icon = pack.icon
+            const Icon = getPackIcon(pack.icon_name)
+            const taskCount = pack.items?.length || 0
+            const displayTasks = pack.items?.slice(0, 3) || []
+            
             return (
               <Card key={pack.id} className="flex flex-col">
                 <CardHeader>
@@ -710,9 +563,11 @@ export function InspirationView({ templates = [] }: InspirationViewProps) {
                     )}>
                       <Icon className="h-6 w-6 text-electric-blue" />
                     </div>
-                    <Badge className={getDifficultyColor(pack.difficulty)}>
-                      {pack.difficulty}
-                    </Badge>
+                    {pack.difficulty && (
+                      <Badge className={getDifficultyColor(pack.difficulty)}>
+                        {pack.difficulty}
+                      </Badge>
+                    )}
                   </div>
                   <CardTitle className="text-xl">{pack.title}</CardTitle>
                 </CardHeader>
@@ -723,35 +578,43 @@ export function InspirationView({ templates = [] }: InspirationViewProps) {
 
                   {/* Stats */}
                   <div className="flex items-center gap-4 text-sm text-muted-foreground mb-6">
-                    <div className="flex items-center gap-1.5">
-                      <Clock className="h-4 w-4" />
-                      <span>{pack.duration}</span>
-                    </div>
+                    {pack.estimated_duration && (
+                      <div className="flex items-center gap-1.5">
+                        <Clock className="h-4 w-4" />
+                        <span>{pack.estimated_duration}</span>
+                      </div>
+                    )}
                     <div className="flex items-center gap-1.5">
                       <CheckSquare className="h-4 w-4" />
-                      <span>{pack.taskCount} tasks</span>
+                      <span>{taskCount} tasks</span>
                     </div>
                   </div>
 
                   {/* Sample tasks */}
-                  <div className="space-y-2 mb-6">
-                    {pack.tasks.map((task, idx) => (
-                      <div key={idx} className="flex items-start gap-2 text-sm">
-                        {task.startsWith('+') ? (
-                          <span className="text-muted-foreground font-medium">{task}</span>
-                        ) : (
-                          <>
-                            <span className="text-muted-foreground">•</span>
-                            <span className="text-muted-foreground">{task}</span>
-                          </>
-                        )}
-                      </div>
-                    ))}
-                  </div>
+                  {displayTasks.length > 0 && (
+                    <div className="space-y-2 mb-6">
+                      {displayTasks.map((item, idx) => (
+                        <div key={idx} className="flex items-start gap-2 text-sm">
+                          <span className="text-muted-foreground">•</span>
+                          <span className="text-muted-foreground">{item.title}</span>
+                        </div>
+                      ))}
+                      {taskCount > 3 && (
+                        <p className="text-sm text-muted-foreground font-medium">
+                          +{taskCount - 3} more tasks
+                        </p>
+                      )}
+                    </div>
+                  )}
 
-                  <Button className="w-full mt-auto">
-                    Use This Pack
-                  </Button>
+                  <UsePackDialog 
+                    pack={pack}
+                    trigger={
+                      <Button className="w-full mt-auto">
+                        Use This Pack
+                      </Button>
+                    }
+                  />
                 </CardContent>
               </Card>
             )
@@ -817,7 +680,7 @@ export function InspirationView({ templates = [] }: InspirationViewProps) {
       <div className="mt-8">
         <h2 className="text-2xl font-semibold mb-6">Choose a Category</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {categories.map((category) => {
+          {categories(packs).map((category) => {
             const Icon = category.icon
             return (
               <Card

@@ -2,6 +2,7 @@ import { Suspense } from 'react'
 import { InspirationView } from './inspiration-view'
 import { Skeleton } from '@/components/ui/skeleton'
 import { getBlueprintTemplates } from '@/actions/blueprints'
+import { getObjectivePacks } from '@/actions/packs'
 
 export const metadata = {
   title: 'Inspiration | CentaurOS',
@@ -9,11 +10,15 @@ export const metadata = {
 }
 
 async function InspirationData() {
-  const templatesResult = await getBlueprintTemplates()
+  const [templatesResult, packsResult] = await Promise.all([
+    getBlueprintTemplates(),
+    getObjectivePacks(),
+  ])
 
   return (
     <InspirationView 
       templates={templatesResult.data || []}
+      packs={packsResult.packs || []}
     />
   )
 }

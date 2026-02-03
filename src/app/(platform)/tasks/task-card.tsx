@@ -8,7 +8,7 @@ import { Separator } from "@/components/ui/separator"
 import { UserAvatar, UserAvatarStack } from "@/components/ui/user-avatar"
 import { Markdown } from "@/components/ui/markdown"
 import { format } from "date-fns"
-import { Calendar as CalendarIcon, Check, Bot, ChevronDown, ChevronUp, ShieldAlert, Eye, EyeOff, ShieldCheck, Paperclip, Plus, CheckCircle2, XCircle, Clock } from "lucide-react"
+import { Calendar as CalendarIcon, Check, Bot, ChevronDown, ChevronUp, ShieldAlert, Eye, EyeOff, ShieldCheck, Paperclip, Plus, CheckCircle2, XCircle, Clock, MessageSquare } from "lucide-react"
 import { Calendar } from "@/components/ui/calendar"
 import {
     Popover,
@@ -43,6 +43,7 @@ type Task = Database["public"]["Tables"]["tasks"]["Row"] & {
     task_number?: number
     task_files?: { id: string }[]
     objective?: { id: string, title: string } | null
+    message_count?: number
 }
 
 type Member = {
@@ -299,6 +300,20 @@ export const TaskCard = memo(function TaskCard(props: TaskCardProps) {
                                 <Paperclip className="w-3 h-3" />
                                 {task.task_files?.length || 0}
                             </button>
+                            {task.message_count !== undefined && task.message_count > 0 && (
+                                <button 
+                                    className="flex items-center gap-1 text-muted-foreground hover:text-foreground transition-colors cursor-pointer" 
+                                    title="View messages"
+                                    onClick={(e) => {
+                                        e.stopPropagation()
+                                        setShowThread(true)
+                                        setShowHistory(false)
+                                    }}
+                                >
+                                    <MessageSquare className="w-3 h-3" />
+                                    {task.message_count}
+                                </button>
+                            )}
                         </div>
                     </div>
 

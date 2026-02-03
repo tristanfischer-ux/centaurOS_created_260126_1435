@@ -39,6 +39,21 @@ export default async function TasksPage() {
         )
     }
 
+    // Fetch message counts for all tasks
+    const tasksWithMessageCounts = await Promise.all(
+        (tasks || []).map(async (task) => {
+            const { count } = await supabase
+                .from('messages')
+                .select('*', { count: 'exact', head: true })
+                .eq('task_id', task.id)
+
+            return {
+                ...task,
+                message_count: count || 0
+            }
+        })
+    )
+
     // Parallelize independent queries
     const [
         { data: currentUserProfile },
@@ -63,14 +78,14 @@ export default async function TasksPage() {
     const teams = teamsData || []
 
     // Join tasks with related data
-    const tasksWithData = tasks?.map(task => ({
+    const tasksWithData = tasksWithMessageCounts.map(task => ({
         ...task,
         assignee: Array.isArray(task.assignee) ? task.assignee[0] : task.assignee,
         creator: Array.isArray(task.creator) ? task.creator[0] : task.creator,
         objective: Array.isArray(task.objective) ? task.objective[0] : task.objective,
         assignees: task.task_assignees?.map(ta => ta.profile).filter(Boolean) || [],
         task_files: task.task_files || []
-    })) || []
+    }))
 
     return (
         <TasksView

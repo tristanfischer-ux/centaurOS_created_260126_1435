@@ -191,16 +191,6 @@ export function MessageBubble({
   const isFile = message.message_type === 'file'
   const hasReplies = replyCount > 0
   
-  // Debug: Log message data to see if read_at is present
-  if (isOwn) {
-    console.log('Message data:', {
-      id: message.id,
-      is_read: message.is_read,
-      read_at: message.read_at,
-      created_at: message.created_at
-    })
-  }
-  
   const handleToggleReaction = (emoji: string) => {
     onToggleReaction?.(emoji)
   }
@@ -343,7 +333,7 @@ export function MessageBubble({
               'flex items-center gap-1',
               isOwn ? 'flex-row-reverse' : 'flex-row'
             )}>
-              <span className="text-[10px] text-muted-foreground">
+              <span className="text-[10px] text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity">
                 Sent {formatTime(message.created_at)}
               </span>
               {isOwn && (
@@ -357,7 +347,7 @@ export function MessageBubble({
               )}
             </div>
             {isOwn && message.read_at && (
-              <span className="text-[10px] text-electric-blue">
+              <span className="text-[10px] text-electric-blue opacity-0 group-hover:opacity-100 transition-opacity">
                 Seen {formatTime(message.read_at)}
               </span>
             )}
