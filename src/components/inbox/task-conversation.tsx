@@ -287,7 +287,7 @@ export function TaskConversation({
         .eq('status', 'active')
         .maybeSingle()
 
-      let conversationId = conversations?.id
+      const conversationId = conversations?.id
 
       // If no conversation exists, we need to create one
       // For simplicity, we'll create task comment directly

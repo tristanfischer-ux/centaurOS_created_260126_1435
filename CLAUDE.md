@@ -26,10 +26,16 @@ This file contains meta-agent behavior directives that influence HOW work is app
 - For API changes: test the endpoint manually
 - For database changes: verify data integrity
 
-## 4. Autonomous Bug Fixing
+## 4. Bug Fixing Strategy
 
-- When given a bug report: **just fix it**. Don't ask for hand-holding
-- Point at logs, errors, failing tests - then resolve them
+1. **First attempt:** Analyze the bug and try a direct fix
+2. **If it doesn't work:** STOP. Don't try another guess.
+   - Write a test that reproduces the bug
+   - Spawn subagent(s) to fix it
+   - Subagent proves fix via passing test
+
+Key: Only ONE attempt before escalating. No shotgun debugging.
+
 - Zero context switching required from the user
 - Go fix failing CI tests without being told how
 - If you can read the error, you can fix the error

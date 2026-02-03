@@ -11,17 +11,18 @@ This skill provides a systematic approach to identifying, fixing, and verifying 
 
 ```
 Bug Fix Progress:
-- [ ] 1. Reproduce the bug
-- [ ] 2. Identify root cause
-- [ ] 3. Implement fix
-- [ ] 4. Test the fix
-- [ ] 5. Verify no regressions
-- [ ] 6. Commit with clear message
+- [ ] 1. Analyze bug & attempt direct fix
+- [ ] 2. If fix fails → Write failing test that reproduces bug
+- [ ] 3. Spawn subagent to implement fix (test must pass)
+- [ ] 4. Verify no regressions
+- [ ] 5. Commit with clear message
 ```
 
-## Step 1: Reproduce the Bug
+**Key rule:** Only ONE direct fix attempt. If it doesn't work, STOP guessing and write a test. No shotgun debugging.
 
-**Cannot fix what you cannot reproduce.** First, confirm the bug:
+## Step 1: Analyze Bug & Attempt Direct Fix
+
+**Understand before fixing.** Analyze the bug, then try ONE direct fix:
 
 ### For UI Bugs
 
@@ -50,7 +51,9 @@ Bug Fix Progress:
 3. Check for RLS policy blocks
 4. Verify data state
 
-## Step 2: Identify Root Cause
+### Root Cause Analysis
+
+Use these techniques to understand the bug before attempting a fix:
 
 ### Error Analysis Pattern
 
@@ -86,9 +89,9 @@ grep -r "functionName" src/ --include="*.ts" --include="*.tsx"
 git log --oneline -20 -- src/path/to/file.tsx
 ```
 
-## Step 3: Implement Fix
+### Attempting the Direct Fix
 
-### Before Coding
+If you understand the root cause, try ONE fix:
 
 1. Understand WHY the bug exists, not just WHERE
 2. Consider if the fix could break other things
@@ -150,7 +153,39 @@ const { error } = await supabase
 2. Add **comments** if the fix isn't obvious
 3. Consider adding **logging** for future debugging
 
-## Step 4: Test the Fix
+## Step 2: If Fix Fails → Write Failing Test
+
+**Your direct fix didn't work. STOP guessing.** Write a test that reproduces the bug:
+
+```bash
+# For E2E bugs (UI, user flows)
+npm run test:e2e -- e2e/new-bug-test.spec.ts
+
+# For unit/integration bugs (logic, API)
+npm run test -- src/lib/__tests__/new-bug-test.test.ts
+```
+
+The test should:
+1. Set up the conditions that trigger the bug
+2. Perform the action that fails
+3. Assert the expected (correct) behavior
+4. **Confirm the test FAILS** - this proves it catches the bug
+
+## Step 3: Spawn Subagent to Fix
+
+Once you have a failing test, spawn a subagent:
+
+```
+Task: Fix the bug in [component/feature]
+- Failing test: [path to test file]
+- Run the test with: npm run test -- [test path]
+- Your fix is complete when the test passes
+- Do not modify the test, only the implementation
+```
+
+The subagent works until the test passes, proving the fix works.
+
+## Step 4: Verify No Regressions
 
 ### Manual Testing
 
@@ -181,8 +216,6 @@ npm run test:e2e -- e2e/specific.spec.ts
 npm run build
 ```
 
-## Step 5: Verify No Regressions
-
 ### Quick Regression Check
 
 1. Test the most critical paths:
@@ -202,7 +235,7 @@ npm run build
 npm run lint && npx tsc --noEmit && npm run test
 ```
 
-## Step 6: Commit with Clear Message
+## Step 5: Commit with Clear Message
 
 Use the `fix:` prefix for bug fixes:
 
