@@ -1206,6 +1206,10 @@ export async function findTaskIdsByNumbers(
 /**
  * Send message and sync to task comments if task references are found
  * 
+ * This function parses #123 task references from the message content and:
+ * 1. Associates the message with the first referenced task (if no explicit taskId)
+ * 2. sendMessageWithContext handles bridging to task_comments automatically
+ * 
  * @param supabase - Supabase client  
  * @param params - Message parameters including content and conversation info
  * @param foundryId - The foundry ID for task lookup
@@ -1216,38 +1220,26 @@ export async function sendMessageWithTaskSync(
   params: SendMessageWithContextParams,
   foundryId: string
 ): Promise<Message> {
-  const { content, senderId } = params
+  const { content } = params
   
-  // Parse task references from content
+  // Parse task references from content (e.g., #123, #456)
   const taskNumbers = parseTaskReferences(content)
   
   // If no explicit taskId but task references found, use the first one
   let taskIdToUse = params.taskId
   if (!taskIdToUse && taskNumbers.length > 0) {
     const taskIds = await findTaskIdsByNumbers(supabase, taskNumbers, foundryId)
-    taskIdToUse = taskIds[0] // Use first referenced task
+    if (taskIds.length > 0) {
+      taskIdToUse = taskIds[0] // Use first referenced task
+    }
   }
   
   // Send the message with context
+  // Note: sendMessageWithContext already handles bridging to task_comments when taskId is provided
   const message = await sendMessageWithContext(supabase, {
     ...params,
     taskId: taskIdToUse
   })
-  
-  // If we have task references and the message was sent, sync to all referenced tasks
-  if (taskNumbers.length > 0) {
-    const taskIds = await findTaskIdsByNumbers(supabase, taskNumbers, foundryId)
-    
-    // Bridge to task comments for all referenced tasks
-    for (const taskId of taskIds) {
-      try {
-        await bridgeMessageToTaskComment(supabase, message.id, taskId, content, senderId)
-      } catch (error) {
-        console.error(`[MessagingService] Failed to sync message to task ${taskId}:`, error)
-        // Continue with other tasks even if one fails
-      }
-    }
-  }
   
   return message
 }
