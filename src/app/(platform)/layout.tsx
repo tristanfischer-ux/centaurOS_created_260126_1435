@@ -9,6 +9,7 @@ import { OfflineIndicator } from "@/components/OfflineIndicator";
 import { OnboardingModal } from "@/components/OnboardingModal";
 import { ExecutiveProfilePrompt, VerificationSuccessToast } from "@/components/onboarding";
 import { MessagingSidebarWrapper } from "@/components/messaging/MessagingSidebarWrapper";
+import { StandupStatusBanner } from "@/components/today/StandupStatusBanner";
 import { Suspense } from "react";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { PresenceProvider } from "@/components/PresenceProvider";
@@ -89,6 +90,7 @@ export default async function PlatformLayout({
                         <ZoomableContent className="flex-1 overflow-y-auto bg-background">
                             <main className="p-4 sm:p-6 lg:p-8 pb-32 lg:pb-8">
                                 <ErrorBoundary>
+                                    <StandupStatusBanner />
                                     {children}
                                 </ErrorBoundary>
                             </main>

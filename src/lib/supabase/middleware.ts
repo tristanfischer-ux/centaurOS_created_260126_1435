@@ -93,10 +93,10 @@ export async function updateSession(request: NextRequest) {
                 .single()
             
             const redirectUrl = request.nextUrl.clone()
-            // Suppliers go to supplier portal, others to dashboard
+            // Suppliers go to supplier portal, others to timeline (Gantt view)
             redirectUrl.pathname = profile?.account_type === 'supplier' 
                 ? '/supplier-portal' 
-                : '/dashboard'
+                : '/timeline'
             return NextResponse.redirect(redirectUrl)
         }
         // User not logged in, let middleware below handle redirect to marketing
@@ -140,10 +140,10 @@ export async function updateSession(request: NextRequest) {
             const isAdmin = profile.role === 'Executive' || profile.role === 'Founder'
 
             if (!isAdmin) {
-                // User doesn't have admin access - redirect to dashboard with error
+                // User doesn't have admin access - redirect to timeline with error
                 console.warn(`[SECURITY] Non-admin user ${user.id} attempted to access ${pathname}`)
                 const redirectUrl = request.nextUrl.clone()
-                redirectUrl.pathname = '/dashboard'
+                redirectUrl.pathname = '/timeline'
                 redirectUrl.searchParams.set('error', 'Access denied')
                 return NextResponse.redirect(redirectUrl)
             }

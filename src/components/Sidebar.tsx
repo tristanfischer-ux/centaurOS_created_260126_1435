@@ -4,8 +4,9 @@ import React from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
-import { Users, CheckSquare, Store, Target, ShieldAlert, Settings, Map, Inbox, Sun } from "lucide-react"
+import { Users, CheckSquare, Store, Target, ShieldAlert, Settings, Map, Inbox, GanttChart } from "lucide-react"
 import { NotificationCenter } from "@/components/NotificationCenter"
+import { UnreadIndicator } from "@/components/today/UnreadIndicator"
 // ThemeToggle removed - CentaurOS enforces light mode per design philosophy
 import { FocusModeToggle } from "@/components/FocusModeToggle"
 import { ZoomControl } from "@/components/ZoomControl"
@@ -33,7 +34,7 @@ const APP_VERSION = "1.0.3"
 
 // Work: day-to-day operations
 const workNavigation = [
-    { name: "Today", href: "/today", icon: Sun, tooltip: "Your daily priorities, decisions, and focus tasks" },
+    { name: "Timeline", href: "/timeline", icon: GanttChart, tooltip: "Gantt view of tasks and objectives" },
     { name: "Inbox", href: "/inbox", icon: Inbox, tooltip: "Messages, activity feed, and conversations" },
     { name: "Objectives", href: "/objectives", icon: Target, tooltip: "Set and track high-level strategic goals" },
     { name: "Tasks", href: "/tasks", icon: CheckSquare, tooltip: "Manage and assign actionable items" },
@@ -88,6 +89,10 @@ export function Sidebar({ foundryName, foundryId, userName, userRole, isAdmin }:
                     <span className="text-[10px] text-international-orange font-mono uppercase px-1.5 py-0.5 bg-orange-50 border border-orange-200 font-semibold tracking-wide">
                         {userRole || "Member"}
                     </span>
+                </div>
+                {/* Unread messages indicator */}
+                <div className="mt-3">
+                    <UnreadIndicator />
                 </div>
             </div>
 
