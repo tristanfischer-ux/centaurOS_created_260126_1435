@@ -169,10 +169,10 @@ export function BlueprintsView({
         <div className="min-w-0 flex-1">
           <div className={typography.pageHeader}>
             <div className={typography.pageHeaderAccent} />
-            <h1 className={typography.h1}>Product Map</h1>
+            <h1 className={typography.h1}>Inspiration</h1>
           </div>
           <p className={typography.pageSubtitle}>
-            See everything you need to build your product. Find experts, source suppliers, and turn gaps into action.
+            Get ideas on what to do next. Discover opportunities, find experts, and turn insights into action.
           </p>
         </div>
 

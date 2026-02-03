@@ -6,8 +6,8 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { createClient } from '@/lib/supabase/server'
 
 export const metadata = {
-  title: 'Product Map | CentaurOS',
-  description: 'See everything you need to build your product. Find experts, source suppliers, and turn gaps into action.',
+  title: 'Inspiration | CentaurOS',
+  description: 'Get ideas on what to do next. Discover opportunities, find experts, and turn insights into action.',
 }
 
 async function BlueprintsData() {

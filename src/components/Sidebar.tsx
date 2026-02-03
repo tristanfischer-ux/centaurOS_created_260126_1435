@@ -4,7 +4,7 @@ import React from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
-import { Users, CheckSquare, Store, Target, ShieldAlert, Settings, Map, Home, GanttChart } from "lucide-react"
+import { Users, CheckSquare, Store, Target, ShieldAlert, Settings, Lightbulb, Home } from "lucide-react"
 import { NotificationCenter } from "@/components/NotificationCenter"
 import { UnreadIndicator } from "@/components/today/UnreadIndicator"
 // ThemeToggle removed - CentaurOS enforces light mode per design philosophy
@@ -35,7 +35,6 @@ const APP_VERSION = "1.0.3"
 // Work: day-to-day operations
 const workNavigation = [
     { name: "Home", href: "/home", icon: Home, tooltip: "Messages, tasks, and daily overview" },
-    { name: "Timeline", href: "/timeline", icon: GanttChart, tooltip: "Gantt view of tasks and objectives" },
     { name: "Objectives", href: "/objectives", icon: Target, tooltip: "Set and track high-level strategic goals" },
     { name: "Tasks", href: "/tasks", icon: CheckSquare, tooltip: "Manage and assign actionable items" },
     { name: "Team", href: "/team", icon: Users, tooltip: "Team members, roles, and capacity" },
@@ -43,7 +42,7 @@ const workNavigation = [
 
 // Discovery: finding help and resources
 const discoveryNavigation = [
-    { name: "Product Map", href: "/blueprints", icon: Map, tooltip: "Map what you need to build, find knowledge gaps, get expert help" },
+    { name: "Inspiration", href: "/blueprints", icon: Lightbulb, tooltip: "Get ideas on what to do next and discover opportunities" },
     { name: "Marketplace", href: "/marketplace", icon: Store, tooltip: "Find experts, suppliers, products, and services" },
 ]
 
@@ -143,7 +142,7 @@ export function Sidebar({ foundryName, foundryId, userName, userRole, isAdmin }:
 
                     return (
                         <>
-                            {/* Work: Home, Timeline, Objectives, Tasks, Team */}
+                            {/* Work: Home, Objectives, Tasks, Team */}
                             {workNavigation.map(renderNavItem)}
                             
                             {/* Spacer */}

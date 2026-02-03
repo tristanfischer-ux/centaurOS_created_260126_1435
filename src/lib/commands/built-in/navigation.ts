@@ -8,7 +8,8 @@ import {
   Store,
   Settings,
   Calendar,
-  Home
+  Home,
+  Lightbulb
 } from 'lucide-react'
 import type { SlashCommand, CommandResult } from '../types'
 import { navigateResult, errorResult } from '../executor'
@@ -62,7 +63,10 @@ export const gotoCommand: SlashCommand = {
       'messages': '/home',
       'msg': '/home',
       'timeline': '/timeline',
-      'tl': '/timeline'
+      'tl': '/timeline',
+      'inspiration': '/blueprints',
+      'ideas': '/blueprints',
+      'blueprints': '/blueprints'
     }
     
     const path = routes[destination]
@@ -212,6 +216,18 @@ export const timelineCommand: SlashCommand = {
   }
 }
 
+export const inspirationCommand: SlashCommand = {
+  name: 'inspiration',
+  description: 'Go to Inspiration - get ideas on what to do next',
+  usage: '/inspiration',
+  icon: Lightbulb,
+  category: 'navigation',
+  aliases: ['ideas', 'blueprints', 'productmap'],
+  execute: async (): Promise<CommandResult> => {
+    return navigateResult('/blueprints')
+  }
+}
+
 // Export all navigation commands
 export const navigationCommands: SlashCommand[] = [
   gotoCommand,
@@ -223,5 +239,6 @@ export const navigationCommands: SlashCommand[] = [
   marketplaceCommand,
   settingsCommand,
   homeCommand,
-  timelineCommand
+  timelineCommand,
+  inspirationCommand
 ]
