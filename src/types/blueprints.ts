@@ -758,3 +758,139 @@ export interface ExpertReviewPacket {
   }
   generated_at: string
 }
+
+// ============================================================================
+// UNIVERSAL SUBSYSTEMS
+// ============================================================================
+
+/**
+ * Structured primer content for a universal subsystem
+ */
+export interface SubsystemPrimer {
+  overview: string
+  why_it_matters: string
+  key_concepts: string[]
+  decision_points: string[]
+  common_mistakes: string[]
+  success_indicators: string[]
+  terminology?: Record<string, string>
+  related_subsystems?: string[]
+}
+
+/**
+ * Key question for assessing subsystem needs
+ */
+export interface SubsystemQuestion {
+  id: string
+  question: string
+  context?: string
+  difficulty?: 'basic' | 'intermediate' | 'advanced'
+}
+
+/**
+ * Learning resource for a subsystem
+ */
+export interface SubsystemLearningResource {
+  title: string
+  url?: string
+  provider?: string
+  author?: string
+  description?: string
+}
+
+/**
+ * Learning resources grouped by type
+ */
+export interface SubsystemLearningResources {
+  courses?: SubsystemLearningResource[]
+  books?: SubsystemLearningResource[]
+  articles?: SubsystemLearningResource[]
+  communities?: SubsystemLearningResource[]
+  resources?: SubsystemLearningResource[]
+}
+
+/**
+ * Universal subsystem - cross-sector technical domain with actionable guidance
+ */
+export interface UniversalSubsystem {
+  id: string
+  name: string
+  slug: string
+  tagline: string | null
+  description: string | null
+  category: DomainCategory
+  icon_name: string
+  display_order: number
+  is_active: boolean
+  
+  // Detailed content
+  primer: SubsystemPrimer | null
+  key_questions: SubsystemQuestion[]
+  learning_resources: SubsystemLearningResources
+  
+  // Marketplace integration
+  marketplace_categories: string[]
+  recommended_executive_roles: string[]
+  recommended_supplier_types: string[]
+  
+  created_at: string
+  updated_at: string
+}
+
+/**
+ * Task definition within an objective pack
+ */
+export interface SubsystemObjectiveTask {
+  order: number
+  title: string
+  description: string
+  role: 'Executive' | 'Apprentice' | 'AI_Agent'
+  estimated_hours?: number
+  is_marketplace_task?: boolean
+  marketplace_filter?: {
+    categories?: string[]
+    type?: 'advice' | 'supplier'
+    subcategory?: string
+  }
+}
+
+/**
+ * Pre-built objective pack for a universal subsystem
+ */
+export interface SubsystemObjectivePack {
+  id: string
+  subsystem_id: string
+  title: string
+  summary: string | null
+  extended_description: string | null
+  difficulty: 'beginner' | 'intermediate' | 'advanced'
+  estimated_duration: string | null
+  is_default: boolean
+  tasks: SubsystemObjectiveTask[]
+  created_at: string
+  updated_at: string
+}
+
+/**
+ * Mapping between blueprint templates and universal subsystems
+ */
+export interface BlueprintSubsystemMapping {
+  id: string
+  template_id: string
+  subsystem_id: string
+  relevance: 'critical' | 'important' | 'optional'
+  context_notes: string | null
+  display_order: number
+  created_at: string
+}
+
+// Category display configuration for subsystems
+export const SUBSYSTEM_CATEGORY_ICONS: Record<DomainCategory, string> = {
+  Electronics: 'Cpu',
+  Mechanical: 'Cog',
+  Software: 'Code',
+  Manufacturing: 'Factory',
+  Regulatory: 'FileCheck',
+  Business: 'Briefcase',
+  Operations: 'Wrench',
+}

@@ -11,9 +11,6 @@ import {
   CheckCircle2,
   Package,
   Target,
-  Users,
-  Bot,
-  User,
   Store,
   Clock,
   ChevronDown,
@@ -34,7 +31,13 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog'
-import { ScrollArea } from '@/components/ui/scroll-area'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Card, CardContent } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
@@ -54,6 +57,9 @@ export function UsePackDialog({ pack, trigger }: UsePackDialogProps) {
     pack.items?.map(item => item.id) || []
   )
   const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null)
+  const [taskAssignees, setTaskAssignees] = useState<Record<string, string>>(
+    pack.items?.reduce((acc, item) => ({ ...acc, [item.id]: 'unassigned' }), {} as Record<string, string>) || {}
+  )
 
   const handleCreate = async () => {
     if (!objectiveTitle.trim()) {
@@ -108,45 +114,6 @@ export function UsePackDialog({ pack, trigger }: UsePackDialogProps) {
       setSelectedTaskIds([])
     } else {
       setSelectedTaskIds(pack.items?.map(item => item.id) || [])
-    }
-  }
-
-  const getRoleIcon = (role: string) => {
-    switch (role) {
-      case 'Executive':
-        return <User className="h-3 w-3" />
-      case 'Apprentice':
-        return <Users className="h-3 w-3" />
-      case 'AI_Agent':
-        return <Bot className="h-3 w-3" />
-      default:
-        return <User className="h-3 w-3" />
-    }
-  }
-
-  const getRoleLabel = (role: string) => {
-    switch (role) {
-      case 'Executive':
-        return 'You'
-      case 'Apprentice':
-        return 'Team'
-      case 'AI_Agent':
-        return 'AI'
-      default:
-        return role
-    }
-  }
-
-  const getRoleColor = (role: string) => {
-    switch (role) {
-      case 'Executive':
-        return 'bg-orange-100 text-orange-700 border-orange-200'
-      case 'Apprentice':
-        return 'bg-blue-100 text-blue-700 border-blue-200'
-      case 'AI_Agent':
-        return 'bg-purple-100 text-purple-700 border-purple-200'
-      default:
-        return 'bg-muted text-muted-foreground'
     }
   }
 
@@ -238,21 +205,6 @@ export function UsePackDialog({ pack, trigger }: UsePackDialogProps) {
                   </p>
                 </CardContent>
               </Card>
-              <Card>
-                <CardContent className="pt-6">
-                  <div className="flex items-center gap-2 mb-1">
-                    <Users className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-xs font-medium text-muted-foreground uppercase">Roles</span>
-                  </div>
-                  <div className="flex gap-1 flex-wrap">
-                    {Array.from(new Set(pack.items?.map(i => i.role) || [])).map(role => (
-                      <Badge key={role} variant="outline" className={cn('text-xs', getRoleColor(role))}>
-                        {getRoleLabel(role)}
-                      </Badge>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
             </div>
 
             {/* What you'll accomplish */}
@@ -278,42 +230,6 @@ export function UsePackDialog({ pack, trigger }: UsePackDialogProps) {
                     </li>
                   )}
                 </ul>
-              </CardContent>
-            </Card>
-
-            {/* Task Breakdown by Role */}
-            <Card>
-              <CardContent className="pt-6">
-                <h3 className="font-semibold text-foreground mb-3 flex items-center gap-2">
-                  <Users className="h-4 w-4" />
-                  Task breakdown by role
-                </h3>
-                <div className="space-y-3">
-                  {[
-                    { role: 'Executive', label: 'You', icon: User, description: 'Tasks requiring your direct involvement and decision-making' },
-                    { role: 'Apprentice', label: 'Team', icon: Users, description: 'Tasks that can be delegated to team members' },
-                    { role: 'AI_Agent', label: 'AI', icon: Bot, description: 'Tasks that AI agents can handle autonomously' },
-                  ].map(({ role, label, icon: Icon, description }) => {
-                    const count = pack.items?.filter(i => i.role === role).length || 0
-                    if (count === 0) return null
-                    return (
-                      <div key={role} className="flex items-start gap-3 p-3 bg-muted rounded-lg">
-                        <div className={cn('h-10 w-10 rounded-lg flex items-center justify-center shrink-0', getRoleColor(role))}>
-                          <Icon className="h-5 w-5" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className="font-medium text-foreground">{label}</span>
-                            <Badge variant="secondary" className="text-xs">
-                              {count} {count === 1 ? 'task' : 'tasks'}
-                            </Badge>
-                          </div>
-                          <p className="text-xs text-muted-foreground">{description}</p>
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
               </CardContent>
             </Card>
 
@@ -356,7 +272,7 @@ export function UsePackDialog({ pack, trigger }: UsePackDialogProps) {
             </div>
 
             {/* Task Selection */}
-            <div className="flex-1 min-h-0 space-y-2">
+            <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <Label>Select tasks to include</Label>
                 <Button
@@ -371,7 +287,7 @@ export function UsePackDialog({ pack, trigger }: UsePackDialogProps) {
                 </Button>
               </div>
 
-              <ScrollArea className="h-[320px] rounded-md border">
+              <div className="rounded-md border">
                 <div className="p-2 space-y-2">
                   {pack.items?.map((item, idx) => {
                     const isExpanded = expandedTaskId === item.id
@@ -400,19 +316,26 @@ export function UsePackDialog({ pack, trigger }: UsePackDialogProps) {
                             className="mt-0.5"
                           />
                           <div className="flex-1 min-w-0">
-                            <div className="flex items-start justify-between gap-2 mb-1">
-                              <div className="flex items-center gap-2 flex-1 min-w-0">
-                                <span className="text-sm font-medium">
-                                  {idx + 1}. {item.title}
-                                </span>
-                                <Badge
-                                  variant="outline"
-                                  className={cn('text-[10px] shrink-0', getRoleColor(item.role))}
-                                >
-                                  {getRoleIcon(item.role)}
-                                  <span className="ml-1">{getRoleLabel(item.role)}</span>
-                                </Badge>
-                              </div>
+                            <div className="flex items-start justify-between gap-3 mb-2">
+                              <span className="text-sm font-medium flex-1">
+                                {idx + 1}. {item.title}
+                              </span>
+                              <Select
+                                value={taskAssignees[item.id] || 'unassigned'}
+                                onValueChange={(value) => {
+                                  setTaskAssignees(prev => ({ ...prev, [item.id]: value }))
+                                }}
+                              >
+                                <SelectTrigger className="w-[140px] h-8 text-xs">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="unassigned">Unassigned</SelectItem>
+                                  <SelectItem value="you">You</SelectItem>
+                                  <SelectItem value="team">Team Member</SelectItem>
+                                  <SelectItem value="agent">AI Agent</SelectItem>
+                                </SelectContent>
+                              </Select>
                               <Button
                                 variant="ghost"
                                 size="sm"
@@ -440,17 +363,10 @@ export function UsePackDialog({ pack, trigger }: UsePackDialogProps) {
                         
                         {isExpanded && item.description && (
                           <div className="px-3 pb-3 pt-0">
-                            <div className="pl-7 space-y-2">
+                            <div className="pl-7">
                               <p className="text-sm text-muted-foreground leading-relaxed">
                                 {item.description}
                               </p>
-                              <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                <span className="font-medium">Assigned to:</span>
-                                <Badge variant="outline" className={cn('text-xs', getRoleColor(item.role))}>
-                                  {getRoleIcon(item.role)}
-                                  <span className="ml-1">{getRoleLabel(item.role)}</span>
-                                </Badge>
-                              </div>
                             </div>
                           </div>
                         )}
@@ -458,9 +374,9 @@ export function UsePackDialog({ pack, trigger }: UsePackDialogProps) {
                     )
                   })}
                 </div>
-              </ScrollArea>
+              </div>
 
-              <div className="flex items-center justify-between text-xs">
+              <div className="flex items-center justify-between text-xs mt-3">
                 <p className="text-muted-foreground">
                   {selectedTaskIds.length} of {pack.items?.length || 0} tasks selected
                 </p>

@@ -1334,6 +1334,51 @@ export type Database = {
           },
         ]
       }
+      blueprint_subsystem_mapping: {
+        Row: {
+          context_notes: string | null
+          created_at: string
+          display_order: number | null
+          id: string
+          relevance: string | null
+          subsystem_id: string
+          template_id: string
+        }
+        Insert: {
+          context_notes?: string | null
+          created_at?: string
+          display_order?: number | null
+          id?: string
+          relevance?: string | null
+          subsystem_id: string
+          template_id: string
+        }
+        Update: {
+          context_notes?: string | null
+          created_at?: string
+          display_order?: number | null
+          id?: string
+          relevance?: string | null
+          subsystem_id?: string
+          template_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "blueprint_subsystem_mapping_subsystem_id_fkey"
+            columns: ["subsystem_id"]
+            isOneToOne: false
+            referencedRelation: "universal_subsystems"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "blueprint_subsystem_mapping_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "blueprint_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       blueprint_suppliers: {
         Row: {
           blueprint_id: string
@@ -7342,6 +7387,56 @@ export type Database = {
         }
         Relationships: []
       }
+      subsystem_objective_packs: {
+        Row: {
+          created_at: string
+          difficulty: string | null
+          estimated_duration: string | null
+          extended_description: string | null
+          id: string
+          is_default: boolean | null
+          subsystem_id: string
+          summary: string | null
+          tasks: Json
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          difficulty?: string | null
+          estimated_duration?: string | null
+          extended_description?: string | null
+          id?: string
+          is_default?: boolean | null
+          subsystem_id: string
+          summary?: string | null
+          tasks?: Json
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          difficulty?: string | null
+          estimated_duration?: string | null
+          extended_description?: string | null
+          id?: string
+          is_default?: boolean | null
+          subsystem_id?: string
+          summary?: string | null
+          tasks?: Json
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subsystem_objective_packs_subsystem_id_fkey"
+            columns: ["subsystem_id"]
+            isOneToOne: false
+            referencedRelation: "universal_subsystems"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       success_checkins: {
         Row: {
           action_items: Json | null
@@ -8482,6 +8577,66 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      universal_subsystems: {
+        Row: {
+          category: string
+          created_at: string
+          description: string | null
+          display_order: number | null
+          icon_name: string | null
+          id: string
+          is_active: boolean | null
+          key_questions: Json | null
+          learning_resources: Json | null
+          marketplace_categories: string[] | null
+          name: string
+          primer: Json | null
+          recommended_executive_roles: string[] | null
+          recommended_supplier_types: string[] | null
+          slug: string
+          tagline: string | null
+          updated_at: string
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          description?: string | null
+          display_order?: number | null
+          icon_name?: string | null
+          id?: string
+          is_active?: boolean | null
+          key_questions?: Json | null
+          learning_resources?: Json | null
+          marketplace_categories?: string[] | null
+          name: string
+          primer?: Json | null
+          recommended_executive_roles?: string[] | null
+          recommended_supplier_types?: string[] | null
+          slug: string
+          tagline?: string | null
+          updated_at?: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          description?: string | null
+          display_order?: number | null
+          icon_name?: string | null
+          id?: string
+          is_active?: boolean | null
+          key_questions?: Json | null
+          learning_resources?: Json | null
+          marketplace_categories?: string[] | null
+          name?: string
+          primer?: Json | null
+          recommended_executive_roles?: string[] | null
+          recommended_supplier_types?: string[] | null
+          slug?: string
+          tagline?: string | null
+          updated_at?: string
+        }
+        Relationships: []
       }
       user_preferences: {
         Row: {
