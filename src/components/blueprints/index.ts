@@ -6,6 +6,7 @@ export { NextActionCard, NextMoveWidget } from './next-action-card'
 export { DomainDetailPanel } from './domain-detail-panel'
 export { CreateBlueprintDialog } from './create-blueprint-dialog'
 export { GuidedAssessment, QuickAssessment } from './guided-assessment'
+export { UsePackDialog } from './use-pack-dialog'
 
 // Visual Blueprint components
 export { 

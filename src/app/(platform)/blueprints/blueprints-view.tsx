@@ -7,6 +7,7 @@ import { typography } from '@/lib/design-system'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -25,10 +26,12 @@ import {
 import {
   BlueprintGrid,
   CreateBlueprintDialog,
+  UsePackDialog,
 } from '@/components/blueprints'
 import { archiveBlueprint, deleteBlueprint } from '@/actions/blueprints'
 import { createAdvisoryQuestion } from '@/actions/advisory'
 import type { Blueprint, BlueprintTemplate } from '@/types/blueprints'
+import type { ObjectivePack } from '@/actions/packs'
 import { QuestionCard, Question } from '@/components/advisory/question-card'
 import { AskModal } from '@/components/advisory/ask-modal'
 import { StatusLegend } from '@/components/advisory/status-legend'
@@ -57,6 +60,12 @@ import {
   HelpCircle,
   ChevronDown,
   Search,
+  Briefcase,
+  Package,
+  Clock,
+  BarChart3,
+  FileText,
+  Store,
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { toast } from 'sonner'
@@ -66,6 +75,7 @@ interface BlueprintsViewProps {
   blueprints: Blueprint[]
   templates: BlueprintTemplate[]
   questions?: Question[]
+  packs?: ObjectivePack[]
   currentUserId?: string
   currentUserRole?: string
 }
@@ -74,6 +84,7 @@ export function BlueprintsView({
   blueprints, 
   templates,
   questions = [],
+  packs = [],
   currentUserId: _currentUserId = '',
   currentUserRole: _currentUserRole,
 }: BlueprintsViewProps) {
@@ -82,10 +93,24 @@ export function BlueprintsView({
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [isDeleting, setIsDeleting] = useState<string | null>(null)
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
+  const [activeTab, setActiveTab] = useState<'business' | 'product'>('business')
   
   // Q&A State
   const [isQAOpen, setIsQAOpen] = useState(true)
   const [qaSearchQuery, setQaSearchQuery] = useState('')
+  
+  // Group packs by category
+  const packsByCategory = useMemo(() => {
+    const grouped: Record<string, ObjectivePack[]> = {}
+    packs.forEach(pack => {
+      const category = pack.category || 'General'
+      if (!grouped[category]) {
+        grouped[category] = []
+      }
+      grouped[category].push(pack)
+    })
+    return grouped
+  }, [packs])
   
   // Filter questions based on search
   const filteredQuestions = useMemo(() => {
@@ -175,25 +200,141 @@ export function BlueprintsView({
             Get ideas on what to do next. Discover opportunities, find experts, and turn insights into action.
           </p>
         </div>
-
-        <div className="flex items-center gap-2">
-          <Button asChild variant="outline">
-            <Link href="/blueprints/explore">
-              <Layers className="mr-2 h-4 w-4" />
-              Explore Tech Trees
-            </Link>
-          </Button>
-          <Button
-            onClick={() => setIsCreateOpen(true)}
-            className="bg-international-orange hover:bg-international-orange/90"
-          >
-            <Plus className="mr-2 h-4 w-4" />
-            New Product Map
-          </Button>
-        </div>
       </div>
 
-      {/* HERO: Visual Technology Tree Preview - Always Visible */}
+      {/* Main Tabs: Business vs Product Guidance */}
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'business' | 'product')} className="w-full">
+        <TabsList className="grid w-full max-w-md grid-cols-2 mb-6">
+          <TabsTrigger value="business" className="gap-2">
+            <Briefcase className="h-4 w-4" />
+            Business Guidance
+          </TabsTrigger>
+          <TabsTrigger value="product" className="gap-2">
+            <Cpu className="h-4 w-4" />
+            Product Guidance
+          </TabsTrigger>
+        </TabsList>
+
+        {/* ===== BUSINESS GUIDANCE TAB ===== */}
+        <TabsContent value="business" className="space-y-8">
+          {/* Business Guidance Intro */}
+          <Card className="bg-gradient-to-r from-blue-50 to-background border-blue-100">
+            <CardContent className="pt-6">
+              <div className="flex items-start gap-4">
+                <div className="p-3 bg-blue-100 rounded-xl shrink-0">
+                  <Package className="h-6 w-6 text-electric-blue" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-semibold text-foreground mb-1">Objective Packs</h3>
+                  <p className="text-sm text-muted-foreground mb-3">
+                    Pre-built objectives with tasks designed by experienced founders. Pick a pack, customize it, and start executing. 
+                    Each pack includes tasks assigned to the right roles — you, your apprentice, or an AI agent.
+                  </p>
+                  <div className="flex flex-wrap gap-3 text-xs">
+                    <div className="flex items-center gap-1.5 text-muted-foreground">
+                      <Target className="h-3.5 w-3.5 text-international-orange" />
+                      <span>Creates objectives with tasks</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 text-muted-foreground">
+                      <Users className="h-3.5 w-3.5 text-electric-blue" />
+                      <span>Role-assigned tasks</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 text-muted-foreground">
+                      <Store className="h-3.5 w-3.5 text-status-success" />
+                      <span>Links to marketplace experts</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Packs Grid by Category */}
+          {Object.keys(packsByCategory).length > 0 ? (
+            <div className="space-y-8">
+              {Object.entries(packsByCategory).map(([category, categoryPacks]) => (
+                <section key={category} className="space-y-4">
+                  <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
+                    <PackCategoryIcon category={category} />
+                    {category}
+                    <Badge variant="secondary" className="ml-2">
+                      {categoryPacks.length} {categoryPacks.length === 1 ? 'pack' : 'packs'}
+                    </Badge>
+                  </h2>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {categoryPacks.map((pack) => (
+                      <PackCard key={pack.id} pack={pack} />
+                    ))}
+                  </div>
+                </section>
+              ))}
+            </div>
+          ) : (
+            <Card className="border-2 border-dashed">
+              <CardContent className="py-12">
+                <EmptyState
+                  icon={<Package className="h-12 w-12" />}
+                  title="No objective packs yet"
+                  description="Objective packs are pre-built objectives with tasks. They'll appear here as they become available."
+                  action={
+                    <Button asChild>
+                      <Link href="/objectives">
+                        Create Custom Objective
+                        <ArrowRight className="ml-2 h-4 w-4" />
+                      </Link>
+                    </Button>
+                  }
+                />
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Marketplace Upsell CTA */}
+          <Card className="bg-gradient-to-r from-orange-50 to-background border-orange-100">
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between gap-4 flex-wrap">
+                <div className="flex items-start gap-3">
+                  <div className="p-2 bg-orange-100 rounded-lg shrink-0">
+                    <Store className="h-5 w-5 text-international-orange" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-foreground">Need expert help?</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Browse our marketplace to find advisors, agencies, and suppliers who can help execute your objectives.
+                    </p>
+                  </div>
+                </div>
+                <Button asChild className="bg-international-orange hover:bg-international-orange/90">
+                  <Link href="/marketplace">
+                    Browse Marketplace
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </Link>
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ===== PRODUCT GUIDANCE TAB ===== */}
+        <TabsContent value="product" className="space-y-8">
+          {/* Product Tab Header Actions */}
+          <div className="flex items-center justify-end gap-2">
+            <Button asChild variant="outline">
+              <Link href="/blueprints/explore">
+                <Layers className="mr-2 h-4 w-4" />
+                Explore Tech Trees
+              </Link>
+            </Button>
+            <Button
+              onClick={() => setIsCreateOpen(true)}
+              className="bg-international-orange hover:bg-international-orange/90"
+            >
+              <Plus className="mr-2 h-4 w-4" />
+              New Product Map
+            </Button>
+          </div>
+
+          {/* HERO: Visual Technology Tree Preview - Always Visible */}
       <Card className="overflow-hidden border-2 border shadow-xl">
         <CardContent className="p-0">
           <div className="bg-muted p-6 sm:p-8">
@@ -399,30 +540,35 @@ export function BlueprintsView({
                 title="Team Coverage"
                 description="Assign team members to domains. See who covers what across your organization."
                 linkText="Team → Skills"
+                href="/team"
               />
               <IntegrationCard
                 icon={Truck}
                 title="Supplier Network"
                 description="Connect manufacturers and suppliers. Request quotes, track lead times."
                 linkText="Marketplace → Manufacturing"
+                href="/marketplace?category=manufacturing"
               />
               <IntegrationCard
                 icon={GraduationCap}
                 title="Expert Advisors"
                 description="Gaps connect to advisors. AI generates expert packets with the right questions."
                 linkText="Marketplace → Advice"
+                href="/marketplace?category=agencies"
               />
               <IntegrationCard
                 icon={Target}
                 title="Objectives & Tasks"
                 description="Turn gaps into objectives with tasks. Assign to team, advisors, or AI agents."
                 linkText="Objectives"
+                href="/objectives"
               />
               <IntegrationCard
                 icon={LayoutDashboard}
                 title="Executive View"
                 description="See coverage across all blueprints. Track milestones and organizational gaps."
                 linkText="Today → Overview"
+                href="/home"
               />
             </div>
           </CardContent>
@@ -590,18 +736,21 @@ export function BlueprintsView({
             title="Expert Matching"
             description="When you find a gap, see marketplace experts who can help. Get pre-written messages to ask the right questions."
             color="purple"
+            href="/marketplace?category=agencies"
           />
           <MagicCard
             icon={Truck}
             title="Supplier Connections"
             description="Physical products need physical suppliers. See who can provide components, get lead times, request quotes."
             color="emerald"
+            href="/marketplace?category=manufacturing"
           />
           <MagicCard
             icon={Target}
             title="Objectives & Tasks"
             description="Turn any knowledge gap into an objective with actionable tasks. Everything stays connected to your blueprint."
             color="orange"
+            href="/objectives"
           />
         </div>
       </section>
@@ -672,6 +821,41 @@ export function BlueprintsView({
           </Card>
         </div>
       </section>
+
+      {/* Marketplace CTA for Product Guidance */}
+      <Card className="bg-gradient-to-r from-blue-50 to-orange-50 border-blue-100">
+        <CardContent className="pt-6">
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            <div className="flex items-start gap-3">
+              <div className="p-2 bg-blue-100 rounded-lg shrink-0">
+                <Users className="h-5 w-5 text-electric-blue" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-foreground">Find experts & suppliers</h3>
+                <p className="text-sm text-muted-foreground">
+                  Connect with advisors who've built similar products, and suppliers who can manufacture components.
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <Button asChild variant="outline">
+                <Link href="/marketplace?category=agencies">
+                  <GraduationCap className="mr-2 h-4 w-4" />
+                  Find Advisors
+                </Link>
+              </Button>
+              <Button asChild className="bg-international-orange hover:bg-international-orange/90">
+                <Link href="/marketplace?category=manufacturing">
+                  <Truck className="mr-2 h-4 w-4" />
+                  Find Suppliers
+                </Link>
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+        </TabsContent>
+      </Tabs>
 
       {/* ADVISORY Q&A SECTION */}
       <section className="space-y-4 mt-8 pt-8 border-t border-muted">
@@ -848,22 +1032,36 @@ function IntegrationCard({
   title,
   description,
   linkText,
+  href,
 }: {
   icon: React.ElementType
   title: string
   description: string
   linkText: string
+  href?: string
 }) {
-  return (
-    <div className="text-center p-4 rounded-lg bg-background border hover:shadow-sm transition-shadow">
+  const content = (
+    <div className={cn(
+      "text-center p-4 rounded-lg bg-background border transition-shadow",
+      href ? "hover:shadow-md hover:border-electric-blue cursor-pointer" : "hover:shadow-sm"
+    )}>
       <div className="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-muted mb-3">
         <Icon className="h-5 w-5 text-muted-foreground" />
       </div>
       <h4 className="font-semibold text-foreground text-sm mb-1">{title}</h4>
       <p className="text-xs text-muted-foreground mb-2 leading-relaxed">{description}</p>
-      <span className="text-[10px] text-electric-blue font-medium">{linkText}</span>
+      <span className="text-[10px] text-electric-blue font-medium flex items-center justify-center gap-1">
+        {linkText}
+        {href && <ArrowRight className="h-3 w-3" />}
+      </span>
     </div>
   )
+
+  if (href) {
+    return <Link href={href}>{content}</Link>
+  }
+
+  return content
 }
 
 // Magic card for features section
@@ -956,6 +1154,109 @@ function TemplateCard({
             </span>
           ))}
         </div>
+      </CardContent>
+    </Card>
+  )
+}
+
+// Icon helper for pack categories
+function PackCategoryIcon({ category }: { category: string }) {
+  const iconMap: Record<string, React.ElementType> = {
+    'Fundraising': BarChart3,
+    'Operations': Briefcase,
+    'Marketing': Target,
+    'Product': Cpu,
+    'Sales': Users,
+    'Legal': FileText,
+    'Finance': BarChart3,
+    'General': Package,
+  }
+  const Icon = iconMap[category] || Package
+  return <Icon className="h-5 w-5 text-muted-foreground" />
+}
+
+// Pack card for "Objective Packs" section
+function PackCard({ pack }: { pack: ObjectivePack }) {
+  const difficultyColors: Record<string, string> = {
+    'beginner': 'bg-green-100 text-green-700',
+    'intermediate': 'bg-blue-100 text-blue-700',
+    'advanced': 'bg-purple-100 text-purple-700',
+  }
+
+  const iconMap: Record<string, React.ElementType> = {
+    'rocket': Rocket,
+    'target': Target,
+    'users': Users,
+    'briefcase': Briefcase,
+    'chart': BarChart3,
+    'document': FileText,
+    'lightbulb': Lightbulb,
+    'sparkles': Sparkles,
+  }
+  const Icon = (pack.icon_name && iconMap[pack.icon_name]) || Package
+
+  return (
+    <Card className="hover:shadow-lg transition-all hover:border-electric-blue group">
+      <CardHeader className="pb-3">
+        <div className="flex items-start justify-between">
+          <div className="h-10 w-10 rounded-lg bg-blue-50 flex items-center justify-center shrink-0 group-hover:bg-blue-100 transition-colors">
+            <Icon className="h-5 w-5 text-electric-blue" />
+          </div>
+          {pack.difficulty && (
+            <Badge 
+              variant="secondary" 
+              className={cn('text-[10px]', difficultyColors[pack.difficulty.toLowerCase()] || '')}
+            >
+              {pack.difficulty}
+            </Badge>
+          )}
+        </div>
+        <CardTitle className="text-base mt-3">{pack.title}</CardTitle>
+        {pack.description && (
+          <CardDescription className="text-sm line-clamp-2">
+            {pack.description}
+          </CardDescription>
+        )}
+      </CardHeader>
+      <CardContent className="pt-0 space-y-3">
+        {/* Pack metadata */}
+        <div className="flex items-center gap-4 text-xs text-muted-foreground">
+          {pack.estimated_duration && (
+            <div className="flex items-center gap-1">
+              <Clock className="h-3.5 w-3.5" />
+              <span>{pack.estimated_duration}</span>
+            </div>
+          )}
+          {pack.items && pack.items.length > 0 && (
+            <div className="flex items-center gap-1">
+              <CheckCircle2 className="h-3.5 w-3.5" />
+              <span>{pack.items.length} tasks</span>
+            </div>
+          )}
+        </div>
+
+        {/* Preview of tasks */}
+        {pack.items && pack.items.length > 0 && (
+          <div className="space-y-1">
+            {pack.items.slice(0, 3).map((item, idx) => (
+              <div key={item.id || idx} className="flex items-center gap-2 text-xs text-muted-foreground">
+                <div className="h-1.5 w-1.5 rounded-full bg-muted-foreground/50" />
+                <span className="truncate">{item.title}</span>
+                <Badge variant="outline" className="text-[9px] ml-auto shrink-0">
+                  {item.role === 'Executive' ? 'You' : item.role === 'Apprentice' ? 'Team' : 'AI'}
+                </Badge>
+              </div>
+            ))}
+            {pack.items.length > 3 && (
+              <p className="text-[10px] text-muted-foreground pl-3">
+                +{pack.items.length - 3} more tasks
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* Action button with dialog */}
+        <UsePackDialog pack={pack} />
       </CardContent>
     </Card>
   )

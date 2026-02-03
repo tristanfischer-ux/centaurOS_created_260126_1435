@@ -2,6 +2,7 @@ import { Suspense } from 'react'
 import { BlueprintsView } from './blueprints-view'
 import { getBlueprints, getBlueprintTemplates } from '@/actions/blueprints'
 import { getAdvisoryQuestions } from '@/actions/advisory'
+import { getObjectivePacks } from '@/actions/packs'
 import { Skeleton } from '@/components/ui/skeleton'
 import { createClient } from '@/lib/supabase/server'
 
@@ -21,10 +22,11 @@ async function BlueprintsData() {
     .eq('id', user.id)
     .single() : { data: null }
 
-  const [blueprintsResult, templatesResult, questionsResult] = await Promise.all([
+  const [blueprintsResult, templatesResult, questionsResult, packsResult] = await Promise.all([
     getBlueprints(),
     getBlueprintTemplates(),
     getAdvisoryQuestions({ limit: 10 }),
+    getObjectivePacks(),
   ])
 
   // Transform questions to match the expected Question interface
@@ -52,6 +54,7 @@ async function BlueprintsData() {
       blueprints={blueprintsResult.data || []}
       templates={templatesResult.data || []}
       questions={transformedQuestions}
+      packs={packsResult.packs || []}
       currentUserId={user?.id || ''}
       currentUserRole={profile?.role || undefined}
     />
