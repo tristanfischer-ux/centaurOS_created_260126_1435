@@ -24,7 +24,20 @@ import {
   Maximize2,
   Bot,
   ShieldCheck,
+  Trash2,
+  Loader2,
 } from "lucide-react"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 import { cn } from "@/lib/utils"
 
 interface TaskAttachment {
@@ -77,6 +90,8 @@ interface TaskActionButtonsProps {
   handleDuplicate: () => void
   handleRunAI: () => void
   handleForward: (formData: FormData) => void
+  handleDelete?: () => Promise<void>
+  isDeleting?: boolean
   sortedMembers: Member[]
   forwardAttachments: TaskAttachment[]
   forwardAttachmentsLoading: boolean
@@ -115,6 +130,8 @@ export function TaskActionButtons({
   handleDuplicate,
   handleRunAI,
   handleForward,
+  handleDelete,
+  isDeleting,
   sortedMembers,
   forwardAttachments,
   forwardAttachmentsLoading,
@@ -249,6 +266,49 @@ export function TaskActionButtons({
             </TooltipTrigger>
             <TooltipContent>Duplicate this task</TooltipContent>
           </Tooltip>
+
+          {/* Delete Task - Only for creator or executive */}
+          {(isCreator || isExecutive) && handleDelete && (
+            <AlertDialog>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <AlertDialogTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      disabled={isLoading || isDeleting}
+                      className="text-muted-foreground hover:text-destructive hover:bg-destructive/10 active:text-destructive active:bg-destructive/20 active:scale-[0.98] transition-all duration-200 px-2 shrink-0"
+                    >
+                      {isDeleting ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Trash2 className="h-4 w-4" />
+                      )}
+                      <span className="hidden xs:inline ml-1">Delete</span>
+                    </Button>
+                  </AlertDialogTrigger>
+                </TooltipTrigger>
+                <TooltipContent>Delete this task</TooltipContent>
+              </Tooltip>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Delete task?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This action cannot be undone. The task and all its comments, attachments, and history will be permanently deleted.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={handleDelete}
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  >
+                    Delete
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          )}
         </div>
 
         {/* Meta Area - History & Notes */}

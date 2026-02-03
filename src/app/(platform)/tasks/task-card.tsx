@@ -36,6 +36,8 @@ import { getStatusColor } from "@/lib/status-colors"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { useTaskCardState } from "@/hooks/useTaskCardState"
 import { useTaskActions } from "@/hooks/useTaskActions"
+import { deleteTasks } from "@/actions/tasks"
+import { toast } from "sonner"
 
 type Task = Database["public"]["Tables"]["tasks"]["Row"] & {
     assignee?: { id: string, full_name: string | null, role: string, email: string, avatar_url?: string | null } | null
@@ -165,6 +167,25 @@ export const TaskCard = memo(function TaskCard(props: TaskCardProps) {
         setForwardOpen,
         setOptimisticAssignees,
     })
+
+    // Delete task state and handler
+    const [isDeleting, setIsDeleting] = useState(false)
+    
+    const handleDelete = async () => {
+        setIsDeleting(true)
+        try {
+            const result = await deleteTasks([task.id])
+            if (result?.error) {
+                toast.error(result.error)
+            } else {
+                toast.success('Task deleted')
+            }
+        } catch (error) {
+            toast.error('Failed to delete task')
+        } finally {
+            setIsDeleting(false)
+        }
+    }
 
     // Helper Functions
     const formatFullDate = (dateStr: string | null) => {
@@ -684,6 +705,8 @@ export const TaskCard = memo(function TaskCard(props: TaskCardProps) {
                         handleDuplicate={handleDuplicate}
                         handleRunAI={handleRunAI}
                         handleForward={handleForward}
+                        handleDelete={handleDelete}
+                        isDeleting={isDeleting}
                         sortedMembers={sortedMembers}
                         forwardAttachments={forwardAttachments}
                         forwardAttachmentsLoading={forwardAttachmentsLoading}

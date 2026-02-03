@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button"
 import { LayoutGrid, List, X, Trash2, CheckSquare, Loader2, Check, UserPlus, Filter, ChevronDown, ChevronRight, CalendarDays, Inbox, History } from "lucide-react"
 import { UserAvatar, UserAvatarStack } from "@/components/ui/user-avatar"
 import { deleteTasks, acceptTask, completeTask, updateTaskAssignees } from "@/actions/tasks"
+import { deleteObjectives } from "@/actions/objectives"
 import { toast } from "sonner"
 import { CreateTaskDialog } from "./create-task-dialog"
 import { QuickAddTask } from "@/components/ui/quick-add-task"
@@ -106,6 +107,7 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
     const [selectedTask, setSelectedTask] = useState<Task | null>(null)
     const [isSelectionMode, setIsSelectionMode] = useState(false)
     const [selectedTaskIds, setSelectedTaskIds] = useState<Set<string>>(new Set())
+    const [selectedObjectiveIds, setSelectedObjectiveIds] = useState<Set<string>>(new Set())
     const [isBulkDeleting, setIsBulkDeleting] = useState(false)
     const [isBulkOperating, setIsBulkOperating] = useState(false)
     const [assignDialogOpen, setAssignDialogOpen] = useState(false)
@@ -325,7 +327,20 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
     const toggleSelectionMode = () => {
         setIsSelectionMode(prev => !prev)
         setSelectedTaskIds(new Set())
+        setSelectedObjectiveIds(new Set())
     }
+
+    const toggleObjectiveSelection = useCallback((objectiveId: string) => {
+        setSelectedObjectiveIds(prev => {
+            const newSet = new Set(prev)
+            if (newSet.has(objectiveId)) {
+                newSet.delete(objectiveId)
+            } else {
+                newSet.add(objectiveId)
+            }
+            return newSet
+        })
+    }, [])
 
     const toggleTaskSelection = useCallback((taskId: string) => {
         setSelectedTaskIds(prev => {
@@ -337,7 +352,7 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
     }, [])
 
     const handleBulkDeleteClick = () => {
-        if (selectedTaskIds.size === 0) return
+        if (selectedTaskIds.size === 0 && selectedObjectiveIds.size === 0) return
         setShowDeleteConfirm(true)
     }
 
@@ -345,14 +360,40 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
         setShowDeleteConfirm(false)
         setIsBulkDeleting(true)
         try {
-            const result = await deleteTasks(Array.from(selectedTaskIds))
-            if (result?.error) {
-                toast.error(result.error)
-                return
+            let tasksDeleted = 0
+            let objectivesDeleted = 0
+
+            // Delete selected tasks
+            if (selectedTaskIds.size > 0) {
+                const taskResult = await deleteTasks(Array.from(selectedTaskIds))
+                if (taskResult?.error) {
+                    toast.error(`Tasks: ${taskResult.error}`)
+                } else {
+                    tasksDeleted = selectedTaskIds.size
+                }
             }
-            toast.success(`${selectedTaskIds.size} tasks deleted`)
+
+            // Delete selected objectives
+            if (selectedObjectiveIds.size > 0) {
+                const objectiveResult = await deleteObjectives(Array.from(selectedObjectiveIds))
+                if (objectiveResult?.error) {
+                    toast.error(`Objectives: ${objectiveResult.error}`)
+                } else {
+                    objectivesDeleted = selectedObjectiveIds.size
+                }
+            }
+
+            // Show success message
+            const messages: string[] = []
+            if (tasksDeleted > 0) messages.push(`${tasksDeleted} task${tasksDeleted > 1 ? 's' : ''}`)
+            if (objectivesDeleted > 0) messages.push(`${objectivesDeleted} objective${objectivesDeleted > 1 ? 's' : ''}`)
+            if (messages.length > 0) {
+                toast.success(`Deleted ${messages.join(' and ')}`)
+            }
+
             setIsSelectionMode(false)
             setSelectedTaskIds(new Set())
+            setSelectedObjectiveIds(new Set())
         } finally {
             setIsBulkDeleting(false)
         }
@@ -897,34 +938,49 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                             const progressPercent = objectiveTasks.length > 0 ? Math.round((completedCount / objectiveTasks.length) * 100) : 0
 
                             return (
-                                <div key={objective.id} className="border rounded-lg overflow-hidden bg-background">
+                                <div key={objective.id} className={cn(
+                                "border rounded-lg overflow-hidden bg-background",
+                                isSelectionMode && selectedObjectiveIds.has(objective.id) && "ring-2 ring-international-orange"
+                            )}>
                                     <div 
                                         className="bg-muted px-4 py-3 border-b flex justify-between items-center cursor-pointer hover:bg-muted/80 transition-colors"
                                         onClick={() => toggleObjectiveExpanded(objective.id)}
                                     >
                                         <h3 className="font-semibold text-foreground flex items-center gap-2">
                                             {isSelectionMode && (
-                                                <Checkbox
-                                                    checked={objectiveTasks.every(t => selectedTaskIds.has(t.id))}
-                                                    onCheckedChange={(checked) => {
-                                                        const newSelection = new Set(selectedTaskIds)
-                                                        if (checked) {
-                                                            objectiveTasks.forEach(t => newSelection.add(t.id))
-                                                        } else {
-                                                            objectiveTasks.forEach(t => newSelection.delete(t.id))
-                                                        }
-                                                        setSelectedTaskIds(newSelection)
-                                                    }}
-                                                    onClick={(e) => e.stopPropagation()}
-                                                    aria-label={`Select all tasks in ${objective.title}`}
-                                                />
+                                                <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                                                    {/* Objective selection checkbox */}
+                                                    <Checkbox
+                                                        checked={selectedObjectiveIds.has(objective.id)}
+                                                        onCheckedChange={() => toggleObjectiveSelection(objective.id)}
+                                                        className="border-international-orange data-[state=checked]:bg-international-orange data-[state=checked]:border-international-orange"
+                                                        aria-label={`Select objective ${objective.title}`}
+                                                    />
+                                                    {/* Tasks selection checkbox */}
+                                                    <Checkbox
+                                                        checked={objectiveTasks.every(t => selectedTaskIds.has(t.id)) && objectiveTasks.length > 0}
+                                                        onCheckedChange={(checked) => {
+                                                            const newSelection = new Set(selectedTaskIds)
+                                                            if (checked) {
+                                                                objectiveTasks.forEach(t => newSelection.add(t.id))
+                                                            } else {
+                                                                objectiveTasks.forEach(t => newSelection.delete(t.id))
+                                                            }
+                                                            setSelectedTaskIds(newSelection)
+                                                        }}
+                                                        aria-label={`Select all tasks in ${objective.title}`}
+                                                    />
+                                                </div>
                                             )}
                                             {isExpanded ? (
                                                 <ChevronDown className="h-4 w-4 text-muted-foreground" />
                                             ) : (
                                                 <ChevronRight className="h-4 w-4 text-muted-foreground" />
                                             )}
-                                            <div className="bg-electric-blue w-2 h-2 rounded-full" />
+                                            <div className={cn(
+                                                "w-2 h-2 rounded-full",
+                                                selectedObjectiveIds.has(objective.id) ? "bg-international-orange" : "bg-electric-blue"
+                                            )} />
                                             {objective.title}
                                             <Badge variant="secondary" className="ml-2 bg-background text-muted-foreground font-normal">
                                                 {objectiveTasks.length} Tasks
@@ -1202,64 +1258,80 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
 
             {/* Bulk Action Toolbar */}
             {
-                selectedTaskIds.size > 0 && (
+                (selectedTaskIds.size > 0 || selectedObjectiveIds.size > 0) && (
                     <div className="fixed bottom-20 sm:bottom-4 left-1/2 -translate-x-1/2 bg-foreground text-background rounded-lg shadow-lg p-4 flex items-center gap-3 z-50">
-                        <span className="text-sm font-medium">{selectedTaskIds.size} selected</span>
-                        <Button
-                            size="sm"
-                            variant="secondary"
-                            onClick={handleBulkAccept}
-                            disabled={isBulkOperating}
-                            className="bg-background text-foreground hover:bg-muted"
-                        >
-                            <Check className="w-4 h-4 mr-1" />
-                            Accept
-                        </Button>
-                        <Button
-                            size="sm"
-                            variant="secondary"
-                            onClick={handleBulkComplete}
-                            disabled={isBulkOperating}
-                            className="bg-background text-foreground hover:bg-muted"
-                        >
-                            <CheckSquare className="w-4 h-4 mr-1" />
-                            Complete
-                        </Button>
-                        <Popover open={assignDialogOpen} onOpenChange={setAssignDialogOpen}>
-                            <PopoverTrigger asChild>
+                        <div className="text-sm font-medium flex items-center gap-2">
+                            {selectedTaskIds.size > 0 && (
+                                <span className="bg-electric-blue text-white px-2 py-0.5 rounded text-xs">
+                                    {selectedTaskIds.size} task{selectedTaskIds.size > 1 ? 's' : ''}
+                                </span>
+                            )}
+                            {selectedObjectiveIds.size > 0 && (
+                                <span className="bg-international-orange text-white px-2 py-0.5 rounded text-xs">
+                                    {selectedObjectiveIds.size} objective{selectedObjectiveIds.size > 1 ? 's' : ''}
+                                </span>
+                            )}
+                        </div>
+                        {/* Task-only actions - hide when only objectives selected */}
+                        {selectedTaskIds.size > 0 && (
+                            <>
                                 <Button
                                     size="sm"
                                     variant="secondary"
+                                    onClick={handleBulkAccept}
                                     disabled={isBulkOperating}
                                     className="bg-background text-foreground hover:bg-muted"
                                 >
-                                    <UserPlus className="w-4 h-4 mr-1" />
-                                    Assign
+                                    <Check className="w-4 h-4 mr-1" />
+                                    Accept
                                 </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-[240px] p-0" align="end">
-                                <Command>
-                                    <CommandInput placeholder="Search members..." />
-                                    <CommandList>
-                                        <CommandEmpty>No members found.</CommandEmpty>
-                                        <CommandGroup>
-                                            {members.map((member) => (
-                                                <CommandItem
-                                                    key={member.id}
-                                                    value={member.full_name || ''}
-                                                    onSelect={() => {
-                                                        setAssignDialogOpen(false)
-                                                        handleBulkAssign(member.id)
-                                                    }}
-                                                >
-                                                    {member.full_name} {member.role === 'AI_Agent' ? '🤖' : ''}
-                                                </CommandItem>
-                                            ))}
-                                        </CommandGroup>
-                                    </CommandList>
-                                </Command>
-                            </PopoverContent>
-                        </Popover>
+                                <Button
+                                    size="sm"
+                                    variant="secondary"
+                                    onClick={handleBulkComplete}
+                                    disabled={isBulkOperating}
+                                    className="bg-background text-foreground hover:bg-muted"
+                                >
+                                    <CheckSquare className="w-4 h-4 mr-1" />
+                                    Complete
+                                </Button>
+                                <Popover open={assignDialogOpen} onOpenChange={setAssignDialogOpen}>
+                                    <PopoverTrigger asChild>
+                                        <Button
+                                            size="sm"
+                                            variant="secondary"
+                                            disabled={isBulkOperating}
+                                            className="bg-background text-foreground hover:bg-muted"
+                                        >
+                                            <UserPlus className="w-4 h-4 mr-1" />
+                                            Assign
+                                        </Button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-[240px] p-0" align="end">
+                                        <Command>
+                                            <CommandInput placeholder="Search members..." />
+                                            <CommandList>
+                                                <CommandEmpty>No members found.</CommandEmpty>
+                                                <CommandGroup>
+                                                    {members.map((member) => (
+                                                        <CommandItem
+                                                            key={member.id}
+                                                            value={member.full_name || ''}
+                                                            onSelect={() => {
+                                                                setAssignDialogOpen(false)
+                                                                handleBulkAssign(member.id)
+                                                            }}
+                                                        >
+                                                            {member.full_name} {member.role === 'AI_Agent' ? '🤖' : ''}
+                                                        </CommandItem>
+                                                    ))}
+                                                </CommandGroup>
+                                            </CommandList>
+                                        </Command>
+                                    </PopoverContent>
+                                </Popover>
+                            </>
+                        )}
                         <Button
                             size="sm"
                             variant="destructive"
@@ -1284,6 +1356,7 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                             onClick={() => {
                                 setIsSelectionMode(false)
                                 setSelectedTaskIds(new Set())
+                                setSelectedObjectiveIds(new Set())
                             }}
                             disabled={isBulkOperating || isBulkDeleting}
                             className="text-background hover:bg-foreground/90"

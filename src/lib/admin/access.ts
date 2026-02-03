@@ -9,10 +9,12 @@ type UntypedClient = any
 
 /**
  * Check if a user has admin privileges
+ * Checks both admin_users table AND Founder role as fallback
  */
 export async function isAdmin(userId: string): Promise<boolean> {
     const supabase = await createClient() as UntypedClient
     
+    // First check admin_users table
     const { data, error } = await supabase
         .from('admin_users')
         .select('id')
@@ -34,10 +36,21 @@ export async function isAdmin(userId: string): Promise<boolean> {
         if (!isExpectedError) {
             console.error('Error checking admin status:', error.message || error.code)
         }
-        return false
+        // Fall through to check Founder role
     }
     
-    return !!data
+    if (data) {
+        return true
+    }
+    
+    // Fallback: Check if user is a Founder (Founders should have system admin access)
+    const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', userId)
+        .maybeSingle()
+    
+    return profile?.role === 'Founder'
 }
 
 /**
