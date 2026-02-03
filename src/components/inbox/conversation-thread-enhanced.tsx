@@ -12,7 +12,7 @@ import { useConversation } from '@/hooks/useConversation'
 import { useMessagingShortcuts } from '@/hooks/useMessagingShortcuts'
 import type { MessageWithSender } from '@/lib/messaging/service'
 import type { MessageWithContext } from '@/types/messaging'
-import { sendMessageWithContext } from '@/lib/messaging/service'
+import { sendMessageWithContext, bridgeMessageToTaskComment } from '@/lib/messaging/service'
 import { createClient } from '@/lib/supabase/client'
 import { 
   MoreVertical, 
