@@ -202,8 +202,17 @@ const getCriticalityColor = (criticality: string) => {
 /**
  * DomainCard - Displays a single knowledge domain with its details
  * Enhanced with learning resources, marketplace links, and AI summary
+ * Supports three sizes: small (compact row), medium (standard card), full (all details)
  */
-function DomainCard({ domain, templateId }: { domain: KnowledgeDomain; templateId: string }) {
+function DomainCard({ 
+  domain, 
+  templateId,
+  size = 'medium'
+}: { 
+  domain: KnowledgeDomain
+  templateId: string
+  size?: 'small' | 'medium' | 'full'
+}) {
   const router = useRouter()
   const [showResources, setShowResources] = useState(false)
   const categoryColors = getDomainCategoryColor(domain.category)
@@ -231,6 +240,101 @@ function DomainCard({ domain, templateId }: { domain: KnowledgeDomain; templateI
     ? `/marketplace?category=${encodeURIComponent(domain.supplier_categories[0])}&type=supplier`
     : '/marketplace?category=Products'
   
+  // SMALL SIZE: Compact row
+  if (size === 'small') {
+    return (
+      <Card className="hover:shadow-sm transition-shadow">
+        <CardContent className="p-3">
+          <div className="flex items-center gap-3">
+            <Badge className={cn(categoryColors.bg, categoryColors.text, "text-[9px] shrink-0")}>
+              {domain.category || 'General'}
+            </Badge>
+            <span className="font-medium text-sm flex-1 truncate">{domain.name}</span>
+            {domain.criticality && (
+              <Badge className={cn(criticalityColor, "text-[9px] shrink-0")}>
+                {domain.criticality}
+              </Badge>
+            )}
+            {subDomainCount > 0 && (
+              <span className="text-xs text-muted-foreground shrink-0">
+                {subDomainCount} sub
+              </span>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  // MEDIUM SIZE: Standard card with key info
+  if (size === 'medium') {
+    return (
+      <Card className="hover:shadow-md transition-shadow">
+        <CardHeader className="pb-3">
+          <div className="flex items-center gap-2 mb-2">
+            <Badge className={cn(categoryColors.bg, categoryColors.text)}>
+              {domain.category || 'General'}
+            </Badge>
+            {domain.criticality && (
+              <Badge className={criticalityColor}>
+                {domain.criticality}
+              </Badge>
+            )}
+          </div>
+          <CardTitle className="text-lg">{domain.name}</CardTitle>
+          {domain.description && (
+            <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
+              {domain.description}
+            </p>
+          )}
+        </CardHeader>
+        <CardContent className="pt-0">
+          {/* Typical roles */}
+          {domain.typical_roles && domain.typical_roles.length > 0 && (
+            <div className="mb-4">
+              <p className="text-xs font-medium mb-2">Typical Roles:</p>
+              <div className="flex flex-wrap gap-1">
+                {domain.typical_roles.slice(0, 3).map((role, idx) => (
+                  <Badge key={idx} variant="secondary" className="text-xs">
+                    {role}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+          )}
+          
+          {/* Action buttons */}
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" className="flex-1 text-xs" asChild>
+              <Link href={expertSearchUrl}>
+                <Users2 className="h-3 w-3 mr-1" />
+                Find Expert
+              </Link>
+            </Button>
+            <Button variant="outline" size="sm" className="flex-1 text-xs" asChild>
+              <Link href={supplierSearchUrl}>
+                <Truck className="h-3 w-3 mr-1" />
+                Find Supplier
+              </Link>
+            </Button>
+          </div>
+          
+          {/* Explore button */}
+          <Button 
+            variant="default"
+            size="sm"
+            className="w-full mt-2 bg-purple-600 hover:bg-purple-700"
+            onClick={() => router.push(`/blueprints/explore?template=${templateId}&domain=${domain.id}`)}
+          >
+            Explore Domain Tree
+            <ArrowRight className="h-3 w-3 ml-1" />
+          </Button>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  // FULL SIZE: All details (current implementation)
   return (
     <Card className="hover:shadow-md transition-shadow">
       <CardHeader>
@@ -479,6 +583,7 @@ function IndustryDetailView({
   const router = useRouter()
   const [domains, setDomains] = useState<KnowledgeDomain[]>([])
   const [loadingDomains, setLoadingDomains] = useState(true)
+  const [domainCardSize, setDomainCardSize] = useState<'small' | 'medium' | 'full'>('medium')
 
   useEffect(() => {
     let mounted = true
@@ -543,7 +648,40 @@ function IndustryDetailView({
 
       {/* Knowledge Domains */}
       <div className="mt-8">
-        <h2 className="text-2xl font-semibold mb-6">Key Technical Domains</h2>
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-2xl font-semibold">Key Technical Domains</h2>
+          
+          {/* Size toggle for domain cards */}
+          <div className="bg-muted p-1 rounded-md flex items-center" title="Card detail level">
+            <Button
+              variant={domainCardSize === 'small' ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => setDomainCardSize('small')}
+              className={cn("h-8 w-8 p-0", domainCardSize === 'small' && 'shadow-sm')}
+              title="Compact cards"
+            >
+              <Minus className="h-4 w-4" />
+            </Button>
+            <Button
+              variant={domainCardSize === 'medium' ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => setDomainCardSize('medium')}
+              className={cn("h-8 w-8 p-0", domainCardSize === 'medium' && 'shadow-sm')}
+              title="Standard cards"
+            >
+              <Square className="h-4 w-4" />
+            </Button>
+            <Button
+              variant={domainCardSize === 'full' ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => setDomainCardSize('full')}
+              className={cn("h-8 w-8 p-0", domainCardSize === 'full' && 'shadow-sm')}
+              title="Detailed cards"
+            >
+              <AlignJustify className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
         
         {loadingDomains ? (
           <div className="grid grid-cols-1 gap-6">
@@ -570,12 +708,20 @@ function IndustryDetailView({
             </CardContent>
           </Card>
         ) : (
-          <div className="grid grid-cols-1 gap-6">
+          <div className={cn(
+            "grid gap-4 lg:gap-6",
+            domainCardSize === 'full' 
+              ? "grid-cols-1" 
+              : domainCardSize === 'medium'
+                ? "grid-cols-1 md:grid-cols-2"
+                : "grid-cols-1"
+          )}>
             {domains.map((domain) => (
               <DomainCard 
                 key={domain.id} 
                 domain={domain} 
                 templateId={selectedIndustry.id}
+                size={domainCardSize}
               />
             ))}
           </div>
@@ -1131,199 +1277,49 @@ export function InspirationView({ templates = [], packs = [] }: InspirationViewP
             onBack={() => setSelectedIndustry(null)} 
           />
         ) : (
-          // Industry template grid
+          // Industry template grid - simple selection (no size toggle)
           <div>
-            {/* Results count and size controls */}
-            <div className="flex items-center justify-between mb-4">
-              <p className="text-sm text-muted-foreground">
-                Showing {templates.filter(t => ['robotics', 'rockets', 'satellites', 'ai-datacentre', 'pharmaceuticals', 'consumer-electronics', 'saas', 'mobile'].includes(t.product_category)).length} templates
-              </p>
-              <div className="flex items-center gap-3">
-                {/* Card size controls */}
-                <div className="bg-muted p-1 rounded-md flex items-center" title="Card detail level">
-                  <Button
-                    variant={defaultCardSize === 'small' ? 'default' : 'ghost'}
-                    size="sm"
-                    onClick={() => setAllCardsSize('small')}
-                    className={cn(
-                      "h-8 w-8 p-0",
-                      defaultCardSize === 'small' && 'shadow-sm'
-                    )}
-                    title="Compact cards"
-                  >
-                    <Minus className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant={defaultCardSize === 'medium' ? 'default' : 'ghost'}
-                    size="sm"
-                    onClick={() => setAllCardsSize('medium')}
-                    className={cn(
-                      "h-8 w-8 p-0",
-                      defaultCardSize === 'medium' && 'shadow-sm'
-                    )}
-                    title="Standard cards"
-                  >
-                    <Square className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant={defaultCardSize === 'full' ? 'default' : 'ghost'}
-                    size="sm"
-                    onClick={() => setAllCardsSize('full')}
-                    className={cn(
-                      "h-8 w-8 p-0",
-                      defaultCardSize === 'full' && 'shadow-sm'
-                    )}
-                    title="Detailed cards"
-                  >
-                    <AlignJustify className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-            </div>
+            <p className="text-sm text-muted-foreground mb-4">
+              Select an industry to explore its technical domains
+            </p>
 
-            {/* Template grid */}
-            <div className={cn(
-              "grid gap-4 lg:gap-6 animate-fade-in",
-              defaultCardSize === 'full' 
-                ? "grid-cols-1 lg:grid-cols-2" 
-                : "grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
-            )}>
+            {/* Simple industry selection grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               {templates
                 .filter(t => ['robotics', 'rockets', 'satellites', 'ai-datacentre', 'pharmaceuticals', 'consumer-electronics', 'saas', 'mobile'].includes(t.product_category))
                 .map((template) => {
                   const Icon = getTemplateIcon(template.icon)
                   const difficulty = getDifficultyFromMetadata(template.metadata)
-                  const size = defaultCardSize
                   
-                  // Render full-size card with detail modal
-                  if (size === 'full') {
-                    return (
-                      <Card 
-                        key={template.id}
-                        className="flex flex-col transition-all duration-200 hover:shadow-md cursor-pointer"
-                        onClick={() => setSelectedIndustry(template)}
-                      >
-                        <CardHeader>
-                          <div className="flex items-start justify-between gap-4 mb-2">
-                            <div className="p-3 rounded-lg bg-purple-100">
-                              <Icon className="h-6 w-6 text-purple-600" />
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <Badge className={cn("text-xs", getDifficultyColor(difficulty))}>
-                                {difficulty}
-                              </Badge>
-                              <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                                <Layers className="h-3.5 w-3.5" />
-                                <span>{template.estimated_domains} domains</span>
-                              </div>
-                              <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                                <CheckSquare className="h-3.5 w-3.5" />
-                                <span>{template.estimated_questions} questions</span>
-                              </div>
-                            </div>
-                          </div>
-                          <CardTitle className="text-xl">{template.name}</CardTitle>
-                          <p className="text-sm text-muted-foreground mt-2 line-clamp-3">
-                            {template.description}
-                          </p>
-                        </CardHeader>
-                        <CardContent className="pt-0">
-                          <div className="flex items-center gap-2 text-sm text-purple-600 font-medium">
-                            <Eye className="h-4 w-4" />
-                            Click to view blueprint details
-                          </div>
-                        </CardContent>
-                      </Card>
-                    )
-                  }
-
-                  // Render small card
-                  if (size === 'small') {
-                    return (
-                      <Card 
-                        key={template.id}
-                        className="flex flex-col transition-all duration-200 hover:shadow-md cursor-pointer hover:border-purple-500/50"
-                        onClick={() => setSelectedIndustry(template)}
-                      >
-                        <CardContent className="p-3">
-                          <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-lg bg-purple-100 flex items-center justify-center shrink-0">
-                              <Icon className="h-5 w-5 text-purple-600" />
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2 mb-0.5">
-                                <Badge className={cn("text-[9px] px-1.5 py-0", getDifficultyColor(difficulty))}>
-                                  {difficulty}
-                                </Badge>
-                                <span className="text-xs text-muted-foreground">
-                                  {template.estimated_domains} domains
-                                </span>
-                              </div>
-                              <h3 className="text-sm font-bold text-foreground truncate">
-                                {template.name}
-                              </h3>
-                            </div>
-                            <span className="text-xs text-muted-foreground shrink-0">
-                              {template.estimated_questions} Q
-                            </span>
-                          </div>
-                          <div className="flex justify-center mt-2 pt-2 border-t border-muted">
-                            <span className="text-[10px] text-muted-foreground flex items-center gap-1">
-                              <ChevronDown className="w-3 h-3" />
-                              More info
-                            </span>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    )
-                  }
-
-                  // Render medium card (default)
                   return (
                     <Card 
                       key={template.id}
-                      className="flex flex-col transition-all duration-200 hover:shadow-md cursor-pointer hover:border-purple-500/50"
+                      className="cursor-pointer hover:shadow-md hover:border-purple-500/50 transition-all"
                       onClick={() => setSelectedIndustry(template)}
                     >
-                      <CardHeader>
-                        <div className="flex items-start justify-between gap-4 mb-2">
-                          <div className="p-2.5 rounded-lg bg-purple-100">
+                      <CardContent className="p-4">
+                        <div className="flex items-center gap-3 mb-3">
+                          <div className="p-2.5 rounded-lg bg-purple-100 shrink-0">
                             <Icon className="h-5 w-5 text-purple-600" />
                           </div>
-                          <div className="flex items-center gap-2">
-                            <Badge className={cn("text-xs", getDifficultyColor(difficulty))}>
-                              {difficulty}
-                            </Badge>
-                            <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                              <Layers className="h-3.5 w-3.5" />
-                              <span>{template.estimated_domains}</span>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1">
+                              <Badge className={cn("text-[10px]", getDifficultyColor(difficulty))}>
+                                {difficulty}
+                              </Badge>
+                              <span className="text-xs text-muted-foreground">
+                                {template.estimated_domains} domains
+                              </span>
                             </div>
-                            <button className="h-6 w-6 p-0 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors">
-                              <ChevronDown className="h-4 w-4" />
-                            </button>
+                            <h3 className="font-semibold text-sm truncate">{template.name}</h3>
                           </div>
                         </div>
-                        <CardTitle className="text-lg leading-tight">{template.name}</CardTitle>
-                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-1">
-                          <CheckSquare className="h-3.5 w-3.5" />
-                          <span>{template.estimated_questions} questions</span>
-                        </div>
-                      </CardHeader>
-                      
-                      <CardContent className="flex-1 flex flex-col pt-0">
-                        <p className="text-sm text-muted-foreground mb-4 line-clamp-2">
+                        <p className="text-xs text-muted-foreground line-clamp-2">
                           {template.description}
                         </p>
-
-                        <div className="flex items-center justify-between pt-3 border-t border-muted mt-auto">
-                          <button className="text-[10px] text-muted-foreground hover:text-foreground flex items-center gap-0.5 transition-colors">
-                            <ChevronUp className="w-3 h-3" />
-                          </button>
-                          
-                          <Button size="sm" className="h-8 text-xs shadow-sm bg-purple-600 hover:bg-purple-700">
-                            <Eye className="w-3 h-3 mr-1" />
-                            View
-                          </Button>
+                        <div className="flex items-center gap-1 mt-3 pt-3 border-t border-muted text-xs text-purple-600 font-medium">
+                          <Eye className="h-3 w-3" />
+                          <span>Click to explore</span>
                         </div>
                       </CardContent>
                     </Card>
