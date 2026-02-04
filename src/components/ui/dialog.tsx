@@ -65,6 +65,11 @@ const DialogContent = React.forwardRef<
         "fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2",
         dialogContentVariants({ size, className })
       )}
+      style={{
+        backfaceVisibility: 'hidden',
+        WebkitFontSmoothing: 'antialiased',
+        transform: 'translate(-50%, -50%) translateZ(0)',
+      }}
       {...props}
     >
       {children}
