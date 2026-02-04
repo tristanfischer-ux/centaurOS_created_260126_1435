@@ -70,6 +70,10 @@ import Link from 'next/link'
 interface MarketplaceListingDialogProps {
     listing: MarketplaceListing
     trigger?: React.ReactNode
+    /** Controlled mode: external open state */
+    open?: boolean
+    /** Controlled mode: callback when open state changes */
+    onOpenChange?: (open: boolean) => void
 }
 
 // Badge styles matching the category color scheme
@@ -102,10 +106,20 @@ function getAITypeIcon(subcategory: string) {
     }
 }
 
-export function MarketplaceListingDialog({ listing, trigger }: MarketplaceListingDialogProps) {
-    const [open, setOpen] = useState(false)
+export function MarketplaceListingDialog({ 
+    listing, 
+    trigger,
+    open: controlledOpen,
+    onOpenChange: controlledOnOpenChange
+}: MarketplaceListingDialogProps) {
+    const [internalOpen, setInternalOpen] = useState(false)
     const [isContacting, setIsContacting] = useState(false)
     const [activeTab, setActiveTab] = useState<'overview' | 'details'>('overview')
+
+    // Support both controlled and uncontrolled modes
+    const isControlled = controlledOpen !== undefined
+    const open = isControlled ? controlledOpen : internalOpen
+    const setOpen = isControlled ? (controlledOnOpenChange ?? (() => {})) : setInternalOpen
 
     const attrs = listing.attributes || {}
     const category = listing.category
@@ -142,13 +156,16 @@ export function MarketplaceListingDialog({ listing, trigger }: MarketplaceListin
 
     return (
         <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild>
-                {trigger || (
-                    <Button size="sm">
-                        View Details
-                    </Button>
-                )}
-            </DialogTrigger>
+            {/* Only render trigger in uncontrolled mode */}
+            {!isControlled && (
+                <DialogTrigger asChild>
+                    {trigger || (
+                        <Button size="sm">
+                            View Details
+                        </Button>
+                    )}
+                </DialogTrigger>
+            )}
             <DialogContent size="lg" className="max-w-3xl max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
                     <div className="flex items-center gap-2 mb-1">
