@@ -12,7 +12,6 @@ import {
   BarChart3, 
   Settings, 
   HelpCircle,
-  Store,
   LogOut
 } from "lucide-react"
 import { NotificationCenter } from "@/components/NotificationCenter"
@@ -34,10 +33,6 @@ const mainNavigation = [
   { name: "Orders", href: "/supplier-portal/orders", icon: ShoppingCart, tooltip: "View and manage orders" },
   { name: "RFQs", href: "/supplier-portal/rfqs", icon: FileText, tooltip: "Respond to quote requests" },
   { name: "Analytics", href: "/supplier-portal/analytics", icon: BarChart3, tooltip: "Earnings and performance metrics" },
-]
-
-const browseNavigation = [
-  { name: "Marketplace", href: "/marketplace", icon: Store, tooltip: "Browse the marketplace" },
 ]
 
 const supportNavigation = [
@@ -131,9 +126,6 @@ export function SupplierSidebar({ userName, userEmail }: SupplierSidebarProps) {
         
         {/* Spacer */}
         <div className="my-3 border-t border-slate-100" />
-        
-        {/* Browse Navigation */}
-        {browseNavigation.map(renderNavItem)}
         
         {/* Spacer */}
         <div className="my-3 border-t border-slate-100" />
