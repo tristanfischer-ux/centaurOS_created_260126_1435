@@ -396,6 +396,8 @@ export function HomeLayoutClient({
               tasksDueToday={tasksDueToday}
               tasksDueThisWeek={tasksDueThisWeek}
               teamMembers={teamMembers}
+              members={members}
+              tasks={tasks}
               userId={currentUserId}
               userRole={userRole}
               foundryId={foundryId}
@@ -494,6 +496,8 @@ export function HomeLayoutClient({
               tasksDueToday={tasksDueToday}
               tasksDueThisWeek={tasksDueThisWeek}
               teamMembers={teamMembers}
+              members={members}
+              tasks={tasks}
               userId={currentUserId}
               userRole={userRole}
               foundryId={foundryId}
@@ -608,6 +612,8 @@ export function HomeLayoutClient({
               tasksDueToday={tasksDueToday}
               tasksDueThisWeek={tasksDueThisWeek}
               teamMembers={teamMembers}
+              members={members}
+              tasks={tasks}
               userId={currentUserId}
               userRole={userRole}
               foundryId={foundryId}

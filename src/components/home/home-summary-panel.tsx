@@ -14,6 +14,7 @@ import { cn } from '@/lib/utils'
 import { ActionItemsSection } from './action-items-section'
 import { TasksDueSection } from './tasks-due-section'
 import { TeamActivitySection } from './team-activity-section'
+import { HomeAnalytics } from './home-analytics'
 import { Skeleton } from '@/components/ui/skeleton'
 
 interface ActionTask {
@@ -79,6 +80,19 @@ interface TeamMemberActivity {
   }[]
 }
 
+/** Member with messaging metadata for analytics */
+interface AnalyticsMember {
+  id: string
+  full_name: string | null
+  unread_count?: number
+}
+
+/** Task with messaging metadata for analytics */
+interface AnalyticsTask {
+  id: string
+  unread_message_count?: number
+}
+
 export interface HomeSummaryPanelProps {
   // Action items data
   overdueTasks: ActionTask[]
@@ -91,6 +105,10 @@ export interface HomeSummaryPanelProps {
   
   // Team activity data
   teamMembers: TeamMemberActivity[]
+  
+  // Analytics data (optional - for unread message charts)
+  members?: AnalyticsMember[]
+  tasks?: AnalyticsTask[]
   
   // User context
   userId: string
@@ -115,6 +133,8 @@ export function HomeSummaryPanel({
   tasksDueToday,
   tasksDueThisWeek,
   teamMembers,
+  members,
+  tasks,
   userId,
   userRole,
   foundryId,
@@ -126,7 +146,20 @@ export function HomeSummaryPanel({
     <div className={cn("flex flex-col h-full overflow-hidden", className)}>
       {/* Scrollable content */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        {/* Action Items - Always at top */}
+        {/* Quick Analytics at top */}
+        <HomeAnalytics
+          members={members}
+          tasks={tasks}
+          teamMembers={teamMembers}
+          overdueTasks={overdueTasks}
+          pendingDecisions={pendingDecisions}
+          blockers={blockers}
+          tasksDueToday={tasksDueToday}
+          tasksDueThisWeek={tasksDueThisWeek}
+          isExecutiveOrFounder={isExecutiveOrFounder}
+        />
+        
+        {/* Action Items */}
         <ActionItemsSection
           overdueTasks={overdueTasks}
           pendingDecisions={pendingDecisions}
