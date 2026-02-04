@@ -159,17 +159,6 @@ export const FEATURE_REGISTRY: Feature[] = [
         changelog: 'GDPR compliance tools for handling data subject access requests (DSARs), data exports, and right-to-be-forgotten requests.'
     },
     {
-        id: 'admin-migration',
-        name: 'User Migration Tools',
-        description: 'Tools for migrating users from legacy systems',
-        route: '/admin/migration',
-        releasedAt: new Date('2026-01-10'),
-        category: 'admin',
-        status: 'hidden',
-        isVisibleInNav: false,
-        changelog: 'Migration tools for onboarding users from external systems with data import and account linking.'
-    },
-    {
         id: 'admin-settings',
         name: 'Admin Settings',
         description: 'Platform-wide configuration and settings',
@@ -187,8 +176,8 @@ export const FEATURE_REGISTRY: Feature[] = [
         route: '/buyer',
         releasedAt: new Date('2026-01-10'),
         category: 'buyer',
-        status: 'hidden',
-        isVisibleInNav: false,
+        status: 'stable',
+        isVisibleInNav: true,
         changelog: 'Buyer-focused dashboard showing active orders, spending analytics, and recommended providers.'
     },
     {
@@ -198,7 +187,7 @@ export const FEATURE_REGISTRY: Feature[] = [
         route: '/buyer/analytics',
         releasedAt: new Date('2026-01-10'),
         category: 'buyer',
-        status: 'hidden',
+        status: 'stable',
         isVisibleInNav: false,
         changelog: 'Analytics dashboard for buyers showing spending trends, provider performance, and ROI metrics.'
     },
@@ -209,8 +198,8 @@ export const FEATURE_REGISTRY: Feature[] = [
         route: '/my-orders',
         releasedAt: new Date('2026-01-10'),
         category: 'marketplace',
-        status: 'hidden',
-        isVisibleInNav: false,
+        status: 'stable',
+        isVisibleInNav: true,
         changelog: 'Orders management page for viewing order history, tracking active orders, and managing deliverables.'
     },
     {

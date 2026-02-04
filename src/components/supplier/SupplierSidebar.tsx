@@ -99,7 +99,7 @@ export function SupplierSidebar({ userName, userEmail }: SupplierSidebarProps) {
         <div className="flex items-center justify-between">
           <Link href="/supplier-portal" className="group flex items-center gap-2">
             <span className="font-display text-xl font-bold tracking-[0.05em] text-foreground group-hover:text-international-orange transition-colors">
-              CentaurOS
+              ForgeOS
             </span>
             <span className="w-1.5 h-1.5 rounded-full bg-international-orange animate-pulse shadow-[0_0_8px_rgba(255,69,0,0.6)]"></span>
           </Link>

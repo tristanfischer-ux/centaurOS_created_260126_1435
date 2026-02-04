@@ -66,7 +66,6 @@ export async function GET(request: Request) {
           redirectPath = '/objectives'
         }
       }
-      }
 
       // Redirect to the appropriate page with a success message
       const redirectUrl = new URL(redirectPath, requestUrl.origin)
