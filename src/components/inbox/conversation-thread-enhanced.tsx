@@ -11,7 +11,7 @@ import { ContextSelector } from './context-selector'
 import { useConversation } from '@/hooks/useConversation'
 import { useMessagingShortcuts } from '@/hooks/useMessagingShortcuts'
 import type { MessageWithSender } from '@/lib/messaging/service'
-import type { MessageWithContext } from '@/types/messaging'
+import type { MessageWithContext } from '@/lib/messaging/service'
 import { sendMessageWithContext } from '@/lib/messaging/service'
 import { createClient } from '@/lib/supabase/client'
 import { 
@@ -390,8 +390,8 @@ export function ConversationThreadEnhanced({
           content: result.fileName,
           message_type: 'file',
           file_url: result.url,
-          task_id: currentContext?.type === 'task' ? currentContext.id : null,
-          objective_id: currentContext?.type === 'objective' ? currentContext.id : null,
+          task_id: currentContext?.taskId ?? null,
+          objective_id: currentContext?.objectiveId ?? null,
         })
         .select()
         .single()

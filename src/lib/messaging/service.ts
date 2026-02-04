@@ -1131,16 +1131,20 @@ export async function getTaskThread(
   }
 
   // Transform messages to TaskThreadItem format
-  const messageItems = (messages || []).map((msg) => ({
-    id: msg.id,
-    content: msg.content || '',
-    author: msg.sender as import('@/types/tasks').Profile,
-    created_at: msg.created_at,
-    source: 'message' as const,
-    message_id: msg.id,
-    task_id: taskId,
-    conversation_id: msg.conversation_id
-  }))
+  const messageItems = (messages || []).map((msg) => {
+    // Supabase returns the joined profile as an array, get the first element
+    const senderData = Array.isArray(msg.sender) ? msg.sender[0] : msg.sender
+    return {
+      id: msg.id,
+      content: msg.content || '',
+      author: senderData as import('@/types/tasks').Profile,
+      created_at: msg.created_at,
+      source: 'message' as const,
+      message_id: msg.id,
+      task_id: taskId,
+      conversation_id: msg.conversation_id
+    }
+  })
 
   // Filter out comments that were synced FROM messages (to avoid duplicates)
   // These have the marker: _[Synced from conversation - Message ID: xyz]_
@@ -1149,14 +1153,18 @@ export async function getTaskThread(
   )
 
   // Transform comments to TaskThreadItem format
-  const commentItems = filteredComments.map((comment) => ({
-    id: comment.id,
-    content: comment.content,
-    author: comment.user as import('@/types/tasks').Profile,
-    created_at: comment.created_at || new Date().toISOString(),
-    source: 'comment' as const,
-    task_id: taskId
-  }))
+  const commentItems = filteredComments.map((comment) => {
+    // Supabase returns the joined profile as an array, get the first element
+    const userData = Array.isArray(comment.user) ? comment.user[0] : comment.user
+    return {
+      id: comment.id,
+      content: comment.content,
+      author: userData as import('@/types/tasks').Profile,
+      created_at: comment.created_at || new Date().toISOString(),
+      source: 'comment' as const,
+      task_id: taskId
+    }
+  })
 
   // Merge and sort by created_at
   const merged = [...messageItems, ...commentItems].sort(

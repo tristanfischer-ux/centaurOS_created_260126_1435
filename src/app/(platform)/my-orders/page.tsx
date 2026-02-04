@@ -70,7 +70,7 @@ export default async function MyOrdersPage() {
                 </div>
             </div>
 
-            <div className="max-w-5xl">
+            <div className="max-w-5xl mx-auto">
                 <Suspense fallback={<OrdersLoadingSkeleton />}>
                     <MyOrdersView
                         activeOrders={activeResult.data}

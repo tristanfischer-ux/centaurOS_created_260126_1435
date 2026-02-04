@@ -176,7 +176,6 @@ export function TaskConversation({
   const [forwardReason, setForwardReason] = useState('')
 
   const bottomRef = useRef<HTMLDivElement>(null)
-  const inputRef = useRef<HTMLInputElement>(null)
 
   // Check if current user is assignee
   const isAssignee = task.assignee?.id === currentUserId || task.assigned_to === currentUserId
@@ -322,7 +321,6 @@ export function TaskConversation({
       toast.error('Failed to send message')
     } finally {
       setIsSending(false)
-      inputRef.current?.focus()
     }
   }
 
@@ -600,7 +598,6 @@ export function TaskConversation({
                 avatarUrl={participant.avatar_url}
                 size="sm"
                 className="ring-2 ring-background"
-                title={participant.full_name || participant.email}
               />
             ))}
             {participants.length > 5 && (
@@ -619,7 +616,6 @@ export function TaskConversation({
         <div className="flex items-end gap-2">
           <div className="flex-1">
             <MentionInput
-              ref={inputRef}
               value={inputValue}
               onChange={setInputValue}
               members={members.map(m => ({
@@ -628,11 +624,10 @@ export function TaskConversation({
                 email: m.email,
               }))}
               placeholder="Type a message or note... Use @ to mention"
-              onSubmit={(e) => {
-                e.preventDefault()
-                if (inputValue.trim()) {
-                  handleSend(e)
-                }
+              onSubmit={() => {
+                // Trigger form submission on Enter
+                const submitEvent = new Event('submit', { bubbles: true, cancelable: true })
+                document.querySelector('form')?.dispatchEvent(submitEvent)
               }}
               className="bg-background"
             />
