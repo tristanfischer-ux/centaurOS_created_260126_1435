@@ -25,6 +25,7 @@ import {
 import { CreateTaskDialog } from "@/app/(platform)/tasks/create-task-dialog"
 import { FullTaskView } from "@/components/tasks/full-task-view"
 import { getStatusBadgeClass } from "@/lib/status-colors"
+import { ObjectivesAnalytics } from "@/components/objectives/objectives-analytics"
 
 
 
@@ -196,6 +197,9 @@ export function ObjectivesListView({ objectives, objectivesForDialog, members, t
                     </div>
                 )}
             </div>
+
+            {/* Objectives Analytics */}
+            <ObjectivesAnalytics objectives={objectives} />
 
             {/* Hoisted Delete Dialog (Single) */}
             <AlertDialog open={!!objectiveToDelete} onOpenChange={(open) => !open && setObjectiveToDelete(null)}>

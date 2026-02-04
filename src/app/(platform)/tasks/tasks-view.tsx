@@ -68,6 +68,7 @@ import { EmptyState } from "@/components/ui/empty-state"
 import { Progress } from "@/components/ui/progress"
 import { getStatusBadgeClass } from "@/lib/status-colors"
 import { GanttView, JoinedTask } from "@/components/timeline/GanttView"
+import { TasksAnalytics } from "@/components/tasks/tasks-analytics"
 
 // Task type - extended from database type with joined relations
 // Must match TaskCard's Task type for compatibility
@@ -798,6 +799,9 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                         </div>
                     </div>
                 </div>
+
+                {/* Task Analytics */}
+                <TasksAnalytics tasks={tasks} />
 
                 {/* Quick Add Task */}
                 <div className="mb-4">
