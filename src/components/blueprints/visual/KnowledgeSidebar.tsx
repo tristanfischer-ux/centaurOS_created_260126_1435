@@ -35,6 +35,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Separator } from '@/components/ui/separator'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { UserAvatar } from '@/components/ui/user-avatar'
 import { Textarea } from '@/components/ui/textarea'
 import {
   Collapsible,
@@ -200,12 +201,13 @@ function ExpertCard({ expert }: { expert: ExpertMatch }) {
   return (
     <div className="p-3 border rounded-lg hover:shadow-sm transition-all group">
       <div className="flex items-start gap-3">
-        <Avatar className="h-10 w-10 border">
-          <AvatarImage src={expert.avatar} />
-          <AvatarFallback className="bg-muted text-sm">
-            {expert.name.split(' ').map(n => n[0]).join('')}
-          </AvatarFallback>
-        </Avatar>
+        <UserAvatar 
+          name={expert.name}
+          role={undefined}
+          size="md"
+          className="border"
+          src={expert.avatar}
+        />
         
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">

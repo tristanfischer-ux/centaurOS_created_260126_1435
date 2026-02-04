@@ -9,7 +9,7 @@ import {
     DialogTitle,
     DialogDescription,
 } from "@/components/ui/dialog"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { UserAvatar } from "@/components/ui/user-avatar"
 import { Badge } from "@/components/ui/badge"
 import { GitCompare, Check } from "lucide-react"
 
@@ -94,11 +94,11 @@ export function CompareToDialog({ currentMember, allMembers }: CompareToDialogPr
                                         onClick={() => handleSelectMember(member)}
                                         className="flex items-center gap-4 p-3 rounded-lg border border-border hover:border-status-info hover:bg-status-info-light transition-colors text-left"
                                     >
-                                        <Avatar className="h-10 w-10">
-                                            <AvatarFallback className="bg-muted text-muted-foreground">
-                                                {member.full_name?.substring(0, 2).toUpperCase() || "?"}
-                                            </AvatarFallback>
-                                        </Avatar>
+                                        <UserAvatar 
+                                            name={member.full_name}
+                                            role={member.role || undefined}
+                                            size="md"
+                                        />
                                         <div className="flex-1">
                                             <div className="font-medium text-foreground">{member.full_name}</div>
                                             <div className="text-sm text-muted-foreground">{member.role}</div>
@@ -120,11 +120,12 @@ export function CompareToDialog({ currentMember, allMembers }: CompareToDialogPr
                                         {[currentMember, selectedMember!].map(member => (
                                             <th key={member.id} className="py-4 px-6 text-center">
                                                 <div className="flex flex-col items-center gap-2">
-                                                    <Avatar className="h-14 w-14 border-2 border-slate-200">
-                                                        <AvatarFallback className="bg-muted text-muted-foreground font-bold">
-                                                            {member.full_name?.substring(0, 2).toUpperCase()}
-                                                        </AvatarFallback>
-                                                    </Avatar>
+                                                    <UserAvatar 
+                                                        name={member.full_name}
+                                                        role={member.role || undefined}
+                                                        size="xl"
+                                                        className="border-2 border-slate-200"
+                                                    />
                                                     <span className="font-semibold text-foreground">{member.full_name}</span>
                                                 </div>
                                             </th>

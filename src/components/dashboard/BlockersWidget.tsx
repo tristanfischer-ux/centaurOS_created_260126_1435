@@ -4,12 +4,11 @@ import { useState, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { UserAvatar } from '@/components/ui/user-avatar'
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { AlertTriangle, CheckCircle, Loader2, HelpCircle } from 'lucide-react'
 import { getStandupsWithBlockers, type Standup } from '@/actions/standups'
 import { formatDistanceToNow } from 'date-fns'
 import Link from 'next/link'
-import { cn, getInitials } from '@/lib/utils'
+import { cn } from '@/lib/utils'
 
 interface BlockersWidgetProps {
     userRole: string
@@ -103,11 +102,11 @@ export function BlockersWidget({ userRole }: BlockersWidgetProps) {
                                     )}
                                 >
                                     <div className="flex items-start gap-3">
-                                        <Avatar className="h-8 w-8 shrink-0">
-                                            <AvatarFallback className="text-xs bg-muted text-muted-foreground">
-                                                {getInitials(user?.full_name || null)}
-                                            </AvatarFallback>
-                                        </Avatar>
+                                        <UserAvatar
+                                            name={user?.full_name}
+                                            role={user?.role || undefined}
+                                            size="sm"
+                                        />
                                         <div className="flex-1 min-w-0">
                                             <div className="flex items-center gap-2 mb-1">
                                                 <span className="text-sm font-medium text-foreground">

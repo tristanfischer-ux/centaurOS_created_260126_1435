@@ -24,6 +24,8 @@ import { updateTaskAssignees, updateTaskDates } from "@/actions/tasks"
 import { toast } from "sonner"
 import { format } from "date-fns"
 import { getStatusBarClass, getStatusBadgeClass } from "@/lib/status-colors"
+import { UserAvatar } from "@/components/ui/user-avatar"
+import { getInitials } from "@/lib/utils"
 
 // Types for joined data
 type JoinedTask = Database["public"]["Tables"]["tasks"]["Row"] & {
@@ -38,49 +40,6 @@ interface TimelineListViewProps {
     tasks: JoinedTask[]
     members: { id: string, full_name: string, role: string, email?: string }[]
     currentUserId: string
-}
-
-// Get initials from full name
-function getInitials(fullName: string | null | undefined): string {
-    if (!fullName) return "?"
-    const parts = fullName.trim().split(/\s+/)
-    if (parts.length === 1) return parts[0].charAt(0).toUpperCase()
-    return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase()
-}
-
-// Avatar color based on name (consistent color per person)
-function getAvatarColor(name: string | null | undefined): string {
-    if (!name) return "bg-muted-foreground/50"
-    const colors = [
-        "bg-blue-500", "bg-green-500", "bg-purple-500", "bg-pink-500",
-        "bg-indigo-500", "bg-teal-500", "bg-orange-500", "bg-rose-500"
-    ]
-    let hash = 0
-    for (let i = 0; i < name.length; i++) {
-        hash = name.charCodeAt(i) + ((hash << 5) - hash)
-    }
-    return colors[Math.abs(hash) % colors.length]
-}
-
-// Initials Avatar Component
-function InitialsAvatar({
-    name,
-    size = "md",
-    isAI = false
-}: {
-    name: string | null | undefined
-    size?: "sm" | "md"
-    isAI?: boolean
-}) {
-    const initials = getInitials(name)
-    const bgColor = isAI ? "bg-amber-500" : getAvatarColor(name)
-    const sizeClasses = size === "sm" ? "h-5 w-5 text-[10px]" : "h-8 w-8 text-xs"
-
-    return (
-        <div className={`${sizeClasses} ${bgColor} rounded-full flex items-center justify-center text-white font-semibold shrink-0`}>
-            {isAI ? "🤖" : initials}
-        </div>
-    )
 }
 
 // Group tasks by DUE DATE (end_date)
@@ -188,10 +147,10 @@ function MiniTimelineBar({ task, windowStart, windowEnd, stableNow }: {
                 className="absolute top-0 flex items-center h-full z-20"
                 style={{ left: `calc(${startPercent}% + 2px)` }}
             >
-                <InitialsAvatar
+                <UserAvatar
                     name={task.profiles?.full_name}
-                    size="sm"
-                    isAI={isAI}
+                    role={task.profiles?.role}
+                    size="xs"
                 />
             </div>
         </div>
@@ -417,15 +376,15 @@ export function TimelineListView({ tasks, members, currentUserId }: TimelineList
                                                 <div onClick={(e) => e.stopPropagation()}>
                                                     <Popover>
                                                         <PopoverTrigger asChild>
-                                                            <div className="relative group cursor-pointer">
+                                                                <div className="relative group cursor-pointer">
                                                                 <div className="flex -space-x-2">
                                                                     {currentAssignees.length > 0 ? (
                                                                         currentAssignees.slice(0, 3).map((assignee, i) => (
                                                                             <div key={assignee.id} className="relative" style={{ zIndex: 10 - i }}>
-                                                                                <InitialsAvatar
+                                                                                <UserAvatar
                                                                                     name={assignee.full_name}
-                                                                                    size="md"
-                                                                                    isAI={assignee.role === 'AI_Agent'}
+                                                                                    role={assignee.role}
+                                                                                    size="sm"
                                                                                 />
                                                                             </div>
                                                                         ))
@@ -457,7 +416,7 @@ export function TimelineListView({ tasks, members, currentUserId }: TimelineList
                                                                                     onSelect={() => handleAssigneeToggle(task.id, currentAssignees, member.id)}
                                                                                 >
                                                                                     <div className="flex items-center gap-2 w-full">
-                                                                                        <InitialsAvatar name={member.full_name} size="sm" isAI={member.role === 'AI_Agent'} />
+                                                                                        <UserAvatar name={member.full_name} role={member.role} size="xs" />
                                                                                         <span className="truncate flex-1">{member.full_name}</span>
                                                                                         {isSelected && <Check className="ml-auto h-4 w-4 text-international-orange" />}
                                                                                     </div>

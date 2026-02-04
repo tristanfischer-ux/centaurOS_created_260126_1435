@@ -23,6 +23,8 @@ import { useRouter } from "next/navigation"
 import { format, addDays, subDays, addWeeks, subWeeks, addMonths, subMonths } from "date-fns"
 import { getStatusHex } from "@/lib/status-colors"
 import { FullTaskView } from "@/components/tasks/full-task-view"
+import { UserAvatar, UserAvatarStack } from "@/components/ui/user-avatar"
+import { getInitials } from "@/lib/utils"
 
 // Profile type for assignees
 type AssigneeProfile = {
@@ -64,28 +66,6 @@ interface ExtendedGanttTask extends GanttTask {
     assignees?: AssigneeProfile[] // All assignees for multi-assignee display
     taskProgress?: number // Actual progress percentage from DB
     taskStatus?: string | null // Task status for legend reference
-}
-
-// Get initials from full name
-function getInitials(fullName: string | null | undefined): string {
-    if (!fullName) return "?"
-    const parts = fullName.trim().split(/\s+/)
-    if (parts.length === 1) return parts[0].charAt(0).toUpperCase()
-    return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase()
-}
-
-// Avatar color based on name (consistent color per person)
-function getAvatarColor(name: string | null | undefined): string {
-    if (!name) return "bg-muted"
-    const colors = [
-        "bg-chart-2", "bg-chart-3", "bg-chart-5", "bg-chart-6",
-        "bg-chart-4", "bg-chart-1", "bg-chart-2", "bg-chart-3"
-    ]
-    let hash = 0
-    for (let i = 0; i < name.length; i++) {
-        hash = name.charCodeAt(i) + ((hash << 5) - hash)
-    }
-    return colors[Math.abs(hash) % colors.length]
 }
 
 // Calculate progress based on task status
@@ -131,27 +111,6 @@ function getBarColor(task: { status: string | null, end_date: string | null }): 
     return getStatusHex(task.status)
 }
 
-// Initials Avatar Component
-function InitialsAvatar({
-    name,
-    size = "sm",
-    isAI = false
-}: {
-    name: string | null | undefined
-    size?: "xs" | "sm"
-    isAI?: boolean
-}) {
-    const initials = getInitials(name)
-    const bgColor = isAI ? "bg-status-warning" : getAvatarColor(name)
-    const sizeClasses = size === "xs" ? "h-5 w-5 text-[9px]" : "h-6 w-6 text-[10px]"
-
-    return (
-        <div className={`${sizeClasses} ${bgColor} rounded-full flex items-center justify-center text-white font-semibold shrink-0`}>
-            {isAI ? "🤖" : initials}
-        </div>
-    )
-}
-
 // Custom Header Component
 function CustomTaskListHeader({ headerHeight }: { headerHeight: number }) {
     return (
@@ -163,35 +122,6 @@ function CustomTaskListHeader({ headerHeight }: { headerHeight: number }) {
             <div className="flex-1 px-2 min-w-[120px]">Name</div>
             <div className="w-20 px-2 text-center">From</div>
             <div className="w-20 px-2 text-center">To</div>
-        </div>
-    )
-}
-
-// Multi-assignee avatar stack component
-function AssigneeAvatarStack({ assignees, maxDisplay = 3 }: { assignees: AssigneeProfile[], maxDisplay?: number }) {
-    if (!assignees || assignees.length === 0) {
-        return <InitialsAvatar name={null} size="xs" />
-    }
-
-    const displayedAssignees = assignees.slice(0, maxDisplay)
-    const remainingCount = assignees.length - maxDisplay
-
-    return (
-        <div className="flex items-center -space-x-1.5">
-            {displayedAssignees.map((assignee, idx) => (
-                <div key={assignee.id} style={{ zIndex: maxDisplay - idx }} className="ring-1 ring-white rounded-full">
-                    <InitialsAvatar
-                        name={assignee.full_name}
-                        size="xs"
-                        isAI={assignee.role === 'AI_Agent'}
-                    />
-                </div>
-            ))}
-            {remainingCount > 0 && (
-                <div className="h-5 w-5 bg-muted rounded-full flex items-center justify-center text-[8px] font-semibold text-muted-foreground ring-1 ring-white">
-                    +{remainingCount}
-                </div>
-            )}
         </div>
     )
 }
@@ -227,12 +157,21 @@ function CustomTaskListTable({
                         <div className="flex-1 px-2 min-w-[120px] flex items-center gap-2">
                             {/* Show multiple assignees if available, otherwise fall back to single */}
                             {task.assignees && task.assignees.length > 0 ? (
-                                <AssigneeAvatarStack assignees={task.assignees} />
-                            ) : (
-                                <InitialsAvatar
-                                    name={task.assigneeName}
+                                <UserAvatarStack 
+                                    users={task.assignees.map(a => ({
+                                        id: a.id,
+                                        name: a.full_name,
+                                        role: a.role,
+                                        avatarUrl: null
+                                    }))}
                                     size="xs"
-                                    isAI={task.assigneeRole === 'AI_Agent'}
+                                    max={3}
+                                />
+                            ) : (
+                                <UserAvatar 
+                                    name={task.assigneeName} 
+                                    role={task.assigneeRole}
+                                    size="xs" 
                                 />
                             )}
                             <span className="text-foreground truncate">{displayName}</span>

@@ -3,8 +3,8 @@
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { X, GitCompare, User, Brain, Zap } from "lucide-react"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { X, GitCompare, Brain, Zap } from "lucide-react"
+import { UserAvatar } from "@/components/ui/user-avatar"
 import { cn } from "@/lib/utils"
 
 interface TeamMemberForComparison {
@@ -36,19 +36,6 @@ function getRoleColors(role: string): string {
         case 'Apprentice': 
         default: return 'bg-electric-blue-light text-electric-blue border-electric-blue-light'
     }
-}
-
-/**
- * Get initials from full name for avatar display.
- * 
- * @param name - The full name to extract initials from
- * @returns Uppercase initials (e.g., "JD" for "John Doe")
- */
-function getInitials(name: string | null): string {
-    if (!name) return '?'
-    const parts = name.trim().split(/\s+/)
-    if (parts.length === 1) return parts[0].charAt(0).toUpperCase()
-    return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase()
 }
 
 /**
@@ -113,7 +100,6 @@ export function TeamComparisonBar({
                     <div className="flex gap-3 min-w-min">
                         {selectedMembers.map(member => {
                             const colorClasses = getRoleColors(member.role)
-                            const isAI = member.role === 'AI_Agent'
                             const isCentaur = !!member.paired_ai_id
                             
                             return (
@@ -125,16 +111,13 @@ export function TeamComparisonBar({
                                     )}
                                 >
                                     {/* Avatar with role icon */}
-                                    <div className="flex-shrink-0 w-8 h-8 rounded-md bg-background flex items-center justify-center relative">
-                                        {isAI ? (
-                                            <Brain className="w-4 h-4" />
-                                        ) : (
-                                            <Avatar className="h-8 w-8">
-                                                <AvatarFallback className="bg-transparent text-xs font-medium">
-                                                    {getInitials(member.full_name)}
-                                                </AvatarFallback>
-                                            </Avatar>
-                                        )}
+                                    <div className="flex-shrink-0 relative">
+                                        <UserAvatar
+                                            name={member.full_name}
+                                            role={member.role}
+                                            size="sm"
+                                            className="h-8 w-8"
+                                        />
                                         {isCentaur && (
                                             <div className="absolute -bottom-1 -right-1 bg-status-warning rounded-full p-0.5">
                                                 <Zap className="w-2 h-2 text-white fill-white" />

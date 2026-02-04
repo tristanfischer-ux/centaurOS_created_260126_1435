@@ -5,6 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { UserAvatar } from "@/components/ui/user-avatar"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { 
     X, 
@@ -58,16 +59,6 @@ function getRoleBadgeClass(role: string): string {
         case 'Apprentice':
         default: return 'bg-electric-blue-light text-electric-blue border-0'
     }
-}
-
-/**
- * Get initials from full name.
- */
-function getInitials(name: string | null): string {
-    if (!name) return '?'
-    const parts = name.trim().split(/\s+/)
-    if (parts.length === 1) return parts[0].charAt(0).toUpperCase()
-    return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase()
 }
 
 /**
@@ -369,11 +360,20 @@ function MemberHeader({ member }: { member: TeamMemberForComparison }) {
     return (
         <div className="flex items-start gap-3">
             <div className="relative flex-shrink-0">
-                <Avatar className="h-12 w-12 border-2 border-muted">
-                    <AvatarFallback className="bg-muted text-muted-foreground font-bold">
-                        {isAI ? <Brain className="h-5 w-5" /> : getInitials(member.full_name)}
-                    </AvatarFallback>
-                </Avatar>
+                {isAI ? (
+                    <Avatar className="h-12 w-12 border-2 border-muted">
+                        <AvatarFallback className="bg-muted text-muted-foreground font-bold">
+                            <Brain className="h-5 w-5" />
+                        </AvatarFallback>
+                    </Avatar>
+                ) : (
+                    <UserAvatar 
+                        name={member.full_name} 
+                        role={member.role}
+                        size="lg"
+                        className="border-2 border-muted"
+                    />
+                )}
                 {isCentaur && (
                     <div className="absolute -bottom-1 -right-1 bg-status-warning rounded-full p-0.5 border-2 border-background">
                         <Zap className="w-2.5 h-2.5 text-white fill-white" />
@@ -467,11 +467,20 @@ function MemberComparisonCard({
         <Card className="p-4">
             <div className="flex items-start gap-3 mb-4">
                 <div className="relative flex-shrink-0">
-                    <Avatar className="h-12 w-12 border-2 border-muted">
-                        <AvatarFallback className="bg-muted text-muted-foreground font-bold">
-                            {isAI ? <Brain className="h-5 w-5" /> : getInitials(member.full_name)}
-                        </AvatarFallback>
-                    </Avatar>
+                    {isAI ? (
+                        <Avatar className="h-12 w-12 border-2 border-muted">
+                            <AvatarFallback className="bg-muted text-muted-foreground font-bold">
+                                <Brain className="h-5 w-5" />
+                            </AvatarFallback>
+                        </Avatar>
+                    ) : (
+                        <UserAvatar 
+                            name={member.full_name} 
+                            role={member.role}
+                            size="lg"
+                            className="border-2 border-muted"
+                        />
+                    )}
                     {isCentaur && (
                         <div className="absolute -bottom-1 -right-1 bg-status-warning rounded-full p-0.5 border-2 border-background">
                             <Zap className="w-2.5 h-2.5 text-white fill-white" />

@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { UserAvatar } from "@/components/ui/user-avatar"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
@@ -35,7 +35,7 @@ import { Markdown } from "@/components/ui/markdown"
 import { addMemberToTeam, removeMemberFromTeam, assignTaskToMember, unassignTaskFromMember } from "@/actions/team-assignments"
 import { updateProfileDetails } from "@/actions/profiles"
 import { toast } from "sonner"
-import { cn, getInitials } from "@/lib/utils"
+import { cn } from "@/lib/utils"
 import {
     Loader2,
     Edit2,
@@ -583,11 +583,12 @@ export function FullProfileView({ open, onOpenChange, memberId, currentUserId }:
                         </div>
                     ) : profile ? (
                         <div className="flex items-start gap-6">
-                            <Avatar className="h-32 w-32 border-4 border-slate-50 shadow-inner">
-                                <AvatarFallback className="text-4xl bg-muted">
-                                    {profile.role === 'AI_Agent' ? '🤖' : getInitials(profile.full_name || profile.email)}
-                                </AvatarFallback>
-                            </Avatar>
+                            <UserAvatar
+                                name={profile.full_name}
+                                role={profile.role}
+                                size="3xl"
+                                className="border-4 border-slate-50 shadow-inner"
+                            />
                             
                             <div className="flex-1 min-w-0">
                                 <div className="flex items-start justify-between gap-4">

@@ -7,7 +7,7 @@ import { PublicProfile } from '@/actions/public-profile'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { UserAvatar } from '@/components/ui/user-avatar'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { 
     Star, 
@@ -60,13 +60,6 @@ export function PublicProfileView({ profile }: PublicProfileViewProps) {
         return `${symbols[profile.currency] || ''}${amount.toLocaleString()}`
     }
     
-    const initials = profile.user_name
-        ?.split(' ')
-        .map(n => n[0])
-        .join('')
-        .toUpperCase()
-        .slice(0, 2) || 'EX'
-    
     return (
         <div className="max-w-5xl mx-auto py-8 px-4">
             {/* Header Section */}
@@ -77,12 +70,15 @@ export function PublicProfileView({ profile }: PublicProfileViewProps) {
                         <CardContent className="pt-6">
                             {/* Avatar and Basic Info */}
                             <div className="text-center mb-6">
-                                <Avatar className="w-28 h-28 mx-auto mb-4 border-4 border-background shadow-lg">
-                                    <AvatarImage src={profile.user_avatar || undefined} />
-                                    <AvatarFallback className="text-2xl font-semibold bg-international-orange/10 text-international-orange">
-                                        {initials}
-                                    </AvatarFallback>
-                                </Avatar>
+                                <div className="mx-auto mb-4">
+                                    <UserAvatar
+                                        name={profile.user_name}
+                                        role="Executive"
+                                        avatarUrl={profile.user_avatar}
+                                        size="2xl"
+                                        className="border-4 border-background shadow-lg"
+                                    />
+                                </div>
                                 
                                 <h1 className="text-2xl font-bold text-foreground mb-1">
                                     {profile.user_name || 'Executive'}

@@ -5,7 +5,7 @@ import { X, Send, Loader2, MessageSquare } from 'lucide-react'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { UserAvatar } from '@/components/ui/user-avatar'
 import { cn } from '@/lib/utils'
 import { format } from 'date-fns'
 import { getThreadReplies, sendThreadReply, getThreadParent, type ThreadReply, type ThreadMessage } from '@/actions/threads'
@@ -140,15 +140,6 @@ export function ThreadPanel({ parentMessageId, onClose, open }: ThreadPanelProps
     }
   }
 
-  function getInitials(name: string | null): string {
-    if (!name) return '?'
-    return name
-      .split(' ')
-      .map(n => n[0])
-      .join('')
-      .toUpperCase()
-      .slice(0, 2)
-  }
 
   return (
     <Sheet open={open} onOpenChange={(open) => !open && onClose()}>
@@ -196,12 +187,13 @@ export function ThreadPanel({ parentMessageId, onClose, open }: ThreadPanelProps
               {parentMessage && (
                 <div className="pb-6 border-b">
                   <div className="flex gap-3">
-                    <Avatar className="h-10 w-10 flex-shrink-0">
-                      <AvatarImage src={parentMessage.sender?.avatar_url || undefined} />
-                      <AvatarFallback>
-                        {getInitials(parentMessage.sender?.full_name || null)}
-                      </AvatarFallback>
-                    </Avatar>
+                    <UserAvatar
+                      name={parentMessage.sender?.full_name}
+                      avatarUrl={parentMessage.sender?.avatar_url}
+                      role={parentMessage.sender?.role}
+                      size="md"
+                      className="flex-shrink-0"
+                    />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-baseline gap-2 mb-1">
                         <span className="font-semibold text-foreground">
@@ -230,12 +222,13 @@ export function ThreadPanel({ parentMessageId, onClose, open }: ThreadPanelProps
                 <div className="space-y-4">
                   {replies.map((reply) => (
                     <div key={reply.id} className="flex gap-3">
-                      <Avatar className="h-8 w-8 flex-shrink-0">
-                        <AvatarImage src={reply.sender?.avatar_url || undefined} />
-                        <AvatarFallback className="text-xs">
-                          {getInitials(reply.sender?.full_name || null)}
-                        </AvatarFallback>
-                      </Avatar>
+                      <UserAvatar
+                        name={reply.sender?.full_name}
+                        avatarUrl={reply.sender?.avatar_url}
+                        role={reply.sender?.role}
+                        size="sm"
+                        className="flex-shrink-0"
+                      />
                       <div className="flex-1 min-w-0">
                         <div className="flex items-baseline gap-2 mb-1">
                           <span className="font-medium text-sm text-foreground">

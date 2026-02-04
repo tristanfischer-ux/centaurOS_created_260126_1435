@@ -5,6 +5,7 @@ import { useAutoRefresh } from "@/hooks/useAutoRefresh"
 import { RefreshButton } from "@/components/RefreshButton"
 import { formatDistanceToNow, isPast, parseISO } from "date-fns"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { UserAvatar } from "@/components/ui/user-avatar"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -154,14 +155,6 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
         setTeamName("")
         setTeamError(null)
         setShowQuickTeamDialog(true)
-    }
-
-    // Helper: get initials from full name
-    const getInitials = (name: string | null) => {
-        if (!name) return '?'
-        const parts = name.trim().split(/\s+/)
-        if (parts.length === 1) return parts[0].charAt(0).toUpperCase()
-        return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase()
     }
 
     // Helper: calculate bandwidth from task counts
@@ -465,11 +458,20 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                         
                         {/* Avatar with Presence */}
                         <div className="relative">
-                            <Avatar className={`h-10 w-10 ${avatarBorderClass}`}>
-                                <AvatarFallback className={avatarBgClass}>
-                                    {isAIAgent ? <Brain className="h-5 w-5" /> : getInitials(member.full_name)}
-                                </AvatarFallback>
-                            </Avatar>
+                            {isAIAgent ? (
+                                <Avatar className={`h-10 w-10 ${avatarBorderClass}`}>
+                                    <AvatarFallback className={avatarBgClass}>
+                                        <Brain className="h-5 w-5" />
+                                    </AvatarFallback>
+                                </Avatar>
+                            ) : (
+                                <UserAvatar 
+                                    name={member.full_name} 
+                                    role={member.role}
+                                    size="md"
+                                    className={avatarBorderClass}
+                                />
+                            )}
                             {!isAIAgent && (
                                 <PresenceIndicator
                                     status={getPresenceForUser(member.id)?.status || 'offline'}
@@ -820,11 +822,20 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                             onClick={() => setSelectedMemberId(member.id)}
                         >
                             <div className="relative">
-                                <Avatar className="h-9 w-9 border border-muted">
-                                    <AvatarFallback className="bg-muted text-muted-foreground text-xs">
-                                        {isAIAgent ? <Brain className="h-4 w-4" /> : getInitials(member.full_name)}
-                                    </AvatarFallback>
-                                </Avatar>
+                                {isAIAgent ? (
+                                    <Avatar className="h-9 w-9 border border-muted">
+                                        <AvatarFallback className="bg-muted text-muted-foreground text-xs">
+                                            <Brain className="h-4 w-4" />
+                                        </AvatarFallback>
+                                    </Avatar>
+                                ) : (
+                                    <UserAvatar 
+                                        name={member.full_name} 
+                                        role={member.role}
+                                        size="sm"
+                                        className="border border-muted"
+                                    />
+                                )}
                                 {!isAIAgent && (
                                     <PresenceIndicator
                                         status={getPresenceForUser(member.id)?.status || 'offline'}
@@ -1292,11 +1303,13 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                                             {/* Member avatars */}
                                             <div className="flex -space-x-2">
                                                 {(team.members || []).slice(0, 4).map(member => (
-                                                    <Avatar key={member.id} className="h-8 w-8 border-2 border-background">
-                                                        <AvatarFallback className="bg-status-success-light text-status-success-dark text-xs font-bold">
-                                                            {getInitials(member.full_name)}
-                                                        </AvatarFallback>
-                                                    </Avatar>
+                                                    <UserAvatar 
+                                                        key={member.id}
+                                                        name={member.full_name}
+                                                        role={member.role || undefined}
+                                                        size="md"
+                                                        className="border-2 border-background"
+                                                    />
                                                 ))}
                                                 {(team.members || []).length > 4 && (
                                                     <div className="h-8 w-8 rounded-full bg-muted border-2 border-background flex items-center justify-center text-xs text-muted-foreground">
@@ -1404,11 +1417,12 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                         <div className="flex items-center justify-center gap-4 py-4 flex-wrap">
                             {quickTeamMembers.map((member, idx) => (
                                 <div key={member.id} className="flex flex-col items-center relative">
-                                    <Avatar className="h-14 w-14 border-2 border-status-success">
-                                        <AvatarFallback className="bg-status-success-light text-status-success-dark font-bold">
-                                            {getInitials(member.full_name)}
-                                        </AvatarFallback>
-                                    </Avatar>
+                                    <UserAvatar 
+                                        name={member.full_name}
+                                        role={member.role}
+                                        size="xl"
+                                        className="border-2 border-status-success"
+                                    />
                                     <span className="text-sm font-medium text-foreground mt-2">{member.full_name?.split(' ')[0]}</span>
                                     {idx < quickTeamMembers.length - 1 && (
                                         <span className="absolute top-7 left-[calc(100%+0.5rem)] text-2xl text-status-success">+</span>

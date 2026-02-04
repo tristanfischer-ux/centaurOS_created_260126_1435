@@ -10,6 +10,7 @@ export interface ThreadMessage {
     id: string
     full_name: string | null
     avatar_url: string | null
+    role: string | null
   } | null
   created_at: string
   reply_count: number
@@ -23,6 +24,7 @@ export interface ThreadReply {
     id: string
     full_name: string | null
     avatar_url: string | null
+    role: string | null
   } | null
   created_at: string
   parent_message_id: string
@@ -73,7 +75,7 @@ export async function getThreadReplies(
         sender_id,
         created_at,
         parent_message_id,
-        sender:profiles!messages_sender_id_fkey(id, full_name, avatar_url)
+        sender:profiles!messages_sender_id_fkey(id, full_name, avatar_url, role)
       `)
       .eq('parent_message_id', parentMessageId)
       .order('created_at', { ascending: true })
@@ -143,7 +145,7 @@ export async function sendThreadReply(
         sender_id,
         created_at,
         parent_message_id,
-        sender:profiles!messages_sender_id_fkey(id, full_name, avatar_url)
+        sender:profiles!messages_sender_id_fkey(id, full_name, avatar_url, role)
       `)
       .single()
     
@@ -183,7 +185,7 @@ export async function getThreadParent(
         sender_id,
         created_at,
         reply_count,
-        sender:profiles!messages_sender_id_fkey(id, full_name, avatar_url)
+        sender:profiles!messages_sender_id_fkey(id, full_name, avatar_url, role)
       `)
       .eq('id', messageId)
       .single()

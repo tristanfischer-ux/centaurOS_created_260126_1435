@@ -12,7 +12,7 @@
 import Link from 'next/link'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { UserAvatar } from '@/components/ui/user-avatar'
 import { 
   AlertCircle, 
   Clock, 
@@ -215,11 +215,11 @@ export function ActionItemsSection({
                   className="p-2 rounded text-xs bg-destructive/5 border border-destructive/20"
                 >
                   <div className="flex items-center gap-2 mb-1">
-                    <Avatar className="h-4 w-4">
-                      <AvatarFallback className="text-[8px] bg-muted">
-                        {getInitials(standup.user.full_name || 'U')}
-                      </AvatarFallback>
-                    </Avatar>
+                    <UserAvatar 
+                      name={standup.user.full_name || 'U'}
+                      role={standup.user.role}
+                      size="xs"
+                    />
                     <span className="font-medium text-foreground">
                       {standup.user.full_name}
                     </span>

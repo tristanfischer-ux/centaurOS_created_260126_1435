@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
 import { Markdown } from "@/components/ui/markdown"
+import { UserAvatar } from "@/components/ui/user-avatar"
 import { deleteObjective } from "@/actions/objectives"
 import { toast } from "sonner"
 import { EditObjectiveDialog } from "@/components/objectives/edit-objective-dialog"
@@ -468,9 +469,16 @@ export function ObjectivesListView({ objectives, objectivesForDialog, members, t
 
                                                         <div className="flex items-center gap-2 sm:gap-3 shrink-0">
                                                             {task.assignee?.full_name && (
-                                                                <span className="text-xs text-muted-foreground max-w-[80px] sm:max-w-[120px] truncate hidden sm:inline">
-                                                                    {task.assignee.full_name}
-                                                                </span>
+                                                                <div className="flex items-center gap-1 hidden sm:flex">
+                                                                    <UserAvatar 
+                                                                        name={task.assignee.full_name} 
+                                                                        role={task.assignee.role} 
+                                                                        size="xs" 
+                                                                    />
+                                                                    <span className="text-xs text-muted-foreground max-w-[80px] sm:max-w-[120px] truncate">
+                                                                        {task.assignee.full_name}
+                                                                    </span>
+                                                                </div>
                                                             )}
 
                                                             {/* Meta Icons */}

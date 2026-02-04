@@ -11,7 +11,7 @@
 import Link from 'next/link'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { UserAvatar } from '@/components/ui/user-avatar'
 import { 
   Users,
   ChevronRight,
@@ -84,12 +84,12 @@ function TeamMemberRow({ member }: { member: TeamMemberActivity }) {
       >
         {/* Avatar with presence */}
         <div className="relative">
-          <Avatar className="h-8 w-8">
-            {member.avatar_url && <AvatarImage src={member.avatar_url} />}
-            <AvatarFallback className="text-xs bg-muted">
-              {getInitials(member.full_name || '?')}
-            </AvatarFallback>
-          </Avatar>
+          <UserAvatar 
+            name={member.full_name || '?'}
+            role={member.role}
+            avatarUrl={member.avatar_url}
+            size="md"
+          />
           <PresenceDot status={member.presence_status} />
         </div>
         

@@ -250,10 +250,6 @@ export function ActivityItem({ item, onReply, onTaskClick }: ActivityItemProps) 
             <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center">
               <Bot className="h-4 w-4 text-muted-foreground" />
             </div>
-          ) : isHistoryItem ? (
-            <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center">
-              <History className="h-4 w-4 text-muted-foreground" />
-            </div>
           ) : (
             <UserAvatar 
               name={item.author.full_name || 'Unknown'} 

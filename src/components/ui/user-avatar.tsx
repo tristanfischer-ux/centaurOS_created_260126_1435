@@ -53,7 +53,7 @@ export interface UserAvatarProps {
   /** Optional avatar image URL */
   avatarUrl?: string | null
   /** Size variant */
-  size?: "xs" | "sm" | "md" | "lg" | "xl"
+  size?: "xs" | "sm" | "md" | "lg" | "xl" | "2xl" | "3xl"
   /** Additional className for the Avatar root */
   className?: string
   /** Whether to show a border */
@@ -68,6 +68,8 @@ const sizeClasses = {
   md: "h-8 w-8",
   lg: "h-10 w-10",
   xl: "h-14 w-14",
+  "2xl": "h-28 w-28",
+  "3xl": "h-32 w-32",
 }
 
 const textSizeClasses = {
@@ -76,6 +78,8 @@ const textSizeClasses = {
   md: "text-xs",
   lg: "text-sm",
   xl: "text-xl",
+  "2xl": "text-2xl",
+  "3xl": "text-4xl",
 }
 
 const iconSizeClasses = {
@@ -84,6 +88,8 @@ const iconSizeClasses = {
   md: "h-3.5 w-3.5",
   lg: "h-4 w-4",
   xl: "h-6 w-6",
+  "2xl": "h-12 w-12",
+  "3xl": "h-16 w-16",
 }
 
 /**

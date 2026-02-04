@@ -6,7 +6,7 @@ import { addTaskComment } from "@/actions/tasks"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { UserAvatar } from "@/components/ui/user-avatar"
 import { Loader2, Send } from "lucide-react"
 
 type Comment = Database["public"]["Tables"]["task_comments"]["Row"]
@@ -49,11 +49,11 @@ export function TaskFeed({ taskId, comments, currentUserId }: { taskId: string, 
 
                         return (
                             <div key={comment.id} className={`flex gap-3 ${isMe ? 'flex-row-reverse' : ''}`}>
-                                <Avatar className="h-8 w-8">
-                                    <AvatarFallback className="text-xs bg-foundry-700 text-gray-300">
-                                        {isMe ? "ME" : "U"}
-                                    </AvatarFallback>
-                                </Avatar>
+                                <UserAvatar 
+                                    name={isMe ? "ME" : "User"}
+                                    role={undefined}
+                                    size="md"
+                                />
                                 <div className={`flex flex-col max-w-[80%] ${isMe ? 'items-end' : 'items-start'}`}>
                                     <div className={`p-3 rounded-lg text-sm ${isMe ? 'bg-accent text-foundry-950' : 'bg-foundry-800 text-gray-200'}`}>
                                         {comment.content}

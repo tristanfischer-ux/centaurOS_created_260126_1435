@@ -5,14 +5,13 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { UserAvatar } from '@/components/ui/user-avatar'
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Check, X, ClipboardCheck, Loader2, ArrowRight, AlertTriangle } from 'lucide-react'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { getPendingApprovals, approveTask } from '@/actions/tasks'
 import { toast } from 'sonner'
 import { formatDistanceToNow } from 'date-fns'
 import Link from 'next/link'
-import { cn, getInitials } from '@/lib/utils'
+import { cn } from '@/lib/utils'
 
 interface Task {
     id: string
@@ -20,7 +19,7 @@ interface Task {
     status: string | null
     risk_level: string | null
     created_at: string | null
-    assignee: { full_name: string | null } | null
+    assignee: { full_name: string | null; role?: string } | null
 }
 
 interface PendingApprovalsWidgetProps {
@@ -102,7 +101,7 @@ export function PendingApprovalsWidget({ userRole }: PendingApprovalsWidgetProps
                 ) : (
                     <div className="space-y-2">
                         {tasks.slice(0, 3).map(task => {
-                            const assignee = task.assignee as { full_name: string | null } | null
+                            const assignee = task.assignee as { full_name: string | null; role?: string } | null
                             const isApproving = approvingId === task.id
                             
                             return (
@@ -112,11 +111,11 @@ export function PendingApprovalsWidget({ userRole }: PendingApprovalsWidgetProps
                                 >
                                     <div className="flex items-center gap-3 min-w-0 flex-1">
                                         {assignee && (
-                                            <Avatar className="h-8 w-8 shrink-0">
-                                                <AvatarFallback className="text-xs bg-muted text-muted-foreground">
-                                                    {getInitials(assignee.full_name)}
-                                                </AvatarFallback>
-                                            </Avatar>
+                                            <UserAvatar
+                                                name={assignee.full_name}
+                                                role={assignee.role}
+                                                size="sm"
+                                            />
                                         )}
                                         <div className="min-w-0">
                                             <p className="text-sm font-medium text-foreground truncate">

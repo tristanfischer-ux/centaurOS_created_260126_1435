@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { UserAvatar } from "@/components/ui/user-avatar"
 import { Separator } from "@/components/ui/separator"
 import { MentionInput } from "@/components/ui/mention-input"
 import { MentionText } from "@/components/ui/mention-text"
@@ -598,17 +598,11 @@ export function FullTaskView({ open, onOpenChange, task, members }: FullTaskView
                                                                         onChange={() => {}}
                                                                         className="h-4 w-4"
                                                                     />
-                                                                    <Avatar className="h-6 w-6">
-                                                                        {member.role === "AI_Agent" ? (
-                                                                            <AvatarImage src="/images/ai-agent-avatar.png" />
-                                                                        ) : null}
-                                                                        <AvatarFallback className={cn(
-                                                                            "text-[10px]",
-                                                                            member.role === "AI_Agent" ? "bg-accent text-accent-foreground" : "bg-muted text-muted-foreground"
-                                                                        )}>
-                                                                            {member.role === "AI_Agent" ? <Bot className="w-3 h-3" /> : getInitials(member.full_name)}
-                                                                        </AvatarFallback>
-                                                                    </Avatar>
+                                                                    <UserAvatar 
+                                                                        name={member.full_name} 
+                                                                        role={member.role} 
+                                                                        size="sm" 
+                                                                    />
                                                                     <span className="text-sm">{member.full_name}</span>
                                                                 </div>
                                                             ))}
@@ -645,19 +639,12 @@ export function FullTaskView({ open, onOpenChange, task, members }: FullTaskView
                                                         <div className="space-y-1">
                                                             {assignees.map(a => (
                                                                 <div key={a.id} className="flex items-center gap-2">
-                                                                    <Avatar className="h-6 w-6">
-                                                                        {a.role === "AI_Agent" ? (
-                                                                            <AvatarImage src="/images/ai-agent-avatar.png" />
-                                                                        ) : a.avatar_url ? (
-                                                                            <AvatarImage src={a.avatar_url} />
-                                                                        ) : null}
-                                                                        <AvatarFallback className={cn(
-                                                                            "text-[10px]",
-                                                                            a.role === "AI_Agent" ? "bg-accent text-accent-foreground" : "bg-muted text-muted-foreground"
-                                                                        )}>
-                                                                            {a.role === "AI_Agent" ? <Bot className="w-3 h-3" /> : getInitials(a.full_name)}
-                                                                        </AvatarFallback>
-                                                                    </Avatar>
+                                                                    <UserAvatar 
+                                                                        name={a.full_name} 
+                                                                        role={a.role}
+                                                                        avatarUrl={a.avatar_url}
+                                                                        size="sm" 
+                                                                    />
                                                                     <span className="font-medium">{a.full_name}</span>
                                                                 </div>
                                                             ))}
@@ -811,11 +798,12 @@ export function FullTaskView({ open, onOpenChange, task, members }: FullTaskView
                                     {humanNotes.map((comment) => (
                                         <div key={comment.id} className="bg-background border rounded-lg p-4">
                                             <div className="flex items-start gap-3">
-                                                <Avatar className="h-8 w-8 shrink-0">
-                                                    <AvatarFallback className="text-xs bg-muted text-muted-foreground font-medium">
-                                                        {comment.user?.full_name?.substring(0, 2).toUpperCase() || 'U'}
-                                                    </AvatarFallback>
-                                                </Avatar>
+                                                <UserAvatar 
+                                                    name={comment.user?.full_name} 
+                                                    role={comment.user?.role}
+                                                    size="md" 
+                                                    className="shrink-0"
+                                                />
                                                 <div className="flex-1 min-w-0">
                                                     <div className="flex items-center gap-2 mb-1">
                                                         <span className="font-medium text-foreground">

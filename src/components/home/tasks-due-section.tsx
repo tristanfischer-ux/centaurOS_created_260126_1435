@@ -9,7 +9,7 @@
 import Link from 'next/link'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { UserAvatar } from '@/components/ui/user-avatar'
 import { 
   Calendar,
   CalendarDays,
@@ -29,6 +29,7 @@ interface TaskDue {
     id: string
     full_name: string | null
     avatar_url?: string | null
+    role?: string | null
   } | null
   objective?: {
     id: string
@@ -55,14 +56,13 @@ function TaskItem({ task, onTaskClick }: { task: TaskDue; onTaskClick?: (taskId:
       className="flex items-center gap-3 p-2 rounded-md hover:bg-muted transition-colors group cursor-pointer"
     >
       {/* Assignee avatar */}
-      <Avatar className="h-6 w-6 flex-shrink-0">
-        {task.assignee?.avatar_url && (
-          <AvatarImage src={task.assignee.avatar_url} />
-        )}
-        <AvatarFallback className="text-[10px] bg-muted">
-          {getInitials(task.assignee?.full_name || '?')}
-        </AvatarFallback>
-      </Avatar>
+      <UserAvatar 
+        name={task.assignee?.full_name || '?'}
+        role={task.assignee?.role}
+        avatarUrl={task.assignee?.avatar_url}
+        size="sm"
+        className="flex-shrink-0"
+      />
       
       {/* Task details */}
       <div className="flex-1 min-w-0">
