@@ -651,7 +651,9 @@ export function CreateObjectiveDialog({ children }: CreateObjectiveDialogProps) 
                                                             </div>
                                                             <div className="space-y-1">
                                                                 <p className="font-medium text-foreground text-sm">{item.title}</p>
-                                                                <Markdown content={item.description || ''} className="text-sm text-muted-foreground" />
+                                                                <div className="text-sm">
+                                                                    <Markdown content={item.description || ''} className="text-muted-foreground" />
+                                                                </div>
                                                                 {/* Role removed for later assignment */}
                                                             </div>
                                                         </div>

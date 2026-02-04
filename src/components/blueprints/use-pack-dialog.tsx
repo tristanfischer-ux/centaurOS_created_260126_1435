@@ -361,10 +361,10 @@ export function UsePackDialog({ pack, trigger }: UsePackDialogProps) {
                             
                             {item.description && (
                               <div className={cn(
-                                "text-xs text-muted-foreground leading-relaxed transition-all",
+                                "text-xs leading-relaxed transition-all",
                                 !isExpanded && "line-clamp-1"
                               )}>
-                                <Markdown content={item.description} className="text-xs" />
+                                <Markdown content={item.description} className="text-xs text-muted-foreground" />
                               </div>
                             )}
                           </div>
