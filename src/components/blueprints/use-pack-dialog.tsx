@@ -41,6 +41,7 @@ import {
 } from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Card, CardContent } from '@/components/ui/card'
+import { Markdown } from '@/components/ui/markdown'
 import { cn } from '@/lib/utils'
 import Link from 'next/link'
 
@@ -363,7 +364,7 @@ export function UsePackDialog({ pack, trigger }: UsePackDialogProps) {
                                 "text-xs text-muted-foreground leading-relaxed transition-all",
                                 !isExpanded && "line-clamp-1"
                               )}>
-                                {item.description}
+                                <Markdown content={item.description} className="text-xs" />
                               </div>
                             )}
                           </div>

@@ -50,6 +50,7 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { EmptyState } from "@/components/ui/empty-state"
+import { Markdown } from "@/components/ui/markdown"
 import { cn } from "@/lib/utils"
 
 type CreationMode = 'manual' | 'pack' | 'import'
@@ -650,7 +651,7 @@ export function CreateObjectiveDialog({ children }: CreateObjectiveDialogProps) 
                                                             </div>
                                                             <div className="space-y-1">
                                                                 <p className="font-medium text-foreground text-sm">{item.title}</p>
-                                                                <p className="text-sm text-muted-foreground">{item.description}</p>
+                                                                <Markdown content={item.description || ''} className="text-sm text-muted-foreground" />
                                                                 {/* Role removed for later assignment */}
                                                             </div>
                                                         </div>
