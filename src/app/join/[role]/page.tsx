@@ -3,11 +3,13 @@
 import { use, useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Check, ArrowRight, ArrowLeft } from "lucide-react";
+import { Check, ArrowRight, ArrowLeft, TestTube2 } from "lucide-react";
 import { signup, submitApplication } from "@/actions/signup";
+import { getDemoAccountData, type DemoAccountData } from "@/actions/demo-accounts";
 
 interface RoleConfig {
     title: string;
@@ -184,9 +186,14 @@ export default function JoinPage({ params }: { params: Promise<{ role: string }>
     const resolvedParams = use(params);
     const roleKey = resolvedParams.role.toLowerCase();
     const config = roleConfigs[roleKey] || roleConfigs["general"];
+    const searchParams = useSearchParams();
     const [stage, setStage] = useState<"hook" | "transitioning" | "form">("hook");
     const [fadeToBlack, setFadeToBlack] = useState(false);
     const videoRef = useRef<HTMLVideoElement>(null);
+    
+    // Demo mode state
+    const isDemoMode = searchParams.get('demo') === 'true';
+    const [demoData, setDemoData] = useState<DemoAccountData | null>(null);
 
     // Check if this role has a video (currently only founder)
     const hasVideo = roleKey === "founder";
@@ -210,6 +217,15 @@ export default function JoinPage({ params }: { params: Promise<{ role: string }>
             setStage("form");
         }
     };
+
+    // Fetch demo data if in demo mode
+    useEffect(() => {
+        if (isDemoMode) {
+            getDemoAccountData(roleKey).then(data => {
+                setDemoData(data);
+            });
+        }
+    }, [isDemoMode, roleKey]);
 
     // Ensure video plays on mount
     useEffect(() => {
@@ -381,6 +397,19 @@ export default function JoinPage({ params }: { params: Promise<{ role: string }>
                     {/* Right: Form */}
                     <div className="w-full md:w-1/2 bg-white text-slate-900 p-6 sm:p-8 md:p-12 lg:p-16 flex flex-col justify-center">
                         <div className="w-full max-w-md mx-auto space-y-6 sm:space-y-8">
+                            {/* Demo Mode Banner */}
+                            {isDemoMode && demoData && (
+                                <div className="bg-violet-50 border border-violet-200 rounded-lg p-4 flex items-start gap-3">
+                                    <TestTube2 className="h-5 w-5 text-violet-600 mt-0.5 shrink-0" />
+                                    <div>
+                                        <h3 className="text-sm font-semibold text-violet-900 mb-1">Demo Mode Active</h3>
+                                        <p className="text-xs text-violet-700">
+                                            All fields are pre-populated with demo data. Just click "{config.ctaText}" to test the flow!
+                                        </p>
+                                    </div>
+                                </div>
+                            )}
+                            
                             <div>
                                 <h2 className="text-xl sm:text-2xl font-bold text-slate-900">
                                     {config.isApplication ? "Apply for consideration" : "Create your account"}
@@ -401,6 +430,7 @@ export default function JoinPage({ params }: { params: Promise<{ role: string }>
                                         id="name"
                                         name="name"
                                         placeholder="John Doe"
+                                        defaultValue={demoData?.fullName || ""}
                                         className="bg-white border-slate-300 focus:border-blue-500 focus:ring-blue-500"
                                         required
                                     />
@@ -413,28 +443,48 @@ export default function JoinPage({ params }: { params: Promise<{ role: string }>
                                         name="email"
                                         type="email"
                                         placeholder="you@example.com"
+                                        defaultValue={demoData?.email || ""}
                                         className="bg-white border-slate-300 focus:border-blue-500 focus:ring-blue-500"
                                         required
                                     />
                                 </div>
 
                                 {/* Additional fields for applications and founder details */}
-                                {config.additionalFields?.map((field) => (
-                                    <div key={field.id} className="space-y-2">
-                                        <Label htmlFor={field.id} className="text-sm font-medium text-slate-900">
-                                            {field.label}
-                                            {field.required && <span className="text-red-500 ml-1">*</span>}
-                                        </Label>
-                                        <Input
-                                            id={field.id}
-                                            name={field.id}
-                                            type={field.type || "text"}
-                                            placeholder={field.placeholder}
-                                            className="bg-white border-slate-300 focus:border-blue-500 focus:ring-blue-500"
-                                            required={field.required}
-                                        />
-                                    </div>
-                                ))}
+                                {config.additionalFields?.map((field) => {
+                                    // Map demo data to field IDs
+                                    const demoValue = demoData ? (() => {
+                                        switch(field.id) {
+                                            case 'company_name': return demoData.companyName;
+                                            case 'industry': return demoData.industry;
+                                            case 'stage': return demoData.stage;
+                                            case 'firm': return demoData.firm;
+                                            case 'aum': return demoData.aum;
+                                            case 'capabilities': return demoData.capabilities;
+                                            case 'location': return demoData.location;
+                                            case 'institution': return demoData.institution;
+                                            case 'department': return demoData.department;
+                                            default: return '';
+                                        }
+                                    })() : '';
+                                    
+                                    return (
+                                        <div key={field.id} className="space-y-2">
+                                            <Label htmlFor={field.id} className="text-sm font-medium text-slate-900">
+                                                {field.label}
+                                                {field.required && <span className="text-red-500 ml-1">*</span>}
+                                            </Label>
+                                            <Input
+                                                id={field.id}
+                                                name={field.id}
+                                                type={field.type || "text"}
+                                                placeholder={field.placeholder}
+                                                defaultValue={demoValue}
+                                                className="bg-white border-slate-300 focus:border-blue-500 focus:ring-blue-500"
+                                                required={field.required}
+                                            />
+                                        </div>
+                                    );
+                                })}
 
                                 {!config.isApplication && (
                                     <div className="space-y-2">
@@ -444,6 +494,7 @@ export default function JoinPage({ params }: { params: Promise<{ role: string }>
                                             name="password"
                                             type="password"
                                             placeholder="Create a strong password"
+                                            defaultValue={demoData?.password || ""}
                                             className="bg-white border-slate-300 focus:border-blue-500 focus:ring-blue-500"
                                             required
                                         />
