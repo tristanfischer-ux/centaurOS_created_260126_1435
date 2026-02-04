@@ -207,7 +207,7 @@ export const MarketCard = memo(function MarketCard({
             }
             setSize(nextSize[currentSize])
         }
-    }, [currentSize, setSize])
+    }, [currentSize, setSize, setDialogOpen])
 
     return (
         <>

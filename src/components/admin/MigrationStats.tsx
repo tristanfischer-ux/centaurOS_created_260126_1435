@@ -2,10 +2,33 @@
 
 import { Card, CardContent } from "@/components/ui/card"
 import { cn } from "@/lib/utils"
-import { LucideIcon } from "lucide-react"
+import { 
+    Database,
+    Mail,
+    CheckCircle2,
+    Clock,
+    XCircle,
+    RefreshCw,
+    type LucideIcon
+} from "lucide-react"
+
+/**
+ * Map of icon names to Lucide icon components.
+ * Icons must be imported and mapped here to avoid serialization issues
+ * when passing from Server Components.
+ */
+const ICON_MAP: Record<string, LucideIcon> = {
+    Database,
+    Mail,
+    CheckCircle2,
+    Clock,
+    XCircle,
+    RefreshCw,
+}
 
 interface MigrationStatsCardProps {
-    icon: LucideIcon
+    /** Icon name from ICON_MAP (e.g., "Database", "Clock") */
+    iconName: string
     label: string
     value: number
     variant?: 'default' | 'success' | 'warning' | 'danger'
@@ -17,12 +40,13 @@ interface MigrationStatsCardProps {
 }
 
 export function MigrationStatsCard({
-    icon: Icon,
+    iconName,
     label,
     value,
     variant = 'default',
     className
 }: MigrationStatsCardProps) {
+    const Icon = ICON_MAP[iconName] || Database
     const variantStyles = {
         default: {
             icon: 'text-muted-foreground bg-muted',

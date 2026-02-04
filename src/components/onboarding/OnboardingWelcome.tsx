@@ -28,7 +28,7 @@ interface OnboardingStep {
 const ONBOARDING_STEPS: OnboardingStep[] = [
     {
         id: 'welcome',
-        title: 'Welcome to CentaurOS',
+        title: 'Welcome to ForgeOS',
         description: 'Your command center for building and running modern organizations. Let\'s take a quick tour of the key features.',
         icon: Sparkles,
     },
@@ -56,9 +56,9 @@ const ONBOARDING_STEPS: OnboardingStep[] = [
     {
         id: 'marketplace',
         title: 'Access the Marketplace',
-        description: 'Find people, products, and AI tools to augment your team. Compare options and book directly.',
+        description: 'Find people, products, and digital tools to augment your team. Compare options and book directly.',
         icon: Store,
-        tip: 'Use AI Search to describe what you need in natural language.',
+        tip: 'Use Smart Search to describe what you need in natural language.',
     },
     {
         id: 'complete',
@@ -68,7 +68,7 @@ const ONBOARDING_STEPS: OnboardingStep[] = [
     },
 ]
 
-const STORAGE_KEY = 'centauros:onboarding:completed'
+const STORAGE_KEY = 'forgeos:onboarding:completed'
 
 interface OnboardingWelcomeProps {
     /** Force show the onboarding even if previously completed */

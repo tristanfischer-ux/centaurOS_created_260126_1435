@@ -5,19 +5,18 @@ import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts"
 import { Brain, Zap } from "lucide-react"
 import type { TeamMember } from "../team-analytics"
 
-interface CentaurStatusChartProps {
+interface AgentPairingChartProps {
   humanMembers: TeamMember[]
   aiAgentCount: number
 }
 
 /**
- * CentaurStatusChart - Radial progress showing AI-human pairing adoption.
+ * AgentPairingChart - Radial progress showing team member pairing with agents.
  * 
- * @description Shows how many human team members are paired with AI agents
- * to form "Centaur" pairs. Encourages adoption by visualizing coverage.
- * Teams with higher Centaur pairing often have better throughput.
+ * @description Shows how many human team members are paired with agents.
+ * Teams with higher pairing rates often have better throughput.
  */
-export function CentaurStatusChart({ humanMembers, aiAgentCount }: CentaurStatusChartProps) {
+export function AgentPairingChart({ humanMembers, aiAgentCount }: AgentPairingChartProps) {
   const pairedCount = humanMembers.filter(m => !!m.paired_ai_id).length
   const unpairedCount = humanMembers.length - pairedCount
   const totalHumans = humanMembers.length
@@ -36,7 +35,7 @@ export function CentaurStatusChart({ humanMembers, aiAgentCount }: CentaurStatus
         <CardHeader className="pb-2">
           <CardTitle className="text-sm font-medium flex items-center gap-2">
             <Brain className="h-4 w-4 text-muted-foreground" />
-            Centaur Pairs
+            Agent Pairs
           </CardTitle>
         </CardHeader>
         <CardContent className="pb-4">
@@ -54,14 +53,14 @@ export function CentaurStatusChart({ humanMembers, aiAgentCount }: CentaurStatus
         <CardHeader className="pb-2">
           <CardTitle className="text-sm font-medium flex items-center gap-2">
             <Brain className="h-4 w-4 text-muted-foreground" />
-            Centaur Pairs
+            Agent Pairs
           </CardTitle>
         </CardHeader>
         <CardContent className="pb-4">
           <div className="h-[100px] flex flex-col items-center justify-center gap-2">
             <Brain className="h-8 w-8 text-muted-foreground/50" />
             <p className="text-[11px] text-muted-foreground text-center">
-              Add AI agents to enable<br />Centaur pairing
+              Add agents to enable<br />team pairing
             </p>
           </div>
         </CardContent>
@@ -74,7 +73,7 @@ export function CentaurStatusChart({ humanMembers, aiAgentCount }: CentaurStatus
       <CardHeader className="pb-2">
         <CardTitle className="text-sm font-medium flex items-center gap-2">
           <Brain className="h-4 w-4 text-status-info" />
-          Centaur Pairs
+          Agent Pairs
         </CardTitle>
       </CardHeader>
       <CardContent className="pb-4">
@@ -114,7 +113,7 @@ export function CentaurStatusChart({ humanMembers, aiAgentCount }: CentaurStatus
           <span className="text-muted-foreground">·</span>
           <span className="text-muted-foreground">{unpairedCount} available</span>
           <span className="text-muted-foreground">·</span>
-          <span className="text-status-info">{aiAgentCount} AI{aiAgentCount !== 1 ? 's' : ''}</span>
+          <span className="text-status-info">{aiAgentCount} agent{aiAgentCount !== 1 ? 's' : ''}</span>
         </div>
       </CardContent>
     </Card>

@@ -1,6 +1,11 @@
 ---
 name: red-team
 description: Constructive red team analysis that challenges ideas while respecting their merit. Synthesizes the best of original thinking with new insights. Use when the user asks to red team, challenge, stress-test, critique, or find weaknesses in ideas, plans, strategies, features, or decisions.
+role: |
+  You are a constructive critic who improves ideas through dialectical thinking.
+  You steel-man before you challenge - prove you understand the idea at its best.
+  You find weaknesses, but you also synthesize improvements.
+  Your goal is to make ideas better, not to tear them down. Thesis + antithesis = synthesis.
 ---
 
 # Red Team Analysis
@@ -208,6 +213,86 @@ For workflows, procedures, methodologies:
 - Question necessity of steps
 - Test for failure modes
 - Validate outcomes
+
+## Evaluation (Before Completing)
+
+Before completing red team analysis, verify:
+
+- [ ] **Steel-manned first?** Did you articulate the original idea's strengths before critiquing?
+- [ ] **Specific challenges?** Are concerns tied to specific assumptions, not vague?
+- [ ] **Conditions stated?** Did you explain WHEN your concerns apply?
+- [ ] **Original respected?** Did you acknowledge where the original might still be right?
+- [ ] **Synthesis provided?** Did you end with an improved version, not just criticism?
+- [ ] **Actionable?** Can the recipient act on your recommendations?
+- [ ] **Constructive tone?** Would you be comfortable receiving this feedback?
+
+## Examples
+
+### Example 1: Technical Architecture Red Team
+
+**Original idea:**
+> "We should use PostgreSQL for our real-time collaboration features because we already have it and know it well."
+
+**Red Team Analysis:**
+
+**1. Steel-Man:**
+The proposal to use PostgreSQL makes sense because:
+- Team has deep PostgreSQL expertise (reduces risk)
+- Already paying for Supabase (no new costs)
+- PostgreSQL's LISTEN/NOTIFY provides real-time capabilities
+- Single database reduces operational complexity
+
+**2. Challenges:**
+
+| Assumption | Challenge | Risk If Wrong |
+|------------|-----------|---------------|
+| "LISTEN/NOTIFY is sufficient" | At 1000+ concurrent users, connection pooling limits may cause message delays | Degraded UX, user complaints |
+| "Single DB reduces complexity" | Mixing OLTP and real-time workloads may require read replicas | Unexpected costs, performance issues |
+| "Team knows it well" | Real-time patterns in PG are different from typical usage | Learning curve may be higher than expected |
+
+**3. Synthesis:**
+
+The PostgreSQL approach is reasonable for MVP with modifications:
+- **Adopt:** Use PostgreSQL for real-time, but...
+- **Modify:** Add Supabase Realtime subscriptions (built on LISTEN/NOTIFY but handles pooling)
+- **Plan for:** Connection pooling review at 500 users
+- **Hedge:** Design abstraction layer so Redis/Pusher swap is possible later
+
+**Recommendation:** Proceed with PostgreSQL + Supabase Realtime. Revisit at 500 concurrent users.
+
+---
+
+### Example 2: Strategic Decision Red Team
+
+**Original idea:**
+> "We should focus exclusively on enterprise customers because they pay more and have lower churn."
+
+**Red Team Analysis:**
+
+**1. Steel-Man:**
+Enterprise focus is logical because:
+- Higher ACV ($50k+ vs $500 SMB)
+- Lower churn (18-month contracts)
+- Reference customers for fundraising
+- Founder's network is in enterprise
+
+**2. Challenges:**
+
+| Assumption | Challenge | Risk If Wrong |
+|------------|-----------|---------------|
+| "Enterprise pays more" | Sales cycle is 6-12 months; CAC may exceed SMB lifetime value | Cash flow crunch before revenue |
+| "Lower churn" | Enterprise requires custom features; R&D burden may exceed revenue | Product becomes unmaintainable |
+| "Founder's network" | Network has 20 contacts; exhausts in 6 months | Then what? |
+
+**3. Synthesis:**
+
+Enterprise is valuable but shouldn't be exclusive:
+- **Adopt:** Enterprise as primary target
+- **Modify:** Maintain self-serve tier for product-led acquisition
+- **Add:** Define "enterprise-ready" threshold (what features before selling enterprise)
+- **Plan for:** SMB cohort as enterprise pipeline (companies that grow into enterprise)
+
+**Recommendation:** "Enterprise-first, not enterprise-only." Keep self-serve alive as discovery channel.
 
 ## Quick Reference
 

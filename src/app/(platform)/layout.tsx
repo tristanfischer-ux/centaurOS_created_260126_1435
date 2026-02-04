@@ -42,7 +42,7 @@ export default async function PlatformLayout({
         console.error("Failed to fetch user profile:", profileError.message);
     }
 
-    let foundryName = "Centaur Foundry";
+    let foundryName = "Forge Foundry";
     let foundryId = "Unknown";
     let hasAdminAccess = false;
 

@@ -39,7 +39,7 @@ export const viewport: Viewport = {
 }
 
 export const metadata: Metadata = {
-  title: "Centaur Dynamics",
+  title: "Fractional Forge",
   description: "We build atoms at the speed of bits.",
   manifest: "/manifest.json",
   icons: {
@@ -50,7 +50,7 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "CentaurOS",
+    title: "ForgeOS",
   },
   formatDetection: {
     telephone: false,

@@ -208,7 +208,7 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
         // Get the dragged ID from dataTransfer (more reliable for Safari)
         const draggedId = e.dataTransfer.getData('text/plain') || draggedMemberId
 
-        // --- Centaur Pairing Logic ---
+        // --- Agent Pairing Logic ---
         const draggedMember = allMembers.find(m => m.id === draggedId)
         const targetMember = allMembers.find(m => m.id === targetMemberId)
 
@@ -356,9 +356,9 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
         const isDeleting = deletingMemberId === member.id
         const isExpanded = expandedMemberIds.has(member.id)
 
-        // Centaur Status
+        // Pairing Status
         const pairedAI = member.pairedAI?.[0]
-        const isCentaur = !!member.paired_ai_id && !!pairedAI
+        const isPaired = !!member.paired_ai_id && !!pairedAI
 
         // Get member's current task details from pre-computed data
         const activeTaskDetails = [...(member.taskDetails?.active || []), ...(member.taskDetails?.pending || [])]
@@ -405,8 +405,8 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
             badgeClass = 'text-electric-blue border bg-electric-blue-light'
         }
 
-        // Centaur Override
-        if (isCentaur) {
+        // Pairing Override
+        if (isPaired) {
             borderClass = 'border-status-warning shadow-md ring-1 ring-status-warning/50'
         }
 
@@ -438,7 +438,7 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                     <div className="absolute inset-0 flex items-center justify-center bg-status-success-light rounded-lg z-10">
                         <div className="bg-status-success text-white px-3 py-1.5 rounded-full text-xs font-medium flex items-center gap-1 shadow-sm">
                             <Zap className="h-3 w-3 fill-white" />
-                            {draggedMemberId && aiAgents.some(a => a.id === draggedMemberId) ? 'Pair Centaur' : 'Combine / Team'}
+                            {draggedMemberId && aiAgents.some(a => a.id === draggedMemberId) ? 'Pair Agent' : 'Combine / Team'}
                         </div>
                     </div>
                 )}
@@ -480,7 +480,7 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                                     size="sm"
                                 />
                             )}
-                            {isCentaur && (
+                            {isPaired && (
                                 <div className="absolute -bottom-1 -right-1 bg-background rounded-full p-[1px] shadow-sm border border-muted">
                                     <Avatar className="h-4 w-4 border border-status-info/30">
                                         <AvatarFallback className="bg-indigo-100 text-indigo-700 text-[6px]">
@@ -497,9 +497,9 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                                 <h3 className="font-semibold text-foreground truncate text-sm">
                                     {member.full_name}
                                 </h3>
-                                {isCentaur && (
+                                {isPaired && (
                                     <Badge variant="secondary" className="text-[9px] bg-status-warning-light text-status-warning-dark h-4 px-1 border-status-warning-light">
-                                        Centaur
+                                        Paired
                                     </Badge>
                                 )}
                             </div>
@@ -620,7 +620,7 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                             </p>
                         )}
 
-                        {/* Centaur Pairing Info */}
+                        {/* Agent Pairing Info */}
                         {isCentaur && pairedAI && (
                             <div className="flex items-center gap-2 text-xs bg-status-warning-light p-2 rounded border border-status-warning-light">
                                 <Brain className="h-4 w-4 text-status-warning-dark" />
@@ -631,7 +631,7 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                                         e.stopPropagation()
                                         startTransition(async () => {
                                             await unpairCentaur(member.id)
-                                            toast.success("Centaur unpaired")
+                                            toast.success("Agent unpaired")
                                         })
                                     }}
                                     className="ml-auto text-status-warning-dark hover:text-destructive transition-colors"
@@ -709,7 +709,7 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                                 <User className="h-3 w-3 mr-1" />
                                 Profile
                             </Button>
-                            {member.role !== 'AI_Agent' && aiAgents.length > 0 && !isCentaur && (
+                            {member.role !== 'AI_Agent' && aiAgents.length > 0 && !isPaired && (
                                 <Button 
                                     variant="secondary" 
                                     size="sm" 
@@ -800,9 +800,9 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
         const isExecutive = type === 'executive'
         const isAIAgent = type === 'ai_agent'
 
-        // Centaur Status
+        // Pairing Status
         const pairedAI = member.pairedAI?.[0]
-        const isCentaur = !!member.paired_ai_id && !!pairedAI
+        const isPaired = !!member.paired_ai_id && !!pairedAI
 
         let badgeClass = 'text-muted-foreground border bg-muted'
 
@@ -857,7 +857,7 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                     </Badge>
                 </td>
                 <td className="px-4 py-3">
-                    {isCentaur && (
+                    {isPaired && (
                         <div className="flex items-center gap-2">
                             <Badge variant="secondary" className="text-[10px] bg-status-warning-light text-status-warning-dark h-5 px-1.5 border-status-warning-light gap-1 pl-1">
                                 <Avatar className="h-3 w-3 inline-block">
@@ -866,13 +866,13 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                                 {pairedAI.full_name}
                             </Badge>
                             <button
-                                aria-label="Unpair Centaur"
+                                aria-label="Unpair Agent"
                                 onClick={(e) => {
                                     e.preventDefault()
                                     e.stopPropagation()
                                     startTransition(async () => {
                                         await unpairCentaur(member.id)
-                                        toast.success("Centaur unpaired")
+                                        toast.success("Agent unpaired")
                                     })
                                 }}
                                 className="text-muted-foreground hover:text-destructive hover:bg-destructive/10 active:text-destructive active:bg-destructive/20 rounded p-1 transition-all opacity-0 group-hover:opacity-100"
@@ -1038,7 +1038,7 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                                     <tr>
                                         <th className="px-4 py-3 pl-6">Profile</th>
                                         <th className="px-4 py-3">Role</th>
-                                        <th className="px-4 py-3">Paired Centaur</th>
+                                        <th className="px-4 py-3">Paired Agent</th>
                                         <th className="px-4 py-3">Tasks</th>
                                         <th className="px-4 py-3"></th>
                                     </tr>
@@ -1093,7 +1093,7 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                                 <tr>
                                     <th className="px-4 py-3 pl-6">Profile</th>
                                     <th className="px-4 py-3">Role</th>
-                                    <th className="px-4 py-3">Paired Centaur</th>
+                                    <th className="px-4 py-3">Paired Agent</th>
                                     <th className="px-4 py-3">Tasks</th>
                                     <th className="px-4 py-3"></th>
                                 </tr>
@@ -1158,7 +1158,7 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                                 <tr>
                                     <th className="px-4 py-3 pl-6">Profile</th>
                                     <th className="px-4 py-3">Role</th>
-                                    <th className="px-4 py-3">Paired Centaur</th>
+                                    <th className="px-4 py-3">Paired Agent</th>
                                     <th className="px-4 py-3">Tasks</th>
                                     <th className="px-4 py-3"></th>
                                 </tr>
@@ -1192,7 +1192,7 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                         Neural Network (AI Agents)
                     </h2>
                     <p className="text-sm text-muted-foreground italic pb-2">
-                        Drag an AI Agent onto a human member to form a Centaur pair.
+                        Drag an agent onto a human member to form a pair.
                     </p>
                     {aiAgents.length === 0 ? (
                         <div className="border-2 border-dashed border rounded-lg">

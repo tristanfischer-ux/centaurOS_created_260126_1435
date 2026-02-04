@@ -9,14 +9,13 @@ import { MigrationStatsCard } from "@/components/admin/MigrationStats"
 import { MigrationTable } from "@/components/admin/MigrationTable"
 import { 
     ArrowUpRight,
-    Database,
-    Mail,
-    CheckCircle2,
-    Clock,
-    XCircle,
     AlertTriangle,
     RefreshCw
 } from "lucide-react"
+
+// NOTE: For MigrationStatsCard, we pass icon names as strings to avoid
+// Server/Client Component serialization issues. See MigrationStats.tsx
+// for the ICON_MAP that maps names to components.
 
 export const dynamic = 'force-dynamic'
 
@@ -77,31 +76,31 @@ async function MigrationContent() {
             {/* Stats Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
                 <MigrationStatsCard
-                    icon={Database}
+                    iconName="Database"
                     label="Total Listings"
                     value={stats.totalListings}
                     variant="default"
                 />
                 <MigrationStatsCard
-                    icon={Clock}
+                    iconName="Clock"
                     label="Pending"
                     value={stats.pendingCount}
                     variant={stats.pendingCount > 0 ? 'warning' : 'default'}
                 />
                 <MigrationStatsCard
-                    icon={Mail}
+                    iconName="Mail"
                     label="Invited"
                     value={stats.invitedCount}
                     variant="default"
                 />
                 <MigrationStatsCard
-                    icon={CheckCircle2}
+                    iconName="CheckCircle2"
                     label="Completed"
                     value={stats.completedCount}
                     variant="success"
                 />
                 <MigrationStatsCard
-                    icon={XCircle}
+                    iconName="XCircle"
                     label="Declined"
                     value={stats.declinedCount}
                     variant={stats.declinedCount > 0 ? 'danger' : 'default'}

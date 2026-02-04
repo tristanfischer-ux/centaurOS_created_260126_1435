@@ -26,9 +26,9 @@ const roleConfigs: Record<string, RoleConfig> = {
         title: "FOUNDER",
         headline: "YOUR VISION. OUR OPERATING SYSTEM.",
         subheadline: "Start with an idea. Launch with an army. Keep your equity.",
-        description: "Don't burn seed capital on a standing army. Your fractional team—Executives who've built before and Apprentices with 10x AI-amplified output—activates in hours, not months.",
+        description: "Don't burn seed capital on a standing army. Your fractional team—Executives who've built before and Apprentices with 10x output—activates in hours, not months.",
         benefits: [
-            "Fractional Execs + AI-amplified Apprentices",
+            "Fractional Execs + high-output Apprentices",
             "Your team scales up and down on demand",
             "Global manufacturing at your fingertips",
             "Legal and IP fortress included"
@@ -60,10 +60,10 @@ const roleConfigs: Record<string, RoleConfig> = {
     apprentice: {
         title: "APPRENTICE",
         headline: "YOU'RE NOT JUNIOR.",
-        subheadline: "You're Founder-in-Training. Your Digital Body awaits.",
-        description: "The Centaur OS gives you Your Digital Body—a 10x multiplier on your output. Ship real hardware in your first month. Learn from executives who've done it.",
+        subheadline: "You're Founder-in-Training. Your 10x toolkit awaits.",
+        description: "ForgeOS multiplies your output 10x. Ship real hardware in your first month. Learn from executives who've done it.",
         benefits: [
-            "10x your output with Your Digital Body",
+            "10x your output from day one",
             "Ship real hardware in month one",
             "Direct mentorship from fractional execs",
             "Fast-track to the Founder track"
@@ -151,7 +151,7 @@ const roleConfigs: Record<string, RoleConfig> = {
     network: {
         title: "NETWORK PARTNER",
         headline: "JOIN THE GRID.",
-        subheadline: "Connect your resources to the Centaur OS.",
+        subheadline: "Connect your resources to ForgeOS.",
         description: "Manufacturing, logistics, communications—connect your physical or digital infrastructure to the network. Consistent deal flow. Automated everything.",
         benefits: [
             "Consistent deal flow",
@@ -164,12 +164,12 @@ const roleConfigs: Record<string, RoleConfig> = {
         isApplication: true
     },
     general: {
-        title: "CENTAUR OS",
+        title: "FORGE OS",
         headline: "BUILD ATOMS AT THE SPEED OF BITS.",
         subheadline: "The operating system for physical creation.",
         description: "Hardware at software speed. A fraction of the cost. A fraction of the time. A fraction of the headcount.",
         benefits: [
-            "AI-native workflow",
+            "High-velocity workflows",
             "Global manufacturing network",
             "Distributed industrial complex",
             "Scale from Day 1"
@@ -253,7 +253,7 @@ export default function JoinPage({ params }: { params: Promise<{ role: string }>
                         Back
                     </Link>
                     <Link href="/login" className="text-white/60 hover:text-white text-sm font-mono uppercase tracking-widest">
-                        Already a Centaur? Login
+                        Already a member? Login
                     </Link>
                 </div>
             </nav>

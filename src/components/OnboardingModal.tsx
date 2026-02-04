@@ -10,8 +10,8 @@ import { createSampleData, createApprenticeTrainingTasks, setAccountType } from 
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
 
-const ONBOARDING_KEY = 'centauros_onboarding_completed'
-const INTENT_SELECTED_KEY = 'centauros_intent_selected'
+const ONBOARDING_KEY = 'forgeos_onboarding_completed'
+const INTENT_SELECTED_KEY = 'forgeos_intent_selected'
 
 type AccountType = 'team_builder' | 'supplier'
 
@@ -57,7 +57,7 @@ const executiveSteps = [
     color: 'text-international-orange'
   },
   {
-    title: 'AI-Amplified Teams',
+    title: 'High-Output Teams',
     description: 'Lead teams of Apprentices with 10x output. The Marketplace connects you with the tools you need.',
     icon: Sparkles,
     color: 'text-international-orange'
@@ -72,14 +72,14 @@ const executiveSteps = [
 
 const apprenticeSteps = [
   {
-    title: 'Welcome to the Guild',
-    description: 'You\'re not junior—you\'re a Founder-in-Training. Your Digital Body awaits.',
+    title: 'Welcome to The Guild',
+    description: 'You\'re not junior—you\'re a Founder-in-Training. Your toolkit awaits.',
     icon: GraduationCap,
     color: 'text-international-orange'
   },
   {
-    title: 'Your Digital Body',
-    description: 'The Centaur OS gives you a 10x multiplier on your output. AI tools and workflows designed for builders.',
+    title: 'Your Toolkit',
+    description: 'ForgeOS multiplies your output 10x. Smart tools and workflows designed for builders.',
     icon: Sparkles,
     color: 'text-international-orange'
   },
@@ -100,7 +100,7 @@ const apprenticeSteps = [
 const defaultSteps = [
   {
     title: 'Welcome to the Foundry',
-    description: 'Your central command for high-velocity creation. CentaurOS combines human ingenuity with AI precision.',
+    description: 'Your central command for high-velocity creation. ForgeOS multiplies human ingenuity.',
     icon: LayoutDashboard,
     color: 'text-international-orange'
   },
@@ -112,7 +112,7 @@ const defaultSteps = [
   },
   {
     title: 'Hybrid Execution',
-    description: 'Assign tasks to human experts or autonomous AI agents. The work happens where it needs to happen.',
+    description: 'Assign tasks to human experts or digital agents. The work happens where it needs to happen.',
     icon: Zap,
     color: 'text-international-orange'
   },
@@ -212,7 +212,7 @@ export function OnboardingModal({ userRole, accountType: initialAccountType }: O
       try {
         const result = await createApprenticeTrainingTasks()
         if (result.success) {
-          toast.success('Your Digital Body is ready! Training tasks have been assigned.')
+          toast.success('Your toolkit is ready! Training tasks have been assigned.')
         }
       } catch (error) {
         console.error('Failed to create training tasks:', error)
@@ -262,7 +262,7 @@ export function OnboardingModal({ userRole, accountType: initialAccountType }: O
             {/* Content */}
             <div className="pt-12 pb-10 px-10 text-center relative z-10 font-sans">
               <h2 className="text-3xl font-display font-medium text-foreground mb-3 tracking-tight">
-                Welcome to CentaurOS
+                Welcome to ForgeOS
               </h2>
               <p className="text-muted-foreground mb-10 max-w-md mx-auto leading-relaxed text-sm">
                 Tell us why you&apos;re here so we can personalize your experience.
@@ -289,7 +289,7 @@ export function OnboardingModal({ userRole, accountType: initialAccountType }: O
                     I sell products or services
                   </h3>
                   <p className="text-sm text-muted-foreground leading-relaxed">
-                    List your offerings, respond to requests, and manage orders from your dedicated Supplier Portal.
+                    List your offerings, respond to requests, and manage orders from your Supplier Portal.
                   </p>
                 </button>
 
@@ -313,7 +313,7 @@ export function OnboardingModal({ userRole, accountType: initialAccountType }: O
                     I build and manage teams
                   </h3>
                   <p className="text-sm text-muted-foreground leading-relaxed">
-                    Define objectives, assign tasks, and collaborate with your team using AI-powered workflows.
+                    Define objectives, assign tasks, and collaborate with your team using intelligent workflows.
                   </p>
                 </button>
               </div>

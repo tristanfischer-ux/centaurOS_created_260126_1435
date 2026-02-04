@@ -1,6 +1,11 @@
 ---
 name: security-review
 description: Comprehensive security review checklist for CentaurOS code changes. Use before committing code, during code review, when creating PRs, or when the user mentions security review, audit, vulnerability check, or secure code. Systematically checks for IDOR, XSS, injection, authentication, rate limiting, and data exposure issues.
+role: |
+  You are a security auditor who assumes every system is already compromised.
+  You check authentication first, then authorization, then data isolation.
+  You never skip a check because "it's probably fine" - you verify everything.
+  You flag issues even if they seem unlikely to be exploited. Better safe than breached.
 ---
 
 # Security Review Checklist
@@ -195,3 +200,123 @@ Before every commit that touches:
 **Migration:**
 - [ ] RLS enabled and forced
 - [ ] Appropriate policies for all operations
+
+## Anti-Patterns
+
+**BAD:** "This is internal-only, we don't need auth"
+**WHY:** Internal APIs get exposed. Attackers find them. Always authenticate.
+
+**BAD:** "RLS will handle it, I don't need server-side checks"
+**WHY:** Defense in depth. RLS is the last line, not the only line.
+
+**BAD:** "It's just a read operation, IDOR doesn't matter"
+**WHY:** Reading other users' data is a breach. Every ID-based query needs ownership verification.
+
+**BAD:** "Rate limiting slows down legitimate users"
+**WHY:** Without it, one attacker can DoS your API or brute-force auth. 10 req/min is fine for humans.
+
+**BAD:** "The error message helps users debug"
+**WHY:** Detailed errors help attackers more. Use generic messages externally, detailed logs internally.
+
+**BAD:** Checking `if (user.role === 'admin')` in the frontend
+**WHY:** Frontend checks are bypassable. Always verify permissions server-side.
+
+## Evaluation (Before Completing)
+
+Before approving code as secure, verify:
+
+- [ ] **Auth check present?** Does every endpoint verify the user is authenticated?
+- [ ] **IDOR prevented?** Do ID-based queries include ownership/foundry filter?
+- [ ] **Rate limiting?** Are abuse-prone endpoints (AI, auth, payments) rate limited?
+- [ ] **Input validated?** Is user input validated with Zod before use?
+- [ ] **Errors sanitized?** Do error responses hide internal details?
+- [ ] **RLS enforced?** Do new tables have RLS enabled AND policies defined?
+- [ ] **No secrets exposed?** Are API keys, tokens, emails excluded from responses?
+
+## Examples
+
+### Example 1: IDOR in Task Deletion
+
+**Code submitted:**
+```typescript
+export async function deleteTask(taskId: string) {
+  const supabase = await createClient()
+  await supabase.from('tasks').delete().eq('id', taskId)
+}
+```
+
+**Security issue:** Any user can delete any task by guessing IDs.
+
+**Fixed code:**
+```typescript
+export async function deleteTask(taskId: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('Unauthorized')
+  
+  const foundryId = await getFoundryIdCached()
+  await supabase.from('tasks')
+    .delete()
+    .eq('id', taskId)
+    .eq('foundry_id', foundryId) // Ownership check
+}
+```
+
+---
+
+### Example 2: XSS via User URL
+
+**Code submitted:**
+```tsx
+<a href={project.website_url}>Visit Website</a>
+```
+
+**Security issue:** If `website_url` is `javascript:alert('xss')`, clicking executes code.
+
+**Fixed code:**
+```tsx
+import { sanitizeHref } from '@/lib/security/sanitize'
+
+{project.website_url && sanitizeHref(project.website_url) !== '#' && (
+  <a 
+    href={sanitizeHref(project.website_url)}
+    target="_blank"
+    rel="noopener noreferrer"
+  >
+    Visit Website
+  </a>
+)}
+```
+
+---
+
+### Example 3: Missing Rate Limit on AI Endpoint
+
+**Code submitted:**
+```typescript
+export async function POST(req: NextRequest) {
+  const { prompt } = await req.json()
+  const response = await openai.chat.completions.create({...})
+  return NextResponse.json({ result: response })
+}
+```
+
+**Security issue:** Attacker can spam endpoint, running up AI costs.
+
+**Fixed code:**
+```typescript
+export async function POST(req: NextRequest) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  
+  const rateLimitResult = await rateLimit('ai', `ai:${user.id}`, { limit: 10, window: 60 })
+  if (!rateLimitResult.success) {
+    return NextResponse.json({ error: 'Rate limit exceeded' }, { status: 429 })
+  }
+  
+  const { prompt } = await req.json()
+  const response = await openai.chat.completions.create({...})
+  return NextResponse.json({ result: response })
+}
+```

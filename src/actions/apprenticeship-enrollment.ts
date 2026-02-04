@@ -449,8 +449,8 @@ async function createInductionObjective(
       risk_level: 'High'
     },
     {
-      title: '🤖 Complete AI Readiness Training',
-      description: 'Set up your Digital Body: Install Cursor IDE, configure Claude/ChatGPT access, and complete AI safety training. You\'ll use these tools daily.',
+      title: '🤖 Complete Toolkit Setup',
+      description: 'Set up your toolkit: Install Cursor IDE, configure your development environment, and complete tool safety training. You\'ll use these tools daily.',
       end_date: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString(),
       risk_level: 'Medium'
     },
@@ -461,8 +461,8 @@ async function createInductionObjective(
       risk_level: 'Low'
     },
     {
-      title: '📖 Read the Guild Handbook',
-      description: 'Understand how the Centaur Guild works, your path to becoming a founder, OTJT requirements, and how to get the most from your mentors.',
+      title: '📖 Read The Guild Handbook',
+      description: 'Understand how The Guild works, your path to becoming a founder, OTJT requirements, and how to get the most from your mentors.',
       end_date: new Date(Date.now() + 4 * 24 * 60 * 60 * 1000).toISOString(),
       risk_level: 'Low'
     },

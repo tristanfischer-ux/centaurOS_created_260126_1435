@@ -3,7 +3,7 @@
 import { TeamCapacityChart } from "./charts/capacity-chart"
 import { TaskPipelineChart } from "./charts/pipeline-chart"
 import { TopPerformersChart } from "./charts/performers-chart"
-import { CentaurStatusChart } from "./charts/centaur-chart"
+import { AgentPairingChart } from "./charts/centaur-chart"
 
 /**
  * Member data required for team analytics charts.
@@ -31,7 +31,7 @@ interface TeamAnalyticsProps {
  * TeamAnalytics - Compact analytics dashboard for team page.
  * 
  * @description Displays 4 small charts showing team capacity, 
- * task pipeline, top performers, and Centaur pairing status.
+ * task pipeline, top performers, and agent pairing status.
  * Charts are designed to be compact (h-[140px]) to not overwhelm
  * the main team list below.
  * 
@@ -50,7 +50,7 @@ export function TeamAnalytics({ members }: TeamAnalyticsProps) {
       <TeamCapacityChart members={humanMembers} />
       <TaskPipelineChart members={members} />
       <TopPerformersChart members={members} />
-      <CentaurStatusChart humanMembers={humanMembers} aiAgentCount={aiAgents.length} />
+      <AgentPairingChart humanMembers={humanMembers} aiAgentCount={aiAgents.length} />
     </div>
   )
 }

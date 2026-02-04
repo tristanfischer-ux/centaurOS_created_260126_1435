@@ -140,7 +140,7 @@ function getBandwidth(member: Member): { label: string; className: string; score
  * 
  * @description Renders a team member card with three size variants (small/medium/full),
  * matching the marketplace listing card pattern. Shows role badge, task metrics,
- * bandwidth status, and centaur pairing indicator.
+ * bandwidth status, and agent pairing indicator.
  * 
  * @component
  */
@@ -170,7 +170,7 @@ export const TeamMemberCard = memo(function TeamMemberCard({
     }, [member.id, onSizeChange])
 
     const isAI = member.role === 'AI_Agent'
-    const isCentaur = !!member.paired_ai_id && !!member.pairedAI?.[0]
+    const isPaired = !!member.paired_ai_id && !!member.pairedAI?.[0]
     const pairedAI = member.pairedAI?.[0]
     const initials = getInitials(member.full_name)
     const avatarGradient = getAvatarGradient(member.role, member.full_name)
@@ -209,7 +209,7 @@ export const TeamMemberCard = memo(function TeamMemberCard({
                 "group relative flex flex-col border hover:border-orange-300 hover:shadow-md transition-all duration-200 overflow-hidden bg-background cursor-pointer",
                 isSelected && "ring-2 ring-orange-500 border-orange-500",
                 currentSize === 'full' && "col-span-1 md:col-span-2",
-                isCentaur && "border-status-warning/50"
+                isPaired && "border-status-warning/50"
             )}
             onMouseEnter={() => setIsHovered(true)}
             onMouseLeave={() => setIsHovered(false)}
@@ -264,7 +264,7 @@ export const TeamMemberCard = memo(function TeamMemberCard({
                                         size="sm"
                                     />
                                 )}
-                                {isCentaur && (
+                                {isPaired && (
                                     <div className="absolute -bottom-1 -right-1 bg-status-warning rounded-full p-0.5">
                                         <Zap className="w-2 h-2 text-white fill-white" />
                                     </div>
@@ -277,9 +277,9 @@ export const TeamMemberCard = memo(function TeamMemberCard({
                                     <Badge variant="secondary" className={cn("uppercase text-[9px] tracking-wider font-semibold border-0 shrink-0 px-1.5 py-0", roleBadgeStyles[member.role])}>
                                         {member.role.replace('_', ' ')}
                                     </Badge>
-                                    {isCentaur && (
+                                    {isPaired && (
                                         <Badge variant="secondary" className="text-[9px] bg-status-warning-light text-status-warning-dark border-0 px-1.5 py-0">
-                                            Centaur
+                                            Paired
                                         </Badge>
                                     )}
                                 </div>
@@ -334,7 +334,7 @@ export const TeamMemberCard = memo(function TeamMemberCard({
                                         size="sm"
                                     />
                                 )}
-                                {isCentaur && (
+                                {isPaired && (
                                     <div className="absolute -bottom-1 -right-1 bg-status-warning rounded-full p-0.5 border border-background">
                                         <Zap className="w-2.5 h-2.5 text-white fill-white" />
                                     </div>
@@ -346,10 +346,10 @@ export const TeamMemberCard = memo(function TeamMemberCard({
                                     <Badge variant="secondary" className={cn("uppercase text-[10px] tracking-wider font-semibold border-0 shrink-0", roleBadgeStyles[member.role])}>
                                         {member.role.replace('_', ' ')}
                                     </Badge>
-                                    {isCentaur && (
+                                    {isPaired && (
                                         <Badge variant="secondary" className="text-[10px] bg-status-warning-light text-status-warning-dark border-0">
                                             <Zap className="w-2.5 h-2.5 mr-0.5" />
-                                            Centaur
+                                            Paired
                                         </Badge>
                                     )}
                                 </div>
@@ -399,8 +399,8 @@ export const TeamMemberCard = memo(function TeamMemberCard({
                             )}
                         </div>
 
-                        {/* Centaur pairing info */}
-                        {isCentaur && pairedAI && (
+                        {/* Agent pairing info */}
+                        {isPaired && pairedAI && (
                             <div className="flex items-center gap-1.5 mb-3">
                                 <span className="text-[10px] px-2 py-0.5 rounded-full bg-status-warning-light text-status-warning-dark flex items-center gap-1">
                                     <Brain className="w-3 h-3" />
@@ -471,7 +471,7 @@ export const TeamMemberCard = memo(function TeamMemberCard({
                                         size="md"
                                     />
                                 )}
-                                {isCentaur && (
+                                {isPaired && (
                                     <div className="absolute -bottom-1 -right-1 bg-status-warning rounded-full p-1 border-2 border-background">
                                         <Zap className="w-3 h-3 text-white fill-white" />
                                     </div>
@@ -483,10 +483,10 @@ export const TeamMemberCard = memo(function TeamMemberCard({
                                     <Badge variant="secondary" className={cn("uppercase text-[10px] tracking-wider font-semibold border-0 shrink-0", roleBadgeStyles[member.role])}>
                                         {member.role.replace('_', ' ')}
                                     </Badge>
-                                    {isCentaur && (
+                                    {isPaired && (
                                         <Badge variant="secondary" className="text-[10px] bg-status-warning-light text-status-warning-dark border-0">
                                             <Zap className="w-2.5 h-2.5 mr-0.5" />
-                                            Centaur
+                                            Paired
                                         </Badge>
                                     )}
                                 </div>
@@ -552,12 +552,12 @@ export const TeamMemberCard = memo(function TeamMemberCard({
                             )}
                         </div>
 
-                        {/* Centaur Pairing Info */}
-                        {isCentaur && pairedAI && (
+                        {/* Agent Pairing Info */}
+                        {isPaired && pairedAI && (
                             <div className="mb-4">
                                 <p className="text-xs font-medium text-muted-foreground mb-2 flex items-center gap-1">
                                     <Zap className="w-3 h-3 text-status-warning" />
-                                    Centaur Pairing
+                                    Agent Pairing
                                 </p>
                                 <div className="flex items-center gap-2 p-2 rounded-lg bg-status-warning-light border border-status-warning/20">
                                     <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center">

@@ -158,11 +158,11 @@ export function MarketplaceView({
     } | null>(null)
     const [aiExplanation, setAiExplanation] = useState<string>('')
 
-    // Centaur Matcher state
-    const [showCentaurMatcher, setShowCentaurMatcher] = useState(false)
-    const [centaurMatchLoading, setCentaurMatchLoading] = useState(false)
+    // Agent Matcher state
+    const [showAgentMatcher, setShowAgentMatcher] = useState(false)
+    const [agentMatchLoading, setAgentMatchLoading] = useState(false)
     const [selectedMemberId, setSelectedMemberId] = useState<string>('')
-    const [centaurSuggestions, setCentaurSuggestions] = useState<{
+    const [agentSuggestions, setAgentSuggestions] = useState<{
         listingId: string
         title: string
         compatibilityScore: number
@@ -445,12 +445,12 @@ export function MarketplaceView({
         }
     }, [searchQuery, activeTab])
 
-    // Centaur Matcher handler
-    const handleCentaurMatch = useCallback(async (memberId: string) => {
+    // Agent Matcher handler
+    const handleAgentMatch = useCallback(async (memberId: string) => {
         if (!memberId) return
         
-        setCentaurMatchLoading(true)
-        setCentaurSuggestions([])
+        setAgentMatchLoading(true)
+        setAgentSuggestions([])
         
         try {
             const response = await fetch('/api/marketplace/centaur-match', {
@@ -462,15 +462,15 @@ export function MarketplaceView({
             const data = await response.json()
             
             if (data.suggestions) {
-                setCentaurSuggestions(data.suggestions)
+                setAgentSuggestions(data.suggestions)
             } else {
                 toast.error(data.error || 'Failed to get AI pairing suggestions')
             }
         } catch (error) {
-            console.error('Centaur match error:', error)
-            toast.error('Failed to get AI pairing suggestions')
+            console.error('Agent match error:', error)
+            toast.error('Failed to get pairing suggestions')
         } finally {
-            setCentaurMatchLoading(false)
+            setAgentMatchLoading(false)
         }
     }, [])
 
@@ -1458,24 +1458,24 @@ export function MarketplaceView({
                         </div>
                     )}
 
-                    {/* Centaur Matcher - on Services tab (includes AI) */}
+                    {/* Agent Matcher - on Services tab */}
                     {activeTab === 'Services' && (
                         <div className="mb-6">
                             <button
-                                onClick={() => setShowCentaurMatcher(!showCentaurMatcher)}
+                                onClick={() => setShowAgentMatcher(!showAgentMatcher)}
                                 className="flex items-center gap-2 text-sm font-medium text-violet-700 hover:text-violet-900 mb-3"
                             >
                                 <Users className="h-4 w-4" />
-                                Build Your Centaur
-                                <ArrowRight className={`h-4 w-4 transition-transform ${showCentaurMatcher ? 'rotate-90' : ''}`} />
+                                Find Your Agent
+                                <ArrowRight className={`h-4 w-4 transition-transform ${showAgentMatcher ? 'rotate-90' : ''}`} />
                             </button>
                             
-                            {showCentaurMatcher && (
+                            {showAgentMatcher && (
                                 <Card className="p-4 bg-gradient-to-r from-accent/10 to-status-info-light/50 border-accent/20">
                                     <div className="flex flex-col gap-4">
                                         <div>
-                                            <h3 className="font-medium text-violet-900">Find the Perfect AI Partner</h3>
-                                            <p className="text-sm text-violet-700">Select a team member to get AI-powered pairing suggestions.</p>
+                                            <h3 className="font-medium text-violet-900">Find the Perfect Partner</h3>
+                                            <p className="text-sm text-violet-700">Select a team member to get pairing suggestions.</p>
                                         </div>
                                         
                                         <div className="flex gap-3 items-end">
@@ -1504,8 +1504,8 @@ export function MarketplaceView({
                                                 )}
                                             </div>
                                             <Button
-                                                onClick={() => handleCentaurMatch(selectedMemberId)}
-                                                disabled={!selectedMemberId || centaurMatchLoading}
+                                                onClick={() => handleAgentMatch(selectedMemberId)}
+                                                disabled={!selectedMemberId || agentMatchLoading}
                                                 className="bg-violet-600 hover:bg-violet-700"
                                             >
                                                 {centaurMatchLoading ? (
@@ -1522,8 +1522,8 @@ export function MarketplaceView({
                                             </Button>
                                         </div>
                                         
-                                        {/* Centaur Suggestions */}
-                                        {centaurSuggestions.length > 0 && (
+                                        {/* Agent Suggestions */}
+                                        {agentSuggestions.length > 0 && (
                                             <div className="space-y-3 pt-3 border-t border-accent/20">
                                                 <h4 className="text-sm font-medium text-violet-900">Recommended AI Partners</h4>
                                                 {centaurSuggestions.map((suggestion, idx) => {

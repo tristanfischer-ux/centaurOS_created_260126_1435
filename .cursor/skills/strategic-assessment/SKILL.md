@@ -1,11 +1,27 @@
 ---
 name: strategic-assessment
 description: Create comprehensive strategic business assessments with product grades, risk analysis, and action plans. Use when the user asks to assess, evaluate strategy, create executive summary, review business model, analyze product, or mentions strategic review, business analysis, or investment readiness.
+role: |
+  You are a business strategist who has advised startups and enterprises.
+  You are data-driven: claims without evidence are just opinions.
+  You are honest about risks - sugar-coating helps no one.
+  You provide actionable recommendations, not just analysis. "What should we do?"
 ---
 
 # Strategic Assessment
 
 Framework for creating comprehensive business and product assessments.
+
+## Discovery (Before You Start)
+
+Before assessing, ensure you have answers to these questions. If any are unclear, ask the user:
+
+- [ ] **What is being assessed?** (product, business model, strategy, specific decision)
+- [ ] **Who is the audience?** (founder, investors, board, team)
+- [ ] **What's the context?** (fundraising, pivot decision, growth planning, acquisition)
+- [ ] **What questions need answering?** (go/no-go, priority ranking, risk assessment)
+- [ ] **What data is available?** (metrics, financials, user research, competitive intel)
+- [ ] **What's the timeline?** (quick assessment vs deep dive)
 
 ## Assessment Workflow
 
@@ -278,16 +294,105 @@ AI Integration:       [Progress bar] [%]
 
 **Best practice:** Run assessment first, then red team the findings.
 
-## Checklist
+## Evaluation (Before Completing)
 
-Before completing assessment:
+Before completing assessment, verify:
 
-- [ ] Gathered quantitative data (not just impressions)
-- [ ] Scored all four dimensions with evidence
-- [ ] Identified both strengths AND gaps
-- [ ] Risks have severity and timeline
-- [ ] Action plan has owners (roles, not names)
-- [ ] Metrics have current values (or marked as unknown)
-- [ ] Confidence level stated honestly
-- [ ] Key dependencies identified
-- [ ] Caveats about data limitations included
+- [ ] **Data gathered?** Did you collect quantitative evidence, not just impressions?
+- [ ] **All dimensions scored?** Did you grade Product, Market, Team/Ops, Technical?
+- [ ] **Evidence cited?** Does each grade have specific supporting data?
+- [ ] **Risks identified?** Are risks categorized by severity with timelines?
+- [ ] **Strengths included?** Did you identify what's working well (not just gaps)?
+- [ ] **Action plan created?** Are recommendations actionable with owners identified?
+- [ ] **Caveats stated?** Did you acknowledge data limitations and confidence levels?
+- [ ] **Honest assessment?** Would you stand behind this if presenting to a board?
+
+## Examples
+
+### Example 1: SaaS Product Assessment
+
+**Context:** Evaluating a B2B SaaS product for Series A readiness
+
+**Discovery answers:**
+- Being assessed: Product + business model
+- Audience: Founder + potential investors
+- Context: Series A fundraising in 6 months
+- Key questions: Is the product ready? What gaps need closing?
+
+**Assessment output:**
+
+```markdown
+## Executive Summary
+
+**Overall Grade: B- (Promising with Gaps)**
+**Investment Recommendation: Conditionally Ready**
+
+| Dimension | Grade | Key Factor |
+|-----------|-------|------------|
+| Product | B+ | Strong core, needs polish |
+| Market | B | Clear niche, competition emerging |
+| Team/Ops | C+ | Founder-dependent, needs hires |
+| Technical | B | Solid architecture, monitoring gaps |
+
+## Critical Risks
+
+| Risk | Severity | Timeline |
+|------|----------|----------|
+| No cost tracking for AI features | HIGH | 30 days |
+| Bus factor on founder | MEDIUM | 60 days |
+| No enterprise security audit | MEDIUM | 90 days |
+
+## Action Plan (Next 90 Days)
+
+1. **Week 1-2:** Implement AI cost tracking and alerts
+2. **Week 3-4:** Hire senior engineer to reduce bus factor
+3. **Month 2:** Complete SOC 2 Type 1 preparation
+4. **Month 3:** Enterprise pilot with 2 customers
+
+## Confidence Level
+
+Medium-High. Assessment based on:
+- Full codebase access
+- 3 customer interviews
+- Financial data review
+- Limited: No competitor deep-dive
+```
+
+---
+
+### Example 2: Feature Prioritization Assessment
+
+**Context:** Evaluating which of 3 features to build next
+
+**Assessment output:**
+
+```markdown
+## Feature Comparison
+
+| Feature | User Value | Effort | Strategic Fit | Score |
+|---------|-----------|--------|---------------|-------|
+| Team Chat | High | Medium | High | A- |
+| API Access | Medium | Low | Medium | B+ |
+| Mobile App | High | High | Low | C+ |
+
+## Recommendation
+
+**Build: Team Chat**
+
+Rationale:
+- Highest user request frequency (47% of feedback)
+- Aligns with collaboration positioning
+- Medium effort with existing infrastructure
+- Competitive gap (neither competitor has real-time chat)
+
+**Defer: Mobile App**
+- High effort, low strategic value
+- Web app works on mobile
+- No user churn due to missing mobile app
+
+## Caveats
+
+- User value based on feature requests, not validated demand
+- Effort estimates from engineering (may need refinement)
+- Strategic fit assessment is subjective
+```

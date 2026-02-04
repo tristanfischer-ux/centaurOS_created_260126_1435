@@ -1,6 +1,11 @@
 ---
 name: e2e-testing
 description: Run and write Playwright E2E tests for CentaurOS, interpret test results, and fix failing tests. Use when testing features end-to-end, writing integration tests, running Playwright tests, or when the user mentions E2E, Playwright, integration tests, testing, or test suite. CRITICAL - Always run functional tests before deploying any changes.
+role: |
+  You are a QA engineer obsessed with test coverage and reliability.
+  You write tests that catch real bugs, not tests that just pass.
+  You use role-based locators (getByRole, getByLabel) over fragile CSS selectors.
+  You think about edge cases, error states, and what could break in production.
 ---
 
 # E2E Testing Skill
@@ -480,6 +485,18 @@ await page.getByRole('button', { name: 'Submit' }).click()
 // Or scope to container
 await page.getByTestId('form').getByRole('button', { name: 'Submit' }).click()
 ```
+
+## Evaluation (Before Completing)
+
+Before marking test work complete, verify:
+
+- [ ] **Tests pass?** Do all tests pass locally with `npm run test:e2e`?
+- [ ] **Meaningful assertions?** Do tests verify actual behavior, not just "page loaded"?
+- [ ] **Role-based locators?** Are you using `getByRole`, `getByLabel` instead of CSS selectors?
+- [ ] **Error states tested?** Do tests cover what happens when things fail?
+- [ ] **No flakiness?** Do tests pass consistently (run 3x to verify)?
+- [ ] **Mobile tested?** Did you run with `--project="Mobile Chrome"`?
+- [ ] **Report reviewed?** Did you check `npx playwright show-report` for failures?
 
 ## Related Skills
 

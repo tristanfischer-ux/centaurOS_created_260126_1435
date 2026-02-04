@@ -2,10 +2,40 @@
 
 import { Card, CardContent } from "@/components/ui/card"
 import { cn } from "@/lib/utils"
-import { LucideIcon, TrendingUp, TrendingDown, Minus } from "lucide-react"
+import { 
+    TrendingUp, 
+    TrendingDown, 
+    Minus,
+    ClipboardList,
+    AlertTriangle,
+    Activity,
+    RefreshCw,
+    Users,
+    Building2,
+    DollarSign,
+    Package,
+    type LucideIcon
+} from "lucide-react"
+
+/**
+ * Map of icon names to Lucide icon components.
+ * Icons must be imported and mapped here to avoid serialization issues
+ * when passing from Server Components.
+ */
+const ICON_MAP: Record<string, LucideIcon> = {
+    ClipboardList,
+    AlertTriangle,
+    Activity,
+    RefreshCw,
+    Users,
+    Building2,
+    DollarSign,
+    Package,
+}
 
 interface StatsCardProps {
-    icon: LucideIcon
+    /** Icon name from ICON_MAP (e.g., "ClipboardList", "Activity") */
+    iconName: string
     label: string
     value: string | number
     trend?: {
@@ -17,13 +47,14 @@ interface StatsCardProps {
 }
 
 export function StatsCard({
-    icon: Icon,
+    iconName,
     label,
     value,
     trend,
     variant = 'default',
     className
 }: StatsCardProps) {
+    const Icon = ICON_MAP[iconName] || Activity
     const variantStyles = {
         default: {
             icon: 'text-muted-foreground',

@@ -38,7 +38,7 @@ function ErrorMessage() {
 }
 
 function LoginForm() {
-    const marketingDomain = process.env.NEXT_PUBLIC_MARKETING_DOMAIN || 'https://centaurdynamics.io'
+    const marketingDomain = process.env.NEXT_PUBLIC_MARKETING_DOMAIN || 'https://fractionalforge.io'
     
     return (
         <div className="w-full max-w-sm mx-auto space-y-8 relative z-10">
@@ -51,7 +51,7 @@ function LoginForm() {
                 
                 <div className="mb-8">
                     <h2 className="text-sm font-bold tracking-[0.2em] uppercase text-international-orange">
-                        Centaur Dynamics
+                        Fractional Forge
                     </h2>
                 </div>
                 
@@ -60,7 +60,7 @@ function LoginForm() {
                         Welcome Back.
                     </h1>
                     <p className="text-muted-foreground text-sm leading-relaxed">
-                        Enter your credentials to access <span className="font-semibold text-foreground">CentaurOS</span>.
+                        Enter your credentials to access <span className="font-semibold text-foreground">ForgeOS</span>.
                     </p>
                 </div>
             </div>
@@ -101,7 +101,7 @@ function LoginForm() {
 
                 <div className="text-center pt-4">
                     <span className="text-xs text-muted-foreground">
-                        Protected by Centaur Security Layer v4.3
+                        Protected by Forge Security Layer v4.3
                     </span>
                 </div>
             </form>
@@ -116,7 +116,7 @@ export default function LoginPage() {
             <div className="hidden lg:flex w-1/2 relative bg-muted overflow-hidden">
                 <Image
                     src="/images/digital-centaur-working.png"
-                    alt="Digital Centaur converting bits to atoms, 3D printing a rocket engine"
+                    alt="Team converting ideas to products, 3D printing a rocket engine"
                     fill
                     className="object-cover object-right"
                     priority
@@ -129,7 +129,7 @@ export default function LoginPage() {
                 <div className="relative z-20 flex flex-col justify-end p-12 h-full text-foreground pb-20">
                     <div className="h-1 w-20 bg-international-orange mb-6 shadow-[0_0_15px_rgba(255,69,0,0.6)]" />
                     <h3 className="text-sm font-bold tracking-[0.2em] uppercase text-international-orange mb-2">
-                        Centaur Dynamics
+                        Fractional Forge
                     </h3>
                     <h2 className="text-5xl font-display font-medium leading-[1.1] mb-6 tracking-tight drop-shadow-sm">
                         We build atoms at the

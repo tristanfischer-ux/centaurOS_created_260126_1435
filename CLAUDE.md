@@ -29,12 +29,18 @@ This file contains meta-agent behavior directives that influence HOW work is app
 ## 4. Bug Fixing Strategy
 
 1. **First attempt:** Analyze the bug and try a direct fix
-2. **If it doesn't work:** STOP. Don't try another guess.
+2. **If user says "still doesn't work":** STOP IMMEDIATELY.
+   - **Switch to Plan Mode** - Do NOT try another fix
+   - Re-analyze: What assumptions might be wrong?
+   - Think through: What other root causes are possible?
+   - Create explicit debugging plan before any more code changes
    - Write a test that reproduces the bug
-   - Spawn subagent(s) to fix it
-   - Subagent proves fix via passing test
+   - Spawn subagent(s) to fix it if needed
+   - Prove fix works via passing test
 
-Key: Only ONE attempt before escalating. No shotgun debugging.
+**Key: Only ONE attempt before escalating to plan mode. No shotgun debugging.**
+
+Why plan mode? If your first fix didn't work, your mental model of the problem is likely wrong. More attempts with the same wrong model will keep failing. Plan mode forces you to step back, re-evaluate assumptions, and approach the problem fresh.
 
 - Zero context switching required from the user
 - Go fix failing CI tests without being told how

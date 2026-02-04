@@ -18,7 +18,7 @@ const roles = [
     },
     {
         title: "APPRENTICES DO.",
-        description: "The Digital Body. Skilled operators amplified by AI and robotics. Join the Guild and build the future with your own hands, supercharged by the System.",
+        description: "Skilled operators with 10x output. Join The Guild and build the future with your own hands, supercharged by the System.",
         image: "/images/centaur-apprentice.png",
         href: "/login?role=apprentice"
     }
@@ -37,7 +37,7 @@ export function BusinessModelSection() {
                         Roles in the machine.
                     </h2>
                     <p className="text-lg text-muted-foreground leading-relaxed font-light">
-                        The Centaur OS is designed for three distinct operators. Each plays a critical role in the atom-building process.
+                        ForgeOS is designed for three distinct operators. Each plays a critical role in the atom-building process.
                     </p>
                 </div>
 

@@ -24,6 +24,10 @@ import {
     RefreshCw
 } from "lucide-react"
 
+// NOTE: For StatsCard, we pass icon names as strings to avoid
+// Server/Client Component serialization issues. See StatsCard.tsx
+// for the ICON_MAP that maps names to components.
+
 export default async function AdminDashboardPage() {
     // Fetch all data in parallel
     const [
@@ -51,25 +55,25 @@ export default async function AdminDashboardPage() {
             {/* Stats Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 <StatsCard
-                    icon={ClipboardList}
+                    iconName="ClipboardList"
                     label="Pending Applications"
                     value={stats.pendingApplications}
                     variant={stats.pendingApplications > 5 ? 'warning' : 'default'}
                 />
                 <StatsCard
-                    icon={AlertTriangle}
+                    iconName="AlertTriangle"
                     label="Open Disputes"
                     value={stats.openDisputes}
                     variant={stats.openDisputes > 0 ? 'danger' : 'default'}
                 />
                 <StatsCard
-                    icon={RefreshCw}
+                    iconName="RefreshCw"
                     label="Webhook Backlog"
                     value={stats.webhookBacklog}
                     variant={stats.webhookBacklog > 20 ? 'warning' : 'default'}
                 />
                 <StatsCard
-                    icon={Activity}
+                    iconName="Activity"
                     label="Actions Today"
                     value={stats.recentActivityCount}
                 />

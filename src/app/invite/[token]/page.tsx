@@ -153,7 +153,7 @@ export default function InvitePage({ params }: { params: Promise<{ token: string
         <div className="w-full md:w-1/2 relative overflow-hidden">
           <Image
             src="/images/centaur-os-core.png"
-            alt="CentaurOS"
+            alt="ForgeOS"
             fill
             className="object-cover opacity-20"
           />

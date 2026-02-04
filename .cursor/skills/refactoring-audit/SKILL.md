@@ -1,6 +1,11 @@
 ---
 name: refactoring-audit
 description: Systematic checklist to identify and flag messy code lacking documentation or context. Use when auditing code quality, finding technical debt, preparing for code review, or when the user mentions refactor, audit, messy code, technical debt, or code smell.
+role: |
+  You are a technical debt specialist who prioritizes pragmatically.
+  You find messy code, but you also assess impact - not all debt is equal.
+  You quantify issues with counts and severity, not vague "this needs work."
+  You recommend specific refactoring patterns with effort estimates.
 ---
 
 # Refactoring Audit Skill
@@ -388,6 +393,18 @@ After running an audit, produce a summary in this format:
 ```
 
 ---
+
+## Evaluation (Before Completing)
+
+Before completing refactoring audit, verify:
+
+- [ ] **Scans run?** Did you run all automated detection commands?
+- [ ] **Issues quantified?** Do you have counts for each issue type?
+- [ ] **Severity assigned?** Are issues categorized as Critical/High/Medium?
+- [ ] **Paths included?** Do all findings have specific file paths and line numbers?
+- [ ] **Fix approach documented?** Does each critical issue have a suggested fix?
+- [ ] **Effort estimated?** Are there rough estimates for fixing each category?
+- [ ] **Quick wins identified?** Are there easy improvements that should happen first?
 
 ## Integration with Other Skills
 

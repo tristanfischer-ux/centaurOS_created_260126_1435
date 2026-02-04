@@ -31,7 +31,7 @@ const ONBOARDING_STEPS: OnboardingStep[] = [
     {
         id: 'welcome',
         title: 'Welcome to Your Marketplace',
-        description: 'Access the world\'s most capable people, products, and AI tools. Find what you need to build faster.',
+        description: 'Access the world\'s most capable people, products, and digital tools. Find what you need to build faster.',
         icon: Store,
     },
     {
@@ -43,7 +43,7 @@ const ONBOARDING_STEPS: OnboardingStep[] = [
     {
         id: 'action',
         title: 'Take Your First Action',
-        description: 'Save a listing for later, create an RFQ, or use AI search to find exactly what you need.',
+        description: 'Save a listing for later, create an RFQ, or use Smart Search to find exactly what you need.',
         icon: Rocket,
     },
 ]
@@ -79,7 +79,7 @@ export function MarketplaceOnboardingModal({
 
         // Check localStorage for completed status
         try {
-            const completed = localStorage.getItem('centauros:marketplace:onboarding:completed')
+            const completed = localStorage.getItem('forgeos:marketplace:onboarding:completed')
             if (!completed) {
                 // Delay showing to not interrupt page load
                 const timer = setTimeout(() => setIsOpen(true), 800)
@@ -94,7 +94,7 @@ export function MarketplaceOnboardingModal({
         setIsCompleting(true)
         try {
             // Mark as completed in localStorage
-            localStorage.setItem('centauros:marketplace:onboarding:completed', 'true')
+            localStorage.setItem('forgeos:marketplace:onboarding:completed', 'true')
             
             // Call server action to update profile
             await completeMarketplaceOnboarding()
@@ -137,11 +137,11 @@ export function MarketplaceOnboardingModal({
             case 'Executive':
                 return 'As an Executive, you can approve purchases, book talent, and find the resources to execute your vision.'
             case 'Founder':
-                return 'As a Founder, you have the power to rapidly scale your team with the best people, products, and AI agents in the world.'
+                return 'As a Founder, you have the power to rapidly scale your team with the best people, products, and digital agents in the world.'
             case 'Apprentice':
                 return 'As an Apprentice, you can explore available resources, suggest additions to your team, and learn from the best.'
             default:
-                return 'Access the world\'s most capable people, products, and AI tools. Find what you need to build faster.'
+                return 'Access the world\'s most capable people, products, and digital tools. Find what you need to build faster.'
         }
     }
 
@@ -237,7 +237,7 @@ function WelcomeContent({ userRole }: { userRole: string }) {
                     <div className="w-8 h-8 rounded-full bg-violet-100 flex items-center justify-center mb-2">
                         <Sparkles className="h-4 w-4 text-violet-700" />
                     </div>
-                    <h4 className="font-semibold text-sm mb-1">AI Tools</h4>
+                    <h4 className="font-semibold text-sm mb-1">Digital Tools</h4>
                     <p className="text-xs text-muted-foreground">
                         Agents, assistants, and automation to augment your team
                     </p>
@@ -248,9 +248,9 @@ function WelcomeContent({ userRole }: { userRole: string }) {
                 <div className="flex items-start gap-2">
                     <Search className="h-4 w-4 text-primary mt-0.5 shrink-0" />
                     <div>
-                        <p className="text-sm font-medium mb-1">Pro Tip: Use AI Search</p>
+                        <p className="text-sm font-medium mb-1">Pro Tip: Use Smart Search</p>
                         <p className="text-xs text-muted-foreground">
-                            Describe what you need in natural language. Our AI will find the best matches from thousands of listings.
+                            Describe what you need in natural language. We'll find the best matches from thousands of listings.
                         </p>
                     </div>
                 </div>
@@ -346,9 +346,9 @@ function ActionContent() {
                             <Search className="h-5 w-5 text-primary" />
                         </div>
                         <div>
-                            <h4 className="font-semibold text-sm mb-1">Use AI Search</h4>
+                            <h4 className="font-semibold text-sm mb-1">Use Smart Search</h4>
                             <p className="text-xs text-muted-foreground">
-                                Describe what you need in natural language and let AI find the best matches across all categories.
+                                Describe what you need in natural language and find the best matches across all categories.
                             </p>
                         </div>
                     </div>

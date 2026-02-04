@@ -1,9 +1,8 @@
 "use client"
 
-import { UnreadMessagesChart } from "./charts/unread-messages-chart"
-import { TeamOnlineChart } from "./charts/team-online-chart"
-import { TodaysPulseChart } from "./charts/todays-pulse-chart"
-import { ActionRequiredChart } from "./charts/action-required-chart"
+import { Card, CardContent } from "@/components/ui/card"
+import { MessageSquare, Users, AlertTriangle, Clock } from "lucide-react"
+import { cn } from "@/lib/utils"
 
 /**
  * Member with messaging metadata for analytics.
@@ -75,11 +74,11 @@ interface HomeAnalyticsProps {
 }
 
 /**
- * HomeAnalytics - Compact analytics dashboard for home/inbox page.
+ * HomeAnalytics - Compact horizontal stats bar for home/inbox page.
  * 
- * @description Displays 4 small metric cards showing unread messages,
- * team availability, today's urgency, and action items requiring attention.
- * Provides instant situational awareness at the top of the summary panel.
+ * @description Displays key metrics in a single scannable row: unread messages,
+ * team online count, overdue tasks, and tasks due today. Provides instant 
+ * situational awareness without taking up excessive vertical space.
  * 
  * @component
  * 
@@ -101,27 +100,54 @@ export function HomeAnalytics({
   tasks = [],
   teamMembers,
   overdueTasks,
-  pendingDecisions,
-  blockers,
   tasksDueToday,
-  tasksDueThisWeek,
-  isExecutiveOrFounder
 }: HomeAnalyticsProps) {
+  // Calculate metrics
+  const unreadCount = members.reduce((sum, m) => sum + (m.unread_count || 0), 0)
+                    + tasks.reduce((sum, t) => sum + (t.unread_message_count || 0), 0)
+  const onlineCount = teamMembers.filter(m => m.presence_status === 'online').length
+  const overdueCount = overdueTasks.length
+  const dueTodayCount = tasksDueToday.length
+
   return (
-    <div className="grid grid-cols-2 gap-3 mb-4">
-      <UnreadMessagesChart members={members} tasks={tasks} />
-      <TeamOnlineChart teamMembers={teamMembers} />
-      <TodaysPulseChart 
-        overdueTasks={overdueTasks}
-        tasksDueToday={tasksDueToday}
-        tasksDueThisWeek={tasksDueThisWeek}
-      />
-      <ActionRequiredChart
-        overdueTasks={overdueTasks}
-        pendingDecisions={pendingDecisions}
-        blockers={blockers}
-        isExecutiveOrFounder={isExecutiveOrFounder}
-      />
-    </div>
+    <Card className="border bg-background mb-4">
+      <CardContent className="py-2.5 px-3">
+        <div className="flex items-center justify-between text-xs">
+          {/* Unread messages */}
+          <div className="flex items-center gap-1">
+            <MessageSquare className="h-3.5 w-3.5 text-muted-foreground" />
+            <span className="font-semibold text-foreground">{unreadCount}</span>
+            <span className="text-muted-foreground">msgs</span>
+          </div>
+          
+          {/* Team online */}
+          <div className="flex items-center gap-1">
+            <Users className="h-3.5 w-3.5 text-muted-foreground" />
+            <span className="font-semibold text-foreground">{onlineCount}</span>
+            <span className="text-muted-foreground">online</span>
+          </div>
+          
+          {/* Overdue tasks */}
+          <div className={cn(
+            "flex items-center gap-1",
+            overdueCount > 0 && "text-destructive"
+          )}>
+            <AlertTriangle className="h-3.5 w-3.5" />
+            <span className="font-semibold">{overdueCount}</span>
+            <span className={overdueCount > 0 ? "" : "text-muted-foreground"}>overdue</span>
+          </div>
+          
+          {/* Due today */}
+          <div className={cn(
+            "flex items-center gap-1",
+            dueTodayCount > 0 && "text-status-warning"
+          )}>
+            <Clock className="h-3.5 w-3.5" />
+            <span className="font-semibold">{dueTodayCount}</span>
+            <span className={dueTodayCount > 0 ? "" : "text-muted-foreground"}>today</span>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
   )
 }

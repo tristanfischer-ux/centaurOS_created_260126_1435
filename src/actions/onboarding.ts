@@ -124,8 +124,8 @@ export async function createApprenticeTrainingTasks() {
   const { data: objective, error: objError } = await supabase
     .from('objectives')
     .insert({
-      title: 'Week 1: Digital Body Setup',
-      description: 'Complete your initial training and set up your Digital Body - the AI-powered toolkit that amplifies your output 10x.',
+      title: 'Week 1: Toolkit Setup',
+      description: 'Complete your initial training and set up your toolkit - the system that amplifies your output 10x.',
       creator_id: user.id,
       foundry_id,
       status: 'on_track'
@@ -146,13 +146,13 @@ export async function createApprenticeTrainingTasks() {
       end_date: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() // Due in 1 day
     },
     { 
-      title: 'Take the Digital Body tour', 
-      description: 'Explore the AI tools available in the marketplace. These tools will amplify your output and help you ship faster.',
+      title: 'Take the platform tour', 
+      description: 'Explore the tools available in the marketplace. These tools will amplify your output and help you ship faster.',
       end_date: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString() // Due in 2 days
     },
     { 
-      title: 'Review the Guild handbook', 
-      description: 'Understand how the Centaur Guild works, your path to becoming a founder, and how to get the most from your mentors.',
+      title: 'Review The Guild handbook', 
+      description: 'Understand how The Guild works, your path to becoming a founder, and how to get the most from your mentors.',
       end_date: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString() // Due in 3 days
     },
     { 

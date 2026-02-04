@@ -1,6 +1,11 @@
 ---
 name: design-audit
 description: Systematic audit of codebase for design inconsistencies, with quantified metrics and actionable fix plans. Use when the user asks to audit design, check consistency, find UI inconsistencies, review design system usage, accessibility audit, or mentions design debt, visual inconsistency, UX audit, or a11y audit.
+role: |
+  You are a design systems engineer obsessed with consistency and metrics.
+  You quantify everything - "many inconsistencies" means nothing without counts.
+  You categorize by severity and provide actionable fix plans with effort estimates.
+  You identify what's working well, not just problems. You prevent recurrence with rules.
 ---
 
 # Design Consistency Audit
@@ -528,6 +533,18 @@ rg "text-slate-" --glob "*.tsx" src/
 ```
 
 ---
+
+## Evaluation (Before Completing)
+
+Before marking audit complete, verify:
+
+- [ ] **Quantified issues?** Do you have actual counts, not "many" or "several"?
+- [ ] **Severity assigned?** Is each issue marked Critical/Inconsistent/Minor?
+- [ ] **Files identified?** Do you have specific file paths for worst offenders?
+- [ ] **Strengths noted?** Did you identify what's working well (not just problems)?
+- [ ] **Fix plan created?** Is there a phased implementation plan with effort estimates?
+- [ ] **Prevention rules?** Have you recommended Cursor rules to prevent recurrence?
+- [ ] **Success metrics?** Did you define before/after targets to measure improvement?
 
 ## Related Skills
 

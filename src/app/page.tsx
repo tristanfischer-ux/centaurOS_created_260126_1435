@@ -17,7 +17,7 @@ import {
 } from "@/components/marketing/animations";
 
 // Domain configuration
-const APP_DOMAIN = process.env.NEXT_PUBLIC_APP_DOMAIN || 'https://centauros.io';
+const APP_DOMAIN = process.env.NEXT_PUBLIC_APP_DOMAIN || 'https://forgeos.io';
 
 export default function MarketingPage() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -28,7 +28,7 @@ export default function MarketingPage() {
       <nav className="bg-background">
         <div className="max-w-7xl mx-auto px-6 py-4 md:py-6 flex items-center justify-between">
           <Link href="/" className="text-lg md:text-xl font-bold tracking-tight">
-            CENTAUR DYNAMICS
+            FRACTIONAL FORGE
           </Link>
           
           {/* Desktop Navigation */}
@@ -202,9 +202,9 @@ export default function MarketingPage() {
               <span className="text-xs text-electric-blue font-mono uppercase tracking-widest mb-2">
                 Apprentices Do
               </span>
-              <h3 className="text-xl md:text-2xl font-bold mb-3 md:mb-4">THE DIGITAL BODY.</h3>
+              <h3 className="text-xl md:text-2xl font-bold mb-3 md:mb-4">10X YOUR OUTPUT.</h3>
               <p className="text-muted-foreground text-sm leading-relaxed flex-1">
-                &ldquo;We pair you with a seasoned executive and teach you the latest AI skills, multiplying your output tenfold. You aren&apos;t a junior. You are a Founder-in-Training.&rdquo;
+                &ldquo;We pair you with a seasoned executive and teach you cutting-edge workflows, multiplying your output tenfold. You aren&apos;t a junior. You are a Founder-in-Training.&rdquo;
               </p>
               {/* Action Buttons */}
               <div className="pt-4 md:pt-6 mt-4 border-t border-muted flex gap-2 md:gap-3">
@@ -427,7 +427,7 @@ export default function MarketingPage() {
       <footer className="py-8 md:py-12 border-t border bg-muted">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 text-center">
           <p className="text-sm text-muted-foreground">
-            &copy; {new Date().getFullYear()} Centaur Dynamics Ltd. All rights reserved.
+            &copy; {new Date().getFullYear()} Fractional Forge Ltd. All rights reserved.
           </p>
         </div>
       </footer>
@@ -439,7 +439,7 @@ export default function MarketingPage() {
  * Hero Section with animated elements and parallax background.
  * 
  * @description Displays the main hero with badge, headline, tagline animations
- * and a parallax centaur image background.
+ * and a parallax hero image background.
  */
 function HeroSection() {
   const { scrollY } = useScroll();
@@ -491,14 +491,14 @@ function HeroSection() {
         </motion.p>
       </div>
 
-      {/* Centaur Image - Parallax effect on desktop */}
+      {/* Hero Image - Parallax effect on desktop */}
       <motion.div
         style={{ y: parallaxY }}
         className="relative w-full h-[50vh] md:absolute md:inset-0 md:h-auto will-change-transform"
       >
         <Image
           src="/images/hero-centaur-main.png"
-          alt="Centaur"
+          alt="Hardware at software speed"
           fill
           className="object-contain object-center opacity-40"
           priority

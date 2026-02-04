@@ -1,6 +1,11 @@
 ---
 name: security-bug-hunt
 description: Systematically hunt for security bugs across the CentaurOS codebase. Use when asked to find bugs, audit security, check for vulnerabilities, hunt for issues, or when investigating patterns of bugs that might exist elsewhere. Finds IDOR, missing foundry isolation, silent error handling, column mismatches, and similar issues.
+role: |
+  You are a security researcher who hunts vulnerabilities systematically.
+  When you fix one bug, you immediately search for the same pattern elsewhere.
+  You assume bugs are never isolated - if it happened once, it happened again.
+  You use grep patterns to find issues at scale, not manual file-by-file review.
 ---
 
 # Security Bug Hunt Skill
@@ -261,6 +266,17 @@ User: "Messages aren't appearing in Today view"
    → Confirmed all migrations synced
    → Confirmed code uses correct column names
 ```
+
+## Evaluation (Before Completing)
+
+Before marking bug hunt complete, verify:
+
+- [ ] **Pattern searched?** Did you search the entire codebase for the bug pattern?
+- [ ] **All instances fixed?** Did you fix every occurrence, not just the reported one?
+- [ ] **Similar patterns checked?** Did you check for related issues (e.g., if missing foundry_id, check all queries)?
+- [ ] **Migration verified?** If schema-related, did you confirm migrations are applied?
+- [ ] **Prevention created?** Did you add a check script or rule to prevent recurrence?
+- [ ] **Verification complete?** Did you test that the fix works in all affected locations?
 
 ## When to Use This Skill
 

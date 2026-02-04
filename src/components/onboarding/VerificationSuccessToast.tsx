@@ -16,7 +16,7 @@ export function VerificationSuccessToast() {
     
     if (verified === 'true') {
       // Show success toast
-      toast.success('Email verified successfully! Welcome to CentaurOS.', {
+      toast.success('Email verified successfully! Welcome to ForgeOS.', {
         duration: 5000,
         description: 'Your account is now fully activated.',
       })

@@ -16,7 +16,7 @@ const signupSuccessConfig: Record<string, SuccessConfig> = {
     title: "Welcome, Founder.",
     subtitle: "Your command center is being prepared.",
     description:
-      "Check your email to verify your account. Once verified, you'll have immediate access to the Centaur OS.",
+      "Check your email to verify your account. Once verified, you'll have immediate access to ForgeOS.",
     nextStep: "Verify your email → Access your dashboard → Start building",
     ctaText: "Go to Login",
     ctaLink: "/login",
@@ -36,25 +36,25 @@ const signupSuccessConfig: Record<string, SuccessConfig> = {
     ctaText: "Go to Login",
     ctaLink: "/login",
     preparing: [
-      { label: "Joining the Centaur Guild", icon: Users },
+      { label: "Joining The Guild", icon: Users },
       { label: "Setting up your executive profile", icon: Shield },
       { label: "Preparing approval workflows", icon: Check },
       { label: "Connecting to venture pipeline", icon: Target },
     ],
   },
   apprentice: {
-    title: "Welcome to the Guild.",
-    subtitle: "Your Digital Body awaits.",
+    title: "Welcome to The Guild.",
+    subtitle: "Your toolkit is ready.",
     description:
       "Check your email to verify your account. Your training begins immediately upon verification.",
-    nextStep: "Verify your email → Enter the Guild → Begin training",
+    nextStep: "Verify your email → Enter The Guild → Begin training",
     ctaText: "Go to Login",
     ctaLink: "/login",
     preparing: [
-      { label: "Joining the Centaur Guild", icon: Users },
-      { label: "Preparing your Digital Body toolkit", icon: Bot },
+      { label: "Joining The Guild", icon: Users },
+      { label: "Preparing your productivity toolkit", icon: Bot },
       { label: "Assigning your first training tasks", icon: Target },
-      { label: "Connecting AI amplification tools", icon: Sparkles },
+      { label: "Activating your toolkit", icon: Sparkles },
     ],
   },
 };
@@ -91,7 +91,7 @@ const applicationSuccessConfig: Record<string, SuccessConfig> = {
     title: "Application Received.",
     subtitle: "Joining the Grid.",
     description:
-      "We'll review your application and reach out to discuss how your resources can connect to the Centaur OS.",
+      "We'll review your application and reach out to discuss how your resources can connect to ForgeOS.",
     nextStep: "Application review → Integration planning → Go live",
     ctaText: "Back to Home",
     ctaLink: "/",
@@ -195,7 +195,7 @@ export default async function SuccessPage({
         {/* Support Link */}
         <p className="mt-8 sm:mt-10 text-xs text-white/30">
           Questions?{" "}
-          <a href="mailto:support@centauros.ai" className="underline hover:text-white/50">
+          <a href="mailto:support@forgeos.io" className="underline hover:text-white/50">
             Contact support
           </a>
         </p>

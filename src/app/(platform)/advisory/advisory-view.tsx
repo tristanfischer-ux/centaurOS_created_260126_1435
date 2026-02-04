@@ -84,7 +84,7 @@ const RESOURCES = [
     {
         id: "getting-started",
         title: "Getting Started Guide",
-        description: "Learn the fundamentals of the Centaur OS platform and how to maximize your productivity.",
+        description: "Learn the fundamentals of the ForgeOS platform and how to maximize your productivity.",
         icon: GraduationCap,
         category: "Guide",
         href: "/help"

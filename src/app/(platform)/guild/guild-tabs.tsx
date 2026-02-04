@@ -122,7 +122,7 @@ export function GuildTabs({ events, members, isExecutive }: GuildTabsProps) {
             {/* Network Tab */}
             <TabsContent value="network" className="space-y-4">
                 <p className="text-sm text-muted-foreground">
-                    Connect with other members of the Centaur community.
+                    Connect with other members of The Guild community.
                 </p>
 
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
