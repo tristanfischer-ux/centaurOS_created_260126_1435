@@ -7,9 +7,25 @@ import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { UserAvatar } from "@/components/ui/user-avatar"
-import { Loader2, Send } from "lucide-react"
+import { Badge } from "@/components/ui/badge"
+import { Loader2, Send, Inbox } from "lucide-react"
 
 type Comment = Database["public"]["Tables"]["task_comments"]["Row"]
+
+/**
+ * Strip sync marker metadata from comment content for display.
+ * Removes the "_[Synced from conversation - Message ID: xyz]_" suffix.
+ */
+function stripSyncMarker(content: string): string {
+    return content.replace(/\n\n_\[Synced from conversation.*?\]_$/s, '')
+}
+
+/**
+ * Check if a comment was synced from the inbox/messaging system.
+ */
+function isFromInbox(content: string): boolean {
+    return content.includes('[Synced from conversation')
+}
 
 export function TaskFeed({ taskId, comments, currentUserId }: { taskId: string, comments: Comment[], currentUserId: string }) {
     const [content, setContent] = useState("")
@@ -26,9 +42,9 @@ export function TaskFeed({ taskId, comments, currentUserId }: { taskId: string, 
     }
 
     return (
-        <div className="flex flex-col h-full bg-foundry-900 border-l border-foundry-800">
-            <div className="p-4 border-b border-foundry-800">
-                <h3 className="font-semibold text-white">Activity Log</h3>
+        <div className="flex flex-col h-full bg-background border-l border">
+            <div className="p-4 border-b border">
+                <h3 className="font-semibold text-foreground">Activity Log</h3>
             </div>
 
             <ScrollArea className="flex-1 p-4">
@@ -36,12 +52,14 @@ export function TaskFeed({ taskId, comments, currentUserId }: { taskId: string, 
                     {comments.map((comment) => {
                         const isSystem = comment.is_system_log
                         const isMe = comment.user_id === currentUserId
+                        const fromInbox = isFromInbox(comment.content)
+                        const displayContent = stripSyncMarker(comment.content)
 
                         if (isSystem) {
                             return (
                                 <div key={comment.id} className="flex justify-center my-2">
-                                    <span className="text-[10px] text-muted-foreground bg-foundry-800 px-2 py-1 rounded-full uppercase tracking-wider">
-                                        {comment.content}
+                                    <span className="text-[10px] text-muted-foreground bg-muted px-2 py-1 rounded-full uppercase tracking-wider">
+                                        {displayContent}
                                     </span>
                                 </div>
                             )
@@ -55,8 +73,14 @@ export function TaskFeed({ taskId, comments, currentUserId }: { taskId: string, 
                                     size="md"
                                 />
                                 <div className={`flex flex-col max-w-[80%] ${isMe ? 'items-end' : 'items-start'}`}>
-                                    <div className={`p-3 rounded-lg text-sm ${isMe ? 'bg-accent text-foundry-950' : 'bg-foundry-800 text-gray-200'}`}>
-                                        {comment.content}
+                                    {fromInbox && (
+                                        <Badge variant="secondary" className="text-xs mb-1 gap-1">
+                                            <Inbox className="h-3 w-3" />
+                                            From Inbox
+                                        </Badge>
+                                    )}
+                                    <div className={`p-3 rounded-lg text-sm ${isMe ? 'bg-accent text-accent-foreground' : 'bg-muted text-foreground'}`}>
+                                        {displayContent}
                                     </div>
                                     <span className="text-[10px] text-muted-foreground mt-1">
                                         {new Date(comment.created_at!).toLocaleTimeString()}
@@ -71,12 +95,12 @@ export function TaskFeed({ taskId, comments, currentUserId }: { taskId: string, 
                 </div>
             </ScrollArea>
 
-            <form onSubmit={handleSubmit} className="p-4 border-t border-foundry-800 flex gap-2">
+            <form onSubmit={handleSubmit} className="p-4 border-t border flex gap-2">
                 <Textarea
                     value={content}
                     onChange={(e) => setContent(e.target.value)}
                     placeholder="Type a message..."
-                    className="bg-foundry-950 border-foundry-800 min-h-[40px] max-h-[100px]"
+                    className="bg-card border min-h-[40px] max-h-[100px]"
                 />
                 <Button size="icon" type="submit" disabled={loading || !content.trim()} className="h-auto">
                     {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}

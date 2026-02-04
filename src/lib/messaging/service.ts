@@ -1136,8 +1136,14 @@ export async function getTaskThread(
     conversation_id: msg.conversation_id
   }))
 
+  // Filter out comments that were synced FROM messages (to avoid duplicates)
+  // These have the marker: _[Synced from conversation - Message ID: xyz]_
+  const filteredComments = (comments || []).filter(
+    comment => !comment.content.includes('[Synced from conversation')
+  )
+
   // Transform comments to TaskThreadItem format
-  const commentItems = (comments || []).map((comment) => ({
+  const commentItems = filteredComments.map((comment) => ({
     id: comment.id,
     content: comment.content,
     author: comment.user as import('@/types/tasks').Profile,
