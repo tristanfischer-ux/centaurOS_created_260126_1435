@@ -11,6 +11,7 @@ import { MentionInput } from '@/components/ui/mention-input'
 import { createClient } from '@/lib/supabase/client'
 import { getTaskThread, sendMessageWithContext } from '@/lib/messaging/service'
 import { acceptTask, rejectTask, completeTask, forwardTask } from '@/actions/tasks'
+import { startTaskDiscussion } from '@/actions/messaging'
 import { toast } from 'sonner'
 import { formatDistanceToNow } from 'date-fns'
 import {
@@ -289,26 +290,18 @@ export function TaskConversation({
 
       const conversationId = conversations?.id
 
-      // If no conversation exists, we need to create one
-      // For simplicity, we'll create task comment directly
-      // In a full implementation, you'd want to ensure conversation exists
+      // If no conversation exists, create one via the server action
       if (!conversationId) {
-        // Create task comment directly (fallback)
-        const { data: comment, error: commentError } = await supabase
-          .from('task_comments')
-          .insert({
-            task_id: taskId,
-            user_id: currentUserId,
-            content,
-            foundry_id: task.assignee?.foundry_id || null,
-            is_system_log: false,
-          })
-          .select()
-          .single()
-
-        if (commentError) throw commentError
+        // Create conversation and send message via server action
+        // This ensures the message goes through the proper messaging system
+        // and the message-to-note sync happens automatically
+        const result = await startTaskDiscussion(taskId, content)
         
-        toast.success('Note added')
+        if (!result.success) {
+          throw new Error(result.error || 'Failed to create task discussion')
+        }
+        
+        toast.success('Message sent')
       } else {
         // Send message with task context (creates both message and comment)
         await sendMessageWithContext(supabase, {
