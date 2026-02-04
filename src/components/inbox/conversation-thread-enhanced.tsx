@@ -11,8 +11,8 @@ import { ContextSelector } from './context-selector'
 import { useConversation } from '@/hooks/useConversation'
 import { useMessagingShortcuts } from '@/hooks/useMessagingShortcuts'
 import type { MessageWithSender } from '@/lib/messaging/service'
-import type { MessageWithContext } from '@/lib/messaging/service'
-import { sendMessageWithContext } from '@/lib/messaging/service'
+import type { MessageWithContext } from '@/types/messaging'
+import { sendMessageWithContext, bridgeMessageToTaskComment } from '@/lib/messaging/service'
 import { createClient } from '@/lib/supabase/client'
 import { 
   MoreVertical, 
@@ -264,8 +264,7 @@ export function ConversationThreadEnhanced({
   }, [])
 
   // Handle send message with context (for CommandInput)
-  // Uses sendMessageWithContext for task context (handles bridging with real message ID)
-  // Falls back to hook's sendMessage for optimistic updates on non-task messages
+  // Uses sendMessageWithContext when there's a task context to get the message ID
   const handleSend = useCallback(async (content: string): Promise<boolean> => {
     console.log('[handleSend] Called with:', { content, conversationId, isSending })
     
@@ -288,43 +287,62 @@ export function ConversationThreadEnhanced({
     setIsSending(true)
 
     try {
-      // If there's a task context, use sendMessageWithContext which:
-      // 1. Creates the message with task_id field
-      // 2. Returns the message with its actual ID
-      // 3. Automatically bridges to task_comments with the real message ID
+      const supabase = createClient()
+      
+      // If there's a task context, use sendMessageWithContext to get the message ID
       if (currentContext?.taskId) {
-        console.log('[handleSend] Sending with task context via sendMessageWithContext...')
-        const supabase = createClient()
+        console.log('[handleSend] Sending message with task context:', currentContext.taskId)
         
         try {
-          await sendMessageWithContext(supabase, {
+          // Send message and get the message ID
+          const messageId = await sendMessageWithContext(
+            supabase,
             conversationId,
-            senderId: currentUserId,
-            content: content.trim(),
-            taskId: currentContext.taskId,
-            objectiveId: currentContext.objectiveId,
-          })
-          console.log('[handleSend] sendMessageWithContext succeeded')
+            currentUserId,
+            content.trim(),
+            currentContext.taskId,
+            undefined // no objective context in this flow
+          )
+          
+          if (!messageId) {
+            console.error('[handleSend] sendMessageWithContext returned no message ID')
+            toast.error('Failed to send message')
+            return false
+          }
+          
+          console.log('[handleSend] Message sent with ID:', messageId)
+          
+          // Bridge the message to task comments
+          await bridgeMessageToTaskComment(
+            supabase,
+            messageId,
+            currentContext.taskId,
+            content.trim(),
+            currentUserId
+          )
+          
+          console.log('[handleSend] Successfully bridged message to task')
           return true
         } catch (contextError) {
           console.error('[handleSend] Failed to send message with context:', contextError)
           toast.error('Failed to send message')
           return false
         }
+      } else {
+        // No task context - use the hook's sendMessage for optimistic updates
+        console.log('[handleSend] Calling hookSendMessage (no context)...')
+        
+        const success = await hookSendMessage(content.trim())
+        
+        console.log('[handleSend] hookSendMessage returned:', success)
+        
+        if (!success) {
+          toast.error('Failed to send message')
+          return false
+        }
+        
+        return true
       }
-      
-      // For non-task messages, use the hook's sendMessage which has optimistic updates
-      console.log('[handleSend] Calling hookSendMessage...')
-      const success = await hookSendMessage(content.trim())
-      
-      console.log('[handleSend] hookSendMessage returned:', success)
-      
-      if (!success) {
-        toast.error('Failed to send message')
-        return false
-      }
-      
-      return true
     } catch (error) {
       console.error('[handleSend] Failed to send message:', error)
       toast.error('Failed to send message')
@@ -390,8 +408,8 @@ export function ConversationThreadEnhanced({
           content: result.fileName,
           message_type: 'file',
           file_url: result.url,
-          task_id: currentContext?.taskId ?? null,
-          objective_id: currentContext?.objectiveId ?? null,
+          task_id: currentContext?.type === 'task' ? currentContext.id : null,
+          objective_id: currentContext?.type === 'objective' ? currentContext.id : null,
         })
         .select()
         .single()

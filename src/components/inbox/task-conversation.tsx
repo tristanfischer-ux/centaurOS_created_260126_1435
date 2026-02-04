@@ -176,6 +176,7 @@ export function TaskConversation({
   const [forwardReason, setForwardReason] = useState('')
 
   const bottomRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
 
   // Check if current user is assignee
   const isAssignee = task.assignee?.id === currentUserId || task.assigned_to === currentUserId
@@ -278,7 +279,6 @@ export function TaskConversation({
 
     try {
       // Get or create a conversation for this task
-      // For now, we'll use a direct approach by finding existing conversation or creating one
       const { data: conversations } = await supabase
         .from('conversations')
         .select('id')
@@ -287,19 +287,17 @@ export function TaskConversation({
         .eq('status', 'active')
         .maybeSingle()
 
-      const conversationId = conversations?.id
+      let conversationId = conversations?.id
 
-      // If no conversation exists, create one via the server action
+      // If no conversation exists, create one using startTaskDiscussion
       if (!conversationId) {
-        // Create conversation and send message via server action
-        // This ensures the message goes through the proper messaging system
-        // and the message-to-note sync happens automatically
         const result = await startTaskDiscussion(taskId, content)
         
-        if (!result.success) {
-          throw new Error(result.error || 'Failed to create task discussion')
+        if (!result.success || !result.data) {
+          throw new Error(result.error || 'Failed to create conversation')
         }
         
+        conversationId = result.data.id
         toast.success('Message sent')
       } else {
         // Send message with task context (creates both message and comment)
@@ -318,9 +316,10 @@ export function TaskConversation({
     } catch (err) {
       console.error('Failed to send message:', err)
       setInputValue(content) // Restore input
-      toast.error('Failed to send message')
+      toast.error(err instanceof Error ? err.message : 'Failed to send message')
     } finally {
       setIsSending(false)
+      inputRef.current?.focus()
     }
   }
 
@@ -598,6 +597,7 @@ export function TaskConversation({
                 avatarUrl={participant.avatar_url}
                 size="sm"
                 className="ring-2 ring-background"
+                title={participant.full_name || participant.email}
               />
             ))}
             {participants.length > 5 && (
@@ -616,6 +616,7 @@ export function TaskConversation({
         <div className="flex items-end gap-2">
           <div className="flex-1">
             <MentionInput
+              ref={inputRef}
               value={inputValue}
               onChange={setInputValue}
               members={members.map(m => ({
@@ -624,10 +625,11 @@ export function TaskConversation({
                 email: m.email,
               }))}
               placeholder="Type a message or note... Use @ to mention"
-              onSubmit={() => {
-                // Trigger form submission on Enter
-                const submitEvent = new Event('submit', { bubbles: true, cancelable: true })
-                document.querySelector('form')?.dispatchEvent(submitEvent)
+              onSubmit={(e) => {
+                e.preventDefault()
+                if (inputValue.trim()) {
+                  handleSend(e)
+                }
               }}
               className="bg-background"
             />

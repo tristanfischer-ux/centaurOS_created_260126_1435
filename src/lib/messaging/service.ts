@@ -1051,41 +1051,34 @@ export async function bridgeMessageToTaskComment(
     throw new Error(`Task not found: ${taskError?.message || 'Unknown error'}`)
   }
 
-  // Skip if no message ID provided (can't track duplicates reliably)
-  if (!messageId) {
-    console.warn('[bridgeMessageToTaskComment] No message ID provided, creating unlinked comment')
+  // Check if a comment already exists for this message (by message_id)
+  const { data: existing } = await supabase
+    .from('task_comments')
+    .select('id')
+    .eq('message_id', messageId)
+    .maybeSingle()
+
+  if (existing) {
+    // Comment already exists for this message, skip creation
+    return
   }
 
-  // Check if a comment already exists for this message (reliable duplicate detection)
-  if (messageId) {
-    const { data: existing } = await supabase
-      .from('task_comments')
-      .select('id')
-      .eq('message_id', messageId)
-      .maybeSingle()
-
-    if (existing) {
-      // Comment already exists for this message, skip creation
-      return
-    }
-  }
-
-  // Create task comment with message_id tracking (no sync marker needed in content)
+  // Create task comment linked to the message
+  // No need for sync marker in content since we have message_id field
   const { error: commentError } = await supabase
     .from('task_comments')
     .insert({
       task_id: taskId,
       user_id: userId,
-      content: content, // Clean content, no sync marker
+      content: content,
       foundry_id: task.foundry_id,
-      is_system_log: false,
-      message_id: messageId || null,
-      synced_from_message: !!messageId,
+      message_id: messageId,
+      synced_from_message: true,
+      is_system_log: true // Mark as system-synced
     })
 
   if (commentError) {
-    console.error('[bridgeMessageToTaskComment] Failed to create comment:', commentError)
-    throw commentError
+    throw new Error(`Failed to create task comment: ${commentError.message}`)
   }
 }
 
@@ -1121,6 +1114,7 @@ export async function getTaskThread(
       content,
       created_at,
       task_id,
+      synced_from_message,
       user:profiles!task_comments_user_id_fkey(id, full_name, avatar_url, email, role, foundry_id)
     `)
     .eq('task_id', taskId)
@@ -1131,40 +1125,32 @@ export async function getTaskThread(
   }
 
   // Transform messages to TaskThreadItem format
-  const messageItems = (messages || []).map((msg) => {
-    // Supabase returns the joined profile as an array, get the first element
-    const senderData = Array.isArray(msg.sender) ? msg.sender[0] : msg.sender
-    return {
-      id: msg.id,
-      content: msg.content || '',
-      author: senderData as import('@/types/tasks').Profile,
-      created_at: msg.created_at,
-      source: 'message' as const,
-      message_id: msg.id,
-      task_id: taskId,
-      conversation_id: msg.conversation_id
-    }
-  })
+  const messageItems = (messages || []).map((msg) => ({
+    id: msg.id,
+    content: msg.content || '',
+    author: msg.sender as import('@/types/tasks').Profile,
+    created_at: msg.created_at,
+    source: 'message' as const,
+    message_id: msg.id,
+    task_id: taskId,
+    conversation_id: msg.conversation_id
+  }))
 
   // Filter out comments that were synced FROM messages (to avoid duplicates)
-  // These have the marker: _[Synced from conversation - Message ID: xyz]_
+  // These have synced_from_message = true
   const filteredComments = (comments || []).filter(
-    comment => !comment.content.includes('[Synced from conversation')
+    comment => !comment.synced_from_message
   )
 
   // Transform comments to TaskThreadItem format
-  const commentItems = filteredComments.map((comment) => {
-    // Supabase returns the joined profile as an array, get the first element
-    const userData = Array.isArray(comment.user) ? comment.user[0] : comment.user
-    return {
-      id: comment.id,
-      content: comment.content,
-      author: userData as import('@/types/tasks').Profile,
-      created_at: comment.created_at || new Date().toISOString(),
-      source: 'comment' as const,
-      task_id: taskId
-    }
-  })
+  const commentItems = filteredComments.map((comment) => ({
+    id: comment.id,
+    content: comment.content,
+    author: comment.user as import('@/types/tasks').Profile,
+    created_at: comment.created_at || new Date().toISOString(),
+    source: 'comment' as const,
+    task_id: taskId
+  }))
 
   // Merge and sort by created_at
   const merged = [...messageItems, ...commentItems].sort(
