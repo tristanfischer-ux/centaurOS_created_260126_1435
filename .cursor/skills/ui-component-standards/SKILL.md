@@ -670,6 +670,9 @@ This automatically checks for color violations. If it fails, fix all issues befo
 
 ### Components
 - [ ] **CRITICAL: No Sheet/side panels** - Use Dialog instead
+- [ ] **User avatars use `UserAvatar` component (not direct `Avatar`)**
+- [ ] **No hardcoded avatar backgrounds (`bg-muted`, `bg-slate-*`, `bg-foundry-*`)**
+- [ ] **Database queries include `role` field for avatar coloring**
 - [ ] Status indicators use `StatusBadge` (not Badge with colors)
 - [ ] Cards use `Card` component (not custom divs)
 - [ ] Dialogs have solid backgrounds (no opacity < 100%)

@@ -56,6 +56,188 @@ interface UserAvatarProps {
 | `md` | `h-8 w-8` | `text-xs` | Default, cards, messages |
 | `lg` | `h-10 w-10` | `text-sm` | Profile headers, prominent display |
 | `xl` | `h-14 w-14` | `text-xl` | Large profile cards |
+| `2xl` | `h-20 w-20` | `text-2xl` | Public profile views |
+| `3xl` | `h-24 w-24` | `text-3xl` | Full profile pages |
+
+## CRITICAL Anti-Patterns (NEVER Do This)
+
+During avatar standardization, we found **35+ inconsistent implementations** across 23 files. These are the exact violations found and how to fix them.
+
+### ❌ Anti-Pattern #1: Custom Avatar Components
+
+**Found in:** 2 files (GanttView.tsx, TimelineListView.tsx)
+
+**The Problem:** Creating custom avatar components that duplicate `UserAvatar` functionality.
+
+```tsx
+// ❌ WRONG - Custom InitialsAvatar component
+const InitialsAvatar = ({ name, color }: { name: string; color: string }) => {
+  const getInitials = (name: string) => {
+    return name.split(' ').map(n => n[0]).join('').slice(0, 2)
+  }
+  
+  return (
+    <div className={`h-8 w-8 rounded-full bg-${color}-100 text-${color}-700`}>
+      {getInitials(name)}
+    </div>
+  )
+}
+
+// ✅ CORRECT - Use UserAvatar
+import { UserAvatar } from '@/components/ui/user-avatar'
+<UserAvatar name="John Doe" role="Executive" size="md" />
+```
+
+---
+
+### ❌ Anti-Pattern #2: Direct Avatar with Hardcoded `bg-muted`
+
+**Found in:** 8 files
+
+**The Problem:** Using `Avatar` directly with hardcoded gray background instead of role-based colors.
+
+```tsx
+// ❌ WRONG - Hardcoded bg-muted
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+
+<Avatar>
+  <AvatarFallback className="bg-muted text-muted-foreground">
+    {getInitials(user.full_name)}
+  </AvatarFallback>
+</Avatar>
+
+// ✅ CORRECT - UserAvatar with role-based colors
+import { UserAvatar } from '@/components/ui/user-avatar'
+<UserAvatar name={user.full_name} role={user.role} size="md" />
+```
+
+---
+
+### ❌ Anti-Pattern #3: Hardcoded `bg-foundry-*` Colors
+
+**Found in:** task-feed.tsx
+
+```tsx
+// ❌ WRONG
+<AvatarFallback className="bg-foundry-700 text-white">
+  {task.user?.full_name?.split(' ').map(n => n[0]).join('')}
+</AvatarFallback>
+
+// ✅ CORRECT
+<UserAvatar name={task.user?.full_name} role={task.user?.role} size="md" />
+```
+
+---
+
+### ❌ Anti-Pattern #4: Duplicate `getInitials` Functions
+
+**Found in:** 6 files
+
+```tsx
+// ❌ WRONG - Local getInitials function
+const getInitials = (name: string) => {
+  return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
+}
+
+// ✅ CORRECT - Use centralized utility
+import { getInitials } from '@/lib/utils'
+// Even better: UserAvatar does this automatically
+<UserAvatar name={user.full_name} role={user.role} />
+```
+
+---
+
+### ❌ Anti-Pattern #5: Custom Avatar Stack Implementations
+
+**Found in:** GanttView.tsx
+
+```tsx
+// ❌ WRONG - Custom avatar stack
+const AssigneeAvatarStack = ({ assignees }: { assignees: User[] }) => {
+  return (
+    <div className="flex -space-x-2">
+      {assignees.slice(0, 3).map(a => <InitialsAvatar key={a.id} ... />)}
+      {assignees.length > 3 && <div>+{assignees.length - 3}</div>}
+    </div>
+  )
+}
+
+// ✅ CORRECT - Use UserAvatarStack
+import { UserAvatarStack } from '@/components/ui/user-avatar'
+<UserAvatarStack users={assignees} size="sm" max={3} />
+```
+
+---
+
+### ❌ Anti-Pattern #6: Missing `role` Field in Database Queries
+
+**Found in:** threads.ts, messaging components
+
+```tsx
+// ❌ WRONG - Missing role field
+const { data } = await supabase
+  .from('messages')
+  .select('*, sender:users!inner(id, full_name, avatar_url)')
+
+// ✅ CORRECT - Include role field
+const { data } = await supabase
+  .from('messages')
+  .select('*, sender:users!inner(id, full_name, avatar_url, role)')
+```
+
+---
+
+### ❌ Anti-Pattern #7: Manual Color Assignment Based on Name Hash
+
+**Found in:** Timeline components
+
+```tsx
+// ❌ WRONG - Color based on name hash
+const getAvatarColor = (name: string) => {
+  const colors = ['blue', 'green', 'purple', 'orange']
+  const hash = name.split('').reduce((acc, c) => acc + c.charCodeAt(0), 0)
+  return colors[hash % colors.length]
+}
+
+// ✅ CORRECT - Role-based colors
+<UserAvatar name={user.name} role={user.role} />
+```
+
+---
+
+### ❌ Anti-Pattern #8: Conditional Avatar Logic for AI Agents
+
+**Found in:** Profile views
+
+```tsx
+// ❌ WRONG - Manual AI agent detection
+{user.role === 'AI_Agent' ? (
+  <div className="bg-purple-100">
+    <Bot className="h-7 w-7 text-purple-600" />
+  </div>
+) : (
+  <Avatar>...</Avatar>
+)}
+
+// ✅ CORRECT - UserAvatar handles AI agents automatically
+<UserAvatar name={user.full_name} role={user.role} size="xl" />
+```
+
+---
+
+## Migration Checklist
+
+If you find avatar code that doesn't use `UserAvatar`, check:
+
+- [ ] Is this an **internal user**? → Use `UserAvatar`
+- [ ] Does the query fetch the `role` field? → Add it if missing
+- [ ] Are there local `getInitials` or `getAvatarColor` functions? → Remove them
+- [ ] Is this a **stacked avatar** display? → Use `UserAvatarStack`
+- [ ] Is this an **external user/organization**? → Plain `Avatar` is okay
+- [ ] Does the avatar have hardcoded colors? → Replace with `UserAvatar`
+- [ ] Is there conditional logic for AI agents? → `UserAvatar` handles it
+
+---
 
 ## Examples
 

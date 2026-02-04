@@ -373,6 +373,98 @@ import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert'
 </Alert>
 ```
 
+## 11. Avatar Component (User Avatars)
+
+**CRITICAL: Always use UserAvatar for internal users**
+
+### Use UserAvatar for All Internal Users
+
+```tsx
+import { UserAvatar, UserAvatarStack } from '@/components/ui/user-avatar'
+
+// ✅ CORRECT - Automatic role-based colors
+<UserAvatar name="Jane Smith" role="Founder" size="md" />
+<UserAvatar name="AI Assistant" role="AI_Agent" size="sm" />
+
+// ❌ WRONG - Direct Avatar with manual colors
+import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+<Avatar>
+  <AvatarFallback className="bg-blue-100 text-blue-700">
+    JS
+  </AvatarFallback>
+</Avatar>
+```
+
+### Role-Based Color System (Automatic)
+
+UserAvatar automatically applies role-based colors:
+- **Founder** → Orange background
+- **Executive** → Blue background
+- **Apprentice** → Green background
+- **AI_Agent** → Purple background with bot icon
+- **Default** → Muted gray
+
+### Size Variants
+
+| Size | Use Case |
+|------|----------|
+| `xs` | Inline mentions, compact lists |
+| `sm` | Dropdowns, messages |
+| `md` | Default (cards, lists) |
+| `lg` | Profile headers |
+| `xl` | Large profile displays |
+| `2xl` | Public profile view |
+| `3xl` | Full profile pages |
+
+### When to Use Direct Avatar
+
+Only use `Avatar` (not `UserAvatar`) for:
+- Non-user entities (organization logos)
+- External users without roles (suppliers, buyers)
+- Placeholder/decorative avatars
+
+```tsx
+// ✅ CORRECT - External user without role
+<Avatar>
+  <AvatarImage src={supplier.logo} />
+  <AvatarFallback>SP</AvatarFallback>
+</Avatar>
+```
+
+### Avatar Stacks (Multiple Users)
+
+```tsx
+// ✅ CORRECT - Stack with overflow indicator
+<UserAvatarStack 
+  users={assignees.map(a => ({
+    id: a.id,
+    name: a.full_name,
+    role: a.role,
+    avatarUrl: a.avatar_url
+  }))}
+  size="sm"
+  max={4}
+/>
+
+// ❌ WRONG - Manual stack implementation
+<div className="flex -space-x-2">
+  {assignees.map(a => <Avatar key={a.id}>...</Avatar>)}
+</div>
+```
+
+### Common Violations
+
+During codebase standardization, we found these anti-patterns:
+
+1. **Direct Avatar with `bg-muted`** - Found in 8 files
+2. **Custom InitialsAvatar components** - Found in timeline components
+3. **Hardcoded `bg-foundry-*` colors** - Found in task feed
+4. **Missing `role` field in queries** - Found in messaging
+5. **Duplicate `getInitials` functions** - Found in 6 files
+6. **Custom avatar stacks** - Found in Gantt view
+
+See `.cursor/rules/avatar-standard.mdc` for complete anti-pattern documentation.
+
 ## Component Naming Convention
 
 When creating custom components that wrap or extend base components:
@@ -395,6 +487,9 @@ Before committing any component usage:
 
 - [ ] Badges use semantic variants (not custom colors)
 - [ ] StatusBadge used for all status indicators
+- [ ] **User avatars use UserAvatar component (not direct Avatar)**
+- [ ] **No hardcoded avatar backgrounds (bg-muted, bg-slate-*, bg-foundry-*)**
+- [ ] **Database queries include `role` field for avatar coloring**
 - [ ] Buttons use semantic variants and include loading states
 - [ ] Icon-only buttons have `aria-label`
 - [ ] Cards use Card component (not custom divs)
