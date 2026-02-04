@@ -105,6 +105,7 @@ function getAITypeIcon(subcategory: string) {
 export function MarketplaceListingDialog({ listing, trigger }: MarketplaceListingDialogProps) {
     const [open, setOpen] = useState(false)
     const [isContacting, setIsContacting] = useState(false)
+    const [activeTab, setActiveTab] = useState<'overview' | 'details'>('overview')
 
     const attrs = listing.attributes || {}
     const category = listing.category
@@ -178,13 +179,13 @@ export function MarketplaceListingDialog({ listing, trigger }: MarketplaceListin
                     </DialogTitle>
                 </DialogHeader>
 
-                <Tabs defaultValue="overview" className="mt-4">
+                <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'overview' | 'details')} className="mt-4">
                     <TabsList className="grid w-full grid-cols-2">
-                        <TabsTrigger value="overview" className="gap-2">
+                        <TabsTrigger value="overview" className="gap-2" onClick={(e) => e.stopPropagation()}>
                             <Info className="h-4 w-4" />
                             Overview
                         </TabsTrigger>
-                        <TabsTrigger value="details" className="gap-2">
+                        <TabsTrigger value="details" className="gap-2" onClick={(e) => e.stopPropagation()}>
                             <CheckCircle2 className="h-4 w-4" />
                             Details
                         </TabsTrigger>
@@ -331,7 +332,8 @@ function KeyMetricsGrid({ category, attrs }: { category: string; attrs: Record<s
 
 // Skills/Expertise Preview
 function SkillsPreview({ category, attrs }: { category: string; attrs: Record<string, unknown> }) {
-    const skills = (attrs.skills || attrs.expertise || attrs.integrations || attrs.capabilities || []) as string[]
+    const rawSkills = attrs.skills || attrs.expertise || attrs.integrations || attrs.capabilities || []
+    const skills = Array.isArray(rawSkills) ? rawSkills as string[] : []
 
     if (skills.length === 0) return null
 
@@ -404,7 +406,7 @@ function PeopleDetails({ attrs }: { attrs: Record<string, unknown> }) {
             )}
 
             {/* Full Skills/Expertise */}
-            {(attrs.skills || attrs.expertise) && (
+            {(attrs.skills || attrs.expertise) && Array.isArray(attrs.skills || attrs.expertise) && (
                 <Card>
                     <CardContent className="pt-6">
                         <h3 className="font-semibold text-foreground flex items-center gap-2 mb-2">
@@ -423,7 +425,7 @@ function PeopleDetails({ attrs }: { attrs: Record<string, unknown> }) {
             )}
 
             {/* Certifications */}
-            {attrs.certifications && (
+            {attrs.certifications && Array.isArray(attrs.certifications) && (
                 <Card>
                     <CardContent className="pt-6">
                         <h3 className="font-semibold text-foreground flex items-center gap-2 mb-2">
@@ -449,7 +451,7 @@ function AIDetails({ attrs }: { attrs: Record<string, unknown> }) {
     return (
         <div className="space-y-4">
             {/* Integrations */}
-            {attrs.integrations && (
+            {attrs.integrations && Array.isArray(attrs.integrations) && (
                 <Card>
                     <CardContent className="pt-6">
                         <h3 className="font-semibold text-foreground flex items-center gap-2 mb-2">
@@ -468,7 +470,7 @@ function AIDetails({ attrs }: { attrs: Record<string, unknown> }) {
             )}
 
             {/* Use Cases */}
-            {attrs.use_cases && (
+            {attrs.use_cases && Array.isArray(attrs.use_cases) && (
                 <Card>
                     <CardContent className="pt-6">
                         <h3 className="font-semibold text-foreground flex items-center gap-2 mb-2">
@@ -552,7 +554,7 @@ function ProductsDetails({ attrs }: { attrs: Record<string, unknown> }) {
     return (
         <div className="space-y-4">
             {/* Certifications */}
-            {attrs.certifications && (
+            {attrs.certifications && Array.isArray(attrs.certifications) && (
                 <Card>
                     <CardContent className="pt-6">
                         <h3 className="font-semibold text-foreground flex items-center gap-2 mb-2">
@@ -571,7 +573,7 @@ function ProductsDetails({ attrs }: { attrs: Record<string, unknown> }) {
             )}
 
             {/* Capabilities */}
-            {attrs.capabilities && (
+            {attrs.capabilities && Array.isArray(attrs.capabilities) && (
                 <Card>
                     <CardContent className="pt-6">
                         <h3 className="font-semibold text-foreground flex items-center gap-2 mb-2">
