@@ -1,130 +1,211 @@
 # Agent Handover Document
-**Date:** February 3, 2026
-**Task:** Fix Inspiration Page UI consistency - Industry Sector card behavior
+**Date:** February 4, 2026
+**Session:** Notification Navigation + VC Application Fix
 **Status:** Complete ✅
 
 ---
 
 ## Context
 
-The user requested improvements to the Inspiration page UI, specifically making the Industry Sector cards (Level 2 - domain cards) work the same way as Business Objectives and Subsystems cards (PackCard). The key issue was that the DomainCard component lacked the interactive click-to-expand behavior and size toggle functionality that PackCard had.
+User reported that clicking notifications in the NotificationCenter dropdown didn't navigate to the relevant task/issue. Notifications only marked as read but didn't take the user to the linked page, making them non-actionable. This required making the entire notification item clickable and updating the tasks page to handle deep-linking via the `taskId` query parameter.
 
 ---
 
 ## COMPLETED ✅
 
-### 1. Industry Sector Two-Level Navigation
-- **Level 1**: Industry selection grid with simple clickable cards (Robotics, Rockets, Mobile, etc.)
-- **Level 2**: Domain detail view with interactive domain cards
-- Files modified: `src/app/(platform)/inspiration/inspiration-view.tsx`
+### Part 1: Clickable Notification Navigation
 
-### 2. DomainCard Interactive Behavior (Matching PackCard)
-- Added `onSizeChange` callback prop for click-to-expand behavior
-- Implemented click-to-cycle functionality (small → medium → full → small)
-- Added expand/collapse toggle buttons on each card size variant
-- Added "View" button on medium cards to expand to full
-- Files modified: `src/app/(platform)/inspiration/inspiration-view.tsx`
+#### 1. Clickable Notification Items
+- **Problem:** Clicking notifications only marked them as read, didn't navigate to the linked page
+- **Solution:** Made entire notification item clickable - click navigates to link, marks as read, closes popover
+- **Changes:**
+  - Replaced tiny `ExternalLink` icon with `ChevronRight` indicator
+  - Added `router.push()` navigation on click
+  - Added `setIsOpen(false)` to close popover after navigation
+  - Wrapped notification content in clickable div with proper hover states
+- **File modified:** `src/components/NotificationCenter.tsx`
 
-### 3. Individual Card Size State
-- Added `domainSizes` state for per-card size overrides (like PackCard pattern)
-- Added `defaultDomainSize` state for global size control
-- Added `handleDomainSizeChange` callback
-- Added `setAllDomainSize` function for global toggle
-- Files modified: `src/app/(platform)/inspiration/inspiration-view.tsx`
+### 2. Task Deep-Linking via Query Parameter
+- **Problem:** Notification links like `/tasks?taskId=xyz` didn't auto-open the task detail
+- **Solution:** Added `searchParams` support to tasks page and auto-open task when `taskId` is present
+- **Changes:**
+  - Added `searchParams` prop to page component (Next.js 13+ pattern)
+  - Passed `initialTaskId` to `TasksView` component
+  - Added `useEffect` in TasksView to find and open task when `initialTaskId` is provided
+- **Files modified:** 
+  - `src/app/(platform)/tasks/page.tsx`
+  - `src/app/(platform)/tasks/tasks-view.tsx`
 
-### 4. Responsive Grid Layout
-- Small size: 4-column grid on desktop
-- Medium size: 4-column grid on desktop
-- Full size: 2-column grid on desktop
-- Files modified: `src/app/(platform)/inspiration/inspiration-view.tsx`
+### 3. Verified All Notification Types Have Links
+- **Task notifications:** `/tasks?taskId=${taskId}` ✅
+- **Advisory notifications:** `/advisory/${questionId}` ✅
+- **Delegation notifications:** `/settings/delegations` ✅
+- **Marketplace RFQ:** `/marketplace/rfq/${rfqId}` ✅
+- **Marketplace orders:** `/marketplace/orders/${orderId}` ✅
+- **Marketplace listings:** `/marketplace/listings/${listingId}` ✅
 
-### 5. Previous Fixes (From Earlier Session)
-- Fixed UsePackDialog content visibility (was showing blank)
-- Removed redundant "What are Objective Packs?" section
-- Improved medium card view (more info than small)
-- Fixed wasted space in full view dialog
-- Fixed hidden avatars in task selection
+---
+
+### Part 2: Fixed VC Application Submissions
+
+#### Problem: VC "Apply for Access" Was Broken
+- **Issue:** VCs could not submit applications
+- **Root cause:** Database table required `user_id NOT NULL`, but VCs are unauthenticated when applying
+- **RLS policy:** Required `user_id = auth.uid()` which prevented unauthenticated inserts
+
+#### Solution: Database Migration
+- **Migration:** `20260204190000_fix_vc_applications.sql`
+- **Changes:**
+  1. Made `user_id` nullable in `provider_applications` table
+  2. Added RLS policy to allow unauthenticated inserts (`user_id IS NULL`)
+  3. Added index for admin review of unauthenticated applications
+- **Applied:** `npx supabase db push` ✅
+
+#### Impact
+- ✅ VCs can now successfully submit applications
+- ✅ Also fixes: Factory, University, Network partner applications
+- ✅ Applications stored with `user_id = NULL` until account is created
+- ✅ No code changes needed - `submitApplication()` was already correct
+- ✅ **University:** Made institution field required (was optional before)
+
+**See:** `VC_APPLICATION_FIX.md` for complete technical details
+
+---
+
+### Part 3: Fixed Supplier/Executive/Apprentice Signups
+
+#### Problem: Supplier, Executive, and Apprentice Signups Failed
+- **Issue:** These user types could not create accounts
+- **Root cause:** Missing system foundries in database
+  - Code references `"centaur-guild"` for Executives/Apprentices
+  - Code references `"centaur-suppliers"` for Suppliers
+  - Neither foundry existed in the database
+- **Foreign key constraint:** `profiles.foundry_id` must reference existing foundry
+
+#### Solution: Database Migration
+- **Migration:** `20260204200000_create_system_foundries.sql`
+- **Changes:**
+  1. Created `"centaur-guild"` foundry → displays as "The Forge Guild"
+  2. Ensured `"centaur-suppliers"` foundry exists → displays as "Forge Marketplace"
+  3. Added RLS policy to allow viewing system foundries
+- **Applied:** `npx supabase db push` ✅
+
+#### Impact
+- ✅ Suppliers can now successfully sign up
+- ✅ Executives can now successfully sign up
+- ✅ Apprentices can now successfully sign up
+- ✅ All three roles join their respective system foundries
+- ✅ No code changes needed - signup logic was correct
+
+**See:** `SUPPLIER_SIGNUP_FIX.md` for complete technical details
 
 ---
 
 ## REMAINING TASKS 🔧
 
-### No blocking issues remaining
+**No blocking issues!** All signup flows and navigation are now functional:
 
-The Inspiration page is now fully functional:
-- Business Objectives: Small/Medium/Full working ✅
-- Subsystems: Small/Medium/Full working ✅
-- Industry Sector: Level 1 selection + Level 2 domain cards with Small/Medium/Full working ✅
+### What's Working ✅
+- ✅ Notification navigation (click → navigate + mark read + close)
+- ✅ Task notifications auto-open task detail dialog
+- ✅ VC applications work (unauthenticated users can apply)
+- ✅ Supplier signups work (join centaur-suppliers foundry)
+- ✅ Executive signups work (join centaur-guild foundry)
+- ✅ Apprentice signups work (join centaur-guild foundry)
+- ✅ Founder signups work (create own foundry)
 
-### Optional Enhancements (If User Requests)
-
-#### Enhancement 1: Domain Dialog (Like UsePackDialog)
-**Problem:** Full size DomainCard shows expanded content inline, not in a dialog like PackCard
-**Files:** `src/app/(platform)/inspiration/inspiration-view.tsx`, possibly new `src/components/blueprints/use-domain-dialog.tsx`
-**Approach:** Create a `UseDomainDialog` component similar to `UsePackDialog` that opens when clicking full-size domain cards
-
-#### Enhancement 2: Learning Resources Panel
-**Problem:** The learning resources section in DomainCard could be more prominent
-**Files:** `src/app/(platform)/inspiration/inspiration-view.tsx`
-**Approach:** Make learning resources (courses, books, tools) more accessible in medium/full views
+### Future Enhancements (If Requested)
+- Add toast notification when navigating from notification (optional feedback)
+- Implement notification grouping (e.g., "3 new task assignments")
+- Add notification preferences (per-notification-type settings)
+- Admin panel to review VC/Factory/University applications
 
 ---
 
 ## KEY FILES
 
-| File | Purpose |
-|------|---------|
-| `src/app/(platform)/inspiration/inspiration-view.tsx` | Main Inspiration page with all card components |
-| `src/components/blueprints/use-pack-dialog.tsx` | Dialog for objective packs (reference implementation) |
-| `src/actions/blueprints.ts` | Server actions for fetching templates and domains |
+| Purpose | File |
+|---------|------|
+| **Notifications** | |
+| Notification component | `src/components/NotificationCenter.tsx` |
+| Tasks page (with deep-linking) | `src/app/(platform)/tasks/page.tsx` |
+| Tasks view (auto-open logic) | `src/app/(platform)/tasks/tasks-view.tsx` |
+| Notification creation | `src/actions/notifications.ts` |
+| Marketplace notifications | `src/actions/notifications-marketplace.ts` |
+| Implementation plan | `NOTIFICATION_NAVIGATION_PLAN.md` |
+| **VC Applications** | |
+| VC application page | `src/app/join/[role]/page.tsx` |
+| Signup actions | `src/actions/signup.ts` (submitApplication function) |
+| Database migration | `supabase/migrations/20260204190000_fix_vc_applications.sql` |
+| Technical docs | `VC_APPLICATION_FIX.md` |
+| **Supplier/Executive/Apprentice Signups** | |
+| Join pages | `src/app/join/[role]/page.tsx` |
+| Signup logic | `src/actions/signup.ts` (signup function) |
+| Database migration | `supabase/migrations/20260204200000_create_system_foundries.sql` |
+| Technical docs | `SUPPLIER_SIGNUP_FIX.md` |
+| **Testing** | |
+| Complete test guide | `ALL_SIGNUPS_TEST_GUIDE.md` - Test all 8 signup/application flows |
+
+---
+
+## DEMO ACCOUNTS
+
+Test credentials are documented in `DEMO_CREDENTIALS.md`:
+
+| Role | Email | Password |
+|------|-------|----------|
+| Founder | founder@demo.forgeOS.io | Demo123!Founder |
+| Executive | executive@demo.forgeOS.io | Demo123!Executive |
+| Apprentice | apprentice@demo.forgeOS.io | Demo123!Apprentice |
+| Supplier | supplier@demo.forgeOS.io | Demo123!Supplier |
+| VC | vc@demo.forgeOS.io | Demo123!VC |
+| University | university@demo.forgeOS.io | Demo123!University |
 
 ---
 
 ## USEFUL COMMANDS
 
 ```bash
-# Check TypeScript errors
-npx tsc --noEmit
-
-# Run linter
-npm run lint
-
-# Run dev server
-npm run dev
-
-# Deploy to Vercel (manual)
-vercel --prod --yes
+# Build and type-check
+npm run build
 
 # Check deployment status
 vercel ls
+
+# Run demo data scripts (if needed)
+npx tsx scripts/create-demo-foundries.ts
+npx tsx scripts/reset-demo-sample-data.ts
+npx tsx scripts/create-demo-sample-data.ts
+
+# Check for design token violations
+./scripts/check-design-tokens.sh
 ```
-
----
-
-## DEPLOYMENT
-
-**Latest Production Deployment:** https://centaur-os-created-260126-1435-1lgh3xr8m.vercel.app
-
-Vercel auto-deploys on push to main branch (though may need manual trigger sometimes).
 
 ---
 
 ## QUICK START FOR NEXT AGENT
 
 1. Read this document
-2. If user reports issues with Inspiration page, check `src/app/(platform)/inspiration/inspiration-view.tsx`
-3. The key pattern to understand:
-   - `PackCard` = Business Objectives and Subsystems cards
-   - `DomainCard` = Industry Sector domain cards (now matches PackCard pattern)
-   - Both use individual card size state with `onSizeChange` callbacks
-4. Run `npm run dev` and visit `/inspiration` to test
-5. The user prefers centered Dialogs over side panels (Sheet components are FORBIDDEN)
-
----
-
-## RELEVANT SKILLS
-
-- `.cursor/skills/vercel-deploy/SKILL.md` - For deployment
-- `.cursor/skills/ui-component-standards/SKILL.md` - UI standards
-- `.cursor/rules/component-patterns.mdc` - Component usage patterns
-- `.cursor/rules/color-consistency.mdc` - Color token requirements
+2. **Test Notification Navigation:**
+   - Log in to https://centaurdynamics.io with demo account
+   - Click bell icon to open notifications
+   - Click any notification → should navigate + mark as read + close popover
+   - For task notifications → should auto-open task detail dialog
+3. **Test VC Application:**
+   - Visit https://centaurdynamics.io/join/vc
+   - Click "Apply for Access"
+   - Fill out form and submit
+   - Should redirect to success page ✅
+4. **Test Supplier Signup:**
+   - Visit https://centaurdynamics.io/join/supplier
+   - Fill out form and submit
+   - Should create account and redirect to success ✅
+5. **Test Executive/Apprentice Signup:**
+   - Visit https://centaurdynamics.io/join/executive (or /apprentice)
+   - Fill out form and submit
+   - Should create account and redirect to success ✅
+6. Check `tasks/todo.md` for any tracked work
+7. See technical docs:
+   - `NOTIFICATION_NAVIGATION_PLAN.md` - Notification implementation
+   - `VC_APPLICATION_FIX.md` - VC application fix details
+   - `SUPPLIER_SIGNUP_FIX.md` - Supplier/Executive/Apprentice signup fix

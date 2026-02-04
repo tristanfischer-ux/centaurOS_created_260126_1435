@@ -146,8 +146,8 @@ const roleConfigs: Record<string, RoleConfig> = {
         ctaText: "Partner With Us",
         isApplication: true,
         additionalFields: [
-            { id: "institution", label: "Institution", placeholder: "MIT, Stanford..." },
-            { id: "department", label: "Department/School", placeholder: "Engineering, Business..." }
+            { id: "institution", label: "Institution", placeholder: "MIT, Stanford...", required: true },
+            { id: "department", label: "Department/School", placeholder: "Engineering, Business...", required: false }
         ]
     },
     network: {

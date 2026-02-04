@@ -100,10 +100,11 @@ interface TasksViewProps {
     currentUserId: string
     currentUserRole?: string
     teams: { id: string, name: string }[]
+    initialTaskId?: string
 }
 
 // ...
-export function TasksView({ tasks, objectives, members, currentUserId, currentUserRole, teams }: TasksViewProps) {
+export function TasksView({ tasks, objectives, members, currentUserId, currentUserRole, teams, initialTaskId }: TasksViewProps) {
     const [viewMode, setViewMode] = useState<'grid' | 'list' | 'timeline'>('grid')
     const [selectedTask, setSelectedTask] = useState<Task | null>(null)
     const [isSelectionMode, setIsSelectionMode] = useState(false)
@@ -129,6 +130,16 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
 
     // Filter Presets State
     const [activePreset, setActivePreset] = useState<string | null>(null)
+
+    // Auto-open task from notification link (if initialTaskId is provided)
+    useEffect(() => {
+        if (initialTaskId && tasks.length > 0) {
+            const task = tasks.find(t => t.id === initialTaskId)
+            if (task) {
+                setSelectedTask(task)
+            }
+        }
+    }, [initialTaskId, tasks])
 
     // Load active preset from localStorage on mount
     useEffect(() => {

@@ -54,16 +54,20 @@ async function verifyAndFixDemoAccounts() {
     if (profileError || !profile) {
       console.log(`  ⚠️  Profile missing - creating...`)
       
-      // Determine role (must be one of: Executive, Apprentice, AI_Agent)
+      // Determine role and foundry based on demo role
       const demoRole = authUser.user_metadata.demo_role || 'founder'
       const role = demoRole === 'vc' ? 'Executive' : 
-                   demoRole === 'supplier' ? 'Executive' : // Suppliers are treated as Executives
+                   demoRole === 'supplier' ? 'Apprentice' :
                    demoRole === 'university' ? 'Executive' :
-                   demoRole === 'founder' ? 'Executive' :
+                   demoRole === 'founder' ? 'Founder' :
                    demoRole === 'executive' ? 'Executive' :
                    'Apprentice' // apprentice and any others
       
-      // Create profile with a demo foundry_id
+      // Use correct system foundry IDs
+      const foundryId = demoRole === 'supplier' ? 'centaur-suppliers' : 'centaur-guild'
+      const accountType = demoRole === 'supplier' ? 'supplier' : 'team_builder'
+      
+      // Create profile with correct foundry_id
       const { error: insertError } = await supabase
         .from('profiles')
         .insert({
@@ -71,7 +75,8 @@ async function verifyAndFixDemoAccounts() {
           email: authUser.email,
           full_name: authUser.user_metadata.full_name || 'Demo User',
           role: role,
-          foundry_id: `demo-foundry-${demoRole}` // Each demo user gets their own foundry
+          foundry_id: foundryId,
+          account_type: accountType
         })
       
       if (insertError) {

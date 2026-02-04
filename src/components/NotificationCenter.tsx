@@ -1,13 +1,14 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Bell, CheckCheck, ExternalLink } from 'lucide-react'
+import { Bell, CheckCheck, ChevronRight } from 'lucide-react'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { createClient } from '@/lib/supabase/client'
 import { formatDistanceToNow } from 'date-fns'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
 
 interface Notification {
@@ -21,6 +22,7 @@ interface Notification {
 }
 
 export function NotificationCenter() {
+  const router = useRouter()
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [unreadCount, setUnreadCount] = useState(0)
   const [isOpen, setIsOpen] = useState(false)
@@ -157,16 +159,17 @@ export function NotificationCenter() {
             </div>
           ) : (
             <div className="divide-y">
-              {notifications.map(notification => (
-                <div
-                  key={notification.id}
-                  className={cn(
-                    'p-3 hover:bg-slate-50 cursor-pointer transition-colors',
-                    !notification.is_read && 'bg-blue-50/50'
-                  )}
-                  onClick={() => markAsRead(notification.id)}
-                >
-                  <div className="flex gap-4">
+              {notifications.map(notification => {
+                const handleClick = async () => {
+                  await markAsRead(notification.id)
+                  setIsOpen(false)
+                  if (notification.link) {
+                    router.push(notification.link)
+                  }
+                }
+
+                const notificationContent = (
+                  <div className="flex gap-4 items-start">
                     <span className="text-lg">{getIcon(notification.type)}</span>
                     <div className="flex-1 min-w-0">
                       <p className={cn(
@@ -185,13 +188,24 @@ export function NotificationCenter() {
                       </p>
                     </div>
                     {notification.link && (
-                      <Link href={notification.link} onClick={(e) => e.stopPropagation()}>
-                        <ExternalLink className="h-4 w-4 text-muted-foreground hover:text-foreground" />
-                      </Link>
+                      <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                     )}
                   </div>
-                </div>
-              ))}
+                )
+
+                return (
+                  <div
+                    key={notification.id}
+                    onClick={handleClick}
+                    className={cn(
+                      'p-3 hover:bg-slate-50 cursor-pointer transition-colors',
+                      !notification.is_read && 'bg-blue-50/50'
+                    )}
+                  >
+                    {notificationContent}
+                  </div>
+                )
+              })}
             </div>
           )}
         </ScrollArea>

@@ -5,7 +5,14 @@ import { TasksView } from './tasks-view'
 // Revalidate every 60 seconds
 export const revalidate = 60
 
-export default async function TasksPage() {
+interface TasksPageProps {
+    searchParams: Promise<{ taskId?: string }>
+}
+
+export default async function TasksPage({ searchParams }: TasksPageProps) {
+    const params = await searchParams
+    const taskId = params.taskId
+
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
 
@@ -95,6 +102,7 @@ export default async function TasksPage() {
                 teams={teams}
                 currentUserId={user.id}
                 currentUserRole={currentUserRole}
+                initialTaskId={taskId}
         />
     )
 }

@@ -57,6 +57,21 @@ const signupSuccessConfig: Record<string, SuccessConfig> = {
       { label: "Activating your toolkit", icon: Sparkles },
     ],
   },
+  supplier: {
+    title: "Welcome, Supplier.",
+    subtitle: "Your storefront is being prepared.",
+    description:
+      "Check your email to verify your account. Once verified, you'll have access to your Supplier Portal where you can list products, respond to RFQs, and manage orders.",
+    nextStep: "Verify your email → Access Supplier Portal → Start selling",
+    ctaText: "Go to Login",
+    ctaLink: "/login",
+    preparing: [
+      { label: "Setting up your supplier account", icon: Building },
+      { label: "Preparing your product catalog", icon: Sparkles },
+      { label: "Connecting to the marketplace", icon: Users },
+      { label: "Activating order management", icon: Target },
+    ],
+  },
 };
 
 const applicationSuccessConfig: Record<string, SuccessConfig> = {

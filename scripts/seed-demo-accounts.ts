@@ -126,6 +126,16 @@ async function seedDemoAccounts() {
 
       console.log(`  ✅ Created auth user: ${authData.user.id}`)
 
+      // Determine foundry_id based on role
+      // - Founders get their own foundry (created separately)
+      // - Executives, Apprentices, VC, University → centaur-guild
+      // - Suppliers → centaur-suppliers
+      const getFoundryId = (role: string): string => {
+        if (role === 'supplier') return 'centaur-suppliers'
+        if (role === 'founder') return 'demo-foundry' // Will be updated with actual foundry
+        return 'centaur-guild' // executive, apprentice, vc, university
+      }
+
       // Create profile record
       const { error: profileError } = await supabase
         .from('profiles')
@@ -134,9 +144,11 @@ async function seedDemoAccounts() {
           email: account.email,
           full_name: account.fullName,
           role: account.role === 'vc' ? 'Executive' : 
-                account.role === 'supplier' ? 'Supplier' :
+                account.role === 'supplier' ? 'Apprentice' :
                 account.role === 'university' ? 'Executive' :
                 account.role.charAt(0).toUpperCase() + account.role.slice(1),
+          foundry_id: getFoundryId(account.role),
+          account_type: account.role === 'supplier' ? 'supplier' : 'team_builder',
           is_demo_account: true
         })
 
