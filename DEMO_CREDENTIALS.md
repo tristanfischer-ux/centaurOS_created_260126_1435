@@ -18,6 +18,23 @@ All demo accounts are now fully configured and ready to use for testing.
 - **Login Page**: https://your-domain.vercel.app/login
 - **Demo Hub**: https://your-domain.vercel.app/demo
 
+## First Login Experience
+
+After logging in, users land on the **Objectives page** (not Dashboard) where they see:
+
+### "Discover ForgeOS" Objective
+
+All demo accounts have a pre-populated discovery objective with 6 guided tasks:
+
+1. **Explore Your Tasks** - Visit Tasks page, see views, create/assign tasks
+2. **Review Your Team** - Check Team page, member profiles, invite features
+3. **Browse the Marketplace** - Find Executives, Apprentices, providers
+4. **Check Your Inbox** - Notifications and action items command center
+5. **Explore Inspiration** - Resources, templates, playbooks library
+6. **Visit The Guild** - Community knowledge sharing
+
+Each task description guides users through actual ForgeOS features.
+
 ## Testing Demo Mode
 
 Visit `/demo` to see all demo accounts with one-click access to pre-filled signup forms.
