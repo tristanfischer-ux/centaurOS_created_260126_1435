@@ -165,6 +165,14 @@ export async function updateSession(request: NextRequest) {
             )
             
             if (!isAllowedForSupplier && !pathname.startsWith('/api/')) {
+                // Check for potential redirect loop by examining referer
+                const referer = request.headers.get('referer')
+                if (referer?.includes('/supplier-portal')) {
+                    // Already tried supplier-portal, don't redirect back (prevents loop)
+                    console.warn('[Middleware] Potential redirect loop detected for supplier, allowing access to:', pathname)
+                    return response
+                }
+                
                 // Supplier trying to access platform routes - redirect to supplier portal
                 const redirectUrl = request.nextUrl.clone()
                 redirectUrl.pathname = '/supplier-portal'

@@ -29,13 +29,16 @@ export default async function SupplierPortalLayout({
     .eq("id", user.id)
     .single()
 
-  if (profileError) {
-    console.error("Failed to fetch user profile:", profileError.message)
+  // If profile fetch failed or profile doesn't exist, redirect to login
+  // This prevents redirect loops with middleware
+  if (profileError || !profile) {
+    console.error("Failed to fetch user profile:", profileError?.message)
+    redirect("/login?error=profile_not_found")
   }
 
-  // If user is not a supplier, redirect them to the main platform
-  if (profile?.account_type !== "supplier") {
-    redirect("/timeline")
+  // If user is not a supplier, redirect them to login (not /timeline to prevent loops)
+  if (profile.account_type !== "supplier") {
+    redirect("/login?error=not_supplier_account")
   }
 
   return (
