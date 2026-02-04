@@ -4,7 +4,9 @@ import Image from "next/image"
 
 import { useState, useEffect, useCallback, useMemo } from "react"
 import { useAutoRefresh } from "@/hooks/useAutoRefresh"
+import { useDebounce } from "@/hooks/useDebounce"
 import { RefreshButton } from "@/components/RefreshButton"
+import { SearchInput } from "@/components/ui/search-input"
 import { TaskCard } from "./task-card"
 import { Button } from "@/components/ui/button"
 import { LayoutGrid, List, X, Trash2, CheckSquare, Loader2, Check, UserPlus, Filter, ChevronDown, ChevronRight, CalendarDays, Inbox, History } from "lucide-react"
@@ -120,6 +122,10 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
     const [statusFilter, setStatusFilter] = useState<string[]>([])
     const [assigneeFilter, setAssigneeFilter] = useState<string | 'unassigned' | 'all'>('all')
     const [sortBy, setSortBy] = useState<'due_date_asc' | 'due_date_desc' | 'created_desc'>('due_date_asc')
+    
+    // Search state
+    const [searchQuery, setSearchQuery] = useState('')
+    const debouncedQuery = useDebounce(searchQuery, 300)
 
     // Tab State for Active/History/All
     const [activeTab, setActiveTab] = useState<'active' | 'history' | 'all'>('active')
@@ -214,6 +220,9 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
         },
     ]
 
+    // Search filtering flag
+    const isSearching = debouncedQuery.trim() !== ''
+    
     // Filter Logic
     const filteredTasks = tasks.filter(task => {
         // Apply preset filter first if active
@@ -234,6 +243,22 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                 if (task.assignee_id) return false
             } else {
                 if (task.assignee_id !== assigneeFilter) return false
+            }
+        }
+        
+        // Search Filter
+        if (debouncedQuery.trim()) {
+            const query = debouncedQuery.toLowerCase().trim()
+            const numQuery = query.replace(/^#/, '') // Handle "#123" format
+            
+            const matchesTitle = task.title?.toLowerCase().includes(query)
+            const matchesDescription = task.description?.toLowerCase().includes(query)
+            const matchesTaskNumber = task.task_number?.toString() === numQuery
+            const matchesObjective = task.objective?.title?.toLowerCase().includes(query)
+            const matchesAssignee = task.assignee?.full_name?.toLowerCase().includes(query)
+            
+            if (!matchesTitle && !matchesDescription && !matchesTaskNumber && !matchesObjective && !matchesAssignee) {
+                return false
             }
         }
 
@@ -591,6 +616,15 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                                 </div>
                             ) : (
                                 <>
+                                    {/* Search Input */}
+                                    <SearchInput
+                                        value={searchQuery}
+                                        onChange={setSearchQuery}
+                                        placeholder="Search tasks..."
+                                        aria-label="Search tasks"
+                                        className="w-[180px] sm:w-[220px]"
+                                    />
+                                    
                                     {/* Preset Dropdown */}
                                     <Select 
                                         value={activePreset || 'all-tasks'} 
@@ -764,7 +798,7 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                                     )}
 
                                     {/* Active Filter Indicator */}
-                                    {(activePreset || statusFilter.length > 0 || assigneeFilter !== 'all') && (
+                                    {(activePreset || statusFilter.length > 0 || assigneeFilter !== 'all' || isSearching) && (
                                         <div className="flex items-center gap-2 px-3 py-1.5 bg-orange-50 border border-orange-200 rounded-lg">
                                             <Filter className="h-3.5 w-3.5 text-orange-600" />
                                             <span className="text-xs font-medium text-orange-700">
@@ -775,6 +809,7 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                                                     setActivePreset(null)
                                                     setStatusFilter([])
                                                     setAssigneeFilter('all')
+                                                    setSearchQuery('')
                                                 }}
                                                 className="text-orange-600 hover:text-orange-800 transition-colors"
                                                 aria-label="Clear all filters"

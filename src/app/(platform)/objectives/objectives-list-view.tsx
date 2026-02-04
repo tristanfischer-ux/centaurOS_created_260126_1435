@@ -1,8 +1,10 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useMemo } from "react"
 import { useAutoRefresh } from "@/hooks/useAutoRefresh"
+import { useDebounce } from "@/hooks/useDebounce"
 import { RefreshButton } from "@/components/RefreshButton"
+import { SearchInput } from "@/components/ui/search-input"
 import { ChevronDown, ChevronRight, Target, CheckCircle2, Clock, AlertCircle, ArrowRight, Trash, MessageSquare, Paperclip, Loader2, Plus, FileText, Pencil } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -85,9 +87,26 @@ export function ObjectivesListView({ objectives, objectivesForDialog, members, t
     const [isDeletingSingle, setIsDeletingSingle] = useState(false)
     const [isDeletingBulk, setIsDeletingBulk] = useState(false)
     const [selectedTask, setSelectedTask] = useState<Task | null>(null)
+    
+    // Search state
+    const [searchQuery, setSearchQuery] = useState('')
+    const debouncedQuery = useDebounce(searchQuery, 300)
 
     // Auto-refresh using Supabase Realtime
     useAutoRefresh({ tables: ['objectives', 'tasks'] })
+    
+    // Filter objectives by search query
+    const filteredObjectives = useMemo(() => {
+        if (!debouncedQuery.trim()) return objectives
+        const query = debouncedQuery.toLowerCase().trim()
+        return objectives.filter(obj =>
+            obj.title?.toLowerCase().includes(query) ||
+            obj.description?.toLowerCase().includes(query) ||
+            obj.extended_description?.toLowerCase().includes(query)
+        )
+    }, [objectives, debouncedQuery])
+    
+    const isSearching = debouncedQuery.trim() !== ''
 
     // Handle single deletion
     const handleDeleteSingle = async () => {
@@ -156,15 +175,15 @@ export function ObjectivesListView({ objectives, objectivesForDialog, members, t
     }
 
     const toggleSelectAll = () => {
-        if (selectedIds.size === objectives.length) {
+        if (selectedIds.size === filteredObjectives.length) {
             setSelectedIds(new Set())
         } else {
-            setSelectedIds(new Set(objectives.map(o => o.id)))
+            setSelectedIds(new Set(filteredObjectives.map(o => o.id)))
         }
     }
 
     const expandAll = () => {
-        setExpandedIds(new Set(objectives.map(o => o.id)))
+        setExpandedIds(new Set(filteredObjectives.map(o => o.id)))
     }
 
     const collapseAll = () => {
@@ -174,29 +193,47 @@ export function ObjectivesListView({ objectives, objectivesForDialog, members, t
     return (
         <div className="space-y-6">
             {/* Controls */}
-            <div className="flex items-center justify-between">
-                <div className="flex gap-2">
-                    <RefreshButton />
-                    <Button variant="secondary" size="sm" onClick={expandAll}>
-                        Expand All
-                    </Button>
-                    <Button variant="secondary" size="sm" onClick={collapseAll}>
-                        Collapse All
-                    </Button>
+            <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+                <div className="flex-1">
+                    <SearchInput
+                        value={searchQuery}
+                        onChange={setSearchQuery}
+                        placeholder="Search objectives..."
+                        aria-label="Search objectives"
+                        className="w-full sm:max-w-sm"
+                    />
                 </div>
-
-                {selectedIds.size > 0 && (
-                    <div className="flex gap-2 animate-in fade-in slide-in-from-right-4 duration-300">
-                        <Button
-                            variant="destructive"
-                            size="sm"
-                            onClick={() => setShowBulkDeleteDialog(true)}
-                        >
-                            Delete Selected ({selectedIds.size})
+                <div className="flex items-center justify-between gap-2">
+                    <div className="flex gap-2">
+                        <RefreshButton />
+                        <Button variant="secondary" size="sm" onClick={expandAll}>
+                            Expand All
+                        </Button>
+                        <Button variant="secondary" size="sm" onClick={collapseAll}>
+                            Collapse All
                         </Button>
                     </div>
-                )}
+
+                    {selectedIds.size > 0 && (
+                        <div className="flex gap-2 animate-in fade-in slide-in-from-right-4 duration-300">
+                            <Button
+                                variant="destructive"
+                                size="sm"
+                                onClick={() => setShowBulkDeleteDialog(true)}
+                            >
+                                Delete Selected ({selectedIds.size})
+                            </Button>
+                        </div>
+                    )}
+                </div>
             </div>
+            
+            {/* Search results count */}
+            {isSearching && (
+                <div className="text-sm text-muted-foreground">
+                    Showing {filteredObjectives.length} of {objectives.length} objectives
+                </div>
+            )}
 
             {/* Objectives Analytics */}
             <ObjectivesAnalytics objectives={objectives} />
@@ -284,13 +321,13 @@ export function ObjectivesListView({ objectives, objectivesForDialog, members, t
             {/* Objectives List */}
             <div className="space-y-4">
                 {/* Select All Header (Optional, but good for bulk actions) */}
-                {objectives.length > 0 && (
+                {filteredObjectives.length > 0 && (
                     <div className="flex items-center px-4 py-2 bg-muted/50 rounded-md">
                         <div className="flex items-center h-5 w-5 mr-4">
                             <input
                                 type="checkbox"
                                 className="h-4 w-4 rounded bg-muted text-foreground focus:ring-ring cursor-pointer"
-                                checked={selectedIds.size === objectives.length && objectives.length > 0}
+                                checked={selectedIds.size === filteredObjectives.length && filteredObjectives.length > 0}
                                 onChange={toggleSelectAll}
                                 aria-label="Select all objectives"
                             />
@@ -299,7 +336,7 @@ export function ObjectivesListView({ objectives, objectivesForDialog, members, t
                     </div>
                 )}
 
-                {objectives.map(objective => {
+                {filteredObjectives.map(objective => {
                     const isExpanded = expandedIds.has(objective.id)
                     const isSelected = selectedIds.has(objective.id)
                     const taskCount = objective.tasks.length
@@ -533,9 +570,15 @@ export function ObjectivesListView({ objectives, objectivesForDialog, members, t
                     )
                 })}
 
-                {objectives.length === 0 && (
+                {filteredObjectives.length === 0 && (
                     <div className="py-12 text-center bg-muted/30 rounded-lg text-muted-foreground">
-                        No objectives set. Define your mission.
+                        {isSearching ? (
+                            <>
+                                No objectives match &quot;{debouncedQuery}&quot;
+                            </>
+                        ) : (
+                            "No objectives set. Define your mission."
+                        )}
                     </div>
                 )}
             </div>
