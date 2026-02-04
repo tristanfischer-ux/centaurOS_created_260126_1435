@@ -12,7 +12,7 @@ import { useConversation } from '@/hooks/useConversation'
 import { useMessagingShortcuts } from '@/hooks/useMessagingShortcuts'
 import type { MessageWithSender } from '@/lib/messaging/service'
 import type { MessageWithContext } from '@/types/messaging'
-import { sendMessageWithContext, bridgeMessageToTaskComment } from '@/lib/messaging/service'
+import { sendMessageWithContext } from '@/lib/messaging/service'
 import { createClient } from '@/lib/supabase/client'
 import { 
   MoreVertical, 
@@ -264,7 +264,8 @@ export function ConversationThreadEnhanced({
   }, [])
 
   // Handle send message with context (for CommandInput)
-  // Uses the hook's sendMessage for optimistic updates, then bridges to task if needed
+  // Uses sendMessageWithContext for task context (handles bridging with real message ID)
+  // Falls back to hook's sendMessage for optimistic updates on non-task messages
   const handleSend = useCallback(async (content: string): Promise<boolean> => {
     console.log('[handleSend] Called with:', { content, conversationId, isSending })
     
@@ -287,9 +288,33 @@ export function ConversationThreadEnhanced({
     setIsSending(true)
 
     try {
-      console.log('[handleSend] Calling hookSendMessage...')
+      // If there's a task context, use sendMessageWithContext which:
+      // 1. Creates the message with task_id field
+      // 2. Returns the message with its actual ID
+      // 3. Automatically bridges to task_comments with the real message ID
+      if (currentContext?.taskId) {
+        console.log('[handleSend] Sending with task context via sendMessageWithContext...')
+        const supabase = createClient()
+        
+        try {
+          await sendMessageWithContext(supabase, {
+            conversationId,
+            senderId: currentUserId,
+            content: content.trim(),
+            taskId: currentContext.taskId,
+            objectiveId: currentContext.objectiveId,
+          })
+          console.log('[handleSend] sendMessageWithContext succeeded')
+          return true
+        } catch (contextError) {
+          console.error('[handleSend] Failed to send message with context:', contextError)
+          toast.error('Failed to send message')
+          return false
+        }
+      }
       
-      // Use the hook's sendMessage which has optimistic updates
+      // For non-task messages, use the hook's sendMessage which has optimistic updates
+      console.log('[handleSend] Calling hookSendMessage...')
       const success = await hookSendMessage(content.trim())
       
       console.log('[handleSend] hookSendMessage returned:', success)
@@ -297,25 +322,6 @@ export function ConversationThreadEnhanced({
       if (!success) {
         toast.error('Failed to send message')
         return false
-      }
-      
-      // If there's a task context, also bridge the message to task comments
-      // (This is done separately since the hook's sendMessage doesn't support context)
-      if (currentContext?.taskId) {
-        try {
-          const supabase = createClient()
-          // Bridge the message content to task notes
-          await bridgeMessageToTaskComment(
-            supabase,
-            '', // No message ID yet - we'll create a standalone comment
-            currentContext.taskId,
-            content.trim(),
-            currentUserId
-          )
-        } catch (bridgeError) {
-          console.warn('[handleSend] Failed to bridge to task:', bridgeError)
-          // Don't fail the whole send if bridging fails
-        }
       }
       
       return true
