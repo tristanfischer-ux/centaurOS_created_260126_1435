@@ -92,11 +92,7 @@ export function SupplierOnboardingModal({ forceOpen }: SupplierOnboardingModalPr
           <DialogTitle>{step.title}</DialogTitle>
         </VisuallyHidden>
 
-        <div className="relative overflow-hidden">
-          {/* Subtle Industrial Grid Background */}
-          <div
-            className="absolute inset-0 opacity-[0.03] pointer-events-none bg-[linear-gradient(#000_1px,transparent_1px),linear-gradient(90deg,#000_1px,transparent_1px)] bg-[length:24px_24px]"
-          />
+        <div className="relative overflow-hidden bg-background">
 
           {/* Progress Indicator - Line Style */}
           <div className="absolute top-0 left-0 right-0 h-1 bg-muted">

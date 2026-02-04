@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useState, useMemo, useEffect, useCallback } from "react"
-import { Loader2, Store, Search, X, SlidersHorizontal, MapPin, Briefcase, GraduationCap, Bot, Factory, Zap, Shield, LayoutGrid, List, ShieldCheck, Clock, Sparkles, Users, ArrowRight, Bookmark, Star, Rows3, Square, LayoutList, Minus, AlignJustify, UserCircle, Package, Wrench, CheckCircle2, FileText, Heart, RefreshCw } from "lucide-react"
+import { Loader2, Store, Search, X, SlidersHorizontal, MapPin, Briefcase, GraduationCap, Bot, Factory, Zap, Shield, LayoutGrid, List, ShieldCheck, Clock, Sparkles, Users, ArrowRight, Bookmark, Star, Rows3, Square, LayoutList, Minus, AlignJustify, UserCircle, Package, Wrench, CheckCircle2, FileText, Heart, RefreshCw, ShoppingBag } from "lucide-react"
 import { toast } from "sonner"
 import { Card, CardContent } from "@/components/ui/card"
 import { cn } from "@/lib/utils"
@@ -849,6 +849,12 @@ export function MarketplaceView({
                                 {savedListings.length}
                             </Badge>
                         )}
+                    </TabsTrigger>
+                    <TabsTrigger value="orders" className="flex-1 gap-2" asChild>
+                        <Link href="/my-orders">
+                            <ShoppingBag className="h-4 w-4" />
+                            My Orders
+                        </Link>
                     </TabsTrigger>
                 </TabsList>
 

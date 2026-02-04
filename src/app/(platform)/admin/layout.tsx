@@ -13,7 +13,6 @@ import {
     BarChart3,
     Shield,
     Settings,
-    Users,
     FlaskConical
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -25,7 +24,6 @@ const adminNavigation = [
     { name: "QA Testing", href: "/admin/qa", icon: FlaskConical },
     { name: "Analytics", href: "/admin/analytics", icon: BarChart3 },
     { name: "GDPR", href: "/admin/gdpr", icon: Shield },
-    { name: "Migration", href: "/admin/migration", icon: Users },
     { name: "Settings", href: "/admin/settings", icon: Settings },
     { name: "About", href: "/admin/about", icon: Info },
 ]

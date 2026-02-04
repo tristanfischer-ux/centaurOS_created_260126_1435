@@ -4,7 +4,7 @@ import React from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
-import { Users, CheckSquare, Store, Target, ShieldAlert, Settings, Lightbulb, Inbox } from "lucide-react"
+import { Users, CheckSquare, Store, Target, ShieldAlert, Settings, Lightbulb, Inbox, ShoppingBag } from "lucide-react"
 import { NotificationCenter } from "@/components/NotificationCenter"
 import { UnreadIndicator } from "@/components/today/UnreadIndicator"
 // ThemeToggle removed - ForgeOS enforces light mode per design philosophy
@@ -44,6 +44,7 @@ const workNavigation = [
 const discoveryNavigation = [
     { name: "Inspiration", href: "/inspiration", icon: Lightbulb, tooltip: "Get ideas on what to do next and discover opportunities" },
     { name: "Marketplace", href: "/marketplace", icon: Store, tooltip: "Find experts, suppliers, products, and services" },
+    { name: "My Orders", href: "/my-orders", icon: ShoppingBag, tooltip: "View and manage your marketplace orders" },
 ]
 
 // Settings only - accessible but not prominent

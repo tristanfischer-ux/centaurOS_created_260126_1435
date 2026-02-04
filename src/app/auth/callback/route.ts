@@ -52,8 +52,20 @@ export async function GET(request: Request) {
       if (profile?.account_type === 'supplier') {
         redirectPath = '/supplier-portal'
       } else {
-        // All other users go to objectives page to see "Discover ForgeOS" objective
-        redirectPath = '/objectives'
+        // Check if user has marketplace orders (buyer)
+        const { count: orderCount } = await supabase
+          .from('orders')
+          .select('*', { count: 'exact', head: true })
+          .eq('buyer_id', user.id)
+
+        if (orderCount && orderCount > 0) {
+          // User is a buyer with orders, redirect to buyer dashboard
+          redirectPath = '/buyer'
+        } else {
+          // All other users go to objectives page to see "Discover ForgeOS" objective
+          redirectPath = '/objectives'
+        }
+      }
       }
 
       // Redirect to the appropriate page with a success message
