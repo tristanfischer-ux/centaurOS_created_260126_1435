@@ -7,6 +7,13 @@ description: Standards for UI components including semantic color tokens, access
 
 This skill ensures consistent, accessible UI components in CentaurOS. **ALWAYS consult this before writing UI code.**
 
+## Design Philosophy
+
+This skill provides implementation patterns and standards. For design THINKING and evaluation:
+→ [visual-design-philosophy](~/.cursor/skills/visual-design-philosophy/SKILL.md)
+
+Use the philosophy skill first to determine WHAT should change, then use this skill for HOW to implement it.
+
 ## Color Token Reference
 
 **IMPORTANT:** For all color usage, see `.cursor/rules/color-consistency.mdc` which is the single source of truth.

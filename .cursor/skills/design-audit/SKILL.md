@@ -7,6 +7,13 @@ description: Systematic audit of codebase for design inconsistencies, with quant
 
 Systematic methodology for identifying and fixing design inconsistencies across a codebase.
 
+## Philosophy Layer
+
+For design THINKING (should I change this? why? is this good?), use the general skill:
+→ [visual-design-philosophy](~/.cursor/skills/visual-design-philosophy/SKILL.md)
+
+This skill (design-audit) focuses on DETECTION - finding specific code violations in this codebase.
+
 ## Prevention vs Detection
 
 **For PREVENTING inconsistencies when writing new code:**

@@ -573,6 +573,7 @@ onKeyDown={(e) => {
 
 ## Related Skills
 
+- [visual-design-philosophy](~/.cursor/skills/visual-design-philosophy/SKILL.md) - For holistic design evaluation (not just a11y)
 - [design-audit](../design-audit/SKILL.md) - Run audit first to identify a11y issues to remediate
 - [ui-component-standards](../ui-component-standards/SKILL.md) - Reference for correct accessible component patterns
 - [multi-step-form](../multi-step-form/SKILL.md) - Accessible form wizard patterns
