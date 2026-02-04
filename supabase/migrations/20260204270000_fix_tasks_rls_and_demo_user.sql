@@ -9,6 +9,7 @@
 DROP POLICY IF EXISTS "Users can view all tasks" ON public.tasks;
 DROP POLICY IF EXISTS "Users can view tasks in their foundry" ON public.tasks;
 DROP POLICY IF EXISTS "Active users can view tasks in their foundry" ON public.tasks;
+DROP POLICY IF EXISTS "authenticated_users_view_tasks" ON public.tasks;
 
 -- Create simple policy for tasks viewing
 CREATE POLICY "authenticated_users_view_tasks" ON public.tasks
