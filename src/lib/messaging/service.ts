@@ -1051,35 +1051,41 @@ export async function bridgeMessageToTaskComment(
     throw new Error(`Task not found: ${taskError?.message || 'Unknown error'}`)
   }
 
-  // Check if a comment already exists for this message
-  const { data: existing } = await supabase
-    .from('task_comments')
-    .select('id')
-    .eq('task_id', taskId)
-    .eq('user_id', userId)
-    .eq('content', content)
-    .maybeSingle()
-
-  if (existing) {
-    // Comment already exists, skip creation
-    return
+  // Skip if no message ID provided (can't track duplicates reliably)
+  if (!messageId) {
+    console.warn('[bridgeMessageToTaskComment] No message ID provided, creating unlinked comment')
   }
 
-  // Create task comment with reference to message in content or as system note
-  const commentContent = `${content}\n\n_[Synced from conversation - Message ID: ${messageId}]_`
+  // Check if a comment already exists for this message (reliable duplicate detection)
+  if (messageId) {
+    const { data: existing } = await supabase
+      .from('task_comments')
+      .select('id')
+      .eq('message_id', messageId)
+      .maybeSingle()
 
+    if (existing) {
+      // Comment already exists for this message, skip creation
+      return
+    }
+  }
+
+  // Create task comment with message_id tracking (no sync marker needed in content)
   const { error: commentError } = await supabase
     .from('task_comments')
     .insert({
       task_id: taskId,
       user_id: userId,
-      content: commentContent,
+      content: content, // Clean content, no sync marker
       foundry_id: task.foundry_id,
-      is_system_log: true // Mark as system-synced
+      is_system_log: false,
+      message_id: messageId || null,
+      synced_from_message: !!messageId,
     })
 
   if (commentError) {
-    throw new Error(`Failed to create task comment: ${commentError.message}`)
+    console.error('[bridgeMessageToTaskComment] Failed to create comment:', commentError)
+    throw commentError
   }
 }
 
