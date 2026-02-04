@@ -10,7 +10,6 @@ import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Loader2, ArrowRight, CreditCard, AlertCircle } from "lucide-react"
-import { completeMigrationSignup } from "@/actions/migration"
 import { createProviderFromSignup, initiateStripeOnboarding } from "@/actions/provider"
 
 interface ProviderSignupFormProps {
@@ -67,11 +66,6 @@ export function ProviderSignupForm({ listingId, listing, migrationRecord }: Prov
                 if (!result.success) {
                     setError(result.error || 'Failed to create provider profile')
                     return
-                }
-                
-                // If this is a migration, update the migration record
-                if (listingId && migrationRecord) {
-                    await completeMigrationSignup(listingId)
                 }
                 
                 // Move to Stripe step
