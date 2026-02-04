@@ -55,8 +55,8 @@ export default async function MyOrdersPage() {
     ])
 
     return (
-        <div className="container max-w-5xl mx-auto py-8 px-4">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-slate-100 mb-8">
+        <div className="space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-slate-100">
                 <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-3 mb-1">
                         <div className="h-8 w-1 bg-primary rounded-full shadow-[0_0_8px_rgba(234,88,12,0.6)]" />
@@ -70,13 +70,15 @@ export default async function MyOrdersPage() {
                 </div>
             </div>
 
-            <Suspense fallback={<OrdersLoadingSkeleton />}>
-                <MyOrdersView
-                    activeOrders={activeResult.data}
-                    completedOrders={completedResult.data}
-                    cancelledOrders={cancelledResult.data}
-                />
-            </Suspense>
+            <div className="max-w-5xl">
+                <Suspense fallback={<OrdersLoadingSkeleton />}>
+                    <MyOrdersView
+                        activeOrders={activeResult.data}
+                        completedOrders={completedResult.data}
+                        cancelledOrders={cancelledResult.data}
+                    />
+                </Suspense>
+            </div>
         </div>
     )
 }
