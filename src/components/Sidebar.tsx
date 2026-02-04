@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils"
 import { Users, CheckSquare, Store, Target, ShieldAlert, Settings, Lightbulb, Inbox } from "lucide-react"
 import { NotificationCenter } from "@/components/NotificationCenter"
 import { UnreadIndicator } from "@/components/today/UnreadIndicator"
-// ThemeToggle removed - CentaurOS enforces light mode per design philosophy
+// ThemeToggle removed - ForgeOS enforces light mode per design philosophy
 import { FocusModeToggle } from "@/components/FocusModeToggle"
 import { ZoomControl } from "@/components/ZoomControl"
 import { useZoomContext } from "@/components/ZoomProvider"
@@ -62,7 +62,7 @@ export function Sidebar({ foundryName, foundryId, userName, userRole, isAdmin }:
                 <div className="flex items-center justify-between">
                     <Link href="/dashboard" className="group flex items-center gap-2">
                         <span className="font-display text-xl font-bold tracking-[0.05em] text-foreground group-hover:text-international-orange transition-colors">
-                            CentaurOS
+                            ForgeOS
                         </span>
                         <span className="w-1.5 h-1.5 rounded-full bg-international-orange animate-pulse shadow-[0_0_8px_rgba(255,69,0,0.6)]"></span>
                     </Link>
