@@ -47,6 +47,7 @@ import { PresenceIndicator } from "@/components/PresenceIndicator"
 import { TeamComparisonBar } from "@/components/team/team-comparison-bar"
 import { TeamComparisonModal } from "@/components/team/team-comparison-modal"
 import { TeamMemberCard, CardSize } from "@/components/team/team-member-card"
+import { TeamAnalytics } from "@/components/team/team-analytics"
 import { cn } from "@/lib/utils"
 
 
@@ -999,6 +1000,9 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                     </div>
                 </div>
             </div>
+
+            {/* Team Analytics Charts */}
+            <TeamAnalytics members={allMembers} />
 
             {/* Pending Invitations */}
             <PendingInvitations />
