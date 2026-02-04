@@ -106,6 +106,7 @@ export const MarketCard = memo(function MarketCard({
     const [internalSize, setInternalSize] = useState<CardSize>(size)
     const [isSaving, setIsSaving] = useState(false)
     const [localSavedState, setLocalSavedState] = useState(isSaved)
+    const [dialogOpen, setDialogOpen] = useState(false)
     
     // Use controlled or uncontrolled size
     const currentSize = onSizeChange ? size : internalSize
@@ -178,19 +179,6 @@ export const MarketCard = memo(function MarketCard({
     // Get all tags/skills
     const allTags = attrs.skills || attrs.expertise || attrs.integrations || attrs.certifications || []
     
-    // Cycle through sizes on click
-    const handleCardClick = useCallback((e: React.MouseEvent) => {
-        // Don't expand if clicking on buttons or links
-        if ((e.target as HTMLElement).closest('button, a')) return
-        
-        const nextSize: Record<CardSize, CardSize> = {
-            'small': 'medium',
-            'medium': 'full',
-            'full': 'small'
-        }
-        setSize(nextSize[currentSize])
-    }, [currentSize, setSize])
-    
     // Size indicator button
     const handleSizeToggle = useCallback((e: React.MouseEvent) => {
         e.stopPropagation()
@@ -202,7 +190,27 @@ export const MarketCard = memo(function MarketCard({
         setSize(nextSize[currentSize])
     }, [currentSize, setSize])
 
+    // Handle card click - cycles size for small/medium, opens dialog for full
+    const handleCardClickWithDialog = useCallback((e: React.MouseEvent) => {
+        // Don't expand if clicking on buttons or links
+        if ((e.target as HTMLElement).closest('button, a')) return
+        
+        if (currentSize === 'full') {
+            // Full size: open dialog
+            setDialogOpen(true)
+        } else {
+            // Small/medium: cycle to next size
+            const nextSize: Record<CardSize, CardSize> = {
+                'small': 'medium',
+                'medium': 'full',
+                'full': 'small'
+            }
+            setSize(nextSize[currentSize])
+        }
+    }, [currentSize, setSize])
+
     return (
+        <>
         <Card 
             className={cn(
                 "group relative flex flex-col border hover:border-orange-300 hover:shadow-md transition-all duration-200 overflow-hidden bg-background cursor-pointer",
@@ -211,7 +219,7 @@ export const MarketCard = memo(function MarketCard({
             )}
             onMouseEnter={() => setIsHovered(true)}
             onMouseLeave={() => setIsHovered(false)}
-            onClick={handleCardClick}
+            onClick={handleCardClickWithDialog}
         >
             {/* Action buttons - top right */}
             <div className="absolute top-3 right-3 z-20 flex items-center gap-2">
@@ -462,7 +470,6 @@ export const MarketCard = memo(function MarketCard({
                                 <h3 className="text-lg font-bold tracking-tight text-foreground">
                                     {listing.title}
                                 </h3>
-                                {/* Role/Function subtitle in header for full size */}
                                 {isPerson && attrs.role && (
                                     <p className="text-sm font-medium text-muted-foreground mt-1">{attrs.role}</p>
                                 )}
@@ -481,7 +488,7 @@ export const MarketCard = memo(function MarketCard({
                             </div>
                         </div>
 
-                        {/* Full Description - no clamp */}
+                        {/* Full Description */}
                         <p className="text-sm text-muted-foreground mb-4">
                             {listing.description}
                         </p>
@@ -561,8 +568,8 @@ export const MarketCard = memo(function MarketCard({
                             </div>
                         )}
 
-                        {/* Additional attributes for full view */}
-                        {(attrs.certifications && attrs.certifications !== allTags) && (
+                        {/* Certifications */}
+                        {(attrs.certifications && Array.isArray(attrs.certifications) && attrs.certifications !== allTags) && (
                             <div className="mb-4">
                                 <p className="text-xs font-medium text-muted-foreground mb-2 flex items-center gap-1">
                                     <Award className="w-3 h-3" />
@@ -578,17 +585,21 @@ export const MarketCard = memo(function MarketCard({
                             </div>
                         )}
 
-                        {/* Footer with actions */}
+                        {/* Footer - Click to view prompt */}
                         <div className="flex items-center justify-between pt-4 border-t border-muted mt-auto">
-                            <button
-                                onClick={handleSizeToggle}
-                                className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors"
-                            >
-                                <ChevronUp className="w-4 h-4" />
-                                Show less
-                            </button>
+                            <div className="flex items-center gap-2 text-sm text-electric-blue font-medium">
+                                <Eye className="h-4 w-4" />
+                                Click to view full details
+                            </div>
                             
                             <div className="flex items-center gap-2">
+                                <button
+                                    onClick={handleSizeToggle}
+                                    className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors"
+                                >
+                                    <ChevronUp className="w-4 h-4" />
+                                    Show less
+                                </button>
                                 <Button 
                                     size="sm" 
                                     variant="secondary"
@@ -601,25 +612,21 @@ export const MarketCard = memo(function MarketCard({
                                     <GitCompareArrows className="w-3 h-3 mr-1" />
                                     {isSelected ? 'Remove' : 'Compare'}
                                 </Button>
-                                <MarketplaceListingDialog
-                                    listing={listing}
-                                    trigger={
-                                        <Button 
-                                            size="sm" 
-                                            variant="default"
-                                            className="h-8 text-xs shadow-sm"
-                                        >
-                                            <Eye className="w-3 h-3 mr-1" />
-                                            View Details
-                                        </Button>
-                                    }
-                                />
                             </div>
                         </div>
                     </>
                 )}
+
             </CardContent>
         </Card>
+        
+        {/* Controlled dialog - always rendered in same place in component tree */}
+        <MarketplaceListingDialog
+            listing={listing}
+            open={dialogOpen}
+            onOpenChange={setDialogOpen}
+        />
+        </>
     )
 })
 

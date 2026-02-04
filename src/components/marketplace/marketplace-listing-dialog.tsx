@@ -70,6 +70,10 @@ import Link from 'next/link'
 interface MarketplaceListingDialogProps {
     listing: MarketplaceListing
     trigger?: React.ReactNode
+    /** Controlled mode: external open state */
+    open?: boolean
+    /** Controlled mode: callback when open state changes */
+    onOpenChange?: (open: boolean) => void
 }
 
 // Badge styles matching the category color scheme
@@ -102,10 +106,19 @@ function getAITypeIcon(subcategory: string) {
     }
 }
 
-export function MarketplaceListingDialog({ listing, trigger }: MarketplaceListingDialogProps) {
-    const [open, setOpen] = useState(false)
+export function MarketplaceListingDialog({ 
+    listing, 
+    trigger,
+    open: controlledOpen,
+    onOpenChange: controlledOnOpenChange
+}: MarketplaceListingDialogProps) {
+    // Support both controlled and uncontrolled modes
+    const [internalOpen, setInternalOpen] = useState(false)
+    const isControlled = controlledOpen !== undefined
+    const dialogOpen = isControlled ? controlledOpen : internalOpen
+    const setDialogOpen = isControlled ? controlledOnOpenChange! : setInternalOpen
+    
     const [isContacting, setIsContacting] = useState(false)
-    const [activeTab, setActiveTab] = useState<'overview' | 'details'>('overview')
 
     const attrs = listing.attributes || {}
     const category = listing.category
@@ -125,7 +138,7 @@ export function MarketplaceListingDialog({ listing, trigger }: MarketplaceListin
             const result = await contactExpert(providerId, listing.id)
             if (result.success) {
                 toast.success('Conversation started! Check the Messages sidebar.')
-                setOpen(false)
+                setDialogOpen(false)
             } else {
                 toast.error(result.error || 'Failed to start conversation')
             }
@@ -141,14 +154,17 @@ export function MarketplaceListingDialog({ listing, trigger }: MarketplaceListin
     const primaryMetric = attrs.rate || attrs.cost || attrs.price || null
 
     return (
-        <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild>
-                {trigger || (
-                    <Button size="sm">
-                        View Details
-                    </Button>
-                )}
-            </DialogTrigger>
+        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+            {/* Only render trigger in uncontrolled mode or when trigger is explicitly provided */}
+            {(!isControlled || trigger) && (
+                <DialogTrigger asChild>
+                    {trigger || (
+                        <Button size="sm">
+                            View Details
+                        </Button>
+                    )}
+                </DialogTrigger>
+            )}
             <DialogContent size="lg" className="max-w-3xl max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
                     <div className="flex items-center gap-2 mb-1">
@@ -179,13 +195,13 @@ export function MarketplaceListingDialog({ listing, trigger }: MarketplaceListin
                     </DialogTitle>
                 </DialogHeader>
 
-                <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'overview' | 'details')} className="mt-4">
+                <Tabs defaultValue="overview" className="mt-4">
                     <TabsList className="grid w-full grid-cols-2">
-                        <TabsTrigger value="overview" className="gap-2" onClick={(e) => e.stopPropagation()}>
+                        <TabsTrigger value="overview" className="gap-2">
                             <Info className="h-4 w-4" />
                             Overview
                         </TabsTrigger>
-                        <TabsTrigger value="details" className="gap-2" onClick={(e) => e.stopPropagation()}>
+                        <TabsTrigger value="details" className="gap-2">
                             <CheckCircle2 className="h-4 w-4" />
                             Details
                         </TabsTrigger>
@@ -254,7 +270,7 @@ export function MarketplaceListingDialog({ listing, trigger }: MarketplaceListin
                 </Tabs>
 
                 <DialogFooter className="mt-4">
-                    <Button variant="outline" onClick={() => setOpen(false)}>
+                    <Button variant="outline" onClick={() => setDialogOpen(false)}>
                         Close
                     </Button>
                     <Button asChild variant="secondary">
