@@ -9,7 +9,7 @@ import { NextResponse } from 'next/server'
 export async function GET(request: Request) {
   const requestUrl = new URL(request.url)
   const code = requestUrl.searchParams.get('code')
-  const next = requestUrl.searchParams.get('next') || '/dashboard'
+  const next = requestUrl.searchParams.get('next') || '/objectives'
   const error = requestUrl.searchParams.get('error')
   const errorDescription = requestUrl.searchParams.get('error_description')
 
@@ -51,12 +51,9 @@ export async function GET(request: Request) {
       // Suppliers go to supplier portal
       if (profile?.account_type === 'supplier') {
         redirectPath = '/supplier-portal'
-      } else if (profile?.role === 'Apprentice') {
-        redirectPath = '/dashboard' // Apprentices go to dashboard to see training tasks
-      } else if (profile?.role === 'Executive') {
-        redirectPath = '/dashboard' // Executives go to dashboard
-      } else if (profile?.role === 'Founder') {
-        redirectPath = '/dashboard' // Founders go to dashboard
+      } else {
+        // All other users go to objectives page to see "Discover ForgeOS" objective
+        redirectPath = '/objectives'
       }
 
       // Redirect to the appropriate page with a success message

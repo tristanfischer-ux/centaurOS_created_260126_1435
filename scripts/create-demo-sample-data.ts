@@ -40,22 +40,16 @@ async function createSampleDataForUser(userId: string, foundryId: string, role: 
     return
   }
   
-  // Create sample objective
+  // Create discovery objective - same for all roles
   const { data: objective, error: objError } = await supabase
     .from('objectives')
     .insert({
-      title: role === 'founder' ? 'Launch MVP' : 
-             role === 'executive' ? 'Strategic Consulting Engagements' :
-             'Complete Apprenticeship Training',
-      description: role === 'founder' 
-        ? 'Build and launch your minimum viable product in 90 days' 
-        : role === 'executive'
-        ? 'Portfolio of fractional executive engagements across multiple startups'
-        : 'Complete your Founder-in-Training program',
+      title: 'Discover ForgeOS',
+      description: 'Welcome! Complete these tasks to explore ForgeOS features and see how everything works. Each task guides you to a different part of the platform.',
       creator_id: userId,
       foundry_id: foundryId,
       status: 'In Progress',
-      progress: 10
+      progress: 0
     })
     .select()
     .single()
@@ -67,21 +61,39 @@ async function createSampleDataForUser(userId: string, foundryId: string, role: 
   
   console.log(`  ✅ Created objective: "${objective.title}"`)
   
-  // Create sample tasks (status must be: Pending, Accepted, Rejected, Amended, Amended_Pending_Approval)
-  const sampleTasks = role === 'founder' ? [
-    { title: 'Define product requirements', description: 'Document core features and user stories', status: 'Accepted' },
-    { title: 'Build prototype', description: 'Create clickable prototype for user testing', status: 'Pending' },
-    { title: 'Secure seed funding', description: 'Pitch to 10 investors, close $500K round', status: 'Pending' },
-    { title: 'Hire first engineer', description: 'Interview candidates and make offer', status: 'Pending' }
-  ] : role === 'executive' ? [
-    { title: 'Strategic planning session', description: 'Lead quarterly planning with startup A', status: 'Accepted' },
-    { title: 'Mentor apprentice team', description: 'Review deliverables and provide guidance', status: 'Pending' },
-    { title: 'Investor deck review', description: 'Critique pitch deck for startup B', status: 'Pending' }
-  ] : [
-    { title: 'Complete toolkit tutorial', description: 'Learn ForgeOS productivity tools', status: 'Accepted' },
-    { title: 'Ship first feature', description: 'Complete and deploy your first real feature', status: 'Pending' },
-    { title: 'Shadow an Executive', description: 'Observe strategic decision-making in action', status: 'Pending' },
-    { title: 'Present at Guild meeting', description: 'Demo your work to The Guild', status: 'Pending' }
+  // Create discovery tasks that guide through the platform
+  // Tasks reference actual features/routes in ForgeOS
+  const sampleTasks = [
+    { 
+      title: 'Explore Your Tasks', 
+      description: 'Visit the Tasks page to see how work is organized. Create, assign, and track tasks. Try the different views (list, kanban, calendar).', 
+      status: 'Pending' 
+    },
+    { 
+      title: 'Review Your Team', 
+      description: 'Check out the Team page to see who\'s in your foundry. View member profiles, roles, and activity. Invite new members if needed.', 
+      status: 'Pending' 
+    },
+    { 
+      title: 'Browse the Marketplace', 
+      description: 'Explore the Marketplace to find Executives, Apprentices, and service providers. See how to build your fractional team.', 
+      status: 'Pending' 
+    },
+    { 
+      title: 'Check Your Inbox', 
+      description: 'Visit the Inbox to see notifications and action items. This is your command center for what needs attention.', 
+      status: 'Pending' 
+    },
+    { 
+      title: 'Explore Inspiration', 
+      description: 'Browse the Inspiration library for resources, templates, and playbooks. Save items to your personal collection.', 
+      status: 'Pending' 
+    },
+    { 
+      title: 'Visit The Guild', 
+      description: 'Check out The Guild page to connect with the ForgeOS community. Share knowledge and learn from others.', 
+      status: 'Pending' 
+    }
   ]
   
   for (const task of sampleTasks) {

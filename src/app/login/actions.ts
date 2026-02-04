@@ -93,6 +93,7 @@ export async function login(formData: FormData) {
         }
     }
     
-    // Default: team builders and users without account type go to dashboard
-    redirect('/dashboard')
+    // Default: team builders and users without account type go to objectives
+    // This shows the "Discover ForgeOS" objective for new users
+    redirect('/objectives')
 }
