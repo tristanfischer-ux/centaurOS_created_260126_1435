@@ -49,13 +49,13 @@ describe('TaskCard', () => {
     it('shows Accept button for assignee', () => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         render(<TaskCard task={mockTask as any} currentUserId="user-1" {...defaultProps} />)
-        expect(screen.getByText('Accept')).toBeInTheDocument()
+        expect(screen.getByText('Accept Task')).toBeInTheDocument()
     })
 
     it('hides Accept button for non-assignee', () => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         render(<TaskCard task={mockTask as any} currentUserId="user-2" {...defaultProps} />)
-        expect(screen.queryByText('Accept')).not.toBeInTheDocument()
+        expect(screen.queryByText('Accept Task')).not.toBeInTheDocument()
     })
 
     it.skip('shows Amendment Notes when status is Amended_Pending_Approval', () => {
