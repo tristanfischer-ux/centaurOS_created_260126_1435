@@ -282,12 +282,16 @@ describe('Task Actions', () => {
         it('should handle concurrent forward operations', async () => {
             const mockTask = { id: VALID_TASK_ID, assignee_id: VALID_USER_ID, forwarding_history: [], creator_id: VALID_OTHER_USER_ID, foundry_id: VALID_FOUNDRY_ID }
             const VALID_ASSIGNEE_2 = '550e8400-e29b-41d4-a716-446655440008'
-            
+
             mockSupabaseClient.from.mockImplementation((table: string) => {
                 if (table === 'tasks') {
                     return {
                         select: jest.fn().mockReturnValue({
                             eq: jest.fn().mockReturnValue({
+                                eq: jest.fn().mockReturnValue({
+                                    single: jest.fn().mockResolvedValue({ data: mockTask, error: null }),
+                                    maybeSingle: jest.fn().mockResolvedValue({ data: mockTask, error: null }),
+                                }),
                                 single: jest.fn().mockResolvedValue({ data: mockTask, error: null })
                             })
                         }),
@@ -343,6 +347,10 @@ describe('Task Actions', () => {
                     return {
                         select: jest.fn().mockReturnValue({
                             eq: jest.fn().mockReturnValue({
+                                eq: jest.fn().mockReturnValue({
+                                    single: jest.fn().mockResolvedValue({ data: mockTask, error: null }),
+                                    maybeSingle: jest.fn().mockResolvedValue({ data: mockTask, error: null }),
+                                }),
                                 single: jest.fn().mockResolvedValue({ data: mockTask, error: null })
                             })
                         }),

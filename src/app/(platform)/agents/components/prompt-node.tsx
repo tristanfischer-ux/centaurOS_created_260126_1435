@@ -1,0 +1,117 @@
+"use client"
+
+import React, { memo } from "react"
+import { Handle, Position, type NodeProps } from "@xyflow/react"
+import { CATEGORY_ACCENT_COLORS, CATEGORY_META, type PromptCategory } from "../lib/agent-types"
+import {
+    Rocket, TrendingUp, Megaphone, DollarSign, Compass, Package,
+    Calculator, Users, Heart, Scale, Palette, BarChart3, Sparkles,
+    Target, Layers, UserPlus, CheckCircle, Shield, PieChart, Calendar,
+    Map, RefreshCcw, Mail, Presentation, Send, FileText, HelpCircle,
+    FolderOpen, ListChecks, FileSearch, ClipboardCheck, PartyPopper,
+    Share2, Search, GitBranch, Newspaper, ShoppingBag, Layout, Video,
+    MessageSquare, Monitor, Filter, Grid3x3, AlertTriangle, ListOrdered,
+    Code, UserCircle, Columns, Bug, Wallet, Banknote, Receipt, Settings,
+    AlertCircle, ShoppingCart, Briefcase, Star, BookOpen, RotateCcw,
+    LogOut, Inbox, Activity, ThumbsUp, Lock, ScrollText, Image, Type,
+    Film, Camera, Play, Database, LayoutDashboard, ClipboardList,
+    Swords, MessageCircle, Clock, LayoutGrid, ImageIcon,
+} from "lucide-react"
+import type { LucideIcon } from "lucide-react"
+
+/** Map icon names to lucide components */
+const ICON_MAP: Record<string, LucideIcon> = {
+    Rocket, TrendingUp, Megaphone, DollarSign, Compass, Package,
+    Calculator, Users, Heart, Scale, Palette, BarChart3, Sparkles,
+    Target, Layers, UserPlus, CheckCircle, Shield, PieChart, Calendar,
+    Map, RefreshCcw, Mail, Presentation, Send, FileText, HelpCircle,
+    FolderOpen, ListChecks, FileSearch, ClipboardCheck, PartyPopper,
+    Share2, Search, GitBranch, Newspaper, ShoppingBag, Layout, Video,
+    MessageSquare, Monitor, Filter, Grid3x3, AlertTriangle, ListOrdered,
+    Code, UserCircle, Columns, Bug, Wallet, Banknote, Receipt, Settings,
+    AlertCircle, ShoppingCart, Briefcase, Star, BookOpen, RotateCcw,
+    LogOut, Inbox, Activity, ThumbsUp, Lock, ScrollText, Image, Type,
+    Film, Camera, Play, Database, LayoutDashboard, ClipboardList,
+    Swords, MessageCircle, Clock, LayoutGrid, ImageIcon,
+}
+
+export function getIcon(name: string): LucideIcon {
+    return ICON_MAP[name] ?? Sparkles
+}
+
+interface PromptNodeData {
+    label?: string
+    description?: string
+    category?: PromptCategory
+    icon?: string
+    [key: string]: unknown
+}
+
+function PromptNodeComponent({ data, selected }: NodeProps) {
+    const nodeData = data as PromptNodeData
+    const category = nodeData.category ?? "startup-strategy"
+    const accentColor = CATEGORY_ACCENT_COLORS[category] ?? "#94a3b8"
+    const meta = CATEGORY_META[category]
+    const Icon = getIcon(nodeData.icon ?? "Sparkles")
+
+    return (
+        <div
+            className={`
+                group relative bg-white rounded-xl border-2 shadow-sm
+                transition-all duration-200 w-[260px]
+                hover:shadow-md hover:-translate-y-0.5
+                ${selected ? "shadow-lg ring-2 ring-blue-400/50 -translate-y-0.5" : "border-slate-200"}
+            `}
+            style={{
+                borderLeftColor: accentColor,
+                borderLeftWidth: "4px",
+            }}
+        >
+            {/* Input handle */}
+            <Handle
+                type="target"
+                position={Position.Top}
+                className="!w-3 !h-3 !bg-blue-400 !border-2 !border-white !-top-1.5"
+            />
+
+            <div className="p-3">
+                {/* Header */}
+                <div className="flex items-start gap-2.5">
+                    <div
+                        className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+                        style={{ backgroundColor: `${accentColor}15` }}
+                    >
+                        <Icon
+                            className="w-4 h-4"
+                            style={{ color: accentColor }}
+                        />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-foreground truncate leading-tight">
+                            {nodeData.label || "Prompt"}
+                        </p>
+                        <p className="text-[10px] font-medium mt-0.5" style={{ color: accentColor }}>
+                            {meta?.label ?? category}
+                        </p>
+                    </div>
+                </div>
+
+                {/* Description */}
+                {nodeData.description && (
+                    <p className="text-[11px] text-muted-foreground mt-2 leading-relaxed line-clamp-2">
+                        {nodeData.description}
+                    </p>
+                )}
+            </div>
+
+            {/* Output handle */}
+            <Handle
+                type="source"
+                position={Position.Bottom}
+                className="!w-3 !h-3 !bg-blue-400 !border-2 !border-white !-bottom-1.5"
+            />
+        </div>
+    )
+}
+
+export const PromptNode = memo(PromptNodeComponent)
