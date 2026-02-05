@@ -10,6 +10,7 @@
  */
 
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { revalidatePath } from 'next/cache'
 import type { FoundryPurposeData } from '@/types/foundry'
 
@@ -103,8 +104,13 @@ export async function updateFoundryPurpose(
   }
   
   try {
-    // Update foundry purpose_data
-    const { data, error: updateError } = await supabase
+    // Update foundry purpose_data using admin client to bypass RLS
+    // SECURITY: Auth checks above verify user is authenticated, owns this foundry, and is a Founder
+    console.log('[FoundryActions] Creating admin client and attempting update...')
+    const adminClient = createAdminClient()
+    
+    console.log('[FoundryActions] Admin client created, executing update for foundryId:', foundryId)
+    const { data, error: updateError } = await adminClient
       .from('foundries')
       .update({ 
         purpose_data: purposeData as any // JSONB field
@@ -112,6 +118,13 @@ export async function updateFoundryPurpose(
       .eq('id', foundryId)
       .select()
       .single()
+    
+    console.log('[FoundryActions] Update result:', {
+      hasData: !!data,
+      hasError: !!updateError,
+      errorMessage: updateError?.message,
+      errorCode: updateError?.code,
+    })
     
     if (updateError) {
       console.error('[FoundryActions] Failed to update purpose:', {
