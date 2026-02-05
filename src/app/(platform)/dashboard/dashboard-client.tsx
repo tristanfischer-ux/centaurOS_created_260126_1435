@@ -1,0 +1,217 @@
+'use client'
+
+import { useState } from 'react'
+import { DashboardHero } from '@/components/dashboard/dashboard-hero'
+import { PriorityQueue } from '@/components/dashboard/priority-queue'
+import { ObjectiveCards } from '@/components/dashboard/objective-cards'
+import { TeamPulse } from '@/components/dashboard/team-pulse'
+import { ActivityFeed } from '@/components/dashboard/activity-feed'
+import { QuickActions } from '@/components/dashboard/quick-actions'
+import { ProductivityChart } from '@/components/dashboard/productivity-chart'
+import { StatsCards } from '@/components/dashboard/stats-cards'
+
+interface User {
+  id: string
+  fullName: string
+  role: string
+  avatarUrl: string | null
+}
+
+interface Task {
+  id: string
+  title: string
+  status: string
+  start_date: string | null
+  end_date: string | null
+  task_number?: number
+  created_at: string
+  objective?: { id: string; title: string; status: string } | null
+  creator?: { id: string; full_name: string | null } | null
+  assignee?: { id: string; full_name: string | null; avatar_url?: string | null } | null
+}
+
+interface Objective {
+  id: string
+  title: string
+  description?: string | null
+  status: string
+  progress?: number | null
+  start_date: string | null
+  end_date: string | null
+  created_at: string
+  creator?: { id: string; full_name: string | null; avatar_url?: string | null } | null
+}
+
+interface TeamMember {
+  id: string
+  full_name: string | null
+  avatar_url: string | null
+  role: string | null
+  status: 'online' | 'away' | 'focus' | 'offline'
+  last_seen: string | null
+  current_task: { id: string; title: string; task_number?: number } | null
+}
+
+interface Activity {
+  type: string
+  timestamp: string
+  task_id?: string
+  task_title?: string
+  task_number?: number
+  objective_id?: string
+  objective_title?: string
+  user: { id: string; full_name: string | null; avatar_url?: string | null } | null
+}
+
+interface TaskCompletionStat {
+  date: string
+  label: string
+  myTasks: number
+  teamTasks: number
+}
+
+interface Blocker {
+  id: string
+  blockers: string
+  blocker_severity: string | null
+  needs_help: boolean
+  user: { id: string; full_name: string | null; avatar_url?: string | null }
+}
+
+interface UnreadCounts {
+  direct: number
+  task: number
+  total: number
+}
+
+export interface DashboardClientProps {
+  user: User
+  foundryId: string
+  myTasks: Task[]
+  objectives: Objective[]
+  teamPresence: TeamMember[]
+  recentActivity: Activity[]
+  taskCompletionStats: TaskCompletionStat[]
+  overdueTasks: Task[]
+  tasksDueToday: Task[]
+  tasksDueThisWeek: Task[]
+  blockers: Blocker[]
+  pendingDecisions: Task[]
+  unreadCounts: UnreadCounts
+  isExecutiveOrFounder: boolean
+}
+
+/**
+ * Dashboard Client Component
+ * 
+ * Beautiful command center with personalized widgets and stunning visualizations
+ */
+export function DashboardClient({
+  user,
+  foundryId,
+  myTasks,
+  objectives,
+  teamPresence,
+  recentActivity,
+  taskCompletionStats,
+  overdueTasks,
+  tasksDueToday,
+  tasksDueThisWeek,
+  blockers,
+  pendingDecisions,
+  unreadCounts,
+  isExecutiveOrFounder
+}: DashboardClientProps) {
+  const [selectedView, setSelectedView] = useState<'overview' | 'tasks' | 'team'>('overview')
+  
+  // Calculate key metrics
+  const totalTasks = myTasks.length
+  const todayTasks = tasksDueToday.filter(t => 
+    myTasks.some(mt => mt.id === t.id)
+  ).length
+  const overdueCount = overdueTasks.filter(t => 
+    myTasks.some(mt => mt.id === t.id)
+  ).length
+  const activeObjectives = objectives.filter(o => o.status === 'Active' || o.status === 'In_Progress').length
+  const teamOnline = teamPresence.filter(m => m.status === 'online' || m.status === 'focus').length
+  
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-orange-50/30">
+      {/* Hero Section */}
+      <DashboardHero
+        userName={user.fullName}
+        userRole={user.role}
+        totalTasks={totalTasks}
+        todayTasks={todayTasks}
+        overdueCount={overdueCount}
+        unreadCount={unreadCounts.total}
+        onViewChange={setSelectedView}
+        selectedView={selectedView}
+      />
+      
+      {/* Main Dashboard Grid */}
+      <div className="px-4 sm:px-6 lg:px-8 pb-8 space-y-6">
+        {/* Stats Cards Row */}
+        <StatsCards
+          totalTasks={totalTasks}
+          todayTasks={todayTasks}
+          overdueCount={overdueCount}
+          activeObjectives={activeObjectives}
+          teamOnline={teamOnline}
+          teamTotal={teamPresence.length}
+          unreadMessages={unreadCounts.total}
+          isExecutiveOrFounder={isExecutiveOrFounder}
+          blockersCount={blockers.length}
+          pendingDecisionsCount={pendingDecisions.length}
+        />
+        
+        {/* Main Content Grid */}
+        {selectedView === 'overview' && (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Left Column - Priority & Actions */}
+            <div className="lg:col-span-1 space-y-6">
+              <QuickActions foundryId={foundryId} />
+              <PriorityQueue
+                myTasks={myTasks}
+                overdueTasks={overdueTasks}
+                tasksDueToday={tasksDueToday}
+                userId={user.id}
+              />
+            </div>
+            
+            {/* Middle Column - Objectives & Charts */}
+            <div className="lg:col-span-1 space-y-6">
+              <ObjectiveCards objectives={objectives} />
+              <ProductivityChart data={taskCompletionStats} />
+            </div>
+            
+            {/* Right Column - Team & Activity */}
+            <div className="lg:col-span-1 space-y-6">
+              <TeamPulse teamMembers={teamPresence} />
+              <ActivityFeed activities={recentActivity} />
+            </div>
+          </div>
+        )}
+        
+        {selectedView === 'tasks' && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <PriorityQueue
+              myTasks={myTasks}
+              overdueTasks={overdueTasks}
+              tasksDueToday={tasksDueToday}
+              userId={user.id}
+            />
+            <ProductivityChart data={taskCompletionStats} />
+          </div>
+        )}
+        
+        {selectedView === 'team' && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <TeamPulse teamMembers={teamPresence} expanded />
+            <ActivityFeed activities={recentActivity} expanded />
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
