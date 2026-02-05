@@ -705,8 +705,8 @@ export function FullProfileView({ open, onOpenChange, memberId, currentUserId }:
                     ) : profile ? (
                         <>
                             {/* Bio Section */}
-                            <div className="bg-muted rounded-lg p-6 space-y-4">
-                                <h3 className="text-sm font-semibold text-foreground uppercase tracking-wider">About</h3>
+                            <div className="bg-muted/50 rounded-xl p-6 space-y-4">
+                                <h3 className="text-lg font-semibold text-foreground">About</h3>
                                 {isEditing ? (
                                     <Textarea
                                         value={editedBio}
@@ -722,8 +722,8 @@ export function FullProfileView({ open, onOpenChange, memberId, currentUserId }:
                             </div>
                             
                             {/* Contact Details Section */}
-                            <div className="bg-muted rounded-lg p-6 space-y-4">
-                                <h3 className="text-sm font-semibold text-foreground uppercase tracking-wider">Contact Details</h3>
+                            <div className="bg-muted/50 rounded-xl p-6 space-y-4">
+                                <h3 className="text-lg font-semibold text-foreground">Contact Details</h3>
                                 
                                 {isEditing ? (
                                     <div className="space-y-4">
@@ -787,7 +787,7 @@ export function FullProfileView({ open, onOpenChange, memberId, currentUserId }:
                             </div>
                             
                             {/* Metrics Grid */}
-                            <div className="bg-muted rounded-lg p-6">
+                            <div className="bg-muted/50 rounded-xl p-6">
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                                     <div className="flex items-center gap-3">
                                         <div className="p-2 bg-status-info-light text-status-info rounded-lg">
@@ -820,12 +820,12 @@ export function FullProfileView({ open, onOpenChange, memberId, currentUserId }:
                             </div>
                             
                             {/* Teams Section */}
-                            <div>
-                                <div className="flex items-center justify-between mb-4">
-                                    <h2 className="text-sm font-semibold text-foreground uppercase tracking-wider flex items-center gap-2">
-                                        <Users className="h-4 w-4" /> Teams
-                                        <Badge variant="secondary" className="text-xs">{teamMemberships.length}</Badge>
-                                    </h2>
+                            <div className="space-y-4">
+                                <div className="flex items-center justify-between">
+                                    <h3 className="text-lg font-semibold text-foreground flex items-center gap-2">
+                                        <Users className="h-5 w-5 text-muted-foreground" /> Teams
+                                        <Badge variant="secondary">{teamMemberships.length}</Badge>
+                                    </h3>
                                     {canManageAssignments && availableTeams.length > 0 && (
                                         <div className="flex items-center gap-2">
                                             <Select value={selectedTeamId} onValueChange={setSelectedTeamId}>
@@ -858,16 +858,19 @@ export function FullProfileView({ open, onOpenChange, memberId, currentUserId }:
                                     )}
                                 </div>
                                 
-                                <div className="bg-background border border-slate-200 rounded-lg overflow-hidden">
+                                <div className="space-y-3">
                                     {teamMemberships.length === 0 ? (
-                                        <div className="p-8 text-center text-muted-foreground">
-                                            Not on any teams yet
+                                        <div className="flex flex-col items-center justify-center py-12 text-center bg-muted/30 rounded-xl">
+                                            <div className="p-4 rounded-full bg-muted mb-4">
+                                                <Users className="h-8 w-8 text-muted-foreground" />
+                                            </div>
+                                            <p className="text-muted-foreground">Not on any teams yet</p>
                                         </div>
                                     ) : (
                                         teamMemberships.map(membership => (
                                             <div
                                                 key={membership.team_id}
-                                                className="p-4 border-b border-slate-100 last:border-0 hover:bg-muted flex justify-between items-center"
+                                                className="flex items-center justify-between p-4 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
                                             >
                                                 <div className="flex items-center gap-3">
                                                     <Users className="h-4 w-4 text-muted-foreground" />
@@ -896,12 +899,12 @@ export function FullProfileView({ open, onOpenChange, memberId, currentUserId }:
                             </div>
                             
                             {/* Current Tasks Section */}
-                            <div>
-                                <div className="flex items-center justify-between mb-4">
-                                    <h2 className="text-sm font-semibold text-foreground uppercase tracking-wider flex items-center gap-2">
-                                        <Briefcase className="h-4 w-4" /> Current Tasks
-                                        <Badge variant="secondary" className="text-xs">{activeTasks.length}</Badge>
-                                    </h2>
+                            <div className="space-y-4">
+                                <div className="flex items-center justify-between">
+                                    <h3 className="text-lg font-semibold text-foreground flex items-center gap-2">
+                                        <Briefcase className="h-5 w-5 text-muted-foreground" /> Current Tasks
+                                        <Badge variant="secondary">{activeTasks.length}</Badge>
+                                    </h3>
                                     {canManageAssignments && unassignedTasks.length > 0 && (
                                         <div className="flex items-center gap-2">
                                             <Select value={selectedTaskId} onValueChange={setSelectedTaskId}>
@@ -934,16 +937,19 @@ export function FullProfileView({ open, onOpenChange, memberId, currentUserId }:
                                     )}
                                 </div>
                                 
-                                <div className="bg-background border border-slate-200 rounded-lg overflow-hidden">
+                                <div className="space-y-3">
                                     {activeTasks.length === 0 ? (
-                                        <div className="p-8 text-center text-muted-foreground">
-                                            No active tasks
+                                        <div className="flex flex-col items-center justify-center py-12 text-center bg-muted/30 rounded-xl">
+                                            <div className="p-4 rounded-full bg-muted mb-4">
+                                                <Briefcase className="h-8 w-8 text-muted-foreground" />
+                                            </div>
+                                            <p className="text-muted-foreground">No active tasks</p>
                                         </div>
                                     ) : (
                                         activeTasks.map(task => (
                                             <div
                                                 key={task.id}
-                                                className="p-4 border-b border-slate-100 last:border-0 hover:bg-muted flex justify-between items-center"
+                                                className="flex items-center justify-between p-4 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
                                             >
                                                 <div className="flex-1 min-w-0">
                                                     <div className="font-medium text-foreground">{task.title}</div>
@@ -974,21 +980,24 @@ export function FullProfileView({ open, onOpenChange, memberId, currentUserId }:
                             </div>
                             
                             {/* Completed Tasks Section */}
-                            <div>
-                                <h2 className="text-sm font-semibold text-foreground uppercase tracking-wider flex items-center gap-2 mb-4">
-                                    <Check className="h-4 w-4" /> Completed Tasks
-                                    <Badge variant="secondary" className="text-xs">{completedTasks.length}</Badge>
-                                </h2>
-                                <div className="bg-background border border-slate-200 rounded-lg overflow-hidden">
+                            <div className="space-y-4">
+                                <h3 className="text-lg font-semibold text-foreground flex items-center gap-2">
+                                    <Check className="h-5 w-5 text-muted-foreground" /> Completed Tasks
+                                    <Badge variant="secondary">{completedTasks.length}</Badge>
+                                </h3>
+                                <div className="space-y-3">
                                     {completedTasks.length === 0 ? (
-                                        <div className="p-8 text-center text-muted-foreground">
-                                            No completed tasks yet
+                                        <div className="flex flex-col items-center justify-center py-12 text-center bg-muted/30 rounded-xl">
+                                            <div className="p-4 rounded-full bg-muted mb-4">
+                                                <Check className="h-8 w-8 text-muted-foreground" />
+                                            </div>
+                                            <p className="text-muted-foreground">No completed tasks yet</p>
                                         </div>
                                     ) : (
                                         completedTasks.map(task => (
                                             <div
                                                 key={task.id}
-                                                className="p-4 border-b border-slate-100 last:border-0 hover:bg-muted flex justify-between items-center"
+                                                className="flex items-center justify-between p-4 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
                                             >
                                                 <div className="flex-1 min-w-0">
                                                     <div className="font-medium text-foreground">{task.title}</div>

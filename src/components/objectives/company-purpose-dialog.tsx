@@ -242,6 +242,9 @@ export function CompanyPurposeDialog({
   const handleSubmit = async () => {
     if (!validateStep('review')) return
 
+    console.log('[CompanyPurposeDialog] Starting submit with foundryId:', foundryId)
+    console.log('[CompanyPurposeDialog] Purpose text:', formData.purpose?.substring(0, 50))
+
     startTransition(async () => {
       try {
         const purposeData: FoundryPurposeData = {
@@ -253,7 +256,9 @@ export function CompanyPurposeDialog({
           updatedBy: userId,
         }
 
+        console.log('[CompanyPurposeDialog] Calling updateFoundryPurpose action...')
         const result = await updateFoundryPurpose(foundryId, purposeData)
+        console.log('[CompanyPurposeDialog] Action result:', result)
 
         if (result.success) {
           toast.success('Company purpose updated successfully')

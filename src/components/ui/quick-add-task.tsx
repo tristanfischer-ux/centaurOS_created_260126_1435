@@ -70,19 +70,19 @@ export function QuickAddTask({ objectives, members, currentUserId, teams = [], o
                 data-quick-add-trigger
                 onClick={() => setIsExpanded(true)}
                 aria-label="Add a new task (keyboard shortcut: N)"
-                className="w-full flex items-center gap-3 px-4 py-3.5 text-muted-foreground hover:text-foreground border-2 border-dashed border hover:border rounded-lg bg-muted/50 hover:bg-background transition-all duration-200 group"
+                className="w-full flex items-center gap-3 px-4 py-3.5 text-muted-foreground hover:text-foreground border border-dashed border-muted hover:border-international-orange/30 rounded-xl bg-muted/30 hover:bg-international-orange/5 transition-all duration-200 ease-out group"
             >
-                <div className="flex items-center justify-center w-6 h-6 rounded-full bg-muted group-hover:bg-international-orange transition-colors duration-200">
-                    <Plus className="w-3.5 h-3.5 text-muted-foreground group-hover:text-white transition-colors duration-200" aria-hidden="true" />
+                <div className="flex items-center justify-center w-7 h-7 rounded-full bg-muted/50 group-hover:bg-international-orange transition-colors duration-200">
+                    <Plus className="w-4 h-4 text-muted-foreground group-hover:text-white transition-colors duration-200" aria-hidden="true" />
                 </div>
                 <span className="text-sm font-medium">Add a task...</span>
-                <kbd className="ml-auto px-2 py-0.5 text-[10px] font-mono bg-muted group-hover:bg-secondary text-muted-foreground group-hover:text-muted-foreground rounded border border-muted transition-colors duration-200">N</kbd>
+                <kbd className="ml-auto px-2 py-0.5 text-[10px] font-mono bg-muted/50 group-hover:bg-international-orange/10 text-muted-foreground rounded-md border border-muted/50 transition-colors duration-200">N</kbd>
             </button>
         )
     }
 
     return (
-        <form onSubmit={handleSubmit} className="flex gap-2 p-3 rounded-lg bg-background border-2 border-orange-200 shadow-lg ring-2 ring-orange-100" role="form" aria-label="Quick add task">
+        <form onSubmit={handleSubmit} className="flex gap-2 p-3 rounded-xl bg-background border border-international-orange/20 shadow-lg ring-2 ring-international-orange/10" role="form" aria-label="Quick add task">
             <Input
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
@@ -96,9 +96,9 @@ export function QuickAddTask({ objectives, members, currentUserId, teams = [], o
                         setTitle('')
                     }
                 }}
-                className="flex-1 border focus-visible:ring-orange-500"
+                className="flex-1 border focus-visible:ring-international-orange"
             />
-            <Button type="submit" size="sm" disabled={isLoading || !title.trim()} aria-label={isLoading ? "Creating task..." : "Create task"} className="bg-orange-600 hover:bg-orange-700 text-white">
+            <Button type="submit" size="sm" disabled={isLoading || !title.trim()} aria-label={isLoading ? "Creating task..." : "Create task"} className="bg-international-orange hover:bg-international-orange-hover text-white">
                 {isLoading ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" /> : <Plus className="w-4 h-4" aria-hidden="true" />}
                 <span className="ml-1 hidden sm:inline">Add</span>
             </Button>

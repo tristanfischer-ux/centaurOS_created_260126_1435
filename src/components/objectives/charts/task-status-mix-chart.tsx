@@ -42,7 +42,7 @@ export function TaskStatusMixChart({ objectives }: TaskStatusMixChartProps) {
   // Handle empty state
   if (total === 0) {
     return (
-      <Card className="border">
+      <Card className="rounded-xl border shadow-sm">
         <CardHeader className="pb-2">
           <CardTitle className="text-sm font-medium flex items-center gap-2">
             <ListTodo className="h-4 w-4 text-muted-foreground" />
@@ -76,7 +76,7 @@ export function TaskStatusMixChart({ objectives }: TaskStatusMixChartProps) {
   }
 
   return (
-    <Card className="border">
+    <Card className="rounded-xl border shadow-sm">
       <CardHeader className="pb-2">
         <CardTitle className="text-sm font-medium flex items-center gap-2">
           <ListTodo className="h-4 w-4 text-muted-foreground" />

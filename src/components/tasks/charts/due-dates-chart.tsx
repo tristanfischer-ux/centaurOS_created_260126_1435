@@ -49,10 +49,12 @@ export function DueDatesChart({ tasks }: DueDatesChartProps) {
   // Handle empty state
   if (activeTasks.length === 0) {
     return (
-      <Card className="border">
+      <Card className="rounded-xl border shadow-sm">
         <CardHeader className="pb-2">
           <CardTitle className="text-sm font-medium flex items-center gap-2">
-            <CalendarClock className="h-4 w-4 text-muted-foreground" />
+            <div className="p-1.5 rounded-lg bg-muted/50">
+              <CalendarClock className="h-4 w-4 text-muted-foreground" />
+            </div>
             Due Dates
           </CardTitle>
         </CardHeader>
@@ -66,17 +68,19 @@ export function DueDatesChart({ tasks }: DueDatesChartProps) {
   }
 
   return (
-    <Card className="border">
+    <Card className="rounded-xl border shadow-sm">
       <CardHeader className="pb-2">
         <CardTitle className="text-sm font-medium flex items-center gap-2">
-          <CalendarClock className="h-4 w-4 text-muted-foreground" />
+          <div className="p-1.5 rounded-lg bg-muted/50">
+            <CalendarClock className="h-4 w-4 text-muted-foreground" />
+          </div>
           Due Dates
         </CardTitle>
       </CardHeader>
       <CardContent className="pb-4">
         <div className="h-[100px] flex flex-col justify-center space-y-2">
           {/* Overdue - prominent if > 0 */}
-          <div className={`flex items-center justify-between px-2 py-1.5 rounded ${overdue > 0 ? 'bg-status-error-light' : 'bg-muted/50'}`}>
+          <div className={`flex items-center justify-between px-3 py-1.5 rounded-lg ${overdue > 0 ? 'bg-status-error-light' : 'bg-muted/30'}`}>
             <div className="flex items-center gap-2">
               <AlertTriangle className={`h-3.5 w-3.5 ${overdue > 0 ? 'text-status-error' : 'text-muted-foreground'}`} />
               <span className={`text-xs font-medium ${overdue > 0 ? 'text-status-error' : 'text-muted-foreground'}`}>Overdue</span>
@@ -85,7 +89,7 @@ export function DueDatesChart({ tasks }: DueDatesChartProps) {
           </div>
 
           {/* Due Today */}
-          <div className={`flex items-center justify-between px-2 py-1.5 rounded ${dueToday > 0 ? 'bg-status-warning-light' : 'bg-muted/50'}`}>
+          <div className={`flex items-center justify-between px-3 py-1.5 rounded-lg ${dueToday > 0 ? 'bg-status-warning-light' : 'bg-muted/30'}`}>
             <div className="flex items-center gap-2">
               <Clock className={`h-3.5 w-3.5 ${dueToday > 0 ? 'text-status-warning' : 'text-muted-foreground'}`} />
               <span className={`text-xs font-medium ${dueToday > 0 ? 'text-status-warning-dark' : 'text-muted-foreground'}`}>Due Today</span>
@@ -94,7 +98,7 @@ export function DueDatesChart({ tasks }: DueDatesChartProps) {
           </div>
 
           {/* Due This Week */}
-          <div className="flex items-center justify-between px-2 py-1.5 rounded bg-muted/50">
+          <div className="flex items-center justify-between px-3 py-1.5 rounded-lg bg-muted/30">
             <div className="flex items-center gap-2">
               <CalendarDays className="h-3.5 w-3.5 text-status-info" />
               <span className="text-xs font-medium text-muted-foreground">This Week</span>

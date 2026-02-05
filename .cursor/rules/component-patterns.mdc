@@ -162,6 +162,8 @@ import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/componen
 
 ## 4. Dialog Component
 
+**IMPORTANT:** For complex dialogs with 3+ fields, use the **Wizard Pattern**. See `.cursor/rules/wizard-pattern-standards.mdc` for the full standard.
+
 **Use size prop, not custom widths:**
 
 ```tsx
@@ -211,6 +213,61 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
   <Button variant="secondary">Cancel</Button>
 </DialogFooter>
 ```
+
+### Wizard Dialogs (Multi-Step Forms)
+
+For complex forms with 3+ fields or multi-step workflows, use the Wizard Pattern:
+
+```tsx
+// ✅ CORRECT - Wizard with visual stepper
+<Dialog>
+  <DialogContent size="lg" className="max-h-[90vh]">
+    <DialogHeader>
+      <DialogTitle>Define Your Company Purpose</DialogTitle>
+    </DialogHeader>
+    
+    {/* Visual progress stepper */}
+    <WizardStepper steps={STEPS} currentStep={currentStep} />
+    
+    {/* Step content */}
+    <ScrollArea className="max-h-[60vh]">
+      {currentStep === 'basic' && <StepBasicInfo {...props} />}
+      {currentStep === 'details' && <StepDetails {...props} />}
+      {currentStep === 'review' && <StepReview {...props} />}
+    </ScrollArea>
+    
+    {/* Navigation */}
+    <DialogFooter>
+      <div className="flex w-full items-center justify-between">
+        <Button variant="secondary" onClick={isFirstStep ? onClose : goBack}>
+          {isFirstStep ? 'Cancel' : 'Back'}
+        </Button>
+        <Button onClick={isLastStep ? onSubmit : goNext}>
+          {isLastStep ? 'Save' : 'Next'}
+        </Button>
+      </div>
+    </DialogFooter>
+  </DialogContent>
+</Dialog>
+
+// ❌ WRONG - Long single form
+<DialogContent size="lg">
+  <Input label="Title" />
+  <Textarea label="Description" />
+  <Input label="Purpose" />
+  <Textarea label="Mission" />
+  <Textarea label="Vision" />
+  <Input label="Audience" />
+  {/* 10+ more fields... scrolling forever */}
+</DialogContent>
+```
+
+**Key wizard principles:**
+- One concept per step (reduce cognitive load)
+- Visual progress with icons (users know where they are)
+- Conversational typography (questions, not labels)
+- Step validation before proceeding
+- See `.cursor/rules/wizard-pattern-standards.mdc` for full details
 
 ## 5. CRITICAL: NEVER Use Sheet/Side Panels
 

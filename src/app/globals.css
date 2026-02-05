@@ -71,6 +71,23 @@
   --color-international-orange: #ff4500;
   --color-electric-blue: #3b82f6;
 
+  /* Status Colors - Mapped from :root variables */
+  --color-status-success: hsl(var(--status-success));
+  --color-status-success-light: hsl(var(--status-success-light));
+  --color-status-success-dark: hsl(var(--status-success-dark));
+  
+  --color-status-warning: hsl(var(--status-warning));
+  --color-status-warning-light: hsl(var(--status-warning-light));
+  --color-status-warning-dark: hsl(var(--status-warning-dark));
+  
+  --color-status-error: hsl(var(--status-error));
+  --color-status-error-light: hsl(var(--status-error-light));
+  --color-status-error-dark: hsl(var(--status-error-dark));
+  
+  --color-status-info: hsl(var(--status-info));
+  --color-status-info-light: hsl(var(--status-info-light));
+  --color-status-info-dark: hsl(var(--status-info-dark));
+
   /* Typography */
   --font-display: var(--font-playfair), serif;
   --font-sans: var(--font-inter), sans-serif;
@@ -132,6 +149,35 @@
 
     --radius: 8px;
     /* Soft corners - modern, friendly aesthetic */
+    
+    /* Status Colors - HSL values matching tailwind.config.ts */
+    --status-success: 160 84% 39%;
+    /* #10b981 - Emerald */
+    --status-success-light: 152 81% 96%;
+    /* #d1fae5 */
+    --status-success-dark: 160 75% 16%;
+    /* #064e3b */
+    
+    --status-warning: 38 92% 50%;
+    /* #f59e0b - Amber */
+    --status-warning-light: 48 96% 89%;
+    /* #fef3c7 */
+    --status-warning-dark: 28 73% 26%;
+    /* #78350f */
+    
+    --status-error: 0 84% 60%;
+    /* #ef4444 - Red */
+    --status-error-light: 0 93% 94%;
+    /* #fee2e2 */
+    --status-error-dark: 0 63% 31%;
+    /* #7f1d1d */
+    
+    --status-info: 217 91% 60%;
+    /* #3b82f6 - Blue */
+    --status-info-light: 214 95% 93%;
+    /* #dbeafe */
+    --status-info-dark: 224 64% 33%;
+    /* #1e3a8a */
   }
 
   .dark {

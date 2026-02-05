@@ -322,7 +322,7 @@ export function ObjectivesListView({ objectives, objectivesForDialog, members, t
             <div className="space-y-4">
                 {/* Select All Header (Optional, but good for bulk actions) */}
                 {filteredObjectives.length > 0 && (
-                    <div className="flex items-center px-4 py-2 bg-muted/50 rounded-md">
+                    <div className="flex items-center px-4 py-3 bg-muted/30 rounded-xl border border-muted">
                         <div className="flex items-center h-5 w-5 mr-4">
                             <input
                                 type="checkbox"
@@ -357,15 +357,16 @@ export function ObjectivesListView({ objectives, objectivesForDialog, members, t
                     return (
                         <div
                             key={objective.id}
-                            className={`bg-card rounded-lg shadow-md overflow-hidden transition-all duration-200 ${
-                                isSelected ? 'ring-2 ring-ring' : ''
-                            } ${
-                                hasOverdueTasks ? 'ring-2 ring-orange-500' : isStalled ? 'ring-2 ring-yellow-500' : ''
-                            }`}
+                            className={`bg-card rounded-xl border shadow-sm overflow-hidden 
+                                transition-all duration-200 ease-out
+                                hover:shadow-lg hover:-translate-y-0.5
+                                ${isSelected ? 'ring-2 ring-international-orange/50 border-international-orange/30' : ''}
+                                ${hasOverdueTasks ? 'ring-2 ring-orange-500 border-orange-300' : isStalled ? 'ring-2 ring-amber-400 border-amber-200' : ''}
+                            `}
                         >
                             {/* Objective Header */}
                             <div
-                                className="flex items-center gap-4 p-5 cursor-pointer hover:bg-accent/50 active:bg-accent transition-colors"
+                                className="flex items-center gap-4 p-5 cursor-pointer hover:bg-muted/50 active:bg-muted transition-colors duration-150"
                                 onClick={() => toggleExpand(objective.id)}
                             >
                                 {/* Checkbox */}
@@ -397,8 +398,8 @@ export function ObjectivesListView({ objectives, objectivesForDialog, members, t
                                     )}
                                 </button>
 
-                                <div className="h-10 w-10 rounded-lg bg-status-warning-light flex items-center justify-center shrink-0">
-                                    <Target className="h-5 w-5 text-status-warning" />
+                                <div className="h-10 w-10 rounded-xl bg-international-orange/10 flex items-center justify-center shrink-0">
+                                    <Target className="h-5 w-5 text-international-orange" />
                                 </div>
 
                                 <div className="flex-1 min-w-0">
@@ -477,10 +478,13 @@ export function ObjectivesListView({ objectives, objectivesForDialog, members, t
 
                             {/* Tasks List (expanded) */}
                             {isExpanded && (
-                                <div className="bg-muted/30">
+                                <div className="bg-muted/20 border-t border-muted">
                                     {taskCount === 0 ? (
-                                        <div className="p-4 text-center text-sm text-muted-foreground">
-                                            No tasks assigned to this objective yet.
+                                        <div className="flex flex-col items-center justify-center py-12 text-center">
+                                            <div className="p-3 rounded-full bg-muted/50 mb-3">
+                                                <Target className="h-6 w-6 text-muted-foreground" />
+                                            </div>
+                                            <p className="text-sm text-muted-foreground">No tasks assigned to this objective yet.</p>
                                         </div>
                                     ) : (
                                         <div className="space-y-px">
@@ -488,8 +492,8 @@ export function ObjectivesListView({ objectives, objectivesForDialog, members, t
                                                 const statusConfig = getStatusConfig(task.status)
                                                 const StatusIcon = statusConfig.icon
 
-                                                return (
-                                                    <div key={task.id} className="flex items-center gap-2 sm:gap-4 p-4 pl-9 sm:pl-16 hover:bg-card transition-colors">
+                                                    return (
+                                                    <div key={task.id} className="flex items-center gap-2 sm:gap-4 p-4 pl-9 sm:pl-16 hover:bg-background/80 transition-colors duration-150">
                                                         <div title={task.status?.replace('_', ' ') || 'Pending'}>
                                                             <StatusIcon className={`h-4 w-4 shrink-0 ${statusConfig.color.split(' ')[1]}`} />
                                                         </div>
@@ -571,14 +575,17 @@ export function ObjectivesListView({ objectives, objectivesForDialog, members, t
                 })}
 
                 {filteredObjectives.length === 0 && (
-                    <div className="py-12 text-center bg-muted/30 rounded-lg text-muted-foreground">
-                        {isSearching ? (
-                            <>
-                                No objectives match &quot;{debouncedQuery}&quot;
-                            </>
-                        ) : (
-                            "No objectives set. Define your mission."
-                        )}
+                    <div className="flex flex-col items-center justify-center py-16 text-center bg-muted/20 rounded-xl border border-muted">
+                        <div className="p-4 rounded-full bg-muted/50 mb-4">
+                            <Target className="h-10 w-10 text-muted-foreground" />
+                        </div>
+                        <p className="text-muted-foreground">
+                            {isSearching ? (
+                                <>No objectives match &quot;{debouncedQuery}&quot;</>
+                            ) : (
+                                "No objectives set. Define your mission."
+                            )}
+                        </p>
                     </div>
                 )}
             </div>

@@ -59,10 +59,12 @@ export function CompletionRateChart({ tasks }: CompletionRateChartProps) {
   // Handle empty state
   if (totalCount === 0) {
     return (
-      <Card className="border">
+      <Card className="rounded-xl border shadow-sm">
         <CardHeader className="pb-2">
           <CardTitle className="text-sm font-medium flex items-center gap-2">
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
+            <div className="p-1.5 rounded-lg bg-muted/50">
+              <TrendingUp className="h-4 w-4 text-muted-foreground" />
+            </div>
             Completion
           </CardTitle>
         </CardHeader>
@@ -76,10 +78,12 @@ export function CompletionRateChart({ tasks }: CompletionRateChartProps) {
   }
 
   return (
-    <Card className="border">
+    <Card className="rounded-xl border shadow-sm">
       <CardHeader className="pb-2">
         <CardTitle className="text-sm font-medium flex items-center gap-2">
-          <TrendingUp className="h-4 w-4 text-muted-foreground" />
+          <div className="p-1.5 rounded-lg bg-muted/50">
+            <TrendingUp className="h-4 w-4 text-muted-foreground" />
+          </div>
           Completion
         </CardTitle>
       </CardHeader>

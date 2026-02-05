@@ -71,10 +71,8 @@ function getInitials(name: string | null): string {
 
 /**
  * Get avatar gradient colors based on role.
- * - Founder: Purple (authority, leadership)
- * - Executive: Orange (warmth, action)
- * - Apprentice: Blue (growth, learning)
- * - AI_Agent: Indigo/Violet (AI distinction)
+ * Uses international-orange brand color for human roles,
+ * violet for AI agents to distinguish them clearly.
  */
 function getAvatarGradient(role: string, name: string | null): string {
     // Use name to generate consistent but varied gradients within role
@@ -83,41 +81,46 @@ function getAvatarGradient(role: string, name: string | null): string {
     
     switch (role) {
         case 'Founder':
+            // Primary brand orange for leadership
             return variant === 0 
-                ? 'from-purple-400 to-purple-600' 
+                ? 'from-orange-500 to-orange-600' 
                 : variant === 1 
-                ? 'from-purple-500 to-indigo-500'
-                : 'from-indigo-400 to-purple-600'
+                ? 'from-orange-400 to-orange-600'
+                : 'from-orange-500 to-amber-600'
         case 'Executive':
+            // Warm orange tones
             return variant === 0 
-                ? 'from-orange-400 to-orange-600' 
+                ? 'from-orange-400 to-orange-500' 
                 : variant === 1 
                 ? 'from-amber-400 to-orange-500'
-                : 'from-orange-500 to-amber-600'
+                : 'from-orange-400 to-amber-500'
         case 'AI_Agent':
+            // Violet distinguishes AI from humans
             return variant === 0 
-                ? 'from-indigo-400 to-indigo-600' 
+                ? 'from-violet-500 to-violet-600' 
                 : variant === 1 
-                ? 'from-violet-400 to-indigo-500'
-                : 'from-blue-400 to-indigo-600'
+                ? 'from-violet-400 to-violet-600'
+                : 'from-violet-500 to-purple-600'
         case 'Apprentice':
         default:
+            // Neutral slate for apprentices
             return variant === 0 
-                ? 'from-blue-400 to-blue-600' 
+                ? 'from-slate-400 to-slate-500' 
                 : variant === 1 
-                ? 'from-sky-400 to-blue-500'
-                : 'from-blue-500 to-sky-600'
+                ? 'from-slate-300 to-slate-500'
+                : 'from-slate-400 to-slate-600'
     }
 }
 
 /**
- * Role badge styles using semantic tokens.
+ * Role badge styles using brand-consistent colors.
+ * Human roles use orange/neutral, AI uses violet for distinction.
  */
 const roleBadgeStyles: Record<string, string> = {
-    'Founder': 'bg-purple-100 text-purple-700',
-    'Executive': 'bg-orange-100 text-orange-700',
-    'Apprentice': 'bg-blue-100 text-blue-700',
-    'AI_Agent': 'bg-indigo-50 text-indigo-700'
+    'Founder': 'bg-orange-100 text-orange-700',
+    'Executive': 'bg-orange-50 text-orange-600',
+    'Apprentice': 'bg-muted text-muted-foreground',
+    'AI_Agent': 'bg-violet-100 text-violet-700'
 }
 
 /**

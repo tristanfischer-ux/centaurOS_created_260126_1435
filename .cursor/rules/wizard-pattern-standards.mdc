@@ -1,0 +1,441 @@
+---
+description: Standards for multi-step wizard dialogs - the "Purpose Dialog Quality" pattern
+alwaysApply: true
+---
+
+# Multi-Step Wizard Pattern Standards
+
+When a dialog has 3+ fields, complex workflows, or would benefit from guided user input, use the **wizard pattern** instead of a single-form approach. This pattern dramatically improves UX by reducing cognitive load.
+
+## When to Use Wizards
+
+| Use Wizard | Use Single Form |
+|---|---|
+| 3+ distinct information groups | 1-2 simple fields |
+| Complex workflows with dependencies | Independent fields |
+| User needs guidance/context | Self-explanatory inputs |
+| Long forms that scroll | Fits on one screen |
+| Data entry that benefits from focus | Quick edits |
+
+**Examples requiring wizards:**
+- Define Company Purpose (5 steps)
+- Create Objective with Tasks (3+ steps)
+- Onboarding flows
+- Multi-part bookings
+- Complex entity creation
+
+**Examples NOT requiring wizards:**
+- Edit title/description
+- Simple confirmations
+- Quick settings toggles
+
+## The "Purpose Dialog Quality" Standard
+
+The CompanyPurposeDialog (`src/components/objectives/company-purpose-dialog.tsx`) is the gold standard. All wizards should follow these principles:
+
+### 1. Visual Progress Indicator
+
+**REQUIRED**: All wizards must have a clear progress stepper with:
+- Step icons (from lucide-react)
+- Active/completed/pending visual states
+- Connecting lines between steps
+
+```tsx
+// ✅ CORRECT - Visual stepper with states
+const STEPS = [
+  { id: 'basic', title: 'Basic Info', icon: FileText },
+  { id: 'details', title: 'Details', icon: Settings },
+  { id: 'review', title: 'Review', icon: CheckCircle2 },
+]
+
+<div className="flex items-center gap-2 mb-4">
+  {STEPS.map((step, index) => {
+    const Icon = step.icon
+    const isActive = step.id === currentStep
+    const isCompleted = index < currentStepIndex
+
+    return (
+      <div key={step.id} className={cn('flex items-center gap-2 flex-1', index > 0 && 'pl-2')}>
+        {/* Connector line */}
+        {index > 0 && (
+          <div className={cn(
+            'h-0.5 flex-1',
+            isCompleted ? 'bg-international-orange' : 'bg-muted'
+          )} />
+        )}
+        {/* Step icon */}
+        <div className={cn(
+          'flex items-center justify-center rounded-full h-8 w-8 transition-colors',
+          isActive && 'bg-international-orange text-white',
+          isCompleted && !isActive && 'bg-orange-100 text-international-orange',
+          !isActive && !isCompleted && 'bg-muted text-muted-foreground'
+        )}>
+          <Icon className="h-4 w-4" />
+        </div>
+      </div>
+    )
+  })}
+</div>
+
+// ❌ WRONG - No visual progress
+<div>Step {currentStep} of {totalSteps}</div>
+
+// ❌ WRONG - Text-only progress
+<p>Step 2: Enter details</p>
+```
+
+### 2. Conversational Typography
+
+**REQUIRED**: Each step must have:
+- **Heading**: Clear question or action (`text-lg font-semibold`)
+- **Description**: Context and guidance (`text-sm text-muted-foreground`)
+- **Input label**: Field name with required indicator
+
+```tsx
+// ✅ CORRECT - Conversational, guiding
+<div className="space-y-4">
+  <div>
+    <h3 className="text-lg font-semibold mb-2">
+      Why does your company exist?
+    </h3>
+    <p className="text-sm text-muted-foreground">
+      Think beyond profit. What change do you want to make in the world? 
+      What gets you out of bed every day?
+    </p>
+  </div>
+  <div className="space-y-2">
+    <Label htmlFor="whyExists">
+      Your answer <span className="text-destructive" aria-label="required">*</span>
+    </Label>
+    <Textarea id="whyExists" placeholder="We exist to..." />
+  </div>
+</div>
+
+// ❌ WRONG - Technical/cold
+<div>
+  <h3 className="text-sm font-semibold uppercase tracking-wider">
+    COMPANY PURPOSE
+  </h3>
+  <Label>Purpose Statement *</Label>
+  <Textarea placeholder="Enter purpose" />
+</div>
+
+// ❌ WRONG - No guidance
+<div>
+  <Label>Purpose</Label>
+  <Textarea />
+</div>
+```
+
+### 3. One Focus Per Step
+
+**REQUIRED**: Each step should ask about ONE concept or closely related group.
+
+```tsx
+// ✅ CORRECT - One concept per step
+// Step 1: Core Purpose
+<StepCore question="Why does your company exist?" />
+
+// Step 2: Problem & Audience (related concepts)
+<StepAudience 
+  problem="What problem are you solving?"
+  audience="Who are you solving it for?"
+/>
+
+// Step 3: Differentiation  
+<StepDifferentiation question="What makes you unique?" />
+
+// ❌ WRONG - Multiple unrelated concepts
+<div>
+  <Input label="Purpose" />
+  <Input label="Mission" />
+  <Input label="Vision" />
+  <Input label="Target Audience" />
+  <Input label="Unique Value" />
+  <Input label="5-Year Goals" />
+</div>
+```
+
+### 4. Step Validation Before Proceeding
+
+**REQUIRED**: Validate current step before allowing Next.
+
+```tsx
+// ✅ CORRECT - Validate before proceeding
+const validateStep = (step: string): boolean => {
+  switch (step) {
+    case 'basic':
+      if (!formData.title?.trim()) {
+        setError('Please enter a title')
+        return false
+      }
+      return true
+    case 'details':
+      if (!formData.description?.trim()) {
+        setError('Please provide a description')
+        return false
+      }
+      return true
+    default:
+      return true
+  }
+}
+
+const goToNextStep = () => {
+  if (!validateStep(currentStep)) return
+  // ... proceed to next step
+}
+
+// ❌ WRONG - No validation
+const goToNextStep = () => {
+  setCurrentStep(nextStep) // User can skip required fields
+}
+```
+
+### 5. Clear Navigation Flow
+
+**REQUIRED**: Footer with Cancel/Back on left, Next/Submit on right.
+
+```tsx
+// ✅ CORRECT - Clear navigation
+<DialogFooter>
+  <div className="flex w-full items-center justify-between">
+    <Button
+      variant="secondary"
+      onClick={isFirstStep ? onClose : goToPrevStep}
+    >
+      {isFirstStep ? 'Cancel' : (
+        <>
+          <ChevronLeft className="h-4 w-4 mr-2" />
+          Back
+        </>
+      )}
+    </Button>
+
+    {isLastStep ? (
+      <Button onClick={handleSubmit}>
+        <CheckCircle2 className="h-4 w-4 mr-2" />
+        Save
+      </Button>
+    ) : (
+      <Button onClick={goToNextStep}>
+        Next
+        <ChevronRight className="h-4 w-4 ml-2" />
+      </Button>
+    )}
+  </div>
+</DialogFooter>
+
+// ❌ WRONG - Confusing button placement
+<DialogFooter>
+  <Button onClick={goToNextStep}>Next</Button>
+  <Button onClick={handleSubmit}>Save</Button>
+  <Button onClick={onClose}>Cancel</Button>
+</DialogFooter>
+```
+
+### 6. Character Limits with Counters
+
+**REQUIRED**: For text fields, show character count and limit.
+
+```tsx
+// ✅ CORRECT - Character counter
+const CHARACTER_LIMITS = {
+  title: 200,
+  description: 500,
+}
+
+<Textarea
+  value={value}
+  onChange={(e) => onChange(e.target.value)}
+  maxLength={CHARACTER_LIMITS.description}
+/>
+<p className="text-xs text-muted-foreground">
+  {value.length} / {CHARACTER_LIMITS.description} characters
+</p>
+
+// ❌ WRONG - No feedback on limits
+<Textarea maxLength={500} />
+```
+
+### 7. Focus Management
+
+**REQUIRED**: Auto-focus first input when step changes.
+
+```tsx
+// ✅ CORRECT - Focus management
+const goToNextStep = () => {
+  if (!validateStep(currentStep)) return
+  setCurrentStep(nextStep)
+  
+  // Focus first input in next step
+  setTimeout(() => {
+    const firstInput = document.querySelector<HTMLInputElement | HTMLTextAreaElement>(
+      'input:not([disabled]), textarea:not([disabled])'
+    )
+    firstInput?.focus()
+  }, 100)
+}
+
+// ❌ WRONG - No focus management
+const goToNextStep = () => {
+  setCurrentStep(nextStep)
+  // User must manually click into field
+}
+```
+
+### 8. Error Display
+
+**REQUIRED**: Show validation errors clearly using Alert.
+
+```tsx
+// ✅ CORRECT - Clear error display
+{error && (
+  <Alert variant="destructive">
+    <AlertCircle className="h-4 w-4" />
+    <AlertDescription>{error}</AlertDescription>
+  </Alert>
+)}
+
+// ❌ WRONG - Subtle/hidden errors
+{error && <p className="text-red-500 text-xs">{error}</p>}
+```
+
+## Step Component Pattern
+
+Extract each step into its own component for clarity:
+
+```tsx
+// ✅ CORRECT - Extracted step components
+function StepBasicInfo({
+  title,
+  description,
+  onTitleChange,
+  onDescriptionChange,
+  titleLimit,
+  descriptionLimit,
+}: StepBasicInfoProps) {
+  return (
+    <div className="space-y-4">
+      <div>
+        <h3 className="text-lg font-semibold mb-2">
+          What do you want to achieve?
+        </h3>
+        <p className="text-sm text-muted-foreground">
+          Give your objective a clear, actionable title that captures your goal.
+        </p>
+      </div>
+      
+      <div className="space-y-2">
+        <Label htmlFor="title">
+          Objective title <span className="text-destructive">*</span>
+        </Label>
+        <Input
+          id="title"
+          value={title}
+          onChange={(e) => onTitleChange(e.target.value)}
+          placeholder="e.g., Launch MVP by Q2"
+          maxLength={titleLimit}
+        />
+        <p className="text-xs text-muted-foreground">
+          {title.length} / {titleLimit} characters
+        </p>
+      </div>
+      
+      {/* Additional fields... */}
+    </div>
+  )
+}
+
+// ❌ WRONG - All steps inline in main component
+function WizardDialog() {
+  return (
+    <Dialog>
+      <DialogContent>
+        {currentStep === 'basic' && (
+          <div>
+            {/* 50+ lines of inline JSX */}
+          </div>
+        )}
+        {currentStep === 'details' && (
+          <div>
+            {/* 50+ more lines */}
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+  )
+}
+```
+
+## Wizard State Management
+
+```tsx
+// ✅ CORRECT - Clean state management
+type FormStep = 'basic' | 'details' | 'review'
+
+const STEPS: { id: FormStep; title: string; icon: React.ElementType }[] = [
+  { id: 'basic', title: 'Basic Info', icon: FileText },
+  { id: 'details', title: 'Details', icon: Settings },
+  { id: 'review', title: 'Review', icon: CheckCircle2 },
+]
+
+const [currentStep, setCurrentStep] = useState<FormStep>('basic')
+const [formData, setFormData] = useState<FormData>({...})
+const [error, setError] = useState<string | null>(null)
+
+const currentStepIndex = STEPS.findIndex(s => s.id === currentStep)
+const isFirstStep = currentStepIndex === 0
+const isLastStep = currentStepIndex === STEPS.length - 1
+```
+
+## Color Guidelines for Wizards
+
+| Element | Token | Usage |
+|---|---|---|
+| Active step | `bg-international-orange text-white` | Current step indicator |
+| Completed step | `bg-orange-100 text-international-orange` | Past steps |
+| Pending step | `bg-muted text-muted-foreground` | Future steps |
+| Connector (completed) | `bg-international-orange` | Line between completed steps |
+| Connector (pending) | `bg-muted` | Line before current step |
+| Primary CTA | `bg-international-orange` | Save/Submit button on final step |
+
+## Quick Checklist
+
+Before committing any wizard:
+
+- [ ] Has visual progress stepper with icons
+- [ ] Uses `international-orange` for active/completed states
+- [ ] Each step has conversational heading + description
+- [ ] One concept per step (or closely related group)
+- [ ] Step validation before proceeding
+- [ ] Clear Cancel/Back left, Next/Submit right
+- [ ] Character counters on text fields
+- [ ] Auto-focus first input on step change
+- [ ] Errors displayed with Alert component
+- [ ] Steps extracted into separate components
+- [ ] Uses `size="lg"` on DialogContent
+- [ ] Has `max-h-[90vh]` for tall content
+
+## Anti-Patterns to Avoid
+
+| Anti-Pattern | Problem | Solution |
+|---|---|---|
+| Single long form | Overwhelming, high cognitive load | Break into focused steps |
+| Text-only progress | Users can't see where they are | Visual stepper with icons |
+| Uppercase labels | Feels cold/technical | Conversational questions |
+| No guidance text | Users don't understand context | Add helpful descriptions |
+| Skip validation | Incomplete data submitted | Validate before Next |
+| Inline step content | Hard to maintain, cluttered | Extract step components |
+| Generic placeholders | No guidance on input format | Helpful, specific examples |
+
+## Reference Implementation
+
+See `src/components/objectives/company-purpose-dialog.tsx` for the gold standard implementation.
+
+Key patterns to study:
+- Lines 56-62: STEPS array with icons
+- Lines 286-325: Visual progress stepper
+- Lines 438-476: Step component (StepCore)
+- Lines 386-432: Navigation footer
+- Lines 145-186: Step validation

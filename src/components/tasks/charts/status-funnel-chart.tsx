@@ -66,10 +66,12 @@ export function StatusFunnelChart({ tasks }: StatusFunnelChartProps) {
   // Handle empty state
   if (totalTasks === 0) {
     return (
-      <Card className="border">
+      <Card className="rounded-xl border shadow-sm">
         <CardHeader className="pb-2">
           <CardTitle className="text-sm font-medium flex items-center gap-2">
-            <GitBranch className="h-4 w-4 text-muted-foreground" />
+            <div className="p-1.5 rounded-lg bg-muted/50">
+              <GitBranch className="h-4 w-4 text-muted-foreground" />
+            </div>
             Status Funnel
           </CardTitle>
         </CardHeader>
@@ -83,10 +85,12 @@ export function StatusFunnelChart({ tasks }: StatusFunnelChartProps) {
   }
 
   return (
-    <Card className="border">
+    <Card className="rounded-xl border shadow-sm">
       <CardHeader className="pb-2">
         <CardTitle className="text-sm font-medium flex items-center gap-2">
-          <GitBranch className="h-4 w-4 text-muted-foreground" />
+          <div className="p-1.5 rounded-lg bg-muted/50">
+            <GitBranch className="h-4 w-4 text-muted-foreground" />
+          </div>
           Status Funnel
         </CardTitle>
       </CardHeader>

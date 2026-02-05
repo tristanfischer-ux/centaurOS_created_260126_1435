@@ -46,7 +46,7 @@ export function ProgressDistributionChart({ objectives }: ProgressDistributionCh
   // Handle empty state
   if (total === 0) {
     return (
-      <Card className="border">
+      <Card className="rounded-xl border shadow-sm">
         <CardHeader className="pb-2">
           <CardTitle className="text-sm font-medium flex items-center gap-2">
             <BarChart3 className="h-4 w-4 text-muted-foreground" />
@@ -63,7 +63,7 @@ export function ProgressDistributionChart({ objectives }: ProgressDistributionCh
   }
 
   return (
-    <Card className="border">
+    <Card className="rounded-xl border shadow-sm">
       <CardHeader className="pb-2">
         <CardTitle className="text-sm font-medium flex items-center gap-2">
           <BarChart3 className="h-4 w-4 text-muted-foreground" />

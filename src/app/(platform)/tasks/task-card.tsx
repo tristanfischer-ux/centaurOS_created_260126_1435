@@ -240,9 +240,14 @@ export const TaskCard = memo(function TaskCard(props: TaskCardProps) {
     return (
         <Card
             className={cn(
-                "bg-background transition-all duration-300 flex flex-col h-full group/card relative border",
-                isSelectionMode ? "cursor-pointer" : "hover:border-muted hover:shadow-md hover:-translate-y-[2px] active:translate-y-0 active:shadow-sm",
-                isSelected && isSelectionMode ? "ring-2 ring-electric-blue bg-electric-blue-light/10 border-electric-blue" : ""
+                "bg-background flex flex-col h-full group/card relative rounded-xl border shadow-sm",
+                "transition-all duration-200 ease-out",
+                isSelectionMode 
+                    ? "cursor-pointer" 
+                    : "hover:shadow-lg hover:-translate-y-1 active:translate-y-0 active:shadow-md active:scale-[0.99]",
+                isSelected && isSelectionMode 
+                    ? "ring-2 ring-international-orange/50 bg-international-orange/5 border-international-orange/30" 
+                    : ""
             )}
             onClick={isSelectionMode ? handleCardClick : undefined}
         >
@@ -577,7 +582,7 @@ export const TaskCard = memo(function TaskCard(props: TaskCardProps) {
 
             {expanded && (
                 <>
-                    <CardContent className="bg-muted/50 pt-4 pb-4 flex-1">
+                    <CardContent className="bg-muted/30 pt-4 pb-4 flex-1">
                         <div className="space-y-4">
                             {/* Full Description */}
                             <div className="space-y-1">
@@ -597,13 +602,13 @@ export const TaskCard = memo(function TaskCard(props: TaskCardProps) {
                                 <Popover>
                                     <PopoverTrigger asChild>
                                         <div className={cn(
-                                            "bg-muted p-2.5 rounded shadow-sm cursor-pointer hover:bg-muted active:bg-muted transition-colors duration-200 group",
+                                            "bg-background p-2.5 rounded-lg border cursor-pointer hover:bg-muted/50 active:bg-muted transition-colors duration-150 group",
                                             !isAssignee && !isCreator && "pointer-events-none" // Only allow edits if assignee/creator
                                         )}>
-                                            <span className="text-[10px] text-muted-foreground block mb-1 group-hover:text-status-warning transition-colors duration-200">Start Date</span>
+                                            <span className="text-[10px] text-muted-foreground block mb-1 group-hover:text-international-orange transition-colors duration-150">Start Date</span>
                                             <div className="flex items-center gap-2">
-                                                <CalendarIcon className="h-3.5 w-3.5 text-muted-foreground group-hover:text-status-warning" />
-                                                <span className="text-sm font-medium text-foreground group-hover:text-foreground">
+                                                <CalendarIcon className="h-3.5 w-3.5 text-muted-foreground group-hover:text-international-orange transition-colors duration-150" />
+                                                <span className="text-sm font-medium text-foreground">
                                                     {formatFullDate(task.start_date)}
                                                 </span>
                                             </div>
@@ -623,14 +628,14 @@ export const TaskCard = memo(function TaskCard(props: TaskCardProps) {
                                 <Popover>
                                     <PopoverTrigger asChild>
                                         <div className={cn(
-                                            "bg-muted p-2.5 rounded shadow-sm cursor-pointer hover:bg-muted active:bg-muted transition-colors duration-200 group",
+                                            "bg-background p-2.5 rounded-lg border cursor-pointer hover:bg-muted/50 active:bg-muted transition-colors duration-150 group",
                                             !isAssignee && !isCreator && "pointer-events-none"
                                         )}>
-                                            <span className="text-[10px] text-muted-foreground block mb-1 group-hover:text-status-warning transition-colors duration-200">Deadline</span>
+                                            <span className="text-[10px] text-muted-foreground block mb-1 group-hover:text-international-orange transition-colors duration-150">Deadline</span>
                                             <div className="flex items-center gap-2">
-                                                <CalendarIcon className="h-3.5 w-3.5 text-muted-foreground group-hover:text-status-warning" />
+                                                <CalendarIcon className="h-3.5 w-3.5 text-muted-foreground group-hover:text-international-orange transition-colors duration-150" />
                                                 <span className={cn(
-                                                    "text-sm font-medium transition-colors duration-200 group-hover:text-foreground",
+                                                    "text-sm font-medium",
                                                     isOverdue ? "text-destructive" : "text-foreground"
                                                 )}>
                                                     {formatFullDate(task.end_date)}

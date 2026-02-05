@@ -746,21 +746,31 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                                     </Popover>
 
                                     {/* View Mode Switcher */}
-                                    <div className="bg-muted p-1 rounded-lg flex items-center">
+                                    <div className="bg-muted/50 p-1 rounded-xl flex items-center border border-muted">
                                         <Button
-                                            variant={viewMode === 'grid' ? 'default' : 'ghost'}
+                                            variant="ghost"
                                             size="sm"
                                             onClick={() => setViewMode('grid')}
-                                            className={viewMode === 'grid' ? 'shadow-sm' : ''}
+                                            className={cn(
+                                                "h-8 w-8 p-0 rounded-md transition-all duration-200",
+                                                viewMode === 'grid' 
+                                                    ? 'bg-international-orange/10 text-international-orange shadow-sm' 
+                                                    : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                                            )}
                                             aria-label="Grid view"
                                         >
                                             <LayoutGrid className="h-4 w-4" />
                                         </Button>
                                         <Button
-                                            variant={viewMode === 'list' ? 'default' : 'ghost'}
+                                            variant="ghost"
                                             size="sm"
                                             onClick={() => setViewMode('list')}
-                                            className={viewMode === 'list' ? 'shadow-sm' : ''}
+                                            className={cn(
+                                                "h-8 w-8 p-0 rounded-md transition-all duration-200",
+                                                viewMode === 'list' 
+                                                    ? 'bg-international-orange/10 text-international-orange shadow-sm' 
+                                                    : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                                            )}
                                             aria-label="List view"
                                         >
                                             <List className="h-4 w-4" />
@@ -769,10 +779,15 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                                             <Tooltip>
                                                 <TooltipTrigger asChild>
                                                     <Button
-                                                        variant={viewMode === 'timeline' ? 'default' : 'ghost'}
+                                                        variant="ghost"
                                                         size="sm"
                                                         onClick={() => setViewMode('timeline')}
-                                                        className={viewMode === 'timeline' ? 'shadow-sm' : ''}
+                                                        className={cn(
+                                                            "h-8 w-8 p-0 rounded-md transition-all duration-200",
+                                                            viewMode === 'timeline' 
+                                                                ? 'bg-international-orange/10 text-international-orange shadow-sm' 
+                                                                : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                                                        )}
                                                         aria-label="Timeline view"
                                                     >
                                                         <CalendarDays className="h-4 w-4" />
@@ -799,9 +814,9 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
 
                                     {/* Active Filter Indicator */}
                                     {(activePreset || statusFilter.length > 0 || assigneeFilter !== 'all' || isSearching) && (
-                                        <div className="flex items-center gap-2 px-3 py-1.5 bg-orange-50 border border-orange-200 rounded-lg">
-                                            <Filter className="h-3.5 w-3.5 text-orange-600" />
-                                            <span className="text-xs font-medium text-orange-700">
+                                        <div className="flex items-center gap-2 px-3 py-1.5 bg-international-orange/5 border border-international-orange/20 rounded-xl">
+                                            <Filter className="h-3.5 w-3.5 text-international-orange" />
+                                            <span className="text-xs font-medium text-international-orange">
                                                 Showing {sortedTasks.length} of {tasks.length}
                                             </span>
                                             <button
@@ -811,7 +826,7 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                                                     setAssigneeFilter('all')
                                                     setSearchQuery('')
                                                 }}
-                                                className="text-orange-600 hover:text-orange-800 transition-colors"
+                                                className="text-international-orange hover:text-international-orange-hover transition-colors"
                                                 aria-label="Clear all filters"
                                             >
                                                 <X className="h-3.5 w-3.5" />
@@ -913,12 +928,12 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                         {tabTasks.length === 0 && (
                             <>
                                 {tasks.length === 0 ? (
-                                    <div className="col-span-full border border-muted rounded-xl bg-muted p-12 flex flex-col items-center justify-center text-center relative overflow-hidden group min-h-[500px]">
+                                    <div className="col-span-full rounded-xl bg-muted/30 border border-muted p-12 flex flex-col items-center justify-center text-center relative overflow-hidden group min-h-[500px]">
                                         {/* Blueprint Background Pattern */}
-                                        <div className="absolute inset-0 opacity-20 pointer-events-none bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px]"></div>
-                                        <div className="absolute inset-0 bg-[radial-gradient(circle_800px_at_50%_50%,#1e293b,transparent)] opacity-40 pointer-events-none"></div>
+                                        <div className="absolute inset-0 opacity-10 pointer-events-none bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px]"></div>
+                                        <div className="absolute inset-0 bg-[radial-gradient(circle_800px_at_50%_50%,#fb551a08,transparent)] pointer-events-none"></div>
 
-                                        <div className="relative z-10 w-64 h-64 mb-8 opacity-80 transition-all duration-700 group-hover:opacity-100 group-hover:scale-105 group-hover:rotate-1">
+                                        <div className="relative z-10 w-64 h-64 mb-8 opacity-80 transition-all duration-500 ease-out group-hover:opacity-100 group-hover:scale-105">
                                             <Image
                                                 src="/images/tasks-empty-state.png"
                                                 alt="No tasks blueprint"
@@ -937,26 +952,27 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                                         </div>
                                     </div>
                                 ) : activeTab === 'history' && historyCount === 0 ? (
-                                    <div className="col-span-full border-2 border-dashed border rounded-lg bg-muted/50">
+                                    <div className="col-span-full">
                                         <EmptyState
-                                            icon={<History className="h-8 w-8" />}
+                                            icon={<History className="h-10 w-10" />}
                                             title="No task history yet"
                                             description="Completed and rejected tasks will appear here as a record of what your team has accomplished."
                                             action={
                                                 <Button
                                                     variant="link"
                                                     onClick={() => setActiveTab('active')}
-                                                    className="text-status-info"
+                                                    className="text-international-orange"
                                                 >
                                                     View Active Tasks
                                                 </Button>
                                             }
+                                            className="py-12 bg-muted/30 rounded-xl"
                                         />
                                     </div>
                                 ) : (
-                                    <div className="col-span-full border-2 border-dashed border rounded-lg bg-muted/50">
+                                    <div className="col-span-full">
                                         <EmptyState
-                                            icon={<Inbox className="h-8 w-8" />}
+                                            icon={<Inbox className="h-10 w-10" />}
                                             title="No tasks match your filters"
                                             description="Try adjusting your filters to see more tasks."
                                             action={
@@ -967,11 +983,12 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                                                         setAssigneeFilter('all')
                                                         setActivePreset(null)
                                                     }}
-                                                    className="text-status-info"
+                                                    className="text-international-orange"
                                                 >
                                                     Reset Filters
                                                 </Button>
                                             }
+                                            className="py-12 bg-muted/30 rounded-xl"
                                         />
                                     </div>
                                 )}
@@ -989,14 +1006,14 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
 
                             return (
                                 <div key={objective.id} className={cn(
-                                "border rounded-lg overflow-hidden bg-background",
-                                isSelectionMode && selectedObjectiveIds.has(objective.id) && "ring-2 ring-international-orange"
+                                "rounded-xl border shadow-sm overflow-hidden bg-background transition-all duration-200",
+                                isSelectionMode && selectedObjectiveIds.has(objective.id) && "ring-2 ring-international-orange/50"
                             )}>
                                     <div 
-                                        className="bg-muted px-4 py-3 border-b flex justify-between items-center cursor-pointer hover:bg-muted/80 transition-colors"
+                                        className="bg-muted/50 px-4 py-3 border-b flex justify-between items-center cursor-pointer hover:bg-muted transition-colors duration-150"
                                         onClick={() => toggleObjectiveExpanded(objective.id)}
                                     >
-                                        <h3 className="font-semibold text-foreground flex items-center gap-2">
+                                        <h3 className="font-semibold text-foreground flex items-center gap-3">
                                             {isSelectionMode && (
                                                 <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                                                     {/* Objective selection checkbox */}
@@ -1028,7 +1045,7 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                                                 <ChevronRight className="h-4 w-4 text-muted-foreground" />
                                             )}
                                             <div className={cn(
-                                                "w-2 h-2 rounded-full",
+                                                "w-1 h-5 rounded-full",
                                                 selectedObjectiveIds.has(objective.id) ? "bg-international-orange" : "bg-electric-blue"
                                             )} />
                                             {objective.title}
@@ -1052,8 +1069,8 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                                             <div
                                                 key={task.id}
                                                 className={cn(
-                                                    "pl-5 pr-7 py-4 border-b last:border-0 hover:bg-muted active:bg-muted flex items-center justify-between group gap-4 relative cursor-pointer transition-colors duration-200",
-                                                    isSelectionMode && selectedTaskIds.has(task.id) && "bg-electric-blue-light/20 hover:bg-electric-blue-light/30"
+                                                    "pl-5 pr-7 py-4 border-b last:border-0 hover:bg-muted/50 active:bg-muted flex items-center justify-between group gap-4 relative cursor-pointer transition-colors duration-150",
+                                                    isSelectionMode && selectedTaskIds.has(task.id) && "bg-international-orange/5 hover:bg-international-orange/10"
                                                 )}
                                                 onClick={() => {
                                                     if (isSelectionMode) {
@@ -1162,12 +1179,12 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                         })}
 
                         {orphanedTasks.length > 0 && (
-                            <div className="border rounded-lg overflow-hidden bg-background">
+                            <div className="rounded-xl border shadow-sm overflow-hidden bg-background">
                                 <div 
-                                    className="bg-muted px-4 py-3 border-b cursor-pointer hover:bg-muted/80 transition-colors"
+                                    className="bg-muted/50 px-4 py-3 border-b cursor-pointer hover:bg-muted transition-colors duration-150"
                                     onClick={() => toggleObjectiveExpanded('orphaned')}
                                 >
-                                    <h3 className="font-semibold text-muted-foreground flex items-center gap-2">
+                                    <h3 className="font-semibold text-muted-foreground flex items-center gap-3">
                                         {isSelectionMode && (
                                             <Checkbox
                                                 checked={orphanedTasks.every(t => selectedTaskIds.has(t.id))}
@@ -1189,7 +1206,7 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                                         ) : (
                                             <ChevronRight className="h-4 w-4 text-muted-foreground" />
                                         )}
-                                        <div className="bg-muted-foreground w-2 h-2 rounded-full" />
+                                        <div className="w-1 h-5 bg-slate-400 rounded-full" />
                                         General Tasks (No Objective)
                                     </h3>
                                 </div>
@@ -1199,8 +1216,8 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                                         <div
                                             key={task.id}
                                             className={cn(
-                                                "px-5 py-4 border-b last:border-0 hover:bg-muted active:bg-muted flex items-center justify-between group gap-4 cursor-pointer transition-colors duration-200",
-                                                isSelectionMode && selectedTaskIds.has(task.id) && "bg-electric-blue-light/20 hover:bg-electric-blue-light/30"
+                                                "px-5 py-4 border-b last:border-0 hover:bg-muted/50 active:bg-muted flex items-center justify-between group gap-4 cursor-pointer transition-colors duration-150",
+                                                isSelectionMode && selectedTaskIds.has(task.id) && "bg-international-orange/5 hover:bg-international-orange/10"
                                             )}
                                             onClick={() => {
                                                 if (isSelectionMode) {

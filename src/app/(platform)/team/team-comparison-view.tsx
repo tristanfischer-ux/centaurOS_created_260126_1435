@@ -373,36 +373,38 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
         let badgeClass = 'bg-muted text-muted-foreground'
 
         if (isAIAgent) {
-            accentColor = 'bg-indigo-500'
-            borderClass = 'border-status-info/30'
-            ringClass = 'ring-muted border-muted'
-            bgCheckClass = 'bg-muted0'
-            avatarBorderClass = 'border-2 border-status-info/50'
-            avatarBgClass = 'bg-indigo-100 text-indigo-700 font-bold'
-            badgeClass = 'text-status-info border-status-info/30 bg-status-info/10'
-        } else if (isFounder) {
             accentColor = 'bg-purple-500'
-            borderClass = 'border-accent/30'
+            borderClass = 'border-purple-200'
             ringClass = 'ring-muted border-muted'
             bgCheckClass = 'bg-muted0'
-            avatarBorderClass = 'border-2 border-accent'
-            avatarBgClass = 'bg-purple-100 text-purple-700 font-bold'
-            badgeClass = 'text-accent border-accent/30 bg-accent/10'
+            avatarBorderClass = 'border-2 border-purple-300'
+            avatarBgClass = 'bg-purple-100 text-purple-600 font-bold'
+            badgeClass = 'text-purple-600 border-purple-200 bg-purple-100'
+        } else if (isFounder) {
+            // Brand orange for leadership
+            accentColor = 'bg-international-orange'
+            borderClass = 'border-orange-200'
+            ringClass = 'ring-muted border-muted'
+            bgCheckClass = 'bg-muted0'
+            avatarBorderClass = 'border-2 border-international-orange/50'
+            avatarBgClass = 'bg-orange-100 text-orange-700 font-bold'
+            badgeClass = 'text-orange-700 border-orange-200 bg-orange-100'
         } else if (isExecutive) {
-            accentColor = 'bg-status-warning'
-            borderClass = 'border-status-warning-light'
+            // Lighter orange for executives
+            accentColor = 'bg-orange-400'
+            borderClass = 'border-orange-100'
             ringClass = 'ring-muted border-muted'
             bgCheckClass = 'bg-muted0'
-            avatarBorderClass = 'border-2 border-status-warning'
-            avatarBgClass = 'bg-status-warning-light text-status-warning-dark font-bold'
-            badgeClass = 'text-status-warning-dark border-status-warning-light bg-status-warning-light'
+            avatarBorderClass = 'border-2 border-orange-300'
+            avatarBgClass = 'bg-orange-50 text-orange-600 font-bold'
+            badgeClass = 'text-orange-600 border-orange-100 bg-orange-50'
         } else {
-            // Apprentice
-            accentColor = 'bg-electric-blue'
+            // Apprentice - neutral
+            accentColor = 'bg-slate-400'
             borderClass = 'border'
-            avatarBorderClass = 'border-2 border-electric-blue-light'
-            avatarBgClass = 'bg-electric-blue-light text-electric-blue font-bold'
-            badgeClass = 'text-electric-blue border bg-electric-blue-light'
+            avatarBorderClass = 'border-2 border-slate-300'
+            avatarBgClass = 'bg-muted text-muted-foreground font-bold'
+            badgeClass = 'text-muted-foreground border bg-muted'
         }
 
         // Pairing Override
@@ -412,12 +414,14 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
 
         const cardContent = (
             <Card className={`
-                bg-background border shadow-sm transition-all cursor-pointer relative group/card
+                bg-background border shadow-sm cursor-pointer relative group/card
+                transition-all duration-200 ease-out
                 ${borderClass}
-                hover:border-muted hover:shadow-md hover:-translate-y-[2px] active:translate-y-0 active:shadow-sm
+                hover:border-muted-foreground/20 hover:shadow-lg hover:-translate-y-1
+                active:translate-y-0 active:shadow-md active:scale-[0.99]
                 ${isSelected ? `ring-2 ${ringClass}` : ''}
-                ${isDragging ? 'opacity-50 scale-95' : ''}
-                ${isDropTarget ? 'ring-2 ring-status-success border-status-success bg-status-success-light' : ''}
+                ${isDragging ? 'opacity-50 scale-95 shadow-xl rotate-2' : ''}
+                ${isDropTarget ? 'ring-2 ring-status-success border-status-success bg-status-success-light scale-[1.02]' : ''}
                 ${isPairing || isDeleting ? 'opacity-60' : ''}
             `}>
                 {/* Compare button - always visible on hover */}
@@ -435,9 +439,9 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                 </button>
 
                 {isDropTarget && (
-                    <div className="absolute inset-0 flex items-center justify-center bg-status-success-light rounded-lg z-10">
-                        <div className="bg-status-success text-white px-3 py-1.5 rounded-full text-xs font-medium flex items-center gap-1 shadow-sm">
-                            <Zap className="h-3 w-3 fill-white" />
+                    <div className="absolute inset-0 flex items-center justify-center bg-status-success-light/80 backdrop-blur-[2px] rounded-lg z-10 animate-in fade-in duration-200">
+                        <div className="bg-status-success text-white px-4 py-2 rounded-full text-sm font-medium flex items-center gap-2 shadow-lg animate-in zoom-in-95 duration-200">
+                            <Zap className="h-4 w-4 fill-white animate-pulse" />
                             {draggedMemberId && aiAgents.some(a => a.id === draggedMemberId) ? 'Pair Agent' : 'Combine / Team'}
                         </div>
                     </div>
@@ -482,8 +486,8 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                             )}
                             {isPaired && (
                                 <div className="absolute -bottom-1 -right-1 bg-background rounded-full p-[1px] shadow-sm border border-muted">
-                                    <Avatar className="h-4 w-4 border border-status-info/30">
-                                        <AvatarFallback className="bg-indigo-100 text-indigo-700 text-[6px]">
+                                    <Avatar className="h-4 w-4 border border-purple-200">
+                                        <AvatarFallback className="bg-purple-100 text-purple-600 text-[6px]">
                                             <Brain className="h-2 w-2" />
                                         </AvatarFallback>
                                     </Avatar>
@@ -615,16 +619,16 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
 
                         {/* Bio */}
                         {member.bio && (
-                            <p className="text-xs text-muted-foreground italic bg-muted p-2 rounded">
-                                {member.bio}
+                            <p className="text-xs text-muted-foreground italic bg-muted/50 p-3 rounded-lg">
+                                "{member.bio}"
                             </p>
                         )}
 
                         {/* Agent Pairing Info */}
                         {isCentaur && pairedAI && (
-                            <div className="flex items-center gap-2 text-xs bg-status-warning-light p-2 rounded border border-status-warning-light">
-                                <Brain className="h-4 w-4 text-status-warning-dark" />
-                                <span className="text-status-warning-dark">Paired with <strong>{pairedAI.full_name}</strong></span>
+                            <div className="flex items-center gap-2 text-xs bg-purple-50 p-3 rounded-lg border border-purple-200">
+                                <Brain className="h-4 w-4 text-purple-600" />
+                                <span className="text-purple-700">Paired with <strong>{pairedAI.full_name}</strong></span>
                                 <button
                                     onClick={(e) => {
                                         e.preventDefault()
@@ -644,7 +648,7 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                         {/* Current Tasks */}
                         {activeTaskDetails.length > 0 && (
                             <div className="space-y-2">
-                                <h4 className="text-xs font-semibold text-foreground uppercase tracking-wider">Current Tasks</h4>
+                                <h4 className="text-sm font-medium text-foreground">Current Tasks</h4>
                                 <div className="space-y-2">
                                     {activeTaskDetails.slice(0, 3).map((task, idx) => {
                                         const isOverdue = task.end_date ? isPast(parseISO(task.end_date)) : false
@@ -807,15 +811,15 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
         let badgeClass = 'text-muted-foreground border bg-muted'
 
         if (isAIAgent) {
-            badgeClass = 'text-status-info border-status-info/30 bg-status-info/10'
+            badgeClass = 'text-purple-600 border-purple-200 bg-purple-100'
         } else if (isFounder) {
-            badgeClass = 'text-accent border-accent/30 bg-accent/10'
+            badgeClass = 'text-orange-700 border-orange-200 bg-orange-100'
         } else if (isExecutive) {
-            badgeClass = 'text-status-warning-dark border-status-warning-light bg-status-warning-light'
+            badgeClass = 'text-orange-600 border-orange-100 bg-orange-50'
         }
 
         return (
-            <tr className="group hover:bg-muted active:bg-muted transition-colors border-b border-muted last:border-0">
+            <tr className="group hover:bg-muted/50 active:bg-muted transition-colors duration-150 border-b border-muted last:border-0">
                 <td className="px-4 py-3 pl-6">
                     <div className="flex items-center gap-3">
                         <div 
@@ -824,8 +828,8 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                         >
                             <div className="relative">
                                 {isAIAgent ? (
-                                    <Avatar className="h-9 w-9 border border-muted">
-                                        <AvatarFallback className="bg-muted text-muted-foreground text-xs">
+                                    <Avatar className="h-9 w-9 border border-purple-200">
+                                        <AvatarFallback className="bg-purple-100 text-purple-600 text-xs">
                                             <Brain className="h-4 w-4" />
                                         </AvatarFallback>
                                     </Avatar>
@@ -980,12 +984,17 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                     </FeatureTip>
                     <CreateTeamDialog members={[...executives, ...apprentices]} />
 
-                    <div className="flex bg-muted p-1 rounded-lg border border-muted">
+                    <div className="flex bg-muted p-1 rounded-lg">
                         <Button
                             variant="ghost"
                             size="sm"
                             onClick={() => setViewMode('grid')}
-                            className={`h-8 w-8 p-0 rounded-md transition-all ${viewMode === 'grid' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-muted-foreground'}`}
+                            className={cn(
+                                "h-8 w-8 p-0 rounded-md transition-all duration-200",
+                                viewMode === 'grid' 
+                                    ? 'bg-international-orange/10 text-international-orange shadow-sm' 
+                                    : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                            )}
                         >
                             <LayoutGrid className="h-4 w-4" />
                         </Button>
@@ -993,7 +1002,12 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                             variant="ghost"
                             size="sm"
                             onClick={() => setViewMode('list')}
-                            className={`h-8 w-8 p-0 rounded-md transition-all ${viewMode === 'list' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-muted-foreground'}`}
+                            className={cn(
+                                "h-8 w-8 p-0 rounded-md transition-all duration-200",
+                                viewMode === 'list' 
+                                    ? 'bg-international-orange/10 text-international-orange shadow-sm' 
+                                    : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                            )}
                         >
                             <List className="h-4 w-4" />
                         </Button>
@@ -1009,9 +1023,11 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
 
             {/* Founders Section */}
             {founders.length > 0 && (
-                <section className="space-y-4">
-                    <h2 className="text-xl font-semibold text-purple-600 uppercase tracking-wider border-b border-muted pb-2">
-                        Founders (Decide)
+                <section className="space-y-6">
+                    <h2 className="text-xl font-semibold text-foreground border-b border-muted pb-3 flex items-center gap-3">
+                        <div className="w-1 h-6 bg-international-orange rounded-full" />
+                        Founders
+                        <span className="text-sm font-normal text-muted-foreground">Decision makers</span>
                     </h2>
                     {viewMode === 'grid' ? (
                         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -1055,9 +1071,11 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
             )}
 
             {/* Executives Section */}
-            <section className="space-y-4">
-                <h2 className="text-xl font-semibold text-status-warning-dark uppercase tracking-wider border-b border-muted pb-2">
-                    Executives (Evaluate)
+            <section className="space-y-6">
+                <h2 className="text-xl font-semibold text-foreground border-b border-muted pb-3 flex items-center gap-3">
+                    <div className="w-1 h-6 bg-orange-400 rounded-full" />
+                    Executives
+                    <span className="text-sm font-normal text-muted-foreground">Evaluators</span>
                 </h2>
                 {viewMode === 'grid' ? (
                     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -1077,11 +1095,12 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                             />
                         ))}
                         {executives.length === 0 && (
-                            <div className="col-span-full border-2 border-dashed border-muted rounded-lg">
+                            <div className="col-span-full">
                                 <EmptyState
-                                    icon={<Users className="h-8 w-8" />}
+                                    icon={<Users className="h-10 w-10" />}
                                     title="No executives yet"
                                     description="Add executives to evaluate and approve work."
+                                    className="py-12 bg-muted/30 rounded-xl"
                                 />
                             </div>
                         )}
@@ -1120,9 +1139,11 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
             </section>
 
             {/* Apprentices Section */}
-            <section className="space-y-4">
-                <h2 className="text-xl font-semibold text-electric-blue uppercase tracking-wider border-b border-muted pb-2">
-                    Apprentices (Do)
+            <section className="space-y-6">
+                <h2 className="text-xl font-semibold text-foreground border-b border-muted pb-3 flex items-center gap-3">
+                    <div className="w-1 h-6 bg-slate-400 rounded-full" />
+                    Apprentices
+                    <span className="text-sm font-normal text-muted-foreground">Executors</span>
                 </h2>
                 {viewMode === 'grid' ? (
                     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -1142,11 +1163,12 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                             />
                         ))}
                         {apprentices.length === 0 && (
-                            <div className="col-span-full border-2 border-dashed border-muted rounded-lg">
+                            <div className="col-span-full">
                                 <EmptyState
-                                    icon={<Users className="h-8 w-8" />}
+                                    icon={<Users className="h-10 w-10" />}
                                     title="No apprentices yet"
                                     description="Add apprentices to execute tasks and complete work."
+                                    className="py-12 bg-muted/30 rounded-xl"
                                 />
                             </div>
                         )}
@@ -1186,22 +1208,23 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
 
             {/* Neural Network (AI Agents) */}
             {aiAgents.length > 0 && (
-                <section className="space-y-4">
-                    <h2 className="text-xl font-semibold text-status-info uppercase tracking-wider border-b border-status-info/30 pb-2 flex items-center gap-2">
-                        <Brain className="h-5 w-5" />
-                        Neural Network (AI Agents)
+                <section className="space-y-6">
+                    <h2 className="text-xl font-semibold text-foreground border-b border-muted pb-3 flex items-center gap-3">
+                        <div className="w-1 h-6 bg-purple-500 rounded-full" />
+                        <Brain className="h-5 w-5 text-purple-600" />
+                        AI Agents
+                        <span className="text-sm font-normal text-muted-foreground">Automation partners</span>
                     </h2>
                     <p className="text-sm text-muted-foreground italic pb-2">
                         Drag an agent onto a human member to form a pair.
                     </p>
                     {aiAgents.length === 0 ? (
-                        <div className="border-2 border-dashed border rounded-lg">
-                            <EmptyState
-                                icon={<Brain className="h-12 w-12" />}
-                                title="No AI agents yet"
-                                description="Add AI agents to automate tasks and enhance productivity."
-                            />
-                        </div>
+                        <EmptyState
+                            icon={<Brain className="h-10 w-10" />}
+                            title="No AI agents yet"
+                            description="Add AI agents to automate tasks and enhance productivity."
+                            className="py-12 bg-purple-50/50 rounded-xl"
+                        />
                     ) : (
                         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                             {aiAgents.map(member => (
@@ -1223,8 +1246,9 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
 
             {/* Teams Section */}
             {teams.length > 0 && (
-                <section className="space-y-4">
-                    <h2 className="text-xl font-semibold text-status-success uppercase tracking-wider border-b border-muted pb-2">
+                <section className="space-y-6">
+                    <h2 className="text-xl font-semibold text-foreground border-b border-muted pb-3 flex items-center gap-3">
+                        <div className="w-1 h-6 bg-muted-foreground rounded-full" />
                         Teams
                     </h2>
                     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">

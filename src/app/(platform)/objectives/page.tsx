@@ -30,11 +30,19 @@ export default async function ObjectivesPage() {
     }
 
     // Fetch foundry with purpose_data
-    const { data: foundry } = await supabase
+    const { data: foundry, error: foundryError } = await supabase
         .from('foundries')
         .select('id, name, purpose_data')
         .eq('id', profile.foundry_id)
         .single()
+    
+    console.log('[ObjectivesPage] Foundry fetch result:', {
+        foundryId: profile.foundry_id,
+        hasFoundry: !!foundry,
+        hasPurposeData: !!foundry?.purpose_data,
+        purposeDataKeys: foundry?.purpose_data ? Object.keys(foundry.purpose_data) : [],
+        error: foundryError?.message,
+    })
 
     // Fetch objectives
     const { data: objectives, error } = await supabase

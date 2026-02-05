@@ -40,10 +40,12 @@ export function RiskLevelChart({ tasks }: RiskLevelChartProps) {
   // Handle empty state
   if (totalActive === 0) {
     return (
-      <Card className="border">
+      <Card className="rounded-xl border shadow-sm">
         <CardHeader className="pb-2">
           <CardTitle className="text-sm font-medium flex items-center gap-2">
-            <ShieldAlert className="h-4 w-4 text-muted-foreground" />
+            <div className="p-1.5 rounded-lg bg-muted/50">
+              <ShieldAlert className="h-4 w-4 text-muted-foreground" />
+            </div>
             Risk Level
           </CardTitle>
         </CardHeader>
@@ -57,10 +59,12 @@ export function RiskLevelChart({ tasks }: RiskLevelChartProps) {
   }
 
   return (
-    <Card className="border">
+    <Card className="rounded-xl border shadow-sm">
       <CardHeader className="pb-2">
         <CardTitle className="text-sm font-medium flex items-center gap-2">
-          <ShieldAlert className="h-4 w-4 text-muted-foreground" />
+          <div className="p-1.5 rounded-lg bg-muted/50">
+            <ShieldAlert className="h-4 w-4 text-muted-foreground" />
+          </div>
           Risk Level
         </CardTitle>
       </CardHeader>

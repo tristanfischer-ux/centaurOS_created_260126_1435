@@ -22,4 +22,9 @@ export const typography = {
   pageHeader: 'flex items-center gap-3 mb-1',
   pageHeaderAccent: 'h-8 w-1.5 bg-international-orange rounded-full shadow-[0_0_10px_rgba(255,69,0,0.5)]',
   pageSubtitle: 'text-muted-foreground text-sm font-medium pl-4',
+  
+  // Wizard/Multi-step form typography (conversational style)
+  wizardStepTitle: 'text-lg font-semibold text-foreground',
+  wizardStepDescription: 'text-sm text-muted-foreground leading-relaxed',
+  wizardCharacterCount: 'text-xs text-muted-foreground',
 }

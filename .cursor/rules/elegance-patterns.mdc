@@ -1,0 +1,332 @@
+# Elegance Patterns for CentaurOS UI
+
+These patterns establish visual elegance, polish, and consistency across all CentaurOS pages.
+
+**Applied to:** Team page, Objectives page, Tasks page
+
+## 1. Card & Container Patterns
+
+### Standard Card
+All cards should use rounded-xl with subtle shadows and borders:
+
+```tsx
+// ✅ CORRECT - Elegant card
+<Card className="rounded-xl border shadow-sm">
+  <CardHeader>...</CardHeader>
+  <CardContent>...</CardContent>
+</Card>
+
+// ❌ WRONG - Basic or harsh styling
+<Card className="border">...</Card>
+<Card className="rounded-lg shadow-md">...</Card>
+```
+
+### Interactive Cards (hover effects)
+Cards that users interact with need smooth transitions:
+
+```tsx
+// ✅ CORRECT - Smooth hover with lift effect
+<div className={`
+  bg-card rounded-xl border shadow-sm
+  transition-all duration-200 ease-out
+  hover:shadow-lg hover:-translate-y-0.5
+  active:translate-y-0 active:shadow-md active:scale-[0.99]
+`}>
+
+// ❌ WRONG - No transition or harsh effect
+<div className="bg-card rounded-lg hover:shadow-xl">
+```
+
+**Key properties:**
+- `duration-200 ease-out` - Smooth, natural feel
+- `hover:-translate-y-0.5` or `hover:-translate-y-1` - Subtle lift
+- `active:scale-[0.99]` - Click feedback
+- `hover:shadow-lg` - Elevated appearance on hover
+
+## 2. Section Headers with Accent Bars
+
+All section headers should have colored accent bars that match the content theme:
+
+```tsx
+// ✅ CORRECT - Section header with accent bar
+<h2 className="text-xl font-semibold text-foreground border-b border-muted pb-3 flex items-center gap-3">
+  <div className="w-1 h-6 bg-international-orange rounded-full" />
+  Founders
+  <span className="text-sm font-normal text-muted-foreground">Decision makers</span>
+</h2>
+
+// ❌ WRONG - Colored text header
+<h2 className="text-xl font-semibold text-purple-600 uppercase tracking-wider">
+  Founders (Decide)
+</h2>
+```
+
+**Accent bar colors by role/type:**
+| Content Type | Accent Color |
+|---|----|
+| Founders/Leadership | `bg-international-orange` |
+| Executives | `bg-orange-400` |
+| Apprentices | `bg-slate-400` |
+| AI Agents | `bg-violet-500` |
+| Teams/Groups | `bg-muted-foreground` |
+| Generic sections | `bg-muted-foreground` |
+
+## 3. Empty States
+
+Empty states should be welcoming, not harsh:
+
+```tsx
+// ✅ CORRECT - Soft, centered empty state
+<div className="flex flex-col items-center justify-center py-12 text-center bg-muted/30 rounded-xl">
+  <div className="p-4 rounded-full bg-muted mb-4">
+    <Users className="h-10 w-10 text-muted-foreground" />
+  </div>
+  <p className="text-muted-foreground">No members yet</p>
+</div>
+
+// ❌ WRONG - Harsh dashed border
+<div className="border-2 border-dashed border-muted rounded-lg p-8">
+  <p className="text-center text-muted-foreground">No data</p>
+</div>
+```
+
+**Key properties:**
+- `bg-muted/20` or `bg-muted/30` - Soft background
+- `rounded-xl` - Soft corners
+- Large icon (`h-10 w-10`) in a rounded container
+- Centered layout with generous padding (`py-12`)
+
+## 4. View Mode Toggles
+
+Toggle buttons should use brand colors for active state:
+
+```tsx
+// ✅ CORRECT - Brand-colored active state
+<Button
+  className={cn(
+    "h-8 w-8 p-0 rounded-md transition-all duration-200",
+    viewMode === 'grid' 
+      ? 'bg-international-orange/10 text-international-orange shadow-sm' 
+      : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+  )}
+>
+  <LayoutGrid className="h-4 w-4" />
+</Button>
+
+// ❌ WRONG - Plain white active state
+<Button className={viewMode === 'grid' ? 'bg-background shadow-sm' : ''}>
+```
+
+## 5. List Row Hover States
+
+List/table rows should have soft hover transitions:
+
+```tsx
+// ✅ CORRECT - Soft hover with transition
+<tr className="group hover:bg-muted/50 active:bg-muted transition-colors duration-150">
+
+// ❌ WRONG - Harsh or no transition
+<tr className="hover:bg-muted">
+```
+
+## 6. Icon Containers
+
+Icons in headers or cards should have background containers:
+
+```tsx
+// ✅ CORRECT - Icon with branded background
+<div className="h-10 w-10 rounded-xl bg-international-orange/10 flex items-center justify-center">
+  <Target className="h-5 w-5 text-international-orange" />
+</div>
+
+// ❌ WRONG - Raw icon or wrong container
+<div className="h-10 w-10 rounded-lg bg-status-warning-light">
+  <Target className="h-5 w-5 text-status-warning" />
+</div>
+```
+
+**Icon container patterns:**
+- `rounded-xl` for larger icons (10x10 and up)
+- `rounded-lg` for smaller icons (6x6 to 8x8)
+- Use `/10` opacity of the brand color for background
+
+## 7. Drag & Drop Feedback
+
+Drag and drop should have clear, animated feedback:
+
+```tsx
+// ✅ CORRECT - Enhanced drag feedback
+// Dragging item
+${isDragging ? 'opacity-50 scale-95 shadow-xl rotate-2' : ''}
+
+// Drop target
+${isDropTarget ? 'ring-2 ring-status-success border-status-success bg-status-success-light scale-[1.02]' : ''}
+
+// Drop overlay
+<div className="absolute inset-0 flex items-center justify-center bg-status-success-light/80 backdrop-blur-[2px] rounded-lg z-10 animate-in fade-in duration-200">
+  <div className="bg-status-success text-white px-4 py-2 rounded-full text-sm font-medium flex items-center gap-2 shadow-lg animate-in zoom-in-95 duration-200">
+    <Zap className="h-4 w-4 fill-white animate-pulse" />
+    Drop to pair
+  </div>
+</div>
+```
+
+## 8. Loading Skeletons
+
+Loading skeletons should match the layout they're replacing:
+
+```tsx
+// ✅ CORRECT - Matching skeleton with accent
+<div className="flex items-center gap-3">
+  <div className="w-1 h-8 bg-international-orange/30 rounded-full" />
+  <Skeleton className="h-8 w-48" />
+</div>
+
+// ❌ WRONG - Generic skeleton
+<Skeleton className="h-8 w-48" />
+```
+
+**Skeleton best practices:**
+- Include colored accent bars matching the content
+- Match the exact layout structure
+- Use appropriate corner radius (`rounded-md`, `rounded-xl`)
+- Include all visual elements (icons, badges, etc.)
+
+## 9. Select All / Bulk Action Headers
+
+Bulk action controls should be subtle but discoverable:
+
+```tsx
+// ✅ CORRECT - Soft container
+<div className="flex items-center px-4 py-3 bg-muted/30 rounded-xl border border-muted">
+  <input type="checkbox" />
+  <span className="text-sm font-medium text-muted-foreground">Select All</span>
+</div>
+
+// ❌ WRONG - Harsh styling
+<div className="flex items-center px-4 py-2 bg-muted/50 rounded-md">
+```
+
+## 10. Content Expansion (Collapsible)
+
+Expanded content areas should have subtle differentiation:
+
+```tsx
+// ✅ CORRECT - Soft expanded area
+<div className="bg-muted/20 border-t border-muted">
+  {/* Expanded content */}
+</div>
+
+// ❌ WRONG - Harsh or same background
+<div className="bg-muted/30">
+```
+
+## 11. Selection States
+
+Selected items should use brand colors:
+
+```tsx
+// ✅ CORRECT - Brand-colored selection ring
+<Card className={cn(
+  "rounded-xl border shadow-sm",
+  isSelected && "ring-2 ring-international-orange/50 bg-international-orange/5 border-international-orange/30"
+)}>
+
+// ❌ WRONG - Blue or generic selection
+<Card className={cn(
+  "border",
+  isSelected && "ring-2 ring-electric-blue bg-electric-blue-light/10"
+)}>
+```
+
+**Selection row highlight:**
+```tsx
+// ✅ CORRECT - Subtle row selection
+<tr className={cn(
+  "hover:bg-muted/50 transition-colors duration-150",
+  isSelected && "bg-international-orange/5 hover:bg-international-orange/10"
+)}>
+```
+
+## 12. Chart Cards
+
+Analytics chart cards should have consistent styling:
+
+```tsx
+// ✅ CORRECT - Chart card with icon container
+<Card className="rounded-xl border shadow-sm">
+  <CardHeader className="pb-2">
+    <CardTitle className="text-sm font-medium flex items-center gap-2">
+      <div className="p-1.5 rounded-lg bg-muted/50">
+        <ChartIcon className="h-4 w-4 text-muted-foreground" />
+      </div>
+      Chart Title
+    </CardTitle>
+  </CardHeader>
+</Card>
+
+// ❌ WRONG - Plain icon without container
+<Card className="border">
+  <CardTitle className="flex items-center gap-2">
+    <ChartIcon className="h-4 w-4" />
+    Chart Title
+  </CardTitle>
+</Card>
+```
+
+## 13. Quick Add / Input Triggers
+
+Expandable input triggers should be inviting:
+
+```tsx
+// ✅ CORRECT - Soft, inviting trigger
+<button className="w-full flex items-center gap-3 px-4 py-3.5 
+  text-muted-foreground hover:text-foreground 
+  border border-dashed border-muted hover:border-international-orange/30 
+  rounded-xl bg-muted/30 hover:bg-international-orange/5 
+  transition-all duration-200 ease-out group">
+  <div className="flex items-center justify-center w-7 h-7 rounded-full 
+    bg-muted/50 group-hover:bg-international-orange transition-colors">
+    <Plus className="w-4 h-4 text-muted-foreground group-hover:text-white" />
+  </div>
+  Add item...
+</button>
+
+// ❌ WRONG - Harsh dashed border
+<button className="border-2 border-dashed border rounded-lg">
+  + Add item
+</button>
+```
+
+## Quick Reference
+
+| Pattern | Key Classes |
+|---|---|
+| Card | `rounded-xl border shadow-sm` |
+| Interactive Card | `transition-all duration-200 ease-out hover:shadow-lg hover:-translate-y-0.5` |
+| Section Header | `border-b border-muted pb-3 flex items-center gap-3` |
+| Accent Bar | `w-1 h-6 bg-{color} rounded-full` |
+| Empty State | `bg-muted/30 rounded-xl py-12` |
+| Toggle Active | `bg-international-orange/10 text-international-orange` |
+| Row Hover | `hover:bg-muted/50 transition-colors duration-150` |
+| Selection Ring | `ring-2 ring-international-orange/50 bg-international-orange/5` |
+| Icon Container (small) | `p-1.5 rounded-lg bg-muted/50` |
+| Icon Container (large) | `rounded-xl bg-{color}/10` |
+| Skeleton Accent | `bg-{color}/30 rounded-full` |
+| Quick Add Trigger | `rounded-xl bg-muted/30 hover:bg-international-orange/5` |
+
+## Checklist Before Committing
+
+- [ ] Cards use `rounded-xl border shadow-sm`
+- [ ] Interactive elements have `duration-200 ease-out` transitions
+- [ ] Section headers have accent bars matching content theme
+- [ ] Empty states use soft `bg-muted/30` with large centered icons
+- [ ] No harsh dashed borders (use soft dashed: `border-dashed border-muted`)
+- [ ] Hover states use `/50` opacity backgrounds
+- [ ] Selection states use brand colors (`ring-international-orange/50`)
+- [ ] Loading skeletons match actual layout structure
+- [ ] Toggle active states use brand-colored backgrounds
+- [ ] Small icon containers use `p-1.5 rounded-lg bg-muted/50`
+- [ ] Large icon containers use `rounded-xl bg-{color}/10`
+- [ ] Chart cards have icon containers in headers
+- [ ] Quick add triggers use inviting styling with hover transitions

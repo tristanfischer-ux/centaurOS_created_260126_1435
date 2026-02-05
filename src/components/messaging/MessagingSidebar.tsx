@@ -73,7 +73,7 @@ function ConversationListItem({
       <div className="flex-1 min-w-0 overflow-hidden">
         <div className="flex items-center gap-2">
           <span className={cn(
-            'text-sm truncate',
+            'text-sm truncate min-w-0',
             conversation.unread_count && conversation.unread_count > 0 
               ? 'font-semibold text-foreground' 
               : 'text-foreground'
@@ -81,14 +81,14 @@ function ConversationListItem({
             {displayName}
           </span>
           {conversation.last_message && (
-            <span className="text-xs text-muted-foreground flex-shrink-0 ml-auto">
+            <span className="text-xs text-muted-foreground flex-shrink-0 ml-auto whitespace-nowrap">
               {formatDistanceToNow(new Date(conversation.last_message.created_at), { addSuffix: false })}
             </span>
           )}
         </div>
         {conversation.last_message && (
           <p className={cn(
-            'text-xs truncate mt-0.5',
+            'text-xs truncate mt-0.5 max-w-full',
             conversation.unread_count && conversation.unread_count > 0 
               ? 'text-foreground' 
               : 'text-muted-foreground'

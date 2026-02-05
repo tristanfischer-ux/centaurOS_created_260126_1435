@@ -58,24 +58,24 @@ export function CompanyPurposeBox({
   // Show "Define Purpose" CTA for founders when purpose is empty
   if (!purposeData && isFounder) {
     return (
-      <Card className={cn('border-l-4 border-l-international-orange', className)}>
+      <Card className={cn('rounded-xl border-l-4 border-l-international-orange shadow-sm', className)}>
         <CardContent className="pt-6">
-          <div className="flex flex-col items-center text-center py-8 space-y-4">
-            <div className="rounded-full bg-orange-50 p-4">
-              <Compass className="h-8 w-8 text-international-orange" />
+          <div className="flex flex-col items-center text-center py-10 space-y-4">
+            <div className="rounded-full bg-international-orange/10 p-5">
+              <Compass className="h-10 w-10 text-international-orange" />
             </div>
             <div className="space-y-2 max-w-2xl">
-              <h3 className="text-lg font-semibold text-foreground">
+              <h3 className="text-xl font-semibold text-foreground">
                 Define Your Company's Purpose
               </h3>
-              <p className="text-muted-foreground">
+              <p className="text-muted-foreground leading-relaxed">
                 What's your company's reason for existing? A clear purpose helps align 
                 your objectives and inspire your team.
               </p>
             </div>
             <Button 
               onClick={onOpenDialog}
-              className="bg-international-orange hover:bg-international-orange-hover"
+              className="bg-international-orange hover:bg-international-orange-hover transition-colors"
             >
               <Compass className="h-4 w-4 mr-2" />
               Define Purpose
@@ -89,10 +89,12 @@ export function CompanyPurposeBox({
   // Show subtle message for non-founders when purpose is empty
   if (!purposeData && !isFounder) {
     return (
-      <Card className={cn('border-l-4 border-l-muted', className)}>
+      <Card className={cn('rounded-xl border-l-4 border-l-muted shadow-sm', className)}>
         <CardContent className="pt-6">
-          <div className="flex items-start gap-3 py-4">
-            <Info className="h-5 w-5 text-muted-foreground mt-0.5" />
+          <div className="flex items-start gap-4 py-4">
+            <div className="p-2 rounded-lg bg-muted/50">
+              <Info className="h-5 w-5 text-muted-foreground" />
+            </div>
             <div className="space-y-1">
               <p className="text-sm font-medium text-muted-foreground">
                 Company purpose not yet defined
@@ -111,11 +113,13 @@ export function CompanyPurposeBox({
   const hasMissionOrVision = purposeData!.mission || purposeData!.vision
   
   return (
-    <Card className={cn('border-l-4 border-l-international-orange', className)}>
+    <Card className={cn('rounded-xl border-l-4 border-l-international-orange shadow-sm', className)}>
       <CardHeader>
         <div className="flex items-center justify-between">
-          <CardTitle className="flex items-center gap-2">
-            <Compass className="h-5 w-5 text-international-orange" />
+          <CardTitle className="flex items-center gap-3 text-lg">
+            <div className="p-2 rounded-lg bg-international-orange/10">
+              <Compass className="h-5 w-5 text-international-orange" />
+            </div>
             Our Purpose
           </CardTitle>
           {isFounder && (
@@ -161,9 +165,9 @@ export function CompanyPurposeBox({
                 )}
               </Button>
             </CollapsibleTrigger>
-            <CollapsibleContent className="space-y-3 pt-2">
+            <CollapsibleContent className="space-y-4 pt-4">
               {purposeData!.mission && (
-                <div className="space-y-1">
+                <div className="bg-muted/30 rounded-lg p-4 space-y-1">
                   <p className="text-sm font-semibold text-foreground">Mission</p>
                   <p className="text-sm text-muted-foreground leading-relaxed">
                     {purposeData!.mission}
@@ -171,7 +175,7 @@ export function CompanyPurposeBox({
                 </div>
               )}
               {purposeData!.vision && (
-                <div className="space-y-1">
+                <div className="bg-muted/30 rounded-lg p-4 space-y-1">
                   <p className="text-sm font-semibold text-foreground">Vision</p>
                   <p className="text-sm text-muted-foreground leading-relaxed">
                     {purposeData!.vision}
