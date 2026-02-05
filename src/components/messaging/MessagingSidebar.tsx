@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useCallback } from 'react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -10,40 +10,21 @@ import { UserAvatar } from '@/components/ui/user-avatar'
 import { ConversationThread } from './ConversationThread'
 import { QuickComposeDialog } from './QuickComposeDialog'
 import { useConversationList } from '@/hooks/useConversation'
-import type { ConversationWithParticipants, ConversationType } from '@/lib/messaging/service'
+import type { ConversationWithParticipants } from '@/lib/messaging/service'
 import {
   MessageSquare,
   Search,
   Plus,
-  ChevronDown,
-  ChevronRight,
-  Hash,
-  User,
-  Briefcase,
   X,
   PanelRightClose,
-  PanelRight,
-  Target,
-  CheckSquare
+  PanelRight
 } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from '@/components/ui/collapsible'
 
 interface MessagingSidebarProps {
   userId: string
   className?: string
   defaultCollapsed?: boolean
-}
-
-interface ConversationGroup {
-  type: 'channels' | 'direct' | 'experts'
-  label: string
-  icon: typeof Hash
-  conversations: ConversationWithParticipants[]
 }
 
 function getConversationDisplayName(
@@ -60,21 +41,6 @@ function getConversationDisplayName(
   return otherParticipant?.full_name || otherParticipant?.email || 'Unknown'
 }
 
-function getConversationIcon(type: ConversationType | undefined) {
-  switch (type) {
-    case 'task':
-      return CheckSquare
-    case 'objective':
-      return Target
-    case 'expert':
-    case 'marketplace':
-      return Briefcase
-    case 'direct':
-    default:
-      return User
-  }
-}
-
 function ConversationListItem({
   conversation,
   currentUserId,
@@ -87,34 +53,27 @@ function ConversationListItem({
   onClick: () => void
 }) {
   const displayName = getConversationDisplayName(conversation, currentUserId)
-  const Icon = getConversationIcon(conversation.conversation_type)
-  const isChannel = conversation.conversation_type === 'task' || conversation.conversation_type === 'objective'
   const otherParticipant = conversation.buyer?.id === currentUserId ? conversation.seller : conversation.buyer
 
   return (
     <button
       onClick={onClick}
       className={cn(
-        'w-full flex items-center gap-3 px-3 py-2 rounded-md text-left transition-colors',
-        'hover:bg-muted',
-        isSelected && 'bg-muted'
+        'w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-left transition-colors overflow-hidden',
+        'hover:bg-muted border border-transparent',
+        isSelected && 'bg-muted border-border'
       )}
     >
-      {isChannel ? (
-        <div className="h-8 w-8 rounded-md bg-muted flex items-center justify-center flex-shrink-0">
-          <Icon className="h-4 w-4 text-muted-foreground" />
-        </div>
-      ) : (
-        <UserAvatar
-          name={otherParticipant?.full_name}
-          avatarUrl={otherParticipant?.avatar_url}
-          size="sm"
-        />
-      )}
-      <div className="flex-1 min-w-0">
+      <UserAvatar
+        name={otherParticipant?.full_name}
+        avatarUrl={otherParticipant?.avatar_url}
+        size="sm"
+        className="flex-shrink-0"
+      />
+      <div className="flex-1 min-w-0 overflow-hidden">
         <div className="flex items-center justify-between gap-2">
           <span className={cn(
-            'text-sm truncate',
+            'text-sm truncate block',
             conversation.unread_count && conversation.unread_count > 0 
               ? 'font-semibold text-foreground' 
               : 'text-foreground'
@@ -122,14 +81,14 @@ function ConversationListItem({
             {displayName}
           </span>
           {conversation.last_message && (
-            <span className="text-xs text-muted-foreground flex-shrink-0">
+            <span className="text-xs text-muted-foreground flex-shrink-0 whitespace-nowrap">
               {formatDistanceToNow(new Date(conversation.last_message.created_at), { addSuffix: false })}
             </span>
           )}
         </div>
         {conversation.last_message && (
           <p className={cn(
-            'text-xs truncate mt-0.5',
+            'text-xs truncate mt-0.5 block',
             conversation.unread_count && conversation.unread_count > 0 
               ? 'text-foreground' 
               : 'text-muted-foreground'
@@ -139,50 +98,6 @@ function ConversationListItem({
         )}
       </div>
     </button>
-  )
-}
-
-function ConversationSection({
-  group,
-  currentUserId,
-  selectedId,
-  onSelect,
-  defaultOpen = true
-}: {
-  group: ConversationGroup
-  currentUserId: string
-  selectedId: string | null
-  onSelect: (id: string) => void
-  defaultOpen?: boolean
-}) {
-  const [isOpen, setIsOpen] = useState(defaultOpen)
-  const Icon = group.icon
-
-  if (group.conversations.length === 0) {
-    return null
-  }
-
-  return (
-    <Collapsible open={isOpen} onOpenChange={setIsOpen}>
-      <CollapsibleTrigger className="w-full flex items-center justify-between px-3 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider hover:text-foreground transition-colors">
-        <div className="flex items-center gap-2">
-          {isOpen ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
-          <Icon className="h-3.5 w-3.5" />
-          <span>{group.label}</span>
-        </div>
-      </CollapsibleTrigger>
-      <CollapsibleContent className="space-y-0.5 px-1">
-        {group.conversations.map((conv) => (
-          <ConversationListItem
-            key={conv.id}
-            conversation={conv}
-            currentUserId={currentUserId}
-            isSelected={selectedId === conv.id}
-            onClick={() => onSelect(conv.id)}
-          />
-        ))}
-      </CollapsibleContent>
-    </Collapsible>
   )
 }
 
@@ -198,42 +113,20 @@ export function MessagingSidebar({
 
   const { conversations, isLoading, refresh } = useConversationList(userId)
 
-  // Group conversations by type
-  const groupedConversations: ConversationGroup[] = [
-    {
-      type: 'channels',
-      label: 'Channels',
-      icon: Hash,
-      conversations: conversations.filter(c => 
-        c.conversation_type === 'task' || c.conversation_type === 'objective'
-      )
-    },
-    {
-      type: 'direct',
-      label: 'Direct Messages',
-      icon: User,
-      conversations: conversations.filter(c => c.conversation_type === 'direct')
-    },
-    {
-      type: 'experts',
-      label: 'Experts',
-      icon: Briefcase,
-      conversations: conversations.filter(c => 
-        c.conversation_type === 'expert' || c.conversation_type === 'marketplace'
-      )
-    }
-  ]
+  // Filter to direct messages only (combine all types into one list)
+  const directMessages = conversations.filter(c => 
+    c.conversation_type === 'direct' || 
+    c.conversation_type === 'expert' || 
+    c.conversation_type === 'marketplace'
+  )
 
   // Filter by search
-  const filteredGroups = searchQuery
-    ? groupedConversations.map(group => ({
-        ...group,
-        conversations: group.conversations.filter(c => {
-          const displayName = getConversationDisplayName(c, userId).toLowerCase()
-          return displayName.includes(searchQuery.toLowerCase())
-        })
-      }))
-    : groupedConversations
+  const filteredMessages = searchQuery
+    ? directMessages.filter(c => {
+        const displayName = getConversationDisplayName(c, userId).toLowerCase()
+        return displayName.includes(searchQuery.toLowerCase())
+      })
+    : directMessages
 
   // Total unread count
   const totalUnread = conversations.reduce((sum, c) => sum + (c.unread_count || 0), 0)
@@ -351,39 +244,39 @@ export function MessagingSidebar({
                     </div>
                   ))}
                 </div>
-              ) : conversations.length === 0 ? (
+              ) : filteredMessages.length === 0 ? (
                 <div className="text-center py-12 px-4">
                   <MessageSquare className="h-12 w-12 text-muted-foreground/50 mx-auto mb-3" />
-                  <p className="text-sm font-medium text-foreground mb-1">No conversations yet</p>
-                  <p className="text-xs text-muted-foreground mb-4">
-                    Start messaging team members, discuss tasks, or contact experts
+                  <p className="text-sm font-medium text-foreground mb-1">
+                    {searchQuery ? `No conversations match "${searchQuery}"` : 'No conversations yet'}
                   </p>
-                  <Button
-                    size="sm"
-                    onClick={() => setShowCompose(true)}
-                    className="bg-international-orange hover:bg-international-orange-hover"
-                  >
-                    <Plus className="h-4 w-4 mr-2" />
-                    New Message
-                  </Button>
+                  {!searchQuery && (
+                    <>
+                      <p className="text-xs text-muted-foreground mb-4">
+                        Start messaging team members or contact experts
+                      </p>
+                      <Button
+                        size="sm"
+                        onClick={() => setShowCompose(true)}
+                        className="bg-international-orange hover:bg-international-orange-hover"
+                      >
+                        <Plus className="h-4 w-4 mr-2" />
+                        New Message
+                      </Button>
+                    </>
+                  )}
                 </div>
               ) : (
-                filteredGroups.map((group) => (
-                  <ConversationSection
-                    key={group.type}
-                    group={group}
-                    currentUserId={userId}
-                    selectedId={selectedConversationId}
-                    onSelect={handleSelectConversation}
-                  />
-                ))
-              )}
-
-              {searchQuery && filteredGroups.every(g => g.conversations.length === 0) && (
-                <div className="text-center py-8 px-4">
-                  <p className="text-sm text-muted-foreground">
-                    No conversations match "{searchQuery}"
-                  </p>
+                <div className="space-y-1 px-2">
+                  {filteredMessages.map((conv) => (
+                    <ConversationListItem
+                      key={conv.id}
+                      conversation={conv}
+                      currentUserId={userId}
+                      isSelected={selectedConversationId === conv.id}
+                      onClick={() => handleSelectConversation(conv.id)}
+                    />
+                  ))}
                 </div>
               )}
             </div>
