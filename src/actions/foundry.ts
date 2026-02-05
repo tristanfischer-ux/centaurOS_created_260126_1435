@@ -106,10 +106,20 @@ export async function updateFoundryPurpose(
   try {
     // Update foundry purpose_data using admin client to bypass RLS
     // SECURITY: Auth checks above verify user is authenticated, owns this foundry, and is a Founder
-    console.log('[FoundryActions] Creating admin client and attempting update...')
-    const adminClient = createAdminClient()
+    console.log('[FoundryActions] Creating admin client...')
     
-    console.log('[FoundryActions] Admin client created, executing update for foundryId:', foundryId)
+    let adminClient
+    try {
+      adminClient = createAdminClient()
+      console.log('[FoundryActions] Admin client created successfully')
+    } catch (adminError) {
+      console.error('[FoundryActions] Failed to create admin client:', adminError)
+      return { success: false, error: 'Server configuration error' }
+    }
+    
+    console.log('[FoundryActions] Executing update for foundryId:', foundryId)
+    console.log('[FoundryActions] Purpose data keys:', Object.keys(purposeData))
+    
     const { data, error: updateError } = await adminClient
       .from('foundries')
       .update({ 
@@ -119,20 +129,24 @@ export async function updateFoundryPurpose(
       .select()
       .single()
     
-    console.log('[FoundryActions] Update result:', {
+    console.log('[FoundryActions] Update complete. Result:', JSON.stringify({
       hasData: !!data,
       hasError: !!updateError,
       errorMessage: updateError?.message,
       errorCode: updateError?.code,
-    })
+      errorDetails: updateError?.details,
+      errorHint: updateError?.hint,
+    }))
     
     if (updateError) {
-      console.error('[FoundryActions] Failed to update purpose:', {
+      console.error('[FoundryActions] Update failed:', JSON.stringify({
         foundryId,
         error: updateError.message,
         code: updateError.code,
-      })
-      return { success: false, error: 'Failed to update company purpose' }
+        details: updateError.details,
+        hint: updateError.hint,
+      }))
+      return { success: false, error: `Failed to update: ${updateError.message}` }
     }
     
     // AUDIT: Log the purpose update
