@@ -186,7 +186,6 @@ export function BlueprintsView({
         ? 'Question submitted! AI is generating an answer...' 
         : 'Question submitted successfully'
     )
-    router.refresh()
     return { questionId: result.data?.id }
   }
 
@@ -196,7 +195,6 @@ export function BlueprintsView({
       toast.error('Failed to archive blueprint')
     } else {
       toast.success('Blueprint archived')
-      router.refresh()
     }
   }
 
@@ -212,7 +210,6 @@ export function BlueprintsView({
       toast.error('Failed to delete blueprint')
     } else {
       toast.success('Blueprint deleted')
-      router.refresh()
     }
   }
 

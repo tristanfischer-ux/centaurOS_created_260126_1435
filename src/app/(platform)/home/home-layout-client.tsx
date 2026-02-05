@@ -257,6 +257,7 @@ export function HomeLayoutClient({
           assignee:profiles!tasks_assignee_id_fkey(id, full_name, role, email, avatar_url),
           objective:objectives(id, title)
         `)
+        .eq('foundry_id', foundryId)
         .eq('id', taskId)
         .single()
       
@@ -806,6 +807,7 @@ function TaskConversationView({
         const { data: task } = await supabase
           .from('tasks')
           .select('title, task_number')
+          .eq('foundry_id', foundryId)
           .eq('id', taskId)
           .single()
         

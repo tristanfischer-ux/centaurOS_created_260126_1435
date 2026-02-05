@@ -30,24 +30,17 @@ export default async function ObjectivesPage() {
     }
 
     // Fetch foundry with purpose_data
-    const { data: foundry, error: foundryError } = await supabase
+    const { data: foundry } = await supabase
         .from('foundries')
         .select('id, name, purpose_data')
         .eq('id', profile.foundry_id)
         .single()
-    
-    console.log('[ObjectivesPage] Foundry fetch result:', {
-        foundryId: profile.foundry_id,
-        hasFoundry: !!foundry,
-        hasPurposeData: !!foundry?.purpose_data,
-        purposeDataKeys: foundry?.purpose_data ? Object.keys(foundry.purpose_data) : [],
-        error: foundryError?.message,
-    })
 
     // Fetch objectives
     const { data: objectives, error } = await supabase
         .from('objectives')
         .select('id, title, description, extended_description, status, progress, parent_objective_id, creator_id, foundry_id, created_at, updated_at')
+        .eq('foundry_id', profile.foundry_id)
         .order('created_at', { ascending: false })
 
     if (error) {
@@ -104,9 +97,10 @@ export default async function ObjectivesPage() {
         })) || []
     })) || []
 
-    // Fetch data for CreateTaskDialog
-    const objectivesForDialog = await supabase.from('objectives').select('id, title').then(r => r.data || [])
-    const membersData = await supabase.from('profiles').select('id, full_name, role, email')
+    // SECURITY: Fetch data for CreateTaskDialog - filtered by foundry_id
+    // Note: Profiles RLS is disabled due to recursion issues, so app-level filtering is CRITICAL
+    const objectivesForDialog = await supabase.from('objectives').select('id, title').eq('foundry_id', profile.foundry_id).then(r => r.data || [])
+    const membersData = await supabase.from('profiles').select('id, full_name, role, email').eq('foundry_id', profile.foundry_id)
     const members = (membersData.data || []).map(p => ({
         id: p.id,
         full_name: p.full_name || 'Unknown',
@@ -114,8 +108,8 @@ export default async function ObjectivesPage() {
         email: p.email || ''
     }))
 
-    // Fetch Teams
-    const { data: teamsData } = await supabase.from('teams').select('id, name')
+    // Fetch Teams - filtered by foundry_id
+    const { data: teamsData } = await supabase.from('teams').select('id, name').eq('foundry_id', profile.foundry_id)
     const teams = teamsData || []
 
     return (

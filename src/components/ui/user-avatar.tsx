@@ -8,33 +8,34 @@ import { Bot } from "lucide-react"
 /**
  * Role-based avatar colors for CentaurOS
  * Following the design philosophy: bright, airy, optimistic
+ * Uses orange hierarchy: Founder (dark orange) > Executive (light orange) > Apprentice (neutral)
  */
 export const ROLE_COLORS = {
   Founder: {
     bg: "bg-orange-100",
     text: "text-orange-700",
-    border: "border-orange-200",
+    border: "border-international-orange/50",
   },
   Executive: {
-    bg: "bg-blue-100",
-    text: "text-blue-700",
-    border: "border",
+    bg: "bg-orange-50",
+    text: "text-orange-600",
+    border: "border-orange-300",
   },
   Apprentice: {
-    bg: "bg-green-100",
-    text: "text-green-700",
-    border: "border-border",
+    bg: "bg-muted",
+    text: "text-muted-foreground",
+    border: "border-slate-300",
   },
   AI_Agent: {
     bg: "bg-purple-100",
     text: "text-purple-600",
-    border: "border-border",
+    border: "border-purple-300",
   },
   // Default for any other roles
   default: {
     bg: "bg-muted",
     text: "text-muted-foreground",
-    border: "border",
+    border: "border-slate-300",
   },
 } as const
 

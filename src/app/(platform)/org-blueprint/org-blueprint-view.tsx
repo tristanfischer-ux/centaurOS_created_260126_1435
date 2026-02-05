@@ -165,7 +165,6 @@ export function OrgBlueprintView({ functions: initialFunctions, summary: initial
                 toast.error('Failed to initialize blueprint')
             } else {
                 toast.success('Blueprint initialized!')
-                router.refresh()
             }
         } finally {
             setIsInitializing(false)
@@ -174,7 +173,7 @@ export function OrgBlueprintView({ functions: initialFunctions, summary: initial
 
     // Handle refresh after updates
     const handleRefresh = () => {
-        router.refresh()
+        // Revalidation handled by server actions
     }
 
     // Radar category click handler

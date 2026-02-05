@@ -90,6 +90,7 @@ interface TaskActionButtonsProps {
   handleDuplicate: () => void
   handleRunAI: () => void
   handleForward: (formData: FormData) => void
+  handleApprove: () => void
   handleDelete?: () => Promise<void>
   isDeleting?: boolean
   sortedMembers: Member[]
@@ -130,6 +131,7 @@ export function TaskActionButtons({
   handleDuplicate,
   handleRunAI,
   handleForward,
+  handleApprove,
   handleDelete,
   isDeleting,
   sortedMembers,
@@ -144,7 +146,11 @@ export function TaskActionButtons({
   const showMarkComplete =
     task.status === "Accepted" && (isAssignee || userRole === "Executive" || isCreator)
   const showCertify = task.status === "Pending_Executive_Approval" && isExecutive
-  const hasPrimaryActions = showAcceptReject || showMarkComplete || showCertify
+  // APPROVAL: Show approve button for peer review (any user) and executive approval (executives only)
+  const showApprovePeerReview = task.status === "Pending_Peer_Review"
+  const showApproveExecutive = task.status === "Pending_Executive_Approval" && isExecutive
+  const showApprove = showApprovePeerReview || showApproveExecutive
+  const hasPrimaryActions = showAcceptReject || showMarkComplete || showCertify || showApprove
 
   return (
     <CardFooter className="bg-muted p-4 flex flex-col gap-4 mt-auto">
@@ -159,8 +165,9 @@ export function TaskActionButtons({
                   variant="success"
                   disabled={isLoading}
                   className="flex-1 shadow-sm font-medium"
+                  title="Accept this task assignment and start working"
                 >
-                  <Check className="h-4 w-4" /> Accept
+                  <Check className="h-4 w-4" /> Accept Task
                 </Button>
 
                 <Dialog open={rejectOpen} onOpenChange={setRejectOpen}>
@@ -169,8 +176,9 @@ export function TaskActionButtons({
                       variant="secondary"
                       disabled={isLoading}
                       className="flex-1 border-destructive/30 text-destructive hover:bg-destructive/10 hover:border-destructive/50 shadow-sm font-medium"
+                      title="Decline this task assignment"
                     >
-                      <X className="h-4 w-4" /> Reject
+                      <X className="h-4 w-4" /> Reject Task
                     </Button>
                   </DialogTrigger>
                   <DialogContent className="bg-background shadow-xl text-foreground">
@@ -211,6 +219,25 @@ export function TaskActionButtons({
                 className="w-full shadow-sm font-medium"
               >
                 <ShieldCheck className="h-4 w-4" /> Certify Release
+              </Button>
+            )}
+
+            {showApprove && (
+              <Button
+                onClick={handleApprove}
+                variant="success"
+                disabled={isLoading}
+                className="w-full shadow-sm font-medium"
+                title={
+                  task.status === "Pending_Peer_Review"
+                    ? "Approve this peer-reviewed task"
+                    : "Approve and release this high-risk task"
+                }
+              >
+                <Check className="h-4 w-4" />{" "}
+                {task.status === "Pending_Peer_Review"
+                  ? "Approve Peer Review"
+                  : "Approve & Release"}
               </Button>
             )}
           </div>

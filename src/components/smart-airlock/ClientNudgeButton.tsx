@@ -7,9 +7,27 @@ import { nudgeTask } from '@/actions/tasks'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 
+/**
+ * ClientNudgeButton - Notifies executives when external clients ask about hidden tasks
+ * 
+ * @description Part of the Smart Airlock system. When a task is hidden from external
+ * clients (client_visible: false), this button lets team members escalate to executives
+ * that an external customer is inquiring about the task.
+ * 
+ * @security Has 1-hour cooldown to prevent spam/abuse
+ * @audit Logs "CLIENT NUDGE" events to task history
+ * 
+ * @example
+ * // External client emails asking about hidden task
+ * <ClientNudgeButton taskId={task.id} lastNudge={task.last_nudge_at} />
+ * // Click → Notifies executives in their channel
+ */
 interface ClientNudgeButtonProps {
+    /** Task ID to nudge about */
     taskId: string
+    /** Disable the button entirely */
     disabled?: boolean
+    /** Last time this task was nudged (for cooldown enforcement) */
     lastNudge?: string | null
 }
 
@@ -28,7 +46,7 @@ export function ClientNudgeButton({ taskId, disabled, lastNudge }: ClientNudgeBu
         if (result.error) {
             toast.error(result.error)
         } else {
-            toast.success("Request sent to Executive channel.")
+            toast.success("Executives notified about external client inquiry")
             setHasNudged(true)
         }
     }
@@ -41,13 +59,18 @@ export function ClientNudgeButton({ taskId, disabled, lastNudge }: ClientNudgeBu
             size="sm"
             onClick={handleNudge}
             disabled={isLoading || isCoolingDown || hasNudged}
+            title={
+                isCoolingDown || hasNudged
+                    ? "External client update requested (1-hour cooldown)"
+                    : "Notify executives that an external client is asking for an update on this hidden task"
+            }
             className={cn(
                 "border-destructive/30 text-destructive hover:bg-destructive/10 hover:text-destructive transition-all",
                 (isCoolingDown || hasNudged) && "opacity-50 cursor-not-allowed"
             )}
         >
             <PhoneCall className={cn("h-4 w-4", isLoading && "animate-pulse")} />
-            {isCoolingDown || hasNudged ? "Update Requested" : "Request Update"}
+            {isCoolingDown || hasNudged ? "External Client Notified" : "External Client Asking"}
         </Button>
     )
 }

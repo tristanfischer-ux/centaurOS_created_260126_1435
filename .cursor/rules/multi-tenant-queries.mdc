@@ -1,0 +1,67 @@
+# Multi-Tenant Query Standards
+
+**CRITICAL SECURITY RULE:** Every database query MUST filter by `foundry_id` to prevent data leakage across companies.
+
+## Quick Reference
+
+```typescript
+// ✅ ALWAYS DO THIS
+const { data } = await supabase
+    .from('tasks')
+    .select('*')
+    .eq('foundry_id', foundry_id)  // REQUIRED
+
+// ❌ NEVER DO THIS
+const { data } = await supabase
+    .from('tasks')
+    .select('*')  // SECURITY BREACH - No foundry filter!
+```
+
+## Multi-Tenant Tables (Require Filtering)
+
+| Table | Filter | Exception |
+|---|---|---|
+| `tasks` | `.eq('foundry_id', foundry_id)` | NONE |
+| `objectives` | `.eq('foundry_id', foundry_id)` | NONE |
+| `teams` | `.eq('foundry_id', foundry_id)` | NONE |
+| `profiles` | `.eq('foundry_id', foundry_id)` | Self-query only: `.eq('id', user.id)` |
+| `messages` | Via task/objective | Need foundry_id if direct |
+| `foundries` | `.eq('id', foundry_id)` | Must be user's foundry |
+
+## Standard Pattern
+
+```typescript
+// 1. Get user's foundry_id
+const { data: userProfile } = await supabase
+    .from('profiles')
+    .select('foundry_id')
+    .eq('id', user.id)
+    .single()
+
+const foundry_id = userProfile?.foundry_id
+if (!foundry_id) return <Error />
+
+// 2. Filter ALL queries
+const { data: tasks } = await supabase
+    .from('tasks')
+    .select('*')
+    .eq('foundry_id', foundry_id)
+
+const { data: members } = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('foundry_id', foundry_id)
+```
+
+## Pre-Commit Check
+
+```bash
+./scripts/audit-foundry-isolation.sh
+```
+
+Must show: `✅ SECURITY AUDIT PASSED - 0 violations`
+
+## See Also
+
+- `.cursor/rules/database-security.mdc` - Full documentation
+- `./scripts/audit-foundry-isolation.sh` - Automated audit

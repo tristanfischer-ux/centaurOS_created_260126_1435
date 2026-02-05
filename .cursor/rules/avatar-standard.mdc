@@ -24,15 +24,17 @@ import { UserAvatar } from "@/components/ui/user-avatar"
 
 ## Role-Based Color System
 
-The `UserAvatar` component automatically applies colors based on user role:
+The `UserAvatar` component automatically applies colors based on user role using an **orange hierarchy** for leadership:
 
 | Role | Background | Text | Use Case |
 |------|------------|------|----------|
-| `Founder` | `bg-orange-100` | `text-orange-700` | Company founders |
-| `Executive` | `bg-blue-100` | `text-blue-700` | Executive team members |
-| `Apprentice` | `bg-green-100` | `text-green-700` | Apprentices/interns |
-| `AI_Agent` | `bg-purple-100` | `text-purple-600` | AI assistants |
-| Default | `bg-slate-100` | `text-slate-600` | Any other role |
+| `Founder` | `bg-orange-100` | `text-orange-700` | Company founders (dark orange) |
+| `Executive` | `bg-orange-50` | `text-orange-600` | Executive team members (light orange) |
+| `Apprentice` | `bg-muted` | `text-muted-foreground` | Apprentices/interns (neutral) |
+| `AI_Agent` | `bg-purple-100` | `text-purple-600` | AI assistants (purple) |
+| Default | `bg-muted` | `text-muted-foreground` | Any other role (neutral) |
+
+**Visual Hierarchy:** The orange tones create a clear visual hierarchy - Founders stand out with darker orange, Executives with lighter orange, while Apprentices use neutral tones to not compete for attention.
 
 ## Component Props
 

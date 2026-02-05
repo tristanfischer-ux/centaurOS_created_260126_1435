@@ -1,0 +1,492 @@
+# Database Security: Foundry Isolation
+
+**CRITICAL:** CentaurOS is a multi-tenant SaaS platform. Data from different foundries (companies) MUST be isolated at ALL times.
+
+## The Security Breach (Feb 2026)
+
+A catastrophic security failure was discovered where:
+- **Profile data** (names, roles, emails) from ALL companies was visible to ALL users
+- **Task data** (titles, descriptions, statuses) from ALL companies was visible
+- **Root cause:** RLS disabled + missing application-level foundry_id filters
+
+**Impact:** 37+ unfiltered queries found, exposing data across foundries for weeks/months.
+
+---
+
+## CRITICAL RULE: All Queries MUST Filter by foundry_id
+
+**EVERY database query for multi-tenant tables MUST include a `foundry_id` filter.**
+
+### Multi-Tenant Tables (MUST be filtered)
+
+| Table | Filter Required | Exception |
+|---|---|---|
+| `tasks` | `.eq('foundry_id', foundry_id)` | None |
+| `objectives` | `.eq('foundry_id', foundry_id)` | None |
+| `teams` | `.eq('foundry_id', foundry_id)` | None |
+| `messages` | Via task/objective join | Direct queries need foundry_id |
+| `task_comments` | Via task join | Direct queries need foundry_id |
+| `task_assignees` | Via task join | Direct queries need foundry_id |
+| `profiles` | `.eq('foundry_id', foundry_id)` | Only for self-query `.eq('id', user.id)` |
+| `foundries` | `.eq('id', foundry_id)` | Must be user's own foundry |
+
+---
+
+## Secure Query Pattern (Server Components)
+
+**ALWAYS follow this pattern in page.tsx files:**
+
+```typescript
+export default async function SomePage() {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    
+    if (!user) redirect('/login')
+    
+    // SECURITY: Get user's foundry_id FIRST
+    const { data: userProfile } = await supabase
+        .from('profiles')
+        .select('foundry_id, role')
+        .eq('id', user.id)
+        .single()
+    
+    const foundry_id = userProfile?.foundry_id
+    
+    if (!foundry_id) {
+        return <div>Error: No Foundry</div>
+    }
+    
+    // SECURITY: ALL queries MUST filter by foundry_id
+    const { data: tasks } = await supabase
+        .from('tasks')
+        .select('*')
+        .eq('foundry_id', foundry_id)  // ✅ REQUIRED
+    
+    const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, full_name, role')
+        .eq('foundry_id', foundry_id)  // ✅ REQUIRED (RLS is disabled!)
+    
+    const { data: objectives } = await supabase
+        .from('objectives')
+        .select('*')
+        .eq('foundry_id', foundry_id)  // ✅ REQUIRED
+    
+    // ... rest of page
+}
+```
+
+---
+
+## Secure Query Pattern (Server Actions)
+
+**ALWAYS follow this pattern in src/actions/*.ts files:**
+
+```typescript
+'use server'
+
+import { createClient } from '@/lib/supabase/server'
+import { getFoundryIdCached } from '@/lib/supabase/utils'
+
+export async function someAction(resourceId: string) {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return { error: 'Unauthorized' }
+    
+    // SECURITY: Get user's foundry_id
+    const foundry_id = await getFoundryIdCached()
+    if (!foundry_id) return { error: 'User not in a foundry' }
+    
+    // SECURITY: Fetch resource and verify foundry ownership
+    const { data: resource } = await supabase
+        .from('tasks')
+        .select('foundry_id')
+        .eq('id', resourceId)
+        .single()
+    
+    if (!resource) return { error: 'Resource not found' }
+    
+    // SECURITY: Verify resource belongs to user's foundry
+    if (resource.foundry_id !== foundry_id) {
+        return { error: 'Unauthorized: Resource belongs to different foundry' }
+    }
+    
+    // ... perform action
+}
+```
+
+---
+
+## When foundry_id Filter is NOT Needed
+
+**Very rare.** Only exempt queries with explicit `// SECURITY:` comment:
+
+```typescript
+// ✅ CORRECT - Querying user's own profile
+// SECURITY: Self-query - user can only access their own profile
+const { data: userProfile } = await supabase
+    .from('profiles')
+    .select('foundry_id, role')
+    .eq('id', user.id)
+    .single()
+
+// ✅ CORRECT - Auth callback checking role
+// SECURITY: Auth context - user just logged in, fetching their own data
+const { data: profile } = await supabase
+    .from('profiles')
+    .select('role, account_type')
+    .eq('id', user.id)
+    .single()
+
+// ❌ WRONG - No justification
+const { data: profiles } = await supabase
+    .from('profiles')
+    .select('id, full_name')
+```
+
+---
+
+## RLS Status: DISABLED Due to Recursion
+
+**Current state:** `profiles` table RLS is disabled (`USING (true)`) due to infinite recursion when RLS policy tried to check foundry_id by querying profiles table.
+
+**Migration:** `supabase/migrations/20260204250000_disable_profiles_rls_temporarily.sql`
+
+**Implications:**
+- ❌ Database-level isolation is OFF for profiles
+- ✅ **Application-level filtering is THE ONLY DEFENSE**
+- 🚨 **Missing `.eq('foundry_id')` = IMMEDIATE SECURITY BREACH**
+
+**TODO:** Re-enable RLS using JWT claims or session variables instead of table lookups.
+
+---
+
+## Pre-Commit Security Checklist
+
+**Before committing ANY code that queries the database:**
+
+- [ ] Run `./scripts/audit-foundry-isolation.sh` - must show 0 violations
+- [ ] All `.from('tasks')` queries have `.eq('foundry_id', foundry_id)`
+- [ ] All `.from('objectives')` queries have `.eq('foundry_id', foundry_id)`
+- [ ] All `.from('teams')` queries have `.eq('foundry_id', foundry_id)`
+- [ ] All `.from('profiles')` queries EITHER:
+  - Have `.eq('foundry_id', foundry_id)`, OR
+  - Have `.eq('id', user.id)` (self-query), OR
+  - Have `// SECURITY:` comment explaining why filtering is not needed
+- [ ] Server actions verify `resource.foundry_id === user_foundry_id` before mutations
+- [ ] No queries fetch data without user context
+
+---
+
+## Automated Enforcement
+
+### 1. Pre-Commit Hook
+
+Add to `.husky/pre-commit`:
+
+```bash
+#!/bin/sh
+echo "Running foundry isolation audit..."
+./scripts/audit-foundry-isolation.sh || exit 1
+```
+
+### 2. CI/CD Check
+
+Add to `.github/workflows/security.yml`:
+
+```yaml
+- name: Audit Foundry Isolation
+  run: ./scripts/audit-foundry-isolation.sh
+```
+
+### 3. ESLint Rule (Future)
+
+Create custom ESLint rule to detect:
+- `.from('tasks')` without `.eq('foundry_id')`
+- `.from('profiles')` without `.eq('foundry_id')` or `.eq('id')`
+
+---
+
+## Quick Reference: Secure vs Insecure
+
+### ❌ INSECURE - Data Leakage
+
+```typescript
+// WRONG - Fetches ALL tasks from ALL foundries
+const { data: tasks } = await supabase
+    .from('tasks')
+    .select('*')
+
+// WRONG - Fetches ALL profiles from ALL companies
+const { data: members } = await supabase
+    .from('profiles')
+    .select('id, full_name, role')
+
+// WRONG - Fetches ALL objectives from ALL foundries
+const { data: objectives } = await supabase
+    .from('objectives')
+    .select('*')
+```
+
+### ✅ SECURE - Proper Isolation
+
+```typescript
+// Get user's foundry_id first
+const { data: userProfile } = await supabase
+    .from('profiles')
+    .select('foundry_id')
+    .eq('id', user.id)
+    .single()
+
+const foundry_id = userProfile?.foundry_id
+if (!foundry_id) return <Error />
+
+// Filter ALL queries by foundry_id
+const { data: tasks } = await supabase
+    .from('tasks')
+    .select('*')
+    .eq('foundry_id', foundry_id)  // ✅ CRITICAL
+
+const { data: members } = await supabase
+    .from('profiles')
+    .select('id, full_name, role')
+    .eq('foundry_id', foundry_id)  // ✅ CRITICAL
+
+const { data: objectives } = await supabase
+    .from('objectives')
+    .select('*')
+    .eq('foundry_id', foundry_id)  // ✅ CRITICAL
+```
+
+---
+
+## Defense-in-Depth Layers
+
+| Layer | Status | Effectiveness |
+|---|---|---|
+| **RLS Policies** | ❌ Disabled (recursion issue) | 0% - Not active |
+| **Application Filtering** | ⚠️ Inconsistent (37+ violations found) | 50% - Partial coverage |
+| **Server Action Checks** | ✅ Working | 80% - Catches mutations |
+| **Automated Auditing** | ✅ NEW - `audit-foundry-isolation.sh` | 90% - Detects violations |
+
+**Current Risk:** HIGH - Only 1 active layer of defense (server actions)
+
+**Target:** 3+ layers active:
+1. Fix RLS policies (use JWT claims)
+2. Ensure 100% application filtering (0 violations)
+3. Keep server action checks
+4. Add automated CI checks
+
+---
+
+## Incident Response
+
+If a foundry isolation breach is discovered:
+
+1. **Immediate:** Run `./scripts/audit-foundry-isolation.sh` to find all violations
+2. **Triage:** Identify which queries are in production
+3. **Fix:** Add `.eq('foundry_id', foundry_id)` to ALL violations
+4. **Verify:** Re-run audit script until 0 violations
+5. **Test:** Verify no cross-foundry data visible in UI
+6. **Deploy:** Push fix to production immediately
+7. **Notify:** Inform affected users if sensitive data was exposed
+
+---
+
+## Training Examples
+
+### Example 1: Secure Page Component
+
+```typescript
+// tasks/page.tsx - CORRECT implementation
+export default async function TasksPage() {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) redirect('/login')
+    
+    // Step 1: Get foundry_id
+    const { data: userProfile } = await supabase
+        .from('profiles')
+        .select('foundry_id, role')
+        .eq('id', user.id)
+        .single()
+    
+    const foundry_id = userProfile?.foundry_id
+    if (!foundry_id) return <Error />
+    
+    // Step 2: Filter ALL queries by foundry_id
+    const { data: tasks } = await supabase
+        .from('tasks')
+        .select('*')
+        .eq('foundry_id', foundry_id)  // ✅
+    
+    const { data: profiles } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('foundry_id', foundry_id)  // ✅
+    
+    return <TasksView tasks={tasks} members={profiles} />
+}
+```
+
+### Example 2: Secure Server Action
+
+```typescript
+// actions/tasks.ts - CORRECT implementation
+export async function updateTask(taskId: string, updates: Partial<Task>) {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return { error: 'Unauthorized' }
+    
+    // Step 1: Get foundry_id
+    const foundry_id = await getFoundryIdCached()
+    if (!foundry_id) return { error: 'Not in foundry' }
+    
+    // Step 2: Fetch resource AND verify foundry
+    const { data: task } = await supabase
+        .from('tasks')
+        .select('foundry_id')
+        .eq('id', taskId)
+        .single()
+    
+    if (!task) return { error: 'Not found' }
+    
+    // Step 3: Verify ownership
+    if (task.foundry_id !== foundry_id) {
+        return { error: 'Unauthorized: Different foundry' }  // ✅
+    }
+    
+    // Step 4: Perform update (RLS will also enforce)
+    const { error } = await supabase
+        .from('tasks')
+        .update(updates)
+        .eq('id', taskId)
+    
+    return { error }
+}
+```
+
+---
+
+## Developer Guidelines
+
+### When Writing ANY Database Query:
+
+1. **Ask:** "Does this table have a `foundry_id` column?"
+2. **If YES:** Add `.eq('foundry_id', foundry_id)` - NO EXCEPTIONS
+3. **If querying profiles:** Add `.eq('foundry_id', foundry_id)` unless self-query
+4. **Add comment:** `// SECURITY: Filtered by foundry_id for isolation`
+5. **Before commit:** Run `./scripts/audit-foundry-isolation.sh`
+
+### Red Flags to Watch For:
+
+```typescript
+// 🚨 RED FLAG - Generic select without filter
+.from('tasks').select('*')
+.from('profiles').select('id, name')
+.from('objectives').select('*')
+
+// ✅ GREEN FLAG - Explicit foundry_id filter
+.from('tasks').select('*').eq('foundry_id', foundry_id)
+.from('profiles').select('*').eq('foundry_id', foundry_id)
+```
+
+---
+
+## Audit Script Usage
+
+```bash
+# Run security audit before every commit
+./scripts/audit-foundry-isolation.sh
+
+# Expected output: "✅ SECURITY AUDIT PASSED - 0 violations"
+# If violations found: Fix them ALL before committing
+```
+
+---
+
+## Long-Term Fix: Re-Enable RLS
+
+**Current Problem:** RLS policies on `profiles` cause infinite recursion when they query the profiles table to check foundry_id.
+
+**Solution:** Use JWT claims instead of table lookups:
+
+```sql
+-- Store foundry_id in JWT claims during auth
+-- Then RLS policy can access it without querying profiles
+
+CREATE POLICY "view_profiles_same_foundry" ON public.profiles
+    FOR SELECT USING (
+        foundry_id = (current_setting('request.jwt.claims', true)::json->>'foundry_id')::uuid
+    );
+```
+
+**Benefits:**
+- No table lookups = no recursion
+- Database-level enforcement = defense-in-depth
+- Application bugs won't leak data
+
+**See:** `supabase/migrations/20260204250000_disable_profiles_rls_temporarily.sql` for context
+
+---
+
+## Zero Trust Principle
+
+**Never trust RLS alone.** Always implement defense-in-depth:
+
+1. **RLS Policies** - Database-level enforcement (when working)
+2. **Application Filtering** - Explicit `.eq('foundry_id')` in every query
+3. **Server Action Checks** - Verify ownership before mutations
+4. **Automated Auditing** - CI/CD checks for violations
+
+**If ANY layer fails, others must catch it.**
+
+---
+
+## What NOT to Do
+
+```typescript
+// ❌ NEVER trust "it's probably filtered by RLS"
+const { data: tasks } = await supabase
+    .from('tasks')
+    .select('*')
+// Missing .eq('foundry_id') - SECURITY BREACH
+
+// ❌ NEVER assume "the join will filter it"
+const { data: tasks } = await supabase
+    .from('tasks')
+    .select('*, assignee:profiles(*)')
+// Still need .eq('foundry_id') on tasks table!
+
+// ❌ NEVER skip filtering "because RLS is enabled"
+// RLS CAN BE DISABLED (it was for profiles!)
+// ALWAYS filter in application code too
+
+// ❌ NEVER filter in client components
+// Client-side filtering can be bypassed
+// ALWAYS filter server-side in page.tsx or actions
+```
+
+---
+
+## Checklist for Code Reviewers
+
+When reviewing PRs, check:
+
+- [ ] All `.from('tasks')` have `.eq('foundry_id', foundry_id)`
+- [ ] All `.from('profiles')` have `.eq('foundry_id', foundry_id)` OR `.eq('id', user.id)`
+- [ ] All `.from('objectives')` have `.eq('foundry_id', foundry_id)`
+- [ ] All `.from('teams')` have `.eq('foundry_id', foundry_id)`
+- [ ] Server actions verify `resource.foundry_id === user_foundry_id`
+- [ ] `./scripts/audit-foundry-isolation.sh` passes (0 violations)
+
+**If ANY check fails, request changes immediately.**
+
+---
+
+## Additional Resources
+
+- **Audit Script:** `./scripts/audit-foundry-isolation.sh`
+- **RLS Documentation:** `supabase/migrations/20260204250000_disable_profiles_rls_temporarily.sql`
+- **Server Action Security:** `.cursor/skills/secure-server-actions/SKILL.md`
+- **Database Security:** `.cursor/skills/secure-database/SKILL.md`

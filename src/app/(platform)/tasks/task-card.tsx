@@ -5,10 +5,10 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
-import { UserAvatar, UserAvatarStack } from "@/components/ui/user-avatar"
+import { UserAvatar, UserAvatarStack, getRoleColors } from "@/components/ui/user-avatar"
 import { Markdown } from "@/components/ui/markdown"
 import { format } from "date-fns"
-import { Calendar as CalendarIcon, Check, Bot, ChevronDown, ChevronUp, ShieldAlert, Eye, EyeOff, ShieldCheck, Paperclip, Plus, CheckCircle2, XCircle, Clock, MessageSquare } from "lucide-react"
+import { Calendar as CalendarIcon, Check, Bot, ChevronDown, ChevronUp, ShieldAlert, Eye, EyeOff, ShieldCheck, Paperclip, Plus, CheckCircle2, XCircle, Clock, MessageSquare, Trash2 } from "lucide-react"
 import { Calendar } from "@/components/ui/calendar"
 import {
     Popover,
@@ -155,6 +155,7 @@ export const TaskCard = memo(function TaskCard(props: TaskCardProps) {
         handleRunAI,
         handleDateUpdate,
         handleAssigneeToggle,
+        handleApprove,
     } = useTaskActions({
         taskId: task.id,
         taskStartDate: task.start_date,
@@ -240,11 +241,9 @@ export const TaskCard = memo(function TaskCard(props: TaskCardProps) {
     return (
         <Card
             className={cn(
-                "bg-background flex flex-col h-full group/card relative rounded-xl border shadow-sm",
+                "bg-background flex flex-col h-full group/card relative border shadow-sm cursor-pointer",
                 "transition-all duration-200 ease-out",
-                isSelectionMode 
-                    ? "cursor-pointer" 
-                    : "hover:shadow-lg hover:-translate-y-1 active:translate-y-0 active:shadow-md active:scale-[0.99]",
+                "hover:border-muted-foreground/20 hover:shadow-lg",
                 isSelected && isSelectionMode 
                     ? "ring-2 ring-international-orange/50 bg-international-orange/5 border-international-orange/30" 
                     : ""
@@ -367,13 +366,21 @@ export const TaskCard = memo(function TaskCard(props: TaskCardProps) {
                                         aria-label="Select assignee"
                                     >
                                         <div className="flex -space-x-2">
-                                            {currentAssignees.length > 0 ? (
+                                            {currentAssignees.length === 1 ? (
+                                                // Single assignee - show with role-colored border (matches Team page)
+                                                <UserAvatar 
+                                                    name={currentAssignees[0].full_name}
+                                                    role={currentAssignees[0].role}
+                                                    size="md"
+                                                    className={`border-2 ${getRoleColors(currentAssignees[0].role).border}`}
+                                                />
+                                            ) : currentAssignees.length > 1 ? (
+                                                // Multiple assignees - use stack with overlap
                                                 <UserAvatarStack
                                                     users={currentAssignees.map(a => ({
                                                         id: a.id,
                                                         name: a.full_name,
                                                         role: a.role,
-                                                        avatarUrl: a.avatar_url,
                                                     }))}
                                                     size="md"
                                                     max={4}
@@ -535,9 +542,10 @@ export const TaskCard = memo(function TaskCard(props: TaskCardProps) {
                                             onClick={handleAccept}
                                             disabled={isLoading}
                                             className="h-7 px-2 text-status-success hover:bg-status-success-light"
+                                            title="Accept this task assignment and start working"
                                         >
                                             <CheckCircle2 className="h-3.5 w-3.5 mr-1" />
-                                            Accept
+                                            Accept Task
                                         </Button>
                                         <Button
                                             size="sm"
@@ -545,9 +553,10 @@ export const TaskCard = memo(function TaskCard(props: TaskCardProps) {
                                             onClick={() => setRejectOpen(true)}
                                             disabled={isLoading}
                                             className="h-7 px-2 text-destructive hover:bg-status-error-light"
+                                            title="Decline this task assignment"
                                         >
                                             <XCircle className="h-3.5 w-3.5 mr-1" />
-                                            Reject
+                                            Reject Task
                                         </Button>
                                     </>
                                 )}
@@ -558,20 +567,49 @@ export const TaskCard = memo(function TaskCard(props: TaskCardProps) {
                                         onClick={handleComplete}
                                         disabled={isLoading}
                                         className="h-7 px-2 text-status-success hover:bg-status-success-light"
+                                        title="Mark this task as completed"
                                     >
                                         <CheckCircle2 className="h-3.5 w-3.5 mr-1" />
-                                        Complete
+                                        Mark Complete
+                                    </Button>
+                                )}
+                                {task.status === 'Pending_Peer_Review' && (
+                                    <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        onClick={handleApprove}
+                                        disabled={isLoading}
+                                        className="h-7 px-2 text-status-success hover:bg-status-success-light"
+                                        title="Approve this peer-reviewed task"
+                                    >
+                                        <CheckCircle2 className="h-3.5 w-3.5 mr-1" />
+                                        Approve
                                     </Button>
                                 )}
                                 {isExecutive && (task.status === 'Pending_Executive_Approval' || task.status === 'Amended_Pending_Approval') && (
                                     <Button
                                         size="sm"
                                         variant="ghost"
-                                        onClick={() => setRubberStampOpen(true)}
+                                        onClick={handleApprove}
+                                        disabled={isLoading}
                                         className="h-7 px-2 text-international-orange hover:bg-orange-50"
+                                        title="Approve and release this high-risk task"
                                     >
                                         <ShieldCheck className="h-3.5 w-3.5 mr-1" />
-                                        Certify
+                                        Approve & Release
+                                    </Button>
+                                )}
+                                {(isCreator || isExecutive) && (
+                                    <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        onClick={handleDelete}
+                                        disabled={isLoading || isDeleting}
+                                        className="h-7 px-2 text-destructive hover:bg-status-error-light"
+                                        title="Delete this task"
+                                    >
+                                        <Trash2 className="h-3.5 w-3.5 mr-1" />
+                                        Delete
                                     </Button>
                                 )}
                             </div>
@@ -603,7 +641,7 @@ export const TaskCard = memo(function TaskCard(props: TaskCardProps) {
                                     <PopoverTrigger asChild>
                                         <div className={cn(
                                             "bg-background p-2.5 rounded-lg border cursor-pointer hover:bg-muted/50 active:bg-muted transition-colors duration-150 group",
-                                            !isAssignee && !isCreator && "pointer-events-none" // Only allow edits if assignee/creator
+                                            !isAssignee && !isCreator && !isExecutive && "pointer-events-none" // Allow edits for assignee, creator, or executive
                                         )}>
                                             <span className="text-[10px] text-muted-foreground block mb-1 group-hover:text-international-orange transition-colors duration-150">Start Date</span>
                                             <div className="flex items-center gap-2">
@@ -629,7 +667,7 @@ export const TaskCard = memo(function TaskCard(props: TaskCardProps) {
                                     <PopoverTrigger asChild>
                                         <div className={cn(
                                             "bg-background p-2.5 rounded-lg border cursor-pointer hover:bg-muted/50 active:bg-muted transition-colors duration-150 group",
-                                            !isAssignee && !isCreator && "pointer-events-none"
+                                            !isAssignee && !isCreator && !isExecutive && "pointer-events-none" // Allow edits for assignee, creator, or executive
                                         )}>
                                             <span className="text-[10px] text-muted-foreground block mb-1 group-hover:text-international-orange transition-colors duration-150">Deadline</span>
                                             <div className="flex items-center gap-2">
@@ -710,6 +748,7 @@ export const TaskCard = memo(function TaskCard(props: TaskCardProps) {
                         handleDuplicate={handleDuplicate}
                         handleRunAI={handleRunAI}
                         handleForward={handleForward}
+                        handleApprove={handleApprove}
                         handleDelete={handleDelete}
                         isDeleting={isDeleting}
                         sortedMembers={sortedMembers}

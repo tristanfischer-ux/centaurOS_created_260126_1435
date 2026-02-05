@@ -141,7 +141,6 @@ export function ActivityStream({ initialItems, initialCounts, onTaskClick, membe
       }
       
       setIsRefreshing(false)
-      router.refresh()
     })
   }, [filter, router, showSystemLogs, showAllFoundryActivity])
 

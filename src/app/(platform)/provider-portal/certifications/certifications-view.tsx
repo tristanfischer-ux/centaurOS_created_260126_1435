@@ -51,7 +51,6 @@ export function CertificationsView({ certifications, error }: CertificationsView
         
         if (result.success) {
             toast.success('Certification deleted')
-            router.refresh()
         } else {
             toast.error(result.error || 'Failed to delete certification')
         }
@@ -65,14 +64,13 @@ export function CertificationsView({ certifications, error }: CertificationsView
         
         if (result.success) {
             toast.success('Verification request submitted')
-            router.refresh()
         } else {
             toast.error(result.error || 'Failed to request verification')
         }
     }
 
     const handleSuccess = () => {
-        router.refresh()
+        // Revalidation handled by server action
     }
 
     return (

@@ -93,7 +93,6 @@ export function UsePackDialog({ pack, trigger }: UsePackDialogProps) {
         toast.success('Objective created with tasks!')
         setOpen(false)
         router.push('/objectives')
-        router.refresh()
       }
     } catch (error) {
       toast.error('Failed to create objective')

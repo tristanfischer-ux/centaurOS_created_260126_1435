@@ -42,7 +42,6 @@ export function CreateRFQSheet({
         onClick: () => router.push(`/rfq/${rfqId}`),
       },
     })
-    router.refresh()
   }
 
   const handleCancel = () => {

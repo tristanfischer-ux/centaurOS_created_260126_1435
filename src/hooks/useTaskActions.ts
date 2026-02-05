@@ -8,6 +8,7 @@ import {
   triggerAIWorker,
   updateTaskDates,
   updateTaskAssignees,
+  approveTask,
 } from "@/actions/tasks"
 import { toast } from "sonner"
 
@@ -176,6 +177,14 @@ export function useTaskActions({
     [taskId, currentAssignees, members, setOptimisticAssignees]
   )
 
+  const handleApprove = useCallback(async () => {
+    setIsLoading(true)
+    const res = await approveTask(taskId)
+    setIsLoading(false)
+    if (res.error) toast.error(res.error)
+    else toast.success("Task approved and released")
+  }, [taskId, setIsLoading])
+
   return {
     handleAccept,
     handleReject,
@@ -185,5 +194,6 @@ export function useTaskActions({
     handleRunAI,
     handleDateUpdate,
     handleAssigneeToggle,
+    handleApprove,
   }
 }

@@ -108,7 +108,6 @@ export function VoiceRecorder({ onTaskParsed, className }: VoiceRecorderProps) {
                     description: data.transcript ? `"${data.transcript.slice(0, 80)}..."` : undefined,
                     duration: 5000,
                 })
-                router.refresh()
             }
 
         } catch (error) {

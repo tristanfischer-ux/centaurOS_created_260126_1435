@@ -274,7 +274,31 @@ Analytics chart cards should have consistent styling:
 </Card>
 ```
 
-## 13. Quick Add / Input Triggers
+## 13. Warning/Attention Sections
+
+Sections requiring user attention should use warning styling:
+
+```tsx
+// ✅ CORRECT - Warning-styled attention section
+<div className="rounded-xl border border-status-warning/30 shadow-sm overflow-hidden bg-status-warning-light/30">
+  <div className="bg-status-warning-light/50 px-4 py-3 border-b border-status-warning/20 cursor-pointer hover:bg-status-warning-light/70 transition-colors duration-150">
+    <h3 className="font-semibold text-status-warning-dark flex items-center gap-3">
+      <AlertTriangle className="h-4 w-4 text-status-warning" />
+      <span>Tasks Without Objective ({count})</span>
+      <span className="text-xs font-normal text-status-warning ml-auto">Assign to an objective</span>
+    </h3>
+  </div>
+</div>
+
+// ❌ WRONG - Generic muted section for attention items
+<div className="rounded-xl border bg-background">
+  <div className="bg-muted/50 px-4 py-3">
+    General Tasks (No Objective)
+  </div>
+</div>
+```
+
+## 14. Quick Add / Input Triggers
 
 Expandable input triggers should be inviting:
 
@@ -303,7 +327,7 @@ Expandable input triggers should be inviting:
 | Pattern | Key Classes |
 |---|---|
 | Card | `rounded-xl border shadow-sm` |
-| Interactive Card | `transition-all duration-200 ease-out hover:shadow-lg hover:-translate-y-0.5` |
+| Interactive Card | `transition-all duration-200 ease-out hover:shadow-lg hover:-translate-y-1 hover:border-muted-foreground/20` |
 | Section Header | `border-b border-muted pb-3 flex items-center gap-3` |
 | Accent Bar | `w-1 h-6 bg-{color} rounded-full` |
 | Empty State | `bg-muted/30 rounded-xl py-12` |
@@ -314,6 +338,8 @@ Expandable input triggers should be inviting:
 | Icon Container (large) | `rounded-xl bg-{color}/10` |
 | Skeleton Accent | `bg-{color}/30 rounded-full` |
 | Quick Add Trigger | `rounded-xl bg-muted/30 hover:bg-international-orange/5` |
+| Warning Section | `border-status-warning/30 bg-status-warning-light/30` |
+| Single Avatar (role border) | `border-2 ${getRoleColors(role).border}` |
 
 ## Checklist Before Committing
 

@@ -106,19 +106,13 @@ export async function updateFoundryPurpose(
   try {
     // Update foundry purpose_data using admin client to bypass RLS
     // SECURITY: Auth checks above verify user is authenticated, owns this foundry, and is a Founder
-    console.log('[FoundryActions] Creating admin client...')
-    
     let adminClient
     try {
       adminClient = createAdminClient()
-      console.log('[FoundryActions] Admin client created successfully')
     } catch (adminError) {
       console.error('[FoundryActions] Failed to create admin client:', adminError)
       return { success: false, error: 'Server configuration error' }
     }
-    
-    console.log('[FoundryActions] Executing update for foundryId:', foundryId)
-    console.log('[FoundryActions] Purpose data keys:', Object.keys(purposeData))
     
     const { data, error: updateError } = await adminClient
       .from('foundries')
@@ -129,24 +123,13 @@ export async function updateFoundryPurpose(
       .select()
       .single()
     
-    console.log('[FoundryActions] Update complete. Result:', JSON.stringify({
-      hasData: !!data,
-      hasError: !!updateError,
-      errorMessage: updateError?.message,
-      errorCode: updateError?.code,
-      errorDetails: updateError?.details,
-      errorHint: updateError?.hint,
-    }))
-    
     if (updateError) {
-      console.error('[FoundryActions] Update failed:', JSON.stringify({
+      console.error('[FoundryActions] Failed to update purpose:', {
         foundryId,
         error: updateError.message,
         code: updateError.code,
-        details: updateError.details,
-        hint: updateError.hint,
-      }))
-      return { success: false, error: `Failed to update: ${updateError.message}` }
+      })
+      return { success: false, error: 'Failed to update company purpose' }
     }
     
     // AUDIT: Log the purpose update

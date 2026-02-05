@@ -131,6 +131,13 @@ export function CreateTaskDialog({ objectives, members, teams = [], currentUserI
         setObjectiveError(null)
         setSubmitError(null)
         
+        // CRITICAL: Check if objectives exist at all
+        if (!hasObjectives) {
+            setSubmitError("Cannot create task: No objectives exist. Create an objective first.")
+            toast.error("Create an objective before creating tasks")
+            return
+        }
+        
         // Get form values
         const form = event.currentTarget
         const title = (form.elements.namedItem('title') as HTMLInputElement)?.value?.trim()
@@ -148,9 +155,10 @@ export function CreateTaskDialog({ objectives, members, teams = [], currentUserI
             return
         }
         
-        // Validate objective
-        if (!selectedObjective) {
-            setObjectiveError("Objective is required")
+        // CRITICAL: Validate objective is selected
+        if (!selectedObjective || selectedObjective.trim() === '') {
+            setObjectiveError("You must select an objective for this task")
+            toast.error("Please select an objective")
             return
         }
         
@@ -305,6 +313,9 @@ export function CreateTaskDialog({ objectives, members, teams = [], currentUserI
         return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
     }
 
+    // Check if objectives exist
+    const hasObjectives = objectives.length > 0
+
     return (
         <Dialog open={open} onOpenChange={handleOpenChange}>
             <DialogTrigger asChild>
@@ -315,6 +326,8 @@ export function CreateTaskDialog({ objectives, members, teams = [], currentUserI
                         className="touch-manipulation"
                         type="button"
                         onClick={handleMobileClick}
+                        disabled={!hasObjectives}
+                        title={!hasObjectives ? "Create an objective first" : undefined}
                     >
                         <Plus className="h-4 w-4" /> New Task
                     </Button>
@@ -325,7 +338,13 @@ export function CreateTaskDialog({ objectives, members, teams = [], currentUserI
                     <DialogHeader>
                         <DialogTitle>Create New Task</DialogTitle>
                         <DialogDescription>
-                            Assign a new task. Assign to an AI Agent for auto-execution.
+                            {!hasObjectives ? (
+                                <span className="text-destructive">
+                                    ⚠️ You must create at least one objective before creating tasks.
+                                </span>
+                            ) : (
+                                "Assign a new task. Assign to an AI Agent for auto-execution."
+                            )}
                         </DialogDescription>
                     </DialogHeader>
                     <div className="grid gap-4 py-4">
@@ -392,13 +411,16 @@ export function CreateTaskDialog({ objectives, members, teams = [], currentUserI
                                             role="combobox"
                                             aria-expanded={objectiveOpen}
                                             aria-invalid={!!objectiveError}
+                                            disabled={!hasObjectives}
                                             className={cn(
                                                 "w-full justify-between bg-background border-slate-200",
                                                 objectiveError && "border-destructive"
                                             )}
                                             id="objective"
                                         >
-                                            {selectedObjective
+                                            {!hasObjectives
+                                                ? "No objectives available"
+                                                : selectedObjective
                                                 ? objectives.find((o) => o.id === selectedObjective)?.title
                                                 : "Select objective..."}
                                             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
@@ -444,7 +466,6 @@ export function CreateTaskDialog({ objectives, members, teams = [], currentUserI
                                 type="hidden"
                                 name="objective_id"
                                 value={selectedObjective}
-                                required
                             />
                         </div>
 
@@ -582,7 +603,8 @@ export function CreateTaskDialog({ objectives, members, teams = [], currentUserI
                         <Button
                             type="submit"
                             variant="default"
-                            disabled={isLoading || selectedAssignees.length === 0}
+                            disabled={isLoading || selectedAssignees.length === 0 || !selectedObjective}
+                            title={!selectedObjective ? "Please select an objective" : undefined}
                         >
                             {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
                             Create Task

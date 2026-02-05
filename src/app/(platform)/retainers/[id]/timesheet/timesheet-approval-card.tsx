@@ -103,7 +103,6 @@ export function TimesheetApprovalCard({
       }
 
       setSuccess('Timesheet approved successfully')
-      router.refresh()
     } catch {
       setError('Failed to approve timesheet')
     } finally {
@@ -136,7 +135,6 @@ export function TimesheetApprovalCard({
 
       setSuccess('Timesheet disputed')
       setShowDisputeDialog(false)
-      router.refresh()
     } catch {
       setError('Failed to dispute timesheet')
     } finally {

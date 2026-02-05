@@ -9,7 +9,7 @@ import { RefreshButton } from "@/components/RefreshButton"
 import { SearchInput } from "@/components/ui/search-input"
 import { TaskCard } from "./task-card"
 import { Button } from "@/components/ui/button"
-import { LayoutGrid, List, X, Trash2, CheckSquare, Loader2, Check, UserPlus, Filter, ChevronDown, ChevronRight, CalendarDays, Inbox, History } from "lucide-react"
+import { LayoutGrid, List, X, Trash2, CheckSquare, Loader2, Check, UserPlus, Filter, ChevronDown, ChevronRight, CalendarDays, Inbox, History, AlertTriangle } from "lucide-react"
 import { UserAvatar, UserAvatarStack } from "@/components/ui/user-avatar"
 import { deleteTasks, acceptTask, completeTask, updateTaskAssignees } from "@/actions/tasks"
 import { deleteObjectives } from "@/actions/objectives"
@@ -305,14 +305,19 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
     // Group tasks by objective (using tab-filtered tasks)
     const tasksByObjective: Record<string, Task[]> = {}
     const orphanedTasks: Task[] = []
+    
+    // Create a Set of valid objective IDs for quick lookup
+    const validObjectiveIds = new Set(objectives.map(obj => obj.id))
 
     tabTasks.forEach(task => {
-        if (task.objective_id) {
+        // If task has an objective_id AND that objective exists in our list, group it
+        if (task.objective_id && validObjectiveIds.has(task.objective_id)) {
             if (!tasksByObjective[task.objective_id]) {
                 tasksByObjective[task.objective_id] = []
             }
             tasksByObjective[task.objective_id].push(task)
         } else {
+            // Task has no objective OR objective doesn't exist - treat as orphaned
             orphanedTasks.push(task)
         }
     })
@@ -548,22 +553,15 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
     return (
         <>
             <div className="space-y-8">
-                <div className="flex flex-col gap-4">
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-slate-100">
-                        <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-3 mb-1">
-                                <div className="h-8 w-1 bg-orange-600 rounded-full shadow-[0_0_8px_rgba(234,88,12,0.6)]" />
-                                <h1 className="text-2xl sm:text-3xl font-display font-semibold text-foreground tracking-tight flex items-center gap-3">
-                                    Tasks
-                                    <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-orange-50 text-orange-700 text-sm font-medium rounded-full">
-                                        <span className="font-semibold">{tasks.length}</span>
-                                        <span className="text-xs uppercase tracking-wider">total</span>
-                                    </span>
-                                </h1>
-                            </div>
-                            <p className="text-muted-foreground mt-1 text-sm font-medium pl-4">Create and delegate tasks</p>
-                        </div>
-                        <div className="flex flex-wrap items-center gap-3">
+                <div className="space-y-4">
+                    {/* Header Row */}
+                    <div className="flex items-center gap-3 pb-4 border-b border-muted">
+                        <div className="h-8 w-1 bg-orange-600 rounded-full shadow-[0_0_8px_rgba(234,88,12,0.6)]" />
+                        <h1 className="text-2xl sm:text-3xl font-display font-semibold text-foreground tracking-tight">Tasks</h1>
+                    </div>
+                    
+                    {/* Controls Row */}
+                    <div className="flex flex-wrap items-center gap-2">
                             {/* Tab Switcher - Desktop */}
                             <Tabs value={activeTab} onValueChange={(val) => setActiveTab(val as 'active' | 'history' | 'all')} className="hidden sm:block">
                                 <TabsList className="h-9">
@@ -593,8 +591,7 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                                     <SelectItem value="all">All ({tasks.length})</SelectItem>
                                 </SelectContent>
                             </Select>
-                        </div>
-                        <div className="flex flex-wrap items-center gap-2">
+
                             {isSelectionMode ? (
                                 <div className="flex items-center gap-2">
                                     <Button variant="destructive" size="sm" onClick={handleBulkDeleteClick} disabled={selectedTaskIds.size === 0 || isBulkDeleting}>
@@ -857,7 +854,6 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                                     </FeatureTip>
                                 </>
                             )}
-                        </div>
                     </div>
                 </div>
 
@@ -1179,12 +1175,12 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                         })}
 
                         {orphanedTasks.length > 0 && (
-                            <div className="rounded-xl border shadow-sm overflow-hidden bg-background">
+                            <div className="rounded-xl border border-status-warning/30 shadow-sm overflow-hidden bg-status-warning-light/30">
                                 <div 
-                                    className="bg-muted/50 px-4 py-3 border-b cursor-pointer hover:bg-muted transition-colors duration-150"
+                                    className="bg-status-warning-light/50 px-4 py-3 border-b border-status-warning/20 cursor-pointer hover:bg-status-warning-light/70 transition-colors duration-150"
                                     onClick={() => toggleObjectiveExpanded('orphaned')}
                                 >
-                                    <h3 className="font-semibold text-muted-foreground flex items-center gap-3">
+                                    <h3 className="font-semibold text-status-warning-dark flex items-center gap-3">
                                         {isSelectionMode && (
                                             <Checkbox
                                                 checked={orphanedTasks.every(t => selectedTaskIds.has(t.id))}
@@ -1198,16 +1194,17 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                                                     setSelectedTaskIds(newSelection)
                                                 }}
                                                 onClick={(e) => e.stopPropagation()}
-                                                aria-label="Select all general tasks"
+                                                aria-label="Select all unassigned tasks"
                                             />
                                         )}
                                         {expandedObjectives.has('orphaned') ? (
-                                            <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                                            <ChevronDown className="h-4 w-4 text-status-warning" />
                                         ) : (
-                                            <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                                            <ChevronRight className="h-4 w-4 text-status-warning" />
                                         )}
-                                        <div className="w-1 h-5 bg-slate-400 rounded-full" />
-                                        General Tasks (No Objective)
+                                        <AlertTriangle className="h-4 w-4 text-status-warning" />
+                                        <span>No Linked Objective ({orphanedTasks.length})</span>
+                                        <span className="text-xs font-normal text-status-warning ml-auto">Link these tasks to an objective</span>
                                     </h3>
                                 </div>
                                 {expandedObjectives.has('orphaned') && (

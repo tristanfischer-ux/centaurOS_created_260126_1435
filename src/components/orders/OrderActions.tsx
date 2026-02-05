@@ -161,7 +161,6 @@ export function OrderActions({
         }
         toast.success(successMessages[action] || "Action completed")
         onActionComplete?.()
-        router.refresh()
       }
     } catch (error) {
       toast.error("An error occurred")
@@ -303,7 +302,6 @@ export function OrderQuickAction({
       } else {
         toast.success(`${label} successful`)
         onComplete?.()
-        router.refresh()
       }
     } catch {
       toast.error("An error occurred")

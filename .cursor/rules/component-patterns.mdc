@@ -454,12 +454,14 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 
 ### Role-Based Color System (Automatic)
 
-UserAvatar automatically applies role-based colors:
-- **Founder** → Orange background
-- **Executive** → Blue background
-- **Apprentice** → Green background
-- **AI_Agent** → Purple background with bot icon
-- **Default** → Muted gray
+UserAvatar automatically applies role-based colors using an **orange hierarchy**:
+- **Founder** → Dark orange background (`bg-orange-100`)
+- **Executive** → Light orange background (`bg-orange-50`)
+- **Apprentice** → Neutral muted background (`bg-muted`)
+- **AI_Agent** → Purple background with bot icon (`bg-purple-100`)
+- **Default** → Neutral muted background
+
+This creates clear visual hierarchy: Founders stand out most, Executives are visually secondary, Apprentices blend in.
 
 ### Size Variants
 

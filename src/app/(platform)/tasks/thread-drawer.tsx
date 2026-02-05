@@ -170,7 +170,6 @@ export function ThreadDrawer({
                 toast.error(result.error)
             } else {
                 toast.success("Task accepted")
-                router.refresh()
                 onOpenChange(false)
             }
         } finally {
@@ -192,7 +191,6 @@ export function ThreadDrawer({
             toast.success("Task rejected")
             setRejectDialogOpen(false)
             setRejectReason('')
-            router.refresh()
             onOpenChange(false)
         }
         setIsActionLoading(false)
@@ -205,7 +203,6 @@ export function ThreadDrawer({
             toast.error(result.error)
         } else {
             toast.success("Task completed!")
-            router.refresh()
             onOpenChange(false)
         }
         setIsActionLoading(false)
@@ -222,7 +219,6 @@ export function ThreadDrawer({
             toast.error(result.error)
         } else {
             toast.success("Task forwarded!")
-            router.refresh()
             setShowForward(false)
             setForwardToId("")
             setForwardReason("")

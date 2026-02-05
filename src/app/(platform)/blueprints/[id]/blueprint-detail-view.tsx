@@ -101,7 +101,6 @@ export function BlueprintDetailView({
       toast.error('Failed to update status')
     } else {
       toast.success('Status updated')
-      router.refresh()
     }
   }
 
@@ -116,7 +115,6 @@ export function BlueprintDetailView({
       toast.error('Failed to remove expertise')
     } else {
       toast.success('Expertise removed')
-      router.refresh()
     }
   }
 

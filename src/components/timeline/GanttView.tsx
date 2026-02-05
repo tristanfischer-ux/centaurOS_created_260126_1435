@@ -492,8 +492,6 @@ export function GanttView({ tasks, objectives, profiles, members = [], currentUs
                 toast.error(result.error)
             } else {
                 toast.success(`Rescheduled: ${task.name}`)
-                // Trigger server refresh to get updated data
-                router.refresh()
                 // The optimistic override will be cleared by the useEffect when server data matches
                 // Use a fallback timeout of 10 seconds in case server refresh is delayed
                 if (dateChangeTimeoutRef.current) {

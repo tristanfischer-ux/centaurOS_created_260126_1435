@@ -20,7 +20,28 @@ export default async function TasksPage({ searchParams }: TasksPageProps) {
         redirect('/login')
     }
 
-    // SECURITY: Don't fetch email in SSR to prevent exposure in page source
+    // Get current user's foundry_id first for security filtering
+    const { data: userProfile } = await supabase
+        .from('profiles')
+        .select('foundry_id, role')
+        .eq('id', user.id)
+        .single()
+
+    const foundry_id = userProfile?.foundry_id
+
+    if (!foundry_id) {
+        return (
+            <div className="p-8">
+                <h1 className="font-bold mb-2 text-destructive">Error: No Foundry</h1>
+                <p className="text-muted-foreground">
+                    No foundry associated with your account. Please contact support.
+                </p>
+            </div>
+        )
+    }
+
+    // SECURITY: Filter tasks by foundry_id to ensure data isolation
+    // RLS policies also enforce this, but defense-in-depth is critical
     const { data: tasks, error } = await supabase
         .from('tasks')
         .select(`
@@ -31,6 +52,7 @@ export default async function TasksPage({ searchParams }: TasksPageProps) {
             task_files(id, file_name, file_size, created_at),
             task_assignees(profile:profiles(id, full_name, role))
         `)
+        .eq('foundry_id', foundry_id)
         .order('created_at', { ascending: false })
 
     if (error) {
@@ -61,20 +83,19 @@ export default async function TasksPage({ searchParams }: TasksPageProps) {
         })
     )
 
-    // Parallelize independent queries
+    // SECURITY: Filter all queries by foundry_id to ensure data isolation
+    // Note: Profiles RLS is disabled due to recursion issues, so app-level filtering is CRITICAL
     const [
-        { data: currentUserProfile },
         { data: objectives },
         { data: membersData },
         { data: teamsData }
     ] = await Promise.all([
-        supabase.from('profiles').select('id, foundry_id, role').eq('id', user.id).single(),
-        supabase.from('objectives').select('id, title'),
-        supabase.from('profiles').select('id, full_name, role, email'),
-        supabase.from('teams').select('id, name')
+        supabase.from('objectives').select('id, title').eq('foundry_id', foundry_id),
+        supabase.from('profiles').select('id, full_name, role, email').eq('foundry_id', foundry_id),
+        supabase.from('teams').select('id, name').eq('foundry_id', foundry_id)
     ])
 
-    const currentUserRole = currentUserProfile?.role
+    const currentUserRole = userProfile?.role
     const objectivesList = objectives || []
     const members = (membersData || []).map(p => ({
         id: p.id,

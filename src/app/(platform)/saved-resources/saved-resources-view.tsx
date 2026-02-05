@@ -54,7 +54,6 @@ export function SavedResourcesView({ savedResources: initialResources, error }: 
             toast.success('Removed from saved resources')
             // Remove from local state
             setSavedResources(prev => prev.filter(r => r.provider_id !== providerId))
-            router.refresh()
         }
         setRemovingId(null)
     }

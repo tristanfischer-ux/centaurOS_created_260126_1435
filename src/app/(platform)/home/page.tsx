@@ -460,6 +460,7 @@ async function fetchTeamWithActivity(
     const { data: currentTasks } = await supabase
       .from('tasks')
       .select('id, title')
+      .eq('foundry_id', foundryId)
       .in('id', currentTaskIds)
     
     currentTasks?.forEach(t => {
@@ -472,6 +473,7 @@ async function fetchTeamWithActivity(
   const { data: weekTasks } = await supabase
     .from('tasks')
     .select('id, title, end_date, assignee_id')
+    .eq('foundry_id', foundryId)
     .in('assignee_id', memberIds)
     .lte('end_date', weekEnd.toISOString())
     .neq('status', 'Completed')

@@ -32,6 +32,7 @@ async function canModifyTask(
     const { data: task, error: taskError } = await supabase
         .from('tasks')
         .select('creator_id, assignee_id, foundry_id')
+        .eq('foundry_id', userFoundryId) // SECURITY: Filter by foundry first
         .eq('id', taskId)
         .single()
 
@@ -39,7 +40,7 @@ async function canModifyTask(
         return { allowed: false, error: 'Task not found' }
     }
 
-    // Verify task belongs to user's foundry
+    // Task already filtered by foundry_id above - this check is now redundant but kept for clarity
     if (task.foundry_id !== userFoundryId) {
         return { allowed: false, error: 'Unauthorized: Task belongs to a different foundry' }
     }
@@ -354,6 +355,7 @@ export async function rejectTask(taskId: string, reason: string) {
 
     const { error } = await supabase.from('tasks')
         .update({ status: 'Rejected' })
+        .eq('foundry_id', foundry_id) // SECURITY: Defense-in-depth foundry filter
         .eq('id', taskId)
 
     if (error) return { error: sanitizeErrorMessage(error) }
@@ -388,10 +390,10 @@ export async function forwardTask(taskId: string, newAssigneeId: string, reason:
     if (!foundry_id) return { error: 'User not in a foundry' }
 
     // Fetch current task for history with foundry_id for security check
-    const { data: task } = await supabase.from('tasks').select('forwarding_history, assignee_id, foundry_id').eq('id', taskId).single()
+    const { data: task } = await supabase.from('tasks').select('forwarding_history, assignee_id, foundry_id').eq('foundry_id', foundry_id).eq('id', taskId).single()
     if (!task) return { error: 'Task not found' }
 
-    // SECURITY: Verify task belongs to user's foundry
+    // Task already filtered by foundry_id above - this check is now redundant but kept for clarity
     if (task.foundry_id !== foundry_id) {
         return { error: 'Unauthorized: Task belongs to a different foundry' }
     }
@@ -680,6 +682,13 @@ export async function completeTask(taskId: string) {
     const foundry_id = await getFoundryIdCached()
     if (!foundry_id) return { error: 'User not in a foundry' }
 
+    // Fetch user's role
+    const { data: userProfile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .single()
+
     // Fetch Risk Level - only from user's foundry
     const { data: task, error: fetchError } = await supabase
         .from('tasks')
@@ -693,12 +702,17 @@ export async function completeTask(taskId: string) {
     let nextStatus: TaskStatus = 'Completed'
     let clientVisible = true
 
-    if (task.risk_level === 'Medium') {
-        nextStatus = 'Pending_Peer_Review'
-        clientVisible = false
-    } else if (task.risk_level === 'High') {
-        nextStatus = 'Pending_Executive_Approval'
-        clientVisible = false
+    // Founders and Executives can directly complete tasks regardless of risk level
+    const canBypassApproval = userProfile?.role === 'Founder' || userProfile?.role === 'Executive'
+
+    if (!canBypassApproval) {
+        if (task.risk_level === 'Medium') {
+            nextStatus = 'Pending_Peer_Review'
+            clientVisible = false
+        } else if (task.risk_level === 'High') {
+            nextStatus = 'Pending_Executive_Approval'
+            clientVisible = false
+        }
     }
 
     const updates: Partial<Database['public']['Tables']['tasks']['Update']> = { status: nextStatus }

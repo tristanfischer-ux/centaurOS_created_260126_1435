@@ -60,7 +60,6 @@ export function PortfolioManagementView({ items, error }: PortfolioManagementVie
             toast.error(result.error)
         } else {
             toast.success('Portfolio item deleted')
-            router.refresh()
         }
         
         setIsDeleting(false)
@@ -76,12 +75,11 @@ export function PortfolioManagementView({ items, error }: PortfolioManagementVie
             toast.error(result.error)
         } else {
             toast.success(item.is_featured ? 'Removed from featured' : 'Marked as featured')
-            router.refresh()
         }
     }
 
     const handleSuccess = () => {
-        router.refresh()
+        // Revalidation handled by server action
     }
 
     return (

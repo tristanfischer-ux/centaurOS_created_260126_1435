@@ -64,7 +64,6 @@ export function PitchPrepDetailView({ request }: PitchPrepDetailViewProps) {
         toast.error(result.error)
       } else {
         toast.success('Request cancelled')
-        router.refresh()
       }
     })
   }

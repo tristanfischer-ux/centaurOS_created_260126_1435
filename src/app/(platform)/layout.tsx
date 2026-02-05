@@ -52,7 +52,7 @@ export default async function PlatformLayout({
             .from("foundries")
             .select("name")
             .eq("id", profile.foundry_id)
-            .single();
+            .maybeSingle();
 
         if (foundryError) {
             console.error("Failed to fetch foundry:", foundryError.message);
