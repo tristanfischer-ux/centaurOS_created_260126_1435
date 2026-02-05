@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useState, useRef, useEffect } from "react";
+import { use, useState, useRef, useEffect, Suspense } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useSearchParams } from "next/navigation";
@@ -10,6 +10,25 @@ import { Label } from "@/components/ui/label";
 import { Check, ArrowRight, ArrowLeft, TestTube2 } from "lucide-react";
 import { signup, submitApplication } from "@/actions/signup";
 import { getDemoAccountData, type DemoAccountData } from "@/actions/demo-accounts";
+
+// Error message component for displaying form errors
+function ErrorMessage() {
+    const searchParams = useSearchParams();
+    const error = searchParams.get('error');
+    
+    if (!error) return null;
+    
+    return (
+        <div 
+            role="alert" 
+            aria-live="polite"
+            className="p-4 text-sm text-destructive bg-status-error-light border border-destructive rounded-lg flex items-center gap-3"
+        >
+            <span className="h-2 w-2 rounded-full bg-destructive animate-pulse" aria-hidden="true" />
+            {decodeURIComponent(error)}
+        </div>
+    );
+}
 
 interface RoleConfig {
     title: string;
@@ -325,14 +344,14 @@ export default function JoinPage({ params }: { params: Promise<{ role: string }>
                         </p>
 
                         {/* CTA Button */}
-                        <button
+                        <Button
                             onClick={handleBeginInduction}
                             disabled={stage === "transitioning"}
-                            className="group bg-white text-slate-900 px-8 sm:px-12 py-4 sm:py-5 text-sm sm:text-base font-bold tracking-widest uppercase hover:bg-international-orange hover:text-white transition-all duration-300 flex items-center gap-3 mb-8 sm:mb-10 disabled:opacity-50"
+                            className="group bg-background text-foreground px-8 sm:px-12 py-4 sm:py-5 h-auto text-sm sm:text-base font-bold tracking-widest uppercase hover:bg-international-orange hover:text-white transition-all duration-300 flex items-center gap-3 mb-8 sm:mb-10 disabled:opacity-50"
                         >
                             {config.ctaText}
-                            <ArrowRight className="w-4 sm:w-5 h-4 sm:h-5 group-hover:translate-x-1 transition-transform" />
-                        </button>
+                            <ArrowRight className="w-4 sm:w-5 h-4 sm:h-5 group-hover:translate-x-1 transition-transform" aria-hidden="true" />
+                        </Button>
 
                         {/* What You Become - Inline */}
                         <div className="w-full max-w-4xl border-t border-white/10 pt-6 sm:pt-8">
@@ -340,8 +359,8 @@ export default function JoinPage({ params }: { params: Promise<{ role: string }>
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 sm:gap-8 md:gap-12 max-w-3xl mx-auto">
                                 {config.benefits.map((benefit, index) => (
                                     <div key={index} className="flex items-start gap-3 justify-center sm:justify-start">
-                                        <div className="mt-0.5 w-5 h-5 rounded-full bg-blue-500/20 flex items-center justify-center shrink-0">
-                                            <Check className="w-3 h-3 text-blue-400" />
+                                        <div className="mt-0.5 w-5 h-5 rounded-full bg-primary/20 flex items-center justify-center shrink-0" aria-hidden="true">
+                                            <Check className="w-3 h-3 text-primary" />
                                         </div>
                                         <span className="text-white/80 text-sm">{benefit}</span>
                                     </div>
@@ -354,7 +373,7 @@ export default function JoinPage({ params }: { params: Promise<{ role: string }>
                 /* Stage 2: The Form */
                 <div className="min-h-screen flex flex-col md:flex-row animate-in fade-in duration-1000">
                     {/* Left: Context with Video Background */}
-                    <div className="w-full md:w-1/2 relative overflow-hidden bg-slate-900">
+                    <div className="w-full md:w-1/2 relative overflow-hidden bg-card">
                         {hasVideo ? (
                             <video
                                 className="absolute inset-0 w-full h-full object-cover opacity-50"
@@ -373,16 +392,17 @@ export default function JoinPage({ params }: { params: Promise<{ role: string }>
                                 className="object-cover opacity-30"
                             />
                         )}
-                        <div className="absolute inset-0 bg-gradient-to-r from-slate-900 via-slate-900/90 to-slate-900/70" />
+                        <div className="absolute inset-0 bg-gradient-to-r from-card via-card/90 to-card/70" />
                         <div className="relative z-10 p-6 sm:p-8 md:p-12 lg:p-16 flex flex-col justify-center min-h-[40vh] md:min-h-screen">
-                            <button
+                            <Button
+                                variant="ghost"
                                 onClick={() => setStage("hook")}
-                                className="text-white/60 hover:text-white text-sm font-mono uppercase tracking-widest flex items-center gap-2 mb-6 sm:mb-8"
+                                className="text-white/60 hover:text-white hover:bg-transparent text-sm font-mono uppercase tracking-widest flex items-center gap-2 mb-6 sm:mb-8 w-fit p-0 h-auto"
                             >
-                                <ArrowLeft className="w-4 h-4" />
+                                <ArrowLeft className="w-4 h-4" aria-hidden="true" />
                                 Back
-                            </button>
-                            <span className="text-xs font-mono text-blue-400 tracking-widest mb-3 sm:mb-4 block uppercase">
+                            </Button>
+                            <span className="text-xs font-mono text-primary tracking-widest mb-3 sm:mb-4 block uppercase">
                                 {config.isApplication ? "Application" : "Induction"}: {config.title}
                             </span>
                             <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-4 sm:mb-6 leading-tight text-white">
@@ -395,15 +415,20 @@ export default function JoinPage({ params }: { params: Promise<{ role: string }>
                     </div>
 
                     {/* Right: Form */}
-                    <div className="w-full md:w-1/2 bg-white text-slate-900 p-6 sm:p-8 md:p-12 lg:p-16 flex flex-col justify-center">
+                    <div className="w-full md:w-1/2 bg-background text-foreground p-6 sm:p-8 md:p-12 lg:p-16 flex flex-col justify-center">
                         <div className="w-full max-w-md mx-auto space-y-6 sm:space-y-8">
+                            {/* Error Message */}
+                            <Suspense fallback={null}>
+                                <ErrorMessage />
+                            </Suspense>
+                            
                             {/* Demo Mode Banner */}
                             {isDemoMode && demoData && (
-                                <div className="bg-violet-50 border border-violet-200 rounded-lg p-4 flex items-start gap-3">
-                                    <TestTube2 className="h-5 w-5 text-violet-600 mt-0.5 shrink-0" />
+                                <div className="bg-status-info-light border border-status-info rounded-lg p-4 flex items-start gap-3">
+                                    <TestTube2 className="h-5 w-5 text-status-info mt-0.5 shrink-0" aria-hidden="true" />
                                     <div>
-                                        <h3 className="text-sm font-semibold text-violet-900 mb-1">Demo Mode Active</h3>
-                                        <p className="text-xs text-violet-700">
+                                        <h3 className="text-sm font-semibold text-foreground mb-1">Demo Mode Active</h3>
+                                        <p className="text-xs text-muted-foreground">
                                             All fields are pre-populated with demo data. Just click "{config.ctaText}" to test the flow!
                                         </p>
                                     </div>
@@ -411,10 +436,10 @@ export default function JoinPage({ params }: { params: Promise<{ role: string }>
                             )}
                             
                             <div>
-                                <h2 className="text-xl sm:text-2xl font-bold text-slate-900">
+                                <h2 className="text-xl sm:text-2xl font-bold text-foreground">
                                     {config.isApplication ? "Apply for consideration" : "Create your account"}
                                 </h2>
-                                <p className="text-slate-600 mt-2 text-sm">
+                                <p className="text-muted-foreground mt-2 text-sm">
                                     {config.isApplication 
                                         ? "We review every application personally." 
                                         : "Enter your details to begin the induction."}
@@ -425,27 +450,35 @@ export default function JoinPage({ params }: { params: Promise<{ role: string }>
                                 <input type="hidden" name="role" value={roleKey} />
                                 
                                 <div className="space-y-2">
-                                    <Label htmlFor="name" className="text-sm font-medium text-slate-900">Full Name</Label>
+                                    <Label htmlFor="name" className="text-sm font-medium text-foreground">
+                                        Full Name
+                                        <span className="text-destructive ml-1" aria-label="required">*</span>
+                                    </Label>
                                     <Input
                                         id="name"
                                         name="name"
                                         placeholder="John Doe"
                                         defaultValue={demoData?.fullName || ""}
-                                        className="bg-white border-slate-300 focus:border-blue-500 focus:ring-blue-500"
+                                        className="bg-background border-input focus:border-ring focus:ring-ring"
                                         required
+                                        aria-required="true"
                                     />
                                 </div>
 
                                 <div className="space-y-2">
-                                    <Label htmlFor="email" className="text-sm font-medium text-slate-900">Email</Label>
+                                    <Label htmlFor="email" className="text-sm font-medium text-foreground">
+                                        Email
+                                        <span className="text-destructive ml-1" aria-label="required">*</span>
+                                    </Label>
                                     <Input
                                         id="email"
                                         name="email"
                                         type="email"
                                         placeholder="you@example.com"
                                         defaultValue={demoData?.email || ""}
-                                        className="bg-white border-slate-300 focus:border-blue-500 focus:ring-blue-500"
+                                        className="bg-background border-input focus:border-ring focus:ring-ring"
                                         required
+                                        aria-required="true"
                                     />
                                 </div>
 
@@ -469,9 +502,9 @@ export default function JoinPage({ params }: { params: Promise<{ role: string }>
                                     
                                     return (
                                         <div key={field.id} className="space-y-2">
-                                            <Label htmlFor={field.id} className="text-sm font-medium text-slate-900">
+                                            <Label htmlFor={field.id} className="text-sm font-medium text-foreground">
                                                 {field.label}
-                                                {field.required && <span className="text-red-500 ml-1">*</span>}
+                                                {field.required && <span className="text-destructive ml-1" aria-label="required">*</span>}
                                             </Label>
                                             <Input
                                                 id={field.id}
@@ -479,8 +512,9 @@ export default function JoinPage({ params }: { params: Promise<{ role: string }>
                                                 type={field.type || "text"}
                                                 placeholder={field.placeholder}
                                                 defaultValue={demoValue}
-                                                className="bg-white border-slate-300 focus:border-blue-500 focus:ring-blue-500"
+                                                className="bg-background border-input focus:border-ring focus:ring-ring"
                                                 required={field.required}
+                                                aria-required={field.required}
                                             />
                                         </div>
                                     );
@@ -488,32 +522,41 @@ export default function JoinPage({ params }: { params: Promise<{ role: string }>
 
                                 {!config.isApplication && (
                                     <div className="space-y-2">
-                                        <Label htmlFor="password" className="text-sm font-medium text-slate-900">Password</Label>
+                                        <Label htmlFor="password" className="text-sm font-medium text-foreground">
+                                            Password
+                                            <span className="text-destructive ml-1" aria-label="required">*</span>
+                                        </Label>
                                         <Input
                                             id="password"
                                             name="password"
                                             type="password"
                                             placeholder="Create a strong password"
                                             defaultValue={demoData?.password || ""}
-                                            className="bg-white border-slate-300 focus:border-blue-500 focus:ring-blue-500"
+                                            className="bg-background border-input focus:border-ring focus:ring-ring"
                                             required
+                                            aria-required="true"
+                                            minLength={6}
+                                            aria-describedby="password-hint"
                                         />
+                                        <p id="password-hint" className="text-xs text-muted-foreground">
+                                            Minimum 6 characters
+                                        </p>
                                     </div>
                                 )}
 
                                 <Button 
                                     type="submit"
-                                    className="w-full bg-international-orange hover:bg-international-orange-hover text-white font-bold tracking-widest uppercase py-5 sm:py-6 h-auto text-sm transition-colors"
+                                    className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-bold tracking-widest uppercase py-5 sm:py-6 h-auto text-sm transition-colors"
                                 >
                                     {config.ctaText}
                                 </Button>
                             </form>
 
-                            <p className="text-xs text-center text-slate-500">
+                            <p className="text-xs text-center text-muted-foreground">
                                 By {config.isApplication ? "applying" : "joining"}, you agree to our{" "}
-                                <Link href="#" className="underline hover:text-slate-700">Terms of Service</Link>{" "}
+                                <Link href="#" className="underline hover:text-foreground transition-colors">Terms of Service</Link>{" "}
                                 and{" "}
-                                <Link href="#" className="underline hover:text-slate-700">Privacy Policy</Link>.
+                                <Link href="#" className="underline hover:text-foreground transition-colors">Privacy Policy</Link>.
                             </p>
                         </div>
                     </div>

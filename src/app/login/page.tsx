@@ -30,8 +30,12 @@ function ErrorMessage() {
     if (!error) return null
 
     return (
-        <div className="p-4 text-sm text-destructive bg-status-error-light border border-destructive rounded-sm mb-6 flex items-center gap-3">
-            <span className="h-2 w-2 rounded-full bg-destructive animate-pulse" />
+        <div 
+            role="alert" 
+            aria-live="polite"
+            className="p-4 text-sm text-destructive bg-status-error-light border border-destructive rounded-sm mb-6 flex items-center gap-3"
+        >
+            <span className="h-2 w-2 rounded-full bg-destructive animate-pulse" aria-hidden="true" />
             {error}
         </div>
     )
@@ -72,7 +76,10 @@ function LoginForm() {
 
                 <div className="space-y-4">
                     <div className="space-y-2">
-                        <Label htmlFor="email" className="text-xs uppercase tracking-wider text-muted-foreground font-medium">Email Address</Label>
+                        <Label htmlFor="email" className="text-xs uppercase tracking-wider text-muted-foreground font-medium">
+                            Email Address
+                            <span className="text-destructive ml-1" aria-label="required">*</span>
+                        </Label>
                         <Input
                             id="email"
                             name="email"
@@ -81,17 +88,22 @@ function LoginForm() {
                             autoFocus
                             autoComplete="off"
                             required
+                            aria-required="true"
                             className="h-11 bg-background border focus:border-international-orange focus:ring-international-orange/20 transition-all font-medium"
                         />
                     </div>
                     <div className="space-y-2">
-                        <Label htmlFor="password" className="text-xs uppercase tracking-wider text-muted-foreground font-medium">Password</Label>
+                        <Label htmlFor="password" className="text-xs uppercase tracking-wider text-muted-foreground font-medium">
+                            Password
+                            <span className="text-destructive ml-1" aria-label="required">*</span>
+                        </Label>
                         <Input
                             id="password"
                             name="password"
                             type="password"
                             autoComplete="current-password"
                             required
+                            aria-required="true"
                             className="h-11 bg-background border focus:border-international-orange focus:ring-international-orange/20 transition-all font-medium font-mono tracking-widest"
                         />
                     </div>

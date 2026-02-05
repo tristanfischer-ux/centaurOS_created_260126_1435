@@ -36,8 +36,8 @@ async function loginAs(
   await page.fill('input[type="email"]', email)
   await page.fill('input[type="password"]', password)
   
-  // Submit form
-  await page.click('button[type="submit"]')
+  // Submit form - use button text since form doesn't have type="submit"
+  await page.click('button:has-text("Access Foundry")')
   
   // Wait for redirect to /today
   await page.waitForURL('**/today', { timeout: 30000 })
