@@ -5,7 +5,7 @@ import { useAutoRefresh } from "@/hooks/useAutoRefresh"
 import { useDebounce } from "@/hooks/useDebounce"
 import { RefreshButton } from "@/components/RefreshButton"
 import { SearchInput } from "@/components/ui/search-input"
-import { ChevronDown, ChevronRight, Target, CheckCircle2, Clock, AlertCircle, ArrowRight, Trash, MessageSquare, Paperclip, Loader2, Plus, FileText, Pencil } from "lucide-react"
+import { ChevronDown, ChevronRight, Target, CheckCircle2, Clock, AlertCircle, ArrowRight, Trash, MessageSquare, Paperclip, Loader2, Plus, FileText, Pencil, Lock } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
@@ -55,6 +55,8 @@ interface Objective {
     extended_description: string | null
     created_at: string | null
     tasks: Task[]
+    is_private?: boolean
+    creator_id?: string
 }
 
 interface ObjectivesListViewProps {
@@ -315,6 +317,9 @@ export function ObjectivesListView({ objectives, objectivesForDialog, members, t
                     open={!!objectiveToEdit}
                     onOpenChange={(open) => !open && setObjectiveToEdit(null)}
                     objective={objectiveToEdit}
+                    members={members}
+                    teams={teams}
+                    currentUserId={currentUserId}
                 />
             )}
 
@@ -411,6 +416,9 @@ export function ObjectivesListView({ objectives, objectivesForDialog, members, t
                                             }}
                                             className="font-semibold text-foreground hover:text-international-orange transition-colors text-left"
                                         >
+                                            {objective.is_private && (
+                                                <Lock className="h-4 w-4 text-status-warning shrink-0" title="Private objective" />
+                                            )}
                                             {objective.title}
                                         </button>
                                         {objective.extended_description && (

@@ -39,7 +39,7 @@ export default async function ObjectivesPage() {
     // Fetch objectives
     const { data: objectives, error } = await supabase
         .from('objectives')
-        .select('id, title, description, extended_description, status, progress, parent_objective_id, creator_id, foundry_id, created_at, updated_at')
+        .select('id, title, description, extended_description, status, progress, parent_objective_id, creator_id, foundry_id, created_at, updated_at, is_private')
         .eq('foundry_id', profile.foundry_id)
         .order('created_at', { ascending: false })
 
@@ -79,6 +79,7 @@ export default async function ObjectivesPage() {
             end_date,
             objective_id,
             foundry_id,
+            is_private,
             assignee:profiles!tasks_assignee_id_fkey(full_name, role),
             task_comments(id, is_system_log),
             task_files(id, file_name, file_size, created_at)

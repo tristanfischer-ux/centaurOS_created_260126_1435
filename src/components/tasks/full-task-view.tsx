@@ -33,7 +33,7 @@ import {
     PopoverTrigger,
 } from "@/components/ui/popover"
 import { Calendar as CalendarComponent } from "@/components/ui/calendar"
-import { addTaskComment, getTaskComments, getTaskAttachments, getTaskHistory, updateTaskDetails, updateTaskAssignees, updateTaskDates, updateTaskStatusAndRisk } from "@/actions/tasks"
+import { addTaskComment, getTaskComments, getTaskAttachments, getTaskHistory, updateTaskDetails, updateTaskAssignees, updateTaskDates, updateTaskStatusAndRisk, updateTaskPrivacy, getTaskShares } from "@/actions/tasks"
 import { uploadTaskAttachment } from "@/actions/attachments"
 import { toast } from "sonner"
 import { cn, getInitials } from "@/lib/utils"
@@ -52,8 +52,12 @@ import {
     Bot,
     Edit2,
     X,
-    Check
+    Check,
+    ChevronDown,
+    Lock,
+    Unlock,
 } from "lucide-react"
+import { PrivacyShareControl, PrivacyBadge, type ShareTarget } from "@/components/ui/privacy-share-control"
 import { Database } from "@/types/database.types"
 
 interface Member {
@@ -84,6 +88,8 @@ interface Task {
     assignees?: Assignee[]
     task_files?: { id: string }[]
     objective?: { id: string; title: string } | null
+    is_private?: boolean
+    creator_id?: string
 }
 
 interface Comment {
@@ -109,9 +115,10 @@ interface FullTaskViewProps {
     task: Task
     members: Member[]
     currentUserId: string
+    teams?: { id: string; name: string }[]
 }
 
-export function FullTaskView({ open, onOpenChange, task, members }: FullTaskViewProps) {
+export function FullTaskView({ open, onOpenChange, task, members, currentUserId, teams = [] }: FullTaskViewProps) {
     const [comments, setComments] = useState<Comment[]>([])
     const [history, setHistory] = useState<TaskHistoryItem[]>([])
     const [attachments, setAttachments] = useState<any[]>([])
@@ -120,8 +127,16 @@ export function FullTaskView({ open, onOpenChange, task, members }: FullTaskView
     const [isSending, setIsSending] = useState(false)
     const [isUploading, setIsUploading] = useState(false)
     const [isDragging, setIsDragging] = useState(false)
+    const [currentStatus, setCurrentStatus] = useState(task.status || "Pending")
+    const [isUpdatingStatus, setIsUpdatingStatus] = useState(false)
+    const [statusPopoverOpen, setStatusPopoverOpen] = useState(false)
     const fileInputRef = useRef<HTMLInputElement>(null)
     const supabase = useMemo(() => createClient(), [])
+
+    // Sync currentStatus when task prop changes
+    useEffect(() => {
+        setCurrentStatus(task.status || "Pending")
+    }, [task.status])
 
     // Editing state
     const [isEditing, setIsEditing] = useState(false)
@@ -139,6 +154,9 @@ export function FullTaskView({ open, onOpenChange, task, members }: FullTaskView
     const [editedAssigneeIds, setEditedAssigneeIds] = useState<string[]>(
         task.assignees?.map(a => a.id) || (task.assignee ? [task.assignee.id] : [])
     )
+    const [editedIsPrivate, setEditedIsPrivate] = useState(task.is_private || false)
+    const [editedSharedWith, setEditedSharedWith] = useState<ShareTarget[]>([])
+    const isTaskCreator = task.creator_id === currentUserId
 
     // Get assignees
     const assignees = task.assignees && task.assignees.length > 0
@@ -168,6 +186,14 @@ export function FullTaskView({ open, onOpenChange, task, members }: FullTaskView
             const historyRes = await getTaskHistory(task.id)
             if (historyRes.data && Array.isArray(historyRes.data)) {
                 setHistory(historyRes.data as TaskHistoryItem[])
+            }
+
+            // Fetch existing shares for privacy controls
+            if (task.is_private) {
+                const sharesRes = await getTaskShares(task.id)
+                if (sharesRes.data) {
+                    setEditedSharedWith(sharesRes.data.map(s => ({ type: s.type, id: s.id })))
+                }
             }
 
             setIsLoading(false)
@@ -307,6 +333,24 @@ export function FullTaskView({ open, onOpenChange, task, members }: FullTaskView
                 }
             }
 
+            // Update privacy settings (only creator can change)
+            if (isTaskCreator && editedIsPrivate !== task.is_private) {
+                const res = await updateTaskPrivacy(task.id, editedIsPrivate, editedSharedWith)
+                if (res.error) {
+                    toast.error(res.error)
+                    setIsSaving(false)
+                    return
+                }
+            } else if (isTaskCreator && editedIsPrivate) {
+                // Even if privacy didn't change, shares might have
+                const res = await updateTaskPrivacy(task.id, editedIsPrivate, editedSharedWith)
+                if (res.error) {
+                    toast.error(res.error)
+                    setIsSaving(false)
+                    return
+                }
+            }
+
             toast.success("Task updated successfully")
             setIsEditing(false)
             
@@ -329,6 +373,58 @@ export function FullTaskView({ open, onOpenChange, task, members }: FullTaskView
         setEditedAssigneeIds(task.assignees?.map(a => a.id) || (task.assignee ? [task.assignee.id] : []))
         setIsEditing(false)
     }
+
+    /**
+     * Quick status change without entering edit mode.
+     * Updates the task status directly and refreshes history.
+     */
+    const handleQuickStatusChange = async (newStatus: string): Promise<void> => {
+        if (newStatus === currentStatus) {
+            setStatusPopoverOpen(false)
+            return
+        }
+
+        setIsUpdatingStatus(true)
+        setStatusPopoverOpen(false)
+
+        try {
+            // Safe cast: newStatus comes from TASK_STATUSES which only has valid enum values
+            const { error } = await supabase
+                .from('tasks')
+                .update({ status: newStatus as Database['public']['Enums']['task_status'] })
+                .eq('id', task.id)
+
+            if (error) {
+                console.error('[FullTaskView] Failed to update status:', { taskId: task.id, error: error.message })
+                toast.error('Failed to update status')
+                return
+            }
+
+            setCurrentStatus(newStatus)
+            setEditedStatus(newStatus)
+            toast.success(`Status changed to ${newStatus.replace(/_/g, ' ')}`)
+
+            // Refresh history to show the status change
+            const historyRes = await getTaskHistory(task.id)
+            if (historyRes.data && Array.isArray(historyRes.data)) {
+                setHistory(historyRes.data as TaskHistoryItem[])
+            }
+        } catch (err) {
+            console.error('[FullTaskView] Unexpected error updating status:', err)
+            toast.error('Failed to update status')
+        } finally {
+            setIsUpdatingStatus(false)
+        }
+    }
+
+    const TASK_STATUSES = [
+        { value: 'Pending', label: 'Pending' },
+        { value: 'Accepted', label: 'Accepted' },
+        { value: 'Pending_Peer_Review', label: 'Peer Review' },
+        { value: 'Pending_Executive_Approval', label: 'Executive Approval' },
+        { value: 'Completed', label: 'Completed' },
+        { value: 'Rejected', label: 'Rejected' },
+    ] as const
 
     const getRiskBadge = (level: string | null) => {
         if (level === 'High') {
@@ -430,9 +526,52 @@ export function FullTaskView({ open, onOpenChange, task, members }: FullTaskView
                                         <span className="text-sm font-mono text-muted-foreground">
                                             #{task.task_number ?? '...'}
                                         </span>
-                                        <Badge className={`${getStatusColor(task.status).bar} text-white border-0`}>
-                                            {(task.status || 'Pending').replace(/_/g, ' ')}
-                                        </Badge>
+                                        {/* Clickable status badge for quick status changes */}
+                                        <Popover open={statusPopoverOpen} onOpenChange={setStatusPopoverOpen}>
+                                            <PopoverTrigger asChild>
+                                                <button
+                                                    type="button"
+                                                    disabled={isUpdatingStatus}
+                                                    className="group/status inline-flex items-center gap-1 cursor-pointer transition-opacity hover:opacity-80 disabled:opacity-50"
+                                                    aria-label={`Change status from ${currentStatus.replace(/_/g, ' ')}`}
+                                                >
+                                                    <Badge className={`${getStatusColor(currentStatus).bar} text-white border-0`}>
+                                                        {isUpdatingStatus ? (
+                                                            <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                                                        ) : null}
+                                                        {currentStatus.replace(/_/g, ' ')}
+                                                    </Badge>
+                                                    <ChevronDown className="h-3 w-3 text-muted-foreground opacity-0 group-hover/status:opacity-100 transition-opacity" />
+                                                </button>
+                                            </PopoverTrigger>
+                                            <PopoverContent className="w-[220px] p-1" align="start">
+                                                <div className="space-y-0.5">
+                                                    <p className="text-xs font-medium text-muted-foreground px-2 py-1.5">Change status</p>
+                                                    {TASK_STATUSES.map((status) => (
+                                                        <button
+                                                            key={status.value}
+                                                            type="button"
+                                                            onClick={() => handleQuickStatusChange(status.value)}
+                                                            className={cn(
+                                                                "flex items-center gap-2 w-full text-left px-2 py-2 rounded-md text-sm transition-colors",
+                                                                currentStatus === status.value
+                                                                    ? "bg-muted font-medium text-foreground"
+                                                                    : "text-foreground hover:bg-muted"
+                                                            )}
+                                                        >
+                                                            <div className={cn(
+                                                                "h-2 w-2 rounded-full shrink-0",
+                                                                getStatusColor(status.value).bar
+                                                            )} />
+                                                            {status.label}
+                                                            {currentStatus === status.value && (
+                                                                <Check className="h-3.5 w-3.5 ml-auto text-muted-foreground" />
+                                                            )}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            </PopoverContent>
+                                        </Popover>
                                         {getRiskBadge(task.risk_level)}
                                     </div>
                                     <DialogTitle className="text-2xl font-display font-semibold text-foreground tracking-tight">
@@ -610,9 +749,31 @@ export function FullTaskView({ open, onOpenChange, task, members }: FullTaskView
                                                     </PopoverContent>
                                                 </Popover>
                                             </div>
+                                            {/* Privacy & Sharing (only for task creator) */}
+                                            {isTaskCreator && (
+                                                <>
+                                                    <Separator className="my-2" />
+                                                    <PrivacyShareControl
+                                                        isPrivate={editedIsPrivate}
+                                                        onPrivateChange={setEditedIsPrivate}
+                                                        sharedWith={editedSharedWith}
+                                                        onSharedWithChange={setEditedSharedWith}
+                                                        members={members}
+                                                        teams={teams}
+                                                        currentUserId={currentUserId}
+                                                    />
+                                                </>
+                                            )}
                                         </>
                                     ) : (
                                         <>
+                                            {/* Privacy indicator (view mode) */}
+                                            {task.is_private && (
+                                                <div className="flex items-center gap-2 text-sm mb-2">
+                                                    <Lock className="h-4 w-4 text-status-warning" />
+                                                    <span className="text-status-warning-dark font-medium">Private</span>
+                                                </div>
+                                            )}
                                             <div className="flex items-center gap-2 text-sm">
                                                 <Calendar className="h-4 w-4 text-muted-foreground" />
                                                 <span className="text-muted-foreground">Start:</span>

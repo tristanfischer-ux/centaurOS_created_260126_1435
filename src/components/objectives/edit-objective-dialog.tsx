@@ -8,13 +8,16 @@ import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { Loader2 } from "lucide-react"
 import { toast } from "sonner"
-import { updateObjective } from "@/actions/objectives"
+import { updateObjective, updateObjectivePrivacy, getObjectiveShares } from "@/actions/objectives"
+import { PrivacyShareControl, type ShareTarget } from "@/components/ui/privacy-share-control"
 
 interface Objective {
     id: string
     title: string
     description: string | null
     extended_description: string | null
+    is_private?: boolean
+    creator_id?: string
 }
 
 interface EditObjectiveDialogProps {
@@ -24,6 +27,12 @@ interface EditObjectiveDialogProps {
     onOpenChange: (open: boolean) => void
     /** The objective to edit */
     objective: Objective
+    /** Available members for sharing */
+    members?: { id: string; full_name: string; role: string }[]
+    /** Available teams for sharing */
+    teams?: { id: string; name: string }[]
+    /** Current user ID */
+    currentUserId?: string
 }
 
 /**
@@ -41,11 +50,14 @@ interface EditObjectiveDialogProps {
  *   objective={selectedObjective}
  * />
  */
-export function EditObjectiveDialog({ open, onOpenChange, objective }: EditObjectiveDialogProps) {
+export function EditObjectiveDialog({ open, onOpenChange, objective, members = [], teams = [], currentUserId = '' }: EditObjectiveDialogProps) {
     const [isLoading, setIsLoading] = useState(false)
     const [title, setTitle] = useState(objective.title)
     const [description, setDescription] = useState(objective.description || "")
     const [extendedDescription, setExtendedDescription] = useState(objective.extended_description || "")
+    const [isPrivate, setIsPrivate] = useState(objective.is_private || false)
+    const [sharedWith, setSharedWith] = useState<ShareTarget[]>([])
+    const isCreator = objective.creator_id === currentUserId
 
     // Reset form when dialog opens or objective changes
     useEffect(() => {
@@ -53,6 +65,17 @@ export function EditObjectiveDialog({ open, onOpenChange, objective }: EditObjec
             setTitle(objective.title)
             setDescription(objective.description || "")
             setExtendedDescription(objective.extended_description || "")
+            setIsPrivate(objective.is_private || false)
+            // Load existing shares
+            if (objective.is_private) {
+                getObjectiveShares(objective.id).then(res => {
+                    if (res.data) {
+                        setSharedWith(res.data.map(s => ({ type: s.type, id: s.id })))
+                    }
+                })
+            } else {
+                setSharedWith([])
+            }
         }
     }, [open, objective])
 
@@ -75,6 +98,14 @@ export function EditObjectiveDialog({ open, onOpenChange, objective }: EditObjec
             if (result.error) {
                 toast.error(result.error)
             } else {
+                // Update privacy if creator
+                if (isCreator) {
+                    const privResult = await updateObjectivePrivacy(objective.id, isPrivate, sharedWith)
+                    if (privResult.error) {
+                        console.error('[EditObjectiveDialog] Failed to update privacy:', privResult.error)
+                        // Don't block - main update succeeded
+                    }
+                }
                 toast.success("Objective updated")
                 onOpenChange(false)
             }
@@ -148,6 +179,19 @@ export function EditObjectiveDialog({ open, onOpenChange, objective }: EditObjec
                             Use this for detailed context that helps team members understand the full scope.
                         </p>
                     </div>
+
+                    {/* Privacy & Sharing (only for objective creator) */}
+                    {isCreator && members.length > 0 && (
+                        <PrivacyShareControl
+                            isPrivate={isPrivate}
+                            onPrivateChange={setIsPrivate}
+                            sharedWith={sharedWith}
+                            onSharedWithChange={setSharedWith}
+                            members={members}
+                            teams={teams}
+                            currentUserId={currentUserId}
+                        />
+                    )}
                 </div>
 
                 <DialogFooter className="flex-shrink-0 gap-2 pt-4 border-t">

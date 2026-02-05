@@ -48,10 +48,11 @@ import {
     DialogTrigger,
 } from "@/components/ui/dialog"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { ScrollArea } from "@/components/ui/scroll-area"
 import { EmptyState } from "@/components/ui/empty-state"
 import { Markdown } from "@/components/ui/markdown"
 import { cn } from "@/lib/utils"
+import { PrivacyShareControl, type ShareTarget } from "@/components/ui/privacy-share-control"
+import { createClient } from "@/lib/supabase/client"
 
 type CreationMode = 'manual' | 'pack' | 'import'
 
@@ -100,6 +101,13 @@ export function CreateObjectiveDialog({ children }: CreateObjectiveDialogProps) 
     const [packSearchQuery, setPackSearchQuery] = useState('')
     const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
 
+    // Privacy & Sharing
+    const [isPrivate, setIsPrivate] = useState(false)
+    const [sharedWith, setSharedWith] = useState<ShareTarget[]>([])
+    const [dialogMembers, setDialogMembers] = useState<{ id: string; full_name: string; role: string }[]>([])
+    const [dialogTeams, setDialogTeams] = useState<{ id: string; name: string }[]>([])
+    const [currentUserId, setCurrentUserId] = useState('')
+
     // Import Data
     const [isAnalyzing, setIsAnalyzing] = useState(false)
     const [analyzedObjectives, setAnalyzedObjectives] = useState<AnalyzedObjective[]>([])
@@ -128,10 +136,30 @@ export function CreateObjectiveDialog({ children }: CreateObjectiveDialogProps) 
 
     const loadPacksCallback = useCallback(loadPacks, [])
 
-    // Load packs on open
+    // Load members and teams for sharing
+    const loadMembersAndTeams = useCallback(async () => {
+        const supabase = createClient()
+        const { data: { user } } = await supabase.auth.getUser()
+        if (user) setCurrentUserId(user.id)
+
+        const { data: profiles } = await supabase
+            .from('profiles')
+            .select('id, full_name, role')
+
+        if (profiles) setDialogMembers(profiles)
+
+        const { data: teams } = await supabase
+            .from('teams')
+            .select('id, name')
+
+        if (teams) setDialogTeams(teams)
+    }, [])
+
+    // Load packs + members/teams on open
     useEffect(() => {
         if (open) {
             loadPacksCallback()
+            loadMembersAndTeams()
         } else {
             // Reset state on close
             setTimeout(() => {
@@ -148,9 +176,11 @@ export function CreateObjectiveDialog({ children }: CreateObjectiveDialogProps) 
                 setPackSearchQuery('')
                 setSelectedCategory(null)
                 setShowAdvanced(false)
+                setIsPrivate(false)
+                setSharedWith([])
             }, 300)
         }
-    }, [open, loadPacksCallback])
+    }, [open, loadPacksCallback, loadMembersAndTeams])
 
     const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0]
@@ -263,6 +293,10 @@ export function CreateObjectiveDialog({ children }: CreateObjectiveDialogProps) 
         formData.append('title', title)
         formData.append('description', description)
         formData.append('extendedDescription', extendedDescription)
+        formData.append('is_private', String(isPrivate))
+        if (isPrivate && sharedWith.length > 0) {
+            formData.append('share_with', JSON.stringify(sharedWith))
+        }
 
         // Add special handling for Packs
         if (mode === 'pack' && selectedPack) {
@@ -381,8 +415,8 @@ export function CreateObjectiveDialog({ children }: CreateObjectiveDialogProps) 
                     </div>
                 </div>
 
-                {/* Main Content Area */}
-                <ScrollArea className="flex-1 bg-background">
+                {/* Main Content Area - min-h-0 enables flex child to shrink and scroll */}
+                <div className="flex-1 min-h-0 overflow-y-auto bg-background">
                     <div className="p-6">
 
                         {/* MANUAL MODE */}
@@ -500,6 +534,17 @@ export function CreateObjectiveDialog({ children }: CreateObjectiveDialogProps) 
                                         </div>
                                     </div>
                                 )}
+
+                                {/* Privacy & Sharing */}
+                                <PrivacyShareControl
+                                    isPrivate={isPrivate}
+                                    onPrivateChange={setIsPrivate}
+                                    sharedWith={sharedWith}
+                                    onSharedWithChange={setSharedWith}
+                                    members={dialogMembers}
+                                    teams={dialogTeams}
+                                    currentUserId={currentUserId}
+                                />
                             </div>
                         )}
 
@@ -812,7 +857,22 @@ export function CreateObjectiveDialog({ children }: CreateObjectiveDialogProps) 
                         )}
 
                     </div>
-                </ScrollArea>
+                </div>
+
+                {/* Privacy toggle for pack/import modes (manual mode has it inline) */}
+                {mode !== 'manual' && (
+                    <div className="px-6 pb-2">
+                        <PrivacyShareControl
+                            isPrivate={isPrivate}
+                            onPrivateChange={setIsPrivate}
+                            sharedWith={sharedWith}
+                            onSharedWithChange={setSharedWith}
+                            members={dialogMembers}
+                            teams={dialogTeams}
+                            currentUserId={currentUserId}
+                        />
+                    </div>
+                )}
 
                 {/* Footer Actions */}
                 <DialogFooter className="p-6 pt-4 bg-muted/50">

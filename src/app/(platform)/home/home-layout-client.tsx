@@ -11,6 +11,7 @@ import { ArrowLeft, Users, CheckSquare, MessageSquare, PanelLeftOpen, LayoutDash
 import { updateUserPreferences } from '@/lib/preferences/service'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
+import { startDirectMessage } from '@/actions/messaging'
 import type { Database } from '@/types/database.types'
 import type { UserPreferences } from '@/types/preferences'
 import { PeopleList } from '@/components/inbox/people-list'
@@ -692,7 +693,7 @@ export function HomeLayoutClient({
 }
 
 /**
- * Direct conversation view
+ * Direct conversation view - finds or creates a DM conversation via server action
  */
 function DirectConversationView({
   personId,
@@ -711,61 +712,55 @@ function DirectConversationView({
 }) {
   const [conversationId, setConversationId] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
-  const supabase = createClient()
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
   
   useEffect(() => {
-    async function fetchOrCreateConversation() {
+    let cancelled = false
+    
+    async function fetchOrCreateConversation(): Promise<void> {
       setIsLoading(true)
+      setErrorMessage(null)
       
       try {
-        const { data: existing } = await supabase
-          .from('conversations')
-          .select('id')
-          .eq('conversation_type', 'direct')
-          .or(`and(buyer_id.eq.${currentUserId},seller_id.eq.${personId}),and(buyer_id.eq.${personId},seller_id.eq.${currentUserId})`)
-          .maybeSingle()
+        // Use the server action which properly handles finding or creating
+        // a direct conversation with correct RLS, participant management,
+        // and the service layer's fallback checks
+        const result = await startDirectMessage(personId)
         
-        if (existing) {
-          setConversationId(existing.id)
-        } else {
-          const { data: newConv, error } = await supabase
-            .from('conversations')
-            .insert({
-              buyer_id: currentUserId,
-              seller_id: personId,
-              conversation_type: 'direct',
-              status: 'active'
-            })
-            .select('id')
-            .single()
-          
-          if (error) {
-            console.error('Error creating conversation:', error)
-            toast.error('Failed to create conversation')
-            return
-          }
-          
-          if (newConv) {
-            await supabase
-              .from('conversation_participants')
-              .insert([
-                { conversation_id: newConv.id, profile_id: currentUserId },
-                { conversation_id: newConv.id, profile_id: personId }
-              ])
-            
-            setConversationId(newConv.id)
-          }
+        if (cancelled) return
+        
+        if (!result.success || !result.data) {
+          const errMsg = result.error || 'Failed to load conversation'
+          console.error('[DirectConversationView] startDirectMessage failed:', {
+            personId,
+            error: errMsg,
+          })
+          setErrorMessage(errMsg)
+          toast.error(errMsg)
+          return
         }
+        
+        setConversationId(result.data.id)
       } catch (error) {
-        console.error('Error fetching/creating conversation:', error)
+        if (cancelled) return
+        const errMsg = error instanceof Error ? error.message : 'Failed to load conversation'
+        console.error('[DirectConversationView] Unexpected error:', {
+          personId,
+          error: errMsg,
+        })
+        setErrorMessage(errMsg)
         toast.error('Failed to load conversation')
       } finally {
-        setIsLoading(false)
+        if (!cancelled) {
+          setIsLoading(false)
+        }
       }
     }
     
     fetchOrCreateConversation()
-  }, [personId, currentUserId, supabase])
+    
+    return () => { cancelled = true }
+  }, [personId])
   
   if (isLoading) {
     return (
@@ -783,7 +778,31 @@ function DirectConversationView({
       <div className="flex-1 flex items-center justify-center">
         <div className="text-center">
           <MessageSquare className="h-16 w-16 text-muted-foreground/50 mx-auto mb-4" />
-          <p className="text-sm text-muted-foreground">Failed to load conversation</p>
+          <p className="text-sm text-muted-foreground">
+            {errorMessage || 'Failed to load conversation'}
+          </p>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="mt-3"
+            onClick={() => {
+              setIsLoading(true)
+              setErrorMessage(null)
+              startDirectMessage(personId).then(result => {
+                if (result.success && result.data) {
+                  setConversationId(result.data.id)
+                } else {
+                  setErrorMessage(result.error || 'Failed to load conversation')
+                }
+              }).catch(() => {
+                setErrorMessage('Failed to load conversation')
+              }).finally(() => {
+                setIsLoading(false)
+              })
+            }}
+          >
+            Try again
+          </Button>
         </div>
       </div>
     )

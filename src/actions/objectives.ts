@@ -24,6 +24,8 @@ export async function createObjective(formData: FormData) {
     const description = formData.get('description') as string
     const extendedDescription = formData.get('extendedDescription') as string
     const playbookId = formData.get('playbookId') as string
+    const isPrivate = formData.get('is_private') === 'true'
+    const shareWithJson = formData.get('share_with') as string
 
     // Get selected tasks (handle multiple values with same name)
     const selectedTaskIds = formData.getAll('selectedTaskIds') as string[]
@@ -54,7 +56,8 @@ export async function createObjective(formData: FormData) {
                 description: validatedDescription || null,
                 extended_description: extendedDescription?.trim() || null,
                 creator_id: user.id,
-                foundry_id
+                foundry_id,
+                is_private: isPrivate,
             }).select().single()
             if (res.error) throw res.error
             return res.data
@@ -65,6 +68,27 @@ export async function createObjective(formData: FormData) {
     }
 
     if (!objective) return { error: 'Failed to create objective' }
+
+    // Insert share records for private objectives
+    if (isPrivate && shareWithJson) {
+        try {
+            const shareTargets = JSON.parse(shareWithJson) as { type: string; id: string }[]
+            const shareRecords = shareTargets.map(target => ({
+                objective_id: objective.id,
+                shared_with_user_id: target.type === 'user' ? target.id : null,
+                shared_with_team_id: target.type === 'team' ? target.id : null,
+                shared_by: user.id,
+            }))
+            if (shareRecords.length > 0) {
+                const { error: shareError } = await supabase.from('objective_shares').insert(shareRecords)
+                if (shareError) {
+                    console.error('[ObjectiveService] Failed to create objective shares:', shareError)
+                }
+            }
+        } catch (error) {
+            console.error('[ObjectiveService] Failed to parse share targets:', error)
+        }
+    }
 
     // 3. Create Tasks
     let tasksToInsert: Database['public']['Tables']['tasks']['Insert'][] = []
@@ -623,4 +647,107 @@ export async function createObjectiveFromSubsystem(input: {
         console.error('[CreateSubsystemObjective] Unexpected error:', error)
         return { error: error instanceof Error ? error.message : 'Failed to create objective' }
     }
+}
+
+/**
+ * Updates the privacy setting and share targets for an objective.
+ *
+ * @param objectiveId - The objective to update
+ * @param isPrivate - Whether the objective should be private
+ * @param shareTargets - Array of { type: 'user'|'team', id: string }
+ *
+ * @security Only the objective creator can change privacy settings
+ */
+export async function updateObjectivePrivacy(
+    objectiveId: string,
+    isPrivate: boolean,
+    shareTargets: { type: string; id: string }[]
+): Promise<{ error?: string }> {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return { error: 'Unauthorized' }
+
+    // AUTH: Verify user is the objective creator
+    const { data: objective, error: fetchError } = await supabase
+        .from('objectives')
+        .select('id, creator_id')
+        .eq('id', objectiveId)
+        .single()
+
+    if (fetchError || !objective) return { error: 'Objective not found' }
+    if (objective.creator_id !== user.id) return { error: 'Only the objective creator can change privacy settings' }
+
+    // Update is_private flag
+    const { error: updateError } = await supabase
+        .from('objectives')
+        .update({ is_private: isPrivate })
+        .eq('id', objectiveId)
+
+    if (updateError) return { error: 'Failed to update privacy setting' }
+
+    // Replace all shares: delete existing, insert new
+    const { error: deleteError } = await supabase
+        .from('objective_shares')
+        .delete()
+        .eq('objective_id', objectiveId)
+
+    if (deleteError) {
+        console.error('[ObjectiveService] Failed to clear objective shares:', deleteError)
+    }
+
+    if (isPrivate && shareTargets.length > 0) {
+        const shareRecords = shareTargets.map(target => ({
+            objective_id: objectiveId,
+            shared_with_user_id: target.type === 'user' ? target.id : null,
+            shared_with_team_id: target.type === 'team' ? target.id : null,
+            shared_by: user.id,
+        }))
+        const { error: shareError } = await supabase.from('objective_shares').insert(shareRecords)
+        if (shareError) {
+            console.error('[ObjectiveService] Failed to create objective shares:', shareError)
+            return { error: 'Privacy updated but failed to save share settings' }
+        }
+    }
+
+    revalidatePath('/objectives')
+    return {}
+}
+
+/**
+ * Gets share targets for an objective.
+ *
+ * @param objectiveId - The objective to get shares for
+ * @returns Array of share targets with names for display
+ */
+export async function getObjectiveShares(objectiveId: string): Promise<{
+    data: { type: 'user' | 'team'; id: string; name: string }[]
+    error?: string
+}> {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return { data: [], error: 'Unauthorized' }
+
+    const { data: shares, error } = await supabase
+        .from('objective_shares')
+        .select(`
+            shared_with_user_id,
+            shared_with_team_id,
+            user:profiles!shared_with_user_id(id, full_name),
+            team:teams!shared_with_team_id(id, name)
+        `)
+        .eq('objective_id', objectiveId)
+
+    if (error) return { data: [], error: 'Failed to fetch shares' }
+
+    const targets = (shares || []).map(s => {
+        if (s.shared_with_user_id && s.user) {
+            return { type: 'user' as const, id: s.shared_with_user_id, name: (s.user as { full_name: string }).full_name || 'Unknown' }
+        }
+        if (s.shared_with_team_id && s.team) {
+            return { type: 'team' as const, id: s.shared_with_team_id, name: (s.team as { name: string }).name || 'Unknown' }
+        }
+        return null
+    }).filter(Boolean) as { type: 'user' | 'team'; id: string; name: string }[]
+
+    return { data: targets }
 }

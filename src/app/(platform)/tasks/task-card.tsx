@@ -8,7 +8,7 @@ import { Separator } from "@/components/ui/separator"
 import { UserAvatar, UserAvatarStack, getRoleColors } from "@/components/ui/user-avatar"
 import { Markdown } from "@/components/ui/markdown"
 import { format } from "date-fns"
-import { Calendar as CalendarIcon, Check, Bot, ChevronDown, ChevronUp, ShieldAlert, Eye, EyeOff, ShieldCheck, Paperclip, Plus, CheckCircle2, XCircle, Clock, MessageSquare, Trash2 } from "lucide-react"
+import { Calendar as CalendarIcon, Check, Bot, ChevronDown, ChevronUp, ShieldAlert, Eye, EyeOff, ShieldCheck, Paperclip, Plus, CheckCircle2, XCircle, Clock, MessageSquare, Trash2, Lock } from "lucide-react"
 import { Calendar } from "@/components/ui/calendar"
 import {
     Popover,
@@ -301,7 +301,10 @@ export const TaskCard = memo(function TaskCard(props: TaskCardProps) {
                                 {task.objective.title}
                             </div>
                         )}
-                        <h3 className="font-display font-semibold text-lg text-foreground leading-tight group-hover/card:text-electric-blue transition-colors duration-200 tracking-tight">
+                        <h3 className="font-display font-semibold text-lg text-foreground leading-tight group-hover/card:text-electric-blue transition-colors duration-200 tracking-tight flex items-center gap-2">
+                            {task.is_private && (
+                                <Lock className="h-4 w-4 text-status-warning shrink-0" title="Private task" />
+                            )}
                             {task.title}
                         </h3>
 

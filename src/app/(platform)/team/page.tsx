@@ -26,7 +26,7 @@ export default async function TeamPage() {
     // Fetch all tasks for task metrics
     const { data: tasks } = await supabase
         .from('tasks')
-        .select('assignee_id, status, title, end_date, created_at')
+        .select('id, assignee_id, status, title, end_date, created_at')
         .eq('foundry_id', foundry_id)
 
     // Fetch all profiles for the current foundry
@@ -77,6 +77,7 @@ export default async function TeamPage() {
 
     // Security: Removed email and phone_number from member metrics to prevent data exposure
     interface TaskDetail {
+        id: string
         title: string
         end_date: string | null
         created_at: string
@@ -137,11 +138,13 @@ export default async function TeamPage() {
             },
             taskDetails: {
                 active: activeTasks.map(t => ({
+                    id: t.id,
                     title: t.title,
                     end_date: t.end_date,
                     created_at: t.created_at
                 })),
                 pending: pendingTasks.map(t => ({
+                    id: t.id,
                     title: t.title,
                     end_date: t.end_date,
                     created_at: t.created_at

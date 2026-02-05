@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react"
 import { Button } from "@/components/ui/button"
-import { Plus, Loader2, Upload, X, FileIcon, Check, ChevronsUpDown, ChevronDown, ChevronUp } from "lucide-react"
+import { Plus, Loader2, Upload, X, FileIcon, Check, ChevronDown, ChevronUp, Target, Search } from "lucide-react"
 import {
     Dialog,
     DialogContent,
@@ -15,26 +15,6 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from "@/components/ui/select"
-import {
-    Popover,
-    PopoverContent,
-    PopoverTrigger,
-} from "@/components/ui/popover"
-import {
-    Command,
-    CommandEmpty,
-    CommandGroup,
-    CommandInput,
-    CommandItem,
-    CommandList,
-} from "@/components/ui/command"
 import { MultiSelect } from "@/components/ui/multi-select"
 import { createTask } from "@/actions/tasks"
 import { toast } from "sonner"
@@ -42,6 +22,7 @@ import { addDays } from "date-fns"
 import { cn } from "@/lib/utils"
 import { DatePickerWithShortcuts } from "@/components/ui/date-picker-with-shortcuts"
 import { UserAvatar } from "@/components/ui/user-avatar"
+import { PrivacyShareControl, type ShareTarget } from "@/components/ui/privacy-share-control"
 
 interface CreateTaskDialogProps {
     objectives: { id: string; title: string }[]
@@ -66,13 +47,14 @@ export function CreateTaskDialog({ objectives, members, teams = [], currentUserI
     const [open, setOpen] = useState(false)
     const [isLoading, setIsLoading] = useState(false)
     const [showAdvanced, setShowAdvanced] = useState(false)
-    // Default deadline to 7 days from now (can be cleared)
+    // Default start date to today, deadline to 7 days from now (both clearable)
+    const [startDate, setStartDate] = useState<Date | undefined>(() => new Date())
     const [date, setDate] = useState<Date | undefined>(() => addDays(new Date(), 7))
     // Default assignee to current user
     const [selectedAssignees, setSelectedAssignees] = useState<string[]>([currentUserId])
     // Default objective if provided
     const [selectedObjective, setSelectedObjective] = useState<string>(defaultObjectiveId || "")
-    const [objectiveOpen, setObjectiveOpen] = useState(false)
+    const [objectiveSearch, setObjectiveSearch] = useState("")
     const [files, setFiles] = useState<File[]>([])
     const [isDragging, setIsDragging] = useState(false)
     const [titleError, setTitleError] = useState<string | null>(null)
@@ -81,6 +63,8 @@ export function CreateTaskDialog({ objectives, members, teams = [], currentUserI
     const [objectiveError, setObjectiveError] = useState<string | null>(null)
     const [submitError, setSubmitError] = useState<string | null>(null)
     const [description, setDescription] = useState("")
+    const [isPrivate, setIsPrivate] = useState(false)
+    const [sharedWith, setSharedWith] = useState<ShareTarget[]>([])
 
     // Form Refs for manual value setting
     const titleObjRef = useRef<HTMLInputElement>(null)
@@ -103,16 +87,20 @@ export function CreateTaskDialog({ objectives, members, teams = [], currentUserI
             // Reset state after dialog close animation
             setTimeout(() => {
                 // Reset to smart defaults
+                setStartDate(new Date())
                 setDate(addDays(new Date(), 7))
                 setSelectedAssignees([currentUserId])
                 setSelectedObjective(defaultObjectiveId || "")
                 setFiles([])
                 setShowAdvanced(false)
                 setDescription('')
+                setIsPrivate(false)
+                setSharedWith([])
                 if (titleObjRef.current) titleObjRef.current.value = ''
             }, 300)
         } else {
             // When opening, set smart defaults
+            setStartDate(new Date())
             setDate(addDays(new Date(), 7))
             setSelectedAssignees([currentUserId])
             setSelectedObjective(defaultObjectiveId || "")
@@ -166,6 +154,11 @@ export function CreateTaskDialog({ objectives, members, teams = [], currentUserI
 
         const formData = new FormData(form)
 
+        // Append start date if selected
+        if (startDate) {
+            formData.append('start_date', startDate.toISOString())
+        }
+
         // Append deadline if selected
         if (date) {
             formData.append('end_date', date.toISOString())
@@ -176,6 +169,12 @@ export function CreateTaskDialog({ objectives, members, teams = [], currentUserI
             formData.set('assignee_id', selectedAssignees[0])
             // Also send full list for multi-assignee
             formData.set('assignee_ids', JSON.stringify(selectedAssignees))
+        }
+
+        // Append privacy settings
+        formData.set('is_private', String(isPrivate))
+        if (isPrivate && sharedWith.length > 0) {
+            formData.set('share_with', JSON.stringify(sharedWith))
         }
 
         // Append files
@@ -194,6 +193,7 @@ export function CreateTaskDialog({ objectives, members, teams = [], currentUserI
                 toast.success("Task created")
                 setOpen(false)
                 // Reset state
+                setStartDate(undefined)
                 setDate(undefined)
                 setSelectedAssignees([])
                 setFiles([])
@@ -398,65 +398,98 @@ export function CreateTaskDialog({ objectives, members, teams = [], currentUserI
                             )}
                         </div>
 
-                        {/* Objective */}
+                        {/* Objective - Visible scrollable list */}
                         <div className="grid gap-2">
-                            <Label htmlFor="objective">
+                            <Label htmlFor="objective-search">
                                 Objective <span className="text-destructive ml-1" aria-label="required">*</span>
                             </Label>
-                            <div aria-describedby={objectiveError ? "objective-error" : undefined}>
-                                <Popover open={objectiveOpen} onOpenChange={setObjectiveOpen}>
-                                    <PopoverTrigger asChild>
-                                        <Button
-                                            variant="secondary"
-                                            role="combobox"
-                                            aria-expanded={objectiveOpen}
-                                            aria-invalid={!!objectiveError}
-                                            disabled={!hasObjectives}
-                                            className={cn(
-                                                "w-full justify-between bg-background border-slate-200",
-                                                objectiveError && "border-destructive"
-                                            )}
-                                            id="objective"
-                                        >
-                                            {!hasObjectives
-                                                ? "No objectives available"
-                                                : selectedObjective
-                                                ? objectives.find((o) => o.id === selectedObjective)?.title
-                                                : "Select objective..."}
-                                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                                        </Button>
-                                    </PopoverTrigger>
-                                    <PopoverContent className="w-full p-0" align="start">
-                                        <Command>
-                                            <CommandInput placeholder="Search objectives..." />
-                                            <CommandList>
-                                                <CommandEmpty>No objective found.</CommandEmpty>
-                                                <CommandGroup>
-                                                    {objectives.map((obj) => (
-                                                        <CommandItem
-                                                            key={obj.id}
-                                                            value={obj.title}
-                                                            onSelect={() => {
-                                                                setSelectedObjective(obj.id)
-                                                                setObjectiveError(null)
-                                                                setObjectiveOpen(false)
-                                                            }}
-                                                        >
-                                                            <Check
-                                                                className={cn(
-                                                                    "mr-2 h-4 w-4",
-                                                                    selectedObjective === obj.id ? "opacity-100" : "opacity-0"
-                                                                )}
-                                                            />
+
+                            {!hasObjectives ? (
+                                <p className="text-sm text-destructive py-2">
+                                    No objectives available. Create an objective first.
+                                </p>
+                            ) : (
+                                <div
+                                    className={cn(
+                                        "rounded-lg border",
+                                        objectiveError && "border-destructive"
+                                    )}
+                                    aria-describedby={objectiveError ? "objective-error" : undefined}
+                                >
+                                    {/* Search - only show when 4+ objectives */}
+                                    {objectives.length >= 4 && (
+                                        <div className="relative border-b">
+                                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                                            <Input
+                                                id="objective-search"
+                                                placeholder="Search objectives..."
+                                                value={objectiveSearch}
+                                                onChange={(e) => setObjectiveSearch(e.target.value)}
+                                                className="border-0 pl-9 h-9 rounded-b-none focus-visible:ring-0 focus-visible:ring-offset-0"
+                                            />
+                                        </div>
+                                    )}
+
+                                    {/* Scrollable objective list */}
+                                    <div className="max-h-[180px] overflow-y-auto" role="listbox" aria-label="Select an objective">
+                                        {(() => {
+                                            const filtered = objectives.filter(obj =>
+                                                !objectiveSearch ||
+                                                obj.title.toLowerCase().includes(objectiveSearch.toLowerCase())
+                                            )
+
+                                            if (filtered.length === 0) {
+                                                return (
+                                                    <p className="text-sm text-muted-foreground text-center py-4">
+                                                        No objectives match your search.
+                                                    </p>
+                                                )
+                                            }
+
+                                            return filtered.map((obj) => {
+                                                const isSelected = selectedObjective === obj.id
+                                                return (
+                                                    <button
+                                                        key={obj.id}
+                                                        type="button"
+                                                        role="option"
+                                                        aria-selected={isSelected}
+                                                        onClick={() => {
+                                                            setSelectedObjective(obj.id)
+                                                            setObjectiveError(null)
+                                                        }}
+                                                        className={cn(
+                                                            "w-full flex items-center gap-3 px-3 py-2.5 text-left text-sm transition-colors",
+                                                            "hover:bg-muted/50",
+                                                            isSelected && "bg-international-orange/5"
+                                                        )}
+                                                    >
+                                                        <div className={cn(
+                                                            "flex items-center justify-center shrink-0 h-5 w-5 rounded-full border-2 transition-colors",
+                                                            isSelected
+                                                                ? "border-international-orange bg-international-orange"
+                                                                : "border-muted-foreground/30"
+                                                        )}>
+                                                            {isSelected && <Check className="h-3 w-3 text-white" />}
+                                                        </div>
+                                                        <Target className={cn(
+                                                            "h-3.5 w-3.5 shrink-0",
+                                                            isSelected ? "text-international-orange" : "text-muted-foreground"
+                                                        )} />
+                                                        <span className={cn(
+                                                            "truncate",
+                                                            isSelected ? "font-medium text-foreground" : "text-foreground"
+                                                        )}>
                                                             {obj.title}
-                                                        </CommandItem>
-                                                    ))}
-                                                </CommandGroup>
-                                            </CommandList>
-                                        </Command>
-                                    </PopoverContent>
-                                </Popover>
-                            </div>
+                                                        </span>
+                                                    </button>
+                                                )
+                                            })
+                                        })()}
+                                    </div>
+                                </div>
+                            )}
+
                             {objectiveError && (
                                 <p id="objective-error" className="text-sm text-destructive mt-1" role="alert">
                                     {objectiveError}
@@ -511,14 +544,24 @@ export function CreateTaskDialog({ objectives, members, teams = [], currentUserI
                                     <p className="text-xs text-muted-foreground text-right">{description.length}/500</p>
                                 </div>
 
-                                {/* Deadline */}
-                                <div className="grid gap-2">
-                                    <Label>Deadline (Optional)</Label>
-                                    <DatePickerWithShortcuts
-                                        date={date}
-                                        onDateChange={setDate}
-                                        placeholder="Pick a date"
-                                    />
+                                {/* Dates - Start & Due side by side */}
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    <div className="grid gap-2">
+                                        <Label>Start Date (Optional)</Label>
+                                        <DatePickerWithShortcuts
+                                            date={startDate}
+                                            onDateChange={setStartDate}
+                                            placeholder="Start date"
+                                        />
+                                    </div>
+                                    <div className="grid gap-2">
+                                        <Label>Due Date (Optional)</Label>
+                                        <DatePickerWithShortcuts
+                                            date={date}
+                                            onDateChange={setDate}
+                                            placeholder="Due date"
+                                        />
+                                    </div>
                                 </div>
 
                                 {/* File Attachments */}
@@ -588,6 +631,17 @@ export function CreateTaskDialog({ objectives, members, teams = [], currentUserI
                                         </div>
                                     )}
                                 </div>
+
+                                {/* Privacy & Sharing */}
+                                <PrivacyShareControl
+                                    isPrivate={isPrivate}
+                                    onPrivateChange={setIsPrivate}
+                                    sharedWith={sharedWith}
+                                    onSharedWithChange={setSharedWith}
+                                    members={members}
+                                    teams={teams}
+                                    currentUserId={currentUserId}
+                                />
                             </>
                         )}
                         {submitError && (

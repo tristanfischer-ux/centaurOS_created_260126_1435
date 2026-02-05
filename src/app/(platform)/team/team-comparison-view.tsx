@@ -48,10 +48,13 @@ import { TeamComparisonBar } from "@/components/team/team-comparison-bar"
 import { TeamComparisonModal } from "@/components/team/team-comparison-modal"
 import { TeamMemberCard, CardSize } from "@/components/team/team-member-card"
 import { TeamAnalytics } from "@/components/team/team-analytics"
+import { FullTaskView } from "@/components/tasks/full-task-view"
+import { createClient } from "@/lib/supabase/client"
 import { cn } from "@/lib/utils"
 
 
 interface TaskDetail {
+    id: string
     title: string
     end_date: string | null
     created_at: string
@@ -129,6 +132,11 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
     const [memberToDelete, setMemberToDelete] = useState<string | null>(null)
     const [newName, setNewName] = useState("")
 
+    // Task modal state
+    const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null)
+    const [fullTaskData, setFullTaskData] = useState<any>(null)
+    const [isLoadingTask, setIsLoadingTask] = useState(false)
+
     // Presence tracking for remote team visibility
     const { getPresenceForUser, teamPresence } = usePresenceContext()
 
@@ -157,6 +165,36 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
         setTeamError(null)
         setShowQuickTeamDialog(true)
     }
+
+    // Task click handler - fetches full task data and opens the modal
+    const handleTaskClick = useCallback(async (taskId: string) => {
+        setSelectedTaskId(taskId)
+        setIsLoadingTask(true)
+        
+        try {
+            const supabase = createClient()
+            const { data, error } = await supabase
+                .from('tasks')
+                .select('*')
+                .eq('id', taskId)
+                .single()
+            
+            if (error) {
+                console.error('[TeamView] Failed to fetch task:', { taskId, error: error.message })
+                toast.error('Failed to load task')
+                setSelectedTaskId(null)
+                return
+            }
+            
+            setFullTaskData(data)
+        } catch (err) {
+            console.error('[TeamView] Unexpected error fetching task:', err)
+            toast.error('Failed to load task')
+            setSelectedTaskId(null)
+        } finally {
+            setIsLoadingTask(false)
+        }
+    }, [])
 
     // Helper: calculate bandwidth from task counts
     // Uses same formula as routing-agent.ts: workloadScore = (active * 20) + (pending * 10)
@@ -644,15 +682,26 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                             <div className="space-y-2">
                                 <h4 className="text-sm font-medium text-foreground">Current Tasks</h4>
                                 <div className="space-y-2">
-                                    {activeTaskDetails.slice(0, 3).map((task, idx) => {
+                                    {activeTaskDetails.slice(0, 3).map((task) => {
                                         const isOverdue = task.end_date ? isPast(parseISO(task.end_date)) : false
                                         const hasDeadline = !!task.end_date
                                         
                                         return (
-                                            <div key={idx} className={cn(
-                                                "flex flex-col gap-1 text-xs p-2 rounded border",
-                                                isOverdue ? "bg-destructive/10 border-destructive" : "bg-muted border-muted"
-                                            )}>
+                                            <button
+                                                key={task.id}
+                                                type="button"
+                                                onClick={(e) => {
+                                                    e.preventDefault()
+                                                    e.stopPropagation()
+                                                    handleTaskClick(task.id)
+                                                }}
+                                                className={cn(
+                                                    "flex flex-col gap-1 text-xs p-2 rounded border w-full text-left transition-colors",
+                                                    isOverdue 
+                                                        ? "bg-destructive/10 border-destructive hover:bg-destructive/20" 
+                                                        : "bg-muted border-muted hover:bg-muted/80 hover:border-muted-foreground/20"
+                                                )}
+                                            >
                                                 <div className="flex items-start justify-between gap-2">
                                                     <span className="truncate text-foreground font-medium flex-1">{task.title}</span>
                                                     {hasDeadline && (
@@ -680,7 +729,7 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                                                         </span>
                                                     </div>
                                                 )}
-                                            </div>
+                                            </button>
                                         )
                                     })}
                                     {activeTaskDetails.length > 3 && (
@@ -1036,6 +1085,7 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                                     onViewProfile={setSelectedMemberId}
                                     onMessage={handleMessage}
                                     onAddToTeam={handleAddToTeam}
+                                    onTaskClick={handleTaskClick}
                                     presenceStatus={getPresenceForUser(member.id)?.status as 'online' | 'away' | 'busy' | 'offline' || 'offline'}
                                     presence={getPresenceForUser(member.id)}
                                 />
@@ -1084,6 +1134,7 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                                 onViewProfile={setSelectedMemberId}
                                 onMessage={handleMessage}
                                 onAddToTeam={handleAddToTeam}
+                                onTaskClick={handleTaskClick}
                                 presenceStatus={getPresenceForUser(member.id)?.status as 'online' | 'away' | 'busy' | 'offline' || 'offline'}
                                 presence={getPresenceForUser(member.id)}
                             />
@@ -1152,6 +1203,7 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                                 onViewProfile={setSelectedMemberId}
                                 onMessage={handleMessage}
                                 onAddToTeam={handleAddToTeam}
+                                onTaskClick={handleTaskClick}
                                 presenceStatus={getPresenceForUser(member.id)?.status as 'online' | 'away' | 'busy' | 'offline' || 'offline'}
                                 presence={getPresenceForUser(member.id)}
                             />
@@ -1230,6 +1282,7 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                                     size={cardSizes[member.id] || 'medium'}
                                     onSizeChange={handleCardSizeChange}
                                     onViewProfile={setSelectedMemberId}
+                                    onTaskClick={handleTaskClick}
                                     presenceStatus="online"
                                 />
                             ))}
@@ -1610,6 +1663,27 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                 memberId={selectedMemberId || ''}
                 currentUserId={currentUserId}
             />
+
+            {/* Task Modal */}
+            {fullTaskData && (
+                <FullTaskView
+                    open={!!selectedTaskId && !!fullTaskData}
+                    onOpenChange={(open) => {
+                        if (!open) {
+                            setSelectedTaskId(null)
+                            setFullTaskData(null)
+                        }
+                    }}
+                    task={fullTaskData}
+                    members={allMembers.map(m => ({
+                        id: m.id,
+                        full_name: m.full_name || '',
+                        email: m.email || '',
+                        role: m.role,
+                    }))}
+                    currentUserId={currentUserId}
+                />
+            )}
 
         </div>
     )

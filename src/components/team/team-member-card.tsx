@@ -16,6 +16,7 @@ import { PresenceIndicator } from "@/components/PresenceIndicator"
 export type CardSize = 'small' | 'medium' | 'full'
 
 interface TaskDetail {
+    id: string
     title: string
     end_date: string | null
     created_at: string
@@ -55,6 +56,7 @@ interface TeamMemberCardProps {
     onViewProfile?: (id: string) => void
     onMessage?: (id: string) => void
     onAddToTeam?: (id: string) => void
+    onTaskClick?: (taskId: string) => void
     presenceStatus?: 'online' | 'away' | 'busy' | 'offline'
     presence?: { status: string; last_seen?: string } | null
 }
@@ -156,6 +158,7 @@ export const TeamMemberCard = memo(function TeamMemberCard({
     onViewProfile,
     onMessage,
     onAddToTeam,
+    onTaskClick,
     presenceStatus = 'offline',
     presence,
 }: TeamMemberCardProps) {
@@ -582,15 +585,25 @@ export const TeamMemberCard = memo(function TeamMemberCard({
                                     Current Tasks
                                 </p>
                                 <div className="space-y-2">
-                                    {activeTaskDetails.slice(0, 3).map((task, idx) => {
+                                    {activeTaskDetails.slice(0, 3).map((task) => {
                                         const isOverdue = task.end_date ? isPast(parseISO(task.end_date)) : false
                                         const hasDeadline = !!task.end_date
                                         
                                         return (
-                                            <div key={idx} className={cn(
-                                                "flex items-center justify-between text-xs p-2 rounded border",
-                                                isOverdue ? "bg-destructive/10 border-destructive/30" : "bg-muted border-muted"
-                                            )}>
+                                            <button
+                                                key={task.id}
+                                                type="button"
+                                                onClick={(e) => {
+                                                    e.stopPropagation()
+                                                    onTaskClick?.(task.id)
+                                                }}
+                                                className={cn(
+                                                    "flex items-center justify-between text-xs p-2 rounded border w-full text-left transition-colors",
+                                                    isOverdue 
+                                                        ? "bg-destructive/10 border-destructive/30 hover:bg-destructive/20" 
+                                                        : "bg-muted border-muted hover:bg-muted/80 hover:border-muted-foreground/20"
+                                                )}
+                                            >
                                                 <span className="truncate text-foreground font-medium flex-1 mr-2">{task.title}</span>
                                                 {hasDeadline && (
                                                     <span className={cn(
@@ -603,7 +616,7 @@ export const TeamMemberCard = memo(function TeamMemberCard({
                                                         </span>
                                                     </span>
                                                 )}
-                                            </div>
+                                            </button>
                                         )
                                     })}
                                     {activeTaskDetails.length > 3 && (
