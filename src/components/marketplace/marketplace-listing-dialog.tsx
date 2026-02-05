@@ -198,11 +198,11 @@ export function MarketplaceListingDialog({
 
                 <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'overview' | 'details')} className="mt-4">
                     <TabsList className="grid w-full grid-cols-2">
-                        <TabsTrigger value="overview" className="gap-2" onClick={(e) => e.stopPropagation()}>
+                        <TabsTrigger value="overview" className="gap-2">
                             <Info className="h-4 w-4" />
                             Overview
                         </TabsTrigger>
-                        <TabsTrigger value="details" className="gap-2" onClick={(e) => e.stopPropagation()}>
+                        <TabsTrigger value="details" className="gap-2">
                             <CheckCircle2 className="h-4 w-4" />
                             Details
                         </TabsTrigger>
