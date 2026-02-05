@@ -75,7 +75,7 @@ export default async function HomePage() {
   ] = await Promise.all([
     // Existing inbox data
     fetchMembersWithConversationData(supabase, user.id, foundryId),
-    fetchTasksWithMessageCounts(supabase, foundryId),
+    fetchTasksWithMessageCounts(supabase, foundryId, user.id),
     fetchObjectives(supabase, foundryId),
     getOrCreateUserPreferences(supabase, user.id, foundryId),
     
@@ -348,7 +348,8 @@ async function fetchMembersWithConversationData(
  */
 async function fetchTasksWithMessageCounts(
   supabase: Awaited<ReturnType<typeof createClient>>,
-  foundryId: string
+  foundryId: string,
+  currentUserId: string
 ): Promise<TaskWithContext[]> {
   const { data: tasks, error: tasksError } = await supabase
     .from('tasks')
@@ -376,13 +377,42 @@ async function fetchTasksWithMessageCounts(
     return []
   }
   
-  // For each task, count unread messages
+  // For each task, count genuinely unread messages (not from current user, not yet read)
   const tasksWithCounts = await Promise.all(
     tasks.map(async (task) => {
-      const { count } = await supabase
+      // Find the task conversation
+      const { data: conv } = await supabase
+        .from('conversations')
+        .select('id')
+        .eq('conversation_type', 'task')
+        .eq('task_id', task.id)
+        .maybeSingle()
+      
+      if (!conv) {
+        return { ...task, unread_message_count: 0 }
+      }
+      
+      // Get participant's last_read_at
+      const { data: participant } = await supabase
+        .from('conversation_participants')
+        .select('last_read_at')
+        .eq('conversation_id', conv.id)
+        .eq('profile_id', currentUserId)
+        .maybeSingle()
+      
+      // Count unread messages from other users
+      let query = supabase
         .from('messages')
         .select('*', { count: 'exact', head: true })
-        .eq('task_id', task.id)
+        .eq('conversation_id', conv.id)
+        .neq('sender_id', currentUserId)
+      
+      // If we have a last_read_at, only count messages newer than that
+      if (participant?.last_read_at) {
+        query = query.gt('created_at', participant.last_read_at)
+      }
+      
+      const { count } = await query
       
       return {
         ...task,

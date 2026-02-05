@@ -82,7 +82,7 @@ export const ProviderTrustSection = memo(function ProviderTrustSection({
             <div className={cn('flex items-center gap-3 flex-wrap', className)}>
                 {/* Verified Partner */}
                 {isVerifiedPartner && (
-                    <Badge variant="secondary" className="bg-violet-50 text-violet-700 border-violet-200">
+                    <Badge variant="secondary" className="bg-status-info-light text-status-info-dark border-status-info-light">
                         <Shield className="w-3 h-3 mr-1" />
                         Verified
                     </Badge>
@@ -90,7 +90,7 @@ export const ProviderTrustSection = memo(function ProviderTrustSection({
 
                 {/* New Provider or Rating */}
                 {ratingSummary?.isNewProvider ? (
-                    <Badge variant="secondary" className="bg-violet-50 text-violet-700 border-violet-200">
+                    <Badge variant="secondary" className="bg-status-info-light text-status-info-dark border-status-info-light">
                         <Sparkles className="w-3 h-3 mr-1" />
                         New
                     </Badge>
@@ -127,7 +127,7 @@ export const ProviderTrustSection = memo(function ProviderTrustSection({
                 <div className="flex items-center justify-between">
                     <CardTitle className="text-lg">Trust & Credentials</CardTitle>
                     {isVerifiedPartner && (
-                        <Badge variant="secondary" className="bg-violet-50 text-violet-700 border-violet-200">
+                        <Badge variant="secondary" className="bg-status-info-light text-status-info-dark border-status-info-light">
                             <Shield className="w-3 h-3 mr-1" />
                             Verified Partner
                         </Badge>
@@ -157,7 +157,7 @@ export const ProviderTrustSection = memo(function ProviderTrustSection({
                             <div className="text-center p-3 rounded-lg bg-muted/50">
                                 {ratingSummary?.isNewProvider ? (
                                     <>
-                                        <Sparkles className="w-6 h-6 mx-auto mb-1 text-violet-600" />
+                                        <Sparkles className="w-6 h-6 mx-auto mb-1 text-status-info-dark" />
                                         <p className="text-sm font-medium">New</p>
                                     </>
                                 ) : ratingSummary?.averageRating ? (
@@ -404,11 +404,11 @@ export const ProviderTrustInline = memo(function ProviderTrustInline({
     return (
         <div className={cn('flex items-center gap-2 flex-wrap', className)}>
             {hasVerifiedBadge && (
-                <Shield className="w-4 h-4 text-violet-600" />
+                <Shield className="w-4 h-4 text-status-info-dark" />
             )}
             
             {ratingSummary?.isNewProvider ? (
-                <Badge variant="secondary" className="bg-violet-50 text-violet-700 border-violet-200 text-xs">
+                <Badge variant="secondary" className="bg-status-info-light text-status-info-dark border-status-info-light text-xs">
                     <Sparkles className="w-3 h-3 mr-1" />
                     New
                 </Badge>

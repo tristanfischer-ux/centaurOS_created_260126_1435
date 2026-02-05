@@ -361,7 +361,7 @@ function MemberHeader({ member }: { member: TeamMemberForComparison }) {
         <div className="flex items-start gap-3">
             <div className="relative flex-shrink-0">
                 {isAI ? (
-                    <Avatar className="h-12 w-12 border-2 border-muted">
+                    <Avatar className="h-12 w-12">
                         <AvatarFallback className="bg-muted text-muted-foreground font-bold">
                             <Brain className="h-5 w-5" />
                         </AvatarFallback>
@@ -371,7 +371,6 @@ function MemberHeader({ member }: { member: TeamMemberForComparison }) {
                         name={member.full_name} 
                         role={member.role}
                         size="lg"
-                        className="border-2 border-muted"
                     />
                 )}
                 {isCentaur && (
@@ -468,7 +467,7 @@ function MemberComparisonCard({
             <div className="flex items-start gap-3 mb-4">
                 <div className="relative flex-shrink-0">
                     {isAI ? (
-                        <Avatar className="h-12 w-12 border-2 border-muted">
+                        <Avatar className="h-12 w-12">
                             <AvatarFallback className="bg-muted text-muted-foreground font-bold">
                                 <Brain className="h-5 w-5" />
                             </AvatarFallback>
@@ -478,7 +477,6 @@ function MemberComparisonCard({
                             name={member.full_name} 
                             role={member.role}
                             size="lg"
-                            className="border-2 border-muted"
                         />
                     )}
                     {isCentaur && (

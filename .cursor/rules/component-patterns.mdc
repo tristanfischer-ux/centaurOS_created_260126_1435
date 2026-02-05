@@ -434,12 +434,14 @@ import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert'
 
 **CRITICAL: Always use UserAvatar for internal users**
 
+**DESIGN STANDARD: Avatars must be clean circles without borders or rings.** The bordered avatar style has been removed from the design system for visual consistency.
+
 ### Use UserAvatar for All Internal Users
 
 ```tsx
 import { UserAvatar, UserAvatarStack } from '@/components/ui/user-avatar'
 
-// ✅ CORRECT - Automatic role-based colors
+// ✅ CORRECT - Clean circle with role-based colors
 <UserAvatar name="Jane Smith" role="Founder" size="md" />
 <UserAvatar name="AI Assistant" role="AI_Agent" size="sm" />
 
@@ -450,6 +452,9 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar'
     JS
   </AvatarFallback>
 </Avatar>
+
+// ❌ WRONG - Attempting to add borders (showBorder prop removed)
+<UserAvatar name="John Doe" role="Executive" showBorder />  // Error: prop doesn't exist
 ```
 
 ### Role-Based Color System (Automatic)
@@ -493,7 +498,7 @@ Only use `Avatar` (not `UserAvatar`) for:
 ### Avatar Stacks (Multiple Users)
 
 ```tsx
-// ✅ CORRECT - Stack with overflow indicator
+// ✅ CORRECT - Stack with overflow indicator (no borders needed)
 <UserAvatarStack 
   users={assignees.map(a => ({
     id: a.id,
@@ -510,6 +515,8 @@ Only use `Avatar` (not `UserAvatar`) for:
   {assignees.map(a => <Avatar key={a.id}>...</Avatar>)}
 </div>
 ```
+
+**Note:** Stacked avatars use `-space-x-2` for overlap and work perfectly without borders. The clean circle design maintains clarity even when overlapping.
 
 ### Common Violations
 
@@ -547,6 +554,7 @@ Before committing any component usage:
 - [ ] Badges use semantic variants (not custom colors)
 - [ ] StatusBadge used for all status indicators
 - [ ] **User avatars use UserAvatar component (not direct Avatar)**
+- [ ] **Avatars are clean circles without borders or rings** - no `showBorder` prop
 - [ ] **No hardcoded avatar backgrounds (bg-muted, bg-slate-*, bg-foundry-*)**
 - [ ] **Database queries include `role` field for avatar coloring**
 - [ ] Buttons use semantic variants and include loading states

@@ -10,11 +10,8 @@ import { UserAvatar } from '@/components/ui/user-avatar'
 import { MessageBubble, DateSeparator } from './MessageBubble'
 import { CommandInput } from './CommandInput'
 import { ThreadPanel } from './ThreadPanel'
-import { ContextSelector } from '@/components/inbox/context-selector'
 import { useConversation } from '@/hooks/useConversation'
 import { useMessagingShortcuts } from '@/hooks/useMessagingShortcuts'
-import { sendMessageWithContext } from '@/lib/messaging/service'
-import { createClient } from '@/lib/supabase/client'
 import type { MessageWithSender } from '@/lib/messaging/service'
 import { 
   Send, 
@@ -26,9 +23,8 @@ import {
   WifiOff,
   ChevronUp,
   ExternalLink,
-  Target,
   CheckSquare,
-  X
+  Target
 } from 'lucide-react'
 import Link from 'next/link'
 import { Badge } from '@/components/ui/badge'
@@ -178,33 +174,12 @@ export function ConversationThread({
   const [threadPanelOpen, setThreadPanelOpen] = useState(false)
   const [replyCounts, setReplyCounts] = useState<Record<string, number>>({})
   const [hoveredMessageId, setHoveredMessageId] = useState<string | null>(null)
-  // Context linking state
-  const [currentContext, setCurrentContext] = useState<{ taskId?: string; objectiveId?: string } | null>(null)
-  const [recentContexts, setRecentContexts] = useState<Array<{ taskId?: string; objectiveId?: string }>>([])
   const scrollRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   
   // Use enhanced input when foundryId is available
   const useEnhancedInput = enableCommands && !!foundryId
-  
-  // Show context selector when tasks or objectives are available
-  const showContextSelector = tasks.length > 0 || objectives.length > 0
-  
-  // Handle context change
-  const handleContextChange = useCallback((context: { taskId?: string; objectiveId?: string } | null) => {
-    setCurrentContext(context)
-    
-    // Track recent contexts (max 5)
-    if (context) {
-      setRecentContexts(prev => {
-        const filtered = prev.filter(c => 
-          c.taskId !== context.taskId || c.objectiveId !== context.objectiveId
-        )
-        return [context, ...filtered].slice(0, 5)
-      })
-    }
-  }, [])
   
   // Wire up messaging shortcuts
   useMessagingShortcuts({
@@ -305,23 +280,9 @@ export function ConversationThread({
     setInputValue('')
 
     try {
-      // Use context-aware send if context is selected
-      if (currentContext?.taskId || currentContext?.objectiveId) {
-        const supabase = createClient()
-        await sendMessageWithContext(supabase, {
-          conversationId,
-          senderId: currentUserId,
-          content,
-          taskId: currentContext.taskId,
-          objectiveId: currentContext.objectiveId,
-          messageType: 'text'
-        })
-        // Message will appear via real-time subscription
-      } else {
-        const success = await sendMessage(content)
-        if (!success) {
-          setInputValue(content) // Restore input on failure
-        }
+      const success = await sendMessage(content)
+      if (!success) {
+        setInputValue(content) // Restore input on failure
       }
     } catch (error) {
       console.error('[ConversationThread] Send failed:', error)
@@ -331,7 +292,7 @@ export function ConversationThread({
       setIsSending(false)
       inputRef.current?.focus()
     }
-  }, [inputValue, isSending, conversationId, sendMessage, currentContext, currentUserId])
+  }, [inputValue, isSending, conversationId, sendMessage])
 
   // Handle archive/unarchive
   const handleArchive = async () => {
@@ -589,64 +550,6 @@ export function ConversationThread({
         </div>
       </ScrollArea>
 
-      {/* Compact Context Indicator - above input area */}
-      {showContextSelector && (
-        <div className="px-4 py-2 border-t border-border bg-muted/20 flex-shrink-0">
-          <div className="flex items-center gap-2">
-            {currentContext ? (
-              // Show selected context as a chip with clear button
-              <>
-                <div className="flex items-center gap-2 flex-1 min-w-0">
-                  <span className="text-xs text-muted-foreground">Linked to:</span>
-                  {currentContext.taskId && (
-                    <Badge 
-                      variant="secondary" 
-                      className="text-xs gap-1 bg-international-orange-light text-international-orange-dark border border-international-orange/30"
-                    >
-                      <CheckSquare className="w-3 h-3" />
-                      <span className="truncate max-w-[200px]">
-                        #{tasks.find(t => t.id === currentContext.taskId)?.task_number || '??'}: {tasks.find(t => t.id === currentContext.taskId)?.title || 'Task'}
-                      </span>
-                    </Badge>
-                  )}
-                  {currentContext.objectiveId && (
-                    <Badge 
-                      variant="secondary" 
-                      className="text-xs gap-1 bg-electric-blue-light text-electric-blue border border-electric-blue/30"
-                    >
-                      <Target className="w-3 h-3" />
-                      <span className="truncate max-w-[200px]">
-                        {objectives.find(o => o.id === currentContext.objectiveId)?.title || 'Objective'}
-                      </span>
-                    </Badge>
-                  )}
-                </div>
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
-                  className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                  onClick={() => handleContextChange(null)}
-                  aria-label="Clear context link"
-                >
-                  <X className="w-4 h-4" />
-                </Button>
-              </>
-            ) : (
-              // Show compact selector when no context
-              <div className="w-full">
-                <ContextSelector
-                  tasks={tasks}
-                  objectives={objectives}
-                  currentContext={currentContext}
-                  onContextChange={handleContextChange}
-                  recentContexts={recentContexts}
-                />
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
       {/* Input area */}
       {useEnhancedInput ? (
         <CommandInput
@@ -691,13 +594,7 @@ export function ConversationThread({
               ref={inputRef}
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
-              placeholder={
-                currentContext?.taskId 
-                  ? `Message linked to task...` 
-                  : currentContext?.objectiveId 
-                  ? `Message linked to objective...` 
-                  : 'Type a message...'
-              }
+              placeholder="Type a message..."
               disabled={isSending}
               className="flex-1"
               autoComplete="off"

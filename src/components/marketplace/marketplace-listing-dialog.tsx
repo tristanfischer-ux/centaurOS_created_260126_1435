@@ -49,6 +49,7 @@ import {
 } from '@/components/ui/dialog'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { cn } from '@/lib/utils'
+import { getCategoryBadgeClasses, type MarketplaceCategory } from '@/lib/marketplace-colors'
 import Link from 'next/link'
 
 /**
@@ -74,14 +75,6 @@ interface MarketplaceListingDialogProps {
     open?: boolean
     /** Controlled mode: callback when open state changes */
     onOpenChange?: (open: boolean) => void
-}
-
-// Badge styles matching the category color scheme
-const categoryBadgeStyles: Record<string, string> = {
-    'People': 'bg-orange-100 text-orange-700',
-    'Products': 'bg-slate-100 text-slate-700',
-    'Services': 'bg-blue-100 text-blue-700',
-    'AI': 'bg-violet-50 text-violet-700'
 }
 
 // Get icon for category
@@ -173,7 +166,7 @@ export function MarketplaceListingDialog({
                             variant="secondary"
                             className={cn(
                                 "uppercase text-[10px] tracking-wider font-semibold border-0",
-                                categoryBadgeStyles[category]
+                                getCategoryBadgeClasses(category as MarketplaceCategory)
                             )}
                         >
                             {listing.subcategory}
@@ -211,7 +204,7 @@ export function MarketplaceListingDialog({
                     {/* OVERVIEW TAB */}
                     <TabsContent value="overview" className="mt-4 space-y-4">
                         {/* About section */}
-                        <Card className="bg-blue-50/50 border-blue-100">
+                        <Card className="bg-muted/50 border-muted">
                             <CardContent className="pt-6">
                                 <h3 className="font-semibold text-foreground mb-2 flex items-center gap-2">
                                     <CategoryIcon className="h-4 w-4 text-electric-blue" />

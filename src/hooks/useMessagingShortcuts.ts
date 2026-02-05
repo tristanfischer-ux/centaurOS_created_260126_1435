@@ -10,6 +10,10 @@ export interface MessagingShortcutHandlers {
   onSearch?: () => void
   onGoToMessages?: () => void
   
+  // Unread navigation
+  onJumpToUnread?: () => void
+  onJumpToNextUnread?: () => void
+  
   // Message actions
   onEditLastMessage?: () => void
   onReplyInThread?: () => void
@@ -191,10 +195,21 @@ export function useMessagingShortcuts(handlers: MessagingShortcutHandlers = {}) 
           return
         }
 
-        // U - Mark unread
+        // U - Jump to first unread message (or mark unread if no jump handler)
         if (e.key.toLowerCase() === 'u' && !isMod && !isShift) {
           e.preventDefault()
-          h.onMarkUnread?.()
+          if (h.onJumpToUnread) {
+            h.onJumpToUnread()
+          } else {
+            h.onMarkUnread?.()
+          }
+          return
+        }
+
+        // N - Jump to next unread message
+        if (e.key.toLowerCase() === 'n' && !isMod && !isShift) {
+          e.preventDefault()
+          h.onJumpToNextUnread?.()
           return
         }
 

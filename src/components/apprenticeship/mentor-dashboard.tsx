@@ -184,7 +184,6 @@ export function MentorDashboard({ mentees }: MentorDashboardProps) {
                       avatarUrl={mentee.apprentice.avatar_url}
                       role="Apprentice"
                       size="xl"
-                      showBorder
                     />
                     <div>
                       <CardTitle className="text-lg">{mentee.apprentice.full_name}</CardTitle>

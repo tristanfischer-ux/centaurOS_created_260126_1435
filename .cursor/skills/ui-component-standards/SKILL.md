@@ -671,6 +671,7 @@ This automatically checks for color violations. If it fails, fix all issues befo
 ### Components
 - [ ] **CRITICAL: No Sheet/side panels** - Use Dialog instead
 - [ ] **User avatars use `UserAvatar` component (not direct `Avatar`)**
+- [ ] **Avatars are clean circles without borders or rings** - no `showBorder` prop, no `ring-2`, no `border-2`
 - [ ] **No hardcoded avatar backgrounds (`bg-muted`, `bg-slate-*`, `bg-foundry-*`)**
 - [ ] **Database queries include `role` field for avatar coloring**
 - [ ] Status indicators use `StatusBadge` (not Badge with colors)

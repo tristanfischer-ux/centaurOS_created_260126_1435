@@ -44,8 +44,7 @@ export const TeamCard = memo(function TeamCard({
                                 key={member.id} 
                                 name={member.full_name} 
                                 role={member.role} 
-                                size="md" 
-                                showBorder
+                                size="md"
                                 style={{ zIndex: 3 - i }}
                             />
                         ))}
@@ -98,14 +97,12 @@ export const TeamCard = memo(function TeamCard({
                                     name={member.full_name}
                                     role={member.role}
                                     size="md"
-                                    showBorder
-                                    className="shadow-sm"
                                     style={{ zIndex: displayMembers.length - i }}
                                 />
                             ))}
                             {remainingCount > 0 && (
                                 <div
-                                    className="h-8 w-8 rounded-full bg-muted border-2 border-background flex items-center justify-center text-xs font-medium text-muted-foreground"
+                                    className="h-8 w-8 rounded-full bg-muted flex items-center justify-center text-xs font-medium text-muted-foreground"
                                     style={{ zIndex: 0 }}
                                 >
                                     +{remainingCount}

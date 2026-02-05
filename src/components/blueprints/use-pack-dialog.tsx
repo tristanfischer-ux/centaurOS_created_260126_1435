@@ -16,6 +16,10 @@ import {
   ChevronDown,
   ChevronUp,
   Info,
+  User,
+  Users,
+  Bot,
+  CircleDashed,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -45,12 +49,21 @@ import { Markdown } from '@/components/ui/markdown'
 import { cn } from '@/lib/utils'
 import Link from 'next/link'
 
+interface TeamMember {
+  id: string
+  full_name: string
+  role: string
+  email: string
+  avatar_url?: string | null
+}
+
 interface UsePackDialogProps {
   pack: ObjectivePack
   trigger?: React.ReactNode
+  members?: TeamMember[]
 }
 
-export function UsePackDialog({ pack, trigger }: UsePackDialogProps) {
+export function UsePackDialog({ pack, trigger, members = [] }: UsePackDialogProps) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [isCreating, setIsCreating] = useState(false)
@@ -327,14 +340,42 @@ export function UsePackDialog({ pack, trigger }: UsePackDialogProps) {
                                     setTaskAssignees(prev => ({ ...prev, [item.id]: value }))
                                   }}
                                 >
-                                  <SelectTrigger className="w-[140px] h-8 text-xs">
+                                  <SelectTrigger className="w-[160px] h-8 text-xs">
                                     <SelectValue />
                                   </SelectTrigger>
-                                  <SelectContent className="min-w-[140px]">
-                                    <SelectItem value="unassigned">Unassigned</SelectItem>
-                                    <SelectItem value="you">You (Founder)</SelectItem>
-                                    <SelectItem value="team">Team Member</SelectItem>
-                                    <SelectItem value="agent">AI Agent</SelectItem>
+                                  <SelectContent className="min-w-[200px]">
+                                    <SelectItem value="unassigned" className="py-2.5">
+                                      <div className="flex items-center gap-2">
+                                        <div className="h-6 w-6 rounded-full bg-muted flex items-center justify-center shrink-0">
+                                          <CircleDashed className="h-3.5 w-3.5 text-muted-foreground" />
+                                        </div>
+                                        <span>Unassigned</span>
+                                      </div>
+                                    </SelectItem>
+                                    {members.map((member) => (
+                                      <SelectItem key={member.id} value={member.id} className="py-2.5">
+                                        <div className="flex items-center gap-2">
+                                          <UserAvatar
+                                            name={member.full_name}
+                                            role={member.role}
+                                            avatarUrl={member.avatar_url}
+                                            size="sm"
+                                          />
+                                          <div className="flex flex-col">
+                                            <span className="text-sm font-medium">{member.full_name}</span>
+                                            <span className="text-xs text-muted-foreground">{member.role}</span>
+                                          </div>
+                                        </div>
+                                      </SelectItem>
+                                    ))}
+                                    <SelectItem value="agent" className="py-2.5">
+                                      <div className="flex items-center gap-2">
+                                        <div className="h-6 w-6 rounded-full bg-purple-100 flex items-center justify-center shrink-0">
+                                          <Bot className="h-3.5 w-3.5 text-purple-600" />
+                                        </div>
+                                        <span>AI Agent</span>
+                                      </div>
+                                    </SelectItem>
                                   </SelectContent>
                                 </Select>
                                 {item.description && (

@@ -296,6 +296,7 @@ export async function markAsRead(
 ): Promise<number> {
   const now = new Date().toISOString()
   
+  // Mark individual messages as read
   const { data, error } = await supabase
     .from('messages')
     .update({ 
@@ -309,6 +310,18 @@ export async function markAsRead(
 
   if (error) {
     throw new Error(`Failed to mark messages as read: ${error.message}`)
+  }
+
+  // Also update last_read_at on the participant record
+  // This is critical for unread count calculations
+  const { error: participantError } = await supabase
+    .from('conversation_participants')
+    .update({ last_read_at: now })
+    .eq('conversation_id', conversationId)
+    .eq('profile_id', userId)
+
+  if (participantError) {
+    console.error('[markAsRead] Failed to update last_read_at:', participantError.message)
   }
 
   return data?.length || 0

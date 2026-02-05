@@ -282,7 +282,7 @@ function DomainCard({
   if (size === 'small') {
     return (
       <Card 
-        className="hover:shadow-sm transition-shadow cursor-pointer hover:border-purple-500/50"
+        className="hover:shadow-sm transition-shadow cursor-pointer hover:border-chart-5/50"
         onClick={handleCardClick}
       >
         <CardContent className="p-3">
@@ -321,7 +321,7 @@ function DomainCard({
   if (size === 'medium') {
     return (
       <Card 
-        className="flex flex-col hover:shadow-md transition-shadow cursor-pointer hover:border-purple-500/50"
+        className="flex flex-col hover:shadow-md transition-shadow cursor-pointer hover:border-chart-5/50"
         onClick={handleCardClick}
       >
         <CardHeader className="pb-3">
@@ -376,7 +376,7 @@ function DomainCard({
             
             <Button 
               size="sm" 
-              className="h-8 text-xs shadow-sm bg-purple-600 hover:bg-purple-700"
+              className="h-8 text-xs shadow-sm bg-chart-5 hover:bg-chart-5/90"
               onClick={(e) => {
                 e.stopPropagation()
                 // Expand to full on View click
@@ -697,7 +697,7 @@ function IndustryDetailView({
   return (
     <div>
       {/* Back button and header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-slate-100">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-muted">
         <div className="min-w-0 flex-1">
           <Button
             variant="ghost"
@@ -930,7 +930,7 @@ function IndustryPacksView({
   return (
     <div>
       {/* Back button and header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-slate-100">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-muted">
         <div className="min-w-0 flex-1">
           <Button
             variant="ghost"
@@ -944,8 +944,8 @@ function IndustryPacksView({
           <div className={typography.pageHeader}>
             <div className={typography.pageHeaderAccent} />
             <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-purple-100">
-                <IndustryIcon className="h-6 w-6 text-purple-600" />
+              <div className="p-2 rounded-lg bg-chart-5/20">
+                <IndustryIcon className="h-6 w-6 text-chart-5" />
               </div>
               <h1 className={typography.h1}>
                 {selectedIndustry.name}
@@ -1173,7 +1173,7 @@ function PackCard({ pack, size = 'medium', onSizeChange, isSaved = false, onSave
                 className={cn(
                   "w-8 h-8 rounded-full flex items-center justify-center transition-all duration-200",
                   localSavedState
-                    ? "bg-red-500 text-white shadow-md"
+                    ? "bg-destructive text-white shadow-md"
                     : isHovered
                       ? "bg-background text-muted-foreground shadow-md border opacity-100"
                       : "opacity-0 group-hover:opacity-100"
@@ -1266,7 +1266,7 @@ function PackCard({ pack, size = 'medium', onSizeChange, isSaved = false, onSave
           className={cn(
             "w-8 h-8 rounded-full flex items-center justify-center transition-all duration-200",
             localSavedState
-              ? "bg-red-500 text-white shadow-md"
+              ? "bg-destructive text-white shadow-md"
               : isHovered
                 ? "bg-background text-muted-foreground shadow-md border opacity-100"
                 : "opacity-0 group-hover:opacity-100"
@@ -1580,7 +1580,7 @@ export function InspirationView({ templates = [], packs = [], initialSavedPackId
   return (
     <div>
       {/* Page header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-slate-100">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-muted">
         <div className="min-w-0 flex-1">
           <div className={typography.pageHeader}>
             <div className={typography.pageHeaderAccent} />
@@ -1603,23 +1603,23 @@ export function InspirationView({ templates = [], packs = [], initialSavedPackId
           className={cn(
             "group cursor-pointer transition-all duration-200 overflow-hidden rounded-xl border-2 bg-background",
             selectedCategory === 'business'
-              ? "border-blue-500 shadow-lg bg-blue-50"
-              : "border-border shadow-sm hover:border-blue-400 hover:bg-blue-50 hover:shadow-lg hover:-translate-y-1"
+              ? "border-electric-blue shadow-lg bg-electric-blue-light"
+              : "border-border shadow-sm hover:border-electric-blue/50 hover:bg-electric-blue-light hover:shadow-lg hover:-translate-y-1"
           )}
         >
-          <div className="h-2 bg-blue-500" />
+          <div className="h-2 bg-electric-blue" />
           <div className="p-5 space-y-4">
             <div className="flex items-start justify-between">
               <div className={cn(
                 "w-12 h-12 rounded-xl flex items-center justify-center transition-all duration-200",
-                selectedCategory === 'business' ? "bg-blue-100" : "bg-muted group-hover:bg-blue-100 group-hover:scale-110"
+                selectedCategory === 'business' ? "bg-electric-blue-light" : "bg-muted group-hover:bg-electric-blue-light group-hover:scale-110"
               )}>
                 <Target className={cn(
                   "w-6 h-6 transition-colors duration-200",
-                  selectedCategory === 'business' ? "text-blue-600" : "text-muted-foreground group-hover:text-blue-600"
+                  selectedCategory === 'business' ? "text-electric-blue" : "text-muted-foreground group-hover:text-electric-blue"
                 )} />
               </div>
-              <Badge variant="secondary" className={cn("text-xs font-semibold", selectedCategory === 'business' && "bg-blue-100 text-blue-600")}>
+              <Badge variant="secondary" className={cn("text-xs font-semibold", selectedCategory === 'business' && "bg-electric-blue-light text-electric-blue")}>
                 {getCategoryPackCount('business')} available
               </Badge>
             </div>
@@ -1627,7 +1627,7 @@ export function InspirationView({ templates = [], packs = [], initialSavedPackId
               <h3 className="text-lg font-bold text-foreground mb-1">Business Objectives</h3>
               <p className={cn(
                 "text-sm font-semibold transition-colors",
-                selectedCategory === 'business' ? "text-blue-600" : "text-muted-foreground group-hover:text-blue-600"
+                selectedCategory === 'business' ? "text-electric-blue" : "text-muted-foreground group-hover:text-electric-blue"
               )}>
                 Strategic Growth & Operations
               </p>
@@ -1638,7 +1638,7 @@ export function InspirationView({ templates = [], packs = [], initialSavedPackId
             <ul className="space-y-2">
               {['Sales playbooks and pricing strategy', 'Legal, compliance, and HR operations', 'Finance infrastructure and growth', 'Product launches and marketing'].map((benefit, idx) => (
                 <li key={idx} className="flex items-start gap-2 text-sm">
-                  <CheckCircle2 className={cn("w-4 h-4 mt-0.5 shrink-0", selectedCategory === 'business' ? "text-blue-600" : "text-status-success")} />
+                  <CheckCircle2 className={cn("w-4 h-4 mt-0.5 shrink-0", selectedCategory === 'business' ? "text-electric-blue" : "text-status-success")} />
                   <span className="text-muted-foreground">{benefit}</span>
                 </li>
               ))}
@@ -1646,8 +1646,8 @@ export function InspirationView({ templates = [], packs = [], initialSavedPackId
             <button className={cn(
               "w-full flex items-center justify-between px-4 py-2.5 rounded-lg font-medium text-sm transition-all duration-200",
               selectedCategory === 'business'
-                ? "bg-blue-500 hover:bg-blue-600 text-white shadow-md"
-                : "bg-muted text-muted-foreground group-hover:bg-blue-500 group-hover:text-white"
+                ? "bg-electric-blue hover:bg-electric-blue-hover text-white shadow-md"
+                : "bg-muted text-muted-foreground group-hover:bg-electric-blue group-hover:text-white"
             )}>
               {selectedCategory === 'business' ? 'Browsing Business' : 'Explore Business'}
               <ArrowRight className="w-4 h-4 transition-transform duration-200 group-hover:translate-x-1" />
@@ -1661,23 +1661,23 @@ export function InspirationView({ templates = [], packs = [], initialSavedPackId
           className={cn(
             "group cursor-pointer transition-all duration-200 overflow-hidden rounded-xl border-2 bg-background",
             selectedCategory === 'subsystems'
-              ? "border-emerald-500 shadow-lg bg-emerald-50"
-              : "border-border shadow-sm hover:border-emerald-400 hover:bg-emerald-50 hover:shadow-lg hover:-translate-y-1"
+              ? "border-status-success shadow-lg bg-status-success-light"
+              : "border-border shadow-sm hover:border-status-success/50 hover:bg-status-success-light hover:shadow-lg hover:-translate-y-1"
           )}
         >
-          <div className="h-2 bg-emerald-500" />
+          <div className="h-2 bg-status-success" />
           <div className="p-5 space-y-4">
             <div className="flex items-start justify-between">
               <div className={cn(
                 "w-12 h-12 rounded-xl flex items-center justify-center transition-all duration-200",
-                selectedCategory === 'subsystems' ? "bg-emerald-100" : "bg-muted group-hover:bg-emerald-100 group-hover:scale-110"
+                selectedCategory === 'subsystems' ? "bg-status-success-light" : "bg-muted group-hover:bg-status-success-light group-hover:scale-110"
               )}>
                 <Boxes className={cn(
                   "w-6 h-6 transition-colors duration-200",
-                  selectedCategory === 'subsystems' ? "text-emerald-600" : "text-muted-foreground group-hover:text-emerald-600"
+                  selectedCategory === 'subsystems' ? "text-status-success-dark" : "text-muted-foreground group-hover:text-status-success-dark"
                 )} />
               </div>
-              <Badge variant="secondary" className={cn("text-xs font-semibold", selectedCategory === 'subsystems' && "bg-emerald-100 text-emerald-600")}>
+              <Badge variant="secondary" className={cn("text-xs font-semibold", selectedCategory === 'subsystems' && "bg-status-success-light text-status-success-dark")}>
                 {getCategoryPackCount('subsystems')} available
               </Badge>
             </div>
@@ -1685,7 +1685,7 @@ export function InspirationView({ templates = [], packs = [], initialSavedPackId
               <h3 className="text-lg font-bold text-foreground mb-1">Subsystems & Infrastructure</h3>
               <p className={cn(
                 "text-sm font-semibold transition-colors",
-                selectedCategory === 'subsystems' ? "text-emerald-600" : "text-muted-foreground group-hover:text-emerald-600"
+                selectedCategory === 'subsystems' ? "text-status-success-dark" : "text-muted-foreground group-hover:text-status-success-dark"
               )}>
                 Technical Foundations
               </p>
@@ -1696,7 +1696,7 @@ export function InspirationView({ templates = [], packs = [], initialSavedPackId
             <ul className="space-y-2">
               {['Control systems and embedded software', 'AI/ML capabilities and compute', 'Manufacturing and assembly processes', 'Security audits and compliance'].map((benefit, idx) => (
                 <li key={idx} className="flex items-start gap-2 text-sm">
-                  <CheckCircle2 className={cn("w-4 h-4 mt-0.5 shrink-0", selectedCategory === 'subsystems' ? "text-emerald-600" : "text-status-success")} />
+                  <CheckCircle2 className={cn("w-4 h-4 mt-0.5 shrink-0", selectedCategory === 'subsystems' ? "text-status-success-dark" : "text-status-success")} />
                   <span className="text-muted-foreground">{benefit}</span>
                 </li>
               ))}
@@ -1704,8 +1704,8 @@ export function InspirationView({ templates = [], packs = [], initialSavedPackId
             <button className={cn(
               "w-full flex items-center justify-between px-4 py-2.5 rounded-lg font-medium text-sm transition-all duration-200",
               selectedCategory === 'subsystems'
-                ? "bg-emerald-500 hover:bg-emerald-600 text-white shadow-md"
-                : "bg-muted text-muted-foreground group-hover:bg-emerald-500 group-hover:text-white"
+                ? "bg-status-success hover:bg-status-success/90 text-white shadow-md"
+                : "bg-muted text-muted-foreground group-hover:bg-status-success group-hover:text-white"
             )}>
               {selectedCategory === 'subsystems' ? 'Browsing Subsystems' : 'Explore Subsystems'}
               <ArrowRight className="w-4 h-4 transition-transform duration-200 group-hover:translate-x-1" />
@@ -1713,29 +1713,29 @@ export function InspirationView({ templates = [], packs = [], initialSavedPackId
           </div>
         </div>
 
-        {/* Industry Sector Card - Purple */}
+        {/* Industry Sector Card - Purple (chart-5) */}
         <div 
           onClick={() => handleCategoryClick('industry')}
           className={cn(
             "group cursor-pointer transition-all duration-200 overflow-hidden rounded-xl border-2 bg-background",
             selectedCategory === 'industry'
-              ? "border-purple-500 shadow-lg bg-purple-50"
-              : "border-border shadow-sm hover:border-purple-400 hover:bg-purple-50 hover:shadow-lg hover:-translate-y-1"
+              ? "border-chart-5 shadow-lg bg-chart-5/10"
+              : "border-border shadow-sm hover:border-chart-5/50 hover:bg-chart-5/10 hover:shadow-lg hover:-translate-y-1"
           )}
         >
-          <div className="h-2 bg-purple-500" />
+          <div className="h-2 bg-chart-5" />
           <div className="p-5 space-y-4">
             <div className="flex items-start justify-between">
               <div className={cn(
                 "w-12 h-12 rounded-xl flex items-center justify-center transition-all duration-200",
-                selectedCategory === 'industry' ? "bg-purple-100" : "bg-muted group-hover:bg-purple-100 group-hover:scale-110"
+                selectedCategory === 'industry' ? "bg-chart-5/20" : "bg-muted group-hover:bg-chart-5/20 group-hover:scale-110"
               )}>
                 <CircuitBoard className={cn(
                   "w-6 h-6 transition-colors duration-200",
-                  selectedCategory === 'industry' ? "text-purple-600" : "text-muted-foreground group-hover:text-purple-600"
+                  selectedCategory === 'industry' ? "text-chart-5" : "text-muted-foreground group-hover:text-chart-5"
                 )} />
               </div>
-              <Badge variant="secondary" className={cn("text-xs font-semibold", selectedCategory === 'industry' && "bg-purple-100 text-purple-600")}>
+              <Badge variant="secondary" className={cn("text-xs font-semibold", selectedCategory === 'industry' && "bg-chart-5/20 text-chart-5")}>
                 {industryTemplateCount} industries
               </Badge>
             </div>
@@ -1743,7 +1743,7 @@ export function InspirationView({ templates = [], packs = [], initialSavedPackId
               <h3 className="text-lg font-bold text-foreground mb-1">Industry Sector</h3>
               <p className={cn(
                 "text-sm font-semibold transition-colors",
-                selectedCategory === 'industry' ? "text-purple-600" : "text-muted-foreground group-hover:text-purple-600"
+                selectedCategory === 'industry' ? "text-chart-5" : "text-muted-foreground group-hover:text-chart-5"
               )}>
                 Domain Knowledge & Expertise
               </p>
@@ -1754,7 +1754,7 @@ export function InspirationView({ templates = [], packs = [], initialSavedPackId
             <ul className="space-y-2">
               {['Robotics and autonomous systems', 'Rockets and aerospace engineering', 'AI infrastructure and compute', 'Pharmaceuticals and consumer electronics'].map((benefit, idx) => (
                 <li key={idx} className="flex items-start gap-2 text-sm">
-                  <CheckCircle2 className={cn("w-4 h-4 mt-0.5 shrink-0", selectedCategory === 'industry' ? "text-purple-600" : "text-status-success")} />
+                  <CheckCircle2 className={cn("w-4 h-4 mt-0.5 shrink-0", selectedCategory === 'industry' ? "text-chart-5" : "text-status-success")} />
                   <span className="text-muted-foreground">{benefit}</span>
                 </li>
               ))}
@@ -1762,8 +1762,8 @@ export function InspirationView({ templates = [], packs = [], initialSavedPackId
             <button className={cn(
               "w-full flex items-center justify-between px-4 py-2.5 rounded-lg font-medium text-sm transition-all duration-200",
               selectedCategory === 'industry'
-                ? "bg-purple-500 hover:bg-purple-600 text-white shadow-md"
-                : "bg-muted text-muted-foreground group-hover:bg-purple-500 group-hover:text-white"
+                ? "bg-chart-5 hover:bg-chart-5/90 text-white shadow-md"
+                : "bg-muted text-muted-foreground group-hover:bg-chart-5 group-hover:text-white"
             )}>
               {selectedCategory === 'industry' ? 'Browsing Industries' : 'Explore Industries'}
               <ArrowRight className="w-4 h-4 transition-transform duration-200 group-hover:translate-x-1" />
@@ -1799,13 +1799,13 @@ export function InspirationView({ templates = [], packs = [], initialSavedPackId
                   return (
                     <Card 
                       key={template.id}
-                      className="cursor-pointer hover:shadow-md hover:border-purple-500/50 transition-all"
+                      className="cursor-pointer hover:shadow-md hover:border-chart-5/50 transition-all"
                       onClick={() => setSelectedIndustry(template)}
                     >
                       <CardContent className="p-4">
                         <div className="flex items-center gap-3 mb-3">
-                          <div className="p-2.5 rounded-lg bg-purple-100 shrink-0">
-                            <Icon className="h-5 w-5 text-purple-600" />
+                          <div className="p-2.5 rounded-lg bg-chart-5/20 shrink-0">
+                            <Icon className="h-5 w-5 text-chart-5" />
                           </div>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 mb-1">
@@ -1822,7 +1822,7 @@ export function InspirationView({ templates = [], packs = [], initialSavedPackId
                         <p className="text-xs text-muted-foreground line-clamp-2">
                           {template.description}
                         </p>
-                        <div className="flex items-center gap-1 mt-3 pt-3 border-t border-muted text-xs text-purple-600 font-medium">
+                        <div className="flex items-center gap-1 mt-3 pt-3 border-t border-muted text-xs text-chart-5 font-medium">
                           <Eye className="h-3 w-3" />
                           <span>View objective packs</span>
                         </div>

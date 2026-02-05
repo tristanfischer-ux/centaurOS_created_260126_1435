@@ -16,6 +16,7 @@ import { Loader2, Store, Search, X, SlidersHorizontal, MapPin, Briefcase, Gradua
 import { toast } from "sonner"
 import { Card, CardContent } from "@/components/ui/card"
 import { cn } from "@/lib/utils"
+import { getCategoryColors, type MarketplaceCategory as CategoryType } from "@/lib/marketplace-colors"
 import { useSearchParams, useRouter, usePathname } from "next/navigation"
 import Link from "next/link"
 import { SearchBar, ActiveFilterBadges } from "@/components/search"
@@ -482,22 +483,12 @@ export function MarketplaceView({
     }, [])
 
     // Category definitions for the hero cards
-    // Color scheme rationale:
-    // - People: International Orange (primary brand, warm, human)
-    // - Products: Slate (industrial, manufacturing, physical)
-    // - Services: Electric Blue (secondary brand, tech, digital)
+    // Colors now managed via getCategoryColors() from marketplace-colors.ts
     const categoryCards = [
         {
             id: 'People',
             title: 'People',
             icon: UserCircle,
-            color: 'bg-orange-500',
-            hoverColor: 'hover:border-orange-400 hover:bg-orange-50',
-            lightColor: 'bg-orange-50',
-            borderColor: 'border-orange-500',
-            textColor: 'text-orange-600',
-            iconBg: 'bg-orange-100',
-            buttonBg: 'bg-orange-500 hover:bg-orange-600',
             categories: ['People'],
             headline: 'Expert Talent On-Demand',
             description: 'Access fractional executives, specialists, and apprentices who bring deep expertise without full-time commitment. From CTOs to CAD specialists, find the exact skills you need.',
@@ -512,13 +503,6 @@ export function MarketplaceView({
             id: 'Products',
             title: 'Physical Products',
             icon: Package,
-            color: 'bg-slate-500',
-            hoverColor: 'hover:border-slate-400 hover:bg-slate-50',
-            lightColor: 'bg-slate-50',
-            borderColor: 'border-slate-500',
-            textColor: 'text-slate-600',
-            iconBg: 'bg-slate-100',
-            buttonBg: 'bg-slate-500 hover:bg-slate-600',
             categories: ['Products'],
             headline: 'Manufacturing Partners',
             description: 'Connect with certified manufacturers and suppliers for physical products. From precision engineering to rapid prototyping, source quality components and finished goods.',
@@ -533,13 +517,6 @@ export function MarketplaceView({
             id: 'Services',
             title: 'Services',
             icon: Wrench,
-            color: 'bg-blue-500',
-            hoverColor: 'hover:border-blue-400 hover:bg-blue-50',
-            lightColor: 'bg-blue-50',
-            borderColor: 'border-blue-500',
-            textColor: 'text-blue-600',
-            iconBg: 'bg-blue-100',
-            buttonBg: 'bg-blue-500 hover:bg-blue-600',
             categories: ['Services', 'AI'],
             headline: 'Professional Services & AI Tools',
             description: 'From consulting and legal services to cutting-edge AI tools, access the services that accelerate your business. Includes AI agents, automation tools, and software solutions.',
@@ -814,6 +791,14 @@ export function MarketplaceView({
 
     return (
         <div className="space-y-6">
+            {/* Page Header with orange accent bar */}
+            <div className="flex items-center gap-3 pb-4 border-b border-muted">
+                <div className="h-8 w-1 bg-international-orange rounded-full shadow-[0_0_8px_rgba(234,88,12,0.6)]" />
+                <h1 className="text-2xl sm:text-3xl font-display font-semibold text-foreground tracking-tight">
+                    Marketplace
+                </h1>
+            </div>
+
             {/* Marketplace Onboarding Modal for first-time users */}
             {showOnboarding && (
                 <MarketplaceOnboardingModal
@@ -866,25 +851,25 @@ export function MarketplaceView({
                 <div 
                     onClick={() => handleCategoryClick('People')}
                     className={cn(
-                        "group cursor-pointer transition-all duration-200 overflow-hidden rounded-xl border-2 bg-background",
+                        "group cursor-pointer transition-all duration-200 ease-out overflow-hidden rounded-xl border-2 bg-background",
                         activeTab === 'People'
-                            ? "border-orange-500 shadow-lg bg-orange-50"
-                            : "border-border shadow-sm hover:border-orange-400 hover:bg-orange-50 hover:shadow-lg hover:-translate-y-1"
+                            ? "border-international-orange shadow-lg bg-international-orange/5"
+                            : "border-border shadow-sm hover:border-international-orange/50 hover:bg-international-orange/5 hover:shadow-lg hover:-translate-y-1"
                     )}
                 >
-                    <div className="h-2 bg-orange-500" />
+                    <div className="h-2 bg-international-orange" />
                     <div className="p-5 space-y-4">
                         <div className="flex items-start justify-between">
                             <div className={cn(
                                 "w-12 h-12 rounded-xl flex items-center justify-center transition-all duration-200",
-                                activeTab === 'People' ? "bg-orange-100" : "bg-muted group-hover:bg-orange-100 group-hover:scale-110"
+                                activeTab === 'People' ? getCategoryColors('People').heroIconBgActive : getCategoryColors('People').heroIconBg
                             )}>
                                 <UserCircle className={cn(
                                     "w-6 h-6 transition-colors duration-200",
-                                    activeTab === 'People' ? "text-orange-600" : "text-muted-foreground group-hover:text-orange-600"
+                                    activeTab === 'People' ? getCategoryColors('People').heroTextActive : getCategoryColors('People').heroText
                                 )} />
                             </div>
-                            <Badge variant="secondary" className={cn("text-xs font-semibold", activeTab === 'People' && "bg-orange-100 text-orange-600")}>
+                            <Badge variant="secondary" className={cn("text-xs font-semibold", activeTab === 'People' && getCategoryColors('People').badge)}>
                                 {getCategoryCount('People')} available
                             </Badge>
                         </div>
@@ -892,7 +877,7 @@ export function MarketplaceView({
                             <h3 className="text-lg font-bold text-foreground mb-1">People</h3>
                             <p className={cn(
                                 "text-sm font-semibold transition-colors",
-                                activeTab === 'People' ? "text-orange-600" : "text-muted-foreground group-hover:text-orange-600"
+                                activeTab === 'People' ? getCategoryColors('People').heroTextActive : getCategoryColors('People').heroText
                             )}>
                                 Expert Talent On-Demand
                             </p>
@@ -903,7 +888,7 @@ export function MarketplaceView({
                         <ul className="space-y-2">
                             {['Fractional executives with 15+ years experience', 'Verified credentials and track records', 'Flexible engagement: hourly, daily, or retainer', 'Pre-vetted for quality and reliability'].map((benefit, idx) => (
                                 <li key={idx} className="flex items-start gap-2 text-sm">
-                                    <CheckCircle2 className={cn("w-4 h-4 mt-0.5 shrink-0", activeTab === 'People' ? "text-orange-600" : "text-status-success")} />
+                                    <CheckCircle2 className={cn("w-4 h-4 mt-0.5 shrink-0", activeTab === 'People' ? getCategoryColors('People').icon : "text-status-success")} />
                                     <span className="text-muted-foreground">{benefit}</span>
                                 </li>
                             ))}
@@ -911,8 +896,8 @@ export function MarketplaceView({
                         <button className={cn(
                             "w-full flex items-center justify-between px-4 py-2.5 rounded-lg font-medium text-sm transition-all duration-200",
                             activeTab === 'People'
-                                ? "bg-orange-500 hover:bg-orange-600 text-white shadow-md"
-                                : "bg-muted text-muted-foreground group-hover:bg-orange-500 group-hover:text-white"
+                                ? cn(getCategoryColors('People').button, getCategoryColors('People').buttonHover, "text-white shadow-md")
+                                : cn("bg-muted text-muted-foreground", `group-hover:${getCategoryColors('People').button} group-hover:text-white`)
                         )}>
                             {activeTab === 'People' ? 'Browsing People' : 'Explore People'}
                             <ArrowRight className="w-4 h-4 transition-transform duration-200 group-hover:translate-x-1" />
@@ -920,29 +905,29 @@ export function MarketplaceView({
                     </div>
                 </div>
 
-                {/* Products Card - Slate (industrial, manufacturing) */}
+                {/* Products Card - Muted (industrial, manufacturing) */}
                 <div 
                     onClick={() => handleCategoryClick('Products')}
                     className={cn(
-                        "group cursor-pointer transition-all duration-200 overflow-hidden rounded-xl border-2 bg-background",
+                        "group cursor-pointer transition-all duration-200 ease-out overflow-hidden rounded-xl border-2 bg-background",
                         activeTab === 'Products'
-                            ? "border-slate-500 shadow-lg bg-slate-50"
-                            : "border-border shadow-sm hover:border-slate-400 hover:bg-slate-50 hover:shadow-lg hover:-translate-y-1"
+                            ? "border-muted-foreground/50 shadow-lg bg-muted/50"
+                            : "border-border shadow-sm hover:border-muted-foreground/40 hover:bg-muted/50 hover:shadow-lg hover:-translate-y-1"
                     )}
                 >
-                    <div className="h-2 bg-slate-500" />
+                    <div className="h-2 bg-muted-foreground" />
                     <div className="p-5 space-y-4">
                         <div className="flex items-start justify-between">
                             <div className={cn(
                                 "w-12 h-12 rounded-xl flex items-center justify-center transition-all duration-200",
-                                activeTab === 'Products' ? "bg-slate-100" : "bg-muted group-hover:bg-slate-100 group-hover:scale-110"
+                                activeTab === 'Products' ? getCategoryColors('Products').heroIconBgActive : getCategoryColors('Products').heroIconBg
                             )}>
                                 <Package className={cn(
                                     "w-6 h-6 transition-colors duration-200",
-                                    activeTab === 'Products' ? "text-slate-600" : "text-muted-foreground group-hover:text-slate-600"
+                                    activeTab === 'Products' ? getCategoryColors('Products').heroTextActive : getCategoryColors('Products').heroText
                                 )} />
                             </div>
-                            <Badge variant="secondary" className={cn("text-xs font-semibold", activeTab === 'Products' && "bg-slate-100 text-slate-600")}>
+                            <Badge variant="secondary" className={cn("text-xs font-semibold", activeTab === 'Products' && getCategoryColors('Products').badge)}>
                                 {getCategoryCount('Products')} available
                             </Badge>
                         </div>
@@ -950,7 +935,7 @@ export function MarketplaceView({
                             <h3 className="text-lg font-bold text-foreground mb-1">Physical Products</h3>
                             <p className={cn(
                                 "text-sm font-semibold transition-colors",
-                                activeTab === 'Products' ? "text-slate-600" : "text-muted-foreground group-hover:text-slate-600"
+                                activeTab === 'Products' ? getCategoryColors('Products').heroTextActive : getCategoryColors('Products').heroText
                             )}>
                                 Manufacturing Partners
                             </p>
@@ -961,7 +946,7 @@ export function MarketplaceView({
                         <ul className="space-y-2">
                             {['ISO-certified manufacturing facilities', 'Prototyping to full production scale', 'Quality assurance and compliance', 'Transparent lead times and pricing'].map((benefit, idx) => (
                                 <li key={idx} className="flex items-start gap-2 text-sm">
-                                    <CheckCircle2 className={cn("w-4 h-4 mt-0.5 shrink-0", activeTab === 'Products' ? "text-slate-600" : "text-status-success")} />
+                                    <CheckCircle2 className={cn("w-4 h-4 mt-0.5 shrink-0", activeTab === 'Products' ? getCategoryColors('Products').icon : "text-status-success")} />
                                     <span className="text-muted-foreground">{benefit}</span>
                                 </li>
                             ))}
@@ -969,8 +954,8 @@ export function MarketplaceView({
                         <button className={cn(
                             "w-full flex items-center justify-between px-4 py-2.5 rounded-lg font-medium text-sm transition-all duration-200",
                             activeTab === 'Products'
-                                ? "bg-slate-500 hover:bg-slate-600 text-white shadow-md"
-                                : "bg-muted text-muted-foreground group-hover:bg-slate-500 group-hover:text-white"
+                                ? "bg-secondary hover:bg-secondary/80 text-secondary-foreground shadow-md"
+                                : "bg-muted text-muted-foreground group-hover:bg-secondary group-hover:text-secondary-foreground"
                         )}>
                             {activeTab === 'Products' ? 'Browsing Products' : 'Explore Products'}
                             <ArrowRight className="w-4 h-4 transition-transform duration-200 group-hover:translate-x-1" />
@@ -982,25 +967,25 @@ export function MarketplaceView({
                 <div 
                     onClick={() => handleCategoryClick('Services')}
                     className={cn(
-                        "group cursor-pointer transition-all duration-200 overflow-hidden rounded-xl border-2 bg-background",
+                        "group cursor-pointer transition-all duration-200 ease-out overflow-hidden rounded-xl border-2 bg-background",
                         activeTab === 'Services'
-                            ? "border-blue-500 shadow-lg bg-blue-50"
-                            : "border-border shadow-sm hover:border-blue-400 hover:bg-blue-50 hover:shadow-lg hover:-translate-y-1"
+                            ? "border-electric-blue shadow-lg bg-electric-blue/5"
+                            : "border-border shadow-sm hover:border-electric-blue/50 hover:bg-electric-blue/5 hover:shadow-lg hover:-translate-y-1"
                     )}
                 >
-                    <div className="h-2 bg-blue-500" />
+                    <div className="h-2 bg-electric-blue" />
                     <div className="p-5 space-y-4">
                         <div className="flex items-start justify-between">
                             <div className={cn(
                                 "w-12 h-12 rounded-xl flex items-center justify-center transition-all duration-200",
-                                activeTab === 'Services' ? "bg-blue-100" : "bg-muted group-hover:bg-blue-100 group-hover:scale-110"
+                                activeTab === 'Services' ? getCategoryColors('Services').heroIconBgActive : getCategoryColors('Services').heroIconBg
                             )}>
                                 <Wrench className={cn(
                                     "w-6 h-6 transition-colors duration-200",
-                                    activeTab === 'Services' ? "text-blue-600" : "text-muted-foreground group-hover:text-blue-600"
+                                    activeTab === 'Services' ? getCategoryColors('Services').heroTextActive : getCategoryColors('Services').heroText
                                 )} />
                             </div>
-                            <Badge variant="secondary" className={cn("text-xs font-semibold", activeTab === 'Services' && "bg-blue-100 text-blue-600")}>
+                            <Badge variant="secondary" className={cn("text-xs font-semibold", activeTab === 'Services' && getCategoryColors('Services').badge)}>
                                 {getCategoryCount('Services')} available
                             </Badge>
                         </div>
@@ -1008,7 +993,7 @@ export function MarketplaceView({
                             <h3 className="text-lg font-bold text-foreground mb-1">Services</h3>
                             <p className={cn(
                                 "text-sm font-semibold transition-colors",
-                                activeTab === 'Services' ? "text-blue-600" : "text-muted-foreground group-hover:text-blue-600"
+                                activeTab === 'Services' ? getCategoryColors('Services').heroTextActive : getCategoryColors('Services').heroText
                             )}>
                                 Professional Services & AI Tools
                             </p>
@@ -1019,7 +1004,7 @@ export function MarketplaceView({
                         <ul className="space-y-2">
                             {['Business consulting and advisory', 'AI tools and automation platforms', 'Legal, finance, and HR services', 'Integration support and training'].map((benefit, idx) => (
                                 <li key={idx} className="flex items-start gap-2 text-sm">
-                                    <CheckCircle2 className={cn("w-4 h-4 mt-0.5 shrink-0", activeTab === 'Services' ? "text-blue-600" : "text-status-success")} />
+                                    <CheckCircle2 className={cn("w-4 h-4 mt-0.5 shrink-0", activeTab === 'Services' ? getCategoryColors('Services').icon : "text-status-success")} />
                                     <span className="text-muted-foreground">{benefit}</span>
                                 </li>
                             ))}
@@ -1027,8 +1012,8 @@ export function MarketplaceView({
                         <button className={cn(
                             "w-full flex items-center justify-between px-4 py-2.5 rounded-lg font-medium text-sm transition-all duration-200",
                             activeTab === 'Services'
-                                ? "bg-blue-500 hover:bg-blue-600 text-white shadow-md"
-                                : "bg-muted text-muted-foreground group-hover:bg-blue-500 group-hover:text-white"
+                                ? cn(getCategoryColors('Services').button, getCategoryColors('Services').buttonHover, "text-white shadow-md")
+                                : cn("bg-muted text-muted-foreground", `group-hover:${getCategoryColors('Services').button} group-hover:text-white`)
                         )}>
                             {activeTab === 'Services' ? 'Browsing Services' : 'Explore Services'}
                             <ArrowRight className="w-4 h-4 transition-transform duration-200 group-hover:translate-x-1" />
@@ -1390,19 +1375,19 @@ export function MarketplaceView({
 
                         {/* AI Search Explanation */}
                         {aiExplanation && (
-                            <div className="bg-accent/10 border border-accent/20 rounded-lg p-3 flex items-start justify-between gap-3">
+                            <div className="bg-status-info-light/50 border border-status-info/20 rounded-lg p-3 flex items-start justify-between gap-3">
                                 <div className="flex items-start gap-2">
-                                    <Sparkles className="h-4 w-4 text-violet-600 mt-0.5 shrink-0" />
+                                    <Sparkles className="h-4 w-4 text-status-info-dark mt-0.5 shrink-0" />
                                     <div>
-                                        <p className="text-sm text-violet-900">{aiExplanation}</p>
-                                        <p className="text-xs text-violet-600 mt-1">AI-extracted filters applied. You can modify them above.</p>
+                                        <p className="text-sm text-status-info-dark">{aiExplanation}</p>
+                                        <p className="text-xs text-status-info-dark mt-1">AI-extracted filters applied. You can modify them above.</p>
                                     </div>
                                 </div>
                                 <Button
                                     variant="ghost"
                                     size="sm"
                                     onClick={clearAiFilters}
-                                    className="shrink-0 h-7 text-xs text-violet-600 hover:text-violet-800"
+                                    className="shrink-0 h-7 text-xs text-status-info-dark hover:text-status-info"
                                 >
                                     <X className="h-3 w-3 mr-1" />
                                     Clear AI
@@ -1445,8 +1430,8 @@ export function MarketplaceView({
                                     onClick={() => toggleSubcategory(sub)}
                                     className={`px-3 py-1.5 text-xs font-medium rounded border transition-all ${
                                         selectedSubcategories.has(sub)
-                                            ? 'bg-orange-600 text-white border-orange-600 shadow-sm'
-                                            : 'bg-background text-muted-foreground border hover:border-orange-500/50 hover:bg-orange-50/50 hover:text-orange-700'
+                                            ? 'bg-international-orange text-white border-international-orange shadow-sm'
+                                            : 'bg-background text-muted-foreground border hover:border-international-orange/50 hover:bg-international-orange/5 hover:text-international-orange'
                                     }`}
                                 >
                                     {sub}
@@ -1455,7 +1440,7 @@ export function MarketplaceView({
                             {selectedSubcategories.size > 0 && (
                                 <button
                                     onClick={() => setSelectedSubcategories(new Set())}
-                                    className="px-2 py-1.5 text-xs text-muted-foreground hover:text-orange-600 flex items-center gap-1 rounded border border-transparent hover:border transition-all"
+                                    className="px-2 py-1.5 text-xs text-muted-foreground hover:text-international-orange flex items-center gap-1 rounded border border-transparent hover:border transition-all"
                                 >
                                     <X className="h-3 w-3" />
                                     Clear
@@ -1469,7 +1454,7 @@ export function MarketplaceView({
                         <div className="mb-6">
                             <button
                                 onClick={() => setShowAgentMatcher(!showAgentMatcher)}
-                                className="flex items-center gap-2 text-sm font-medium text-violet-700 hover:text-violet-900 mb-3"
+                                className="flex items-center gap-2 text-sm font-medium text-status-info-dark hover:text-status-info mb-3"
                             >
                                 <Users className="h-4 w-4" />
                                 Find Your Agent
@@ -1477,16 +1462,16 @@ export function MarketplaceView({
                             </button>
                             
                             {showAgentMatcher && (
-                                <Card className="p-4 bg-gradient-to-r from-accent/10 to-status-info-light/50 border-accent/20">
+                                <Card className="p-4 bg-gradient-to-r from-status-info-light/30 to-status-info-light/50 border-status-info/20">
                                     <div className="flex flex-col gap-4">
                                         <div>
-                                            <h3 className="font-medium text-violet-900">Find the Perfect Partner</h3>
-                                            <p className="text-sm text-violet-700">Select a team member to get pairing suggestions.</p>
+                                            <h3 className="font-medium text-status-info-dark">Find the Perfect Partner</h3>
+                                            <p className="text-sm text-status-info-dark">Select a team member to get pairing suggestions.</p>
                                         </div>
                                         
                                         <div className="flex gap-3 items-end">
                                             <div className="flex-1 max-w-xs">
-                                                <label className="text-xs font-medium text-violet-700 mb-1.5 block">Team Member</label>
+                                                <label className="text-xs font-medium text-status-info-dark mb-1.5 block">Team Member</label>
                                                 {teamMembers.length > 0 ? (
                                                     <Select value={selectedMemberId} onValueChange={setSelectedMemberId}>
                                                         <SelectTrigger className="bg-background">
@@ -1512,7 +1497,7 @@ export function MarketplaceView({
                                             <Button
                                                 onClick={() => handleAgentMatch(selectedMemberId)}
                                                 disabled={!selectedMemberId || agentMatchLoading}
-                                                className="bg-violet-600 hover:bg-violet-700"
+                                                className="bg-status-info hover:bg-status-info/90"
                                             >
                                                 {centaurMatchLoading ? (
                                                     <>
@@ -1530,18 +1515,18 @@ export function MarketplaceView({
                                         
                                         {/* Agent Suggestions */}
                                         {agentSuggestions.length > 0 && (
-                                            <div className="space-y-3 pt-3 border-t border-accent/20">
-                                                <h4 className="text-sm font-medium text-violet-900">Recommended AI Partners</h4>
+                                            <div className="space-y-3 pt-3 border-t border-status-info/20">
+                                                <h4 className="text-sm font-medium text-status-info-dark">Recommended AI Partners</h4>
                                                 {centaurSuggestions.map((suggestion, idx) => {
                                                     const listing = initialListings.find(l => l.id === suggestion.listingId)
                                                     return (
-                                                        <div key={suggestion.listingId} className="bg-background rounded-lg p-3 border border-accent/20">
+                                                        <div key={suggestion.listingId} className="bg-background rounded-lg p-3 border border-status-info/20">
                                                             <div className="flex items-start justify-between gap-3">
                                                                 <div className="flex-1">
                                                                     <div className="flex items-center gap-2">
-                                                                        <span className="text-xs font-bold text-violet-600">#{idx + 1}</span>
+                                                                        <span className="text-xs font-bold text-status-info-dark">#{idx + 1}</span>
                                                                         <h5 className="font-medium text-foreground">{suggestion.title}</h5>
-                                                                        <Badge className="bg-violet-100 text-violet-700 text-xs">
+                                                                        <Badge className="bg-status-info-light text-status-info-dark text-xs">
                                                                             {suggestion.compatibilityScore}/10
                                                                         </Badge>
                                                                     </div>
@@ -1688,7 +1673,7 @@ export function MarketplaceView({
                                             className={cn(
                                                 "absolute top-4 right-4 z-10 w-8 h-8 rounded-full flex items-center justify-center transition-all duration-200",
                                                 selectedIds.has(item.id)
-                                                    ? "bg-orange-500 text-white shadow-md"
+                                                    ? "bg-international-orange text-white shadow-md"
                                                     : "bg-card text-muted-foreground shadow-md border border-muted opacity-0 group-hover:opacity-100"
                                             )}
                                             title={selectedIds.has(item.id) ? "Remove from comparison" : "Add to comparison"}
@@ -1781,7 +1766,7 @@ export function MarketplaceView({
                                 title={hasActiveFilters ? "No items match your filters" : "No listings found in this category yet"}
                                 description={hasActiveFilters ? "Try adjusting your filters or search terms." : "Check back later or browse other categories."}
                                 action={hasActiveFilters ? (
-                                    <Button variant="secondary" onClick={clearFilters} className="border hover:border-orange-500 hover:text-orange-700">Clear filters</Button>
+                                    <Button variant="secondary" onClick={clearFilters} className="border hover:border-international-orange/50 hover:text-international-orange">Clear filters</Button>
                                 ) : undefined}
                             />
                         </div>

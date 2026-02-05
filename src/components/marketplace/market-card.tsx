@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
 import { cn } from "@/lib/utils"
+import { getCategoryBadgeClasses, getAvatarGradient, type MarketplaceCategory } from "@/lib/marketplace-colors"
 import { 
     ShieldCheck, MapPin, Clock, Briefcase,
     Bot, Sparkles, BarChart3, Zap, Shield, Cpu,
@@ -48,50 +49,7 @@ function getInitials(title: string): string {
     return (words[0][0] + words[1][0]).toUpperCase()
 }
 
-// Get gradient colors based on category
-// Color scheme rationale:
-// - People: Orange (International Orange - primary brand, warm, human)
-// - Products: Slate (industrial, manufacturing, physical)
-// - Services: Blue (Electric Blue - secondary brand, tech, digital)
-// - AI: Violet (AI distinction within Services)
-function getAvatarGradient(category: string, title: string): string {
-    // Use title to generate consistent but varied gradients within category
-    const hash = title.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0)
-    const variant = hash % 3
-    
-    switch (category) {
-        case 'People':
-            // Orange tones - warm, human, primary brand
-            return variant === 0 
-                ? 'from-orange-400 to-orange-600' 
-                : variant === 1 
-                ? 'from-amber-400 to-orange-500'
-                : 'from-orange-500 to-amber-600'
-        case 'Products':
-            // Slate tones - industrial, manufacturing
-            return variant === 0 
-                ? 'from-slate-400 to-slate-600' 
-                : variant === 1 
-                ? 'from-slate-500 to-slate-700'
-                : 'from-zinc-400 to-slate-600'
-        case 'Services':
-            // Blue tones - tech, digital, secondary brand
-            return variant === 0 
-                ? 'from-blue-400 to-blue-600' 
-                : variant === 1 
-                ? 'from-sky-400 to-blue-500'
-                : 'from-blue-500 to-sky-600'
-        case 'AI':
-            // Violet tones - AI distinction
-            return variant === 0 
-                ? 'from-violet-400 to-violet-600' 
-                : variant === 1 
-                ? 'from-purple-400 to-violet-500'
-                : 'from-indigo-400 to-violet-600'
-        default:
-            return 'from-gray-400 to-gray-600'
-    }
-}
+// Avatar gradients now imported from shared lib (marketplace-colors.ts)
 
 export const MarketCard = memo(function MarketCard({ 
     listing, 
@@ -154,14 +112,6 @@ export const MarketCard = memo(function MarketCard({
         }
     }, [listing.id, localSavedState, onSaveToggle])
 
-    // Badge styles matching the category color scheme
-    const categoryBadgeStyles: Record<string, string> = {
-        'People': 'bg-orange-100 text-orange-700',      // Orange - warm, human
-        'Products': 'bg-slate-100 text-slate-700',      // Slate - industrial
-        'Services': 'bg-blue-100 text-blue-700',        // Blue - tech, digital
-        'AI': 'bg-violet-50 text-violet-700'            // Violet - AI distinction
-    }
-
     const attrs = listing.attributes || {}
     const isPerson = listing.category === 'People'
     const isAI = listing.category === 'AI'
@@ -171,7 +121,7 @@ export const MarketCard = memo(function MarketCard({
 
     const AITypeIcon = isAI ? getAITypeIcon(listing.subcategory) : null
     const initials = getInitials(listing.title)
-    const avatarGradient = getAvatarGradient(listing.category, listing.title)
+    const avatarGradient = getAvatarGradient(listing.category as MarketplaceCategory, listing.title)
 
     // Get the primary metric to show (rate/cost)
     const primaryMetric = attrs.rate || attrs.cost || attrs.price || null
@@ -213,8 +163,10 @@ export const MarketCard = memo(function MarketCard({
         <>
         <Card 
             className={cn(
-                "group relative flex flex-col border hover:border-orange-300 hover:shadow-md transition-all duration-200 overflow-hidden bg-background cursor-pointer",
-                isSelected && "ring-2 ring-orange-500 border-orange-500",
+                "group relative flex flex-col border shadow-sm overflow-hidden bg-background cursor-pointer",
+                "hover:border-muted-foreground/20 hover:shadow-lg hover:-translate-y-0.5",
+                "transition-all duration-200 ease-out",
+                isSelected && "ring-2 ring-international-orange/50 border-international-orange/30",
                 currentSize === 'full' && "col-span-1 md:col-span-2"
             )}
             onMouseEnter={() => setIsHovered(true)}
@@ -252,7 +204,7 @@ export const MarketCard = memo(function MarketCard({
                     className={cn(
                         "w-8 h-8 rounded-full flex items-center justify-center transition-all duration-200",
                         isSelected 
-                            ? "bg-orange-500 text-white shadow-md" 
+                            ? "bg-international-orange text-white shadow-md" 
                             : isHovered 
                                 ? "bg-background text-muted-foreground shadow-md border opacity-100"
                                 : "opacity-0 group-hover:opacity-100"
@@ -286,7 +238,7 @@ export const MarketCard = memo(function MarketCard({
                             {/* Title + Badge */}
                             <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-2 mb-0.5">
-                                    <Badge variant="secondary" className={cn("uppercase text-[9px] tracking-wider font-semibold border-0 shrink-0 px-1.5 py-0", categoryBadgeStyles[listing.category])}>
+                                    <Badge variant="secondary" className={cn("uppercase text-[9px] tracking-wider font-semibold border-0 shrink-0 px-1.5 py-0", getCategoryBadgeClasses(listing.category as MarketplaceCategory))}>
                                         {listing.subcategory}
                                     </Badge>
                                     {listing.is_verified && (
@@ -339,7 +291,7 @@ export const MarketCard = memo(function MarketCard({
 
                             <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-2 mb-1">
-                                    <Badge variant="secondary" className={cn("uppercase text-[10px] tracking-wider font-semibold border-0 shrink-0", categoryBadgeStyles[listing.category])}>
+                                    <Badge variant="secondary" className={cn("uppercase text-[10px] tracking-wider font-semibold border-0 shrink-0", getCategoryBadgeClasses(listing.category as MarketplaceCategory))}>
                                         {listing.subcategory}
                                     </Badge>
                                     {listing.is_verified && (
@@ -357,7 +309,7 @@ export const MarketCard = memo(function MarketCard({
                             <p className="text-sm font-medium text-muted-foreground mb-2 truncate">{attrs.role}</p>
                         )}
                         {isAI && attrs.function && (
-                            <p className="text-sm font-medium text-violet-700 mb-2 line-clamp-2">{attrs.function}</p>
+                            <p className="text-sm font-medium text-status-info-dark mb-2 line-clamp-2">{attrs.function}</p>
                         )}
 
                         {/* Description - 2 lines */}
@@ -460,7 +412,7 @@ export const MarketCard = memo(function MarketCard({
 
                             <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-2 mb-1">
-                                    <Badge variant="secondary" className={cn("uppercase text-[10px] tracking-wider font-semibold border-0 shrink-0", categoryBadgeStyles[listing.category])}>
+                                    <Badge variant="secondary" className={cn("uppercase text-[10px] tracking-wider font-semibold border-0 shrink-0", getCategoryBadgeClasses(listing.category as MarketplaceCategory))}>
                                         {listing.subcategory}
                                     </Badge>
                                     {listing.is_verified && (
@@ -474,7 +426,7 @@ export const MarketCard = memo(function MarketCard({
                                     <p className="text-sm font-medium text-muted-foreground mt-1">{attrs.role}</p>
                                 )}
                                 {isAI && attrs.function && (
-                                    <p className="text-sm font-medium text-violet-700 mt-1">{attrs.function}</p>
+                                    <p className="text-sm font-medium text-status-info-dark mt-1">{attrs.function}</p>
                                 )}
                             </div>
                             

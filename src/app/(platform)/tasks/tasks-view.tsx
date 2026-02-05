@@ -9,7 +9,7 @@ import { RefreshButton } from "@/components/RefreshButton"
 import { SearchInput } from "@/components/ui/search-input"
 import { TaskCard } from "./task-card"
 import { Button } from "@/components/ui/button"
-import { LayoutGrid, List, X, Trash2, CheckSquare, Loader2, Check, UserPlus, Filter, ChevronDown, ChevronRight, CalendarDays, Inbox, History, AlertTriangle } from "lucide-react"
+import { LayoutGrid, List, X, Trash2, CheckSquare, Loader2, Check, UserPlus, Filter, ChevronDown, ChevronRight, CalendarDays, Inbox, History, AlertTriangle, CircleDashed } from "lucide-react"
 import { UserAvatar, UserAvatarStack } from "@/components/ui/user-avatar"
 import { deleteTasks, acceptTask, completeTask, updateTaskAssignees } from "@/actions/tasks"
 import { deleteObjectives } from "@/actions/objectives"
@@ -690,14 +690,21 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                                                         </SelectTrigger>
                                                         <SelectContent>
                                                             <SelectItem value="all">All Assignees</SelectItem>
-                                                            <SelectItem value="unassigned">Unassigned</SelectItem>
+                                                            <SelectItem value="unassigned" className="py-2.5">
+                                                                <div className="flex items-center gap-2">
+                                                                    <div className="h-6 w-6 rounded-full bg-muted flex items-center justify-center shrink-0">
+                                                                        <CircleDashed className="h-3.5 w-3.5 text-muted-foreground" />
+                                                                    </div>
+                                                                    <span>Unassigned</span>
+                                                                </div>
+                                                            </SelectItem>
                                                             {members.map(m => (
-                                                                <SelectItem key={m.id} value={m.id}>
+                                                                <SelectItem key={m.id} value={m.id} className="py-2.5">
                                                                     <div className="flex items-center gap-2">
                                                                         <UserAvatar 
                                                                             name={m.full_name} 
                                                                             role={m.role} 
-                                                                            size="xs" 
+                                                                            size="sm" 
                                                                         />
                                                                         <span>{m.full_name}</span>
                                                                     </div>

@@ -166,8 +166,6 @@ export function ApprenticePoolBrowser() {
                                         role="Apprentice"
                                         avatarUrl={apprentice.avatarUrl}
                                         size="xl"
-                                        showBorder
-                                        className="border"
                                     />
                                     <div>
                                         <h4 className="font-medium text-foreground">{apprentice.fullName}</h4>
@@ -238,8 +236,6 @@ export function ApprenticePoolBrowser() {
                                         role="Apprentice"
                                         avatarUrl={selectedApprentice?.avatarUrl}
                                         size="xl"
-                                        showBorder
-                                        className="border-status-success"
                                     />
                                 </div>
                                 <p className="text-foreground">
@@ -271,8 +267,6 @@ export function ApprenticePoolBrowser() {
                                         role="Apprentice"
                                         avatarUrl={selectedApprentice.avatarUrl}
                                         size="xl"
-                                        showBorder
-                                        className="border"
                                     />
                                     <div>
                                         <h4 className="font-medium">{selectedApprentice.fullName}</h4>

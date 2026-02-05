@@ -131,8 +131,6 @@ export function ProjectAssignmentsList() {
                                             name={assignment.apprenticeName}
                                             role="Apprentice"
                                             size="lg"
-                                            showBorder
-                                            className="border-status-success"
                                         />
                                         <div>
                                             <h4 className="font-medium text-foreground">{assignment.apprenticeName}</h4>
@@ -199,8 +197,6 @@ export function ProjectAssignmentsList() {
                                             name={assignment.apprenticeName}
                                             role="Apprentice"
                                             size="lg"
-                                            showBorder
-                                            className="border"
                                         />
                                         <div>
                                             <h4 className="font-medium text-foreground">{assignment.apprenticeName}</h4>

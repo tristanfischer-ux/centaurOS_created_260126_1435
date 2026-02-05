@@ -2,6 +2,7 @@
 
 import { Badge } from '@/components/ui/badge'
 import { typography } from '@/lib/design-system'
+import { useRouter } from 'next/navigation'
 
 interface HomeHeaderProps {
   totalUnread: number
@@ -15,10 +16,17 @@ interface HomeHeaderProps {
  * and unread message count badge.
  */
 export function HomeHeader({ totalUnread, userName }: HomeHeaderProps) {
+  const router = useRouter()
+  
   // Get time-based greeting
   const hour = new Date().getHours()
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening'
   const displayName = userName?.split(' ')[0] || 'there'
+
+  // Handle jump to unread
+  const handleJumpToUnread = () => {
+    router.push('/home?jumpToUnread=true')
+  }
 
   return (
     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -29,7 +37,19 @@ export function HomeHeader({ totalUnread, userName }: HomeHeaderProps) {
             {greeting}, {displayName}
           </h1>
           {totalUnread > 0 && (
-            <Badge className="ml-2 bg-international-orange text-white">
+            <Badge 
+              className="ml-2 bg-international-orange text-white cursor-pointer hover:bg-international-orange-hover transition-colors"
+              onClick={handleJumpToUnread}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault()
+                  handleJumpToUnread()
+                }
+              }}
+              aria-label={`Jump to ${totalUnread} unread message${totalUnread !== 1 ? 's' : ''}`}
+            >
               {totalUnread} unread
             </Badge>
           )}

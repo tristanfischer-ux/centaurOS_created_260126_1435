@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { cn } from "@/lib/utils"
+import { getCategoryBadgeClasses, type MarketplaceCategory } from "@/lib/marketplace-colors"
 import {
     ShieldCheck,
     MapPin,
@@ -57,14 +58,6 @@ interface MarketplaceListingDetailProps {
     ratings?: RatingsData | null
 }
 
-// Badge styles matching the category color scheme
-const categoryBadgeStyles = {
-    'People': 'bg-orange-100 text-orange-700',      // Orange - warm, human
-    'Products': 'bg-slate-100 text-slate-700',      // Slate - industrial
-    'Services': 'bg-blue-100 text-blue-700',        // Blue - tech, digital
-    'AI': 'bg-violet-50 text-violet-700'            // Violet - AI distinction
-}
-
 export function MarketplaceListingDetail({ listing, trustSignals, ratings }: MarketplaceListingDetailProps) {
     const attrs = listing.attributes || {}
     const category = listing.category
@@ -101,12 +94,12 @@ export function MarketplaceListingDetail({ listing, trustSignals, ratings }: Mar
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-3 border-b border-slate-100">
                 <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-3 mb-1">
-                        <div className="h-8 w-1 bg-orange-600 rounded-full shadow-[0_0_8px_rgba(234,88,12,0.6)]" />
+                        <div className="h-8 w-1 bg-international-orange rounded-full shadow-[0_0_8px_rgba(234,88,12,0.6)]" />
                         <Badge 
                             variant="secondary" 
                             className={cn(
                                 "uppercase text-[10px] tracking-wider font-semibold",
-                                categoryBadgeStyles[category]
+                                getCategoryBadgeClasses(category as MarketplaceCategory)
                             )}
                         >
                             {listing.subcategory}

@@ -48,7 +48,7 @@ const orderTypeConfig: Record<
   service: {
     label: "Service",
     icon: Cpu,
-    color: "text-purple-600",
+    color: "text-chart-5",
   },
 }
 

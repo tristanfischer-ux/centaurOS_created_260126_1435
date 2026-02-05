@@ -74,6 +74,14 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 
+interface TeamMember {
+  id: string
+  full_name: string
+  role: string
+  email: string
+  avatar_url?: string | null
+}
+
 interface BlueprintsViewProps {
   blueprints: Blueprint[]
   templates: BlueprintTemplate[]
@@ -82,6 +90,7 @@ interface BlueprintsViewProps {
   universalSubsystems?: UniversalSubsystem[]
   currentUserId?: string
   currentUserRole?: string
+  members?: TeamMember[]
 }
 
 export function BlueprintsView({ 
@@ -92,6 +101,7 @@ export function BlueprintsView({
   universalSubsystems = [],
   currentUserId: _currentUserId = '',
   currentUserRole: _currentUserRole,
+  members = [],
 }: BlueprintsViewProps) {
   // Note: _currentUserId and _currentUserRole are available for future "My Questions" filter
   const router = useRouter()
@@ -1346,7 +1356,7 @@ function PackCard({ pack }: { pack: ObjectivePack }) {
         )}
 
         {/* Action button with dialog */}
-        <UsePackDialog pack={pack} />
+        <UsePackDialog pack={pack} members={members} />
       </CardContent>
     </Card>
   )

@@ -1,0 +1,48 @@
+/* Message animations */
+
+@keyframes slideInFromBottom {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.message-bubble-own {
+  animation: slideInFromBottom 0.2s ease-out;
+}
+
+.message-bubble-other {
+  animation: fadeIn 0.3s ease-out;
+}
+
+.message-sending {
+  opacity: 0.6;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+.message-failed {
+  opacity: 0.5;
+  border-left: 2px solid hsl(var(--destructive));
+}

@@ -1,27 +1,28 @@
 'use client'
 
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Skeleton } from '@/components/ui/skeleton'
 import { UserAvatar } from '@/components/ui/user-avatar'
 import { MessageBubble, DateSeparator } from '@/components/messaging/MessageBubble'
-import { ContextSelector } from './context-selector'
+import { UnreadDivider } from '@/components/messaging/UnreadDivider'
+import { JumpToUnreadButton } from '@/components/messaging/JumpToUnreadButton'
 import { useConversation } from '@/hooks/useConversation'
 import { useMessagingShortcuts } from '@/hooks/useMessagingShortcuts'
 import type { MessageWithSender } from '@/lib/messaging/service'
 import type { MessageWithContext } from '@/types/messaging'
-import { sendMessageWithContext, bridgeMessageToTaskComment } from '@/lib/messaging/service'
 import { createClient } from '@/lib/supabase/client'
-import { 
+import {
   MoreVertical, 
   Archive, 
   ArrowLeft,
-  Loader2,
   WifiOff,
   ChevronUp,
-  ExternalLink
+  ExternalLink,
+  MessageSquare,
+  CheckSquare
 } from 'lucide-react'
 import {
   DropdownMenu,
@@ -160,21 +161,96 @@ export function ConversationThreadEnhanced({
     loadMore,
     hasMore,
     isConnected,
-    sendMessage: hookSendMessage  // Use the hook's send which has optimistic updates
+    sendMessage: hookSendMessage,  // Use the hook's send which has optimistic updates
+    lastReadAt
   } = useConversation(conversationId)
 
   const [isSending, setIsSending] = useState(false)
   const [isArchiving, setIsArchiving] = useState(false)
   const [hoveredMessageId, setHoveredMessageId] = useState<string | null>(null)
   const [replyCounts, setReplyCounts] = useState<Record<string, number>>({})
-  const [currentContext, setCurrentContext] = useState<{ taskId?: string; objectiveId?: string } | null>(null)
-  const [recentContexts, setRecentContexts] = useState<Array<{ taskId?: string; objectiveId?: string }>>([])
   
   const scrollRef = useRef<HTMLDivElement>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
+  const unreadDividerRef = useRef<HTMLDivElement>(null)
+  
+  // Calculate first unread message index and count
+  const { firstUnreadIndex, unreadCount } = useMemo(() => {
+    if (!lastReadAt || messages.length === 0) {
+      return { firstUnreadIndex: -1, unreadCount: 0 }
+    }
+    
+    const lastReadTime = new Date(lastReadAt).getTime()
+    
+    // Find first message after last_read_at
+    const index = messages.findIndex(msg => {
+      const msgTime = new Date(msg.created_at).getTime()
+      return msgTime > lastReadTime && msg.sender_id !== currentUserId
+    })
+    
+    if (index === -1) {
+      return { firstUnreadIndex: -1, unreadCount: 0 }
+    }
+    
+    // Count unread messages from other users
+    const count = messages.slice(index).filter(msg => msg.sender_id !== currentUserId).length
+    
+    return { firstUnreadIndex: index, unreadCount: count }
+  }, [messages, lastReadAt, currentUserId])
   
   // Wire up messaging shortcuts
   useMessagingShortcuts({
+    onJumpToUnread: () => {
+      // U key - Jump to first unread message
+      if (unreadCount > 0 && unreadDividerRef.current) {
+        unreadDividerRef.current.scrollIntoView({ 
+          behavior: 'smooth', 
+          block: 'center' 
+        })
+        toast.success(`Jumped to ${unreadCount} unread message${unreadCount !== 1 ? 's' : ''}`)
+      } else {
+        toast.info('No unread messages')
+      }
+    },
+    onJumpToNextUnread: () => {
+      // N key - Jump to next unread message after current position
+      if (unreadCount === 0 || firstUnreadIndex === -1) {
+        toast.info('No unread messages')
+        return
+      }
+
+      // Get current scroll position
+      const scrollArea = scrollRef.current
+      if (!scrollArea) return
+
+      const scrollTop = scrollArea.scrollTop
+      const messageElements = scrollArea.querySelectorAll('[data-message-id]')
+      
+      // Find first unread message below current scroll position
+      for (let i = 0; i < messageElements.length; i++) {
+        const el = messageElements[i] as HTMLElement
+        const messageId = el.dataset.messageId
+        const message = messages.find(m => m.id === messageId)
+        
+        if (!message || message.sender_id === currentUserId) continue
+        
+        const messageTime = new Date(message.created_at).getTime()
+        const lastReadTime = lastReadAt ? new Date(lastReadAt).getTime() : 0
+        
+        if (messageTime > lastReadTime && el.offsetTop > scrollTop + 100) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+          return
+        }
+      }
+      
+      // If no next unread, jump to first unread
+      if (unreadDividerRef.current) {
+        unreadDividerRef.current.scrollIntoView({ 
+          behavior: 'smooth', 
+          block: 'center' 
+        })
+      }
+    },
     onReplyInThread: () => {
       // Thread reply functionality - could be enhanced
       if (messages.length > 0) {
@@ -231,6 +307,26 @@ export function ConversationThreadEnhanced({
     }
   }, [messages.length])
 
+  // Auto-scroll to unread divider on conversation load
+  useEffect(() => {
+    // Only auto-scroll if:
+    // 1. Messages have loaded (!isLoading)
+    // 2. There are unread messages (unreadCount > 0)
+    // 3. Unread divider ref exists
+    // 4. This is initial load (conversationId changed)
+    if (!isLoading && unreadCount > 0 && unreadDividerRef.current) {
+      // Small delay to ensure DOM is ready
+      const timer = setTimeout(() => {
+        unreadDividerRef.current?.scrollIntoView({ 
+          behavior: 'smooth', 
+          block: 'center' 
+        })
+      }, 300)
+
+      return () => clearTimeout(timer)
+    }
+  }, [conversationId, isLoading, unreadCount])
+
   // Fetch reply counts for all messages
   useEffect(() => {
     if (messages.length === 0) return
@@ -248,101 +344,24 @@ export function ConversationThreadEnhanced({
     })
   }, [messages.length])
 
-  // Handle context change
-  const handleContextChange = useCallback((context: { taskId?: string; objectiveId?: string } | null) => {
-    setCurrentContext(context)
-    
-    // Track recent contexts (max 5)
-    if (context) {
-      setRecentContexts(prev => {
-        const filtered = prev.filter(c => 
-          c.taskId !== context.taskId || c.objectiveId !== context.objectiveId
-        )
-        return [context, ...filtered].slice(0, 5)
-      })
-    }
-  }, [])
-
-  // Handle send message with context (for CommandInput)
-  // Uses sendMessageWithContext when there's a task context to get the message ID
+  // Handle send message (for CommandInput)
   const handleSend = useCallback(async (content: string): Promise<boolean> => {
-    console.log('[handleSend] Called with:', { content, conversationId, isSending })
-    
-    if (!content.trim()) {
-      console.log('[handleSend] Empty content, returning false')
-      return false
-    }
-    
-    if (isSending) {
-      console.log('[handleSend] Already sending, returning false')
-      return false
-    }
-    
-    if (!conversationId) {
-      console.log('[handleSend] No conversationId, returning false')
-      toast.error('No conversation selected')
+    if (!content.trim() || isSending || !conversationId) {
+      if (!conversationId) toast.error('No conversation selected')
       return false
     }
 
     setIsSending(true)
 
     try {
-      const supabase = createClient()
+      const success = await hookSendMessage(content.trim())
       
-      // If there's a task context, use sendMessageWithContext to get the message ID
-      if (currentContext?.taskId) {
-        console.log('[handleSend] Sending message with task context:', currentContext.taskId)
-        
-        try {
-          // Send message and get the message ID
-          const messageId = await sendMessageWithContext(
-            supabase,
-            conversationId,
-            currentUserId,
-            content.trim(),
-            currentContext.taskId,
-            undefined // no objective context in this flow
-          )
-          
-          if (!messageId) {
-            console.error('[handleSend] sendMessageWithContext returned no message ID')
-            toast.error('Failed to send message')
-            return false
-          }
-          
-          console.log('[handleSend] Message sent with ID:', messageId)
-          
-          // Bridge the message to task comments
-          await bridgeMessageToTaskComment(
-            supabase,
-            messageId,
-            currentContext.taskId,
-            content.trim(),
-            currentUserId
-          )
-          
-          console.log('[handleSend] Successfully bridged message to task')
-          return true
-        } catch (contextError) {
-          console.error('[handleSend] Failed to send message with context:', contextError)
-          toast.error('Failed to send message')
-          return false
-        }
-      } else {
-        // No task context - use the hook's sendMessage for optimistic updates
-        console.log('[handleSend] Calling hookSendMessage (no context)...')
-        
-        const success = await hookSendMessage(content.trim())
-        
-        console.log('[handleSend] hookSendMessage returned:', success)
-        
-        if (!success) {
-          toast.error('Failed to send message')
-          return false
-        }
-        
-        return true
+      if (!success) {
+        toast.error('Failed to send message')
+        return false
       }
+      
+      return true
     } catch (error) {
       console.error('[handleSend] Failed to send message:', error)
       toast.error('Failed to send message')
@@ -350,7 +369,7 @@ export function ConversationThreadEnhanced({
     } finally {
       setIsSending(false)
     }
-  }, [isSending, conversationId, currentUserId, currentContext, hookSendMessage])
+  }, [isSending, conversationId, hookSendMessage])
 
   // Handle archive/unarchive
   const handleArchive = async () => {
@@ -398,9 +417,9 @@ export function ConversationThreadEnhanced({
       // Upload file
       const result = await uploadMessageFile(file, conversationId, currentUserId)
       
-      // Send message with file attachment using context-aware function
+      // Send message with file attachment
       const supabase = createClient()
-      const { data: message, error } = await supabase
+      const { error } = await supabase
         .from('messages')
         .insert({
           conversation_id: conversationId,
@@ -408,8 +427,6 @@ export function ConversationThreadEnhanced({
           content: result.fileName,
           message_type: 'file',
           file_url: result.url,
-          task_id: currentContext?.type === 'task' ? currentContext.id : null,
-          objective_id: currentContext?.type === 'objective' ? currentContext.id : null,
         })
         .select()
         .single()
@@ -439,10 +456,37 @@ export function ConversationThreadEnhanced({
   // No conversation selected
   if (!conversationId) {
     return (
-      <div className={cn('flex flex-col items-center justify-center h-full', className)}>
-        <div className="text-center text-muted-foreground">
-          <p className="text-lg font-medium">No conversation selected</p>
-          <p className="text-sm mt-1">Select a conversation to start messaging</p>
+      <div className={cn('flex flex-col items-center justify-center h-full p-8', className)}>
+        <div className="text-center max-w-md space-y-6">
+          <div className="w-16 h-16 rounded-full bg-international-orange-light mx-auto flex items-center justify-center">
+            <MessageSquare className="w-8 h-8 text-international-orange" />
+          </div>
+          <div>
+            <p className="text-lg font-semibold text-foreground mb-2">No conversation selected</p>
+            <p className="text-sm text-muted-foreground">
+              Select a conversation from the left to start messaging, or start a new discussion about a task.
+            </p>
+          </div>
+          {tasks.length > 0 && (
+            <div className="pt-4 border-t border-border">
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3">
+                Quick Actions
+              </p>
+              <div className="flex flex-wrap gap-2 justify-center">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="text-xs"
+                  onClick={() => {
+                    // Would open task selector
+                  }}
+                >
+                  <CheckSquare className="h-3 w-3 mr-1" />
+                  Discuss a task
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     )
@@ -528,17 +572,6 @@ export function ConversationThreadEnhanced({
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
-
-          {/* Context Selector */}
-          <div className="px-4 pb-3">
-            <ContextSelector
-              tasks={tasks}
-              objectives={objectives}
-              currentContext={currentContext}
-              onContextChange={handleContextChange}
-              recentContexts={recentContexts}
-            />
-          </div>
         </div>
       )}
 
@@ -561,53 +594,106 @@ export function ConversationThreadEnhanced({
           )}
 
           {/* Messages grouped by date */}
-          {Array.from(messageGroups.entries()).map(([dateKey, dayMessages]) => (
-            <div key={dateKey}>
-              <DateSeparator date={dayMessages[0].created_at} />
-              <div className="space-y-2">
-                {dayMessages.map((message, idx) => {
-                  const prevMessage = dayMessages[idx - 1]
-                  const showAvatar = !prevMessage || 
-                    prevMessage.sender_id !== message.sender_id ||
-                    message.message_type === 'system'
+          {(() => {
+            let globalIndex = 0
+            return Array.from(messageGroups.entries()).map(([dateKey, dayMessages]) => (
+              <div key={dateKey}>
+                <DateSeparator date={dayMessages[0].created_at} />
+                <div className="space-y-2">
+                  {dayMessages.map((message, idx) => {
+                    const currentGlobalIndex = globalIndex++
+                    const prevMessage = dayMessages[idx - 1]
+                    const showAvatar = !prevMessage || 
+                      prevMessage.sender_id !== message.sender_id ||
+                      message.message_type === 'system'
 
-                  const messageWithContext = message as MessageWithContext
+                    const messageWithContext = message as MessageWithContext
+                    const isFirstUnread = currentGlobalIndex === firstUnreadIndex
 
-                  return (
-                    <div key={message.id} onMouseEnter={() => setHoveredMessageId(message.id)} onMouseLeave={() => setHoveredMessageId(null)}>
-                      {/* Context tag above message */}
-                      {(messageWithContext.task_id || messageWithContext.objective_id) && (
-                        <MessageContextTag
-                          taskId={messageWithContext.task_id || undefined}
-                          objectiveId={messageWithContext.objective_id || undefined}
-                          task={messageWithContext.task}
-                          objective={messageWithContext.objective}
-                          tasks={tasks}
-                          objectives={objectives}
-                        />
-                      )}
-                      
-                      <MessageBubble
-                        message={message}
-                        isOwn={message.sender_id === currentUserId}
-                        showAvatar={showAvatar}
-                        replyCount={replyCounts[message.id] || 0}
-                        lastReplyAt={message.last_reply_at || null}
-                        onOpenThread={() => toast.info('Thread panel: Coming soon')}
-                      />
-                    </div>
-                  )
-                })}
+                    return (
+                      <div key={message.id}>
+                        {/* Unread divider */}
+                        {isFirstUnread && unreadCount > 0 && (
+                          <UnreadDivider ref={unreadDividerRef} unreadCount={unreadCount} />
+                        )}
+                        
+                        <div 
+                          data-message-id={message.id}
+                          onMouseEnter={() => setHoveredMessageId(message.id)} 
+                          onMouseLeave={() => setHoveredMessageId(null)}
+                        >
+                          {/* Context tag above message */}
+                          {(messageWithContext.task_id || messageWithContext.objective_id) && (
+                            <MessageContextTag
+                              taskId={messageWithContext.task_id || undefined}
+                              objectiveId={messageWithContext.objective_id || undefined}
+                              task={messageWithContext.task}
+                              objective={messageWithContext.objective}
+                              tasks={tasks}
+                              objectives={objectives}
+                            />
+                          )}
+                          
+                          <MessageBubble
+                            message={message}
+                            isOwn={message.sender_id === currentUserId}
+                            showAvatar={showAvatar}
+                            replyCount={replyCounts[message.id] || 0}
+                            lastReplyAt={message.last_reply_at || null}
+                            onOpenThread={() => toast.info('Thread panel: Coming soon')}
+                          />
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
               </div>
-            </div>
-          ))}
+            ))
+          })()}
 
           {/* Empty state */}
           {messages.length === 0 && (
-            <div className="flex flex-col items-center justify-center py-12 text-center">
-              <p className="text-sm text-muted-foreground">
-                No messages yet. Start the conversation!
-              </p>
+            <div className="flex flex-col items-center justify-center py-12 text-center px-4">
+              <div className="max-w-sm space-y-4">
+                <div className="w-12 h-12 rounded-full bg-muted mx-auto flex items-center justify-center">
+                  <MessageSquare className="w-6 h-6 text-muted-foreground" />
+                </div>
+                <div>
+                  <p className="font-medium text-foreground mb-1">Start the conversation</p>
+                  <p className="text-sm text-muted-foreground">
+                    Begin chatting with {otherPersonName}
+                  </p>
+                </div>
+                <div className="pt-2">
+                  <p className="text-xs font-medium text-muted-foreground mb-2">Try these starters:</p>
+                  <div className="flex flex-col gap-2">
+                    <button
+                      onClick={() => {
+                        const input = document.querySelector<HTMLTextAreaElement>('[placeholder*="Type a message"]')
+                        if (input) {
+                          input.value = "Hey! How's it going?"
+                          input.focus()
+                        }
+                      }}
+                      className="text-xs text-international-orange hover:text-international-orange-hover transition-colors text-left px-3 py-2 rounded-lg hover:bg-international-orange-light"
+                    >
+                      👋 "Hey! How's it going?"
+                    </button>
+                    <button
+                      onClick={() => {
+                        const input = document.querySelector<HTMLTextAreaElement>('[placeholder*="Type a message"]')
+                        if (input) {
+                          input.value = "What are you working on?"
+                          input.focus()
+                        }
+                      }}
+                      className="text-xs text-international-orange hover:text-international-orange-hover transition-colors text-left px-3 py-2 rounded-lg hover:bg-international-orange-light"
+                    >
+                      💼 "What are you working on?"
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
           )}
 
@@ -615,6 +701,21 @@ export function ConversationThreadEnhanced({
           <div ref={bottomRef} />
         </div>
       </ScrollArea>
+
+      {/* Jump to Unread Button */}
+      {unreadCount > 0 && (
+        <JumpToUnreadButton
+          unreadCount={unreadCount}
+          onJumpToUnread={() => {
+            unreadDividerRef.current?.scrollIntoView({ 
+              behavior: 'smooth', 
+              block: 'center' 
+            })
+          }}
+          scrollAreaRef={scrollRef}
+          show={unreadCount > 0}
+        />
+      )}
 
       {/* Hidden file input for file uploads */}
       <input
@@ -625,7 +726,7 @@ export function ConversationThreadEnhanced({
         accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.zip"
       />
 
-      {/* Message input with @ mentions, slash commands, and # task references */}
+      {/* Message input with @ mentions and slash commands */}
       <CommandInput
         conversationId={conversationId}
         currentUserId={currentUserId}
@@ -634,13 +735,7 @@ export function ConversationThreadEnhanced({
         tasks={tasks}
         onSend={handleSend}
         onFileClick={handleFileClick}
-        placeholder={
-          currentContext?.taskId 
-            ? `Message about task... (/ for commands, @ to mention, # to link task)` 
-            : currentContext?.objectiveId 
-            ? `Message about objective... (/ for commands, @ to mention, # to link task)` 
-            : 'Type a message... (/ for commands, @ to mention, # to link task)'
-        }
+        placeholder="Type a message... (/ for commands, @ to mention)"
         disabled={isSending || isUploadingFile}
       />
     </div>

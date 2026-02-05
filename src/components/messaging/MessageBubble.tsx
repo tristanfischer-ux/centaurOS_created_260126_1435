@@ -11,10 +11,12 @@ import { ReactionDisplay } from './ReactionDisplay'
 import { QuickReactionBar } from './ReactionPicker'
 import { StarredIndicator } from './StarredIndicator'
 import { PinnedIndicator } from './PinnedIndicator'
+import { MessageActions } from './MessageActions'
 import type { ReactionGroup } from '@/actions/reactions'
 import { formatDistanceToNow } from 'date-fns'
 import { isImageFile, getFileIcon } from '@/lib/file-upload'
 import Image from 'next/image'
+import '@/components/inbox/message-animations.css'
 
 interface MessageBubbleProps {
   message: MessageWithSender
@@ -33,6 +35,9 @@ interface MessageBubbleProps {
   // Message status props
   isStarred?: boolean
   isPinned?: boolean
+  // Action callbacks
+  onToggleStar?: () => void
+  onForwardMessage?: () => void
 }
 
 function formatTime(dateString: string): string {
@@ -183,9 +188,12 @@ export function MessageBubble({
   lastReplyAt,
   onOpenThread,
   isStarred = false,
-  isPinned = false
+  isPinned = false,
+  onToggleStar,
+  onForwardMessage
 }: MessageBubbleProps) {
   const [showQuickReactions, setShowQuickReactions] = useState(false)
+  const [showActions, setShowActions] = useState(false)
   const sender = message.sender
   const isSystem = message.message_type === 'system'
   const isFile = message.message_type === 'file'
@@ -227,10 +235,17 @@ export function MessageBubble({
     <div
       className={cn(
         'flex gap-2 max-w-[85%] group relative',
-        isOwn ? 'ml-auto flex-row-reverse' : 'mr-auto'
+        isOwn ? 'ml-auto flex-row-reverse' : 'mr-auto',
+        isOwn ? 'message-bubble-own' : 'message-bubble-other'
       )}
-      onMouseEnter={() => setShowQuickReactions(true)}
-      onMouseLeave={() => setShowQuickReactions(false)}
+      onMouseEnter={() => {
+        setShowQuickReactions(true)
+        setShowActions(true)
+      }}
+      onMouseLeave={() => {
+        setShowQuickReactions(false)
+        setShowActions(false)
+      }}
     >
       {/* Avatar */}
       {showAvatar && !isOwn && (
@@ -260,6 +275,24 @@ export function MessageBubble({
               isOwn ? 'right-0' : 'left-0'
             )}>
               <QuickReactionBar onSelect={handleAddReaction} />
+            </div>
+          )}
+          
+          {/* Message actions (appears on hover) */}
+          {showActions && !isSystem && (
+            <div className={cn(
+              'absolute top-0 z-10',
+              isOwn ? 'left-0 -translate-x-full -ml-2' : 'right-0 translate-x-full ml-2'
+            )}>
+              <MessageActions
+                messageId={message.id}
+                messageContent={message.content}
+                isOwn={isOwn}
+                isStarred={isStarred}
+                onReplyInThread={onOpenThread ? handleOpenThread : undefined}
+                onToggleStar={onToggleStar}
+                onForward={onForwardMessage}
+              />
             </div>
           )}
           

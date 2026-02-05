@@ -101,7 +101,7 @@ export function ForwardTaskDialog({
                 {sortedMembers.map((member) => (
                   <SelectItem key={member.id} value={member.id}>
                     <div className="flex items-center gap-3">
-                      <UserAvatar name={member.full_name} role={member.role} size="md" showBorder />
+                      <UserAvatar name={member.full_name} role={member.role} size="md" />
                       <span>
                         {member.full_name}
                         {member.role === "AI_Agent" && " 🤖"}

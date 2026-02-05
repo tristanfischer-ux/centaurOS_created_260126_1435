@@ -14,28 +14,23 @@ export const ROLE_COLORS = {
   Founder: {
     bg: "bg-orange-100",
     text: "text-orange-700",
-    border: "border-international-orange/50",
   },
   Executive: {
     bg: "bg-orange-50",
     text: "text-orange-600",
-    border: "border-orange-300",
   },
   Apprentice: {
     bg: "bg-muted",
     text: "text-muted-foreground",
-    border: "border-slate-300",
   },
   AI_Agent: {
     bg: "bg-purple-100",
     text: "text-purple-600",
-    border: "border-purple-300",
   },
   // Default for any other roles
   default: {
     bg: "bg-muted",
     text: "text-muted-foreground",
-    border: "border-slate-300",
   },
 } as const
 
@@ -57,8 +52,6 @@ export interface UserAvatarProps {
   size?: "xs" | "sm" | "md" | "lg" | "xl" | "2xl" | "3xl"
   /** Additional className for the Avatar root */
   className?: string
-  /** Whether to show a border */
-  showBorder?: boolean
   /** Custom z-index for stacked avatars */
   style?: React.CSSProperties
 }
@@ -115,7 +108,6 @@ export function UserAvatar({
   avatarUrl,
   size = "md",
   className,
-  showBorder = false,
   style,
 }: UserAvatarProps) {
   const isAI = role === "AI_Agent"
@@ -126,7 +118,6 @@ export function UserAvatar({
     <Avatar
       className={cn(
         sizeClasses[size],
-        showBorder && `border-2 border-white ring-1 ${colors.border}`,
         className
       )}
       style={style}
@@ -214,7 +205,6 @@ export function UserAvatarStack({
           role={user.role}
           avatarUrl={user.avatarUrl}
           size={size}
-          showBorder
           style={{ zIndex: 10 - index }}
         />
       ))}
@@ -222,7 +212,7 @@ export function UserAvatarStack({
         <div
           className={cn(
             sizeClasses[size],
-            "rounded-full bg-muted text-muted-foreground flex items-center justify-center border-2 border-white",
+            "rounded-full bg-muted text-muted-foreground flex items-center justify-center",
             textSizeClasses[size],
             "font-medium"
           )}

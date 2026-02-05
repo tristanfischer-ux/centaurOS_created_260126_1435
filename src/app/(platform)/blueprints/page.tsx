@@ -16,19 +16,28 @@ async function BlueprintsData() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   
-  // Fetch user profile for role info
+  // Fetch user profile for role and foundry info
   const { data: profile } = user ? await supabase
     .from('profiles')
-    .select('role')
+    .select('role, foundry_id')
     .eq('id', user.id)
     .single() : { data: null }
 
-  const [blueprintsResult, templatesResult, questionsResult, packsResult, universalSubsystems] = await Promise.all([
+  const foundryId = profile?.foundry_id
+
+  const [blueprintsResult, templatesResult, questionsResult, packsResult, universalSubsystems, membersResult] = await Promise.all([
     getBlueprints(),
     getBlueprintTemplates(),
     getAdvisoryQuestions({ limit: 10 }),
     getObjectivePacks(),
     getUniversalSubsystems(),
+    // Fetch team members for task assignment
+    foundryId ? supabase
+      .from('profiles')
+      .select('id, full_name, role, email, avatar_url')
+      .eq('foundry_id', foundryId)
+      .order('full_name')
+      : Promise.resolve({ data: null }),
   ])
 
   // Transform questions to match the expected Question interface
@@ -51,6 +60,15 @@ async function BlueprintsData() {
     views: q.view_count,
   }))
 
+  // Transform members for use in dialogs
+  const members = (membersResult.data || []).map(m => ({
+    id: m.id,
+    full_name: m.full_name || 'Unknown',
+    role: m.role,
+    email: m.email || '',
+    avatar_url: m.avatar_url,
+  }))
+
   return (
     <BlueprintsView
       blueprints={blueprintsResult.data || []}
@@ -60,6 +78,7 @@ async function BlueprintsData() {
       universalSubsystems={universalSubsystems}
       currentUserId={user?.id || ''}
       currentUserRole={profile?.role || undefined}
+      members={members}
     />
   )
 }

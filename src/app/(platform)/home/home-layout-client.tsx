@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useCallback, useEffect, useRef } from 'react'
+import { useSearchParams, useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
@@ -163,6 +164,52 @@ export function HomeLayoutClient({
   // Preference update debouncing
   const preferenceUpdateTimeout = useRef<NodeJS.Timeout | null>(null)
   const supabase = createClient()
+  const searchParams = useSearchParams()
+  const router = useRouter()
+  
+  // Handle "Jump to Unread" from query parameter
+  useEffect(() => {
+    const jumpToUnread = searchParams?.get('jumpToUnread')
+    
+    if (jumpToUnread === 'true') {
+      // Find first member with unread messages
+      const memberWithUnread = members.find(m => (m.unread_count ?? 0) > 0)
+      
+      // Find first task with unread messages
+      const taskWithUnread = tasks.find(t => (t.unread_message_count ?? 0) > 0)
+      
+      if (memberWithUnread) {
+        // Switch to people view and select the person
+        setViewMode('people')
+        setSelectedPersonId(memberWithUnread.id)
+        setSelectedTaskId(null)
+        setCurrentContext(null)
+        setShowConversation(true)
+        setListPanelOpen(false)
+        
+        // Clear the query parameter
+        router.replace('/home', { scroll: false })
+      } else if (taskWithUnread) {
+        // Switch to tasks view and select the task
+        setViewMode('tasks')
+        setSelectedTaskId(taskWithUnread.id)
+        setSelectedPersonId(null)
+        setCurrentContext({
+          taskId: taskWithUnread.id,
+          objectiveId: taskWithUnread.objective_id || undefined
+        })
+        setShowConversation(true)
+        setListPanelOpen(false)
+        
+        // Clear the query parameter
+        router.replace('/home', { scroll: false })
+      } else {
+        toast.info('No unread messages')
+        // Clear the query parameter
+        router.replace('/home', { scroll: false })
+      }
+    }
+  }, [searchParams, members, tasks, router])
   
   // Detect screen size on mount and resize
   useEffect(() => {

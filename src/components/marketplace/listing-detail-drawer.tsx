@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { cn } from "@/lib/utils"
+import { getCategoryBadgeClasses, type MarketplaceCategory } from "@/lib/marketplace-colors"
 import { toast } from "sonner"
 import {
     ShieldCheck,
@@ -40,14 +41,6 @@ interface ListingDetailDrawerProps {
     open: boolean
     onOpenChange: (open: boolean) => void
     listing: MarketplaceListing | null
-}
-
-// Badge styles matching the category color scheme
-const categoryBadgeStyles = {
-    'People': 'bg-orange-100 text-orange-700',      // Orange - warm, human
-    'Products': 'bg-slate-100 text-slate-700',      // Slate - industrial
-    'Services': 'bg-blue-100 text-blue-700',        // Blue - tech, digital
-    'AI': 'bg-violet-50 text-violet-700'            // Violet - AI distinction
 }
 
 export function ListingDetailDrawer({ open, onOpenChange, listing }: ListingDetailDrawerProps) {
@@ -97,7 +90,7 @@ export function ListingDetailDrawer({ open, onOpenChange, listing }: ListingDeta
                             variant="secondary" 
                             className={cn(
                                 "uppercase text-[10px] tracking-wider font-semibold border-0",
-                                categoryBadgeStyles[category]
+                                getCategoryBadgeClasses(category as MarketplaceCategory)
                             )}
                         >
                             {listing.subcategory}
@@ -275,7 +268,7 @@ function PeopleSection({ attrs }: { attrs: Record<string, any> }) {
                     </h4>
                     <div className="flex flex-wrap gap-2">
                         {(attrs.skills || attrs.expertise || []).map((skill: string, i: number) => (
-                            <span key={i} className="text-xs px-2.5 py-1 rounded-full bg-orange-50 text-orange-700">
+                            <span key={i} className="text-xs px-2.5 py-1 rounded-full bg-muted text-muted-foreground">
                                 {skill}
                             </span>
                         ))}
@@ -300,7 +293,7 @@ function AISection({ attrs }: { attrs: Record<string, any> }) {
                     {Array.isArray(attrs.integrations) ? (
                         <div className="flex flex-wrap gap-2">
                             {attrs.integrations.map((integration: string, i: number) => (
-                                <span key={i} className="text-xs px-2.5 py-1 rounded-full bg-violet-50 text-violet-700">
+                                <span key={i} className="text-xs px-2.5 py-1 rounded-full bg-status-info-light text-status-info-dark">
                                     {integration}
                                 </span>
                             ))}
@@ -321,7 +314,7 @@ function AISection({ attrs }: { attrs: Record<string, any> }) {
                     {Array.isArray(attrs.use_cases) ? (
                         <div className="flex flex-wrap gap-2">
                             {attrs.use_cases.map((useCase: string, i: number) => (
-                                <span key={i} className="text-xs px-2.5 py-1 rounded-full bg-violet-50 text-violet-700">
+                                <span key={i} className="text-xs px-2.5 py-1 rounded-full bg-status-info-light text-status-info-dark">
                                     {useCase}
                                 </span>
                             ))}

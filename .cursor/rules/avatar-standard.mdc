@@ -44,10 +44,11 @@ interface UserAvatarProps {
   role?: string | null               // Role for color coding
   avatarUrl?: string | null          // Optional profile image
   size?: "xs" | "sm" | "md" | "lg" | "xl"  // Size variant
-  showBorder?: boolean               // Add border styling
   className?: string                 // Additional classes
 }
 ```
+
+**IMPORTANT:** Avatars must be clean circles without borders or rings. The bordered avatar style has been removed from the design system.
 
 ## Size Reference
 
@@ -263,6 +264,8 @@ If you find avatar code that doesn't use `UserAvatar`, check:
   max={4}
 />
 ```
+
+**Note:** Stacked avatars use `-space-x-2` or `-space-x-3` for overlap without requiring borders. The clean circle design works perfectly for overlapping avatars.
 
 ### In a List/Dropdown
 ```tsx

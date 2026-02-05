@@ -81,7 +81,7 @@ export function ReportPreferences({ hasTelegramLinked }: ReportPreferencesProps)
     
     if (loading) {
         return (
-            <Card className="bg-background border-slate-100">
+            <Card className="bg-background border-muted">
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                         <BarChart3 className="h-5 w-5 text-electric-blue" />
@@ -100,7 +100,7 @@ export function ReportPreferences({ hasTelegramLinked }: ReportPreferencesProps)
     }
     
     return (
-        <Card className="bg-background border-slate-100">
+        <Card className="bg-background border-muted">
             <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                     <BarChart3 className="h-5 w-5 text-electric-blue" />

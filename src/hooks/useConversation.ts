@@ -27,6 +27,7 @@ interface UseConversationReturn {
   hasMore: boolean
   isConnected: boolean
   markAsRead: () => Promise<void>
+  lastReadAt: string | null
 }
 
 export function useConversation(
@@ -41,6 +42,7 @@ export function useConversation(
   const [error, setError] = useState<string | null>(null)
   const [hasMore, setHasMore] = useState(true)
   const [isConnected, setIsConnected] = useState(false)
+  const [lastReadAt, setLastReadAt] = useState<string | null>(null)
   
   const channelRef = useRef<RealtimeChannel | null>(null)
   const supabase = createClient()
@@ -69,12 +71,24 @@ export function useConversation(
       setMessages(result.data?.messages || [])
       setConversation(result.data?.conversation || null)
       setHasMore((result.data?.messages?.length || 0) >= 50)
+      
+      // Fetch participant's last_read_at
+      if (currentUserRef.current) {
+        const { data: participant } = await supabase
+          .from('conversation_participants')
+          .select('last_read_at')
+          .eq('conversation_id', conversationId)
+          .eq('profile_id', currentUserRef.current)
+          .single()
+        
+        setLastReadAt(participant?.last_read_at || null)
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load messages')
     } finally {
       setIsLoading(false)
     }
-  }, [conversationId])
+  }, [conversationId, supabase])
 
   // Load more messages (pagination)
   const loadMore = useCallback(async () => {
@@ -253,7 +267,8 @@ export function useConversation(
     loadMore,
     hasMore,
     isConnected,
-    markAsRead
+    markAsRead,
+    lastReadAt
   }
 }
 

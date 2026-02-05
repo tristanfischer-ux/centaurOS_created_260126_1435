@@ -102,7 +102,7 @@ export function TelegramLink({ initialLink, botUsername }: TelegramLinkProps) {
         : `https://t.me/${botUsername}`
 
     return (
-        <Card className="bg-background border-slate-100 shadow-[0_2px_15px_rgba(0,0,0,0.03)]">
+        <Card className="bg-background border-muted shadow-[0_2px_15px_rgba(0,0,0,0.03)]">
             <CardHeader>
                 <div className="flex items-center gap-2">
                     <MessageCircle className="h-5 w-5 text-[#0088cc]" />

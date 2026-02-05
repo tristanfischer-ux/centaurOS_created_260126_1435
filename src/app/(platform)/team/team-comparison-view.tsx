@@ -368,7 +368,6 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
         let borderClass = 'border'
         let ringClass = 'ring-muted border-muted'
         let bgCheckClass = 'bg-muted0'
-        let avatarBorderClass = 'border'
         let avatarBgClass = 'bg-muted text-muted-foreground'
         let badgeClass = 'bg-muted text-muted-foreground'
 
@@ -377,7 +376,6 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
             borderClass = 'border-purple-200'
             ringClass = 'ring-muted border-muted'
             bgCheckClass = 'bg-muted0'
-            avatarBorderClass = 'border-2 border-purple-300'
             avatarBgClass = 'bg-purple-100 text-purple-600 font-bold'
             badgeClass = 'text-purple-600 border-purple-200 bg-purple-100'
         } else if (isFounder) {
@@ -386,7 +384,6 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
             borderClass = 'border-orange-200'
             ringClass = 'ring-muted border-muted'
             bgCheckClass = 'bg-muted0'
-            avatarBorderClass = 'border-2 border-international-orange/50'
             avatarBgClass = 'bg-orange-100 text-orange-700 font-bold'
             badgeClass = 'text-orange-700 border-orange-200 bg-orange-100'
         } else if (isExecutive) {
@@ -395,14 +392,12 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
             borderClass = 'border-orange-100'
             ringClass = 'ring-muted border-muted'
             bgCheckClass = 'bg-muted0'
-            avatarBorderClass = 'border-2 border-orange-300'
             avatarBgClass = 'bg-orange-50 text-orange-600 font-bold'
             badgeClass = 'text-orange-600 border-orange-100 bg-orange-50'
         } else {
             // Apprentice - neutral
             accentColor = 'bg-slate-400'
             borderClass = 'border'
-            avatarBorderClass = 'border-2 border-slate-300'
             avatarBgClass = 'bg-muted text-muted-foreground font-bold'
             badgeClass = 'text-muted-foreground border bg-muted'
         }
@@ -464,7 +459,7 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                         {/* Avatar with Presence */}
                         <div className="relative">
                             {isAIAgent ? (
-                                <Avatar className={`h-10 w-10 ${avatarBorderClass}`}>
+                                <Avatar className="h-10 w-10">
                                     <AvatarFallback className={avatarBgClass}>
                                         <Brain className="h-5 w-5" />
                                     </AvatarFallback>
@@ -474,7 +469,6 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                                     name={member.full_name} 
                                     role={member.role}
                                     size="md"
-                                    className={avatarBorderClass}
                                 />
                             )}
                             {!isAIAgent && (

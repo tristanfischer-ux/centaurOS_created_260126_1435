@@ -596,12 +596,11 @@ export function TaskConversation({
                 name={participant.full_name || participant.email}
                 avatarUrl={participant.avatar_url}
                 size="sm"
-                className="ring-2 ring-background"
                 title={participant.full_name || participant.email}
               />
             ))}
             {participants.length > 5 && (
-              <div className="w-8 h-8 rounded-full bg-muted border-2 border-background flex items-center justify-center">
+              <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center">
                 <span className="text-xs text-muted-foreground">
                   +{participants.length - 5}
                 </span>

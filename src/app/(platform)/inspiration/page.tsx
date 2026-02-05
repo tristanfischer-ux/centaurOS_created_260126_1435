@@ -40,7 +40,7 @@ function InspirationSkeleton() {
   return (
     <div className="space-y-8">
       {/* Header skeleton */}
-      <div className="space-y-4 pb-4 border-b border-slate-100">
+      <div className="space-y-4 pb-4 border-b border-muted">
         <Skeleton className="h-8 w-48" />
         <Skeleton className="h-5 w-96" />
       </div>
