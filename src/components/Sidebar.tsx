@@ -34,6 +34,7 @@ const APP_VERSION = "1.0.3"
 
 // Work: day-to-day operations
 const workNavigation = [
+    { name: "Home", href: "/dashboard", icon: Home, tooltip: "Your personalized command center with insights and quick actions" },
     { name: "Inbox", href: "/home", icon: Inbox, tooltip: "Messages, activity feed, and conversations" },
     { name: "Objectives", href: "/objectives", icon: Target, tooltip: "Set and track high-level strategic goals" },
     { name: "Tasks", href: "/tasks", icon: CheckSquare, tooltip: "Manage and assign actionable items" },

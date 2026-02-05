@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react"
 import { Button } from "@/components/ui/button"
-import { Plus, Loader2, Upload, X, FileIcon, Check, ChevronDown, ChevronUp, Target, Search } from "lucide-react"
+import { Plus, Loader2, Upload, X, FileIcon, Check, ChevronDown, ChevronUp, Target, ChevronsUpDown } from "lucide-react"
 import {
     Dialog,
     DialogContent,
@@ -23,6 +23,8 @@ import { cn } from "@/lib/utils"
 import { DatePickerWithShortcuts } from "@/components/ui/date-picker-with-shortcuts"
 import { UserAvatar } from "@/components/ui/user-avatar"
 import { PrivacyShareControl, type ShareTarget } from "@/components/ui/privacy-share-control"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command"
 
 interface CreateTaskDialogProps {
     objectives: { id: string; title: string }[]
@@ -54,7 +56,7 @@ export function CreateTaskDialog({ objectives, members, teams = [], currentUserI
     const [selectedAssignees, setSelectedAssignees] = useState<string[]>([currentUserId])
     // Default objective if provided
     const [selectedObjective, setSelectedObjective] = useState<string>(defaultObjectiveId || "")
-    const [objectiveSearch, setObjectiveSearch] = useState("")
+    const [objectiveOpen, setObjectiveOpen] = useState(false)
     const [files, setFiles] = useState<File[]>([])
     const [isDragging, setIsDragging] = useState(false)
     const [titleError, setTitleError] = useState<string | null>(null)
@@ -398,9 +400,9 @@ export function CreateTaskDialog({ objectives, members, teams = [], currentUserI
                             )}
                         </div>
 
-                        {/* Objective - Visible scrollable list */}
+                        {/* Objective - Combobox dropdown */}
                         <div className="grid gap-2">
-                            <Label htmlFor="objective-search">
+                            <Label>
                                 Objective <span className="text-destructive ml-1" aria-label="required">*</span>
                             </Label>
 
@@ -409,85 +411,64 @@ export function CreateTaskDialog({ objectives, members, teams = [], currentUserI
                                     No objectives available. Create an objective first.
                                 </p>
                             ) : (
-                                <div
-                                    className={cn(
-                                        "rounded-lg border",
-                                        objectiveError && "border-destructive"
-                                    )}
-                                    aria-describedby={objectiveError ? "objective-error" : undefined}
-                                >
-                                    {/* Search - only show when 4+ objectives */}
-                                    {objectives.length >= 4 && (
-                                        <div className="relative border-b">
-                                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-                                            <Input
-                                                id="objective-search"
-                                                placeholder="Search objectives..."
-                                                value={objectiveSearch}
-                                                onChange={(e) => setObjectiveSearch(e.target.value)}
-                                                className="border-0 pl-9 h-9 rounded-b-none focus-visible:ring-0 focus-visible:ring-offset-0"
-                                            />
-                                        </div>
-                                    )}
-
-                                    {/* Scrollable objective list */}
-                                    <div className="max-h-[180px] overflow-y-auto" role="listbox" aria-label="Select an objective">
-                                        {(() => {
-                                            const filtered = objectives.filter(obj =>
-                                                !objectiveSearch ||
-                                                obj.title.toLowerCase().includes(objectiveSearch.toLowerCase())
-                                            )
-
-                                            if (filtered.length === 0) {
-                                                return (
-                                                    <p className="text-sm text-muted-foreground text-center py-4">
-                                                        No objectives match your search.
-                                                    </p>
-                                                )
-                                            }
-
-                                            return filtered.map((obj) => {
-                                                const isSelected = selectedObjective === obj.id
-                                                return (
-                                                    <button
-                                                        key={obj.id}
-                                                        type="button"
-                                                        role="option"
-                                                        aria-selected={isSelected}
-                                                        onClick={() => {
-                                                            setSelectedObjective(obj.id)
-                                                            setObjectiveError(null)
-                                                        }}
-                                                        className={cn(
-                                                            "w-full flex items-center gap-3 px-3 py-2.5 text-left text-sm transition-colors",
-                                                            "hover:bg-muted/50",
-                                                            isSelected && "bg-international-orange/5"
-                                                        )}
-                                                    >
-                                                        <div className={cn(
-                                                            "flex items-center justify-center shrink-0 h-5 w-5 rounded-full border-2 transition-colors",
-                                                            isSelected
-                                                                ? "border-international-orange bg-international-orange"
-                                                                : "border-muted-foreground/30"
-                                                        )}>
-                                                            {isSelected && <Check className="h-3 w-3 text-white" />}
-                                                        </div>
-                                                        <Target className={cn(
-                                                            "h-3.5 w-3.5 shrink-0",
-                                                            isSelected ? "text-international-orange" : "text-muted-foreground"
-                                                        )} />
-                                                        <span className={cn(
-                                                            "truncate",
-                                                            isSelected ? "font-medium text-foreground" : "text-foreground"
-                                                        )}>
-                                                            {obj.title}
-                                                        </span>
-                                                    </button>
-                                                )
-                                            })
-                                        })()}
-                                    </div>
-                                </div>
+                                <Popover open={objectiveOpen} onOpenChange={setObjectiveOpen}>
+                                    <PopoverTrigger asChild>
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            role="combobox"
+                                            aria-expanded={objectiveOpen}
+                                            aria-label="Select an objective"
+                                            aria-describedby={objectiveError ? "objective-error" : undefined}
+                                            className={cn(
+                                                "w-full justify-between text-left font-normal",
+                                                !selectedObjective && "text-muted-foreground",
+                                                objectiveError && "border-destructive"
+                                            )}
+                                        >
+                                            <span className="flex items-center gap-2 truncate">
+                                                <Target className="h-3.5 w-3.5 shrink-0 text-international-orange" />
+                                                <span className="truncate">
+                                                    {selectedObjective
+                                                        ? objectives.find(o => o.id === selectedObjective)?.title
+                                                        : "Select an objective..."}
+                                                </span>
+                                            </span>
+                                            <ChevronsUpDown className="h-3.5 w-3.5 shrink-0 opacity-50" />
+                                        </Button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                                        <Command>
+                                            <CommandInput placeholder="Search objectives..." />
+                                            <CommandList>
+                                                <CommandEmpty>No objectives found.</CommandEmpty>
+                                                <CommandGroup>
+                                                    {objectives.map((obj) => (
+                                                        <CommandItem
+                                                            key={obj.id}
+                                                            value={obj.title}
+                                                            onSelect={() => {
+                                                                setSelectedObjective(obj.id)
+                                                                setObjectiveError(null)
+                                                                setObjectiveOpen(false)
+                                                            }}
+                                                        >
+                                                            <Check className={cn(
+                                                                "mr-2 h-3.5 w-3.5",
+                                                                selectedObjective === obj.id ? "opacity-100 text-international-orange" : "opacity-0"
+                                                            )} />
+                                                            <Target className={cn(
+                                                                "mr-2 h-3.5 w-3.5 shrink-0",
+                                                                selectedObjective === obj.id ? "text-international-orange" : "text-muted-foreground"
+                                                            )} />
+                                                            <span className="truncate">{obj.title}</span>
+                                                        </CommandItem>
+                                                    ))}
+                                                </CommandGroup>
+                                            </CommandList>
+                                        </Command>
+                                    </PopoverContent>
+                                </Popover>
                             )}
 
                             {objectiveError && (
