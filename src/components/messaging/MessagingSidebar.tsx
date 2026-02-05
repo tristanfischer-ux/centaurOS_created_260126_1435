@@ -4,7 +4,6 @@ import { useState, useEffect, useCallback } from 'react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Skeleton } from '@/components/ui/skeleton'
 import { UserAvatar } from '@/components/ui/user-avatar'
@@ -118,18 +117,23 @@ function ConversationListItem({
             'text-sm truncate',
             conversation.unread_count && conversation.unread_count > 0 
               ? 'font-semibold text-foreground' 
-              : 'font-medium text-foreground'
+              : 'text-foreground'
           )}>
-            {isChannel ? '#' : '@'} {displayName}
+            {displayName}
           </span>
-          {conversation.unread_count && conversation.unread_count > 0 && (
-            <Badge variant="default" className="h-5 min-w-[20px] px-1.5 text-xs bg-international-orange">
-              {conversation.unread_count > 99 ? '99+' : conversation.unread_count}
-            </Badge>
+          {conversation.last_message && (
+            <span className="text-xs text-muted-foreground flex-shrink-0">
+              {formatDistanceToNow(new Date(conversation.last_message.created_at), { addSuffix: false })}
+            </span>
           )}
         </div>
         {conversation.last_message && (
-          <p className="text-xs text-muted-foreground truncate mt-0.5">
+          <p className={cn(
+            'text-xs truncate mt-0.5',
+            conversation.unread_count && conversation.unread_count > 0 
+              ? 'text-foreground' 
+              : 'text-muted-foreground'
+          )}>
             {conversation.last_message.content || 'File attachment'}
           </p>
         )}
@@ -153,7 +157,6 @@ function ConversationSection({
 }) {
   const [isOpen, setIsOpen] = useState(defaultOpen)
   const Icon = group.icon
-  const totalUnread = group.conversations.reduce((sum, c) => sum + (c.unread_count || 0), 0)
 
   if (group.conversations.length === 0) {
     return null
@@ -167,11 +170,6 @@ function ConversationSection({
           <Icon className="h-3.5 w-3.5" />
           <span>{group.label}</span>
         </div>
-        {totalUnread > 0 && (
-          <Badge variant="secondary" className="h-4 text-[10px] px-1.5">
-            {totalUnread}
-          </Badge>
-        )}
       </CollapsibleTrigger>
       <CollapsibleContent className="space-y-0.5 px-1">
         {group.conversations.map((conv) => (
@@ -281,11 +279,6 @@ export function MessagingSidebar({
         <div className="flex items-center gap-2">
           <MessageSquare className="h-5 w-5 text-international-orange" />
           <h2 className="font-semibold text-foreground">Messages</h2>
-          {totalUnread > 0 && (
-            <Badge variant="default" className="bg-international-orange">
-              {totalUnread}
-            </Badge>
-          )}
         </div>
         <div className="flex items-center gap-1">
           <Button

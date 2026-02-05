@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react'
 import { cn } from '@/lib/utils'
 import { UserAvatar } from '@/components/ui/user-avatar'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -14,9 +13,6 @@ import {
   MessageSquare, 
   Archive, 
   Search, 
-  Package, 
-  FileQuestion,
-  Store,
   Inbox
 } from 'lucide-react'
 
@@ -45,20 +41,6 @@ function formatLastMessageTime(dateString: string): string {
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
 
-
-function getContextIcon(conversation: ConversationWithParticipants) {
-  if (conversation.order_id) return <Package className="w-3 h-3" />
-  if (conversation.rfq_id) return <FileQuestion className="w-3 h-3" />
-  if (conversation.listing_id) return <Store className="w-3 h-3" />
-  return <MessageSquare className="w-3 h-3" />
-}
-
-function getContextLabel(conversation: ConversationWithParticipants): string | null {
-  if (conversation.order_id) return 'Order'
-  if (conversation.rfq_id) return 'RFQ'
-  if (conversation.listing_id) return 'Listing'
-  return null
-}
 
 export function ConversationList({ 
   selectedId, 
@@ -193,7 +175,6 @@ export function ConversationList({
                 : conversation.buyer
               const isSelected = selectedId === conversation.id
               const hasUnread = (conversation.unread_count || 0) > 0
-              const contextLabel = getContextLabel(conversation)
 
               return (
                 <button
@@ -203,8 +184,7 @@ export function ConversationList({
                     'w-full px-4 py-3 flex items-start gap-3 text-left transition-colors',
                     isSelected 
                       ? 'bg-muted' 
-                      : 'hover:bg-muted/50',
-                    hasUnread && !isSelected && 'bg-orange-50/50'
+                      : 'hover:bg-muted/50'
                   )}
                 >
                   {/* Avatar */}
@@ -218,20 +198,12 @@ export function ConversationList({
                   {/* Content */}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <span className={cn(
-                          'text-sm truncate',
-                          hasUnread ? 'font-semibold text-foreground' : 'font-medium text-foreground'
-                        )}>
-                          {otherParticipant.full_name || otherParticipant.email}
-                        </span>
-                        {contextLabel && (
-                          <Badge variant="secondary" className="text-[10px] px-1.5 py-0 flex items-center gap-1">
-                            {getContextIcon(conversation)}
-                            {contextLabel}
-                          </Badge>
-                        )}
-                      </div>
+                      <span className={cn(
+                        'text-sm truncate',
+                        hasUnread ? 'font-semibold text-foreground' : 'text-foreground'
+                      )}>
+                        {otherParticipant.full_name || otherParticipant.email}
+                      </span>
                       <span className="text-xs text-muted-foreground flex-shrink-0">
                         {conversation.last_message 
                           ? formatLastMessageTime(conversation.last_message.created_at)
@@ -239,24 +211,14 @@ export function ConversationList({
                       </span>
                     </div>
 
-                    <div className="flex items-center justify-between gap-2 mt-0.5">
-                      <p className={cn(
-                        'text-xs truncate',
-                        hasUnread ? 'text-foreground' : 'text-muted-foreground'
-                      )}>
-                        {conversation.last_message?.message_type === 'system' && '🔔 '}
-                        {conversation.last_message?.message_type === 'file' && '📎 '}
-                        {conversation.last_message?.content || 'No messages yet'}
-                      </p>
-                      {hasUnread && (
-                        <Badge 
-                          variant="default" 
-                          className="rounded-full min-w-[20px] h-5 flex items-center justify-center text-[10px]"
-                        >
-                          {conversation.unread_count}
-                        </Badge>
-                      )}
-                    </div>
+                    <p className={cn(
+                      'text-xs truncate mt-0.5',
+                      hasUnread ? 'text-foreground' : 'text-muted-foreground'
+                    )}>
+                      {conversation.last_message?.message_type === 'system' && '🔔 '}
+                      {conversation.last_message?.message_type === 'file' && '📎 '}
+                      {conversation.last_message?.content || 'No messages yet'}
+                    </p>
                   </div>
                 </button>
               )
