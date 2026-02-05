@@ -15,7 +15,7 @@ import {
   MessageSquare,
   Search,
   Plus,
-  X,
+  ArrowLeft,
   PanelRightClose,
   PanelRight
 } from 'lucide-react'
@@ -71,9 +71,9 @@ function ConversationListItem({
         className="flex-shrink-0"
       />
       <div className="flex-1 min-w-0 overflow-hidden">
-        <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
           <span className={cn(
-            'text-sm truncate block',
+            'text-sm truncate',
             conversation.unread_count && conversation.unread_count > 0 
               ? 'font-semibold text-foreground' 
               : 'text-foreground'
@@ -81,14 +81,14 @@ function ConversationListItem({
             {displayName}
           </span>
           {conversation.last_message && (
-            <span className="text-xs text-muted-foreground flex-shrink-0 whitespace-nowrap">
+            <span className="text-xs text-muted-foreground flex-shrink-0 ml-auto">
               {formatDistanceToNow(new Date(conversation.last_message.created_at), { addSuffix: false })}
             </span>
           )}
         </div>
         {conversation.last_message && (
           <p className={cn(
-            'text-xs truncate mt-0.5 block',
+            'text-xs truncate mt-0.5',
             conversation.unread_count && conversation.unread_count > 0 
               ? 'text-foreground' 
               : 'text-muted-foreground'
@@ -203,7 +203,7 @@ export function MessagingSidebar({
               onClick={handleCloseThread}
               className="gap-2"
             >
-              <X className="h-4 w-4" />
+              <ArrowLeft className="h-4 w-4" />
               Back to messages
             </Button>
           </div>
