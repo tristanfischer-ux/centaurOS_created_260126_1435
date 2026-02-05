@@ -370,27 +370,6 @@ export async function updateObjective(
     revalidatePath(`/objectives/${objectiveId}`)
     return { success: true }
 }
-
-
-// Admin client for bypassing RLS during deletions (cascading)
-import { createClient as createAdminClient } from '@supabase/supabase-js'
-
-const getAdminClient = () => {
-    const sbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-    const sbServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-
-    if (!sbUrl || !sbServiceRoleKey) {
-        throw new Error('Missing Supabase Service Role configuration')
-    }
-
-    return createAdminClient<Database>(sbUrl, sbServiceRoleKey, {
-        auth: {
-            autoRefreshToken: false,
-            persistSession: false
-        }
-    })
-}
-
 export async function deleteObjective(id: string) {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
@@ -416,23 +395,29 @@ export async function deleteObjective(id: string) {
         return { error: 'Objective not found' } // Don't reveal it exists
     }
     
-    if (objective.creator_id !== user.id) return { error: 'Unauthorized: Only the creator can delete this objective' }
+    // AUTH: Get user role to check for elevated permissions
+    const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .single()
 
-    // 2. Perform delete with Admin Client to bypass RLS on child tables (tasks, history, comments)
-    try {
-        const adminClient = getAdminClient()
-        const { error: deleteError } = await adminClient
-            .from('objectives')
-            .delete()
-            .eq('id', id)
+    const canDeleteAny = profile?.role === 'Executive' || profile?.role === 'Founder'
 
-        if (deleteError) {
-            console.error('Delete error:', deleteError)
-            return { error: deleteError.message }
-        }
-    } catch (e) {
-        console.error('Admin client error:', e)
-        return { error: 'Server configuration error preventing deletion' }
+    // SECURITY: Allow delete if creator OR has elevated role (Executive/Founder)
+    if (objective.creator_id !== user.id && !canDeleteAny) {
+        return { error: 'Unauthorized: Only the creator or admins can delete this objective' }
+    }
+
+    // 2. Perform delete - RLS handles authorization
+    const { error: deleteError } = await supabase
+        .from('objectives')
+        .delete()
+        .eq('id', id)
+
+    if (deleteError) {
+        console.error('Delete error:', deleteError)
+        return { error: deleteError.message }
     }
 
     revalidatePath('/objectives')
@@ -449,6 +434,15 @@ export async function deleteObjectives(ids: string[]) {
     const foundry_id = await getFoundryIdCached()
     if (!foundry_id) return { error: 'User not in a foundry' }
 
+    // AUTH: Get user role to check for elevated permissions
+    const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .single()
+
+    const canDeleteAny = profile?.role === 'Executive' || profile?.role === 'Founder'
+
     // 1. Verify ownership AND foundry isolation of ALL objectives
     const { data: objectives, error: fetchError } = await supabase
         .from('objectives')
@@ -457,28 +451,24 @@ export async function deleteObjectives(ids: string[]) {
 
     if (fetchError) return { error: fetchError.message }
 
-    // SECURITY: Only delete objectives that belong to user's foundry AND are owned by user
+    // SECURITY: Filter objectives - must belong to user's foundry, and either:
+    // - User is creator, OR
+    // - User has elevated role (Executive/Founder)
     const idsToDelete = objectives
-        .filter(o => o.creator_id === user.id && o.foundry_id === foundry_id)
+        .filter(o => o.foundry_id === foundry_id && (canDeleteAny || o.creator_id === user.id))
         .map(o => o.id)
 
     if (idsToDelete.length === 0) return { error: 'No authorized objectives to delete' }
 
-    // 2. Perform delete with Admin Client
-    try {
-        const adminClient = getAdminClient()
-        const { error: deleteError } = await adminClient
-            .from('objectives')
-            .delete()
-            .in('id', idsToDelete)
+    // 2. Perform delete - RLS handles authorization
+    const { error: deleteError } = await supabase
+        .from('objectives')
+        .delete()
+        .in('id', idsToDelete)
 
-        if (deleteError) {
-            console.error('Bulk delete error:', deleteError)
-            return { error: deleteError.message }
-        }
-    } catch (e) {
-        console.error('Admin client error:', e)
-        return { error: 'Server configuration error preventing deletion' }
+    if (deleteError) {
+        console.error('Bulk delete error:', deleteError)
+        return { error: deleteError.message }
     }
 
     revalidatePath('/objectives')

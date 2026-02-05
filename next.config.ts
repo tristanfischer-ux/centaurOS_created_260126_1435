@@ -1,5 +1,6 @@
 import type { NextConfig } from "next";
 
+import { withSentryConfig } from "@sentry/nextjs";
 import withPWAInit from "next-pwa";
 
 const withPWA = withPWAInit({
@@ -62,11 +63,11 @@ const nextConfig: NextConfig = {
               "default-src 'self'",
               // SECURITY: unsafe-inline needed for Next.js/React, unsafe-eval removed for security
               // Note: If eval is needed for specific features, use nonces instead
-              "script-src 'self' 'unsafe-inline' https://*.supabase.co https://*.stripe.com",
+              "script-src 'self' 'unsafe-inline' https://*.supabase.co https://*.stripe.com https://*.sentry.io",
               "style-src 'self' 'unsafe-inline'",
               "img-src 'self' data: https: blob:",
               "font-src 'self' data:",
-              "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.stripe.com https://api.openai.com",
+              "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.stripe.com https://api.openai.com https://*.sentry.io https://*.ingest.sentry.io",
               "frame-src 'self' https://*.stripe.com",
               "frame-ancestors 'self'",
               "form-action 'self'",
@@ -80,4 +81,23 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default withPWA(nextConfig);
+// Wrap with Sentry for error tracking and source maps
+export default withSentryConfig(withPWA(nextConfig), {
+  // Sentry organization and project
+  org: process.env.SENTRY_ORG,
+  project: process.env.SENTRY_PROJECT,
+
+  // Only print logs in CI
+  silent: !process.env.CI,
+
+  // Upload source maps to Sentry and delete after upload
+  sourcemaps: {
+    deleteSourcemapsAfterUpload: true,
+  },
+
+  // Automatically tree-shake Sentry logger statements
+  disableLogger: true,
+
+  // Enables automatic instrumentation of Vercel Cron Monitors
+  automaticVercelMonitors: true,
+});
