@@ -4,6 +4,8 @@ import { CreateObjectiveDialog } from './create-objective-dialog'
 import { ObjectivesListView } from './objectives-list-view'
 import { FeatureTipWrapper } from './feature-tip-wrapper'
 import { TaskStatusLegend } from '@/components/objectives/task-status-legend'
+import { CompanyPurposeWrapper } from '@/components/objectives/company-purpose-wrapper'
+import type { FoundryPurposeData } from '@/types/foundry'
 
 // Revalidate every 60 seconds
 export const revalidate = 60
@@ -15,6 +17,24 @@ export default async function ObjectivesPage() {
     if (!user) {
         redirect('/login')
     }
+
+    // Fetch user profile to get foundry_id and role
+    const { data: profile } = await supabase
+        .from('profiles')
+        .select('id, foundry_id, role')
+        .eq('id', user.id)
+        .single()
+
+    if (!profile) {
+        redirect('/login')
+    }
+
+    // Fetch foundry with purpose_data
+    const { data: foundry } = await supabase
+        .from('foundries')
+        .select('id, name, purpose_data')
+        .eq('id', profile.foundry_id)
+        .single()
 
     // Fetch objectives
     const { data: objectives, error } = await supabase
@@ -98,12 +118,19 @@ export default async function ObjectivesPage() {
                         <div className="h-8 w-1 bg-orange-600 rounded-full shadow-[0_0_8px_rgba(234,88,12,0.6)]" />
                         <h1 className="text-2xl sm:text-3xl font-display font-semibold text-foreground tracking-tight">Strategic Objectives</h1>
                     </div>
-                    <p className="text-muted-foreground mt-1 text-sm font-medium pl-4">High level goals for your company</p>
+                    <p className="text-muted-foreground mt-1 text-sm font-medium pl-4">High-level goals aligned with your company's purpose</p>
                 </div>
                 <FeatureTipWrapper>
                     <CreateObjectiveDialog />
                 </FeatureTipWrapper>
             </div>
+
+            <CompanyPurposeWrapper
+                purposeData={foundry?.purpose_data as FoundryPurposeData | null}
+                isFounder={profile.role === 'Founder'}
+                foundryId={profile.foundry_id}
+                userId={user.id}
+            />
 
             <TaskStatusLegend className="mb-6" />
 
