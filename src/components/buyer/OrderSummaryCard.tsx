@@ -38,21 +38,21 @@ import type { OrderSummary, BookingStatus, PaymentStatus } from '@/types/booking
 function getStatusConfig(status: BookingStatus) {
     switch (status) {
         case 'draft':
-            return { label: 'Draft', color: 'bg-muted text-foreground', icon: Clock }
+            return { label: 'Draft', color: 'bg-muted text-foreground', borderColor: 'border-l-slate-300', icon: Clock }
         case 'pending_payment':
-            return { label: 'Pending Payment', color: 'bg-status-warning-light text-status-warning-dark', icon: Clock }
+            return { label: 'Pending Payment', color: 'bg-status-warning-light text-status-warning-dark', borderColor: 'border-l-amber-400', icon: Clock }
         case 'confirmed':
-            return { label: 'Confirmed', color: 'bg-status-info-light text-status-info-dark', icon: CheckCircle }
+            return { label: 'Confirmed', color: 'bg-status-info-light text-status-info-dark', borderColor: 'border-l-blue-400', icon: CheckCircle }
         case 'in_progress':
-            return { label: 'In Progress', color: 'bg-status-success-light text-status-success-dark', icon: Clock }
+            return { label: 'In Progress', color: 'bg-status-success-light text-status-success-dark', borderColor: 'border-l-emerald-400', icon: Clock }
         case 'completed':
-            return { label: 'Completed', color: 'bg-status-success-light text-status-success-dark', icon: CheckCircle }
+            return { label: 'Completed', color: 'bg-status-success-light text-status-success-dark', borderColor: 'border-l-emerald-500', icon: CheckCircle }
         case 'cancelled':
-            return { label: 'Cancelled', color: 'bg-muted text-muted-foreground', icon: XCircle }
+            return { label: 'Cancelled', color: 'bg-muted text-muted-foreground', borderColor: 'border-l-slate-300', icon: XCircle }
         case 'disputed':
-            return { label: 'Disputed', color: 'bg-status-error-light text-destructive', icon: AlertCircle }
+            return { label: 'Disputed', color: 'bg-status-error-light text-destructive', borderColor: 'border-l-red-400', icon: AlertCircle }
         default:
-            return { label: status, color: 'bg-muted text-foreground', icon: Clock }
+            return { label: status, color: 'bg-muted text-foreground', borderColor: 'border-l-slate-300', icon: Clock }
     }
 }
 
@@ -127,7 +127,7 @@ export function OrderSummaryCard({
     const canLeaveReview = order.status === 'completed' && !order.hasLeftReview
 
     return (
-        <Card className={cn("hover:shadow-md transition-shadow", className)}>
+        <Card className={cn("hover:shadow-md transition-all duration-200 border-l-4", statusConfig.borderColor, "border-slate-200", className)}>
             <CardContent className="p-4 sm:p-6">
                 <div className="flex flex-col sm:flex-row gap-4">
                     {/* Provider Avatar */}

@@ -182,7 +182,7 @@ export function BuyerDashboardView({
                                         <OrderSummaryCardCompact
                                             key={order.id}
                                             order={order}
-                                            onClick={() => router.push(`/my-orders/${order.id}`)}
+                                            onClick={() => router.push(`/orders/${order.id}`)}
                                         />
                                     ))}
                                 </div>

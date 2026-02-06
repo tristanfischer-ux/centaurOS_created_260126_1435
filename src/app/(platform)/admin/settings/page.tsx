@@ -8,11 +8,8 @@ import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
-import { Separator } from '@/components/ui/separator'
 import { 
-    Settings, 
     UserMinus, 
-    RefreshCw, 
     CheckCircle2, 
     AlertTriangle,
     Clock,
@@ -86,34 +83,23 @@ export default function AdminSettingsPage() {
 
     return (
         <div className="space-y-6">
-            {/* Header */}
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-muted">
-                <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-3 mb-1">
-                        <div className="h-8 w-1 bg-international-orange rounded-full" />
-                        <h1 className="text-2xl sm:text-3xl font-display font-semibold text-foreground tracking-tight">
-                            Admin Settings
-                        </h1>
-                    </div>
-                    <p className="text-muted-foreground mt-1 text-sm font-medium pl-4">
-                        Configure platform-wide settings
-                    </p>
-                </div>
-            </div>
-
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {/* Offboarding Settings */}
-                <Card>
-                    <CardHeader>
-                        <div className="flex items-center gap-2">
-                            <UserMinus className="h-5 w-5 text-muted-foreground" />
-                            <CardTitle>Offboarding Settings</CardTitle>
+                <Card className="border-slate-200 shadow-[0_2px_15px_rgba(0,0,0,0.03)] overflow-hidden">
+                    <CardHeader className="bg-gradient-to-r from-orange-50/60 to-transparent border-b border-slate-100">
+                        <div className="flex items-center gap-3">
+                            <div className="p-2 bg-orange-100 rounded-lg">
+                                <UserMinus className="h-5 w-5 text-international-orange" />
+                            </div>
+                            <div>
+                                <CardTitle>Offboarding Settings</CardTitle>
+                                <CardDescription>
+                                    Configure how member offboarding is handled
+                                </CardDescription>
+                            </div>
                         </div>
-                        <CardDescription>
-                            Configure how member offboarding is handled
-                        </CardDescription>
                     </CardHeader>
-                    <CardContent className="space-y-6">
+                    <CardContent className="p-6 space-y-6">
                         {offboardingLoading ? (
                             <div className="flex items-center justify-center py-8">
                                 <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -121,7 +107,7 @@ export default function AdminSettingsPage() {
                         ) : offboardingSettings ? (
                             <>
                                 <div className="space-y-2">
-                                    <Label>Default Offboarding Action</Label>
+                                    <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Default Offboarding Action</Label>
                                     <Select
                                         value={offboardingSettings.default_action}
                                         onValueChange={(value: OffboardingAction) => 
@@ -148,7 +134,7 @@ export default function AdminSettingsPage() {
                                     </p>
                                 </div>
 
-                                <div className="flex items-center justify-between">
+                                <div className="flex items-center justify-between p-3 rounded-lg hover:bg-slate-50 transition-colors">
                                     <div className="space-y-0.5">
                                         <Label>Require Task Reassignment</Label>
                                         <p className="text-xs text-muted-foreground">
@@ -164,7 +150,7 @@ export default function AdminSettingsPage() {
                                 </div>
 
                                 <div className="space-y-2">
-                                    <Label>Data Retention (days)</Label>
+                                    <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Data Retention (days)</Label>
                                     <Input
                                         type="number"
                                         min={1}
@@ -183,24 +169,26 @@ export default function AdminSettingsPage() {
                                     </p>
                                 </div>
 
-                                <Separator />
-
-                                <Button 
-                                    onClick={handleSaveOffboarding}
-                                    disabled={isPending}
-                                    className="w-full"
-                                >
-                                    {isPending ? (
-                                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                                    ) : (
-                                        <Save className="h-4 w-4 mr-2" />
-                                    )}
-                                    Save Offboarding Settings
-                                </Button>
+                                <div className="border-t border-slate-100 pt-4">
+                                    <Button 
+                                        onClick={handleSaveOffboarding}
+                                        disabled={isPending}
+                                        className="w-full"
+                                    >
+                                        {isPending ? (
+                                            <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                                        ) : (
+                                            <Save className="h-4 w-4 mr-2" />
+                                        )}
+                                        Save Offboarding Settings
+                                    </Button>
+                                </div>
                             </>
                         ) : (
                             <div className="text-center py-8 text-muted-foreground">
-                                <AlertTriangle className="h-8 w-8 mx-auto mb-2" />
+                                <div className="w-12 h-12 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-3">
+                                    <AlertTriangle className="h-6 w-6 text-slate-400" />
+                                </div>
                                 <p>Could not load settings</p>
                             </div>
                         )}
@@ -208,17 +196,21 @@ export default function AdminSettingsPage() {
                 </Card>
 
                 {/* Sheets Sync Status */}
-                <Card>
-                    <CardHeader>
-                        <div className="flex items-center gap-2">
-                            <Database className="h-5 w-5 text-muted-foreground" />
-                            <CardTitle>Google Sheets Sync</CardTitle>
+                <Card className="border-slate-200 shadow-[0_2px_15px_rgba(0,0,0,0.03)] overflow-hidden">
+                    <CardHeader className="bg-gradient-to-r from-emerald-50/60 to-transparent border-b border-slate-100">
+                        <div className="flex items-center gap-3">
+                            <div className="p-2 bg-emerald-100 rounded-lg">
+                                <Database className="h-5 w-5 text-emerald-600" />
+                            </div>
+                            <div>
+                                <CardTitle>Google Sheets Sync</CardTitle>
+                                <CardDescription>
+                                    Monitor data synchronisation status
+                                </CardDescription>
+                            </div>
                         </div>
-                        <CardDescription>
-                            Monitor data synchronization status
-                        </CardDescription>
                     </CardHeader>
-                    <CardContent className="space-y-4">
+                    <CardContent className="p-6 space-y-4">
                         {syncLoading ? (
                             <div className="flex items-center justify-center py-8">
                                 <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -226,13 +218,20 @@ export default function AdminSettingsPage() {
                         ) : syncStatus ? (
                             <>
                                 {/* Connection Status */}
-                                <div className="flex items-center justify-between p-4 rounded-lg bg-muted/50">
+                                <div className="flex items-center justify-between p-4 rounded-lg bg-slate-50 border border-slate-100">
                                     <div className="flex items-center gap-3">
-                                        {syncStatus.is_connected ? (
-                                            <CheckCircle2 className="h-6 w-6 text-status-success" />
-                                        ) : (
-                                            <AlertTriangle className="h-6 w-6 text-status-warning" />
-                                        )}
+                                        <div className="relative">
+                                            {syncStatus.is_connected ? (
+                                                <CheckCircle2 className="h-6 w-6 text-status-success" />
+                                            ) : (
+                                                <AlertTriangle className="h-6 w-6 text-status-warning" />
+                                            )}
+                                            {/* Animated connection dot */}
+                                            <span className={cn(
+                                                "absolute -top-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-white",
+                                                syncStatus.is_connected ? "bg-emerald-500 animate-pulse" : "bg-amber-500"
+                                            )} />
+                                        </div>
                                         <div>
                                             <p className="font-medium text-foreground">
                                                 {syncStatus.is_connected ? 'Connected' : 'Not Connected'}
@@ -256,7 +255,7 @@ export default function AdminSettingsPage() {
 
                                 {/* Last Sync */}
                                 {syncStatus.last_sync && (
-                                    <div className="flex items-center gap-2 text-sm">
+                                    <div className="flex items-center gap-2 text-sm px-1">
                                         <Clock className="h-4 w-4 text-muted-foreground" />
                                         <span className="text-muted-foreground">Last sync:</span>
                                         <span className="font-medium text-foreground">
@@ -268,12 +267,12 @@ export default function AdminSettingsPage() {
                                 {/* Recent Errors */}
                                 {syncStatus.recent_errors.length > 0 && (
                                     <div className="space-y-2">
-                                        <Label className="text-status-error">Recent Errors</Label>
+                                        <Label className="text-status-error text-xs font-medium uppercase tracking-wider">Recent Errors</Label>
                                         <div className="space-y-1 max-h-[200px] overflow-y-auto">
                                             {syncStatus.recent_errors.map((error, idx) => (
                                                 <div 
                                                     key={idx}
-                                                    className="p-2 rounded bg-status-error-light text-status-error-dark text-xs"
+                                                    className="p-2.5 rounded-lg bg-status-error-light text-status-error-dark text-xs"
                                                 >
                                                     {error}
                                                 </div>
@@ -294,10 +293,12 @@ export default function AdminSettingsPage() {
                             </>
                         ) : (
                             <div className="text-center py-8 text-muted-foreground">
-                                <Database className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                                <p>Google Sheets integration not configured</p>
+                                <div className="w-12 h-12 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-3">
+                                    <Database className="h-6 w-6 text-slate-400" />
+                                </div>
+                                <p className="text-sm">Google Sheets integration not configured</p>
                                 <p className="text-xs mt-1">
-                                    Connect a Google Sheet to enable data synchronization
+                                    Connect a Google Sheet to enable data synchronisation
                                 </p>
                             </div>
                         )}

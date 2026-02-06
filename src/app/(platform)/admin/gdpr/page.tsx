@@ -198,8 +198,8 @@ export default function AdminGDPRPage() {
       {/* Stats Cards */}
       {stats && (
         <div className="grid gap-4 md:grid-cols-4">
-          <Card>
-            <CardHeader className="pb-2">
+          <Card className="border-slate-200 shadow-[0_2px_15px_rgba(0,0,0,0.03)] overflow-hidden">
+            <CardHeader className="bg-gradient-to-r from-emerald-50/60 to-transparent border-b border-slate-100 pb-2">
               <CardDescription>Pending Requests</CardDescription>
               <CardTitle className="text-3xl flex items-center gap-2">
                 {stats.pendingRequests}
@@ -210,22 +210,22 @@ export default function AdminGDPRPage() {
             </CardHeader>
           </Card>
 
-          <Card>
-            <CardHeader className="pb-2">
+          <Card className="border-slate-200 shadow-[0_2px_15px_rgba(0,0,0,0.03)] overflow-hidden">
+            <CardHeader className="bg-gradient-to-r from-emerald-50/60 to-transparent border-b border-slate-100 pb-2">
               <CardDescription>Processing</CardDescription>
               <CardTitle className="text-3xl">{stats.processingRequests}</CardTitle>
             </CardHeader>
           </Card>
 
-          <Card>
-            <CardHeader className="pb-2">
+          <Card className="border-slate-200 shadow-[0_2px_15px_rgba(0,0,0,0.03)] overflow-hidden">
+            <CardHeader className="bg-gradient-to-r from-emerald-50/60 to-transparent border-b border-slate-100 pb-2">
               <CardDescription>Completed (This Month)</CardDescription>
               <CardTitle className="text-3xl text-status-success">{stats.completedThisMonth}</CardTitle>
             </CardHeader>
           </Card>
 
-          <Card>
-            <CardHeader className="pb-2">
+          <Card className="border-slate-200 shadow-[0_2px_15px_rgba(0,0,0,0.03)] overflow-hidden">
+            <CardHeader className="bg-gradient-to-r from-emerald-50/60 to-transparent border-b border-slate-100 pb-2">
               <CardDescription>Avg. Processing Time</CardDescription>
               <CardTitle className="text-3xl">{stats.averageProcessingTime}h</CardTitle>
             </CardHeader>
@@ -259,7 +259,7 @@ export default function AdminGDPRPage() {
           </div>
 
           {/* Request List */}
-          <Card>
+          <Card className="border-slate-200 shadow-[0_2px_15px_rgba(0,0,0,0.03)] overflow-hidden">
             <CardContent className="p-0">
               {(selectedTab === "pending" ? pendingRequests : allRequests).length === 0 ? (
                 <div className="p-8 text-center text-muted-foreground">
@@ -316,12 +316,16 @@ export default function AdminGDPRPage() {
         {/* Request Detail Panel */}
         <div>
           {selectedRequest ? (
-            <Card>
-              <CardHeader>
+            <Card className="border-slate-200 shadow-[0_2px_15px_rgba(0,0,0,0.03)] overflow-hidden">
+              <CardHeader className="bg-gradient-to-r from-indigo-50/60 to-transparent border-b border-slate-100">
                 <div className="flex items-center gap-2">
                   {(() => {
                     const Icon = TYPE_CONFIG[selectedRequest.request_type].icon
-                    return <Icon className={`h-5 w-5 ${TYPE_CONFIG[selectedRequest.request_type].color}`} />
+                    return (
+                      <div className="p-2 bg-indigo-100 rounded-lg">
+                        <Icon className="h-4 w-4 text-indigo-600" />
+                      </div>
+                    )
                   })()}
                   <CardTitle className="text-lg">
                     {TYPE_CONFIG[selectedRequest.request_type].label}
@@ -331,7 +335,7 @@ export default function AdminGDPRPage() {
                   {STATUS_CONFIG[selectedRequest.status].label}
                 </Badge>
               </CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent className="p-6 space-y-4">
                 {/* User Info */}
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">User</p>
@@ -469,7 +473,7 @@ export default function AdminGDPRPage() {
               </CardContent>
             </Card>
           ) : (
-            <Card>
+            <Card className="border-slate-200 shadow-[0_2px_15px_rgba(0,0,0,0.03)] overflow-hidden">
               <CardContent className="py-12 text-center text-muted-foreground">
                 <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
                 <p>Select a request to view details</p>
@@ -479,11 +483,11 @@ export default function AdminGDPRPage() {
 
           {/* Quick Stats by Type */}
           {stats && (
-            <Card className="mt-4">
-              <CardHeader>
+            <Card className="mt-4 border-slate-200 shadow-[0_2px_15px_rgba(0,0,0,0.03)] overflow-hidden">
+              <CardHeader className="bg-gradient-to-r from-emerald-50/60 to-transparent border-b border-slate-100">
                 <CardTitle className="text-sm">Pending by Type</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-2">
+              <CardContent className="p-6 space-y-2">
                 <div className="flex items-center justify-between">
                   <span className="text-sm flex items-center gap-2">
                     <Eye className="h-4 w-4 text-status-info" />

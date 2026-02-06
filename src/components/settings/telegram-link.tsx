@@ -102,17 +102,21 @@ export function TelegramLink({ initialLink, botUsername }: TelegramLinkProps) {
         : `https://t.me/${botUsername}`
 
     return (
-        <Card className="bg-background border-muted shadow-[0_2px_15px_rgba(0,0,0,0.03)]">
-            <CardHeader>
-                <div className="flex items-center gap-2">
-                    <MessageCircle className="h-5 w-5 text-[#0088cc]" />
-                    <CardTitle>Telegram Integration</CardTitle>
+        <Card className="bg-background border-slate-200 shadow-[0_2px_15px_rgba(0,0,0,0.03)] overflow-hidden">
+            <CardHeader className="bg-gradient-to-r from-sky-50/60 to-transparent border-b border-slate-100">
+                <div className="flex items-center gap-3">
+                    <div className="p-2 bg-sky-100 rounded-lg">
+                        <MessageCircle className="h-5 w-5 text-sky-600" />
+                    </div>
+                    <div>
+                        <CardTitle>Telegram Integration</CardTitle>
+                        <CardDescription>
+                            Link your Telegram to create objectives by sending text or voice messages.
+                        </CardDescription>
+                    </div>
                 </div>
-                <CardDescription>
-                    Link your Telegram to create objectives by sending text or voice messages.
-                </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-6">
+            <CardContent className="p-6 space-y-6">
                 {isLinked ? (
                     // Linked state
                     <div className="space-y-4">
