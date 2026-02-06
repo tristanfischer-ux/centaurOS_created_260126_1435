@@ -10,7 +10,6 @@ import { cn } from "@/lib/utils"
 import { getCategoryBadgeClasses, getAvatarGradient, type MarketplaceCategory } from "@/lib/marketplace-colors"
 import { 
     ShieldCheck, MapPin, Clock, Briefcase,
-    Bot, Sparkles, BarChart3, Zap, Shield, Cpu,
     GitCompareArrows, Mail, Eye, ChevronDown, ChevronUp,
     Star, Calendar, Award, Globe, Wrench, Heart
 } from "lucide-react"
@@ -27,17 +26,6 @@ interface MarketCardProps {
     onSizeChange?: (id: string, size: CardSize) => void
     isSaved?: boolean
     onSaveToggle?: (id: string, isSaved: boolean) => void
-}
-
-// Get icon for AI subcategory
-function getAITypeIcon(subcategory: string) {
-    switch (subcategory) {
-        case 'Agent': return Bot
-        case 'Assistant': return Sparkles
-        case 'Analyzer': return BarChart3
-        case 'Automation': return Zap
-        default: return Bot
-    }
 }
 
 // Generate initials from title
@@ -114,14 +102,14 @@ export const MarketCard = memo(function MarketCard({
 
     const attrs = listing.attributes || {}
     const isPerson = listing.category === 'People'
-    const isAI = listing.category === 'AI'
     const isProduct = listing.category === 'Products'
     const isManufacturer = isProduct && listing.subcategory === 'Manufacturer'
     const isMachineCapacity = isProduct && listing.subcategory === 'Machine Capacity'
 
-    const AITypeIcon = isAI ? getAITypeIcon(listing.subcategory) : null
     const initials = getInitials(listing.title)
-    const avatarGradient = getAvatarGradient(listing.category as MarketplaceCategory, listing.title)
+    const category = listing.category as MarketplaceCategory
+    const avatarGradient = getAvatarGradient(category, listing.title)
+    const categoryBadgeClasses = getCategoryBadgeClasses(category)
 
     // Get the primary metric to show (rate/cost)
     const primaryMetric = attrs.rate || attrs.cost || attrs.price || null
@@ -228,17 +216,13 @@ export const MarketCard = memo(function MarketCard({
                                 "w-10 h-10 rounded-lg bg-gradient-to-br flex items-center justify-center text-white font-semibold text-xs shrink-0 shadow-sm",
                                 avatarGradient
                             )}>
-                                {isAI && AITypeIcon ? (
-                                    <AITypeIcon className="w-5 h-5" />
-                                ) : (
-                                    initials
-                                )}
+                                {initials}
                             </div>
 
                             {/* Title + Badge */}
                             <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-2 mb-0.5">
-                                    <Badge variant="secondary" className={cn("uppercase text-[9px] tracking-wider font-semibold border-0 shrink-0 px-1.5 py-0", getCategoryBadgeClasses(listing.category as MarketplaceCategory))}>
+                                    <Badge variant="secondary" className={cn("uppercase text-[9px] tracking-wider font-semibold border-0 shrink-0 px-1.5 py-0", categoryBadgeClasses)}>
                                         {listing.subcategory}
                                     </Badge>
                                     {listing.is_verified && (
@@ -282,16 +266,12 @@ export const MarketCard = memo(function MarketCard({
                                 "w-12 h-12 rounded-lg bg-gradient-to-br flex items-center justify-center text-white font-semibold text-sm shrink-0 shadow-sm",
                                 avatarGradient
                             )}>
-                                {isAI && AITypeIcon ? (
-                                    <AITypeIcon className="w-6 h-6" />
-                                ) : (
-                                    initials
-                                )}
+                                {initials}
                             </div>
 
                             <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-2 mb-1">
-                                    <Badge variant="secondary" className={cn("uppercase text-[10px] tracking-wider font-semibold border-0 shrink-0", getCategoryBadgeClasses(listing.category as MarketplaceCategory))}>
+                                    <Badge variant="secondary" className={cn("uppercase text-[10px] tracking-wider font-semibold border-0 shrink-0", categoryBadgeClasses)}>
                                         {listing.subcategory}
                                     </Badge>
                                     {listing.is_verified && (
@@ -307,9 +287,6 @@ export const MarketCard = memo(function MarketCard({
                         {/* Role/Function subtitle */}
                         {isPerson && attrs.role && (
                             <p className="text-sm font-medium text-muted-foreground mb-2 truncate">{attrs.role}</p>
-                        )}
-                        {isAI && attrs.function && (
-                            <p className="text-sm font-medium text-status-info-dark mb-2 line-clamp-2">{attrs.function}</p>
                         )}
 
                         {/* Description - 2 lines */}
@@ -335,12 +312,6 @@ export const MarketCard = memo(function MarketCard({
                                 <span className="flex items-center gap-1">
                                     <Clock className="w-3 h-3" />
                                     {attrs.lead_time}
-                                </span>
-                            )}
-                            {isAI && attrs.latency && (
-                                <span className="flex items-center gap-1">
-                                    <Zap className="w-3 h-3" />
-                                    {attrs.latency}
                                 </span>
                             )}
                         </div>
@@ -403,16 +374,12 @@ export const MarketCard = memo(function MarketCard({
                                 "w-16 h-16 rounded-lg bg-gradient-to-br flex items-center justify-center text-white font-bold text-lg shrink-0 shadow-sm",
                                 avatarGradient
                             )}>
-                                {isAI && AITypeIcon ? (
-                                    <AITypeIcon className="w-8 h-8" />
-                                ) : (
-                                    initials
-                                )}
+                                {initials}
                             </div>
 
                             <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-2 mb-1">
-                                    <Badge variant="secondary" className={cn("uppercase text-[10px] tracking-wider font-semibold border-0 shrink-0", getCategoryBadgeClasses(listing.category as MarketplaceCategory))}>
+                                    <Badge variant="secondary" className={cn("uppercase text-[10px] tracking-wider font-semibold border-0 shrink-0", categoryBadgeClasses)}>
                                         {listing.subcategory}
                                     </Badge>
                                     {listing.is_verified && (
@@ -424,9 +391,6 @@ export const MarketCard = memo(function MarketCard({
                                 </h3>
                                 {isPerson && attrs.role && (
                                     <p className="text-sm font-medium text-muted-foreground mt-1">{attrs.role}</p>
-                                )}
-                                {isAI && attrs.function && (
-                                    <p className="text-sm font-medium text-status-info-dark mt-1">{attrs.function}</p>
                                 )}
                             </div>
                             
@@ -483,15 +447,6 @@ export const MarketCard = memo(function MarketCard({
                                     </div>
                                 </div>
                             )}
-                            {isAI && attrs.latency && (
-                                <div className="flex items-center gap-2">
-                                    <Zap className="w-4 h-4 text-muted-foreground" />
-                                    <div>
-                                        <p className="text-xs text-muted-foreground">Latency</p>
-                                        <p className="text-sm font-medium text-foreground">{attrs.latency}</p>
-                                    </div>
-                                </div>
-                            )}
                             {attrs.rating && (
                                 <div className="flex items-center gap-2">
                                     <Star className="w-4 h-4 text-amber-400 fill-amber-400" />
@@ -508,7 +463,7 @@ export const MarketCard = memo(function MarketCard({
                             <div className="mb-4">
                                 <p className="text-xs font-medium text-muted-foreground mb-2 flex items-center gap-1">
                                     <Wrench className="w-3 h-3" />
-                                    {isPerson ? 'Skills & Expertise' : isAI ? 'Integrations' : 'Capabilities'}
+                                    {isPerson ? 'Skills & Expertise' : 'Capabilities'}
                                 </p>
                                 <div className="flex flex-wrap gap-1.5">
                                     {allTags.map((item: string, i: number) => (
