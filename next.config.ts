@@ -19,6 +19,10 @@ const nextConfig: NextConfig = {
   output: "standalone",
   // Silence Turbopack/Webpack conflict warning
   turbopack: {},
+
+  // Transpile @xyflow packages so Turbopack processes their ESM source
+  // instead of their UMD bundles which use dynamic require() calls
+  transpilePackages: ["@xyflow/react", "@xyflow/system"],
   
   // Skip type checking during build (types need regeneration)
   typescript: {
