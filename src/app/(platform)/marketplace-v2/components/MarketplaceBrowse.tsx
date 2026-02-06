@@ -44,6 +44,7 @@ export function MarketplaceBrowse({
     const state = useMarketplaceState({ initialListings, initialSavedIds })
     const [activeTab, setActiveTab] = useState<MarketplaceTab>('browse')
     const [compareListings, setCompareListings] = useState<MarketplaceListing[]>([])
+    const [compareOrigin, setCompareOrigin] = useState<'browse' | 'saved'>('browse')
 
     // Featured listings = verified listings, limit 4
     const featuredListings = initialListings
@@ -69,13 +70,25 @@ export function MarketplaceBrowse({
         }
     }, [])
 
-    // Enter compare mode
-    const handleCompare = useCallback((listings: MarketplaceListing[]) => {
+    // Enter compare mode from browse
+    const handleCompareFromBrowse = useCallback((listings: MarketplaceListing[]) => {
         if (listings.length < 2) {
             toast.error('Select at least 2 items to compare')
             return
         }
         setCompareListings(listings)
+        setCompareOrigin('browse')
+        setActiveTab('compare')
+    }, [])
+
+    // Enter compare mode from saved
+    const handleCompareFromSaved = useCallback((listings: MarketplaceListing[]) => {
+        if (listings.length < 2) {
+            toast.error('Select at least 2 items to compare')
+            return
+        }
+        setCompareListings(listings)
+        setCompareOrigin('saved')
         setActiveTab('compare')
     }, [])
 
@@ -84,19 +97,18 @@ export function MarketplaceBrowse({
         setCompareListings(prev => {
             const next = prev.filter(l => l.id !== id)
             if (next.length < 2) {
-                // Not enough to compare, go back to saved
-                setActiveTab('saved')
+                setActiveTab(compareOrigin)
                 return []
             }
             return next
         })
-    }, [])
+    }, [compareOrigin])
 
-    // Back from compare to saved
+    // Back from compare
     const handleBackFromCompare = useCallback(() => {
-        setActiveTab('saved')
+        setActiveTab(compareOrigin)
         setCompareListings([])
-    }, [])
+    }, [compareOrigin])
 
     return (
         <div className="space-y-6">
@@ -221,6 +233,7 @@ export function MarketplaceBrowse({
                         savedIds={state.savedIds}
                         onSaveToggle={state.toggleSaved}
                         onViewDetail={state.setSelectedListing}
+                        onCompare={handleCompareFromBrowse}
                         hasActiveFilters={state.hasActiveFilters}
                         onClearFilters={state.clearFilters}
                     />
@@ -231,7 +244,7 @@ export function MarketplaceBrowse({
             {activeTab === 'saved' && (
                 <MarketplaceSavedView
                     initialSavedListings={initialSavedListings}
-                    onCompare={handleCompare}
+                    onCompare={handleCompareFromSaved}
                     onViewDetail={state.setSelectedListing}
                 />
             )}

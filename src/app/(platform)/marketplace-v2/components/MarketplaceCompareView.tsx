@@ -236,7 +236,7 @@ export function MarketplaceCompareView({
             <div className="flex items-center gap-3">
                 <Button variant="ghost" size="sm" onClick={onBack} className="gap-1.5">
                     <ArrowLeft className="w-4 h-4" />
-                    Back to Saved
+                    Back
                 </Button>
                 <p className="text-sm text-muted-foreground">
                     Comparing {listings.length} listing{listings.length !== 1 ? 's' : ''}

@@ -1,10 +1,11 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import { MarketCardV2 } from './MarketCardV2'
 import { EmptyState } from '@/components/ui/empty-state'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
 import { cn } from '@/lib/utils'
 import {
     getCategoryBadgeClasses,
@@ -25,6 +26,8 @@ import {
     BarChart3,
     Zap,
     Users,
+    Scale,
+    X,
 } from 'lucide-react'
 import { saveMarketplaceListing, unsaveMarketplaceListing } from '@/actions/marketplace'
 import { toast } from 'sonner'
@@ -35,6 +38,7 @@ interface MarketplaceListingGridProps {
     savedIds: Set<string>
     onSaveToggle: (id: string) => void
     onViewDetail: (listing: MarketplaceListing) => void
+    onCompare: (listings: MarketplaceListing[]) => void
     hasActiveFilters: boolean
     onClearFilters: () => void
 }
@@ -81,13 +85,17 @@ function getResponseTime(attrs: Record<string, unknown>): string | null {
 function ListRow({
     listing,
     isSaved,
+    isSelectedForCompare,
     onSaveToggle,
     onViewDetail,
+    onToggleCompare,
 }: {
     listing: MarketplaceListing
     isSaved: boolean
+    isSelectedForCompare: boolean
     onSaveToggle: (id: string) => void
     onViewDetail: (listing: MarketplaceListing) => void
+    onToggleCompare: (id: string) => void
 }) {
     const attrs = listing.attributes || {}
     const isAI = listing.category === 'AI'
@@ -122,10 +130,21 @@ function ListRow({
         <div
             className={cn(
                 'group flex items-center gap-3 px-4 py-3 rounded-xl border bg-background cursor-pointer',
-                'hover:shadow-md hover:border-muted-foreground/20 transition-all duration-200'
+                'hover:shadow-md hover:border-muted-foreground/20 transition-all duration-200',
+                isSelectedForCompare && 'ring-2 ring-international-orange/50 border-international-orange/30 bg-primary/5'
             )}
             onClick={() => onViewDetail(listing)}
         >
+            {/* Compare checkbox */}
+            <div onClick={(e) => e.stopPropagation()} className="shrink-0">
+                <Checkbox
+                    checked={isSelectedForCompare}
+                    onCheckedChange={() => onToggleCompare(listing.id)}
+                    aria-label={`Select ${listing.title} for comparison`}
+                    className="h-4 w-4"
+                />
+            </div>
+
             {/* Avatar */}
             <div className={cn(
                 'w-10 h-10 rounded-lg bg-gradient-to-br flex items-center justify-center text-white font-semibold text-xs shrink-0',
@@ -235,10 +254,37 @@ export function MarketplaceListingGrid({
     savedIds,
     onSaveToggle,
     onViewDetail,
+    onCompare,
     hasActiveFilters,
     onClearFilters,
 }: MarketplaceListingGridProps) {
     const [viewMode, setViewMode] = useState<ViewMode>('cards')
+    const [selectedForCompare, setSelectedForCompare] = useState<Set<string>>(new Set())
+
+    const toggleCompare = useCallback((id: string) => {
+        setSelectedForCompare(prev => {
+            const next = new Set(prev)
+            if (next.has(id)) {
+                next.delete(id)
+            } else {
+                if (next.size >= 4) {
+                    toast.error('Compare up to 4 items at a time')
+                    return prev
+                }
+                next.add(id)
+            }
+            return next
+        })
+    }, [])
+
+    const handleCompare = useCallback(() => {
+        const selected = listings.filter(l => selectedForCompare.has(l.id))
+        onCompare(selected)
+    }, [listings, selectedForCompare, onCompare])
+
+    const clearCompareSelection = useCallback(() => {
+        setSelectedForCompare(new Set())
+    }, [])
 
     if (listings.length === 0) {
         return (
@@ -262,8 +308,36 @@ export function MarketplaceListingGrid({
 
     return (
         <div className="space-y-4">
-            {/* View mode toggle */}
-            <div className="flex items-center justify-end">
+            {/* View mode toggle + compare selection info */}
+            <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                    {selectedForCompare.size > 0 && (
+                        <>
+                            <Badge variant="secondary" className="gap-1.5 text-xs">
+                                <Scale className="w-3 h-3" />
+                                {selectedForCompare.size} selected
+                            </Badge>
+                            <Button
+                                size="sm"
+                                onClick={handleCompare}
+                                disabled={selectedForCompare.size < 2}
+                                className="gap-1.5 h-7 text-xs"
+                            >
+                                <Scale className="w-3 h-3" />
+                                Compare
+                            </Button>
+                            <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={clearCompareSelection}
+                                className="gap-1 h-7 text-xs text-muted-foreground"
+                            >
+                                <X className="w-3 h-3" />
+                                Clear
+                            </Button>
+                        </>
+                    )}
+                </div>
                 <div className="flex items-center gap-0.5 bg-muted rounded-lg p-0.5">
                     <button
                         onClick={() => setViewMode('cards')}
@@ -300,13 +374,34 @@ export function MarketplaceListingGrid({
             {viewMode === 'cards' && (
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
                     {listings.map((listing) => (
-                        <MarketCardV2
-                            key={listing.id}
-                            listing={listing}
-                            isSaved={savedIds.has(listing.id)}
-                            onSaveToggle={onSaveToggle}
-                            onViewDetail={onViewDetail}
-                        />
+                        <div key={listing.id} className="relative">
+                            {/* Compare checkbox overlay on card */}
+                            <div
+                                className="absolute top-3 left-3 z-10"
+                                onClick={(e) => e.stopPropagation()}
+                            >
+                                <Checkbox
+                                    checked={selectedForCompare.has(listing.id)}
+                                    onCheckedChange={() => toggleCompare(listing.id)}
+                                    aria-label={`Select ${listing.title} for comparison`}
+                                    className={cn(
+                                        'h-5 w-5 border-2 bg-background/80 backdrop-blur-sm',
+                                        selectedForCompare.has(listing.id) && 'border-international-orange'
+                                    )}
+                                />
+                            </div>
+                            <div className={cn(
+                                'rounded-xl transition-all',
+                                selectedForCompare.has(listing.id) && 'ring-2 ring-international-orange/50'
+                            )}>
+                                <MarketCardV2
+                                    listing={listing}
+                                    isSaved={savedIds.has(listing.id)}
+                                    onSaveToggle={onSaveToggle}
+                                    onViewDetail={onViewDetail}
+                                />
+                            </div>
+                        </div>
                     ))}
                 </div>
             )}
@@ -319,10 +414,40 @@ export function MarketplaceListingGrid({
                             key={listing.id}
                             listing={listing}
                             isSaved={savedIds.has(listing.id)}
+                            isSelectedForCompare={selectedForCompare.has(listing.id)}
                             onSaveToggle={onSaveToggle}
                             onViewDetail={onViewDetail}
+                            onToggleCompare={toggleCompare}
                         />
                     ))}
+                </div>
+            )}
+
+            {/* Floating compare bar */}
+            {selectedForCompare.size >= 2 && (
+                <div className="sticky bottom-4 z-20 flex justify-center">
+                    <div className="flex items-center gap-3 bg-foreground text-background px-5 py-3 rounded-full shadow-2xl">
+                        <Scale className="w-4 h-4" />
+                        <span className="text-sm font-medium">
+                            {selectedForCompare.size} items selected
+                        </span>
+                        <Button
+                            size="sm"
+                            variant="secondary"
+                            onClick={handleCompare}
+                            className="gap-1.5 h-8 rounded-full"
+                        >
+                            Compare Now
+                            <ArrowRight className="w-3.5 h-3.5" />
+                        </Button>
+                        <button
+                            onClick={clearCompareSelection}
+                            className="w-6 h-6 rounded-full bg-background/20 hover:bg-background/30 flex items-center justify-center transition-colors"
+                            aria-label="Clear selection"
+                        >
+                            <X className="w-3.5 h-3.5" />
+                        </button>
+                    </div>
                 </div>
             )}
         </div>
