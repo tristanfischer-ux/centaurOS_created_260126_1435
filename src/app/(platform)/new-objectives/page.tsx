@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { ObjectivesBoard } from './objectives-board'
+import type { FoundryPurposeData } from '@/types/foundry'
 
 export const revalidate = 60
 
@@ -21,6 +22,13 @@ export default async function NewObjectivesPage() {
   if (!profile) {
     redirect('/login')
   }
+
+  // Fetch foundry with purpose_data for company purpose display
+  const { data: foundry } = await supabase
+    .from('foundries')
+    .select('id, name, purpose_data')
+    .eq('id', profile.foundry_id)
+    .single()
 
   // Fetch objectives
   // Note: is_private may not be in generated types but exists in DB via migration
@@ -156,6 +164,9 @@ export default async function NewObjectivesPage() {
       teams={teams}
       currentUserId={user.id}
       currentUserRole={profile.role}
+      purposeData={foundry?.purpose_data as FoundryPurposeData | null}
+      isFounder={profile.role === 'Founder'}
+      foundryId={profile.foundry_id}
     />
   )
 }
