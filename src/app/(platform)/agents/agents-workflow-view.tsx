@@ -440,6 +440,18 @@ function AgentsFlowInner() {
             const upstreamOutput = getUpstreamOutput(nodeId, nodes, edges)
             const input = data.userInput?.trim() || upstreamOutput || ""
 
+            // Guard: root nodes (no upstream connection) MUST have user input
+            const isRootNode = !edges.some((e) => e.target === nodeId)
+            if (isRootNode && !input.trim()) {
+                // Don't execute — select the node so user sees the input field
+                setSelectedNodeId(nodeId)
+                setInspectorOpen(true)
+                toast.error("Add your input data before running this step", {
+                    description: "Paste your data into the Input Data field, then click Run Prompt.",
+                })
+                return false
+            }
+
             // Set running state
             updateNodeData(nodeId, { executionStatus: "running", output: "", error: undefined })
 
@@ -582,8 +594,6 @@ function AgentsFlowInner() {
         const orderedIds = getOrderedNodeIds(nodes, edges)
         if (orderedIds.length === 0) return
 
-        setIsChainRunning(true)
-
         // Find first node that isn't already approved
         const startIdx = orderedIds.findIndex((id) => {
             const node = nodes.find((n) => n.id === id)
@@ -593,19 +603,26 @@ function AgentsFlowInner() {
 
         if (startIdx === -1) {
             toast.info("All steps already approved")
-            setIsChainRunning(false)
             return
         }
 
         const nodeId = orderedIds[startIdx]
         setChainProgress({ current: startIdx + 1, total: orderedIds.length })
 
-        // Select and run the first unapproved node
+        // Select the node and open inspector
         setSelectedNodeId(nodeId)
         setInspectorOpen(true)
 
+        // Try to execute — executeNode will block if root node has no input
         abortControllerRef.current = new AbortController()
-        await executeNode(nodeId, abortControllerRef.current.signal)
+        const started = await executeNode(nodeId, abortControllerRef.current.signal)
+
+        // Only mark chain as running if execution actually started
+        if (started) {
+            setIsChainRunning(true)
+        } else {
+            setChainProgress(undefined)
+        }
 
         // Chain continues via handleApproveAndContinue (HITL pattern)
     }, [nodes, edges, executeNode])
