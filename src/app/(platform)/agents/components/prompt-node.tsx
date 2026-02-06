@@ -2,7 +2,7 @@
 
 import React, { memo } from "react"
 import { Handle, Position, type NodeProps } from "@xyflow/react"
-import { CATEGORY_ACCENT_COLORS, CATEGORY_META, type PromptCategory } from "../lib/agent-types"
+import { CATEGORY_ACCENT_COLORS, CATEGORY_META, type PromptCategory, type ExecutionStatus } from "../lib/agent-types"
 import {
     Rocket, TrendingUp, Megaphone, DollarSign, Compass, Package,
     Calculator, Users, Heart, Scale, Palette, BarChart3, Sparkles,
@@ -16,6 +16,7 @@ import {
     LogOut, Inbox, Activity, ThumbsUp, Lock, ScrollText, Image, Type,
     Film, Camera, Play, Database, LayoutDashboard, ClipboardList,
     Swords, MessageCircle, Clock, LayoutGrid, ImageIcon,
+    Loader2, Check, AlertOctagon, Eye, Paperclip,
 } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
 
@@ -39,11 +40,56 @@ export function getIcon(name: string): LucideIcon {
     return ICON_MAP[name] ?? Sparkles
 }
 
+// ─── Status configuration ────────────────────────────────────────────
+const STATUS_CONFIG: Record<ExecutionStatus, {
+    border: string
+    badge: string
+    badgeBg: string
+    badgeText: string
+    icon: LucideIcon
+    animate?: string
+}> = {
+    idle: { border: "", badge: "", badgeBg: "", badgeText: "", icon: Sparkles },
+    running: {
+        border: "ring-2 ring-blue-400/60",
+        badge: "Running",
+        badgeBg: "bg-blue-100",
+        badgeText: "text-blue-700",
+        icon: Loader2,
+        animate: "animate-pulse",
+    },
+    review: {
+        border: "ring-2 ring-amber-400/60",
+        badge: "Review",
+        badgeBg: "bg-amber-100",
+        badgeText: "text-amber-700",
+        icon: Eye,
+    },
+    approved: {
+        border: "ring-2 ring-emerald-400/60",
+        badge: "Approved",
+        badgeBg: "bg-emerald-100",
+        badgeText: "text-emerald-700",
+        icon: Check,
+    },
+    error: {
+        border: "ring-2 ring-red-400/60",
+        badge: "Error",
+        badgeBg: "bg-red-100",
+        badgeText: "text-red-700",
+        icon: AlertOctagon,
+    },
+}
+
 interface PromptNodeData {
     label?: string
     description?: string
     category?: PromptCategory
     icon?: string
+    userInput?: string
+    output?: string
+    executionStatus?: ExecutionStatus
+    attachedFiles?: { name: string }[]
     [key: string]: unknown
 }
 
@@ -54,6 +100,12 @@ function PromptNodeComponent({ data, selected }: NodeProps) {
     const meta = CATEGORY_META[category]
     const Icon = getIcon(nodeData.icon ?? "Sparkles")
 
+    const status = nodeData.executionStatus ?? "idle"
+    const statusCfg = STATUS_CONFIG[status]
+    const hasInput = !!(nodeData.userInput?.trim())
+    const hasFiles = !!(nodeData.attachedFiles && nodeData.attachedFiles.length > 0)
+    const hasOutput = !!(nodeData.output?.trim())
+
     return (
         <div
             className={`
@@ -61,6 +113,8 @@ function PromptNodeComponent({ data, selected }: NodeProps) {
                 transition-all duration-200 w-[260px]
                 hover:shadow-md hover:-translate-y-0.5
                 ${selected ? "shadow-lg ring-2 ring-blue-400/50 -translate-y-0.5" : "border-slate-200"}
+                ${!selected && statusCfg.border ? statusCfg.border : ""}
+                ${statusCfg.animate ?? ""}
             `}
             style={{
                 borderLeftColor: accentColor,
@@ -101,6 +155,47 @@ function PromptNodeComponent({ data, selected }: NodeProps) {
                     <p className="text-[11px] text-muted-foreground mt-2 leading-relaxed line-clamp-2">
                         {nodeData.description}
                     </p>
+                )}
+
+                {/* Status indicators row */}
+                {(status !== "idle" || hasInput || hasFiles || hasOutput) && (
+                    <div className="flex items-center gap-1.5 mt-2 flex-wrap">
+                        {/* Execution status badge */}
+                        {status !== "idle" && (
+                            <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-semibold ${statusCfg.badgeBg} ${statusCfg.badgeText}`}>
+                                {status === "running" ? (
+                                    <Loader2 className="w-2.5 h-2.5 animate-spin" />
+                                ) : (
+                                    <statusCfg.icon className="w-2.5 h-2.5" />
+                                )}
+                                {statusCfg.badge}
+                            </span>
+                        )}
+
+                        {/* Has input indicator */}
+                        {hasInput && status === "idle" && (
+                            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[9px] font-medium bg-blue-50 text-blue-600">
+                                <FileText className="w-2.5 h-2.5" />
+                                Has input
+                            </span>
+                        )}
+
+                        {/* Has files indicator */}
+                        {hasFiles && status === "idle" && (
+                            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[9px] font-medium bg-slate-100 text-slate-600">
+                                <Paperclip className="w-2.5 h-2.5" />
+                                {nodeData.attachedFiles!.length}
+                            </span>
+                        )}
+
+                        {/* Has output indicator */}
+                        {hasOutput && status === "idle" && (
+                            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[9px] font-medium bg-emerald-50 text-emerald-600">
+                                <Check className="w-2.5 h-2.5" />
+                                Output
+                            </span>
+                        )}
+                    </div>
                 )}
             </div>
 

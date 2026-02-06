@@ -9,6 +9,9 @@ import {
     Check,
     PanelLeftClose,
     PanelLeft,
+    Play,
+    Square,
+    Loader2,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -28,6 +31,10 @@ interface WorkflowToolbarProps {
     onToggleSidebar: () => void
     sidebarOpen: boolean
     nodeCount: number
+    onRunChain: () => void
+    onStopChain: () => void
+    isChainRunning: boolean
+    chainProgress?: { current: number; total: number }
 }
 
 export function WorkflowToolbar({
@@ -40,6 +47,10 @@ export function WorkflowToolbar({
     onToggleSidebar,
     sidebarOpen,
     nodeCount,
+    onRunChain,
+    onStopChain,
+    isChainRunning,
+    chainProgress,
 }: WorkflowToolbarProps) {
     const [copied, setCopied] = useState(false)
     const [saved, setSaved] = useState(false)
@@ -125,6 +136,46 @@ export function WorkflowToolbar({
                         </Button>
                     </TooltipTrigger>
                     <TooltipContent>Load a pre-built workflow</TooltipContent>
+                </Tooltip>
+
+                <div className="h-5 w-px bg-slate-200" />
+
+                {/* Run Chain button */}
+                <Tooltip>
+                    <TooltipTrigger asChild>
+                        {isChainRunning ? (
+                            <Button
+                                size="sm"
+                                onClick={onStopChain}
+                                className="gap-1.5 text-xs"
+                                variant="outline"
+                            >
+                                <Square className="w-3 h-3" />
+                                Stop
+                                {chainProgress && (
+                                    <span className="text-[10px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full ml-1">
+                                        {chainProgress.current}/{chainProgress.total}
+                                    </span>
+                                )}
+                            </Button>
+                        ) : (
+                            <Button
+                                size="sm"
+                                onClick={onRunChain}
+                                disabled={nodeCount === 0}
+                                className="gap-1.5 text-xs text-white"
+                                style={{ backgroundColor: nodeCount > 0 ? "#3b82f6" : undefined }}
+                            >
+                                <Play className="w-3.5 h-3.5" />
+                                Run Chain
+                            </Button>
+                        )}
+                    </TooltipTrigger>
+                    <TooltipContent>
+                        {isChainRunning
+                            ? "Stop chain execution"
+                            : "Run all prompts in order (with human review at each step)"}
+                    </TooltipContent>
                 </Tooltip>
 
                 <div className="h-5 w-px bg-slate-200" />
