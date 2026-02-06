@@ -253,6 +253,8 @@ export function MarketplaceBrowse({
             {activeTab === 'compare' && compareListings.length >= 2 && (
                 <MarketplaceCompareView
                     listings={compareListings}
+                    savedIds={state.savedIds}
+                    onSaveToggle={state.toggleSaved}
                     onBack={handleBackFromCompare}
                     onRemove={handleRemoveFromCompare}
                 />
