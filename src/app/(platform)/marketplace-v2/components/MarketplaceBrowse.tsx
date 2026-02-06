@@ -1,6 +1,7 @@
 'use client'
 
-import { useCallback } from 'react'
+import { useState, useCallback } from 'react'
+import { cn } from '@/lib/utils'
 import { MarketplaceCategoryNav } from './MarketplaceCategoryNav'
 import { MarketplaceSearchToolbar } from './MarketplaceSearchToolbar'
 import { MarketplaceFilterPanel } from './MarketplaceFilterPanel'
@@ -8,23 +9,41 @@ import { MarketplaceListingGrid } from './MarketplaceListingGrid'
 import { MarketplaceDetailDialog } from './MarketplaceDetailDialog'
 import { MarketplaceRecommendations } from './MarketplaceRecommendations'
 import { FeaturedBanner } from './FeaturedBanner'
+import { MarketplaceSavedView } from './MarketplaceSavedView'
+import { MarketplaceCompareView } from './MarketplaceCompareView'
 import { useMarketplaceState, type MarketplaceCategory } from '../hooks/useMarketplaceState'
 import { dismissRecommendation } from '@/actions/marketplace'
 import { toast } from 'sonner'
+import {
+    LayoutGrid,
+    Heart,
+    Scale,
+} from 'lucide-react'
 import type { MarketplaceListing, MarketplaceRecommendation } from '@/actions/marketplace'
+
+type MarketplaceTab = 'browse' | 'saved' | 'compare'
 
 interface MarketplaceBrowseProps {
     initialListings: MarketplaceListing[]
     recommendations: MarketplaceRecommendation[]
     initialSavedIds: string[]
+    initialSavedListings: MarketplaceListing[]
 }
+
+const TABS: { id: MarketplaceTab; label: string; icon: React.ElementType }[] = [
+    { id: 'browse', label: 'Browse', icon: LayoutGrid },
+    { id: 'saved', label: 'Saved', icon: Heart },
+]
 
 export function MarketplaceBrowse({
     initialListings,
     recommendations: initialRecommendations,
     initialSavedIds,
+    initialSavedListings,
 }: MarketplaceBrowseProps) {
     const state = useMarketplaceState({ initialListings, initialSavedIds })
+    const [activeTab, setActiveTab] = useState<MarketplaceTab>('browse')
+    const [compareListings, setCompareListings] = useState<MarketplaceListing[]>([])
 
     // Featured listings = verified listings, limit 4
     const featuredListings = initialListings
@@ -39,6 +58,7 @@ export function MarketplaceBrowse({
         if (searchTerm) {
             state.setSearchQuery(searchTerm)
         }
+        setActiveTab('browse')
     }, [state])
 
     // Handle recommendation dismiss
@@ -47,6 +67,35 @@ export function MarketplaceBrowse({
         if (result.error) {
             toast.error('Failed to dismiss')
         }
+    }, [])
+
+    // Enter compare mode
+    const handleCompare = useCallback((listings: MarketplaceListing[]) => {
+        if (listings.length < 2) {
+            toast.error('Select at least 2 items to compare')
+            return
+        }
+        setCompareListings(listings)
+        setActiveTab('compare')
+    }, [])
+
+    // Remove from compare
+    const handleRemoveFromCompare = useCallback((id: string) => {
+        setCompareListings(prev => {
+            const next = prev.filter(l => l.id !== id)
+            if (next.length < 2) {
+                // Not enough to compare, go back to saved
+                setActiveTab('saved')
+                return []
+            }
+            return next
+        })
+    }, [])
+
+    // Back from compare to saved
+    const handleBackFromCompare = useCallback(() => {
+        setActiveTab('saved')
+        setCompareListings([])
     }, [])
 
     return (
@@ -66,69 +115,137 @@ export function MarketplaceBrowse({
                 </div>
             </div>
 
-            {/* AI Recommendations */}
-            <MarketplaceRecommendations
-                recommendations={initialRecommendations}
-                onApplyRecommendation={handleApplyRecommendation}
-                onDismiss={handleDismissRecommendation}
-            />
+            {/* Tab navigation */}
+            <nav aria-label="Marketplace sections" className="flex items-center gap-1 border-b border-border">
+                {TABS.map((tab) => {
+                    const Icon = tab.icon
+                    const isActive = activeTab === tab.id || (activeTab === 'compare' && tab.id === 'saved')
+                    return (
+                        <button
+                            key={tab.id}
+                            onClick={() => {
+                                if (tab.id === 'saved' && activeTab === 'compare') {
+                                    handleBackFromCompare()
+                                } else {
+                                    setActiveTab(tab.id)
+                                }
+                            }}
+                            className={cn(
+                                'flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors',
+                                isActive
+                                    ? 'border-international-orange text-foreground'
+                                    : 'border-transparent text-muted-foreground hover:text-foreground hover:border-muted-foreground/30'
+                            )}
+                            aria-current={isActive ? 'page' : undefined}
+                        >
+                            <Icon className="w-4 h-4" />
+                            {tab.label}
+                            {tab.id === 'saved' && state.savedIds.size > 0 && (
+                                <span className={cn(
+                                    'inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full text-[11px] font-semibold',
+                                    isActive
+                                        ? 'bg-international-orange text-white'
+                                        : 'bg-muted text-muted-foreground'
+                                )}>
+                                    {state.savedIds.size}
+                                </span>
+                            )}
+                        </button>
+                    )
+                })}
+                {activeTab === 'compare' && (
+                    <div className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 border-international-orange text-foreground -mb-px">
+                        <Scale className="w-4 h-4" />
+                        Compare ({compareListings.length})
+                    </div>
+                )}
+            </nav>
 
-            {/* Featured banner - only when no filters active */}
-            {!state.hasActiveFilters && featuredListings.length > 0 && state.activeCategory === 'All' && (
-                <FeaturedBanner
-                    listings={featuredListings}
+            {/* Browse tab content */}
+            {activeTab === 'browse' && (
+                <>
+                    {/* AI Recommendations */}
+                    <MarketplaceRecommendations
+                        recommendations={initialRecommendations}
+                        onApplyRecommendation={handleApplyRecommendation}
+                        onDismiss={handleDismissRecommendation}
+                    />
+
+                    {/* Featured banner - only when no filters active */}
+                    {!state.hasActiveFilters && featuredListings.length > 0 && state.activeCategory === 'All' && (
+                        <FeaturedBanner
+                            listings={featuredListings}
+                            onViewDetail={state.setSelectedListing}
+                        />
+                    )}
+
+                    {/* Category navigation */}
+                    <MarketplaceCategoryNav
+                        activeCategory={state.activeCategory}
+                        onCategoryChange={state.handleCategoryChange}
+                        counts={state.categoryCounts}
+                    />
+
+                    {/* Search + Sort + Filters */}
+                    <MarketplaceSearchToolbar
+                        searchQuery={state.searchQuery}
+                        onSearchChange={state.setSearchQuery}
+                        sortBy={state.sortBy}
+                        onSortChange={state.setSortBy}
+                        showFilters={state.showFilters}
+                        onToggleFilters={() => state.setShowFilters(!state.showFilters)}
+                        hasActiveFilters={state.hasActiveFilters}
+                        onClearAll={state.clearFilters}
+                        resultCount={state.filteredListings.length}
+                    />
+
+                    {/* Filter panel (collapsible) */}
+                    {state.showFilters && (
+                        <MarketplaceFilterPanel
+                            subcategories={state.availableSubcategories}
+                            selectedSubcategories={state.selectedSubcategories}
+                            onToggleSubcategory={state.toggleSubcategory}
+                            onClear={() => {
+                                state.availableSubcategories.forEach(sub => {
+                                    if (state.selectedSubcategories.has(sub)) {
+                                        state.toggleSubcategory(sub)
+                                    }
+                                })
+                            }}
+                        />
+                    )}
+
+                    {/* Listing grid */}
+                    <MarketplaceListingGrid
+                        listings={state.filteredListings}
+                        savedIds={state.savedIds}
+                        onSaveToggle={state.toggleSaved}
+                        onViewDetail={state.setSelectedListing}
+                        hasActiveFilters={state.hasActiveFilters}
+                        onClearFilters={state.clearFilters}
+                    />
+                </>
+            )}
+
+            {/* Saved tab content */}
+            {activeTab === 'saved' && (
+                <MarketplaceSavedView
+                    initialSavedListings={initialSavedListings}
+                    onCompare={handleCompare}
                     onViewDetail={state.setSelectedListing}
                 />
             )}
 
-            {/* Category navigation */}
-            <MarketplaceCategoryNav
-                activeCategory={state.activeCategory}
-                onCategoryChange={state.handleCategoryChange}
-                counts={state.categoryCounts}
-            />
-
-            {/* Search + Sort + Filters */}
-            <MarketplaceSearchToolbar
-                searchQuery={state.searchQuery}
-                onSearchChange={state.setSearchQuery}
-                sortBy={state.sortBy}
-                onSortChange={state.setSortBy}
-                showFilters={state.showFilters}
-                onToggleFilters={() => state.setShowFilters(!state.showFilters)}
-                hasActiveFilters={state.hasActiveFilters}
-                onClearAll={state.clearFilters}
-                resultCount={state.filteredListings.length}
-            />
-
-            {/* Filter panel (collapsible) */}
-            {state.showFilters && (
-                <MarketplaceFilterPanel
-                    subcategories={state.availableSubcategories}
-                    selectedSubcategories={state.selectedSubcategories}
-                    onToggleSubcategory={state.toggleSubcategory}
-                    onClear={() => {
-                        // Clear just subcategory filters
-                        state.availableSubcategories.forEach(sub => {
-                            if (state.selectedSubcategories.has(sub)) {
-                                state.toggleSubcategory(sub)
-                            }
-                        })
-                    }}
+            {/* Compare tab content */}
+            {activeTab === 'compare' && compareListings.length >= 2 && (
+                <MarketplaceCompareView
+                    listings={compareListings}
+                    onBack={handleBackFromCompare}
+                    onRemove={handleRemoveFromCompare}
                 />
             )}
 
-            {/* Listing grid */}
-            <MarketplaceListingGrid
-                listings={state.filteredListings}
-                savedIds={state.savedIds}
-                onSaveToggle={state.toggleSaved}
-                onViewDetail={state.setSelectedListing}
-                hasActiveFilters={state.hasActiveFilters}
-                onClearFilters={state.clearFilters}
-            />
-
-            {/* Detail dialog */}
+            {/* Detail dialog (shared across all tabs) */}
             <MarketplaceDetailDialog
                 listing={state.selectedListing}
                 onClose={() => state.setSelectedListing(null)}
