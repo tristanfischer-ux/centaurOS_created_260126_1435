@@ -814,14 +814,14 @@ export async function getActivityFeed(options?: {
       }
     }
 
-    // Fetch conversation messages
+    // Fetch conversation messages (only true direct messages, not task/objective synced conversations)
     if ((filter === 'all' || filter === 'messages' || filter === 'unread') && myConversationIds.length > 0) {
       const { data: messages } = await supabase
         .from('messages')
         .select(`
           id, content, created_at,
           sender:profiles!sender_id(id, full_name, avatar_url, role),
-          conversation:conversations!conversation_id(id, buyer_id, seller_id)
+          conversation:conversations!conversation_id(id, buyer_id, seller_id, task_id, objective_id, title)
         `)
         .in('conversation_id', myConversationIds)
         .neq('sender_id', user.id)
@@ -835,9 +835,13 @@ export async function getActivityFeed(options?: {
             content: string
             created_at: string | null
             sender: { id: string; full_name: string | null; avatar_url: string | null; role: string | null } | null
-            conversation: { id: string; buyer_id: string; seller_id: string } | null
+            conversation: { id: string; buyer_id: string; seller_id: string; task_id: string | null; objective_id: string | null; title: string | null } | null
           }
           if (!msg.sender || !msg.conversation) continue
+
+          // Skip task-linked and objective-linked conversations -- those are synced
+          // duplicates already shown as task_comment / objective_comment items
+          if (msg.conversation.task_id || msg.conversation.objective_id) continue
 
           const lastReadAt = conversationMap.get(msg.conversation.id)
           const isUnread = !lastReadAt || new Date(msg.created_at || 0) > new Date(lastReadAt)
@@ -857,7 +861,7 @@ export async function getActivityFeed(options?: {
             source: {
               type: 'conversation',
               id: msg.conversation.id,
-              title: 'Direct Message'
+              title: msg.conversation.title || 'Direct Message'
             },
             is_unread: isUnread
           })
@@ -1060,6 +1064,15 @@ export async function getThreadForSource(
 
       if (convError || !conversation) {
         return { success: false, error: 'Conversation not found' }
+      }
+
+      // If this conversation is linked to a task or objective, load that thread instead
+      // (these conversations are synced duplicates of task/objective comments)
+      if (conversation.task_id) {
+        return getThreadForSource('task', conversation.task_id)
+      }
+      if (conversation.objective_id) {
+        return getThreadForSource('objective', conversation.objective_id)
       }
 
       // SECURITY: Verify the user is a participant
