@@ -45,7 +45,7 @@ const workNavigation = [
 // Discovery: finding help and resources
 const discoveryNavigation = [
     { name: "Inspiration", href: "/inspiration", icon: Lightbulb, tooltip: "Get ideas on what to do next and discover opportunities" },
-    { name: "Marketplace", href: "/marketplace", icon: Store, tooltip: "Find experts, suppliers, products, and services" },
+    { name: "Marketplace", href: "/marketplace-v2", icon: Store, tooltip: "Find experts, suppliers, products, and services" },
     { name: "My Orders", href: "/my-orders", icon: ShoppingBag, tooltip: "View and manage your marketplace orders" },
 ]
 
@@ -107,7 +107,7 @@ export function Sidebar({ foundryName, foundryId, userName, userRole, isAdmin }:
                         // Determine which badge to show
                         let badgeContent = null
                         
-                        if (item.href === '/inspiration' || item.href === '/marketplace') {
+                        if (item.href === '/inspiration' || item.href === '/marketplace-v2') {
                             // Show "Demo" badge for Inspiration and Marketplace
                             badgeContent = <NewBadge customText="Demo" />
                         } else if (item.href !== '/objectives' && item.href !== '/settings') {

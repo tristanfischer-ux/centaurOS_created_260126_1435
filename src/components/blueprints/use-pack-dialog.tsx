@@ -257,7 +257,7 @@ export function UsePackDialog({ pack, trigger, members = [] }: UsePackDialogProp
                       Connect with advisors and suppliers in the marketplace who can help you execute these tasks faster.
                     </p>
                     <Button asChild variant="outline" size="sm" className="border-international-orange text-international-orange">
-                      <Link href="/marketplace">
+                      <Link href="/marketplace-v2">
                         Browse marketplace
                         <ArrowRight className="ml-2 h-3.5 w-3.5" />
                       </Link>

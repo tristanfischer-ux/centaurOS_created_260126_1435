@@ -41,7 +41,7 @@ const mainNavigation = [
 // Items in the "More" dropdown
 const moreNavigation = [
   { name: "Analytics", href: "/supplier-portal/analytics", icon: BarChart3 },
-  { name: "Marketplace", href: "/marketplace", icon: Store },
+  { name: "Marketplace", href: "/marketplace-v2", icon: Store },
   { name: "Settings", href: "/supplier-portal/settings", icon: Settings },
   { name: "Help", href: "/help", icon: HelpCircle },
 ]

@@ -103,7 +103,7 @@ export function SavedResourcesView({ savedResources: initialResources, error }: 
                                     Browse the marketplace and save providers or tools to quickly access them here.
                                 </p>
                                 <Button asChild className="mt-4">
-                                    <Link href="/marketplace">
+                                    <Link href="/marketplace-v2">
                                         <Sparkles className="h-4 w-4 mr-2" />
                                         Explore Marketplace
                                     </Link>
@@ -201,7 +201,7 @@ export function SavedResourcesView({ savedResources: initialResources, error }: 
                 {savedResources.length > 0 && (
                     <div className="mt-12 text-center">
                         <Button asChild variant="secondary" size="lg">
-                            <Link href="/marketplace">
+                            <Link href="/marketplace-v2">
                                 <Sparkles className="h-4 w-4 mr-2" />
                                 Find More Resources
                             </Link>
