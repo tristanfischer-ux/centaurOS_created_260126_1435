@@ -10,7 +10,6 @@
  */
 
 import { createClient } from '@/lib/supabase/server'
-import { createAdminClient } from '@/lib/supabase/admin'
 import { revalidatePath } from 'next/cache'
 import type { FoundryPurposeData } from '@/types/foundry'
 
@@ -104,36 +103,22 @@ export async function updateFoundryPurpose(
   }
   
   try {
-    // Update foundry purpose_data using admin client to bypass RLS
-    // SECURITY: Auth checks above verify user is authenticated, owns this foundry, and is a Founder
-    // NOTE: Regular client fails because the RLS UPDATE policy's get_my_foundry_id()
-    // doesn't resolve correctly in server action context. Admin client is safe here
-    // because we've already verified identity and authorization above.
-    const adminClient = createAdminClient()
+    // Update foundry purpose_data via RPC function (SECURITY DEFINER)
+    // SECURITY: The DB function verifies auth.uid(), foundry ownership, and Founder role internally.
+    // This avoids needing a service role key / admin client entirely.
+    const { data, error: rpcError } = await supabase.rpc('update_foundry_purpose', {
+      p_foundry_id: foundryId,
+      p_purpose_data: purposeData as unknown as Record<string, unknown>,
+    })
     
-    const { data: rows, error: updateError } = await adminClient
-      .from('foundries')
-      .update({ 
-        purpose_data: purposeData as any // JSONB field
-      })
-      .eq('id', foundryId)
-      .select()
-    
-    if (updateError) {
-      console.error('[FoundryActions] Failed to update purpose:', {
+    if (rpcError) {
+      console.error('[FoundryActions] Failed to update purpose via RPC:', {
         foundryId,
-        error: updateError.message,
-        code: updateError.code,
+        error: rpcError.message,
+        code: rpcError.code,
       })
-      return { success: false, error: `Failed to update company purpose: ${updateError.message}` }
+      return { success: false, error: `Failed to update company purpose: ${rpcError.message}` }
     }
-    
-    if (!rows || rows.length === 0) {
-      console.error('[FoundryActions] Update matched no rows:', { foundryId })
-      return { success: false, error: 'Foundry not found — no rows updated' }
-    }
-    
-    const data = rows[0]
     
     // AUDIT: Log the purpose update
     console.info('[FoundryActions] Foundry purpose updated:', {
