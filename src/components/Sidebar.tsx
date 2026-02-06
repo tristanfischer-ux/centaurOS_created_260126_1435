@@ -40,11 +40,11 @@ const workNavigation = [
     { name: "Tasks", href: "/new-tasks", icon: CheckSquare, tooltip: "Manage and assign actionable items" },
     { name: "Team", href: "/team", icon: Users, tooltip: "Team members, roles, and capacity" },
     { name: "Agents", href: "/agents", icon: Bot, tooltip: "AI prompt workflows — build, chain, and copy prompts" },
+    { name: "Inspiration", href: "/inspiration", icon: Lightbulb, tooltip: "Get ideas on what to do next and discover opportunities" },
 ]
 
 // Discovery: finding help and resources
 const discoveryNavigation = [
-    { name: "Inspiration", href: "/inspiration", icon: Lightbulb, tooltip: "Get ideas on what to do next and discover opportunities" },
     { name: "Marketplace", href: "/marketplace-v2", icon: Store, tooltip: "Find experts, suppliers, products, and services" },
     { name: "My Orders", href: "/my-orders", icon: ShoppingBag, tooltip: "View and manage your marketplace orders" },
 ]
