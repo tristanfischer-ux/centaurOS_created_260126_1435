@@ -297,6 +297,12 @@ function AgentsFlowInner() {
         [updateNodeData]
     )
 
+    const handleUpdateNodeProvider = useCallback(
+        (nodeId: string, providerId: string, modelId: string, modality: string) =>
+            updateNodeData(nodeId, { providerId, modelId, outputModality: modality }),
+        [updateNodeData]
+    )
+
     // ── Delete node ────────────────────────────────────────────────
     const handleDeleteNode = useCallback(
         (nodeId: string) => {
@@ -424,6 +430,9 @@ function AgentsFlowInner() {
                 customPrompt?: string
                 promptId?: string
                 userInput?: string
+                providerId?: string
+                modelId?: string
+                outputModality?: string
             }
 
             const prompt =
@@ -452,14 +461,25 @@ function AgentsFlowInner() {
                 return false
             }
 
-            // Set running state
-            updateNodeData(nodeId, { executionStatus: "running", output: "", error: undefined })
+            const providerId = data.providerId ?? "openai"
+            const modelId = data.modelId ?? "gpt-4o"
+            const modality = data.outputModality ?? "text"
+
+            // Set running state — clear any previous media outputs
+            updateNodeData(nodeId, {
+                executionStatus: "running",
+                output: "",
+                error: undefined,
+                imageUrl: undefined,
+                audioUrl: undefined,
+                videoUrl: undefined,
+            })
 
             try {
                 const response = await fetch("/api/agents/execute", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ prompt, input }),
+                    body: JSON.stringify({ prompt, input, providerId, modelId, modality }),
                     signal,
                 })
 
@@ -472,7 +492,24 @@ function AgentsFlowInner() {
                     return false
                 }
 
-                // Read SSE stream
+                // Non-text modalities return JSON directly
+                if (modality !== "text") {
+                    const result = await response.json()
+                    if (result.error) {
+                        updateNodeData(nodeId, { executionStatus: "error", error: result.error })
+                        return false
+                    }
+                    updateNodeData(nodeId, {
+                        executionStatus: "review",
+                        imageUrl: result.imageUrl,
+                        audioUrl: result.audioUrl,
+                        videoUrl: result.videoUrl,
+                        output: result.imageUrl ? "[Image generated]" : result.audioUrl ? "[Audio generated]" : result.videoUrl ? "[Video generated]" : "",
+                    })
+                    return true
+                }
+
+                // Text modality: Read SSE stream
                 const reader = response.body?.getReader()
                 if (!reader) {
                     updateNodeData(nodeId, { executionStatus: "error", error: "No response stream" })
@@ -808,6 +845,7 @@ function AgentsFlowInner() {
                         onUpdateInput={handleUpdateNodeInput}
                         onUpdateOutput={handleUpdateNodeOutput}
                         onUpdateFiles={handleUpdateNodeFiles}
+                        onUpdateProvider={handleUpdateNodeProvider}
                         onDelete={handleDeleteNode}
                         onRunNode={handleRunNode}
                         onApproveNode={handleApproveNode}
