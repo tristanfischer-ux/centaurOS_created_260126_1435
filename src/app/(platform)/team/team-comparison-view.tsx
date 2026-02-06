@@ -14,7 +14,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import {
     Check, Users, MoreHorizontal, Pencil, Trash2, Loader2, AlertTriangle,
     LayoutGrid, List, User, MessageSquare, Brain, Unplug, Zap, Search,
-    ArrowRight, UserPlus, Plus, Activity, Bot, ShieldCheck, ChevronRight
+    ArrowRight, UserPlus, Plus, Activity, Bot, ShieldCheck, ChevronRight,
+    BarChart3
 } from "lucide-react"
 import { createTeam, addTeamMember, deleteMember } from "@/actions/team"
 import { startDirectMessage } from "@/actions/messaging"
@@ -53,6 +54,12 @@ import { FullTaskView } from "@/components/tasks/full-task-view"
 import { createClient } from "@/lib/supabase/client"
 import { cn } from "@/lib/utils"
 
+// New feature imports
+import { SmartInsights } from "./smart-insights"
+import { WorkloadBoard } from "./workload-board"
+import { QuickAssignDialog } from "./quick-assign-dialog"
+import { TeamDetailCard } from "./team-detail-card"
+
 
 // ─── Types ───────────────────────────────────────
 
@@ -60,7 +67,13 @@ interface TaskDetail {
     id: string
     title: string
     end_date: string | null
+    start_date: string | null
     created_at: string
+    objective_id: string | null
+    objective_title: string | null
+    progress: number | null
+    risk_level: string | null
+    status: string
 }
 
 interface Member {
@@ -88,6 +101,34 @@ interface Member {
     }
 }
 
+interface ExtendedTask {
+    id: string
+    title: string
+    status: string
+    assignee_id: string | null
+    end_date: string | null
+    start_date: string | null
+    created_at: string
+    objective_id: string | null
+    objective_title: string | null
+    progress: number | null
+    risk_level: string | null
+}
+
+interface InsightMember {
+    id: string
+    name: string
+}
+
+interface Insights {
+    overloadedMembers: InsightMember[]
+    idleMembers: InsightMember[]
+    overdueTaskCount: number
+    unassignedTaskCount: number
+    totalActiveTasks: number
+    totalPendingTasks: number
+}
+
 interface TeamMember {
     id: string
     full_name: string | null
@@ -110,14 +151,18 @@ interface TeamComparisonViewProps {
     aiAgents: Member[]
     teams: Team[]
     currentUserId: string
+    insights?: Insights
+    unassignedTasks?: ExtendedTask[]
+    allTasks?: ExtendedTask[]
 }
 
 
 // ─── Main Component ──────────────────────────────
 
-export function TeamComparisonView({ founders, executives, apprentices, aiAgents, teams, currentUserId }: TeamComparisonViewProps) {
+export function TeamComparisonView({ founders, executives, apprentices, aiAgents, teams, currentUserId, insights, unassignedTasks, allTasks }: TeamComparisonViewProps) {
     // View state
-    const [activeTab, setActiveTab] = useState<'members' | 'teams'>('members')
+    const [activeTab, setActiveTab] = useState<'members' | 'teams' | 'workload'>('members')
+    const [showQuickAssign, setShowQuickAssign] = useState(false)
     const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
     const [searchQuery, setSearchQuery] = useState("")
 
@@ -634,6 +679,19 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
                     <RefreshButton />
+                    {unassignedTasks && unassignedTasks.length > 0 && (
+                        <Button
+                            variant="outline"
+                            onClick={() => setShowQuickAssign(true)}
+                            className="border-amber-200 text-amber-700 hover:bg-amber-50 dark:border-amber-800 dark:text-amber-400 dark:hover:bg-amber-950/30"
+                        >
+                            <Zap className="h-4 w-4 mr-2" />
+                            Quick Assign
+                            <Badge variant="secondary" className="ml-1.5 text-[10px] px-1.5 h-4 bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400">
+                                {unassignedTasks.length}
+                            </Badge>
+                        </Button>
+                    )}
                     <FeatureTip
                         id="team-invite"
                         title="Build Your Team"
@@ -691,6 +749,15 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                 </div>
             </div>
 
+            {/* ─── Smart Insights Bar ─────────────── */}
+            {insights && (
+                <SmartInsights
+                    insights={insights}
+                    onMemberClick={(id) => setSelectedMemberId(id)}
+                    onQuickAssignClick={() => setShowQuickAssign(true)}
+                />
+            )}
+
             {/* ─── Tab Bar + Controls ─────────────── */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-muted pb-3">
                 {/* Tabs */}
@@ -706,6 +773,18 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                     >
                         <Users className="h-4 w-4 inline mr-1.5 -mt-0.5" />
                         Members
+                    </button>
+                    <button
+                        onClick={() => { setActiveTab('workload'); setSearchQuery("") }}
+                        className={cn(
+                            "px-4 py-1.5 rounded-lg text-sm font-medium transition-all duration-200",
+                            activeTab === 'workload'
+                                ? "bg-background text-foreground shadow-sm"
+                                : "text-muted-foreground hover:text-foreground"
+                        )}
+                    >
+                        <BarChart3 className="h-4 w-4 inline mr-1.5 -mt-0.5" />
+                        Workload
                     </button>
                     <button
                         onClick={() => { setActiveTab('teams'); setSearchQuery("") }}
@@ -817,6 +896,23 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                 </div>
             )}
 
+            {/* ─── Workload Tab ────────────────────── */}
+            {activeTab === 'workload' && allTasks && (
+                <WorkloadBoard
+                    members={allMembers.map(m => ({
+                        id: m.id,
+                        full_name: m.full_name || 'Unknown',
+                        role: m.role,
+                        avatar_url: null,
+                        activeTasks: m.activeTasks,
+                        pendingTasks: m.pendingTasks,
+                    }))}
+                    allTasks={allTasks}
+                    onMemberClick={(id) => setSelectedMemberId(id)}
+                    onTaskClick={handleTaskClick}
+                />
+            )}
+
             {/* ─── Teams Tab ─────────────────────── */}
             {activeTab === 'teams' && (
                 <div className="space-y-6">
@@ -840,12 +936,19 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                     ) : (
                         <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
                             {filteredTeams.map(team => (
-                                <Card
+                                <TeamDetailCard
                                     key={team.id}
-                                    className={cn(
-                                        "bg-card border shadow-sm transition-all group/team hover:shadow-md hover:-translate-y-0.5 relative overflow-hidden",
-                                        dropTargetId === team.id && "ring-2 ring-status-success border-status-success bg-status-success-light"
-                                    )}
+                                    team={team}
+                                    allTasks={allTasks || []}
+                                    memberMetrics={allMembers.map(m => ({
+                                        id: m.id,
+                                        activeTasks: m.activeTasks,
+                                        pendingTasks: m.pendingTasks,
+                                    }))}
+                                    onRename={(t) => { setTeamToEdit(t); setNewName(t.name) }}
+                                    onDelete={(id) => setTeamToDelete(id)}
+                                    onMemberClick={(id) => setSelectedMemberId(id)}
+                                    onTaskClick={handleTaskClick}
                                     onDragOver={(e) => {
                                         e.preventDefault()
                                         e.dataTransfer.dropEffect = 'move'
@@ -866,70 +969,8 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                                         setDropTargetId(null)
                                         setDraggedMemberId(null)
                                     }}
-                                >
-                                    {/* Top accent line */}
-                                    <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-international-orange/60 via-electric-blue/40 to-transparent" />
-
-                                    {dropTargetId === team.id && (
-                                        <div className="absolute inset-0 flex items-center justify-center bg-status-success/10 rounded-lg z-10">
-                                            <div className="bg-status-success text-white px-3 py-1 rounded-full text-xs font-medium flex items-center gap-1">
-                                                <UserPlus className="h-3 w-3" />
-                                                Add to Team
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    <CardHeader className="pb-2">
-                                        <div className="flex items-center justify-between">
-                                            <div className="flex items-center gap-2 min-w-0">
-                                                <CardTitle className="text-base font-display font-semibold text-foreground truncate">
-                                                    {team.name}
-                                                </CardTitle>
-                                                {team.is_auto_generated && (
-                                                    <Badge variant="secondary" className="text-[10px] text-muted-foreground shrink-0">Auto</Badge>
-                                                )}
-                                            </div>
-                                            <DropdownMenu>
-                                                <DropdownMenuTrigger asChild>
-                                                    <Button variant="ghost" className="h-7 w-7 p-0 text-muted-foreground opacity-0 group-hover/team:opacity-100 transition-opacity shrink-0">
-                                                        <MoreHorizontal className="h-4 w-4" />
-                                                    </Button>
-                                                </DropdownMenuTrigger>
-                                                <DropdownMenuContent align="end" sideOffset={8}>
-                                                    <DropdownMenuItem onClick={() => { setTeamToEdit({ id: team.id, name: team.name }); setNewName(team.name) }}>
-                                                        <Pencil className="mr-2 h-4 w-4" /> Rename
-                                                    </DropdownMenuItem>
-                                                    <DropdownMenuItem onClick={() => setTeamToDelete(team.id)} className="text-destructive focus:text-destructive focus:bg-destructive/10">
-                                                        <Trash2 className="mr-2 h-4 w-4" /> Delete
-                                                    </DropdownMenuItem>
-                                                </DropdownMenuContent>
-                                            </DropdownMenu>
-                                        </div>
-                                    </CardHeader>
-                                    <CardContent className="pt-0">
-                                        <div className="flex items-center justify-between">
-                                            <div className="flex items-center gap-2">
-                                                <div className="flex -space-x-2">
-                                                    {(team.members || []).slice(0, 5).map(member => (
-                                                        <UserAvatar
-                                                            key={member.id}
-                                                            name={member.full_name}
-                                                            role={member.role || undefined}
-                                                            size="sm"
-                                                            className="border-2 border-background"
-                                                        />
-                                                    ))}
-                                                    {(team.members || []).length > 5 && (
-                                                        <div className="h-7 w-7 rounded-full bg-muted border-2 border-background flex items-center justify-center text-[10px] font-medium text-muted-foreground">
-                                                            +{(team.members || []).length - 5}
-                                                        </div>
-                                                    )}
-                                                </div>
-                                                <span className="text-xs text-muted-foreground">{(team.members || []).length} members</span>
-                                            </div>
-                                        </div>
-                                    </CardContent>
-                                </Card>
+                                    isDropTarget={dropTargetId === team.id}
+                                />
                             ))}
 
                             {/* Add team card */}
@@ -1165,6 +1206,23 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                         role: m.role,
                     }))}
                     currentUserId={currentUserId}
+                />
+            )}
+
+            {/* Quick Assign Dialog */}
+            {unassignedTasks && (
+                <QuickAssignDialog
+                    open={showQuickAssign}
+                    onOpenChange={setShowQuickAssign}
+                    unassignedTasks={unassignedTasks}
+                    members={allMembers.map(m => ({
+                        id: m.id,
+                        full_name: m.full_name || 'Unknown',
+                        role: m.role,
+                        avatar_url: null,
+                        activeTasks: m.activeTasks,
+                        pendingTasks: m.pendingTasks,
+                    }))}
                 />
             )}
         </div>

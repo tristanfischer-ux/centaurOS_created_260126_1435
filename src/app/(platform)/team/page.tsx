@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { TeamComparisonView } from './team-comparison-view'
+import { isPast } from 'date-fns'
 
 export default async function TeamPage() {
     const supabase = await createClient()
@@ -23,14 +24,24 @@ export default async function TeamPage() {
         return <div className="p-8 text-destructive">Error: No Foundry associated with your account.</div>
     }
 
-    // Fetch all tasks for task metrics
+    // Fetch all tasks with extended fields for workload board
     const { data: tasks } = await supabase
         .from('tasks')
-        .select('id, assignee_id, status, title, end_date, created_at')
+        .select('id, assignee_id, status, title, end_date, start_date, created_at, objective_id, progress, risk_level')
         .eq('foundry_id', foundry_id)
 
+    // Fetch objectives for name labels on workload board
+    const { data: objectives } = await supabase
+        .from('objectives')
+        .select('id, title')
+        .eq('foundry_id', foundry_id)
+
+    const objectiveMap: Record<string, string> = {}
+    for (const obj of objectives || []) {
+        objectiveMap[obj.id] = obj.title
+    }
+
     // Fetch all profiles for the current foundry
-    // Security: Only select necessary fields, don't expose email/phone to all team members
     const { data: profiles } = await supabase
         .from('profiles')
         .select(`
@@ -46,7 +57,6 @@ export default async function TeamPage() {
         .order('role', { ascending: true })
 
     // Fetch teams with members
-    // Security: Don't expose email in team member lists
     interface TeamMemberJoin {
         profile: {
             id: string
@@ -75,12 +85,49 @@ export default async function TeamPage() {
         members: (team.team_members as TeamMemberJoin[] | null)?.map(tm => tm.profile).filter((profile): profile is NonNullable<typeof profile> => profile !== null) || []
     })) || []
 
-    // Security: Removed email and phone_number from member metrics to prevent data exposure
+    // ─── Extended Task Interface ─────────────────
+
+    interface ExtendedTask {
+        id: string
+        title: string
+        status: string
+        assignee_id: string | null
+        end_date: string | null
+        start_date: string | null
+        created_at: string
+        objective_id: string | null
+        objective_title: string | null
+        progress: number | null
+        risk_level: string | null
+    }
+
+    // Build extended tasks with objective names
+    const extendedTasks: ExtendedTask[] = (tasks || []).map(t => ({
+        ...t,
+        objective_title: t.objective_id ? (objectiveMap[t.objective_id] || null) : null,
+    }))
+
+    // ─── Unassigned Tasks ────────────────────────
+
+    const unassignedTasks = extendedTasks.filter(t =>
+        !t.assignee_id &&
+        t.status !== 'Completed' &&
+        t.status !== 'Rejected'
+    )
+
+    // ─── Member Metrics ──────────────────────────
+
     interface TaskDetail {
         id: string
         title: string
         end_date: string | null
+        start_date: string | null
         created_at: string
+        objective_id: string | null
+        objective_title: string | null
+        progress: number | null
+        risk_level: string | null
+        status: string
     }
 
     interface MemberMetrics {
@@ -107,12 +154,11 @@ export default async function TeamPage() {
         }
     }
 
-    // Calculate metrics per member with defensive checks
     const membersWithMetrics: MemberMetrics[] = (profiles || [])?.map((profile) => {
-        const memberTasks = (tasks || []).filter(t => t.assignee_id === profile.id)
+        const memberTasks = extendedTasks.filter(t => t.assignee_id === profile.id)
         const activeTasks = memberTasks.filter(t => t.status === 'Accepted')
         const pendingTasks = memberTasks.filter(t => t.status === 'Pending')
-        
+
         return {
             id: profile.id,
             full_name: profile.full_name || 'Unknown',
@@ -141,17 +187,57 @@ export default async function TeamPage() {
                     id: t.id,
                     title: t.title,
                     end_date: t.end_date,
-                    created_at: t.created_at
+                    start_date: t.start_date,
+                    created_at: t.created_at,
+                    objective_id: t.objective_id,
+                    objective_title: t.objective_title,
+                    progress: t.progress,
+                    risk_level: t.risk_level,
+                    status: t.status,
                 })),
                 pending: pendingTasks.map(t => ({
                     id: t.id,
                     title: t.title,
                     end_date: t.end_date,
-                    created_at: t.created_at
+                    start_date: t.start_date,
+                    created_at: t.created_at,
+                    objective_id: t.objective_id,
+                    objective_title: t.objective_title,
+                    progress: t.progress,
+                    risk_level: t.risk_level,
+                    status: t.status,
                 }))
             }
         }
     }) || []
+
+    // ─── Compute Insights ────────────────────────
+
+    const allHumanMembers = membersWithMetrics.filter(m => m.role !== 'AI_Agent')
+
+    const overloadedMembers = allHumanMembers.filter(m => {
+        const score = Math.min(100, (m.activeTasks * 20) + (m.pendingTasks * 10))
+        return score > 70
+    })
+
+    const idleMembers = allHumanMembers.filter(m => m.activeTasks === 0 && m.pendingTasks === 0)
+
+    const overdueTasks = extendedTasks.filter(t => {
+        if (!t.end_date) return false
+        if (t.status === 'Completed' || t.status === 'Rejected') return false
+        return isPast(new Date(t.end_date))
+    })
+
+    const insights = {
+        overloadedMembers: overloadedMembers.map(m => ({ id: m.id, name: m.full_name })),
+        idleMembers: idleMembers.map(m => ({ id: m.id, name: m.full_name })),
+        overdueTaskCount: overdueTasks.length,
+        unassignedTaskCount: unassignedTasks.length,
+        totalActiveTasks: extendedTasks.filter(t => t.status === 'Accepted').length,
+        totalPendingTasks: extendedTasks.filter(t => t.status === 'Pending').length,
+    }
+
+    // ─── Render ──────────────────────────────────
 
     const founders = membersWithMetrics.filter(p => p.role === 'Founder')
     const executives = membersWithMetrics.filter(p => p.role === 'Executive')
@@ -166,6 +252,9 @@ export default async function TeamPage() {
             aiAgents={aiAgents}
             teams={teams || []}
             currentUserId={user.id}
+            insights={insights}
+            unassignedTasks={unassignedTasks}
+            allTasks={extendedTasks}
         />
     )
 }
