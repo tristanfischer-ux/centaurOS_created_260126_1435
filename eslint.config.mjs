@@ -21,6 +21,9 @@ const eslintConfig = defineConfig([
     "test-daily-pulse.js",
     "test-daily-pulse-e2e.js",
     "src/actions/__tests__/activity.test.ts",
+    // Generated Playwright report/trace artifacts
+    "playwright-report/**",
+    "test-results/**",
   ]),
   // Downgrade non-critical rules to warnings for CI to pass
   {

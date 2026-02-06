@@ -17,7 +17,6 @@ import {
     useReactFlow,
 } from "@xyflow/react"
 import "@xyflow/react/dist/style.css"
-import Dagre from "@dagrejs/dagre"
 import { toast } from "sonner"
 import Link from "next/link"
 import { Info, X as XIcon } from "lucide-react"
@@ -105,33 +104,111 @@ function getUpstreamOutput(nodeId: string, nodes: Node[], edges: Edge[]): string
     return (sourceNode.data as { output?: string }).output
 }
 
-// ─── Auto-layout using dagre ──────────────────────────────────────
+// ─── Auto-layout (topological rank-based, no external deps) ──────
 const NODE_WIDTH = 220
 const NODE_HEIGHT = 80
+const NODE_GAP_X = 60
+const NODE_GAP_Y = 80
 
-function getLayoutedElements(nodes: Node[], edges: Edge[], direction: "TB" | "LR" = "TB"): { nodes: Node[]; edges: Edge[] } {
-    const g = new Dagre.graphlib.Graph().setDefaultEdgeLabel(() => ({}))
-    g.setGraph({ rankdir: direction, nodesep: 60, ranksep: 80 })
+/**
+ * Arrange nodes in a layered graph layout using topological sorting.
+ *
+ * @description Replaces dagre with a lightweight implementation that
+ * Turbopack can bundle without "dynamic require" errors. Assigns each
+ * node a rank (layer) based on its longest path from a root, then
+ * spaces nodes evenly within each rank.
+ */
+function getLayoutedElements(
+    nodes: Node[],
+    edges: Edge[],
+    direction: "TB" | "LR" = "TB"
+): { nodes: Node[]; edges: Edge[] } {
+    if (nodes.length === 0) return { nodes, edges }
 
-    for (const node of nodes) {
-        g.setNode(node.id, { width: NODE_WIDTH, height: NODE_HEIGHT })
+    // Build adjacency lists
+    const children = new Map<string, string[]>()
+    const parents = new Map<string, string[]>()
+    const nodeIds = new Set(nodes.map((n) => n.id))
+
+    for (const n of nodes) {
+        children.set(n.id, [])
+        parents.set(n.id, [])
     }
-    for (const edge of edges) {
-        g.setEdge(edge.source, edge.target)
-    }
-
-    Dagre.layout(g)
-
-    const layoutedNodes = nodes.map((node) => {
-        const pos = g.node(node.id)
-        return {
-            ...node,
-            position: {
-                x: pos.x - NODE_WIDTH / 2,
-                y: pos.y - NODE_HEIGHT / 2,
-            },
+    for (const e of edges) {
+        if (nodeIds.has(e.source) && nodeIds.has(e.target)) {
+            children.get(e.source)!.push(e.target)
+            parents.get(e.target)!.push(e.source)
         }
-    })
+    }
+
+    // Assign ranks via longest-path from roots (nodes with no parents)
+    const rank = new Map<string, number>()
+    const roots = nodes.filter((n) => parents.get(n.id)!.length === 0)
+
+    // BFS with longest-path semantics
+    const queue: string[] = roots.map((n) => n.id)
+    for (const id of queue) {
+        if (!rank.has(id)) rank.set(id, 0)
+    }
+
+    // If there are no roots (cycle or all connected), start from first node
+    if (queue.length === 0) {
+        queue.push(nodes[0].id)
+        rank.set(nodes[0].id, 0)
+    }
+
+    for (let i = 0; i < queue.length; i++) {
+        const id = queue[i]
+        const currentRank = rank.get(id) ?? 0
+        for (const childId of children.get(id) ?? []) {
+            const existingRank = rank.get(childId)
+            if (existingRank === undefined || currentRank + 1 > existingRank) {
+                rank.set(childId, currentRank + 1)
+            }
+            if (!queue.includes(childId)) {
+                queue.push(childId)
+            }
+        }
+    }
+
+    // Catch any disconnected nodes
+    for (const n of nodes) {
+        if (!rank.has(n.id)) rank.set(n.id, 0)
+    }
+
+    // Group nodes by rank
+    const rankGroups = new Map<number, string[]>()
+    for (const n of nodes) {
+        const r = rank.get(n.id) ?? 0
+        if (!rankGroups.has(r)) rankGroups.set(r, [])
+        rankGroups.get(r)!.push(n.id)
+    }
+
+    // Position nodes: center each rank horizontally
+    const maxNodesInRank = Math.max(...Array.from(rankGroups.values()).map((g) => g.length))
+    const totalWidth = maxNodesInRank * (NODE_WIDTH + NODE_GAP_X) - NODE_GAP_X
+    const posMap = new Map<string, { x: number; y: number }>()
+
+    for (const [r, ids] of rankGroups) {
+        const rowWidth = ids.length * (NODE_WIDTH + NODE_GAP_X) - NODE_GAP_X
+        const offsetX = (totalWidth - rowWidth) / 2
+
+        for (let i = 0; i < ids.length; i++) {
+            const x = offsetX + i * (NODE_WIDTH + NODE_GAP_X)
+            const y = r * (NODE_HEIGHT + NODE_GAP_Y)
+
+            if (direction === "LR") {
+                posMap.set(ids[i], { x: y, y: x })
+            } else {
+                posMap.set(ids[i], { x, y })
+            }
+        }
+    }
+
+    const layoutedNodes = nodes.map((node) => ({
+        ...node,
+        position: posMap.get(node.id) ?? node.position,
+    }))
 
     return { nodes: layoutedNodes, edges }
 }
