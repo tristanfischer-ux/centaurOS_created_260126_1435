@@ -69,7 +69,7 @@ export function MarketplaceFilters({
 }: MarketplaceFiltersProps) {
     const [isOpen, setIsOpen] = useState(false)
 
-    const showFiltersButton = ['People', 'AI', 'Products'].includes(activeTab)
+    const showFiltersButton = ['People', 'Products'].includes(activeTab)
 
     if (!showFiltersButton) return null
 
@@ -112,50 +112,6 @@ export function MarketplaceFilters({
                                 <SelectItem value="5">5+ years</SelectItem>
                                 <SelectItem value="10">10+ years</SelectItem>
                                 <SelectItem value="15">15+ years</SelectItem>
-                            </SelectContent>
-                        </Select>
-                    </div>
-                </div>
-            )
-        }
-
-        if (activeTab === 'AI') {
-            return (
-                <div className="space-y-4">
-                    <div className="space-y-1.5">
-                        <label className="text-sm font-medium text-muted-foreground flex items-center gap-1">
-                            <Bot className="h-3 w-3" /> Type
-                        </label>
-                        <Select value={aiTypeFilter} onValueChange={setAiTypeFilter}>
-                            <SelectTrigger><SelectValue placeholder="All types" /></SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="all">All types</SelectItem>
-                                {aiTypes.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
-                            </SelectContent>
-                        </Select>
-                    </div>
-                    <div className="space-y-1.5">
-                        <label className="text-sm font-medium text-muted-foreground flex items-center gap-1">
-                            <Zap className="h-3 w-3" /> Max Cost
-                        </label>
-                        <Select value={maxCostFilter} onValueChange={setMaxCostFilter}>
-                            <SelectTrigger><SelectValue placeholder="Any cost" /></SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="all">Any cost</SelectItem>
-                                <SelectItem value="50">Up to £50/mo</SelectItem>
-                                <SelectItem value="100">Up to £100/mo</SelectItem>
-                                <SelectItem value="200">Up to £200/mo</SelectItem>
-                                <SelectItem value="500">Up to £500/mo</SelectItem>
-                            </SelectContent>
-                        </Select>
-                    </div>
-                    <div className="space-y-1.5">
-                        <label className="text-sm font-medium text-muted-foreground">Integration</label>
-                        <Select value={integrationFilter} onValueChange={setIntegrationFilter}>
-                            <SelectTrigger><SelectValue placeholder="Any integration" /></SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="all">Any integration</SelectItem>
-                                {aiIntegrations.map(i => <SelectItem key={i} value={i}>{i}</SelectItem>)}
                             </SelectContent>
                         </Select>
                     </div>

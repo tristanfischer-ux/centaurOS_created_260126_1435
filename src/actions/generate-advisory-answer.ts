@@ -58,7 +58,7 @@ Return ONLY a raw JSON object (no markdown formatting) with this structure:
     "expert_review_reason": "Why they should consult an expert (if applicable)",
     "marketplace_suggestions": [
         {
-            "category": "People" | "Services" | "AI" | "Products",
+            "category": "People" | "Services" | "Products",
             "subcategory": "Optional subcategory",
             "search_term": "What to search for"
         }

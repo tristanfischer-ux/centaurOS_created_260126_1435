@@ -83,19 +83,7 @@ function getCategoryIcon(category: string) {
         case 'People': return User
         case 'Products': return Package
         case 'Services': return Wrench
-        case 'AI': return Bot
         default: return Store
-    }
-}
-
-// Get icon for AI subcategory
-function getAITypeIcon(subcategory: string) {
-    switch (subcategory) {
-        case 'Agent': return Bot
-        case 'Assistant': return Sparkles
-        case 'Analyzer': return BarChart3
-        case 'Automation': return Zap
-        default: return Bot
     }
 }
 
@@ -254,7 +242,6 @@ export function MarketplaceListingDialog({
                     <TabsContent value="details" className="mt-4 space-y-4">
                         {/* Category-specific sections */}
                         {category === 'People' && <PeopleDetails attrs={attrs} />}
-                        {category === 'AI' && <AIDetails attrs={attrs} />}
                         {category === 'Products' && <ProductsDetails attrs={attrs} />}
                         {category === 'Services' && <ServicesDetails attrs={attrs} />}
 
@@ -305,10 +292,6 @@ function KeyMetricsGrid({ category, attrs }: { category: string; attrs: Record<s
         if (attrs.years_experience) metrics.push({ label: 'Experience', value: `${attrs.years_experience} years`, icon: <Briefcase className="h-4 w-4 text-muted-foreground" /> })
         if (attrs.location) metrics.push({ label: 'Location', value: attrs.location, icon: <MapPin className="h-4 w-4 text-muted-foreground" /> })
         if (attrs.availability) metrics.push({ label: 'Availability', value: attrs.availability, icon: <Calendar className="h-4 w-4 text-muted-foreground" /> })
-    } else if (category === 'AI') {
-        if (attrs.cost || attrs.pricing) metrics.push({ label: 'Pricing', value: attrs.cost || attrs.pricing, icon: <DollarSign className="h-4 w-4 text-muted-foreground" /> })
-        if (attrs.accuracy) metrics.push({ label: 'Accuracy', value: attrs.accuracy, icon: <Target className="h-4 w-4 text-muted-foreground" /> })
-        if (attrs.latency) metrics.push({ label: 'Latency', value: attrs.latency, icon: <Zap className="h-4 w-4 text-muted-foreground" /> })
     } else if (category === 'Products') {
         if (attrs.cost || attrs.price) metrics.push({ label: 'Price', value: attrs.cost || attrs.price, icon: <DollarSign className="h-4 w-4 text-muted-foreground" /> })
         if (attrs.lead_time) metrics.push({ label: 'Lead Time', value: attrs.lead_time, icon: <Timer className="h-4 w-4 text-muted-foreground" /> })
@@ -348,7 +331,6 @@ function SkillsPreview({ category, attrs }: { category: string; attrs: Record<st
     if (skills.length === 0) return null
 
     const label = category === 'People' ? 'Skills & Expertise' :
-                  category === 'AI' ? 'Integrations' :
                   category === 'Products' ? 'Capabilities' : 'Specialties'
 
     return (
@@ -448,109 +430,6 @@ function PeopleDetails({ attrs }: { attrs: Record<string, unknown> }) {
                                     {cert}
                                 </Badge>
                             ))}
-                        </div>
-                    </CardContent>
-                </Card>
-            )}
-        </div>
-    )
-}
-
-// AI-specific details
-function AIDetails({ attrs }: { attrs: Record<string, unknown> }) {
-    return (
-        <div className="space-y-4">
-            {/* Integrations */}
-            {attrs.integrations && Array.isArray(attrs.integrations) && (
-                <Card>
-                    <CardContent className="pt-6">
-                        <h3 className="font-semibold text-foreground flex items-center gap-2 mb-2">
-                            <Layers className="h-4 w-4 text-electric-blue" />
-                            Integrations
-                        </h3>
-                        <div className="flex flex-wrap gap-2">
-                            {(attrs.integrations as string[]).map((integration: string, i: number) => (
-                                <Badge key={i} variant="secondary">
-                                    {integration}
-                                </Badge>
-                            ))}
-                        </div>
-                    </CardContent>
-                </Card>
-            )}
-
-            {/* Use Cases */}
-            {attrs.use_cases && Array.isArray(attrs.use_cases) && (
-                <Card>
-                    <CardContent className="pt-6">
-                        <h3 className="font-semibold text-foreground flex items-center gap-2 mb-2">
-                            <Brain className="h-4 w-4 text-electric-blue" />
-                            Use Cases
-                        </h3>
-                        <div className="flex flex-wrap gap-2">
-                            {(attrs.use_cases as string[]).map((useCase: string, i: number) => (
-                                <Badge key={i} variant="secondary">
-                                    {useCase}
-                                </Badge>
-                            ))}
-                        </div>
-                    </CardContent>
-                </Card>
-            )}
-
-            {/* Model Info */}
-            {(attrs.model || attrs.provider) && (
-                <Card>
-                    <CardContent className="pt-6">
-                        <h3 className="font-semibold text-foreground flex items-center gap-2 mb-3">
-                            <Cpu className="h-4 w-4 text-electric-blue" />
-                            Model Details
-                        </h3>
-                        <div className="grid grid-cols-2 gap-4">
-                            {attrs.model && (
-                                <div>
-                                    <p className="text-xs text-muted-foreground mb-1">Model</p>
-                                    <p className="font-medium text-foreground">{String(attrs.model)}</p>
-                                </div>
-                            )}
-                            {attrs.provider && (
-                                <div>
-                                    <p className="text-xs text-muted-foreground mb-1">Provider</p>
-                                    <p className="font-medium text-foreground">{String(attrs.provider)}</p>
-                                </div>
-                            )}
-                        </div>
-                    </CardContent>
-                </Card>
-            )}
-
-            {/* Performance metrics */}
-            {(attrs.accuracy || attrs.latency || attrs.throughput) && (
-                <Card>
-                    <CardContent className="pt-6">
-                        <h3 className="font-semibold text-foreground flex items-center gap-2 mb-3">
-                            <BarChart3 className="h-4 w-4 text-electric-blue" />
-                            Performance
-                        </h3>
-                        <div className="grid grid-cols-3 gap-4">
-                            {attrs.accuracy && (
-                                <div className="text-center p-3 rounded-lg bg-status-success-light">
-                                    <p className="text-lg font-bold text-status-success-dark">{String(attrs.accuracy)}</p>
-                                    <p className="text-xs text-muted-foreground mt-1">Accuracy</p>
-                                </div>
-                            )}
-                            {attrs.latency && (
-                                <div className="text-center p-3 rounded-lg bg-status-info-light">
-                                    <p className="text-lg font-bold text-status-info-dark">{String(attrs.latency)}</p>
-                                    <p className="text-xs text-muted-foreground mt-1">Latency</p>
-                                </div>
-                            )}
-                            {attrs.throughput && (
-                                <div className="text-center p-3 rounded-lg bg-muted">
-                                    <p className="text-lg font-bold text-foreground">{String(attrs.throughput)}</p>
-                                    <p className="text-xs text-muted-foreground mt-1">Throughput</p>
-                                </div>
-                            )}
                         </div>
                     </CardContent>
                 </Card>

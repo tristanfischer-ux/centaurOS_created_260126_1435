@@ -133,7 +133,6 @@ export function ListingDetailDrawer({ open, onOpenChange, listing }: ListingDeta
 
                         {/* Category-specific sections */}
                         {category === 'People' && <PeopleSection attrs={attrs} />}
-                        {category === 'AI' && <AISection attrs={attrs} />}
                         {category === 'Products' && <ProductsSection attrs={attrs} />}
                         {category === 'Services' && <ServicesSection attrs={attrs} />}
 
@@ -184,10 +183,6 @@ function KeyMetricsSection({ category, attrs }: { category: string; attrs: Recor
         if (attrs.rate) metrics.push({ label: 'Rate', value: attrs.rate, icon: <DollarSign className="w-4 h-4" /> })
         if (attrs.years_experience) metrics.push({ label: 'Experience', value: `${attrs.years_experience} years`, icon: <Briefcase className="w-4 h-4" /> })
         if (attrs.projects_completed) metrics.push({ label: 'Projects', value: attrs.projects_completed, icon: <CheckCircle2 className="w-4 h-4" /> })
-    } else if (category === 'AI') {
-        if (attrs.cost || attrs.pricing) metrics.push({ label: 'Pricing', value: attrs.cost || attrs.pricing, icon: <DollarSign className="w-4 h-4" /> })
-        if (attrs.accuracy) metrics.push({ label: 'Accuracy', value: attrs.accuracy, icon: <Target className="w-4 h-4" /> })
-        if (attrs.latency) metrics.push({ label: 'Latency', value: attrs.latency, icon: <Zap className="w-4 h-4" /> })
     } else if (category === 'Products') {
         if (attrs.cost || attrs.price) metrics.push({ label: 'Price', value: attrs.cost || attrs.price, icon: <DollarSign className="w-4 h-4" /> })
         if (attrs.lead_time) metrics.push({ label: 'Lead Time', value: attrs.lead_time, icon: <Timer className="w-4 h-4" /> })

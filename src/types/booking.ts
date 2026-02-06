@@ -100,7 +100,7 @@ export interface OrderSummary {
     // Listing
     listingId?: string
     listingTitle: string
-    listingCategory: 'People' | 'Products' | 'Services' | 'AI'
+    listingCategory: 'People' | 'Products' | 'Services'
     // Dates
     startDate?: string
     endDate?: string
@@ -174,7 +174,7 @@ export interface BookingWizardState {
     listing: {
         id: string
         title: string
-        category: 'People' | 'Products' | 'Services' | 'AI'
+        category: 'People' | 'Products' | 'Services'
         subcategory: string
         description?: string
     }

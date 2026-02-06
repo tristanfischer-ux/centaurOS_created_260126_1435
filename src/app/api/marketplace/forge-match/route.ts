@@ -111,11 +111,10 @@ export async function POST(
             )
         }
 
-        // Fetch AI listings from marketplace
+        // Fetch marketplace listings for matching
         const { data: aiListings, error: listingsError } = await supabase
             .from('marketplace_listings')
             .select('id, title, description, subcategory, attributes, is_verified')
-            .eq('category', 'AI')
 
         if (listingsError) {
             console.error('Error fetching AI listings:', listingsError)

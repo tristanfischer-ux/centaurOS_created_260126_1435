@@ -31,14 +31,26 @@ export async function GET(): Promise<NextResponse> {
     .eq('id', profile.foundry_id)
     .single()
 
+  // Call ensure_foundry_exists RPC which creates the foundry row if missing
+  const { data: ensureResult, error: ensureError } = await supabase.rpc('ensure_foundry_exists', {
+    p_foundry_id: profile.foundry_id,
+  })
+
+  // Now re-query foundry after ensure
+  const { data: foundryAfter, error: foundryAfterError } = await supabase
+    .from('foundries')
+    .select('id, name, purpose_data')
+    .eq('id', profile.foundry_id)
+    .single()
+
   return NextResponse.json({
     userId: user.id,
     foundryId: profile.foundry_id,
     role: profile.role,
-    foundry,
-    foundryError,
-    hasPurposeData: !!foundry?.purpose_data,
-    purposeDataType: typeof foundry?.purpose_data,
-    purposeDataKeys: foundry?.purpose_data ? Object.keys(foundry.purpose_data as object) : null,
+    foundryBefore: { foundry, foundryError },
+    ensureResult,
+    ensureError,
+    foundryAfter,
+    foundryAfterError,
   })
 }

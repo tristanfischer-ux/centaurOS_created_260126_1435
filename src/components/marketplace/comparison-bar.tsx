@@ -18,7 +18,6 @@ interface ComparisonBarProps {
 function getCategoryIcon(category: string) {
     switch (category) {
         case 'People': return User
-        case 'AI': return Bot
         case 'Products': return Package
         case 'Services': return Briefcase
         default: return Package
@@ -26,13 +25,12 @@ function getCategoryIcon(category: string) {
 }
 
 // Get category color classes using semantic tokens
-// People: Brand warm, Products: Neutral, Services: Brand tech, AI: Info
+// People: Brand warm, Products: Neutral, Services: Brand tech
 function getCategoryColors(category: string) {
     switch (category) {
         case 'People': return 'bg-international-orange-light text-international-orange border-international-orange-light'
         case 'Products': return 'bg-muted text-muted-foreground border-border'
         case 'Services': return 'bg-electric-blue-light text-electric-blue border-electric-blue-light'
-        case 'AI': return 'bg-status-info-light text-status-info-dark border-status-info-light'
         default: return 'bg-muted text-muted-foreground border-border'
     }
 }

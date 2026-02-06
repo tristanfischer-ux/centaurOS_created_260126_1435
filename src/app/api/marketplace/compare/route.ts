@@ -8,7 +8,7 @@ import { rateLimit } from "@/lib/security/rate-limit";
 // SECURITY: Zod schema for input validation
 const MarketplaceListingSchema = z.object({
     id: z.string().min(1),
-    category: z.enum(["People", "Products", "Services", "AI"]),
+    category: z.enum(["People", "Products", "Services"]),
     subcategory: z.string(),
     title: z.string().min(1).max(500),
     description: z.string().max(5000).nullable(),
@@ -36,7 +36,7 @@ const openai = new OpenAI({
 // Types for the comparison request/response
 export interface MarketplaceListingInput {
     id: string;
-    category: "People" | "Products" | "Services" | "AI";
+    category: "People" | "Products" | "Services";
     subcategory: string;
     title: string;
     description: string | null;

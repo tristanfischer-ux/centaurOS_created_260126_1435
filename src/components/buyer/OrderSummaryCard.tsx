@@ -99,8 +99,6 @@ function CategoryIconDisplay({ category }: { category: OrderSummary['listingCate
             return <Package className="h-3.5 w-3.5" />
         case 'Services':
             return <Briefcase className="h-3.5 w-3.5" />
-        case 'AI':
-            return <Bot className="h-3.5 w-3.5" />
         default:
             return <Briefcase className="h-3.5 w-3.5" />
     }

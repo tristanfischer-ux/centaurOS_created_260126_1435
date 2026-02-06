@@ -21,7 +21,7 @@ type OrderStatus = 'pending' | 'accepted' | 'in_progress' | 'completed' | 'dispu
 type EscrowStatus = 'pending' | 'held' | 'partial_release' | 'released' | 'refunded'
 type OrderType = 'people_booking' | 'product_rfq' | 'service'
 type SupplierTier = 'verified_partner' | 'approved' | 'pending' | 'suspended'
-type MarketplaceCategory = 'People' | 'Products' | 'Services' | 'AI'
+type MarketplaceCategory = 'People' | 'Products' | 'Services'
 
 interface TestOrder {
   id: string

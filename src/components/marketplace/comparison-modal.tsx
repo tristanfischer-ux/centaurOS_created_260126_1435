@@ -26,7 +26,6 @@ interface ComparisonModalProps {
 // Priority attributes by category - these show first in order
 const PRIORITY_ATTRIBUTES: Record<string, string[]> = {
     'People': ['rate', 'years_experience', 'location', 'availability', 'education'],
-    'AI': ['cost', 'accuracy', 'latency', 'autonomy_level', 'setup_time', 'support'],
     'Products': ['rate', 'price', 'location', 'lead_time', 'certifications', 'capacity_available'],
     'Services': ['rate', 'check_size', 'stage', 'focus', 'specialty', 'location']
 }
@@ -37,12 +36,6 @@ const ATTRIBUTE_SECTIONS: Record<string, Record<string, string[]>> = {
         'Pricing & Availability': ['rate', 'availability', 'projects_completed'],
         'Experience': ['years_experience', 'education', 'role'],
         'Skills & Location': ['skills', 'expertise', 'location', 'certifications'],
-        'Other': []
-    },
-    'AI': {
-        'Cost & Performance': ['cost', 'accuracy', 'latency'],
-        'Capability': ['autonomy_level', 'model', 'training_data'],
-        'Setup & Support': ['setup_time', 'support', 'integrations'],
         'Other': []
     },
     'Products': {
@@ -70,7 +63,6 @@ const categoryBadgeStyles: Record<string, string> = {
     'People': 'bg-international-orange-light text-international-orange',  // Brand warm - human
     'Products': 'bg-muted text-muted-foreground',                         // Neutral - industrial
     'Services': 'bg-electric-blue-light text-electric-blue',              // Brand tech - digital
-    'AI': 'bg-status-info-light text-status-info-dark'                    // Info blue - AI distinction
 }
 
 export function ComparisonModal({ open, onOpenChange, items }: ComparisonModalProps) {

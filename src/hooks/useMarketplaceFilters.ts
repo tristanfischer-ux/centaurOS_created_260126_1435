@@ -121,9 +121,6 @@ export function useMarketplaceFilters() {
         if (activeTab === 'People') {
             return baseFilters || skillFilter !== 'all' || minExperience !== 'all'
         }
-        if (activeTab === 'AI') {
-            return baseFilters || aiTypeFilter !== 'all' || maxCostFilter !== 'all' || integrationFilter !== 'all'
-        }
         if (activeTab === 'Products') {
             return baseFilters || certificationFilter !== 'all' || technologyFilter !== 'all'
         }
@@ -151,10 +148,6 @@ export function useMarketplaceFilters() {
         if (activeTab === 'People') {
             if (skillFilter !== 'all') count++
             if (minExperience !== 'all') count++
-        } else if (activeTab === 'AI') {
-            if (aiTypeFilter !== 'all') count++
-            if (maxCostFilter !== 'all') count++
-            if (integrationFilter !== 'all') count++
         } else if (activeTab === 'Products') {
             if (certificationFilter !== 'all') count++
             if (technologyFilter !== 'all') count++

@@ -29,12 +29,10 @@ const CURATION_STRATEGIES: Record<Role, Array<{
     ],
     executive: [
         { category: 'Services', limit: 2 }, // Advisory/consulting services
-        { category: 'AI', limit: 1 },
         { category: 'Services', subcategory: 'Financial', limit: 1 }
     ],
     apprentice: [
-        { category: 'AI', limit: 2 },
-        { category: 'Services', limit: 1 }, // Training/education services
+        { category: 'Services', limit: 2 }, // Training/education services
         { category: 'People', limit: 1 } // Entry-level opportunities
     ],
     vc: [

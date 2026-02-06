@@ -486,7 +486,7 @@ export async function getListingForBooking(listingId: string): Promise<{
             id: string
             title: string
             description: string | null
-            category: 'People' | 'Products' | 'Services' | 'AI'
+            category: 'People' | 'Products' | 'Services'
             subcategory: string
             attributes: Record<string, unknown>
         }

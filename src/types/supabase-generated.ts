@@ -9248,7 +9248,7 @@ export type Database = {
         | "Growth"
         | "Bridge"
       legal_structure: "Ltd" | "Inc" | "LLC" | "GmbH" | "PLC" | "Other"
-      marketplace_category: "People" | "Products" | "Services" | "AI"
+      marketplace_category: "People" | "Products" | "Services"
       member_role: "Executive" | "Apprentice" | "AI_Agent" | "Founder"
       notification_channel: "push" | "email" | "sms" | "in_app"
       notification_priority: "critical" | "high" | "medium" | "low"
@@ -9468,7 +9468,7 @@ export const Constants = {
         "Bridge",
       ],
       legal_structure: ["Ltd", "Inc", "LLC", "GmbH", "PLC", "Other"],
-      marketplace_category: ["People", "Products", "Services", "AI"],
+      marketplace_category: ["People", "Products", "Services"],
       member_role: ["Executive", "Apprentice", "AI_Agent", "Founder"],
       notification_channel: ["push", "email", "sms", "in_app"],
       notification_priority: ["critical", "high", "medium", "low"],

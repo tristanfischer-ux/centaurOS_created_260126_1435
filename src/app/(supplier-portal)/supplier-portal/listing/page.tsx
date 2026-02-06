@@ -44,8 +44,7 @@ import { toast } from 'sonner'
 const categories = [
     { value: 'People', label: 'People', description: 'Offer your skills as a consultant' },
     { value: 'Products', label: 'Products', description: 'Sell physical products' },
-    { value: 'Services', label: 'Services', description: 'Provide business services' },
-    { value: 'AI', label: 'AI', description: 'Offer AI tools or automation' }
+    { value: 'Services', label: 'Services', description: 'Provide business services' }
 ]
 
 export default function SupplierListingPage() {

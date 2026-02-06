@@ -7,7 +7,7 @@ import type { Json } from '@/types/database.types'
 
 export interface SelfServiceListingInput {
     title: string
-    category: 'People' | 'Products' | 'Services' | 'AI'
+    category: 'People' | 'Products' | 'Services'
     subcategory: string
     description: string
     attributes?: Record<string, unknown>
@@ -39,7 +39,7 @@ export async function createSelfServiceListing(input: SelfServiceListingInput) {
         .from('marketplace_listings')
         .insert({
             title: input.title,
-            category: input.category as 'People' | 'Products' | 'Services' | 'AI',
+            category: input.category as 'People' | 'Products' | 'Services',
             subcategory: input.subcategory,
             description: input.description,
             attributes: (input.attributes || {}) as unknown as Json,
@@ -182,17 +182,6 @@ export async function getSubcategories(category: string) {
             'Training & Development',
             'Other'
         ],
-        'AI': [
-            'AI Agents',
-            'Data Processing',
-            'Content Generation',
-            'Code Generation',
-            'Analytics & Insights',
-            'Automation',
-            'Integration',
-            'Custom AI Solutions',
-            'Other'
-        ]
     }
     
     return subcategories[category] || []

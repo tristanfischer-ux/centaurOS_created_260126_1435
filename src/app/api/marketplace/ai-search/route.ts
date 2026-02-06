@@ -11,7 +11,7 @@ const openai = new OpenAI({
 });
 
 // Marketplace categories
-const MarketplaceCategory = z.enum(["People", "Products", "Services", "AI"]);
+const MarketplaceCategory = z.enum(["People", "Products", "Services"]);
 
 // People-specific filters
 const PeopleFiltersSchema = z.object({
@@ -26,22 +26,6 @@ const PeopleFiltersSchema = z.object({
     location: z.string().optional().describe("Geographic location preference"),
     skills: z.array(z.string()).optional().describe("Required skills or expertise areas"),
     minExperience: z.number().optional().describe("Minimum years of experience required"),
-});
-
-// AI-specific filters
-const AIFiltersSchema = z.object({
-    category: z.literal("AI"),
-    subcategory: z.enum([
-        "Automation",
-        "Analytics",
-        "Writing",
-        "Design",
-        "Development",
-        "Customer Service"
-    ]).optional().describe("The type of AI tool being sought"),
-    type: z.string().optional().describe("Specific AI type or model"),
-    maxCost: z.number().optional().describe("Maximum monthly cost in pounds"),
-    integrations: z.array(z.string()).optional().describe("Required integrations (e.g., Slack, Notion)"),
 });
 
 // Products-specific filters
@@ -76,7 +60,6 @@ const ServicesFiltersSchema = z.object({
 // Combined filter schema with discriminated union
 const MarketplaceFiltersSchema = z.discriminatedUnion("category", [
     PeopleFiltersSchema,
-    AIFiltersSchema,
     ProductsFiltersSchema,
     ServicesFiltersSchema,
 ]);
@@ -104,7 +87,7 @@ interface AISearchSuccessResponse {
     filters: MarketplaceFilters;
     explanation: string;
     confidence: "high" | "medium" | "low";
-    alternativeCategories?: Array<"People" | "Products" | "Services" | "AI">;
+    alternativeCategories?: Array<"People" | "Products" | "Services">;
 }
 
 interface AISearchErrorResponse {
@@ -185,10 +168,6 @@ MARKETPLACE CATEGORIES:
    
 3. **Services** - Professional services (Legal, Financial, HR, Marketing, Design, Development)
    - Agency services, professional firms, outsourced departments
-   
-4. **AI** - AI tools and automation solutions
-   - Types: Automation, Analytics, Writing, Design, Development, Customer Service
-   - Consider integrations (Slack, Notion, etc.) and cost constraints
 
 EXTRACTION GUIDELINES:
 - Identify the primary category based on what the user needs
@@ -198,7 +177,6 @@ EXTRACTION GUIDELINES:
 - Skills like "AI", "blockchain", "fintech" go in the skills array for People
 - Location mentions should be extracted (city, country, or region)
 - Experience mentions (e.g., "senior", "10+ years") → minExperience
-- Budget mentions for AI tools → maxCost
 - Be generous with skill extraction - include related/implied skills
 
 Set confidence:

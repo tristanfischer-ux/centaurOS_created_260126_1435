@@ -84,7 +84,7 @@ interface BookingWizardProps {
     listing: {
         id: string
         title: string
-        category: 'People' | 'Products' | 'Services' | 'AI'
+        category: 'People' | 'Products' | 'Services'
         subcategory: string
         description?: string | null
     }

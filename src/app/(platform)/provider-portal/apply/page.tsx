@@ -51,12 +51,6 @@ const categories = [
         icon: Briefcase,
         description: "Provide business services like manufacturing, logistics, etc."
     },
-    { 
-        value: "AI", 
-        label: "AI", 
-        icon: Bot,
-        description: "Offer AI tools, integrations, or automation services"
-    },
 ]
 
 const availabilityOptions = [

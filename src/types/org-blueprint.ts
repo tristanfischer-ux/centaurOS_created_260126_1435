@@ -220,43 +220,43 @@ export const DEFAULT_BUSINESS_FUNCTIONS: BusinessFunction[] = [
     
     // Legal
     { id: 'leg-corporate', name: 'Corporate Legal', category: 'Legal', description: 'Company formation, governance, equity', typicallyEarlyStage: true, marketplaceCategories: ['Services'] },
-    { id: 'leg-contracts', name: 'Contract Management', category: 'Legal', description: 'Drafting and reviewing agreements', typicallyEarlyStage: true, marketplaceCategories: ['Services', 'AI'] },
+    { id: 'leg-contracts', name: 'Contract Management', category: 'Legal', description: 'Drafting and reviewing agreements', typicallyEarlyStage: true, marketplaceCategories: ['Services'] },
     { id: 'leg-ip', name: 'Intellectual Property', category: 'Legal', description: 'Patents, trademarks, copyrights', typicallyEarlyStage: false, marketplaceCategories: ['Services'] },
     { id: 'leg-compliance', name: 'Regulatory Compliance', category: 'Legal', description: 'Industry-specific regulations', typicallyEarlyStage: false, marketplaceCategories: ['Services'] },
     
     // HR
     { id: 'hr-recruiting', name: 'Recruiting', category: 'HR', description: 'Hiring and talent acquisition', typicallyEarlyStage: true, marketplaceCategories: ['People', 'Services'] },
-    { id: 'hr-payroll', name: 'Payroll', category: 'HR', description: 'Salary processing and benefits', typicallyEarlyStage: true, marketplaceCategories: ['Services', 'AI'] },
+    { id: 'hr-payroll', name: 'Payroll', category: 'HR', description: 'Salary processing and benefits', typicallyEarlyStage: true, marketplaceCategories: ['Services'] },
     { id: 'hr-culture', name: 'Culture & People Ops', category: 'HR', description: 'Employee experience and engagement', typicallyEarlyStage: false },
     { id: 'hr-learning', name: 'Learning & Development', category: 'HR', description: 'Training and professional development', typicallyEarlyStage: false },
     
     // Marketing
     { id: 'mkt-brand', name: 'Brand & Creative', category: 'Marketing', description: 'Brand identity, design, messaging', typicallyEarlyStage: true, marketplaceCategories: ['People', 'Services'] },
-    { id: 'mkt-content', name: 'Content Marketing', category: 'Marketing', description: 'Blog, social media, thought leadership', typicallyEarlyStage: true, marketplaceCategories: ['People', 'AI'] },
+    { id: 'mkt-content', name: 'Content Marketing', category: 'Marketing', description: 'Blog, social media, thought leadership', typicallyEarlyStage: true, marketplaceCategories: ['People'] },
     { id: 'mkt-demand-gen', name: 'Demand Generation', category: 'Marketing', description: 'Lead generation and campaigns', typicallyEarlyStage: false, marketplaceCategories: ['People', 'Services'] },
     { id: 'mkt-pr', name: 'Public Relations', category: 'Marketing', description: 'Media relations and communications', typicallyEarlyStage: false, marketplaceCategories: ['Services'] },
     
     // Sales
     { id: 'sales-development', name: 'Sales Development', category: 'Sales', description: 'Outbound prospecting and qualification', typicallyEarlyStage: true, marketplaceCategories: ['People'] },
     { id: 'sales-account-exec', name: 'Account Executive', category: 'Sales', description: 'Closing deals and managing accounts', typicallyEarlyStage: true, marketplaceCategories: ['People'] },
-    { id: 'sales-ops', name: 'Sales Operations', category: 'Sales', description: 'CRM, reporting, process optimization', typicallyEarlyStage: false, marketplaceCategories: ['AI'] },
+    { id: 'sales-ops', name: 'Sales Operations', category: 'Sales', description: 'CRM, reporting, process optimization', typicallyEarlyStage: false, marketplaceCategories: ['Services'] },
     
     // Product
     { id: 'prod-management', name: 'Product Management', category: 'Product', description: 'Roadmap, prioritization, requirements', typicallyEarlyStage: true, marketplaceCategories: ['People'] },
     { id: 'prod-design', name: 'Product Design', category: 'Product', description: 'UX/UI design and research', typicallyEarlyStage: true, marketplaceCategories: ['People', 'Services'] },
-    { id: 'prod-analytics', name: 'Product Analytics', category: 'Product', description: 'Usage data and user insights', typicallyEarlyStage: false, marketplaceCategories: ['AI'] },
+    { id: 'prod-analytics', name: 'Product Analytics', category: 'Product', description: 'Usage data and user insights', typicallyEarlyStage: false, marketplaceCategories: ['Services'] },
     
     // Engineering
     { id: 'eng-frontend', name: 'Frontend Development', category: 'Engineering', description: 'Web and mobile UI development', typicallyEarlyStage: true, marketplaceCategories: ['People'] },
     { id: 'eng-backend', name: 'Backend Development', category: 'Engineering', description: 'APIs, databases, infrastructure', typicallyEarlyStage: true, marketplaceCategories: ['People'] },
-    { id: 'eng-devops', name: 'DevOps/Infrastructure', category: 'Engineering', description: 'CI/CD, cloud, monitoring', typicallyEarlyStage: false, marketplaceCategories: ['People', 'AI'] },
+    { id: 'eng-devops', name: 'DevOps/Infrastructure', category: 'Engineering', description: 'CI/CD, cloud, monitoring', typicallyEarlyStage: false, marketplaceCategories: ['People'] },
     { id: 'eng-security', name: 'Security', category: 'Engineering', description: 'Application and infrastructure security', typicallyEarlyStage: false, marketplaceCategories: ['Services'] },
     
     // Customer Success
-    { id: 'cs-support', name: 'Customer Support', category: 'Customer Success', description: 'Handling customer inquiries and issues', typicallyEarlyStage: true, marketplaceCategories: ['People', 'AI'] },
+    { id: 'cs-support', name: 'Customer Support', category: 'Customer Success', description: 'Handling customer inquiries and issues', typicallyEarlyStage: true, marketplaceCategories: ['People'] },
     { id: 'cs-success', name: 'Customer Success Management', category: 'Customer Success', description: 'Onboarding, adoption, retention', typicallyEarlyStage: false, marketplaceCategories: ['People'] },
     
     // Administration
-    { id: 'admin-ea', name: 'Executive Assistant', category: 'Administration', description: 'Calendar, travel, administrative support', typicallyEarlyStage: false, marketplaceCategories: ['People', 'AI'] },
+    { id: 'admin-ea', name: 'Executive Assistant', category: 'Administration', description: 'Calendar, travel, administrative support', typicallyEarlyStage: false, marketplaceCategories: ['People'] },
     { id: 'admin-office', name: 'Office Management', category: 'Administration', description: 'Office operations and vendor management', typicallyEarlyStage: false },
 ]

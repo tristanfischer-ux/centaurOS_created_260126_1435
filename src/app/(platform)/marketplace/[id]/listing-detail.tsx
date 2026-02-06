@@ -159,7 +159,6 @@ export function MarketplaceListingDetail({ listing, trustSignals, ratings }: Mar
 
                     {/* Category-specific sections */}
                     {category === 'People' && <PeopleSection attrs={attrs} />}
-                    {category === 'AI' && <AISection attrs={attrs} />}
                     {category === 'Products' && <ProductsSection attrs={attrs} />}
                     {category === 'Services' && <ServicesSection attrs={attrs} />}
 
@@ -197,10 +196,6 @@ function KeyMetricsCard({ category, attrs }: { category: string; attrs: Record<s
         if (attrs.years_experience) metrics.push({ label: 'Experience', value: `${attrs.years_experience} years`, icon: <Briefcase className="h-4 w-4" /> })
         if (attrs.projects_completed) metrics.push({ label: 'Projects', value: attrs.projects_completed, icon: <CheckCircle2 className="h-4 w-4" /> })
         if (attrs.location) metrics.push({ label: 'Location', value: attrs.location, icon: <MapPin className="h-4 w-4" /> })
-    } else if (category === 'AI') {
-        if (attrs.cost || attrs.pricing) metrics.push({ label: 'Pricing', value: attrs.cost || attrs.pricing, icon: <DollarSign className="h-4 w-4" /> })
-        if (attrs.accuracy) metrics.push({ label: 'Accuracy', value: attrs.accuracy, icon: <Target className="h-4 w-4" /> })
-        if (attrs.latency) metrics.push({ label: 'Latency', value: attrs.latency, icon: <Zap className="h-4 w-4" /> })
     } else if (category === 'Products') {
         if (attrs.cost || attrs.price) metrics.push({ label: 'Price', value: attrs.cost || attrs.price, icon: <DollarSign className="h-4 w-4" /> })
         if (attrs.lead_time) metrics.push({ label: 'Lead Time', value: attrs.lead_time, icon: <Timer className="h-4 w-4" /> })
@@ -287,45 +282,6 @@ function PeopleSection({ attrs }: { attrs: Record<string, any> }) {
                             </Badge>
                         ))}
                     </div>
-                </section>
-            )}
-        </div>
-    )
-}
-
-// AI-specific section
-function AISection({ attrs }: { attrs: Record<string, any> }) {
-    return (
-        <div className="space-y-4">
-            {/* Capabilities */}
-            {attrs.capabilities && (
-                <section>
-                    <h2 className="text-lg font-semibold text-foreground flex items-center gap-2 mb-2">
-                        <Brain className="h-5 w-5" />
-                        Capabilities
-                    </h2>
-                    {Array.isArray(attrs.capabilities) ? (
-                        <div className="flex flex-wrap gap-2">
-                            {attrs.capabilities.map((cap: string, i: number) => (
-                                <Badge key={i} variant="secondary">
-                                    {cap}
-                                </Badge>
-                            ))}
-                        </div>
-                    ) : (
-                        <p className="text-muted-foreground">{attrs.capabilities}</p>
-                    )}
-                </section>
-            )}
-
-            {/* Model / Technology */}
-            {attrs.model && (
-                <section>
-                    <h2 className="text-lg font-semibold text-foreground flex items-center gap-2 mb-2">
-                        <Cpu className="h-5 w-5" />
-                        Technology
-                    </h2>
-                    <p className="text-muted-foreground">{attrs.model}</p>
                 </section>
             )}
         </div>
