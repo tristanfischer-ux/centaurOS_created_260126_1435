@@ -12,6 +12,7 @@
  */
 
 import { useState, useCallback, useEffect, useMemo } from 'react'
+import { useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { ArrowLeft } from 'lucide-react'
@@ -44,6 +45,8 @@ export function UpdatesLayout({
   userId,
   foundryId
 }: UpdatesLayoutProps) {
+  const router = useRouter()
+
   // Data state
   const [items, setItems] = useState<ActivityItem[]>(initialItems)
   const [filter, setFilter] = useState<ActivityFilter>('all')
@@ -106,15 +109,18 @@ export function UpdatesLayout({
 
   // Handle item selection
   const handleSelectItem = useCallback((item: ActivityItem) => {
-    // Direct messages go to conversations on the Home page -- skip them
-    if (item.source.type === 'conversation') return
+    // Direct messages live on the Home/Inbox page -- navigate there
+    if (item.source.type === 'conversation') {
+      router.push('/home')
+      return
+    }
 
     setSelectedSource({
       type: item.source.type as 'task' | 'objective',
       id: item.source.id
     })
     setShowThread(true)
-  }, [])
+  }, [router])
 
   // Handle back (mobile)
   const handleBack = useCallback(() => {
