@@ -15,10 +15,45 @@ import { ObjectiveDetailPanel } from './objective-detail-panel'
 import { ObjectivesTreeView } from './objectives-tree-view'
 import { CreateObjectiveDialog } from '../objectives/create-objective-dialog'
 import { ObjectivesGanttView } from './gantt-view'
-import type { ObjectiveWithTasks, Member, Team } from './types'
+import { TaskDetailPanel } from '../new-tasks/task-detail-panel'
+import type { ObjectiveWithTasks, ObjectiveTask, Member, Team } from './types'
+import type { TaskWithData } from '../new-tasks/types'
 
 const LARGE_BREAKPOINT = 1280
 const MEDIUM_BREAKPOINT = 768
+
+/** Map an ObjectiveTask to the TaskWithData shape expected by TaskDetailPanel */
+function toTaskWithData(task: ObjectiveTask, parentObjective: ObjectiveWithTasks): TaskWithData {
+  return {
+    id: task.id,
+    title: task.title,
+    description: task.description,
+    task_number: task.task_number,
+    status: task.status,
+    assignee_id: task.assignee_id,
+    creator_id: task.creator_id,
+    start_date: task.start_date,
+    end_date: task.end_date,
+    risk_level: task.risk_level,
+    progress: task.progress,
+    objective_id: task.objective_id,
+    foundry_id: task.foundry_id,
+    is_private: task.is_private,
+    created_at: task.created_at,
+    // Fields not available in ObjectiveTask -- safe defaults
+    updated_at: task.created_at,
+    amendment_notes: null,
+    rejection_reason: null,
+    nudge_count: null,
+    client_visible: null,
+    message_count: 0,
+    assignee: task.assignee,
+    creator: null,
+    objective: { id: parentObjective.id, title: parentObjective.title },
+    assignees: task.assignees,
+    task_files: [],
+  }
+}
 
 interface ObjectivesBoardProps {
   objectives: ObjectiveWithTasks[]
@@ -43,6 +78,7 @@ export function ObjectivesBoard({
   const [healthFilter, setHealthFilter] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null)
   const [showSearch, setShowSearch] = useState(false)
   const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1400)
 
@@ -65,12 +101,13 @@ export function ObjectivesBoard({
       }
       if (e.key === 'Escape') {
         if (showSearch) setShowSearch(false)
+        else if (selectedTaskId) setSelectedTaskId(null)
         else if (selectedId) setSelectedId(null)
       }
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [showSearch, selectedId])
+  }, [showSearch, selectedId, selectedTaskId])
 
   // Compute health stats
   const stats = useMemo(() => {
@@ -109,11 +146,27 @@ export function ObjectivesBoard({
   )
 
   const handleSelect = useCallback((id: string) => {
+    setSelectedTaskId(null) // clear task selection when selecting an objective
     setSelectedId(prev => prev === id ? null : id)
   }, [])
 
+  const handleTaskSelect = useCallback((taskId: string) => {
+    setSelectedId(null) // clear objective selection when selecting a task
+    setSelectedTaskId(prev => prev === taskId ? null : taskId)
+  }, [])
+
+  // Find the selected task and its parent objective
+  const selectedTaskData: TaskWithData | null = useMemo(() => {
+    if (!selectedTaskId) return null
+    for (const obj of objectives) {
+      const task = obj.tasks.find(t => t.id === selectedTaskId)
+      if (task) return toTaskWithData(task, obj)
+    }
+    return null
+  }, [objectives, selectedTaskId])
+
   const isLarge = windowWidth >= LARGE_BREAKPOINT
-  const showDetailPanel = selectedObjective && isLarge
+  const hasDetailPanel = (selectedObjective || selectedTaskData) && isLarge
 
   return (
     <div className="space-y-6">
@@ -198,9 +251,9 @@ export function ObjectivesBoard({
       </div>
 
       {/* Main Content Area */}
-      <div className="flex gap-6 overflow-hidden">
+      <div className="flex gap-6">
         {/* Left: View content */}
-        <div className="flex-1 min-w-0">
+        <div className={cn('flex-1 min-w-0', hasDetailPanel && 'max-w-[calc(100%-380px)]')}>
           {viewMode === 'board' && (
             <BoardView
               objectives={filteredObjectives}
@@ -220,24 +273,40 @@ export function ObjectivesBoard({
               objectives={filteredObjectives}
               selectedId={selectedId}
               onSelect={handleSelect}
+              onTaskSelect={handleTaskSelect}
             />
           )}
         </div>
 
         {/* Right: Detail panel */}
-        {showDetailPanel && (
-          <div className="w-[360px] shrink-0 rounded-xl border overflow-hidden h-[calc(100vh-300px)] sticky top-8">
-            <ObjectiveDetailPanel
-              objective={selectedObjective}
-              onClose={() => setSelectedId(null)}
-            />
+        {hasDetailPanel && (
+          <div className="w-[360px] flex-shrink-0 rounded-xl border border-slate-100 overflow-hidden h-[calc(100vh-300px)] sticky top-8">
+            {selectedTaskData ? (
+              <TaskDetailPanel
+                task={selectedTaskData}
+                onClose={() => setSelectedTaskId(null)}
+              />
+            ) : selectedObjective ? (
+              <ObjectiveDetailPanel
+                objective={selectedObjective}
+                onClose={() => setSelectedId(null)}
+              />
+            ) : null}
           </div>
         )}
       </div>
 
       {/* Mobile detail: Full-screen overlay */}
-      {selectedObjective && !isLarge && (
-        <div className="fixed inset-0 z-50 bg-background">
+      {selectedTaskData && !isLarge && (
+        <div className="fixed inset-0 z-50 bg-white">
+          <TaskDetailPanel
+            task={selectedTaskData}
+            onClose={() => setSelectedTaskId(null)}
+          />
+        </div>
+      )}
+      {selectedObjective && !selectedTaskData && !isLarge && (
+        <div className="fixed inset-0 z-50 bg-white">
           <ObjectiveDetailPanel
             objective={selectedObjective}
             onClose={() => setSelectedId(null)}
