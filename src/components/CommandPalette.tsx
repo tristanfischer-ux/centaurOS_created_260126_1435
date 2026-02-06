@@ -75,7 +75,7 @@ export function CommandPalette() {
       // Cmd+N - New task (when not in input)
       if (e.key === 'n' && (e.metaKey || e.ctrlKey) && !isInputElement(e.target)) {
         e.preventDefault()
-        router.push('/tasks')
+        router.push('/new-tasks')
       }
       // Cmd+Shift+F - Toggle focus mode
       if (e.key === 'f' && (e.metaKey || e.ctrlKey) && e.shiftKey && !isInputElement(e.target)) {
@@ -179,12 +179,12 @@ export function CommandPalette() {
         
         {/* Quick Actions - Most Used */}
         <CommandGroup heading="Quick Actions">
-          <CommandItem onSelect={() => { router.push('/tasks'); setOpen(false) }}>
+          <CommandItem onSelect={() => { router.push('/new-tasks'); setOpen(false) }}>
             <Plus className="mr-2 h-4 w-4" />
             New Task
             <span className="ml-auto text-xs text-muted-foreground">⌘N</span>
           </CommandItem>
-          <CommandItem onSelect={() => { router.push('/objectives'); setOpen(false) }}>
+          <CommandItem onSelect={() => { router.push('/new-objectives'); setOpen(false) }}>
             <Target className="mr-2 h-4 w-4" />
             New Objective
           </CommandItem>
@@ -225,7 +225,7 @@ export function CommandPalette() {
             {tasks.slice(0, 5).map(task => (
               <CommandItem 
                 key={task.id} 
-                onSelect={() => { router.push(`/tasks?task=${task.id}`); setOpen(false) }}
+                onSelect={() => { router.push(`/new-tasks?taskId=${task.id}`); setOpen(false) }}
               >
                 <CheckSquare className="mr-2 h-4 w-4 text-muted-foreground" />
                 <span className="truncate">{task.title}</span>
@@ -245,7 +245,7 @@ export function CommandPalette() {
             {objectives.slice(0, 5).map(obj => (
               <CommandItem 
                 key={obj.id} 
-                onSelect={() => { router.push(`/objectives/${obj.id}`); setOpen(false) }}
+                onSelect={() => { router.push(`/new-objectives`); setOpen(false) }}
               >
                 <Target className="mr-2 h-4 w-4 text-muted-foreground" />
                 <span className="truncate">{obj.title}</span>
@@ -280,11 +280,11 @@ export function CommandPalette() {
             <LayoutDashboard className="mr-2 h-4 w-4" />
             Dashboard
           </CommandItem>
-          <CommandItem onSelect={() => { router.push('/objectives'); setOpen(false) }}>
+          <CommandItem onSelect={() => { router.push('/new-objectives'); setOpen(false) }}>
             <Target className="mr-2 h-4 w-4" />
             Objectives
           </CommandItem>
-          <CommandItem onSelect={() => { router.push('/tasks'); setOpen(false) }}>
+          <CommandItem onSelect={() => { router.push('/new-tasks'); setOpen(false) }}>
             <CheckSquare className="mr-2 h-4 w-4" />
             Tasks
           </CommandItem>
