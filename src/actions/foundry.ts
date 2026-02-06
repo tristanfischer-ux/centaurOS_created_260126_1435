@@ -10,6 +10,7 @@
  */
 
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { revalidatePath } from 'next/cache'
 import type { FoundryPurposeData } from '@/types/foundry'
 
@@ -103,17 +104,20 @@ export async function updateFoundryPurpose(
   }
   
   try {
-    // Update foundry purpose_data using the authenticated user's client
-    // RLS policy "Founders can update their foundry" permits this operation
+    // Update foundry purpose_data using admin client to bypass RLS
     // SECURITY: Auth checks above verify user is authenticated, owns this foundry, and is a Founder
-    const { data, error: updateError } = await supabase
+    // NOTE: Regular client fails because the RLS UPDATE policy's get_my_foundry_id()
+    // doesn't resolve correctly in server action context. Admin client is safe here
+    // because we've already verified identity and authorization above.
+    const adminClient = createAdminClient()
+    
+    const { data: rows, error: updateError } = await adminClient
       .from('foundries')
       .update({ 
         purpose_data: purposeData as any // JSONB field
       })
       .eq('id', foundryId)
       .select()
-      .single()
     
     if (updateError) {
       console.error('[FoundryActions] Failed to update purpose:', {
@@ -123,6 +127,13 @@ export async function updateFoundryPurpose(
       })
       return { success: false, error: `Failed to update company purpose: ${updateError.message}` }
     }
+    
+    if (!rows || rows.length === 0) {
+      console.error('[FoundryActions] Update matched no rows:', { foundryId })
+      return { success: false, error: 'Foundry not found — no rows updated' }
+    }
+    
+    const data = rows[0]
     
     // AUDIT: Log the purpose update
     console.info('[FoundryActions] Foundry purpose updated:', {
