@@ -35,7 +35,7 @@ const moreNavigation = [
     { name: "Objectives", href: "/new-objectives", icon: Target },
     { name: "Agents", href: "/agents", icon: Bot },
     { name: "Inspiration", href: "/inspiration", icon: Lightbulb },
-    { name: "Marketplace", href: "/marketplace", icon: Store },
+    { name: "Marketplace", href: "/marketplace-v2", icon: Store },
     { name: "Settings", href: "/settings", icon: Settings },
 ]
 
