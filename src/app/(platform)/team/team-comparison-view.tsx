@@ -3,7 +3,6 @@
 import { useState, useTransition, useCallback } from "react"
 import { useAutoRefresh } from "@/hooks/useAutoRefresh"
 import { RefreshButton } from "@/components/RefreshButton"
-import { formatDistanceToNow, isPast, parseISO } from "date-fns"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { UserAvatar } from "@/components/ui/user-avatar"
 import { Badge } from "@/components/ui/badge"
@@ -12,17 +11,19 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
-import { Check, X, GitCompare, Users, MoreHorizontal, Pencil, Trash2, Loader2, AlertTriangle, Mail, Phone, LayoutGrid, List, ChevronUp, ChevronDown, User, Calendar, Clock, CheckCircle2, Sparkles, Repeat, MessageSquare } from "lucide-react"
+import {
+    Check, Users, MoreHorizontal, Pencil, Trash2, Loader2, AlertTriangle,
+    LayoutGrid, List, User, MessageSquare, Brain, Unplug, Zap, Search,
+    ArrowRight, UserPlus, Plus, Activity, Bot, ShieldCheck, ChevronRight
+} from "lucide-react"
 import { createTeam, addTeamMember, deleteMember } from "@/actions/team"
 import { startDirectMessage } from "@/actions/messaging"
 import { deleteTeam, updateTeamName } from "@/actions/teams"
 import Link from "next/link"
-import { CreateTeamDialog } from "./create-team-dialog"
 import { InviteMemberDialog } from "./invite-member-dialog"
 import { PendingInvitations } from "./pending-invitations"
 import { FeatureTip } from "@/components/onboarding"
 import { pairCentaur, unpairCentaur } from "@/actions/team"
-import { Brain, Unplug, Zap } from "lucide-react"
 import { toast } from "sonner"
 import { FullProfileView } from "@/components/team/full-profile-view"
 import {
@@ -52,6 +53,8 @@ import { FullTaskView } from "@/components/tasks/full-task-view"
 import { createClient } from "@/lib/supabase/client"
 import { cn } from "@/lib/utils"
 
+
+// ─── Types ───────────────────────────────────────
 
 interface TaskDetail {
     id: string
@@ -109,105 +112,104 @@ interface TeamComparisonViewProps {
     currentUserId: string
 }
 
+
+// ─── Main Component ──────────────────────────────
+
 export function TeamComparisonView({ founders, executives, apprentices, aiAgents, teams, currentUserId }: TeamComparisonViewProps) {
+    // View state
+    const [activeTab, setActiveTab] = useState<'members' | 'teams'>('members')
     const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
+    const [searchQuery, setSearchQuery] = useState("")
+
+    // Selection & comparison
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
-    const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null)
     const [showComparison, setShowComparison] = useState(false)
 
-    // Drag-and-drop team creation state
+    // Profile & task modals
+    const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null)
+    const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null)
+    const [fullTaskData, setFullTaskData] = useState<any>(null)
+    const [isLoadingTask, setIsLoadingTask] = useState(false)
+
+    // Drag-and-drop state
     const [draggedMemberId, setDraggedMemberId] = useState<string | null>(null)
     const [dropTargetId, setDropTargetId] = useState<string | null>(null)
+    const [pairingMemberId, setPairingMemberId] = useState<string | null>(null)
+    const [deletingMemberId, setDeletingMemberId] = useState<string | null>(null)
+
+    // Quick team creation from drag-drop
     const [showQuickTeamDialog, setShowQuickTeamDialog] = useState(false)
     const [quickTeamMemberIds, setQuickTeamMemberIds] = useState<string[]>([])
     const [teamName, setTeamName] = useState("")
     const [teamError, setTeamError] = useState<string | null>(null)
-    const [isPending, startTransition] = useTransition()
-    const [pairingMemberId, setPairingMemberId] = useState<string | null>(null)
-    const [deletingMemberId, setDeletingMemberId] = useState<string | null>(null)
 
-    // Edit/Delete Team State
+    // Team management
     const [teamToEdit, setTeamToEdit] = useState<{ id: string, name: string } | null>(null)
     const [teamToDelete, setTeamToDelete] = useState<string | null>(null)
     const [memberToDelete, setMemberToDelete] = useState<string | null>(null)
     const [newName, setNewName] = useState("")
 
-    // Task modal state
-    const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null)
-    const [fullTaskData, setFullTaskData] = useState<any>(null)
-    const [isLoadingTask, setIsLoadingTask] = useState(false)
+    // Transitions
+    const [isPending, startTransition] = useTransition()
 
-    // Presence tracking for remote team visibility
-    const { getPresenceForUser, teamPresence } = usePresenceContext()
+    // Card sizes for marketplace cards
+    const [cardSizes, setCardSizes] = useState<Record<string, CardSize>>({})
 
-    // Auto-refresh using Supabase Realtime
+    // Presence
+    const { getPresenceForUser } = usePresenceContext()
     useAutoRefresh({ tables: ['profiles', 'teams', 'presence'] })
 
+    // Derived data
     const allMembers = [...founders, ...executives, ...apprentices, ...aiAgents]
     const selectedMembers = allMembers.filter(m => selectedIds.has(m.id))
     const quickTeamMembers = allMembers.filter(m => quickTeamMemberIds.includes(m.id))
+    const humanMembers = allMembers.filter(m => m.role !== 'AI_Agent')
 
-    // Message handler for marketplace-style cards
-    const handleMessage = async (memberId: string) => {
-        const result = await startDirectMessage(memberId)
-        const member = allMembers.find(m => m.id === memberId)
-        if (result.success) {
-            toast.success(`Started conversation with ${member?.full_name || 'member'}`)
-        } else {
-            toast.error(result.error || 'Failed to start conversation')
-        }
+    // ─── Stats ─────────────────────────────────
+
+    const totalPeople = allMembers.length
+    const totalTeams = teams.filter(t => !t.is_auto_generated).length
+    const totalAI = aiAgents.length
+    const pairedCount = humanMembers.filter(m => m.paired_ai_id).length
+    const avgCapacity = humanMembers.length > 0
+        ? Math.round(humanMembers.reduce((sum, m) => {
+            const score = Math.min(100, (m.activeTasks * 20) + (m.pendingTasks * 10))
+            return sum + (100 - score)
+        }, 0) / humanMembers.length)
+        : 100
+
+    // ─── Search Filter ─────────────────────────
+
+    const filterMembers = (members: Member[]) => {
+        if (!searchQuery.trim()) return members
+        const q = searchQuery.toLowerCase()
+        return members.filter(m =>
+            m.full_name?.toLowerCase().includes(q) ||
+            m.role?.toLowerCase().includes(q) ||
+            m.email?.toLowerCase().includes(q)
+        )
     }
 
-    // Add to team handler - opens quick team dialog with member pre-selected
-    const handleAddToTeam = (memberId: string) => {
-        setQuickTeamMemberIds([memberId])
-        setTeamName("")
-        setTeamError(null)
-        setShowQuickTeamDialog(true)
+    const filterTeams = (teamsList: Team[]) => {
+        if (!searchQuery.trim()) return teamsList
+        const q = searchQuery.toLowerCase()
+        return teamsList.filter(t =>
+            t.name.toLowerCase().includes(q) ||
+            t.members.some(m => m.full_name?.toLowerCase().includes(q))
+        )
     }
 
-    // Task click handler - fetches full task data and opens the modal
-    const handleTaskClick = useCallback(async (taskId: string) => {
-        setSelectedTaskId(taskId)
-        setIsLoadingTask(true)
-        
-        try {
-            const supabase = createClient()
-            const { data, error } = await supabase
-                .from('tasks')
-                .select('*')
-                .eq('id', taskId)
-                .single()
-            
-            if (error) {
-                console.error('[TeamView] Failed to fetch task:', { taskId, error: error.message })
-                toast.error('Failed to load task')
-                setSelectedTaskId(null)
-                return
-            }
-            
-            setFullTaskData(data)
-        } catch (err) {
-            console.error('[TeamView] Unexpected error fetching task:', err)
-            toast.error('Failed to load task')
-            setSelectedTaskId(null)
-        } finally {
-            setIsLoadingTask(false)
-        }
+    const filteredFounders = filterMembers(founders)
+    const filteredExecutives = filterMembers(executives)
+    const filteredApprentices = filterMembers(apprentices)
+    const filteredAIAgents = filterMembers(aiAgents)
+    const filteredTeams = filterTeams(teams)
+
+    // ─── Handlers ──────────────────────────────
+
+    const handleCardSizeChange = useCallback((memberId: string, size: CardSize) => {
+        setCardSizes(prev => ({ ...prev, [memberId]: size }))
     }, [])
-
-    // Helper: calculate bandwidth from task counts
-    // Uses same formula as routing-agent.ts: workloadScore = (active * 20) + (pending * 10)
-    const getBandwidth = (member: Member): { label: string; className: string; score: number } => {
-        const score = Math.min(100, (member.activeTasks * 20) + (member.pendingTasks * 10))
-        if (score <= 40) {
-            return { label: 'Has capacity', className: 'bg-status-success-light text-status-success-dark', score }
-        } else if (score <= 70) {
-            return { label: 'At capacity', className: 'bg-status-warning-light text-status-warning-dark', score }
-        } else {
-            return { label: 'Overloaded', className: 'bg-status-error-light text-status-error-dark', score }
-        }
-    }
 
     const toggleSelection = (id: string) => {
         const newSet = new Set(selectedIds)
@@ -219,10 +221,50 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
         setSelectedIds(newSet)
     }
 
+    const handleMessage = async (memberId: string) => {
+        const member = allMembers.find(m => m.id === memberId)
+        const result = await startDirectMessage(memberId)
+        if (result.success) {
+            toast.success(`Started conversation with ${member?.full_name || 'member'}`)
+        } else {
+            toast.error(result.error || 'Failed to start conversation')
+        }
+    }
+
+    const handleAddToTeam = (memberId: string) => {
+        setQuickTeamMemberIds([memberId])
+        setTeamName("")
+        setTeamError(null)
+        setShowQuickTeamDialog(true)
+    }
+
+    const handleTaskClick = useCallback(async (taskId: string) => {
+        setSelectedTaskId(taskId)
+        setIsLoadingTask(true)
+        try {
+            const supabase = createClient()
+            const { data, error } = await supabase
+                .from('tasks')
+                .select('*')
+                .eq('id', taskId)
+                .single()
+            if (error) {
+                toast.error('Failed to load task')
+                setSelectedTaskId(null)
+                return
+            }
+            setFullTaskData(data)
+        } catch {
+            toast.error('Failed to load task')
+            setSelectedTaskId(null)
+        } finally {
+            setIsLoadingTask(false)
+        }
+    }, [])
+
     // Drag-and-drop handlers
     const handleDragStart = (e: React.DragEvent, memberId: string) => {
         setDraggedMemberId(memberId)
-        // Use text/plain for Safari compatibility
         e.dataTransfer.setData('text/plain', memberId)
         e.dataTransfer.effectAllowed = 'move'
     }
@@ -230,53 +272,40 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
     const handleDragOver = (e: React.DragEvent, memberId: string) => {
         e.preventDefault()
         e.dataTransfer.dropEffect = 'move'
-        // Get the dragged ID from dataTransfer for Safari
         const draggedId = draggedMemberId || e.dataTransfer.getData('text/plain')
         if (draggedId && draggedId !== memberId) {
             setDropTargetId(memberId)
         }
     }
 
-    const handleDragLeave = () => {
-        setDropTargetId(null)
-    }
+    const handleDragLeave = () => setDropTargetId(null)
 
     const handleDrop = (e: React.DragEvent, targetMemberId: string) => {
         e.preventDefault()
-        // Get the dragged ID from dataTransfer (more reliable for Safari)
         const draggedId = e.dataTransfer.getData('text/plain') || draggedMemberId
-
-        // --- Agent Pairing Logic ---
         const draggedMember = allMembers.find(m => m.id === draggedId)
         const targetMember = allMembers.find(m => m.id === targetMemberId)
 
         if (draggedMember && targetMember) {
-            // Case 1: Dragging AI onto Human
+            // AI pairing logic
             if (draggedMember.role === 'AI_Agent' && targetMember.role !== 'AI_Agent') {
                 setPairingMemberId(targetMember.id)
                 startTransition(async () => {
                     const res = await pairCentaur(targetMember.id, draggedMember.id)
-                    if (res?.error) {
-                        toast.error(res.error)
-                    } else {
-                        toast.success(`Paired ${targetMember.full_name} with ${draggedMember.full_name}`)
-                    }
+                    if (res?.error) toast.error(res.error)
+                    else toast.success(`Paired ${targetMember.full_name} with ${draggedMember.full_name}`)
                     setPairingMemberId(null)
                 })
                 setDraggedMemberId(null)
                 setDropTargetId(null)
                 return
             }
-            // Case 2: Dragging Human onto AI
             if (draggedMember.role !== 'AI_Agent' && targetMember.role === 'AI_Agent') {
                 setPairingMemberId(draggedMember.id)
                 startTransition(async () => {
                     const res = await pairCentaur(draggedMember.id, targetMember.id)
-                    if (res?.error) {
-                        toast.error(res.error)
-                    } else {
-                        toast.success(`Paired ${draggedMember.full_name} with ${targetMember.full_name}`)
-                    }
+                    if (res?.error) toast.error(res.error)
+                    else toast.success(`Paired ${draggedMember.full_name} with ${targetMember.full_name}`)
                     setPairingMemberId(null)
                 })
                 setDraggedMemberId(null)
@@ -285,8 +314,8 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
             }
         }
 
+        // Team creation from drag-drop
         if (draggedId && draggedId !== targetMemberId) {
-            // Open quick team creation dialog with both members
             setQuickTeamMemberIds([draggedId, targetMemberId])
             setTeamName("")
             setTeamError(null)
@@ -301,9 +330,9 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
         setDropTargetId(null)
     }
 
+    // Team management handlers
     const handleUpdateName = async () => {
         if (!teamToEdit || !newName.trim()) return
-
         startTransition(async () => {
             try {
                 await updateTeamName(teamToEdit.id, newName)
@@ -319,23 +348,18 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
         if (!teamToDelete) return
         startTransition(async () => {
             const result = await deleteTeam(teamToDelete)
-            if (result?.error) {
-                toast.error(result.error)
-            } else {
-                setTeamToDelete(null)
-            }
+            if (result?.error) toast.error(result.error)
+            else setTeamToDelete(null)
         })
     }
 
     const handleDeleteMember = async () => {
         if (!memberToDelete) return
-
         setDeletingMemberId(memberToDelete)
         startTransition(async () => {
             const res = await deleteMember(memberToDelete)
-            if (res?.error) {
-                toast.error(res.error)
-            } else {
+            if (res?.error) toast.error(res.error)
+            else {
                 toast.success("Member removed")
                 setMemberToDelete(null)
             }
@@ -351,9 +375,8 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
         setTeamError(null)
         startTransition(async () => {
             const result = await createTeam(teamName.trim(), quickTeamMemberIds)
-            if (result.error) {
-                setTeamError(result.error)
-            } else {
+            if (result.error) setTeamError(result.error)
+            else {
                 setShowQuickTeamDialog(false)
                 setQuickTeamMemberIds([])
                 setTeamName("")
@@ -361,512 +384,37 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
         })
     }
 
-    // Track card sizes for marketplace-style cards
-    const [cardSizes, setCardSizes] = useState<Record<string, CardSize>>({})
-    
-    const handleCardSizeChange = useCallback((memberId: string, size: CardSize) => {
-        setCardSizes(prev => ({ ...prev, [memberId]: size }))
-    }, [])
+    // ─── Helper: Bandwidth ─────────────────────
 
-    // Track expanded member cards (legacy, kept for compatibility)
-    const [expandedMemberIds, setExpandedMemberIds] = useState<Set<string>>(new Set())
-    
-    const toggleMemberExpand = (memberId: string) => {
-        setExpandedMemberIds(prev => {
-            const next = new Set(prev)
-            if (next.has(memberId)) {
-                next.delete(memberId)
-            } else {
-                next.add(memberId)
-            }
-            return next
-        })
+    const getBandwidth = (member: Member): { label: string; className: string; score: number } => {
+        const score = Math.min(100, (member.activeTasks * 20) + (member.pendingTasks * 10))
+        if (score <= 40) return { label: 'Has capacity', className: 'bg-status-success-light text-status-success-dark', score }
+        if (score <= 70) return { label: 'At capacity', className: 'bg-status-warning-light text-status-warning-dark', score }
+        return { label: 'Overloaded', className: 'bg-status-error-light text-status-error-dark', score }
     }
 
-    const MemberCard = ({ member, type }: { member: Member, type: 'founder' | 'executive' | 'apprentice' | 'ai_agent' }) => {
-        const isSelected = selectedIds.has(member.id)
-        const isFounder = type === 'founder'
-        const isExecutive = type === 'executive'
-        const isAIAgent = type === 'ai_agent'
-        const isDragging = draggedMemberId === member.id
-        const isDropTarget = dropTargetId === member.id && draggedMemberId !== member.id
-        const isPairing = pairingMemberId === member.id
-        const isDeleting = deletingMemberId === member.id
-        const isExpanded = expandedMemberIds.has(member.id)
 
-        // Pairing Status
+    // ─── Member List Row ───────────────────────
+
+    const MemberListItem = ({ member }: { member: Member }) => {
+        const isAIAgent = member.role === 'AI_Agent'
         const pairedAI = member.pairedAI?.[0]
         const isPaired = !!member.paired_ai_id && !!pairedAI
 
-        // Get member's current task details from pre-computed data
-        const activeTaskDetails = [...(member.taskDetails?.active || []), ...(member.taskDetails?.pending || [])]
-
-        // Determine styles based on type
-        let accentColor = 'bg-muted'
-        let borderClass = 'border'
-        let ringClass = 'ring-muted border-muted'
-        let bgCheckClass = 'bg-muted0'
-        let avatarBgClass = 'bg-muted text-muted-foreground'
-        let badgeClass = 'bg-muted text-muted-foreground'
-
-        if (isAIAgent) {
-            accentColor = 'bg-purple-500'
-            borderClass = 'border-purple-200'
-            ringClass = 'ring-muted border-muted'
-            bgCheckClass = 'bg-muted0'
-            avatarBgClass = 'bg-purple-100 text-purple-600 font-bold'
-            badgeClass = 'text-purple-600 border-purple-200 bg-purple-100'
-        } else if (isFounder) {
-            // Brand orange for leadership
-            accentColor = 'bg-international-orange'
-            borderClass = 'border-orange-200'
-            ringClass = 'ring-muted border-muted'
-            bgCheckClass = 'bg-muted0'
-            avatarBgClass = 'bg-orange-100 text-orange-700 font-bold'
-            badgeClass = 'text-orange-700 border-orange-200 bg-orange-100'
-        } else if (isExecutive) {
-            // Lighter orange for executives
-            accentColor = 'bg-orange-400'
-            borderClass = 'border-orange-100'
-            ringClass = 'ring-muted border-muted'
-            bgCheckClass = 'bg-muted0'
-            avatarBgClass = 'bg-orange-50 text-orange-600 font-bold'
-            badgeClass = 'text-orange-600 border-orange-100 bg-orange-50'
-        } else {
-            // Apprentice - neutral
-            accentColor = 'bg-slate-400'
-            borderClass = 'border'
-            avatarBgClass = 'bg-muted text-muted-foreground font-bold'
-            badgeClass = 'text-muted-foreground border bg-muted'
-        }
-
-        // Pairing Override
-        if (isPaired) {
-            borderClass = 'border-status-warning shadow-md ring-1 ring-status-warning/50'
-        }
-
-        const cardContent = (
-            <Card className={`
-                bg-background border shadow-sm cursor-pointer relative group/card
-                transition-all duration-200 ease-out
-                ${borderClass}
-                hover:border-muted-foreground/20 hover:shadow-lg hover:-translate-y-1
-                active:translate-y-0 active:shadow-md active:scale-[0.99]
-                ${isSelected ? `ring-2 ${ringClass}` : ''}
-                ${isDragging ? 'opacity-50 scale-95 shadow-xl rotate-2' : ''}
-                ${isDropTarget ? 'ring-2 ring-status-success border-status-success bg-status-success-light scale-[1.02]' : ''}
-                ${isPairing || isDeleting ? 'opacity-60' : ''}
-            `}>
-                {/* Compare button - always visible on hover */}
-                <button
-                    onClick={(e) => {
-                        e.stopPropagation()
-                        toggleSelection(member.id)
-                    }}
-                    className={`absolute top-2 right-2 h-6 w-6 rounded-full flex items-center justify-center z-10 transition-all duration-200
-                        ${isSelected ? `${bgCheckClass} text-white` : 'bg-background border text-muted-foreground opacity-0 group-hover/card:opacity-100'}
-                    `}
-                    title={isSelected ? "Remove from comparison" : "Add to comparison"}
-                >
-                    {isSelected ? <Check className="h-4 w-4" /> : <GitCompare className="h-4 w-4" />}
-                </button>
-
-                {isDropTarget && (
-                    <div className="absolute inset-0 flex items-center justify-center bg-status-success-light/80 backdrop-blur-[2px] rounded-lg z-10 animate-in fade-in duration-200">
-                        <div className="bg-status-success text-white px-4 py-2 rounded-full text-sm font-medium flex items-center gap-2 shadow-lg animate-in zoom-in-95 duration-200">
-                            <Zap className="h-4 w-4 fill-white animate-pulse" />
-                            {draggedMemberId && aiAgents.some(a => a.id === draggedMemberId) ? 'Pair Agent' : 'Combine / Team'}
-                        </div>
-                    </div>
-                )}
-                {(isPairing || isDeleting) && (
-                    <div className="absolute inset-0 flex items-center justify-center bg-muted rounded-lg z-10">
-                        <div className="bg-muted text-white px-3 py-1.5 rounded-full text-xs font-medium flex items-center gap-1 shadow-sm">
-                            <Loader2 className="h-3 w-3 animate-spin" />
-                            {isPairing ? 'Pairing...' : 'Removing...'}
-                        </div>
-                    </div>
-                )}
-
-                {/* Collapsed View - Always Visible */}
-                <CardHeader className="p-4 pb-2">
-                    <div className="flex items-center gap-3">
-                        {/* Role Accent Bar */}
-                        <div className={`w-1 h-12 ${accentColor} rounded-full self-stretch`} />
-                        
-                        {/* Avatar with Presence */}
-                        <div className="relative">
-                            {isAIAgent ? (
-                                <Avatar className="h-10 w-10">
-                                    <AvatarFallback className={avatarBgClass}>
-                                        <Brain className="h-5 w-5" />
-                                    </AvatarFallback>
-                                </Avatar>
-                            ) : (
-                                <UserAvatar 
-                                    name={member.full_name} 
-                                    role={member.role}
-                                    size="md"
-                                />
-                            )}
-                            {!isAIAgent && (
-                                <PresenceIndicator
-                                    status={getPresenceForUser(member.id)?.status || 'offline'}
-                                    presence={getPresenceForUser(member.id)}
-                                    size="sm"
-                                />
-                            )}
-                            {isPaired && (
-                                <div className="absolute -bottom-1 -right-1 bg-background rounded-full p-[1px] shadow-sm border border-muted">
-                                    <Avatar className="h-4 w-4 border border-purple-200">
-                                        <AvatarFallback className="bg-purple-100 text-purple-600 text-[6px]">
-                                            <Brain className="h-2 w-2" />
-                                        </AvatarFallback>
-                                    </Avatar>
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Name & Role */}
-                        <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2">
-                                <h3 className="font-semibold text-foreground truncate text-sm">
-                                    {member.full_name}
-                                </h3>
-                                {isPaired && (
-                                    <Badge variant="secondary" className="text-[9px] bg-status-warning-light text-status-warning-dark h-4 px-1 border-status-warning-light">
-                                        Paired
-                                    </Badge>
-                                )}
-                            </div>
-                            <Badge variant="secondary" className={`text-[9px] mt-0.5 ${badgeClass}`}>
-                                {member.role}
-                            </Badge>
-                        </div>
-
-                        {/* Expand/Collapse & Menu */}
-                        <div className="flex items-center gap-1">
-                            <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                    <Button
-                                        variant="ghost"
-                                        type="button"
-                                        className="h-6 w-6 p-0 text-muted-foreground hover:text-muted-foreground opacity-0 group-hover/card:opacity-100 transition-opacity"
-                                        onClick={(e) => {
-                                            e.preventDefault()
-                                            e.stopPropagation()
-                                        }}
-                                        aria-label={`Actions for ${member.full_name}`}
-                                    >
-                                        <MoreHorizontal className="h-4 w-4" />
-                                    </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end" sideOffset={8}>
-                                    <DropdownMenuItem
-                                        onClick={(e) => {
-                                            e.stopPropagation()
-                                            setSelectedMemberId(member.id)
-                                        }}
-                                    >
-                                        <User className="mr-2 h-4 w-4" /> View Profile
-                                    </DropdownMenuItem>
-                                    {member.role !== 'AI_Agent' && (
-                                        <DropdownMenuItem
-                                            onClick={async (e) => {
-                                                e.stopPropagation()
-                                                const result = await startDirectMessage(member.id)
-                                                if (result.success) {
-                                                    toast.success(`Started conversation with ${member.full_name}`)
-                                                } else {
-                                                    toast.error(result.error || 'Failed to start conversation')
-                                                }
-                                            }}
-                                        >
-                                            <MessageSquare className="mr-2 h-4 w-4" /> Message
-                                        </DropdownMenuItem>
-                                    )}
-                                    <DropdownMenuItem
-                                        className="text-destructive focus:text-destructive focus:bg-destructive/10"
-                                        onClick={(e) => {
-                                            e.stopPropagation()
-                                            setMemberToDelete(member.id)
-                                        }}
-                                    >
-                                        <Trash2 className="mr-2 h-4 w-4" /> Remove
-                                    </DropdownMenuItem>
-                                </DropdownMenuContent>
-                            </DropdownMenu>
-                        </div>
-                    </div>
-
-                    {/* Email (truncated in collapsed) */}
-                    {member.email && (
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground mt-2 ml-4">
-                            <Mail className="h-3 w-3 text-muted-foreground" />
-                            <span className="truncate">{member.email}</span>
-                        </div>
-                    )}
-
-                    {/* Stats Row */}
-                    <div className="flex items-center justify-between mt-3 ml-4">
-                        <div className="flex items-center gap-3 text-xs">
-                            {/* Bandwidth indicator */}
-                            {member.role !== 'AI_Agent' && (
-                                <span className={cn(
-                                    "px-1.5 py-0.5 rounded text-[10px] font-medium",
-                                    getBandwidth(member).className
-                                )}>
-                                    {getBandwidth(member).label}
-                                </span>
-                            )}
-                            <span className="text-status-success font-medium">{member.completedTasks} done</span>
-                            <span className="text-electric-blue font-medium">{member.activeTasks} active</span>
-                            <span className="text-muted-foreground">{member.pendingTasks} pending</span>
-                        </div>
-                        <button
-                            onClick={(e) => {
-                                e.preventDefault()
-                                e.stopPropagation()
-                                toggleMemberExpand(member.id)
-                            }}
-                            className="text-muted-foreground hover:text-muted-foreground transition-colors p-1"
-                        >
-                            {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                        </button>
-                    </div>
-                </CardHeader>
-
-                {/* Expanded View */}
-                {isExpanded && (
-                    <CardContent className="pt-0 pb-4 px-4 space-y-3 border-t border-muted mt-2">
-                        {/* Full Contact Info */}
-                        <div className="space-y-1 pt-3">
-                            {member.phone_number && (
-                                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                    <Phone className="h-3 w-3 text-muted-foreground" />
-                                    <span>{member.phone_number}</span>
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Bio */}
-                        {member.bio && (
-                            <p className="text-xs text-muted-foreground italic bg-muted/50 p-3 rounded-lg">
-                                "{member.bio}"
-                            </p>
-                        )}
-
-                        {/* Agent Pairing Info */}
-                        {isCentaur && pairedAI && (
-                            <div className="flex items-center gap-2 text-xs bg-purple-50 p-3 rounded-lg border border-purple-200">
-                                <Brain className="h-4 w-4 text-purple-600" />
-                                <span className="text-purple-700">Paired with <strong>{pairedAI.full_name}</strong></span>
-                                <button
-                                    onClick={(e) => {
-                                        e.preventDefault()
-                                        e.stopPropagation()
-                                        startTransition(async () => {
-                                            await unpairCentaur(member.id)
-                                            toast.success("Agent unpaired")
-                                        })
-                                    }}
-                                    className="ml-auto text-status-warning-dark hover:text-destructive transition-colors"
-                                >
-                                    <Unplug className="h-3 w-3" />
-                                </button>
-                            </div>
-                        )}
-
-                        {/* Current Tasks */}
-                        {activeTaskDetails.length > 0 && (
-                            <div className="space-y-2">
-                                <h4 className="text-sm font-medium text-foreground">Current Tasks</h4>
-                                <div className="space-y-2">
-                                    {activeTaskDetails.slice(0, 3).map((task) => {
-                                        const isOverdue = task.end_date ? isPast(parseISO(task.end_date)) : false
-                                        const hasDeadline = !!task.end_date
-                                        
-                                        return (
-                                            <button
-                                                key={task.id}
-                                                type="button"
-                                                onClick={(e) => {
-                                                    e.preventDefault()
-                                                    e.stopPropagation()
-                                                    handleTaskClick(task.id)
-                                                }}
-                                                className={cn(
-                                                    "flex flex-col gap-1 text-xs p-2 rounded border w-full text-left transition-colors",
-                                                    isOverdue 
-                                                        ? "bg-destructive/10 border-destructive hover:bg-destructive/20" 
-                                                        : "bg-muted border-muted hover:bg-muted/80 hover:border-muted-foreground/20"
-                                                )}
-                                            >
-                                                <div className="flex items-start justify-between gap-2">
-                                                    <span className="truncate text-foreground font-medium flex-1">{task.title}</span>
-                                                    {hasDeadline && (
-                                                        <div className={cn(
-                                                            "flex items-center gap-1 shrink-0",
-                                                            isOverdue ? "text-destructive" : "text-muted-foreground"
-                                                        )}>
-                                                            {isOverdue ? (
-                                                                <AlertTriangle className="h-3 w-3" />
-                                                            ) : (
-                                                                <Clock className="h-3 w-3" />
-                                                            )}
-                                                        </div>
-                                                    )}
-                                                </div>
-                                                {hasDeadline && (
-                                                    <div className={cn(
-                                                        "flex items-center gap-1 text-[10px]",
-                                                        isOverdue ? "text-destructive" : "text-muted-foreground"
-                                                    )}>
-                                                        <Calendar className="h-3 w-3" />
-                                                        <span>
-                                                            {isOverdue ? 'Overdue ' : 'Due '}
-                                                            {formatDistanceToNow(parseISO(task.end_date), { addSuffix: true })}
-                                                        </span>
-                                                    </div>
-                                                )}
-                                            </button>
-                                        )
-                                    })}
-                                    {activeTaskDetails.length > 3 && (
-                                        <div className="text-xs text-muted-foreground text-center pt-1">
-                                            +{activeTaskDetails.length - 3} more tasks
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Action Buttons */}
-                        <div className="flex gap-2 pt-2 border-muted">
-                            <Button 
-                                variant="secondary" 
-                                size="sm" 
-                                className="flex-1 text-xs h-8"
-                                onClick={(e) => {
-                                    e.preventDefault()
-                                    e.stopPropagation()
-                                    setSelectedMemberId(member.id)
-                                }}
-                            >
-                                <User className="h-3 w-3 mr-1" />
-                                Profile
-                            </Button>
-                            {member.role !== 'AI_Agent' && aiAgents.length > 0 && !isPaired && (
-                                <Button 
-                                    variant="secondary" 
-                                    size="sm" 
-                                    onClick={(e) => {
-                                        e.preventDefault()
-                                        e.stopPropagation()
-                                        const availableAI = aiAgents.find(ai => ai.id !== member.paired_ai_id)
-                                        if (availableAI) {
-                                            setPairingMemberId(member.id)
-                                            startTransition(async () => {
-                                                const res = await pairCentaur(member.id, availableAI.id)
-                                                if (res?.error) {
-                                                    toast.error(res.error)
-                                                } else {
-                                                    toast.success(`Paired ${member.full_name} with ${availableAI.full_name}`)
-                                                }
-                                                setPairingMemberId(null)
-                                            })
-                                        }
-                                    }}
-                                    disabled={isPairing}
-                                    className="flex-1 text-xs h-8"
-                                >
-                                    <Zap className="h-3 w-3 mr-1" />
-                                    Pair AI
-                                </Button>
-                            )}
-                            <Button 
-                                variant="secondary" 
-                                size="sm" 
-                                onClick={(e) => {
-                                    e.preventDefault()
-                                    e.stopPropagation()
-                                    setQuickTeamMemberIds([member.id])
-                                    setTeamName("")
-                                    setTeamError(null)
-                                    setShowQuickTeamDialog(true)
-                                }}
-                                className="flex-1 text-xs h-8"
-                            >
-                                <Users className="h-3 w-3 mr-1" />
-                                Team
-                            </Button>
-                        </div>
-                    </CardContent>
-                )}
-            </Card>
-        )
-
-        // Draggable cards with link functionality
-        return (
-            <div
-                draggable={true}
-                onDragStart={(e) => handleDragStart(e, member.id)}
-                onDragOver={(e) => handleDragOver(e, member.id)}
-                onDragLeave={handleDragLeave}
-                onDrop={(e) => handleDrop(e, member.id)}
-                onDragEnd={handleDragEnd}
-                className="block group cursor-grab active:cursor-grabbing active:scale-[0.98] transition-transform"
-                aria-grabbed={draggedMemberId === member.id}
-                role="button"
-                tabIndex={0}
-                aria-label={`Drag ${member.full_name} to pair or create team`}
-                onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                        e.preventDefault()
-                        // For keyboard users, we could show a menu to select action
-                        // For now, just prevent default behavior
-                    }
-                }}
-            >
-                <div
-                    className="cursor-pointer"
-                    onClick={() => {
-                        if (!draggedMemberId) {
-                            setSelectedMemberId(member.id)
-                        }
-                    }}
-                >
-                    {cardContent}
-                </div>
-            </div>
-        )
-    }
-
-    const MemberListItem = ({ member, type }: { member: Member, type: 'founder' | 'executive' | 'apprentice' | 'ai_agent' }) => {
-        const isFounder = type === 'founder'
-        const isExecutive = type === 'executive'
-        const isAIAgent = type === 'ai_agent'
-
-        // Pairing Status
-        const pairedAI = member.pairedAI?.[0]
-        const isPaired = !!member.paired_ai_id && !!pairedAI
-
-        let badgeClass = 'text-muted-foreground border bg-muted'
-
-        if (isAIAgent) {
-            badgeClass = 'text-purple-600 border-purple-200 bg-purple-100'
-        } else if (isFounder) {
-            badgeClass = 'text-orange-700 border-orange-200 bg-orange-100'
-        } else if (isExecutive) {
-            badgeClass = 'text-orange-600 border-orange-100 bg-orange-50'
-        }
+        const roleBadgeClass = isAIAgent
+            ? 'text-purple-600 border-purple-200 bg-purple-100'
+            : member.role === 'Founder'
+                ? 'text-orange-700 border-orange-200 bg-orange-100'
+                : member.role === 'Executive'
+                    ? 'text-orange-600 border-orange-100 bg-orange-50'
+                    : 'text-muted-foreground border bg-muted'
 
         return (
             <tr className="group hover:bg-muted/50 active:bg-muted transition-colors duration-150 border-b border-muted last:border-0">
                 <td className="px-4 py-3 pl-6">
                     <div className="flex items-center gap-3">
-                        <div 
-                            className="flex items-center gap-3 cursor-pointer"
+                        <button
+                            className="flex items-center gap-3"
                             onClick={() => setSelectedMemberId(member.id)}
                         >
                             <div className="relative">
@@ -877,8 +425,8 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                                         </AvatarFallback>
                                     </Avatar>
                                 ) : (
-                                    <UserAvatar 
-                                        name={member.full_name} 
+                                    <UserAvatar
+                                        name={member.full_name}
                                         role={member.role}
                                         size="sm"
                                         className="border border-muted"
@@ -892,14 +440,14 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                                     />
                                 )}
                             </div>
-                            <span className="font-medium text-foreground group-hover:text-electric-blue group-active:text-electric-blue-hover transition-colors">
+                            <span className="font-medium text-foreground group-hover:text-electric-blue transition-colors">
                                 {member.full_name}
                             </span>
-                        </div>
+                        </button>
                     </div>
                 </td>
                 <td className="px-4 py-3">
-                    <Badge variant="secondary" className={`text-[10px] ${badgeClass} font-normal`}>
+                    <Badge variant="secondary" className={cn("text-[10px] font-normal", roleBadgeClass)}>
                         {member.role}
                     </Badge>
                 </td>
@@ -914,15 +462,13 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                             </Badge>
                             <button
                                 aria-label="Unpair Agent"
-                                onClick={(e) => {
-                                    e.preventDefault()
-                                    e.stopPropagation()
+                                onClick={() => {
                                     startTransition(async () => {
                                         await unpairCentaur(member.id)
                                         toast.success("Agent unpaired")
                                     })
                                 }}
-                                className="text-muted-foreground hover:text-destructive hover:bg-destructive/10 active:text-destructive active:bg-destructive/20 rounded p-1 transition-all opacity-0 group-hover:opacity-100"
+                                className="text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded p-1 transition-all opacity-0 group-hover:opacity-100"
                             >
                                 <Unplug className="h-3 w-3" />
                             </button>
@@ -931,12 +477,8 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                 </td>
                 <td className="px-4 py-3 text-muted-foreground">
                     <div className="flex flex-col gap-1.5 text-xs">
-                        {/* Bandwidth indicator */}
-                        {member.role !== 'AI_Agent' && (
-                            <span className={cn(
-                                "px-1.5 py-0.5 rounded text-[10px] font-medium w-fit",
-                                getBandwidth(member).className
-                            )}>
+                        {!isAIAgent && (
+                            <span className={cn("px-1.5 py-0.5 rounded text-[10px] font-medium w-fit", getBandwidth(member).className)}>
                                 {getBandwidth(member).label}
                             </span>
                         )}
@@ -945,49 +487,25 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                             <span className="text-electric-blue font-medium">{member.activeTasks} active</span>
                             <span className="text-muted-foreground">{member.pendingTasks} pending</span>
                         </div>
-                        {member.taskTitles?.active && member.taskTitles.active.length > 0 && (
-                            <div className="text-electric-blue truncate max-w-[200px]">
-                                <span className="font-semibold">Active:</span> {member.taskTitles.active[0]}
-                                {member.taskTitles.active.length > 1 && ` +${member.taskTitles.active.length - 1} more`}
-                            </div>
-                        )}
-                        {member.taskTitles?.pending && member.taskTitles.pending.length > 0 && (
-                            <div className="text-muted-foreground truncate max-w-[200px]">
-                                <span className="font-semibold">Pending:</span> {member.taskTitles.pending[0]}
-                                {member.taskTitles.pending.length > 1 && ` +${member.taskTitles.pending.length - 1} more`}
-                            </div>
-                        )}
                     </div>
                 </td>
                 <td className="px-4 py-3 text-right pr-6">
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                            <Button
-                                variant="ghost"
-                                type="button"
-                                className="h-8 w-8 p-0 text-muted-foreground hover:text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity"
-                                aria-label={`Actions for ${member.full_name}`}
-                            >
+                            <Button variant="ghost" className="h-8 w-8 p-0 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" aria-label={`Actions for ${member.full_name}`}>
                                 <MoreHorizontal className="h-4 w-4" />
                             </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                            <DropdownMenuItem
-                                onClick={() => setSelectedMemberId(member.id)}
-                            >
-                                View Profile
+                            <DropdownMenuItem onClick={() => setSelectedMemberId(member.id)}>
+                                <User className="mr-2 h-4 w-4" /> View Profile
                             </DropdownMenuItem>
-                            {member.role !== 'AI_Agent' && (
-                                <DropdownMenuItem
-                                    onClick={async () => {
-                                        const result = await startDirectMessage(member.id)
-                                        if (result.success) {
-                                            toast.success(`Started conversation with ${member.full_name}`)
-                                        } else {
-                                            toast.error(result.error || 'Failed to start conversation')
-                                        }
-                                    }}
-                                >
+                            {!isAIAgent && (
+                                <DropdownMenuItem onClick={async () => {
+                                    const result = await startDirectMessage(member.id)
+                                    if (result.success) toast.success(`Started conversation with ${member.full_name}`)
+                                    else toast.error(result.error || 'Failed to start conversation')
+                                }}>
                                     <MessageSquare className="mr-2 h-4 w-4" /> Message
                                 </DropdownMenuItem>
                             )}
@@ -995,7 +513,7 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                                 className="text-destructive focus:text-destructive focus:bg-destructive/10"
                                 onClick={() => setMemberToDelete(member.id)}
                             >
-                                <Trash2 className="mr-2 h-4 w-4" /> Delete Person
+                                <Trash2 className="mr-2 h-4 w-4" /> Remove
                             </DropdownMenuItem>
                         </DropdownMenuContent>
                     </DropdownMenu>
@@ -1004,18 +522,117 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
         )
     }
 
+
+    // ─── Member Grid Section ───────────────────
+
+    const MemberSection = ({ title, subtitle, accentColor, icon, members }: {
+        title: string
+        subtitle: string
+        accentColor: string
+        icon?: React.ReactNode
+        members: Member[]
+    }) => {
+        if (members.length === 0 && !searchQuery) return null
+
+        return (
+            <section className="space-y-4">
+                <div className="flex items-center gap-3 border-b border-muted pb-3">
+                    <div className={cn("w-1 h-6 rounded-full", accentColor)} />
+                    {icon}
+                    <h2 className="text-lg font-display font-semibold text-foreground">{title}</h2>
+                    <Badge variant="secondary" className="text-xs font-normal">{members.length}</Badge>
+                    <span className="text-sm text-muted-foreground">{subtitle}</span>
+                </div>
+
+                {members.length === 0 ? (
+                    <EmptyState
+                        icon={<Users className="h-8 w-8" />}
+                        title={searchQuery ? `No ${title.toLowerCase()} match "${searchQuery}"` : `No ${title.toLowerCase()} yet`}
+                        description={searchQuery ? "Try a different search term" : `Add ${title.toLowerCase()} to get started.`}
+                        className="py-10 bg-muted/20 rounded-xl border border-muted"
+                    />
+                ) : viewMode === 'grid' ? (
+                    <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                        {members.map(member => (
+                            <div
+                                key={member.id}
+                                draggable
+                                onDragStart={(e) => handleDragStart(e, member.id)}
+                                onDragOver={(e) => handleDragOver(e, member.id)}
+                                onDragLeave={handleDragLeave}
+                                onDrop={(e) => handleDrop(e, member.id)}
+                                onDragEnd={handleDragEnd}
+                                className={cn(
+                                    "cursor-grab active:cursor-grabbing active:scale-[0.98] transition-transform",
+                                    draggedMemberId === member.id && "opacity-50 scale-95",
+                                    dropTargetId === member.id && draggedMemberId !== member.id && "scale-[1.02]"
+                                )}
+                            >
+                                {dropTargetId === member.id && draggedMemberId !== member.id && (
+                                    <div className="absolute inset-0 flex items-center justify-center bg-status-success-light/80 backdrop-blur-[2px] rounded-lg z-10 animate-in fade-in duration-200">
+                                        <div className="bg-status-success text-white px-4 py-2 rounded-full text-sm font-medium flex items-center gap-2 shadow-lg">
+                                            <Zap className="h-4 w-4 fill-white" />
+                                            {draggedMemberId && aiAgents.some(a => a.id === draggedMemberId) ? 'Pair Agent' : 'Create Team'}
+                                        </div>
+                                    </div>
+                                )}
+                                <TeamMemberCard
+                                    member={member}
+                                    isSelected={selectedIds.has(member.id)}
+                                    onToggleSelect={toggleSelection}
+                                    size={cardSizes[member.id] || 'medium'}
+                                    onSizeChange={handleCardSizeChange}
+                                    onViewProfile={setSelectedMemberId}
+                                    onMessage={member.role !== 'AI_Agent' ? handleMessage : undefined}
+                                    onAddToTeam={handleAddToTeam}
+                                    onTaskClick={handleTaskClick}
+                                    presenceStatus={member.role === 'AI_Agent' ? 'online' : (getPresenceForUser(member.id)?.status as 'online' | 'away' | 'busy' | 'offline' || 'offline')}
+                                    presence={member.role === 'AI_Agent' ? undefined : getPresenceForUser(member.id)}
+                                />
+                            </div>
+                        ))}
+                    </div>
+                ) : (
+                    <div className="border border-muted rounded-xl overflow-hidden">
+                        <table className="w-full text-sm text-left">
+                            <thead className="bg-muted/50 text-muted-foreground font-medium border-b border-muted">
+                                <tr>
+                                    <th className="px-4 py-2.5 pl-6 text-xs font-medium uppercase tracking-wider">Profile</th>
+                                    <th className="px-4 py-2.5 text-xs font-medium uppercase tracking-wider">Role</th>
+                                    <th className="px-4 py-2.5 text-xs font-medium uppercase tracking-wider">AI Partner</th>
+                                    <th className="px-4 py-2.5 text-xs font-medium uppercase tracking-wider">Workload</th>
+                                    <th className="px-4 py-2.5 w-12"></th>
+                                </tr>
+                            </thead>
+                            <tbody className="bg-background">
+                                {members.map(member => (
+                                    <MemberListItem key={member.id} member={member} />
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
+            </section>
+        )
+    }
+
+
+    // ─── Render ────────────────────────────────
+
     return (
         <div className="space-y-6">
-            {/* Header */}
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-muted">
+            {/* ─── Header ─────────────────────────── */}
+            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
                 <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-3 mb-1">
-                        <div className="h-8 w-1 bg-orange-600 rounded-full shadow-[0_0_8px_rgba(234,88,12,0.6)]" />
+                        <div className="h-8 w-1 bg-international-orange rounded-full shadow-[0_0_8px_rgba(234,88,12,0.6)]" />
                         <h1 className="text-2xl sm:text-3xl font-display font-semibold text-foreground tracking-tight">Team</h1>
                     </div>
-                    <p className="text-muted-foreground mt-1 text-sm font-medium pl-4">Manage your team members and roles</p>
+                    <p className="text-muted-foreground mt-1 text-sm font-medium pl-4">
+                        Manage your people, build teams, and track performance
+                    </p>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 shrink-0">
                     <RefreshButton />
                     <FeatureTip
                         id="team-invite"
@@ -1025,290 +642,210 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                     >
                         <InviteMemberDialog />
                     </FeatureTip>
-                    <CreateTeamDialog members={[...executives, ...apprentices]} />
+                    <Link href="/team/new">
+                        <Button className="bg-international-orange hover:bg-international-orange/90 text-white shadow-sm">
+                            <Plus className="h-4 w-4 mr-2" />
+                            New Team
+                        </Button>
+                    </Link>
+                </div>
+            </div>
 
-                    <div className="flex bg-muted p-1 rounded-lg">
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setViewMode('grid')}
-                            className={cn(
-                                "h-8 w-8 p-0 rounded-md transition-all duration-200",
-                                viewMode === 'grid' 
-                                    ? 'bg-international-orange/10 text-international-orange shadow-sm' 
-                                    : 'text-muted-foreground hover:text-foreground hover:bg-muted'
-                            )}
-                        >
-                            <LayoutGrid className="h-4 w-4" />
-                        </Button>
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setViewMode('list')}
-                            className={cn(
-                                "h-8 w-8 p-0 rounded-md transition-all duration-200",
-                                viewMode === 'list' 
-                                    ? 'bg-international-orange/10 text-international-orange shadow-sm' 
-                                    : 'text-muted-foreground hover:text-foreground hover:bg-muted'
-                            )}
-                        >
-                            <List className="h-4 w-4" />
-                        </Button>
+            {/* ─── Stats Row ──────────────────────── */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="bg-card border border-muted rounded-xl p-4 flex items-center gap-3 hover:shadow-sm transition-shadow">
+                    <div className="h-10 w-10 rounded-xl bg-international-orange/10 flex items-center justify-center shrink-0">
+                        <Users className="h-5 w-5 text-international-orange" />
+                    </div>
+                    <div>
+                        <p className="text-2xl font-display font-bold text-foreground">{totalPeople}</p>
+                        <p className="text-xs text-muted-foreground">People</p>
+                    </div>
+                </div>
+                <div className="bg-card border border-muted rounded-xl p-4 flex items-center gap-3 hover:shadow-sm transition-shadow">
+                    <div className="h-10 w-10 rounded-xl bg-electric-blue/10 flex items-center justify-center shrink-0">
+                        <ShieldCheck className="h-5 w-5 text-electric-blue" />
+                    </div>
+                    <div>
+                        <p className="text-2xl font-display font-bold text-foreground">{totalTeams}</p>
+                        <p className="text-xs text-muted-foreground">Teams</p>
+                    </div>
+                </div>
+                <div className="bg-card border border-muted rounded-xl p-4 flex items-center gap-3 hover:shadow-sm transition-shadow">
+                    <div className="h-10 w-10 rounded-xl bg-purple-500/10 flex items-center justify-center shrink-0">
+                        <Bot className="h-5 w-5 text-purple-500" />
+                    </div>
+                    <div>
+                        <p className="text-2xl font-display font-bold text-foreground">{totalAI}</p>
+                        <p className="text-xs text-muted-foreground">AI Agents</p>
+                    </div>
+                </div>
+                <div className="bg-card border border-muted rounded-xl p-4 flex items-center gap-3 hover:shadow-sm transition-shadow">
+                    <div className="h-10 w-10 rounded-xl bg-status-success/10 flex items-center justify-center shrink-0">
+                        <Activity className="h-5 w-5 text-status-success" />
+                    </div>
+                    <div>
+                        <p className="text-2xl font-display font-bold text-foreground">{avgCapacity}%</p>
+                        <p className="text-xs text-muted-foreground">Avg Capacity</p>
                     </div>
                 </div>
             </div>
 
-            {/* Team Analytics Charts */}
-            <TeamAnalytics members={allMembers} />
+            {/* ─── Tab Bar + Controls ─────────────── */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-muted pb-3">
+                {/* Tabs */}
+                <div className="flex items-center gap-1 bg-muted/50 p-1 rounded-xl border border-muted w-fit">
+                    <button
+                        onClick={() => { setActiveTab('members'); setSearchQuery("") }}
+                        className={cn(
+                            "px-4 py-1.5 rounded-lg text-sm font-medium transition-all duration-200",
+                            activeTab === 'members'
+                                ? "bg-background text-foreground shadow-sm"
+                                : "text-muted-foreground hover:text-foreground"
+                        )}
+                    >
+                        <Users className="h-4 w-4 inline mr-1.5 -mt-0.5" />
+                        Members
+                    </button>
+                    <button
+                        onClick={() => { setActiveTab('teams'); setSearchQuery("") }}
+                        className={cn(
+                            "px-4 py-1.5 rounded-lg text-sm font-medium transition-all duration-200",
+                            activeTab === 'teams'
+                                ? "bg-background text-foreground shadow-sm"
+                                : "text-muted-foreground hover:text-foreground"
+                        )}
+                    >
+                        <ShieldCheck className="h-4 w-4 inline mr-1.5 -mt-0.5" />
+                        Teams
+                        {totalTeams > 0 && (
+                            <Badge variant="secondary" className="ml-1.5 text-[10px] px-1.5 h-4">{totalTeams}</Badge>
+                        )}
+                    </button>
+                </div>
 
-            {/* Pending Invitations */}
+                {/* Controls */}
+                <div className="flex items-center gap-2">
+                    {/* Search */}
+                    <div className="relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <Input
+                            placeholder={activeTab === 'members' ? "Search people..." : "Search teams..."}
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="pl-9 h-9 w-48 sm:w-56 bg-background border-muted text-sm"
+                        />
+                    </div>
+
+                    {/* View toggle (members only) */}
+                    {activeTab === 'members' && (
+                        <div className="flex bg-muted/50 p-1 rounded-xl border border-muted">
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setViewMode('grid')}
+                                className={cn(
+                                    "h-7 w-7 p-0 rounded-md transition-all duration-200",
+                                    viewMode === 'grid'
+                                        ? 'bg-international-orange/10 text-international-orange shadow-sm'
+                                        : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                                )}
+                                aria-label="Grid view"
+                            >
+                                <LayoutGrid className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setViewMode('list')}
+                                className={cn(
+                                    "h-7 w-7 p-0 rounded-md transition-all duration-200",
+                                    viewMode === 'list'
+                                        ? 'bg-international-orange/10 text-international-orange shadow-sm'
+                                        : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                                )}
+                                aria-label="List view"
+                            >
+                                <List className="h-3.5 w-3.5" />
+                            </Button>
+                        </div>
+                    )}
+                </div>
+            </div>
+
+            {/* ─── Pending Invitations ────────────── */}
             <PendingInvitations />
 
-            {/* Founders Section */}
-            {founders.length > 0 && (
-                <section className="space-y-6">
-                    <h2 className="text-xl font-semibold text-foreground border-b border-muted pb-3 flex items-center gap-3">
-                        <div className="w-1 h-6 bg-international-orange rounded-full" />
-                        Founders
-                        <span className="text-sm font-normal text-muted-foreground">Decision makers</span>
-                    </h2>
-                    {viewMode === 'grid' ? (
-                        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                            {founders.map(member => (
-                                <TeamMemberCard
-                                    key={member.id}
-                                    member={member}
-                                    isSelected={selectedIds.has(member.id)}
-                                    onToggleSelect={toggleSelection}
-                                    size={cardSizes[member.id] || 'medium'}
-                                    onSizeChange={handleCardSizeChange}
-                                    onViewProfile={setSelectedMemberId}
-                                    onMessage={handleMessage}
-                                    onAddToTeam={handleAddToTeam}
-                                    onTaskClick={handleTaskClick}
-                                    presenceStatus={getPresenceForUser(member.id)?.status as 'online' | 'away' | 'busy' | 'offline' || 'offline'}
-                                    presence={getPresenceForUser(member.id)}
-                                />
-                            ))}
-                        </div>
-                    ) : (
-                        <div className="border border-muted rounded-lg overflow-hidden">
-                            <table className="w-full text-sm text-left">
-                                <thead className="bg-muted text-muted-foreground font-medium border-b border-muted">
-                                    <tr>
-                                        <th className="px-4 py-3 pl-6">Profile</th>
-                                        <th className="px-4 py-3">Role</th>
-                                        <th className="px-4 py-3">Paired Agent</th>
-                                        <th className="px-4 py-3">Tasks</th>
-                                        <th className="px-4 py-3"></th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-muted bg-background">
-                                    {founders.map(member => (
-                                        <MemberListItem key={member.id} member={member} type="founder" />
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
+            {/* ─── Members Tab ────────────────────── */}
+            {activeTab === 'members' && (
+                <div className="space-y-8">
+                    {/* Team Analytics Charts */}
+                    <TeamAnalytics members={allMembers} />
+
+                    <MemberSection
+                        title="Founders"
+                        subtitle="Decision makers"
+                        accentColor="bg-international-orange"
+                        members={filteredFounders}
+                    />
+                    <MemberSection
+                        title="Executives"
+                        subtitle="Evaluators"
+                        accentColor="bg-orange-400"
+                        members={filteredExecutives}
+                    />
+                    <MemberSection
+                        title="Apprentices"
+                        subtitle="Executors"
+                        accentColor="bg-slate-400"
+                        members={filteredApprentices}
+                    />
+                    <MemberSection
+                        title="AI Agents"
+                        subtitle="Automation partners"
+                        accentColor="bg-purple-500"
+                        icon={<Brain className="h-4 w-4 text-purple-500" />}
+                        members={filteredAIAgents}
+                    />
+
+                    {/* Drag hint */}
+                    {aiAgents.length > 0 && humanMembers.length > 0 && (
+                        <p className="text-xs text-muted-foreground text-center italic pb-2">
+                            Drag an AI agent onto a person to pair them, or drag two people together to create a team.
+                        </p>
                     )}
-                </section>
+                </div>
             )}
 
-            {/* Executives Section */}
-            <section className="space-y-6">
-                <h2 className="text-xl font-semibold text-foreground border-b border-muted pb-3 flex items-center gap-3">
-                    <div className="w-1 h-6 bg-orange-400 rounded-full" />
-                    Executives
-                    <span className="text-sm font-normal text-muted-foreground">Evaluators</span>
-                </h2>
-                {viewMode === 'grid' ? (
-                    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                        {executives.map(member => (
-                            <TeamMemberCard
-                                key={member.id}
-                                member={member}
-                                isSelected={selectedIds.has(member.id)}
-                                onToggleSelect={toggleSelection}
-                                size={cardSizes[member.id] || 'medium'}
-                                onSizeChange={handleCardSizeChange}
-                                onViewProfile={setSelectedMemberId}
-                                onMessage={handleMessage}
-                                onAddToTeam={handleAddToTeam}
-                                onTaskClick={handleTaskClick}
-                                presenceStatus={getPresenceForUser(member.id)?.status as 'online' | 'away' | 'busy' | 'offline' || 'offline'}
-                                presence={getPresenceForUser(member.id)}
-                            />
-                        ))}
-                        {executives.length === 0 && (
-                            <div className="col-span-full">
-                                <EmptyState
-                                    icon={<Users className="h-10 w-10" />}
-                                    title="No executives yet"
-                                    description="Add executives to evaluate and approve work."
-                                    className="py-12 bg-muted/30 rounded-xl"
-                                />
-                            </div>
-                        )}
-                    </div>
-                ) : (
-                    <div className="border border-muted rounded-lg overflow-hidden">
-                        <table className="w-full text-sm text-left">
-                            <thead className="bg-muted text-muted-foreground font-medium border-b border-muted">
-                                <tr>
-                                    <th className="px-4 py-3 pl-6">Profile</th>
-                                    <th className="px-4 py-3">Role</th>
-                                    <th className="px-4 py-3">Paired Agent</th>
-                                    <th className="px-4 py-3">Tasks</th>
-                                    <th className="px-4 py-3"></th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-muted bg-background">
-                                {executives.map(member => (
-                                    <MemberListItem key={member.id} member={member} type="executive" />
-                                ))}
-                                {executives.length === 0 && (
-                                    <tr>
-                                        <td colSpan={5} className="py-8">
-                                            <EmptyState
-                                                icon={<Users className="h-12 w-12" />}
-                                                title="No executives yet"
-                                                description="Add executives to evaluate and approve work."
-                                            />
-                                        </td>
-                                    </tr>
-                                )}
-                            </tbody>
-                        </table>
-                    </div>
-                )}
-            </section>
-
-            {/* Apprentices Section */}
-            <section className="space-y-6">
-                <h2 className="text-xl font-semibold text-foreground border-b border-muted pb-3 flex items-center gap-3">
-                    <div className="w-1 h-6 bg-slate-400 rounded-full" />
-                    Apprentices
-                    <span className="text-sm font-normal text-muted-foreground">Executors</span>
-                </h2>
-                {viewMode === 'grid' ? (
-                    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                        {apprentices.map(member => (
-                            <TeamMemberCard
-                                key={member.id}
-                                member={member}
-                                isSelected={selectedIds.has(member.id)}
-                                onToggleSelect={toggleSelection}
-                                size={cardSizes[member.id] || 'medium'}
-                                onSizeChange={handleCardSizeChange}
-                                onViewProfile={setSelectedMemberId}
-                                onMessage={handleMessage}
-                                onAddToTeam={handleAddToTeam}
-                                onTaskClick={handleTaskClick}
-                                presenceStatus={getPresenceForUser(member.id)?.status as 'online' | 'away' | 'busy' | 'offline' || 'offline'}
-                                presence={getPresenceForUser(member.id)}
-                            />
-                        ))}
-                        {apprentices.length === 0 && (
-                            <div className="col-span-full">
-                                <EmptyState
-                                    icon={<Users className="h-10 w-10" />}
-                                    title="No apprentices yet"
-                                    description="Add apprentices to execute tasks and complete work."
-                                    className="py-12 bg-muted/30 rounded-xl"
-                                />
-                            </div>
-                        )}
-                    </div>
-                ) : (
-                    <div className="border border-muted rounded-lg overflow-hidden">
-                        <table className="w-full text-sm text-left">
-                            <thead className="bg-muted text-muted-foreground font-medium border-b border-muted">
-                                <tr>
-                                    <th className="px-4 py-3 pl-6">Profile</th>
-                                    <th className="px-4 py-3">Role</th>
-                                    <th className="px-4 py-3">Paired Agent</th>
-                                    <th className="px-4 py-3">Tasks</th>
-                                    <th className="px-4 py-3"></th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-muted bg-background">
-                                {apprentices.map(member => (
-                                    <MemberListItem key={member.id} member={member} type="apprentice" />
-                                ))}
-                                {apprentices.length === 0 && (
-                                    <tr>
-                                        <td colSpan={5} className="py-8">
-                                            <EmptyState
-                                                icon={<Users className="h-8 w-8" />}
-                                                title="No apprentices yet"
-                                                description="Add apprentices to execute tasks and complete work."
-                                            />
-                                        </td>
-                                    </tr>
-                                )}
-                            </tbody>
-                        </table>
-                    </div>
-                )}
-            </section>
-
-            {/* Neural Network (AI Agents) */}
-            {aiAgents.length > 0 && (
-                <section className="space-y-6">
-                    <h2 className="text-xl font-semibold text-foreground border-b border-muted pb-3 flex items-center gap-3">
-                        <div className="w-1 h-6 bg-purple-500 rounded-full" />
-                        <Brain className="h-5 w-5 text-purple-600" />
-                        AI Agents
-                        <span className="text-sm font-normal text-muted-foreground">Automation partners</span>
-                    </h2>
-                    <p className="text-sm text-muted-foreground italic pb-2">
-                        Drag an agent onto a human member to form a pair.
-                    </p>
-                    {aiAgents.length === 0 ? (
+            {/* ─── Teams Tab ─────────────────────── */}
+            {activeTab === 'teams' && (
+                <div className="space-y-6">
+                    {filteredTeams.length === 0 ? (
                         <EmptyState
-                            icon={<Brain className="h-10 w-10" />}
-                            title="No AI agents yet"
-                            description="Add AI agents to automate tasks and enhance productivity."
-                            className="py-12 bg-purple-50/50 rounded-xl"
+                            icon={<Users className="h-12 w-12" />}
+                            title={searchQuery ? `No teams match "${searchQuery}"` : "No teams yet"}
+                            description={searchQuery ? "Try a different search term" : "Create a team to group people for specific projects or missions."}
+                            action={
+                                !searchQuery ? (
+                                    <Link href="/team/new">
+                                        <Button className="bg-international-orange hover:bg-international-orange/90 text-white">
+                                            <Plus className="h-4 w-4 mr-2" />
+                                            Create Your First Team
+                                        </Button>
+                                    </Link>
+                                ) : undefined
+                            }
+                            className="py-16 bg-muted/20 rounded-xl border border-muted"
                         />
                     ) : (
-                        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                            {aiAgents.map(member => (
-                                <TeamMemberCard
-                                    key={member.id}
-                                    member={member}
-                                    isSelected={selectedIds.has(member.id)}
-                                    onToggleSelect={toggleSelection}
-                                    size={cardSizes[member.id] || 'medium'}
-                                    onSizeChange={handleCardSizeChange}
-                                    onViewProfile={setSelectedMemberId}
-                                    onTaskClick={handleTaskClick}
-                                    presenceStatus="online"
-                                />
-                            ))}
-                        </div>
-                    )}
-                </section>
-            )}
-
-            {/* Teams Section */}
-            {teams.length > 0 && (
-                <section className="space-y-6">
-                    <h2 className="text-xl font-semibold text-foreground border-b border-muted pb-3 flex items-center gap-3">
-                        <div className="w-1 h-6 bg-muted-foreground rounded-full" />
-                        Teams
-                    </h2>
-                    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                        {teams.map(team => {
-                            const isDropTarget = dropTargetId === team.id
-
-                            return (
+                        <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
+                            {filteredTeams.map(team => (
                                 <Card
                                     key={team.id}
-                                    className={`
-                                        bg-background border shadow-sm transition-all group relative
-                                        ${isDropTarget ? 'ring-2 ring-status-success border-status-success bg-status-success-light' : 'hover:border-status-success active:border-status-success'}
-                                    `}
+                                    className={cn(
+                                        "bg-card border shadow-sm transition-all group/team hover:shadow-md hover:-translate-y-0.5 relative overflow-hidden",
+                                        dropTargetId === team.id && "ring-2 ring-status-success border-status-success bg-status-success-light"
+                                    )}
                                     onDragOver={(e) => {
                                         e.preventDefault()
                                         e.dataTransfer.dropEffect = 'move'
@@ -1321,7 +858,6 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                                     onDrop={(e) => {
                                         e.preventDefault()
                                         const draggedId = e.dataTransfer.getData('text/plain') || draggedMemberId
-
                                         if (draggedId && !team.members.some(m => m.id === draggedId)) {
                                             startTransition(async () => {
                                                 await addTeamMember(team.id, draggedId)
@@ -1331,124 +867,87 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                                         setDraggedMemberId(null)
                                     }}
                                 >
-                                    {isDropTarget && (
+                                    {/* Top accent line */}
+                                    <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-international-orange/60 via-electric-blue/40 to-transparent" />
+
+                                    {dropTargetId === team.id && (
                                         <div className="absolute inset-0 flex items-center justify-center bg-status-success/10 rounded-lg z-10">
                                             <div className="bg-status-success text-white px-3 py-1 rounded-full text-xs font-medium flex items-center gap-1">
-                                                <Users className="h-3 w-3" />
+                                                <UserPlus className="h-3 w-3" />
                                                 Add to Team
                                             </div>
                                         </div>
                                     )}
+
                                     <CardHeader className="pb-2">
                                         <div className="flex items-center justify-between">
-                                            <CardTitle className="text-lg text-foreground truncate pr-6">{team.name}</CardTitle>
-
-                                            <div className="flex items-center gap-2">
+                                            <div className="flex items-center gap-2 min-w-0">
+                                                <CardTitle className="text-base font-display font-semibold text-foreground truncate">
+                                                    {team.name}
+                                                </CardTitle>
                                                 {team.is_auto_generated && (
-                                                    <Badge variant="secondary" className="text-[10px] text-muted-foreground">Auto</Badge>
+                                                    <Badge variant="secondary" className="text-[10px] text-muted-foreground shrink-0">Auto</Badge>
                                                 )}
-
-                                                {/* Team Actions Dropdown */}
-                                                <DropdownMenu>
-                                                    <DropdownMenuTrigger asChild>
-                                                        <Button variant="ghost" className="h-8 w-8 p-0 text-muted-foreground hover:text-muted-foreground">
-                                                            <MoreHorizontal className="h-4 w-4" />
-                                                        </Button>
-                                                    </DropdownMenuTrigger>
-                                                    <DropdownMenuContent align="end" className="w-[160px] bg-background border-muted" sideOffset={8}>
-                                                        <DropdownMenuItem onClick={() => {
-                                                            setTeamToEdit({ id: team.id, name: team.name })
-                                                            setNewName(team.name)
-                                                        }}>
-                                                            <Pencil className="mr-2 h-4 w-4" /> Rename
-                                                        </DropdownMenuItem>
-                                                        <DropdownMenuItem
-                                                            onClick={() => setTeamToDelete(team.id)}
-                                                            className="text-destructive focus:text-destructive focus:bg-destructive/10"
-                                                        >
-                                                            <Trash2 className="mr-2 h-4 w-4" /> Delete
-                                                        </DropdownMenuItem>
-                                                    </DropdownMenuContent>
-                                                </DropdownMenu>
                                             </div>
+                                            <DropdownMenu>
+                                                <DropdownMenuTrigger asChild>
+                                                    <Button variant="ghost" className="h-7 w-7 p-0 text-muted-foreground opacity-0 group-hover/team:opacity-100 transition-opacity shrink-0">
+                                                        <MoreHorizontal className="h-4 w-4" />
+                                                    </Button>
+                                                </DropdownMenuTrigger>
+                                                <DropdownMenuContent align="end" sideOffset={8}>
+                                                    <DropdownMenuItem onClick={() => { setTeamToEdit({ id: team.id, name: team.name }); setNewName(team.name) }}>
+                                                        <Pencil className="mr-2 h-4 w-4" /> Rename
+                                                    </DropdownMenuItem>
+                                                    <DropdownMenuItem onClick={() => setTeamToDelete(team.id)} className="text-destructive focus:text-destructive focus:bg-destructive/10">
+                                                        <Trash2 className="mr-2 h-4 w-4" /> Delete
+                                                    </DropdownMenuItem>
+                                                </DropdownMenuContent>
+                                            </DropdownMenu>
                                         </div>
                                     </CardHeader>
-                                    <CardContent>
-                                        <div className="flex items-center gap-2">
-                                            {/* Member avatars */}
-                                            <div className="flex -space-x-2">
-                                                {(team.members || []).slice(0, 4).map(member => (
-                                                    <UserAvatar 
-                                                        key={member.id}
-                                                        name={member.full_name}
-                                                        role={member.role || undefined}
-                                                        size="md"
-                                                        className="border-2 border-background"
-                                                    />
-                                                ))}
-                                                {(team.members || []).length > 4 && (
-                                                    <div className="h-8 w-8 rounded-full bg-muted border-2 border-background flex items-center justify-center text-xs text-muted-foreground">
-                                                        +{(team.members || []).length - 4}
-                                                    </div>
-                                                )}
+                                    <CardContent className="pt-0">
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center gap-2">
+                                                <div className="flex -space-x-2">
+                                                    {(team.members || []).slice(0, 5).map(member => (
+                                                        <UserAvatar
+                                                            key={member.id}
+                                                            name={member.full_name}
+                                                            role={member.role || undefined}
+                                                            size="sm"
+                                                            className="border-2 border-background"
+                                                        />
+                                                    ))}
+                                                    {(team.members || []).length > 5 && (
+                                                        <div className="h-7 w-7 rounded-full bg-muted border-2 border-background flex items-center justify-center text-[10px] font-medium text-muted-foreground">
+                                                            +{(team.members || []).length - 5}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                                <span className="text-xs text-muted-foreground">{(team.members || []).length} members</span>
                                             </div>
-                                            <span className="text-sm text-muted-foreground ml-2">{(team.members || []).length} members</span>
                                         </div>
                                     </CardContent>
                                 </Card>
-                            )
-                        })}
-                    </div>
-                </section>
+                            ))}
+
+                            {/* Add team card */}
+                            <Link href="/team/new" className="block">
+                                <Card className="bg-transparent border-2 border-dashed border-muted hover:border-international-orange/40 hover:bg-international-orange/5 transition-all h-full flex items-center justify-center min-h-[120px] cursor-pointer group/add">
+                                    <div className="flex flex-col items-center gap-2 text-muted-foreground group-hover/add:text-international-orange transition-colors">
+                                        <Plus className="h-6 w-6" />
+                                        <span className="text-sm font-medium">New Team</span>
+                                    </div>
+                                </Card>
+                            </Link>
+                        </div>
+                    )}
+                </div>
             )}
 
-            {/* Coming Soon Features */}
-            <section className="pt-4 space-y-3">
-                <Link 
-                    href="/retainers"
-                    className="block border border-dashed border-muted rounded-lg p-4 hover:border-muted-foreground hover:bg-muted/50 transition-all group"
-                >
-                    <div className="flex items-center gap-3">
-                        <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center group-hover:bg-background transition-colors">
-                            <Repeat className="h-5 w-5 text-muted-foreground" />
-                        </div>
-                        <div className="flex-1">
-                            <div className="flex items-center gap-2">
-                                <span className="font-medium text-foreground">Retainers</span>
-                                <Badge variant="secondary" className="text-[10px] bg-muted text-muted-foreground">
-                                    <Sparkles className="h-3 w-3 mr-1" />
-                                    Coming Soon
-                                </Badge>
-                            </div>
-                            <p className="text-sm text-muted-foreground">
-                                Manage ongoing service retainers with your providers
-                            </p>
-                        </div>
-                    </div>
-                </Link>
-                <Link 
-                    href="/org-blueprint"
-                    className="block border border-dashed border-muted rounded-lg p-4 hover:border-muted-foreground hover:bg-muted/50 transition-all group"
-                >
-                    <div className="flex items-center gap-3">
-                        <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center group-hover:bg-background transition-colors">
-                            <LayoutGrid className="h-5 w-5 text-muted-foreground" />
-                        </div>
-                        <div className="flex-1">
-                            <div className="flex items-center gap-2">
-                                <span className="font-medium text-foreground">Org Blueprint</span>
-                                <Badge variant="secondary" className="text-[10px] bg-muted text-muted-foreground">
-                                    <Sparkles className="h-3 w-3 mr-1" />
-                                    Coming Soon
-                                </Badge>
-                            </div>
-                            <p className="text-sm text-muted-foreground">
-                                Business function coverage and gap analysis for your team
-                            </p>
-                        </div>
-                    </div>
-                </Link>
-            </section>
+
+            {/* ─── Modals & Dialogs ──────────────── */}
 
             {/* Comparison Modal */}
             <TeamComparisonModal
@@ -1457,7 +956,7 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                 members={selectedMembers}
             />
 
-            {/* Comparison Bar (bottom sticky) - shows automatically when members selected, hides when modal opens */}
+            {/* Comparison Bar */}
             {!showComparison && (
                 <TeamComparisonBar
                     selectedMembers={selectedMembers}
@@ -1471,46 +970,37 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                 />
             )}
 
-            {/* Quick Team Creation Dialog (from drag-drop or button) */}
+            {/* Quick Team Creation Dialog */}
             <Dialog open={showQuickTeamDialog} onOpenChange={setShowQuickTeamDialog}>
                 <DialogContent size="sm">
                     <DialogHeader>
                         <DialogTitle className="flex items-center gap-2 text-foreground">
-                            <Users className="h-5 w-5 text-status-success" />
+                            <Users className="h-5 w-5 text-international-orange" />
                             Create Team
                         </DialogTitle>
                         <DialogDescription>
-                            {quickTeamMemberIds.length === 1 
+                            {quickTeamMemberIds.length === 1
                                 ? "Select additional members and name your team"
-                                : "Name your new team with these members"
-                            }
+                                : "Name your new team with these members"}
                         </DialogDescription>
                     </DialogHeader>
-
                     <div className="space-y-4 pt-2">
-                        {/* Show selected members */}
-                        <div className="flex items-center justify-center gap-4 py-4 flex-wrap">
+                        <div className="flex items-center justify-center gap-4 py-3 flex-wrap">
                             {quickTeamMembers.map((member, idx) => (
                                 <div key={member.id} className="flex flex-col items-center relative">
-                                    <UserAvatar 
-                                        name={member.full_name}
-                                        role={member.role}
-                                        size="xl"
-                                        className="border-2 border-status-success"
-                                    />
+                                    <UserAvatar name={member.full_name} role={member.role} size="xl" className="border-2 border-international-orange/50" />
                                     <span className="text-sm font-medium text-foreground mt-2">{member.full_name?.split(' ')[0]}</span>
                                     {idx < quickTeamMembers.length - 1 && (
-                                        <span className="absolute top-7 left-[calc(100%+0.5rem)] text-2xl text-status-success">+</span>
+                                        <span className="absolute top-7 left-[calc(100%+0.5rem)] text-2xl text-international-orange">+</span>
                                     )}
                                 </div>
                             ))}
                         </div>
 
-                        {/* Allow selecting additional members if starting with one */}
                         {quickTeamMemberIds.length === 1 && (
                             <div className="space-y-2">
                                 <Label>Add Members</Label>
-                                <div className="max-h-40 overflow-y-auto border border-muted rounded-md p-2 space-y-1">
+                                <div className="max-h-40 overflow-y-auto border border-muted rounded-lg p-2 space-y-1">
                                     {allMembers
                                         .filter(m => !quickTeamMemberIds.includes(m.id))
                                         .map(member => (
@@ -1525,13 +1015,15 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                                                     }
                                                 }}
                                                 className={cn(
-                                                    "w-full text-left px-2 py-1.5 rounded text-sm transition-colors",
+                                                    "w-full text-left px-3 py-2 rounded-lg text-sm transition-colors flex items-center gap-2",
                                                     quickTeamMemberIds.includes(member.id)
-                                                        ? "bg-status-success-light text-status-success-dark border border-status-success-light"
+                                                        ? "bg-international-orange/10 text-international-orange border border-international-orange/20"
                                                         : "hover:bg-muted"
                                                 )}
                                             >
+                                                {quickTeamMemberIds.includes(member.id) && <Check className="h-3 w-3" />}
                                                 {member.full_name}
+                                                <Badge variant="secondary" className="ml-auto text-[9px]">{member.role}</Badge>
                                             </button>
                                         ))}
                                 </div>
@@ -1551,9 +1043,7 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                         </div>
 
                         {teamError && (
-                            <div className="text-sm text-destructive bg-destructive/10 p-3 rounded-lg">
-                                {teamError}
-                            </div>
+                            <div className="text-sm text-destructive bg-destructive/10 p-3 rounded-lg">{teamError}</div>
                         )}
 
                         <div className="flex justify-end gap-3 pt-2">
@@ -1561,13 +1051,11 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                                 setShowQuickTeamDialog(false)
                                 setQuickTeamMemberIds([])
                                 setTeamName("")
-                            }}>
-                                Cancel
-                            </Button>
+                            }}>Cancel</Button>
                             <Button
                                 onClick={handleCreateQuickTeam}
                                 disabled={isPending || !teamName.trim() || quickTeamMemberIds.length < 2}
-                                className="bg-status-success hover:bg-status-success-dark"
+                                className="bg-international-orange hover:bg-international-orange/90 text-white"
                             >
                                 {isPending ? "Creating..." : "Create Team"}
                             </Button>
@@ -1575,6 +1063,7 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                     </div>
                 </DialogContent>
             </Dialog>
+
             {/* Rename Team Dialog */}
             <Dialog open={!!teamToEdit} onOpenChange={(open) => !open && setTeamToEdit(null)}>
                 <DialogContent size="sm">
@@ -1590,20 +1079,19 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                                 onChange={(e) => setNewName(e.target.value)}
                                 placeholder="Team Name"
                                 autoFocus
-                                className="bg-background border-muted"
                             />
                         </div>
                     </div>
                     <DialogFooter>
                         <Button variant="secondary" onClick={() => setTeamToEdit(null)}>Cancel</Button>
-                        <Button onClick={handleUpdateName} disabled={isPending || !newName.trim()} className="bg-electric-blue hover:bg-electric-blue-hover text-white">
+                        <Button onClick={handleUpdateName} disabled={isPending || !newName.trim()} className="bg-international-orange hover:bg-international-orange/90 text-white">
                             {isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : "Save Changes"}
                         </Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
 
-            {/* Delete Confirmation Dialog */}
+            {/* Delete Team Confirmation */}
             <AlertDialog open={!!teamToDelete} onOpenChange={(open) => !open && setTeamToDelete(null)}>
                 <AlertDialogContent className="bg-background text-foreground border-muted">
                     <AlertDialogHeader>
@@ -1612,7 +1100,7 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                             Delete Team?
                         </AlertDialogTitle>
                         <AlertDialogDescription>
-                            This will permanently delete this team. This action cannot be undone.
+                            This will permanently delete this team. Members will not be removed from your roster. This action cannot be undone.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
@@ -1624,7 +1112,7 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                 </AlertDialogContent>
             </AlertDialog>
 
-            {/* Member Delete/Archive Confirmation */}
+            {/* Member Delete Confirmation */}
             <AlertDialog open={!!memberToDelete} onOpenChange={(open) => !open && setMemberToDelete(null)}>
                 <AlertDialogContent className="bg-background text-foreground border-muted">
                     <AlertDialogHeader>
@@ -1644,13 +1132,8 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                         <AlertDialogCancel disabled={!!deletingMemberId}>Cancel</AlertDialogCancel>
                         <AlertDialogAction onClick={handleDeleteMember} disabled={!!deletingMemberId} className="bg-destructive hover:bg-destructive/90 focus:ring-destructive">
                             {deletingMemberId ? (
-                                <>
-                                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                                    Removing...
-                                </>
-                            ) : (
-                                "Remove Person"
-                            )}
+                                <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Removing...</>
+                            ) : "Remove Person"}
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
@@ -1684,9 +1167,6 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                     currentUserId={currentUserId}
                 />
             )}
-
         </div>
     )
 }
-
-
