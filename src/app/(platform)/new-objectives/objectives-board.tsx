@@ -198,9 +198,9 @@ export function ObjectivesBoard({
       </div>
 
       {/* Main Content Area */}
-      <div className="flex gap-6">
+      <div className="flex gap-6 overflow-hidden">
         {/* Left: View content */}
-        <div className={cn('flex-1 min-w-0', showDetailPanel && 'max-w-[calc(100%-380px)]')}>
+        <div className="flex-1 min-w-0">
           {viewMode === 'board' && (
             <BoardView
               objectives={filteredObjectives}
@@ -226,7 +226,7 @@ export function ObjectivesBoard({
 
         {/* Right: Detail panel */}
         {showDetailPanel && (
-          <div className="w-[360px] flex-shrink-0 rounded-xl border border-slate-100 overflow-hidden h-[calc(100vh-300px)] sticky top-8">
+          <div className="w-[360px] shrink-0 rounded-xl border overflow-hidden h-[calc(100vh-300px)] sticky top-8">
             <ObjectiveDetailPanel
               objective={selectedObjective}
               onClose={() => setSelectedId(null)}
@@ -237,7 +237,7 @@ export function ObjectivesBoard({
 
       {/* Mobile detail: Full-screen overlay */}
       {selectedObjective && !isLarge && (
-        <div className="fixed inset-0 z-50 bg-white">
+        <div className="fixed inset-0 z-50 bg-background">
           <ObjectiveDetailPanel
             objective={selectedObjective}
             onClose={() => setSelectedId(null)}
