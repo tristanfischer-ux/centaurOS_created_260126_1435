@@ -23,7 +23,7 @@ function TaskRow({ task }: { task: ObjectiveTask }) {
   const statusBadge = getStatusBadgeClass(task.status)
 
   return (
-    <div className="flex items-center gap-3 py-2.5 px-3 rounded-lg hover:bg-muted/50 transition-colors group">
+    <div className="flex items-center gap-2 py-2.5 px-3 rounded-lg hover:bg-muted/50 transition-colors group overflow-hidden">
       {/* Status indicator */}
       {task.status === 'Completed' ? (
         <CheckCircle2 className="h-4 w-4 text-status-success flex-shrink-0" />
@@ -67,7 +67,7 @@ export function ObjectiveDetailPanel({ objective, onClose }: ObjectiveDetailPane
   const completedTasks = objective.tasks.filter(t => t.status === 'Completed')
 
   return (
-    <div className="h-full flex flex-col bg-white border-l border-slate-100">
+    <div className="h-full flex flex-col bg-white border-l border-slate-100 overflow-hidden">
       {/* Header */}
       <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
         <h2 className="text-base font-semibold text-foreground truncate pr-4">
@@ -78,8 +78,8 @@ export function ObjectiveDetailPanel({ objective, onClose }: ObjectiveDetailPane
         </Button>
       </div>
 
-      <ScrollArea className="flex-1">
-        <div className="p-5 space-y-6">
+      <ScrollArea className="flex-1 w-full">
+        <div className="p-5 space-y-6 overflow-hidden">
           {/* Progress Section */}
           <div className="flex items-center gap-4">
             <ProgressRing progress={objective.progress} size={64} strokeWidth={5} variant={variant} />
@@ -111,7 +111,7 @@ export function ObjectiveDetailPanel({ objective, onClose }: ObjectiveDetailPane
                   <FileText className="h-3.5 w-3.5" />
                   Description
                 </div>
-                <p className="text-sm text-foreground leading-relaxed">
+                <p className="text-sm text-foreground leading-relaxed break-words">
                   {objective.description}
                 </p>
               </div>
@@ -124,7 +124,7 @@ export function ObjectiveDetailPanel({ objective, onClose }: ObjectiveDetailPane
               <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
                 Details
               </div>
-              <div className="text-sm text-foreground leading-relaxed prose prose-sm max-w-none">
+              <div className="text-sm text-foreground leading-relaxed break-words max-w-none">
                 {objective.extended_description.length > 500
                   ? objective.extended_description.slice(0, 500) + '...'
                   : objective.extended_description}
