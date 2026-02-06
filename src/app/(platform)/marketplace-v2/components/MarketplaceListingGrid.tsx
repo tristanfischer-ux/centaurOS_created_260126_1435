@@ -412,27 +412,26 @@ export function MarketplaceListingGrid({
 
             {/* Floating compare bar */}
             {selectedForCompare.size >= 2 && (
-                <div className="sticky bottom-4 z-20 flex justify-center">
-                    <div className="flex items-center gap-3 bg-foreground text-background px-5 py-3 rounded-full shadow-2xl">
-                        <Scale className="w-4 h-4" />
-                        <span className="text-sm font-medium">
+                <div className="sticky bottom-6 z-20 flex justify-center animate-in slide-in-from-bottom-4 fade-in duration-300">
+                    <div className="flex items-center gap-4 bg-international-orange text-white px-6 py-3.5 rounded-2xl shadow-[0_8px_30px_rgba(234,88,12,0.4)]">
+                        <Scale className="w-5 h-5" />
+                        <span className="text-sm font-semibold">
                             {selectedForCompare.size} items selected
                         </span>
                         <Button
                             size="sm"
-                            variant="secondary"
                             onClick={handleCompare}
-                            className="gap-1.5 h-8 rounded-full"
+                            className="gap-1.5 h-9 rounded-xl bg-white text-international-orange hover:bg-white/90 font-semibold"
                         >
                             Compare Now
-                            <ArrowRight className="w-3.5 h-3.5" />
+                            <ArrowRight className="w-4 h-4" />
                         </Button>
                         <button
                             onClick={clearCompareSelection}
-                            className="w-6 h-6 rounded-full bg-background/20 hover:bg-background/30 flex items-center justify-center transition-colors"
+                            className="w-7 h-7 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition-colors"
                             aria-label="Clear selection"
                         >
-                            <X className="w-3.5 h-3.5" />
+                            <X className="w-4 h-4" />
                         </button>
                     </div>
                 </div>
