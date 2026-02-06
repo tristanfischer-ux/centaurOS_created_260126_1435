@@ -4,7 +4,7 @@ import React from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
-import { Users, CheckSquare, Store, Target, ShieldAlert, Settings, Lightbulb, Inbox, ShoppingBag, Bot } from "lucide-react"
+import { Users, CheckSquare, Store, Target, ShieldAlert, Settings, Lightbulb, Inbox, ShoppingBag, Bot, Home } from "lucide-react"
 import { NotificationCenter } from "@/components/NotificationCenter"
 import { UnreadIndicator } from "@/components/today/UnreadIndicator"
 // ThemeToggle removed - ForgeOS enforces light mode per design philosophy
