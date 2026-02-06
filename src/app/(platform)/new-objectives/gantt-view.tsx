@@ -7,11 +7,12 @@ import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import {
   ChevronLeft, ChevronRight, CalendarDays, GanttChartSquare,
+  ChevronDown, ChevronRight as ChevronRightIcon,
 } from 'lucide-react'
 import { format, addDays, subDays, addWeeks, subWeeks, addMonths, subMonths } from 'date-fns'
 import type { ObjectiveWithTasks } from './types'
 
-// ─── Health color mapping ───────────────────────────────────────────
+// ─── Health color mapping (for objective bars) ──────────────────────
 const HEALTH_COLORS: Record<string, { bar: string; progress: string }> = {
   'on-track':    { bar: '#22c55e', progress: '#16a34a' },
   'at-risk':     { bar: '#f59e0b', progress: '#d97706' },
@@ -20,14 +21,31 @@ const HEALTH_COLORS: Record<string, { bar: string; progress: string }> = {
   'not-started': { bar: '#9ca3af', progress: '#6b7280' },
 }
 
-const TASK_STATUS_COLORS: Record<string, string> = {
-  Pending: '#9ca3af',
-  Accepted: '#3b82f6',
-  Pending_Peer_Review: '#a855f7',
-  Pending_Executive_Approval: '#a855f7',
-  Amended_Pending_Approval: '#a855f7',
-  Completed: '#22c55e',
-  Rejected: '#ef4444',
+// ─── Task status color mapping (for task bars) ─────────────────────
+function getTaskBarColor(status: string, endDate: string | null): string {
+  const now = new Date()
+
+  // Overdue check: past end date and not completed
+  if (endDate && status !== 'Completed' && status !== 'Rejected') {
+    const end = new Date(endDate)
+    if (end < now) return '#ef4444' // red -- overdue
+
+    // Due within 3 days
+    const threeDays = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000)
+    if (end <= threeDays) return '#f59e0b' // amber -- due soon
+  }
+
+  // Status-based
+  switch (status) {
+    case 'Completed': return '#22c55e'
+    case 'Accepted': return '#3b82f6'
+    case 'Pending_Peer_Review':
+    case 'Pending_Executive_Approval':
+    case 'Amended_Pending_Approval': return '#a855f7'
+    case 'Rejected': return '#ef4444'
+    case 'Pending':
+    default: return '#9ca3af'
+  }
 }
 
 // ─── Extended GanttTask ─────────────────────────────────────────────
@@ -37,6 +55,7 @@ interface ExtendedGanttTask extends GanttTask {
   completedCount?: number
   isObjective?: boolean
   progressPct?: number
+  taskStatusColor?: string  // actual color for the task bar
 }
 
 // ─── Custom Header ──────────────────────────────────────────────────
@@ -60,12 +79,16 @@ function ObjListTable({
   onExpanderClick,
   sortedTasks,
   onSelectObjective,
+  collapsedObjectives,
+  onToggleCollapse,
 }: {
   tasks: ExtendedGanttTask[]
   rowHeight: number
   onExpanderClick: (task: GanttTask) => void
   sortedTasks: ExtendedGanttTask[]
   onSelectObjective: (id: string) => void
+  collapsedObjectives: Set<string>
+  onToggleCollapse: (id: string) => void
 }) {
   return (
     <div>
@@ -73,6 +96,7 @@ function ObjListTable({
         const isObj = task.isObjective
         const healthColor = isObj ? HEALTH_COLORS[task.objectiveHealth || 'not-started'] : null
         const progressPct = task.progressPct ?? task.progress
+        const isCollapsed = isObj ? collapsedObjectives.has(task.id) : false
 
         return (
           <div
@@ -81,29 +105,62 @@ function ObjListTable({
               'flex items-center text-sm cursor-pointer transition-colors border-b border-slate-50',
               isObj
                 ? 'bg-muted/20 hover:bg-muted/40 font-medium'
-                : 'pl-6 hover:bg-muted/30'
+                : 'hover:bg-muted/30'
             )}
             style={{ height: rowHeight }}
             onClick={() => {
-              if (isObj) onSelectObjective(task.id)
+              if (isObj) {
+                onSelectObjective(task.id)
+                onToggleCollapse(task.id)
+              }
               onExpanderClick(task)
             }}
           >
             {/* Name */}
-            <div className="flex-1 px-4 min-w-[200px] flex items-center gap-2 overflow-hidden">
+            <div className="flex-1 px-4 min-w-[200px] flex items-center gap-1.5 overflow-hidden">
+              {/* Expand/collapse chevron for objectives */}
+              {isObj ? (
+                <button
+                  className="flex-shrink-0 p-0.5 rounded hover:bg-muted/60 transition-colors"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onToggleCollapse(task.id)
+                    onExpanderClick(task)
+                  }}
+                  aria-label={isCollapsed ? 'Expand' : 'Collapse'}
+                >
+                  {isCollapsed
+                    ? <ChevronRightIcon className="h-3.5 w-3.5 text-muted-foreground" />
+                    : <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+                  }
+                </button>
+              ) : (
+                <span className="w-5 flex-shrink-0" /> // indent spacer for tasks
+              )}
+
+              {/* Health/status dot */}
               {isObj && healthColor && (
                 <span
                   className="w-2 h-2 rounded-full flex-shrink-0"
                   style={{ backgroundColor: healthColor.bar }}
                 />
               )}
-              {!isObj && <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/30 flex-shrink-0 ml-1" />}
+              {!isObj && task.taskStatusColor && (
+                <span
+                  className="w-1.5 h-1.5 rounded-full flex-shrink-0"
+                  style={{ backgroundColor: task.taskStatusColor }}
+                />
+              )}
+
+              {/* Label */}
               <span className={cn(
                 'truncate',
                 isObj ? 'text-foreground text-[13px]' : 'text-muted-foreground text-[12px]'
               )}>
                 {task.name}
               </span>
+
+              {/* Task count badge for objectives */}
               {isObj && task.taskCount !== undefined && (
                 <span className="ml-auto shrink-0 text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded tabular-nums">
                   {task.completedCount}/{task.taskCount}
@@ -111,7 +168,7 @@ function ObjListTable({
               )}
             </div>
 
-            {/* Progress */}
+            {/* Progress bar */}
             <div className="w-16 px-2 flex items-center justify-center">
               <div className="w-full max-w-[48px] h-1.5 bg-muted/50 rounded-full overflow-hidden">
                 <div
@@ -120,7 +177,7 @@ function ObjListTable({
                     width: `${progressPct}%`,
                     backgroundColor: isObj
                       ? (healthColor?.progress || '#9ca3af')
-                      : (TASK_STATUS_COLORS[task.name] || '#3b82f6'),
+                      : (task.taskStatusColor || '#9ca3af'),
                   }}
                 />
               </div>
@@ -191,6 +248,7 @@ interface ObjectivesGanttViewProps {
 export function ObjectivesGanttView({ objectives, selectedId, onSelect }: ObjectivesGanttViewProps) {
   const [viewMode, setViewMode] = useState<ViewMode>(ViewMode.Week)
   const [dateOffset, setDateOffset] = useState<Date>(new Date())
+  const [collapsedObjectives, setCollapsedObjectives] = useState<Set<string>>(new Set())
 
   const navigate = (dir: 'prev' | 'next') => {
     setDateOffset(prev => {
@@ -199,6 +257,18 @@ export function ObjectivesGanttView({ objectives, selectedId, onSelect }: Object
       return dir === 'next' ? addMonths(prev, 2) : subMonths(prev, 2)
     })
   }
+
+  const toggleCollapse = useCallback((objId: string) => {
+    setCollapsedObjectives(prev => {
+      const next = new Set(prev)
+      if (next.has(objId)) {
+        next.delete(objId)
+      } else {
+        next.add(objId)
+      }
+      return next
+    })
+  }, [])
 
   // Build hierarchical gantt data: objectives as projects, tasks nested under them
   const ganttTasks: ExtendedGanttTask[] = useMemo(() => {
@@ -215,7 +285,6 @@ export function ObjectivesGanttView({ objectives, selectedId, onSelect }: Object
         .filter(t => t.end_date)
         .map(t => new Date(t.end_date!).getTime())
 
-      // Fallback dates
       let objStart = allStarts.length > 0 ? new Date(Math.min(...allStarts)) : new Date(obj.created_at)
       let objEnd = allEnds.length > 0 ? new Date(Math.max(...allEnds)) : new Date(objStart.getTime() + 14 * 86400000)
 
@@ -223,8 +292,9 @@ export function ObjectivesGanttView({ objectives, selectedId, onSelect }: Object
       if (isNaN(objEnd.getTime()) || objEnd <= objStart) objEnd = new Date(objStart.getTime() + 14 * 86400000)
 
       const healthPalette = HEALTH_COLORS[obj.health] || HEALTH_COLORS['not-started']
+      const isCollapsed = collapsedObjectives.has(obj.id)
 
-      // Add objective row (project type)
+      // Objective row (project type)
       result.push({
         start: objStart,
         end: objEnd,
@@ -232,7 +302,7 @@ export function ObjectivesGanttView({ objectives, selectedId, onSelect }: Object
         id: obj.id,
         type: 'project',
         progress: obj.progress,
-        hideChildren: false,
+        hideChildren: isCollapsed,
         isDisabled: true,
         styles: {
           progressColor: healthPalette.progress,
@@ -246,39 +316,42 @@ export function ObjectivesGanttView({ objectives, selectedId, onSelect }: Object
         progressPct: obj.progress,
       })
 
-      // Add child tasks
-      for (const task of obj.tasks) {
-        let taskStart = task.start_date ? new Date(task.start_date) : new Date(task.created_at)
-        let taskEnd = task.end_date ? new Date(task.end_date) : new Date(taskStart.getTime() + 86400000)
+      // Child tasks (only add to gantt data if not collapsed)
+      if (!isCollapsed) {
+        for (const task of obj.tasks) {
+          let taskStart = task.start_date ? new Date(task.start_date) : new Date(task.created_at)
+          let taskEnd = task.end_date ? new Date(task.end_date) : new Date(taskStart.getTime() + 86400000)
 
-        if (isNaN(taskStart.getTime())) taskStart = now
-        if (isNaN(taskEnd.getTime()) || taskEnd <= taskStart) taskEnd = new Date(taskStart.getTime() + 86400000)
+          if (isNaN(taskStart.getTime())) taskStart = now
+          if (isNaN(taskEnd.getTime()) || taskEnd <= taskStart) taskEnd = new Date(taskStart.getTime() + 86400000)
 
-        const taskColor = TASK_STATUS_COLORS[task.status] || '#9ca3af'
-        const taskProgress = typeof task.progress === 'number' ? task.progress : (task.status === 'Completed' ? 100 : 0)
+          const taskColor = getTaskBarColor(task.status, task.end_date)
+          const taskProgress = typeof task.progress === 'number' ? task.progress : (task.status === 'Completed' ? 100 : 0)
 
-        result.push({
-          start: taskStart,
-          end: taskEnd,
-          name: task.title,
-          id: task.id,
-          type: 'task',
-          project: obj.id,
-          progress: taskProgress,
-          isDisabled: true,
-          styles: {
-            progressColor: taskColor,
-            progressSelectedColor: taskColor,
-            backgroundColor: taskColor,
-          },
-          isObjective: false,
-          progressPct: taskProgress,
-        })
+          result.push({
+            start: taskStart,
+            end: taskEnd,
+            name: task.title,
+            id: task.id,
+            type: 'task',
+            project: obj.id,
+            progress: taskProgress,
+            isDisabled: true,
+            styles: {
+              progressColor: taskColor,
+              progressSelectedColor: taskColor,
+              backgroundColor: taskColor,
+            },
+            isObjective: false,
+            progressPct: taskProgress,
+            taskStatusColor: taskColor,
+          })
+        }
       }
     }
 
     return result
-  }, [objectives])
+  }, [objectives, collapsedObjectives])
 
   // Click handler
   const handleClick = useCallback((task: GanttTask) => {
@@ -286,12 +359,26 @@ export function ObjectivesGanttView({ objectives, selectedId, onSelect }: Object
     if (ext.isObjective) onSelect(task.id)
   }, [onSelect])
 
+  // Expander click handler (for gantt library)
+  const handleExpanderClick = useCallback((task: GanttTask) => {
+    const ext = task as ExtendedGanttTask
+    if (ext.isObjective) {
+      toggleCollapse(task.id)
+    }
+  }, [toggleCollapse])
+
   // Memoized table wrapper
   const MemoizedTable = useCallback(
     (props: { tasks: ExtendedGanttTask[]; rowHeight: number; onExpanderClick: (task: GanttTask) => void }) => (
-      <ObjListTable {...props} sortedTasks={ganttTasks} onSelectObjective={onSelect} />
+      <ObjListTable
+        {...props}
+        sortedTasks={ganttTasks}
+        onSelectObjective={onSelect}
+        collapsedObjectives={collapsedObjectives}
+        onToggleCollapse={toggleCollapse}
+      />
     ),
-    [ganttTasks, onSelect]
+    [ganttTasks, onSelect, collapsedObjectives, toggleCollapse]
   )
 
   // ─── Empty state ────────────────────────────────────────────────
@@ -309,16 +396,15 @@ export function ObjectivesGanttView({ objectives, selectedId, onSelect }: Object
 
   return (
     <div className="space-y-3">
-      {/* ─── Toolbar ─────────────────────────────────────────────── */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        {/* Health legend */}
-        <div className="flex flex-wrap items-center gap-3 text-[11px]">
-          <span className="text-muted-foreground font-medium">Health:</span>
+      {/* ─── Legend ───────────────────────────────────────────────── */}
+      <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-[11px]">
+        {/* Objective health legend */}
+        <div className="flex items-center gap-3">
+          <span className="text-muted-foreground font-semibold">Objectives:</span>
           {[
             { label: 'On Track', color: '#22c55e' },
             { label: 'At Risk', color: '#f59e0b' },
             { label: 'Off Track', color: '#ef4444' },
-            { label: 'Completed', color: '#22c55e' },
             { label: 'Not Started', color: '#9ca3af' },
           ].map(s => (
             <span key={s.label} className="flex items-center gap-1.5">
@@ -326,6 +412,55 @@ export function ObjectivesGanttView({ objectives, selectedId, onSelect }: Object
               <span className="text-muted-foreground">{s.label}</span>
             </span>
           ))}
+        </div>
+
+        {/* Task status legend */}
+        <div className="flex items-center gap-3">
+          <span className="text-muted-foreground font-semibold">Tasks:</span>
+          {[
+            { label: 'Pending', color: '#9ca3af' },
+            { label: 'In Progress', color: '#3b82f6' },
+            { label: 'Completed', color: '#22c55e' },
+            { label: 'Due Soon', color: '#f59e0b' },
+            { label: 'Overdue', color: '#ef4444' },
+          ].map(s => (
+            <span key={s.label} className="flex items-center gap-1.5">
+              <span className="w-3 h-2 rounded-sm" style={{ backgroundColor: s.color }} />
+              <span className="text-muted-foreground">{s.label}</span>
+            </span>
+          ))}
+        </div>
+      </div>
+
+      {/* ─── Toolbar ─────────────────────────────────────────────── */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        {/* Expand/Collapse all */}
+        <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 text-[11px] text-muted-foreground"
+            onClick={() => {
+              // If any are expanded, collapse all. Otherwise expand all.
+              if (collapsedObjectives.size < objectives.length) {
+                setCollapsedObjectives(new Set(objectives.map(o => o.id)))
+              } else {
+                setCollapsedObjectives(new Set())
+              }
+            }}
+          >
+            {collapsedObjectives.size < objectives.length ? (
+              <>
+                <ChevronRightIcon className="h-3 w-3 mr-1" />
+                Collapse All
+              </>
+            ) : (
+              <>
+                <ChevronDown className="h-3 w-3 mr-1" />
+                Expand All
+              </>
+            )}
+          </Button>
         </div>
 
         {/* View mode + navigation */}
@@ -386,7 +521,7 @@ export function ObjectivesGanttView({ objectives, selectedId, onSelect }: Object
       {/* ─── Gantt Chart ─────────────────────────────────────────── */}
       <div className="bg-white rounded-xl border border-slate-100 overflow-hidden shadow-sm">
         <Gantt
-          key={`gantt-objectives-${dateOffset.getTime()}`}
+          key={`gantt-objectives-${dateOffset.getTime()}-${collapsedObjectives.size}`}
           tasks={ganttTasks}
           viewMode={viewMode}
           viewDate={dateOffset}
@@ -396,6 +531,7 @@ export function ObjectivesGanttView({ objectives, selectedId, onSelect }: Object
           rowHeight={40}
           headerHeight={50}
           onClick={handleClick}
+          onExpanderClick={handleExpanderClick}
           TaskListHeader={ObjListHeader}
           TaskListTable={MemoizedTable}
           TooltipContent={ObjTooltip}
