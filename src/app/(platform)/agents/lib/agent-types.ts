@@ -196,12 +196,20 @@ export interface PromptNodeData {
     imageUrl?: string     // for image outputs
     audioUrl?: string     // for audio outputs
     videoUrl?: string     // for video outputs
+    // Human-task specific fields (only used when node type is "human-task")
+    isHumanTask?: boolean
+    guidance?: string            // Detailed guidance for the person completing this step
+    checklist?: string[]         // Checklist items the person should complete
+    checklistCompleted?: boolean[] // Tracks which checklist items are done
 }
+
+// ─── Workflow Node Types ────────────────────────────────────────────
+export type WorkflowNodeType = "prompt" | "trigger" | "output" | "human-task"
 
 // ─── Workflow Types ──────────────────────────────────────────────────
 export interface WorkflowNode {
     id: string
-    type: "prompt" | "trigger" | "output"
+    type: WorkflowNodeType
     position: { x: number; y: number }
     data: PromptNodeData
 }
