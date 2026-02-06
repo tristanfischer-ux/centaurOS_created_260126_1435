@@ -4,7 +4,7 @@ import React from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
-import { Users, CheckSquare, Store, Target, ShieldAlert, Settings, Lightbulb, ShoppingBag, Bot, Home, Bell, UserCircle } from "lucide-react"
+import { Users, CheckSquare, Store, Target, ShieldAlert, Lightbulb, ShoppingBag, Bot, Home, Bell } from "lucide-react"
 import { NotificationCenter } from "@/components/NotificationCenter"
 import { UnreadIndicator } from "@/components/today/UnreadIndicator"
 import { FoundrySwitcher } from "@/components/FoundrySwitcher"
@@ -14,6 +14,7 @@ import { ZoomControl } from "@/components/ZoomControl"
 import { useZoomContext } from "@/components/ZoomProvider"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { NewBadge } from "@/components/ui/new-badge"
+import { AccountPopover } from "@/components/account-popover"
 
 /**
  * Determines if a navigation item should be marked as active
@@ -50,11 +51,7 @@ const discoveryNavigation = [
     { name: "My Orders", href: "/my-orders", icon: ShoppingBag, tooltip: "View and manage your marketplace orders" },
 ]
 
-// Profile & Settings
-const settingsNavigation = [
-    { name: "My Profile", href: "/my-profile", icon: UserCircle, tooltip: "Manage your marketplace profile and presence" },
-    { name: "Settings", href: "/settings", icon: Settings, tooltip: "Account and app settings" },
-]
+// Profile & Settings moved to AccountPopover (accessed via user avatar)
 
 interface FoundryInfo {
     foundryId: string
@@ -95,6 +92,10 @@ export function Sidebar({ foundryName, foundryId, userName, userRole, isAdmin, u
                 userName={userName}
                 userRole={userRole}
             />
+            {/* Account menu (My Profile, Settings, Sign Out) */}
+            <div className="px-4 pb-2">
+                <AccountPopover userName={userName} userRole={userRole} />
+            </div>
             {/* Unread messages indicator */}
             <div className="px-4 pb-4">
                 <UnreadIndicator />
@@ -167,12 +168,6 @@ export function Sidebar({ foundryName, foundryId, userName, userRole, isAdmin, u
                             
                             {/* Discovery: Product Map, Marketplace */}
                             {discoveryNavigation.map(renderNavItem)}
-                            
-                            {/* Spacer */}
-                            <div className="my-3 border-t border-slate-100" />
-                            
-                            {/* Settings */}
-                            {settingsNavigation.map(renderNavItem)}
                         </>
                     )
                 })()}

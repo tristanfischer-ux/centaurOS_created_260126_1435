@@ -7,7 +7,7 @@ import {
     getAvatarGradient,
     type MarketplaceCategory,
 } from '@/lib/marketplace-colors'
-import { ShieldCheck, Star, ArrowRight, Zap } from 'lucide-react'
+import { ShieldCheck, Star, ArrowRight, TrendingUp, Clock, Users } from 'lucide-react'
 import type { MarketplaceListing } from '@/actions/marketplace'
 
 interface FeaturedBannerProps {
@@ -15,14 +15,50 @@ interface FeaturedBannerProps {
     onViewDetail: (listing: MarketplaceListing) => void
 }
 
+/**
+ * Determines the most notable attribute about a listing to display as a reason tag.
+ *
+ * @description Priority: high rating → many bookings → fast response → verified fallback.
+ * This gives users a concrete reason why this provider stands out.
+ */
+function getHighlightReason(listing: MarketplaceListing): { label: string; icon: React.ElementType } {
+    const attrs = listing.attributes || {}
+    const rating = attrs.rating_average as number | undefined
+    const bookings = attrs.total_bookings as number | undefined
+    const responseHours = attrs.response_time_hours as number | undefined
+
+    if (rating && rating >= 4.5) {
+        return { label: `${rating.toFixed(1)} rating`, icon: Star }
+    }
+    if (bookings && bookings >= 5) {
+        return { label: `${bookings} projects`, icon: Users }
+    }
+    if (responseHours && responseHours <= 2) {
+        return { label: 'Fast responder', icon: Clock }
+    }
+    if (rating && rating > 0) {
+        return { label: `${rating.toFixed(1)} rating`, icon: Star }
+    }
+    return { label: 'Verified', icon: ShieldCheck }
+}
+
+/**
+ * Displays top-rated, verified marketplace providers with visible reasons for ranking.
+ *
+ * @description Replaces the generic "Featured" label with data-driven context so
+ * users understand why these providers are highlighted above others.
+ */
 export function FeaturedBanner({ listings, onViewDetail }: FeaturedBannerProps) {
     if (listings.length === 0) return null
 
     return (
         <div className="space-y-3">
             <div className="flex items-center gap-2">
-                <Zap className="h-4 w-4 text-international-orange" aria-hidden="true" />
-                <h2 className="text-sm font-semibold text-foreground">Featured</h2>
+                <TrendingUp className="h-4 w-4 text-international-orange" aria-hidden="true" />
+                <h2 className="text-sm font-semibold text-foreground">Top Rated</h2>
+                <span className="text-xs text-muted-foreground">
+                    Highest-rated verified providers
+                </span>
             </div>
 
             <div className="flex gap-4 overflow-x-auto pb-2 -mx-1 px-1 snap-x snap-mandatory">
@@ -30,10 +66,12 @@ export function FeaturedBanner({ listings, onViewDetail }: FeaturedBannerProps) 
                     const attrs = listing.attributes || {}
                     const gradient = getAvatarGradient(listing.category as MarketplaceCategory, listing.title)
                     const price = (attrs.rate || attrs.cost || attrs.price || attrs.day_rate) as string | undefined
-                    const rating = attrs.rating_average as number | undefined
                     const initials = listing.title.trim().split(/\s+/).length > 1
                         ? `${listing.title.trim().split(/\s+/)[0][0]}${listing.title.trim().split(/\s+/)[1][0]}`.toUpperCase()
                         : listing.title.substring(0, 2).toUpperCase()
+
+                    const reason = getHighlightReason(listing)
+                    const ReasonIcon = reason.icon
 
                     return (
                         <button
@@ -70,12 +108,11 @@ export function FeaturedBanner({ listings, onViewDetail }: FeaturedBannerProps) 
                                     >
                                         {listing.subcategory}
                                     </Badge>
-                                    {rating && (
-                                        <span className="flex items-center gap-0.5">
-                                            <Star className="w-3 h-3 text-amber-400 fill-amber-400" aria-hidden="true" />
-                                            {rating.toFixed(1)}
-                                        </span>
-                                    )}
+                                    {/* Reason tag: explains WHY this provider is highlighted */}
+                                    <span className="flex items-center gap-0.5 text-international-orange font-medium">
+                                        <ReasonIcon className="w-3 h-3" aria-hidden="true" />
+                                        {reason.label}
+                                    </span>
                                     {price && (
                                         <span className="font-medium text-foreground">{price}</span>
                                     )}

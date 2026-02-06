@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
-import { AgentsWorkflowView } from "./agents-workflow-view"
 import { checkHasAnyProviderKey } from "@/actions/ai-providers"
+import { AgentsWorkflowViewLoader } from "./agents-workflow-loader"
 
 export const revalidate = 60
 
@@ -15,7 +15,15 @@ export default async function AgentsPage() {
         redirect("/login")
     }
 
-    const hasApiKey = await checkHasAnyProviderKey()
+    let hasApiKey = false
+    try {
+        hasApiKey = await checkHasAnyProviderKey()
+    } catch (err) {
+        console.error("[AgentsPage] Failed to check API key status:", {
+            error: err instanceof Error ? err.message : "Unknown error",
+        })
+        // Continue with hasApiKey = false — user will see the banner
+    }
 
     return (
         <div className="flex flex-col h-[calc(100vh-2rem)] -m-4 sm:-m-6 lg:-m-8">
@@ -32,9 +40,9 @@ export default async function AgentsPage() {
                 </p>
             </div>
 
-            {/* Workflow view fills remaining space */}
+            {/* Workflow view fills remaining space (loaded client-only) */}
             <div className="flex-1 min-h-0">
-                <AgentsWorkflowView hasApiKey={hasApiKey} />
+                <AgentsWorkflowViewLoader hasApiKey={hasApiKey} />
             </div>
         </div>
     )

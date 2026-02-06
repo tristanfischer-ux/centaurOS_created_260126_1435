@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { FOUNDER_STORAGE } from './auth.setup'
+import { FOUNDER_STORAGE } from './auth-storage'
 
 /**
  * Agents Page - Workflow Builder E2E Tests

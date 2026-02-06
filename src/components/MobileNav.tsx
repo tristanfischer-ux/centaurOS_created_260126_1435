@@ -3,14 +3,16 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
-import { Users, CheckSquare, Store, Settings, Target, MoreHorizontal, Lightbulb, Bell, Home, Bot } from "lucide-react"
+import { Users, CheckSquare, Store, Settings, Target, MoreHorizontal, Lightbulb, Bell, Home, Bot, UserCircle, LogOut } from "lucide-react"
 import {
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
+    DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { NewBadge } from "@/components/ui/new-badge"
+import { signOut } from "@/actions/auth"
 
 /**
  * Determines if a navigation item should be marked as active
@@ -29,13 +31,18 @@ const mainNavigation = [
     { name: "Tasks", shortName: "Tasks", href: "/new-tasks", icon: CheckSquare },
 ]
 
-// Items in the "More" dropdown (Objectives + Discovery + Settings)
+// Items in the "More" dropdown - governance and discovery
 const moreNavigation = [
     { name: "Team", href: "/team", icon: Users },
     { name: "Objectives", href: "/new-objectives", icon: Target },
     { name: "Agents", href: "/agents", icon: Bot },
     { name: "Inspiration", href: "/inspiration", icon: Lightbulb },
     { name: "Marketplace", href: "/marketplace", icon: Store },
+]
+
+// Account items - personal profile and settings
+const accountNavigation = [
+    { name: "My Profile", href: "/my-profile", icon: UserCircle },
     { name: "Settings", href: "/settings", icon: Settings },
 ]
 
@@ -69,12 +76,12 @@ export function MobileNav() {
                         <button
                             className={cn(
                                 "flex flex-col items-center justify-center w-full min-h-[44px] min-w-[44px] h-full space-y-0.5 xs:space-y-1 touch-action-manipulation",
-                                moreNavigation.some(item => isRouteActive(pathname, item.href))
+                                [...moreNavigation, ...accountNavigation].some(item => isRouteActive(pathname, item.href))
                                     ? "text-international-orange" 
                                     : "text-muted-foreground hover:text-foreground"
                             )}
                         >
-                            <MoreHorizontal className={cn("h-5 w-5 shrink-0", moreNavigation.some(item => isRouteActive(pathname, item.href)) && "fill-current")} />
+                            <MoreHorizontal className={cn("h-5 w-5 shrink-0", [...moreNavigation, ...accountNavigation].some(item => isRouteActive(pathname, item.href)) && "fill-current")} />
                             <span className="text-[10px] xs:text-xs font-medium">More</span>
                         </button>
                     </DropdownMenuTrigger>
@@ -99,6 +106,42 @@ export function MobileNav() {
                                 </DropdownMenuItem>
                             )
                         })}
+
+                        <DropdownMenuSeparator />
+
+                        {/* Account items */}
+                        {accountNavigation.map((item) => {
+                            const isActive = isRouteActive(pathname, item.href)
+                            return (
+                                <DropdownMenuItem key={item.name} asChild>
+                                    <Link
+                                        href={item.href}
+                                        className={cn(
+                                            "flex items-center gap-2 cursor-pointer w-full",
+                                            isActive && "text-international-orange"
+                                        )}
+                                    >
+                                        <item.icon className="h-4 w-4" />
+                                        {item.name}
+                                    </Link>
+                                </DropdownMenuItem>
+                            )
+                        })}
+
+                        <DropdownMenuSeparator />
+
+                        {/* Sign Out */}
+                        <DropdownMenuItem asChild>
+                            <form action={signOut} className="w-full">
+                                <button
+                                    type="submit"
+                                    className="flex items-center gap-2 cursor-pointer w-full text-destructive"
+                                >
+                                    <LogOut className="h-4 w-4" />
+                                    Sign Out
+                                </button>
+                            </form>
+                        </DropdownMenuItem>
                     </DropdownMenuContent>
                 </DropdownMenu>
             </div>

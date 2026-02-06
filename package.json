@@ -11,6 +11,8 @@
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:debug": "playwright test --debug",
+    "test:e2e:walkthroughs": "playwright test --project=qa-founder --project=qa-executive --project=qa-apprentice --project=qa-supplier && node scripts/generate-video-gallery.mjs && open test-results/video-walkthroughs.html",
+    "test:e2e:gallery": "node scripts/generate-video-gallery.mjs && open test-results/video-walkthroughs.html",
     "prepare": "husky"
   },
   "dependencies": {

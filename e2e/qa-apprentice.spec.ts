@@ -1,201 +1,251 @@
 import { test, expect } from '@playwright/test'
-import { APPRENTICE_STORAGE } from './auth.setup'
+import { APPRENTICE_STORAGE } from './auth-storage'
 
 /**
- * Apprentice Persona - Day in the Life QA Tests
- * 
- * Tests core flows and apprentice-specific features:
- * - Login and dashboard (limited view)
- * - Navigation
- * - Messaging
- * - Task creation (own tasks)
- * - Permission restrictions (no admin, no approvals)
- * - OTJT logging
- * - Guild/learning features
+ * Apprentice Persona — Full Day-in-the-Life Video Walkthrough
+ *
+ * Covers every route an Apprentice can access, plus negative tests
+ * verifying they CANNOT access admin or approval features.
+ *
+ * Sections:
+ *   1. Core Work Flow (Home, Updates, Objectives, Tasks, Team, Agents)
+ *   2. Discovery Flow (Inspiration, Marketplace, My Orders)
+ *   3. Profile & Settings
+ *   4. Apprentice-specific pages (Apprenticeship, Guild, OTJT)
+ *   5. Permission restrictions (no admin, no approvals)
  */
 
-test.describe('Apprentice - Day in the Life', () => {
-  // Use apprentice authentication
+test.describe('Apprentice — Day in the Life', () => {
   test.use({ storageState: APPRENTICE_STORAGE })
 
-  test.describe('Core Flow Tests', () => {
-    test('dashboard loads with appropriate widgets', async ({ page }) => {
-      await page.goto('/today')
-      
-      // Verify greeting is visible
-      await expect(page.getByText(/Good (morning|afternoon|evening)/)).toBeVisible({ timeout: 10000 })
-      
-      // Apprentice should NOT see pending approvals count in needs attention
-      // (they can't approve tasks)
-      
-      // No console errors
+  // ─── Helpers ────────────────────────────────────────────────
+  async function navigateViaSidebar(page: any, linkText: string, urlFragment: string): Promise<void> {
+    const link = page.locator(`nav a:has-text("${linkText}")`).first()
+    await expect(link).toBeVisible({ timeout: 10_000 })
+    await link.click()
+    await page.waitForURL(`**${urlFragment}`, { timeout: 15_000 })
+    await page.waitForLoadState('networkidle')
+  }
+
+  // ─── 1. Core Work Flow ─────────────────────────────────────
+
+  test.describe('Core Work Flow', () => {
+    test('Home — dashboard loads with greeting', async ({ page }) => {
+      await page.goto('/dashboard')
+      await page.waitForLoadState('networkidle')
+
+      await expect(
+        page.getByText(/Good (morning|afternoon|evening)/)
+      ).toBeVisible({ timeout: 10_000 })
+
       const errors: string[] = []
-      page.on('console', msg => {
+      page.on('console', (msg: any) => {
         if (msg.type() === 'error') errors.push(msg.text())
       })
-      await page.waitForTimeout(2000)
-      expect(errors.filter(e => !e.includes('favicon'))).toHaveLength(0)
+      await page.waitForTimeout(2_000)
+      expect(errors.filter((e: string) => !e.includes('favicon'))).toHaveLength(0)
     })
 
-    test('sidebar navigation works', async ({ page }) => {
-      await page.goto('/today')
-      
-      // Test key navigation items
-      const navItems = [
-        { name: 'Today', url: '/today' },
-        { name: 'Messages', url: '/messages' },
-        { name: 'Objectives', url: '/objectives' },
-        { name: 'Tasks', url: '/tasks' },
-        { name: 'Team', url: '/team' },
-      ]
+    test('Updates — activity feed loads', async ({ page }) => {
+      await page.goto('/dashboard')
+      await navigateViaSidebar(page, 'Updates', '/updates')
 
-      for (const item of navItems) {
-        const navLink = page.locator(`nav a:has-text("${item.name}")`).first()
-        if (await navLink.isVisible()) {
-          await navLink.click()
-          await page.waitForURL(`**${item.url}`, { timeout: 10000 })
-          await expect(page.locator('body')).not.toContainText('Error')
+      const heading = page.getByRole('heading').first()
+      await expect(heading).toBeVisible({ timeout: 10_000 })
+    })
+
+    test('Objectives — view list', async ({ page }) => {
+      await page.goto('/dashboard')
+      await navigateViaSidebar(page, 'Objectives', '/new-objectives')
+
+      await expect(
+        page.getByText(/objective/i).first()
+      ).toBeVisible({ timeout: 10_000 })
+    })
+
+    test('Tasks — view list, create own task', async ({ page }) => {
+      await page.goto('/dashboard')
+      await navigateViaSidebar(page, 'Tasks', '/new-tasks')
+
+      await page.waitForLoadState('networkidle')
+
+      const newTaskBtn = page.getByRole('button', { name: /new task|create task|\+/i }).first()
+      if (await newTaskBtn.isVisible({ timeout: 5_000 }).catch(() => false)) {
+        await newTaskBtn.click()
+        await expect(page.getByRole('dialog')).toBeVisible({ timeout: 5_000 })
+
+        const titleInput = page
+          .getByLabel(/title/i)
+          .or(page.locator('input[name="title"]'))
+          .first()
+        if (await titleInput.isVisible({ timeout: 3_000 }).catch(() => false)) {
+          await titleInput.fill(`Apprentice walkthrough task — ${new Date().toISOString().slice(0, 16)}`)
         }
-      }
-    })
 
-    test('messages page loads', async ({ page }) => {
-      await page.goto('/messages')
-      await page.waitForLoadState('networkidle')
-      
-      // Page should load
-      const pageContent = await page.content()
-      expect(pageContent).toBeTruthy()
-    })
-
-    test('can create own tasks', async ({ page }) => {
-      await page.goto('/tasks')
-      await page.waitForLoadState('networkidle')
-      
-      // Open create dialog
-      const newTaskButton = page.getByRole('button', { name: /new task|create task|\+/i }).first()
-      if (await newTaskButton.isVisible()) {
-        await newTaskButton.click()
-        await expect(page.getByRole('dialog')).toBeVisible({ timeout: 5000 })
-        
-        // Fill in task details
-        const titleInput = page.getByLabel(/title/i).or(page.locator('input[name="title"]')).first()
-        await titleInput.fill(`QA Test Task - Apprentice - ${new Date().toISOString()}`)
-        
-        // Close dialog
         await page.keyboard.press('Escape')
       }
     })
+
+    test('Team — view members (read-only)', async ({ page }) => {
+      await page.goto('/dashboard')
+      await navigateViaSidebar(page, 'Team', '/team')
+
+      await expect(page.getByText(/team/i).first()).toBeVisible({ timeout: 10_000 })
+    })
+
+    test('Agents — view agent workflows', async ({ page }) => {
+      await page.goto('/dashboard')
+      await navigateViaSidebar(page, 'Agents', '/agents')
+
+      await page.waitForLoadState('networkidle')
+      const body = page.locator('body')
+      await expect(body).not.toContainText('Error', { timeout: 5_000 })
+    })
   })
 
-  test.describe('Apprentice-Specific Tests', () => {
-    test('System Admin link is NOT visible', async ({ page }) => {
-      await page.goto('/today')
+  // ─── 2. Discovery Flow ─────────────────────────────────────
+
+  test.describe('Discovery Flow', () => {
+    test('Inspiration — browse ideas', async ({ page }) => {
+      await page.goto('/dashboard')
+      await navigateViaSidebar(page, 'Inspiration', '/inspiration')
+
       await page.waitForLoadState('networkidle')
-      
-      // Check sidebar for System Admin link - should NOT be visible
-      const sidebar = page.locator('nav')
-      const adminLink = sidebar.getByText(/system admin/i)
-      
-      // Apprentice should NOT have admin link visible (unless explicitly granted)
-      const isVisible = await adminLink.isVisible().catch(() => false)
-      
-      // We expect this to be false, but some apprentices may have explicit admin grants
-      // So we just log this for the test report
-      if (isVisible) {
-        console.log('Note: Apprentice has admin access (may have explicit grant)')
+      const body = page.locator('body')
+      await expect(body).not.toContainText('Error', { timeout: 5_000 })
+    })
+
+    test('Marketplace — browse listings', async ({ page }) => {
+      await page.goto('/dashboard')
+      await navigateViaSidebar(page, 'Marketplace', '/marketplace')
+
+      await page.waitForLoadState('networkidle')
+
+      const listingCard = page.locator('[data-testid="listing-card"], [data-testid="product-card"]').first()
+      if (await listingCard.isVisible({ timeout: 5_000 }).catch(() => false)) {
+        await listingCard.click()
+        await page.waitForTimeout(2_000)
+        await page.goBack()
+        await page.waitForLoadState('networkidle')
       }
     })
 
-    test('admin page redirects or shows access denied', async ({ page }) => {
-      await page.goto('/admin')
+    test('My Orders — view orders', async ({ page }) => {
+      await page.goto('/dashboard')
+      await navigateViaSidebar(page, 'My Orders', '/my-orders')
+
       await page.waitForLoadState('networkidle')
-      
-      // Should either redirect or show access denied
-      const url = page.url()
-      const pageContent = await page.content()
-      
-      const isRedirected = !url.includes('/admin')
-      const showsAccessDenied = pageContent.includes('Access Denied') || pageContent.includes('permission')
-      
-      // One of these should be true (unless apprentice has explicit admin grant)
-      expect(isRedirected || showsAccessDenied || true).toBeTruthy()
+      const body = page.locator('body')
+      await expect(body).not.toContainText('Error', { timeout: 5_000 })
+    })
+  })
+
+  // ─── 3. Profile & Settings ─────────────────────────────────
+
+  test.describe('Profile & Settings', () => {
+    test('My Profile — view marketplace profile', async ({ page }) => {
+      await page.goto('/dashboard')
+      await navigateViaSidebar(page, 'My Profile', '/my-profile')
+
+      await page.waitForLoadState('networkidle')
+      const body = page.locator('body')
+      await expect(body).not.toContainText('Error', { timeout: 5_000 })
     })
 
-    test('can access apprenticeship dashboard', async ({ page }) => {
+    test('Settings — view account settings', async ({ page }) => {
+      await page.goto('/dashboard')
+      await navigateViaSidebar(page, 'Settings', '/settings')
+
+      await page.waitForLoadState('networkidle')
+      expect(page.url()).toContain('/settings')
+    })
+  })
+
+  // ─── 4. Apprentice-Specific Pages ──────────────────────────
+
+  test.describe('Apprentice-Specific Pages', () => {
+    test('Apprenticeship — view enrollment/progress', async ({ page }) => {
       await page.goto('/apprenticeship')
       await page.waitForLoadState('networkidle')
-      
-      // Page should load
-      const pageContent = await page.content()
-      expect(pageContent).toBeTruthy()
-      
-      // Should see apprenticeship content
-      // (may show enrollment or "not enrolled" state)
+
+      // Should load — may show enrollment or "not enrolled" state
+      const body = page.locator('body')
+      await expect(body).not.toContainText('Error', { timeout: 5_000 })
     })
 
-    test('can access guild page', async ({ page }) => {
+    test('Guild — view learning content', async ({ page }) => {
       await page.goto('/guild')
       await page.waitForLoadState('networkidle')
-      
-      // Page should load
+
       expect(page.url()).toContain('/guild')
-      const pageContent = await page.content()
-      expect(pageContent).toBeTruthy()
+      const body = page.locator('body')
+      await expect(body).not.toContainText('Error', { timeout: 5_000 })
     })
 
-    test('task approval button is not visible', async ({ page }) => {
-      await page.goto('/tasks')
+    test('OTJT logging UI accessible if enrolled', async ({ page }) => {
+      await page.goto('/apprenticeship')
       await page.waitForLoadState('networkidle')
-      
-      // Look for any tasks
-      // If there are tasks pending approval, apprentice should NOT see approve button
-      const approveButton = page.getByRole('button', { name: /^approve$/i })
-      const isVisible = await approveButton.isVisible().catch(() => false)
-      
-      // Apprentice should not have approve capability
+
+      // Look for OTJT logging button (only visible if enrolled)
+      const otjtBtn = page.getByRole('button', { name: /log.*otjt|log.*hours/i })
+      const isVisible = await otjtBtn.isVisible({ timeout: 3_000 }).catch(() => false)
+
+      if (isVisible) {
+        await otjtBtn.click()
+        await expect(page.getByRole('dialog')).toBeVisible({ timeout: 5_000 })
+        await page.keyboard.press('Escape')
+      }
+    })
+
+    test('Messages — page loads', async ({ page }) => {
+      await page.goto('/messages')
+      await page.waitForLoadState('networkidle')
+
+      const body = page.locator('body')
+      await expect(body).not.toContainText('Error', { timeout: 5_000 })
+    })
+  })
+
+  // ─── 5. Permission Restrictions ────────────────────────────
+
+  test.describe('Permission Restrictions', () => {
+    test('System Admin link is NOT visible in sidebar', async ({ page }) => {
+      await page.goto('/dashboard')
+      await page.waitForLoadState('networkidle')
+
+      const adminLink = page.locator('nav').getByText(/system admin/i)
+      const isVisible = await adminLink.isVisible({ timeout: 3_000 }).catch(() => false)
+
+      // Apprentice should NOT see admin link
       expect(isVisible).toBeFalsy()
     })
 
-    test('cannot delete tasks created by others (negative test)', async ({ page }) => {
-      await page.goto('/tasks')
+    test('/admin redirects or shows access denied', async ({ page }) => {
+      await page.goto('/admin')
       await page.waitForLoadState('networkidle')
-      
-      // This is a negative test - we verify the restriction exists
-      // The actual enforcement is at the API/RLS level
-      // Here we just verify the page loads and doesn't show global delete options
-      
-      const pageContent = await page.content()
-      expect(pageContent).toBeTruthy()
-    })
-  })
 
-  test.describe('OTJT and Learning Features', () => {
-    test('can view apprenticeship progress', async ({ page }) => {
-      await page.goto('/apprenticeship')
-      await page.waitForLoadState('networkidle')
-      
-      // Should see some apprenticeship content
-      const pageContent = await page.content()
-      expect(pageContent).toBeTruthy()
+      const url = page.url()
+      const content = await page.content()
+
+      // Should either redirect away from /admin or show access denied
+      const isBlocked =
+        !url.includes('/admin') ||
+        content.includes('Access Denied') ||
+        content.includes('permission') ||
+        content.includes('Unauthorized')
+
+      expect(isBlocked).toBeTruthy()
     })
 
-    test('OTJT logging UI is accessible if enrolled', async ({ page }) => {
-      await page.goto('/apprenticeship')
+    test('Task approval button is not visible', async ({ page }) => {
+      await page.goto('/new-tasks')
       await page.waitForLoadState('networkidle')
-      
-      // Look for OTJT logging button
-      const otjtButton = page.getByRole('button', { name: /log.*otjt|log.*hours/i })
-      
-      // This may or may not be visible depending on enrollment status
-      const isVisible = await otjtButton.isVisible().catch(() => false)
-      
-      if (isVisible) {
-        await otjtButton.click()
-        // Dialog should open
-        await expect(page.getByRole('dialog')).toBeVisible({ timeout: 5000 })
-        await page.keyboard.press('Escape')
-      }
+
+      // Apprentice should NOT see an approve button
+      const approveBtn = page.getByRole('button', { name: /^approve$/i })
+      const isVisible = await approveBtn.isVisible({ timeout: 3_000 }).catch(() => false)
+
+      expect(isVisible).toBeFalsy()
     })
   })
 })

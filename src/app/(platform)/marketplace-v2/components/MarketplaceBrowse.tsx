@@ -46,9 +46,17 @@ export function MarketplaceBrowse({
     const [compareListings, setCompareListings] = useState<MarketplaceListing[]>([])
     const [compareOrigin, setCompareOrigin] = useState<'browse' | 'saved'>('browse')
 
-    // Featured listings = verified listings, limit 4
+    // Top-rated listings: verified, sorted by rating then bookings, limit 4
     const featuredListings = initialListings
         .filter(l => l.is_verified)
+        .sort((a, b) => {
+            const ratingA = (a.attributes?.rating_average as number) || 0
+            const ratingB = (b.attributes?.rating_average as number) || 0
+            if (ratingB !== ratingA) return ratingB - ratingA
+            const bookingsA = (a.attributes?.total_bookings as number) || 0
+            const bookingsB = (b.attributes?.total_bookings as number) || 0
+            return bookingsB - bookingsA
+        })
         .slice(0, 4)
 
     // Handle recommendation click

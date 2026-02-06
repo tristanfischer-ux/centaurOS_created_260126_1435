@@ -1,170 +1,248 @@
 import { test, expect } from '@playwright/test'
-import { FOUNDER_STORAGE } from './auth.setup'
+import { FOUNDER_STORAGE } from './auth-storage'
 
 /**
- * Founder Persona - Day in the Life QA Tests
- * 
- * Tests all executive capabilities plus founder-specific features:
- * - All core flows
- * - Foundry settings access
- * - Full admin access
- * - Role management capabilities
+ * Founder Persona — Full Day-in-the-Life Video Walkthrough
+ *
+ * Covers every sidebar route plus founder-only admin pages.
+ * Designed to produce a meaningful video recording of the entire app
+ * as experienced by a Founder user.
+ *
+ * The tests are grouped into three sections:
+ *   1. Core Work Flow (Home, Updates, Objectives, Tasks, Team, Agents)
+ *   2. Discovery Flow (Inspiration, Marketplace, My Orders)
+ *   3. Profile, Settings & Admin
+ *   4. Permissions verification
  */
 
-test.describe('Founder - Day in the Life', () => {
-  // Use founder authentication
+test.describe('Founder — Day in the Life', () => {
   test.use({ storageState: FOUNDER_STORAGE })
 
-  test.describe('Core Flow Tests', () => {
-    test('dashboard loads with all widgets', async ({ page }) => {
-      await page.goto('/today')
-      
-      // Verify greeting is visible
-      await expect(page.getByText(/Good (morning|afternoon|evening)/)).toBeVisible({ timeout: 10000 })
-      
-      // No console errors
+  // ─── Helpers ────────────────────────────────────────────────
+  /** Navigate via sidebar link text and wait for URL. */
+  async function navigateViaSidebar(page: any, linkText: string, urlFragment: string): Promise<void> {
+    const link = page.locator(`nav a:has-text("${linkText}")`).first()
+    await expect(link).toBeVisible({ timeout: 10_000 })
+    await link.click()
+    await page.waitForURL(`**${urlFragment}`, { timeout: 15_000 })
+    await page.waitForLoadState('networkidle')
+  }
+
+  // ─── 1. Core Work Flow ─────────────────────────────────────
+
+  test.describe('Core Work Flow', () => {
+    test('Home — dashboard loads with greeting and widgets', async ({ page }) => {
+      await page.goto('/dashboard')
+      await page.waitForLoadState('networkidle')
+
+      // Greeting banner should be visible
+      await expect(
+        page.getByText(/Good (morning|afternoon|evening)/)
+      ).toBeVisible({ timeout: 10_000 })
+
+      // Page should render without JS errors (ignore favicon)
       const errors: string[] = []
-      page.on('console', msg => {
+      page.on('console', (msg: any) => {
         if (msg.type() === 'error') errors.push(msg.text())
       })
-      await page.waitForTimeout(2000)
-      expect(errors.filter(e => !e.includes('favicon'))).toHaveLength(0)
+      await page.waitForTimeout(2_000)
+      expect(errors.filter((e: string) => !e.includes('favicon'))).toHaveLength(0)
     })
 
-    test('sidebar navigation works', async ({ page }) => {
-      await page.goto('/today')
-      
-      // Test key navigation items
-      const navItems = [
-        { name: 'Today', url: '/today' },
-        { name: 'Tasks', url: '/tasks' },
-        { name: 'Team', url: '/team' },
-        { name: 'Settings', url: '/settings' },
-      ]
+    test('Updates — activity feed loads', async ({ page }) => {
+      await page.goto('/dashboard')
+      await navigateViaSidebar(page, 'Updates', '/updates')
 
-      for (const item of navItems) {
-        const navLink = page.locator(`nav a:has-text("${item.name}")`).first()
-        if (await navLink.isVisible()) {
-          await navLink.click()
-          await page.waitForURL(`**${item.url}`, { timeout: 10000 })
-          await expect(page.locator('body')).not.toContainText('Error')
-        }
+      // Page should have some content — heading or empty state
+      const heading = page.getByRole('heading').first()
+      await expect(heading).toBeVisible({ timeout: 10_000 })
+    })
+
+    test('Objectives — view list and interact', async ({ page }) => {
+      await page.goto('/dashboard')
+      await navigateViaSidebar(page, 'Objectives', '/new-objectives')
+
+      // Should see objectives heading or empty state
+      await expect(
+        page.getByText(/objective/i).first()
+      ).toBeVisible({ timeout: 10_000 })
+
+      // If there are objective cards, click the first one to open detail
+      const firstCard = page.locator('[data-testid="objective-card"], .cursor-pointer').first()
+      if (await firstCard.isVisible({ timeout: 3_000 }).catch(() => false)) {
+        await firstCard.click()
+        await page.waitForTimeout(1_500)
+        // Go back
+        await page.goBack()
+        await page.waitForLoadState('networkidle')
       }
     })
 
-    test('messages page loads', async ({ page }) => {
-      await page.goto('/messages')
-      await page.waitForLoadState('networkidle')
-      
-      // Page should load without errors
-      const pageContent = await page.content()
-      expect(pageContent).toBeTruthy()
-    })
+    test('Tasks — view list, open create dialog', async ({ page }) => {
+      await page.goto('/dashboard')
+      await navigateViaSidebar(page, 'Tasks', '/new-tasks')
 
-    test('can create a task', async ({ page }) => {
-      await page.goto('/tasks')
       await page.waitForLoadState('networkidle')
-      
-      // Open create dialog
-      const newTaskButton = page.getByRole('button', { name: /new task|create task|\+/i }).first()
-      if (await newTaskButton.isVisible()) {
-        await newTaskButton.click()
-        await expect(page.getByRole('dialog')).toBeVisible({ timeout: 5000 })
-        
-        // Fill in task details
-        const titleInput = page.getByLabel(/title/i).or(page.locator('input[name="title"]')).first()
-        await titleInput.fill(`QA Test Task - Founder - ${new Date().toISOString()}`)
-        
-        // Close dialog
+
+      // Try to open the create-task dialog
+      const newTaskBtn = page.getByRole('button', { name: /new task|create task|\+/i }).first()
+      if (await newTaskBtn.isVisible({ timeout: 5_000 }).catch(() => false)) {
+        await newTaskBtn.click()
+        await expect(page.getByRole('dialog')).toBeVisible({ timeout: 5_000 })
+
+        // Fill title so the video shows real interaction
+        const titleInput = page
+          .getByLabel(/title/i)
+          .or(page.locator('input[name="title"]'))
+          .first()
+        if (await titleInput.isVisible({ timeout: 3_000 }).catch(() => false)) {
+          await titleInput.fill(`Founder walkthrough task — ${new Date().toISOString().slice(0, 16)}`)
+        }
+
+        // Close without saving
         await page.keyboard.press('Escape')
       }
     })
+
+    test('Team — view members, open invite dialog', async ({ page }) => {
+      await page.goto('/dashboard')
+      await navigateViaSidebar(page, 'Team', '/team')
+
+      await expect(page.getByText(/team/i).first()).toBeVisible({ timeout: 10_000 })
+
+      // Try invite member dialog
+      const inviteBtn = page.getByRole('button', { name: /invite|add member/i }).first()
+      if (await inviteBtn.isVisible({ timeout: 5_000 }).catch(() => false)) {
+        await inviteBtn.click()
+        await expect(page.getByRole('dialog')).toBeVisible({ timeout: 5_000 })
+        await page.keyboard.press('Escape')
+      }
+    })
+
+    test('Agents — view agent workflows', async ({ page }) => {
+      await page.goto('/dashboard')
+      await navigateViaSidebar(page, 'Agents', '/agents')
+
+      // Page should load without error
+      await page.waitForLoadState('networkidle')
+      const body = page.locator('body')
+      await expect(body).not.toContainText('Error', { timeout: 5_000 })
+    })
   })
 
-  test.describe('Founder-Specific Tests', () => {
-    test('System Admin link is visible', async ({ page }) => {
-      await page.goto('/today')
+  // ─── 2. Discovery Flow ─────────────────────────────────────
+
+  test.describe('Discovery Flow', () => {
+    test('Inspiration — browse ideas', async ({ page }) => {
+      await page.goto('/dashboard')
+      await navigateViaSidebar(page, 'Inspiration', '/inspiration')
+
       await page.waitForLoadState('networkidle')
-      
-      // Check sidebar for System Admin link
-      const adminLink = page.locator('nav').getByText(/admin|system admin/i).first()
-      const isVisible = await adminLink.isVisible().catch(() => false)
-      
-      // Founder should have admin access
-      expect(isVisible).toBeTruthy()
+      // Should see inspiration content or empty state
+      const body = page.locator('body')
+      await expect(body).not.toContainText('Error', { timeout: 5_000 })
     })
 
-    test('can access full admin dashboard', async ({ page }) => {
+    test('Marketplace — browse listings', async ({ page }) => {
+      await page.goto('/dashboard')
+      await navigateViaSidebar(page, 'Marketplace', '/marketplace')
+
+      await page.waitForLoadState('networkidle')
+
+      // Try clicking a listing card for the video
+      const listingCard = page.locator('[data-testid="listing-card"], [data-testid="product-card"]').first()
+      if (await listingCard.isVisible({ timeout: 5_000 }).catch(() => false)) {
+        await listingCard.click()
+        await page.waitForTimeout(2_000)
+        await page.goBack()
+        await page.waitForLoadState('networkidle')
+      }
+    })
+
+    test('My Orders — view orders', async ({ page }) => {
+      await page.goto('/dashboard')
+      await navigateViaSidebar(page, 'My Orders', '/my-orders')
+
+      await page.waitForLoadState('networkidle')
+      const body = page.locator('body')
+      await expect(body).not.toContainText('Error', { timeout: 5_000 })
+    })
+  })
+
+  // ─── 3. Profile, Settings & Admin ──────────────────────────
+
+  test.describe('Profile & Settings', () => {
+    test('My Profile — view marketplace profile', async ({ page }) => {
+      await page.goto('/dashboard')
+      await navigateViaSidebar(page, 'My Profile', '/my-profile')
+
+      await page.waitForLoadState('networkidle')
+      const body = page.locator('body')
+      await expect(body).not.toContainText('Error', { timeout: 5_000 })
+    })
+
+    test('Settings — view account settings', async ({ page }) => {
+      await page.goto('/dashboard')
+      await navigateViaSidebar(page, 'Settings', '/settings')
+
+      await page.waitForLoadState('networkidle')
+      expect(page.url()).toContain('/settings')
+    })
+  })
+
+  test.describe('Admin — Founder Only', () => {
+    test('System Admin link is visible in sidebar', async ({ page }) => {
+      await page.goto('/dashboard')
+      await page.waitForLoadState('networkidle')
+
+      const adminLink = page.locator('nav').getByText(/system admin/i).first()
+      await expect(adminLink).toBeVisible({ timeout: 10_000 })
+    })
+
+    test('Admin dashboard loads', async ({ page }) => {
       await page.goto('/admin')
       await page.waitForLoadState('networkidle')
-      
-      // Should be on admin page
+
       expect(page.url()).toContain('/admin')
-      
-      // Should see admin content
-      await expect(page.getByText(/admin|operations|dashboard/i).first()).toBeVisible({ timeout: 10000 })
+      await expect(
+        page.getByText(/admin|operations|dashboard/i).first()
+      ).toBeVisible({ timeout: 10_000 })
     })
 
-    test('can access admin applications', async ({ page }) => {
+    test('Admin — Applications page loads', async ({ page }) => {
       await page.goto('/admin/applications')
       await page.waitForLoadState('networkidle')
-      
-      // Should load without access denied
+
       expect(page.url()).toContain('/admin/applications')
-      const pageContent = await page.content()
-      expect(pageContent).not.toContain('Access Denied')
+      const content = await page.content()
+      expect(content).not.toContain('Access Denied')
     })
 
-    test('can access admin analytics', async ({ page }) => {
+    test('Admin — Analytics page loads', async ({ page }) => {
       await page.goto('/admin/analytics')
       await page.waitForLoadState('networkidle')
-      
+
       expect(page.url()).toContain('/admin/analytics')
-      const pageContent = await page.content()
-      expect(pageContent).not.toContain('Access Denied')
+      const content = await page.content()
+      expect(content).not.toContain('Access Denied')
     })
 
-    test('can access admin health', async ({ page }) => {
+    test('Admin — Health page loads', async ({ page }) => {
       await page.goto('/admin/health')
       await page.waitForLoadState('networkidle')
-      
+
       expect(page.url()).toContain('/admin/health')
-      const pageContent = await page.content()
-      expect(pageContent).not.toContain('Access Denied')
+      const content = await page.content()
+      expect(content).not.toContain('Access Denied')
     })
 
-    test('can access admin GDPR', async ({ page }) => {
+    test('Admin — GDPR page loads', async ({ page }) => {
       await page.goto('/admin/gdpr')
       await page.waitForLoadState('networkidle')
-      
+
       expect(page.url()).toContain('/admin/gdpr')
-      const pageContent = await page.content()
-      expect(pageContent).not.toContain('Access Denied')
-    })
-
-    test('can access settings with foundry section', async ({ page }) => {
-      await page.goto('/settings')
-      await page.waitForLoadState('networkidle')
-      
-      // Settings page should load
-      expect(page.url()).toContain('/settings')
-      
-      // Founder should see foundry settings
-      // This may vary based on UI structure
-      const pageContent = await page.content()
-      expect(pageContent).toBeTruthy()
-    })
-
-    test('can view and manage team', async ({ page }) => {
-      await page.goto('/team')
-      await page.waitForLoadState('networkidle')
-      
-      // Check team page loaded
-      await expect(page.getByText(/team/i).first()).toBeVisible()
-      
-      // Founder should have full team management
-      const pageContent = await page.content()
-      expect(pageContent).toBeTruthy()
+      const content = await page.content()
+      expect(content).not.toContain('Access Denied')
     })
   })
 })

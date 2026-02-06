@@ -10,6 +10,8 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
   workers: process.env.CI ? 1 : undefined,
+  // Walkthrough tests navigate many pages — give them room
+  timeout: 120_000,
   reporter: [
     ['html'],
     ['json', { outputFile: 'test-results/results.json' }],
@@ -18,7 +20,8 @@ export default defineConfig({
     baseURL: process.env.TEST_URL || 'http://localhost:3000',
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
-    video: 'on-first-retry',
+    // Always record video so every run produces a walkthrough
+    video: 'on',
   },
   projects: [
     // Auth setup projects - run first
@@ -26,7 +29,7 @@ export default defineConfig({
       name: 'auth-setup',
       testMatch: /auth\.setup\.ts/,
     },
-    // QA Tests - Day in the Life
+    // QA Tests - Day in the Life (one per persona)
     {
       name: 'qa-executive',
       testMatch: /qa-executive\.spec\.ts/,
@@ -52,6 +55,15 @@ export default defineConfig({
       use: { 
         ...devices['Desktop Chrome'],
         storageState: path.join(authDir, 'apprentice.json'),
+      },
+    },
+    {
+      name: 'qa-supplier',
+      testMatch: /qa-supplier\.spec\.ts/,
+      dependencies: ['auth-setup'],
+      use: {
+        ...devices['Desktop Chrome'],
+        storageState: path.join(authDir, 'supplier.json'),
       },
     },
     // General tests (unauthenticated)

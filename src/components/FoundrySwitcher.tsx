@@ -62,20 +62,12 @@ export function FoundrySwitcher({
   // Single foundry - just show info, no dropdown
   if (!hasMultipleFoundries) {
     return (
-      <div className="px-4 pb-4">
+      <div className="px-4 pb-2">
         <div className="text-sm font-semibold text-foreground uppercase tracking-wider truncate">
           {currentFoundryName || 'My Foundry'}
         </div>
         <div className="text-[10px] text-muted-foreground font-mono mt-0.5 tracking-wide">
           {currentFoundryId || 'Loading...'}
-        </div>
-        <div className="mt-3 flex items-center gap-2">
-          <div className="text-sm text-muted-foreground truncate">
-            {userName || 'Loading...'}
-          </div>
-          <span className="text-[10px] text-international-orange font-mono uppercase px-1.5 py-0.5 bg-orange-50 border border-orange-200 font-semibold tracking-wide">
-            {userRole || 'Member'}
-          </span>
         </div>
       </div>
     )
@@ -85,7 +77,7 @@ export function FoundrySwitcher({
   const activeFoundry = foundries.find(f => f.isActive) || foundries[0]
 
   return (
-    <div className="px-4 pb-4">
+    <div className="px-4 pb-2">
       <DropdownMenu open={open} onOpenChange={setOpen}>
         <DropdownMenuTrigger asChild>
           <button
@@ -138,15 +130,6 @@ export function FoundrySwitcher({
           ))}
         </DropdownMenuContent>
       </DropdownMenu>
-
-      <div className="mt-3 flex items-center gap-2">
-        <div className="text-sm text-muted-foreground truncate">
-          {userName || 'Loading...'}
-        </div>
-        <span className="text-[10px] text-international-orange font-mono uppercase px-1.5 py-0.5 bg-orange-50 border border-orange-200 font-semibold tracking-wide">
-          {activeFoundry?.role || userRole || 'Member'}
-        </span>
-      </div>
     </div>
   )
 }
