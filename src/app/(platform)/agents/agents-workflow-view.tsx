@@ -17,15 +17,17 @@ import {
     useReactFlow,
 } from "@xyflow/react"
 import "@xyflow/react/dist/style.css"
+import { toast } from "sonner"
 
 import { PromptNode } from "./components/prompt-node"
 import { PromptLibrarySidebar } from "./components/prompt-library-sidebar"
 import { NodeInspector } from "./components/node-inspector"
 import { WorkflowToolbar } from "./components/workflow-toolbar"
 import { WorkflowTemplatesDialog } from "./components/workflow-templates-dialog"
+import { CreatePromptDialog } from "./components/create-prompt-dialog"
 import { getPromptById } from "./lib/prompt-library"
-import type { PromptCategory, Workflow } from "./lib/agent-types"
-import type { WorkflowTemplate } from "./lib/agent-types"
+import { loadCustomPrompts, getCustomPromptById } from "./lib/custom-prompts"
+import type { PromptCategory, Workflow, WorkflowTemplate, CustomPrompt, AttachedFile, ExecutionStatus } from "./lib/agent-types"
 
 // ─── localStorage persistence ─────────────────────────────────────
 const STORAGE_KEY = "forgeos-agent-workflows"
@@ -65,6 +67,40 @@ function uid() {
     return `node_${Date.now()}_${idCounter++}`
 }
 
+// ─── Topological sort for chain execution ─────────────────────────
+function getOrderedNodeIds(nodes: Node[], edges: Edge[]): string[] {
+    const nodeMap = new Map(nodes.map((n) => [n.id, n]))
+    const edgeMap = new Map(edges.map((e) => [e.source, e.target]))
+
+    // Find start node (not a target of any edge)
+    const targets = new Set(edges.map((e) => e.target))
+    let currentId = nodes.find((n) => !targets.has(n.id))?.id
+    const ordered: string[] = []
+
+    const visited = new Set<string>()
+    while (currentId && !visited.has(currentId)) {
+        visited.add(currentId)
+        if (nodeMap.has(currentId)) ordered.push(currentId)
+        currentId = edgeMap.get(currentId)
+    }
+
+    // Add any unlinked nodes
+    for (const n of nodes) {
+        if (!visited.has(n.id)) ordered.push(n.id)
+    }
+
+    return ordered
+}
+
+// ─── Get upstream node output (for chaining) ──────────────────────
+function getUpstreamOutput(nodeId: string, nodes: Node[], edges: Edge[]): string | undefined {
+    const sourceEdge = edges.find((e) => e.target === nodeId)
+    if (!sourceEdge) return undefined
+    const sourceNode = nodes.find((n) => n.id === sourceEdge.source)
+    if (!sourceNode) return undefined
+    return (sourceNode.data as { output?: string }).output
+}
+
 // ─── Inner flow (needs ReactFlowProvider) ─────────────────────────
 function AgentsFlowInner() {
     const reactFlowWrapper = useRef<HTMLDivElement>(null)
@@ -77,16 +113,28 @@ function AgentsFlowInner() {
     const [sidebarOpen, setSidebarOpen] = useState(true)
     const [inspectorOpen, setInspectorOpen] = useState(false)
     const [templatesOpen, setTemplatesOpen] = useState(false)
+    const [createPromptOpen, setCreatePromptOpen] = useState(false)
 
     // Workflow metadata
     const [workflowId, setWorkflowId] = useState<string>("")
     const [workflowName, setWorkflowName] = useState("Untitled Workflow")
     const [workflows, setWorkflows] = useState<Workflow[]>([])
 
-    // Load saved workflows on mount
+    // Custom prompts
+    const [customPrompts, setCustomPrompts] = useState<CustomPrompt[]>([])
+
+    // Chain execution state
+    const [isChainRunning, setIsChainRunning] = useState(false)
+    const [chainProgress, setChainProgress] = useState<{ current: number; total: number } | undefined>()
+    const abortControllerRef = useRef<AbortController | null>(null)
+    const pendingContinueRef = useRef<string | null>(null)
+
+    // Load saved workflows and custom prompts on mount
     useEffect(() => {
         const saved = loadWorkflows()
         setWorkflows(saved)
+        setCustomPrompts(loadCustomPrompts())
+
         const activeId = loadActiveId()
         if (activeId) {
             const active = saved.find((w) => w.id === activeId)
@@ -98,7 +146,6 @@ function AgentsFlowInner() {
                 return
             }
         }
-        // New blank workflow
         const newId = `wf_${Date.now()}`
         setWorkflowId(newId)
     }, [setNodes, setEdges])
@@ -136,6 +183,11 @@ function AgentsFlowInner() {
         setInspectorOpen(false)
     }, [])
 
+    // ── Helper to resolve a prompt (library or custom) ────────────
+    const resolvePrompt = useCallback((promptId: string) => {
+        return getPromptById(promptId) ?? getCustomPromptById(promptId) ?? null
+    }, [])
+
     // ── Drag-and-drop from sidebar ────────────────────────────────
     const onDragOver = useCallback((event: React.DragEvent) => {
         event.preventDefault()
@@ -145,10 +197,48 @@ function AgentsFlowInner() {
     const onDrop = useCallback(
         (event: React.DragEvent) => {
             event.preventDefault()
+
+            // Check for file drops first
+            if (event.dataTransfer.files.length > 0) {
+                // File dropped on canvas — create a data input node
+                const file = event.dataTransfer.files[0]
+                const reader = new FileReader()
+                reader.onload = () => {
+                    const position = screenToFlowPosition({
+                        x: event.clientX,
+                        y: event.clientY,
+                    })
+                    const newNode: Node = {
+                        id: uid(),
+                        type: "prompt",
+                        position,
+                        data: {
+                            label: `Data: ${file.name}`,
+                            description: `Imported from ${file.name}`,
+                            category: "data-analytics",
+                            icon: "FileText",
+                            customPrompt: "Analyze the following data and provide a comprehensive summary with key insights:\n\n{{input}}",
+                            userInput: reader.result as string,
+                            attachedFiles: [{
+                                name: file.name,
+                                content: reader.result as string,
+                                type: file.type || "text/plain",
+                                size: file.size,
+                            }],
+                        },
+                    }
+                    setNodes((nds) => [...nds, newNode])
+                    toast.success(`Imported ${file.name}`)
+                }
+                reader.readAsText(file)
+                return
+            }
+
+            // Prompt drag from sidebar
             const promptId = event.dataTransfer.getData("application/promptId")
             if (!promptId) return
 
-            const prompt = getPromptById(promptId)
+            const prompt = resolvePrompt(promptId)
             if (!prompt) return
 
             const position = screenToFlowPosition({
@@ -172,7 +262,54 @@ function AgentsFlowInner() {
 
             setNodes((nds) => [...nds, newNode])
         },
-        [screenToFlowPosition, setNodes]
+        [screenToFlowPosition, setNodes, resolvePrompt]
+    )
+
+    // ── Update node data helpers ──────────────────────────────────
+    const updateNodeData = useCallback(
+        (nodeId: string, updates: Record<string, unknown>) => {
+            setNodes((nds) =>
+                nds.map((n) =>
+                    n.id === nodeId ? { ...n, data: { ...n.data, ...updates } } : n
+                )
+            )
+        },
+        [setNodes]
+    )
+
+    const handleUpdateNodePrompt = useCallback(
+        (nodeId: string, newPrompt: string) => updateNodeData(nodeId, { customPrompt: newPrompt }),
+        [updateNodeData]
+    )
+
+    const handleUpdateNodeInput = useCallback(
+        (nodeId: string, input: string) => updateNodeData(nodeId, { userInput: input }),
+        [updateNodeData]
+    )
+
+    const handleUpdateNodeOutput = useCallback(
+        (nodeId: string, output: string) => updateNodeData(nodeId, { output }),
+        [updateNodeData]
+    )
+
+    const handleUpdateNodeFiles = useCallback(
+        (nodeId: string, files: AttachedFile[]) => updateNodeData(nodeId, { attachedFiles: files }),
+        [updateNodeData]
+    )
+
+    // ── Delete node ────────────────────────────────────────────────
+    const handleDeleteNode = useCallback(
+        (nodeId: string) => {
+            setNodes((nds) => nds.filter((n) => n.id !== nodeId))
+            setEdges((eds) =>
+                eds.filter((e) => e.source !== nodeId && e.target !== nodeId)
+            )
+            if (selectedNodeId === nodeId) {
+                setSelectedNodeId(null)
+                setInspectorOpen(false)
+            }
+        },
+        [setNodes, setEdges, selectedNodeId]
     )
 
     // ── Save workflow ──────────────────────────────────────────────
@@ -235,72 +372,277 @@ function AgentsFlowInner() {
         saveActiveId(newId)
     }, [setNodes, setEdges])
 
-    // ── Update node prompt text ────────────────────────────────────
-    const handleUpdateNodePrompt = useCallback(
-        (nodeId: string, newPrompt: string) => {
-            setNodes((nds) =>
-                nds.map((n) =>
-                    n.id === nodeId
-                        ? { ...n, data: { ...n.data, customPrompt: newPrompt } }
-                        : n
-                )
-            )
-        },
-        [setNodes]
-    )
-
-    // ── Delete node ────────────────────────────────────────────────
-    const handleDeleteNode = useCallback(
-        (nodeId: string) => {
-            setNodes((nds) => nds.filter((n) => n.id !== nodeId))
-            setEdges((eds) =>
-                eds.filter((e) => e.source !== nodeId && e.target !== nodeId)
-            )
-            if (selectedNodeId === nodeId) {
-                setSelectedNodeId(null)
-                setInspectorOpen(false)
-            }
-        },
-        [setNodes, setEdges, selectedNodeId]
-    )
-
     // ── Copy all prompts as chained text ───────────────────────────
     const handleCopyAll = useCallback(() => {
-        // Build ordered chain by following edges
+        const orderedIds = getOrderedNodeIds(nodes, edges)
         const nodeMap = new Map(nodes.map((n) => [n.id, n]))
-        const edgeMap = new Map(edges.map((e) => [e.source, e.target]))
 
-        // Find start node (not a target of any edge)
-        const targets = new Set(edges.map((e) => e.target))
-        let currentId = nodes.find((n) => !targets.has(n.id))?.id
-        const orderedNodes: Node[] = []
-
-        const visited = new Set<string>()
-        while (currentId && !visited.has(currentId)) {
-            visited.add(currentId)
-            const node = nodeMap.get(currentId)
-            if (node) orderedNodes.push(node)
-            currentId = edgeMap.get(currentId)
-        }
-
-        // Add any unlinked nodes
-        for (const n of nodes) {
-            if (!visited.has(n.id)) orderedNodes.push(n)
-        }
-
-        const text = orderedNodes
-            .map((n, i) => {
-                const data = n.data as { label?: string; customPrompt?: string; promptId?: string }
+        const text = orderedIds
+            .map((id, i) => {
+                const n = nodeMap.get(id)
+                if (!n) return ""
+                const data = n.data as { label?: string; customPrompt?: string; promptId?: string; userInput?: string; output?: string }
                 const prompt =
                     data.customPrompt ||
-                    getPromptById(data.promptId ?? "")?.defaultPrompt ||
+                    resolvePrompt(data.promptId ?? "")?.defaultPrompt ||
                     ""
-                return `--- Step ${i + 1}: ${data.label || "Untitled"} ---\n\n${prompt}`
+                let section = `--- Step ${i + 1}: ${data.label || "Untitled"} ---\n\n${prompt}`
+                if (data.userInput) section += `\n\n[Input Data]\n${data.userInput}`
+                if (data.output) section += `\n\n[Output]\n${data.output}`
+                return section
             })
+            .filter(Boolean)
             .join("\n\n")
 
         navigator.clipboard.writeText(text)
-    }, [nodes, edges])
+    }, [nodes, edges, resolvePrompt])
+
+    // ── Custom prompts refresh ────────────────────────────────────
+    const handleCustomPromptsChange = useCallback(() => {
+        setCustomPrompts(loadCustomPrompts())
+    }, [])
+
+    const handlePromptCreated = useCallback(
+        (prompt: CustomPrompt) => {
+            handleCustomPromptsChange()
+            toast.success(`Created "${prompt.title}"`)
+        },
+        [handleCustomPromptsChange]
+    )
+
+    // ═══════════════════════════════════════════════════════════════
+    // ── AI Execution ──────────────────────────────────────────────
+    // ═══════════════════════════════════════════════════════════════
+
+    const executeNode = useCallback(
+        async (nodeId: string, signal?: AbortSignal): Promise<boolean> => {
+            // Get current node data
+            const node = nodes.find((n) => n.id === nodeId)
+            if (!node) return false
+
+            const data = node.data as {
+                customPrompt?: string
+                promptId?: string
+                userInput?: string
+            }
+
+            const prompt =
+                data.customPrompt ||
+                resolvePrompt(data.promptId ?? "")?.defaultPrompt ||
+                ""
+
+            if (!prompt.trim()) {
+                updateNodeData(nodeId, { executionStatus: "error", error: "No prompt text" })
+                return false
+            }
+
+            // Determine input: user input > upstream output > empty
+            const upstreamOutput = getUpstreamOutput(nodeId, nodes, edges)
+            const input = data.userInput?.trim() || upstreamOutput || ""
+
+            // Set running state
+            updateNodeData(nodeId, { executionStatus: "running", output: "", error: undefined })
+
+            try {
+                const response = await fetch("/api/agents/execute", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ prompt, input }),
+                    signal,
+                })
+
+                if (!response.ok) {
+                    const err = await response.json().catch(() => ({ error: "Request failed" }))
+                    updateNodeData(nodeId, {
+                        executionStatus: "error",
+                        error: err.error || `HTTP ${response.status}`,
+                    })
+                    return false
+                }
+
+                // Read SSE stream
+                const reader = response.body?.getReader()
+                if (!reader) {
+                    updateNodeData(nodeId, { executionStatus: "error", error: "No response stream" })
+                    return false
+                }
+
+                const decoder = new TextDecoder()
+                let fullOutput = ""
+
+                while (true) {
+                    const { done, value } = await reader.read()
+                    if (done) break
+
+                    const chunk = decoder.decode(value, { stream: true })
+                    const lines = chunk.split("\n")
+
+                    for (const line of lines) {
+                        if (line.startsWith("data: ")) {
+                            const payload = line.slice(6).trim()
+                            if (payload === "[DONE]") break
+
+                            try {
+                                const parsed = JSON.parse(payload)
+                                if (parsed.error) {
+                                    updateNodeData(nodeId, {
+                                        executionStatus: "error",
+                                        error: parsed.error,
+                                        output: fullOutput,
+                                    })
+                                    return false
+                                }
+                                if (parsed.text) {
+                                    fullOutput += parsed.text
+                                    // Update output progressively
+                                    updateNodeData(nodeId, { output: fullOutput })
+                                }
+                            } catch {
+                                // Skip unparseable lines
+                            }
+                        }
+                    }
+                }
+
+                // Done — set to review state (HITL pattern)
+                updateNodeData(nodeId, {
+                    executionStatus: "review",
+                    output: fullOutput,
+                })
+                return true
+            } catch (err) {
+                if ((err as Error).name === "AbortError") {
+                    updateNodeData(nodeId, {
+                        executionStatus: "idle",
+                        error: undefined,
+                    })
+                    return false
+                }
+                updateNodeData(nodeId, {
+                    executionStatus: "error",
+                    error: (err as Error).message || "Execution failed",
+                })
+                return false
+            }
+        },
+        [nodes, edges, resolvePrompt, updateNodeData]
+    )
+
+    // ── Run single node ───────────────────────────────────────────
+    const handleRunNode = useCallback(
+        async (nodeId: string) => {
+            abortControllerRef.current = new AbortController()
+            const success = await executeNode(nodeId, abortControllerRef.current.signal)
+            if (success) {
+                // Select the node and open inspector to show output
+                setSelectedNodeId(nodeId)
+                setInspectorOpen(true)
+            }
+        },
+        [executeNode]
+    )
+
+    // ── Approve node (HITL) ───────────────────────────────────────
+    const handleApproveNode = useCallback(
+        (nodeId: string) => {
+            updateNodeData(nodeId, { executionStatus: "approved" })
+            toast.success("Output approved")
+        },
+        [updateNodeData]
+    )
+
+    // ── Approve and continue chain ────────────────────────────────
+    const handleApproveAndContinue = useCallback(
+        async (nodeId: string) => {
+            // Approve the current node
+            updateNodeData(nodeId, { executionStatus: "approved" })
+
+            // Find next node in chain
+            const nextEdge = edges.find((e) => e.source === nodeId)
+            if (!nextEdge) {
+                toast.success("Chain complete — all steps approved")
+                setIsChainRunning(false)
+                setChainProgress(undefined)
+                return
+            }
+
+            const nextNodeId = nextEdge.target
+            // Select and run next node
+            setSelectedNodeId(nextNodeId)
+            setInspectorOpen(true)
+
+            abortControllerRef.current = new AbortController()
+            await executeNode(nextNodeId, abortControllerRef.current.signal)
+        },
+        [edges, updateNodeData, executeNode]
+    )
+
+    // ── Run chain (HITL step-through) ─────────────────────────────
+    const handleRunChain = useCallback(async () => {
+        const orderedIds = getOrderedNodeIds(nodes, edges)
+        if (orderedIds.length === 0) return
+
+        setIsChainRunning(true)
+
+        // Find first node that isn't already approved
+        const startIdx = orderedIds.findIndex((id) => {
+            const node = nodes.find((n) => n.id === id)
+            const status = (node?.data as { executionStatus?: string })?.executionStatus
+            return status !== "approved"
+        })
+
+        if (startIdx === -1) {
+            toast.info("All steps already approved")
+            setIsChainRunning(false)
+            return
+        }
+
+        const nodeId = orderedIds[startIdx]
+        setChainProgress({ current: startIdx + 1, total: orderedIds.length })
+
+        // Select and run the first unapproved node
+        setSelectedNodeId(nodeId)
+        setInspectorOpen(true)
+
+        abortControllerRef.current = new AbortController()
+        await executeNode(nodeId, abortControllerRef.current.signal)
+
+        // Chain continues via handleApproveAndContinue (HITL pattern)
+    }, [nodes, edges, executeNode])
+
+    // ── Stop chain ────────────────────────────────────────────────
+    const handleStopChain = useCallback(() => {
+        abortControllerRef.current?.abort()
+        setIsChainRunning(false)
+        setChainProgress(undefined)
+        toast.info("Chain execution stopped")
+    }, [])
+
+    // ── Keyboard shortcuts ────────────────────────────────────────
+    useEffect(() => {
+        const handler = (e: KeyboardEvent) => {
+            // Cmd+Enter: Run selected node
+            if ((e.metaKey || e.ctrlKey) && e.key === "Enter" && !e.shiftKey) {
+                if (selectedNodeId) {
+                    e.preventDefault()
+                    handleRunNode(selectedNodeId)
+                }
+            }
+            // Cmd+Shift+Enter: Run chain
+            if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === "Enter") {
+                e.preventDefault()
+                handleRunChain()
+            }
+            // Cmd+S: Save
+            if ((e.metaKey || e.ctrlKey) && e.key === "s") {
+                e.preventDefault()
+                handleSave()
+                toast.success("Workflow saved")
+            }
+        }
+        window.addEventListener("keydown", handler)
+        return () => window.removeEventListener("keydown", handler)
+    }, [selectedNodeId, handleRunNode, handleRunChain, handleSave])
 
     return (
         <div className="flex flex-col h-[calc(100vh-2rem)] -m-4 sm:-m-6 lg:-m-8">
@@ -315,6 +657,10 @@ function AgentsFlowInner() {
                 onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
                 sidebarOpen={sidebarOpen}
                 nodeCount={nodes.length}
+                onRunChain={handleRunChain}
+                onStopChain={handleStopChain}
+                isChainRunning={isChainRunning}
+                chainProgress={chainProgress}
             />
 
             <div className="flex flex-1 overflow-hidden">
@@ -322,6 +668,9 @@ function AgentsFlowInner() {
                 {sidebarOpen && (
                     <PromptLibrarySidebar
                         onClose={() => setSidebarOpen(false)}
+                        onCreatePrompt={() => setCreatePromptOpen(true)}
+                        customPrompts={customPrompts}
+                        onCustomPromptsChange={handleCustomPromptsChange}
                     />
                 )}
 
@@ -354,6 +703,12 @@ function AgentsFlowInner() {
                             className="!bg-white !border-slate-200 !shadow-sm"
                             maskColor="rgba(248, 250, 252, 0.7)"
                             nodeColor={(n) => {
+                                const status = (n.data as { executionStatus?: string })?.executionStatus
+                                if (status === "running") return "#3b82f6"
+                                if (status === "review") return "#f59e0b"
+                                if (status === "approved") return "#10b981"
+                                if (status === "error") return "#ef4444"
+
                                 const cat = (n.data as { category?: string })?.category
                                 const colors: Record<string, string> = {
                                     "startup-strategy": "#ea580c",
@@ -403,16 +758,22 @@ function AgentsFlowInner() {
                                     Build your AI workflow
                                 </h3>
                                 <p className="text-sm text-muted-foreground mb-4 leading-relaxed">
-                                    Drag prompts from the sidebar onto the canvas, then connect them
-                                    to create powerful daisy-chained AI workflows. Copy the full
-                                    chain to paste into any LLM.
+                                    Drag prompts from the sidebar, connect them into chains, add your data, then hit <strong>Run Chain</strong> to execute with AI. Review each step before continuing.
                                 </p>
-                                <button
-                                    onClick={() => setTemplatesOpen(true)}
-                                    className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-international-orange hover:bg-orange-600 rounded-lg transition-colors shadow-sm"
-                                >
-                                    Start from a template
-                                </button>
+                                <div className="flex items-center justify-center gap-3">
+                                    <button
+                                        onClick={() => setTemplatesOpen(true)}
+                                        className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-international-orange hover:bg-orange-600 rounded-lg transition-colors shadow-sm"
+                                    >
+                                        Start from a template
+                                    </button>
+                                    <button
+                                        onClick={() => setCreatePromptOpen(true)}
+                                        className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-foreground bg-white border border-slate-200 hover:bg-slate-50 rounded-lg transition-colors"
+                                    >
+                                        Create a prompt
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     )}
@@ -427,7 +788,13 @@ function AgentsFlowInner() {
                             setSelectedNodeId(null)
                         }}
                         onUpdatePrompt={handleUpdateNodePrompt}
+                        onUpdateInput={handleUpdateNodeInput}
+                        onUpdateOutput={handleUpdateNodeOutput}
+                        onUpdateFiles={handleUpdateNodeFiles}
                         onDelete={handleDeleteNode}
+                        onRunNode={handleRunNode}
+                        onApproveNode={handleApproveNode}
+                        onApproveAndContinue={handleApproveAndContinue}
                     />
                 )}
             </div>
@@ -437,6 +804,13 @@ function AgentsFlowInner() {
                 open={templatesOpen}
                 onOpenChange={setTemplatesOpen}
                 onSelectTemplate={handleLoadTemplate}
+            />
+
+            {/* Create prompt dialog */}
+            <CreatePromptDialog
+                open={createPromptOpen}
+                onOpenChange={setCreatePromptOpen}
+                onPromptCreated={handlePromptCreated}
             />
         </div>
     )

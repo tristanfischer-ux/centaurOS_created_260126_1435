@@ -142,6 +142,17 @@ export const CATEGORY_ACCENT_COLORS: Record<PromptCategory, string> = {
     "data-analytics": "#4f46e5",
 }
 
+// ─── Execution States (HITL pattern) ─────────────────────────────────
+export type ExecutionStatus = "idle" | "running" | "review" | "approved" | "error"
+
+// ─── Attached Files ──────────────────────────────────────────────────
+export interface AttachedFile {
+    name: string
+    content: string // text content read client-side
+    type: string // MIME type
+    size: number // bytes
+}
+
 // ─── Prompt Template ─────────────────────────────────────────────────
 export interface PromptTemplate {
     id: string
@@ -156,20 +167,36 @@ export interface PromptTemplate {
     suggestedNext: string[] // IDs of prompts that chain well after this one
 }
 
+// ─── Custom Prompt (user-created) ────────────────────────────────────
+export interface CustomPrompt extends PromptTemplate {
+    isCustom: true
+    createdAt: string
+    updatedAt: string
+}
+
+// ─── Node Data (extends ReactFlow node data) ─────────────────────────
+export interface PromptNodeData {
+    promptId?: string
+    label: string
+    description?: string
+    category?: PromptCategory
+    icon?: string
+    customPrompt?: string
+    triggerType?: string
+    // Input / output / execution
+    userInput?: string
+    output?: string
+    executionStatus?: ExecutionStatus
+    error?: string
+    attachedFiles?: AttachedFile[]
+}
+
 // ─── Workflow Types ──────────────────────────────────────────────────
 export interface WorkflowNode {
     id: string
     type: "prompt" | "trigger" | "output"
     position: { x: number; y: number }
-    data: {
-        promptId?: string
-        label: string
-        description?: string
-        category?: PromptCategory
-        icon?: string
-        customPrompt?: string
-        triggerType?: string
-    }
+    data: PromptNodeData
 }
 
 export interface WorkflowEdge {

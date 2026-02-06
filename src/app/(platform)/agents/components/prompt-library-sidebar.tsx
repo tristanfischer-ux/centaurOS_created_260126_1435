@@ -1,46 +1,84 @@
 "use client"
 
-import React, { useState, useMemo } from "react"
-import { Search, X, GripVertical } from "lucide-react"
+import React, { useState, useMemo, useEffect } from "react"
+import { Search, X, GripVertical, Plus, Trash2, User } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import { Button } from "@/components/ui/button"
 import { PROMPT_LIBRARY, searchPrompts, getPromptsByCategory } from "../lib/prompt-library"
-import { CATEGORY_META, PROMPT_CATEGORIES, CATEGORY_ACCENT_COLORS, type PromptCategory } from "../lib/agent-types"
+import { CATEGORY_META, PROMPT_CATEGORIES, CATEGORY_ACCENT_COLORS, type PromptCategory, type CustomPrompt, type PromptTemplate } from "../lib/agent-types"
+import { loadCustomPrompts, deleteCustomPrompt } from "../lib/custom-prompts"
 import { getIcon } from "./prompt-node"
 import { cn } from "@/lib/utils"
 
 interface PromptLibrarySidebarProps {
     onClose: () => void
+    onCreatePrompt: () => void
+    customPrompts: CustomPrompt[]
+    onCustomPromptsChange: () => void
 }
 
-export function PromptLibrarySidebar({ onClose }: PromptLibrarySidebarProps) {
+export function PromptLibrarySidebar({ onClose, onCreatePrompt, customPrompts, onCustomPromptsChange }: PromptLibrarySidebarProps) {
     const [searchQuery, setSearchQuery] = useState("")
-    const [activeCategory, setActiveCategory] = useState<PromptCategory | "all">("all")
+    const [activeCategory, setActiveCategory] = useState<PromptCategory | "all" | "custom">("all")
+
+    // Combine library + custom for search
+    const allPrompts = useMemo(() => {
+        return [...PROMPT_LIBRARY, ...customPrompts] as PromptTemplate[]
+    }, [customPrompts])
 
     const filteredPrompts = useMemo(() => {
-        let prompts = PROMPT_LIBRARY
-        if (searchQuery.trim()) {
-            prompts = searchPrompts(searchQuery)
-        }
-        if (activeCategory !== "all") {
+        let prompts = allPrompts
+        if (activeCategory === "custom") {
+            prompts = customPrompts
+        } else if (activeCategory !== "all") {
             prompts = prompts.filter((p) => p.category === activeCategory)
         }
+        if (searchQuery.trim()) {
+            const q = searchQuery.toLowerCase()
+            prompts = prompts.filter(
+                (p) =>
+                    p.title.toLowerCase().includes(q) ||
+                    p.description.toLowerCase().includes(q) ||
+                    p.tags.some((t) => t.toLowerCase().includes(q))
+            )
+        }
         return prompts
-    }, [searchQuery, activeCategory])
+    }, [searchQuery, activeCategory, allPrompts, customPrompts])
 
     // Group by category for display
     const groupedPrompts = useMemo(() => {
-        const groups: Record<string, typeof filteredPrompts> = {}
+        const groups: Record<string, PromptTemplate[]> = {}
+
+        // Custom prompts first if viewing "all"
+        if (activeCategory !== "custom") {
+            const customs = filteredPrompts.filter((p) => "isCustom" in p)
+            if (customs.length > 0) {
+                groups["_custom"] = customs
+            }
+        }
+
         for (const p of filteredPrompts) {
+            if ("isCustom" in p && activeCategory !== "custom") continue
             if (!groups[p.category]) groups[p.category] = []
             groups[p.category].push(p)
         }
+
+        if (activeCategory === "custom") {
+            return { _custom: filteredPrompts }
+        }
+
         return groups
-    }, [filteredPrompts])
+    }, [filteredPrompts, activeCategory])
 
     const onDragStart = (event: React.DragEvent, promptId: string) => {
         event.dataTransfer.setData("application/promptId", promptId)
         event.dataTransfer.effectAllowed = "move"
+    }
+
+    const handleDeleteCustom = (id: string) => {
+        deleteCustomPrompt(id)
+        onCustomPromptsChange()
     }
 
     return (
@@ -51,12 +89,23 @@ export function PromptLibrarySidebar({ onClose }: PromptLibrarySidebarProps) {
                     <h2 className="text-sm font-semibold text-foreground">
                         Prompt Library
                     </h2>
-                    <button
-                        onClick={onClose}
-                        className="p-1 rounded-md hover:bg-slate-100 text-muted-foreground"
-                    >
-                        <X className="w-4 h-4" />
-                    </button>
+                    <div className="flex items-center gap-1">
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={onCreatePrompt}
+                            className="h-7 px-2 text-[11px] gap-1"
+                        >
+                            <Plus className="w-3 h-3" />
+                            Create
+                        </Button>
+                        <button
+                            onClick={onClose}
+                            className="p-1 rounded-md hover:bg-slate-100 text-muted-foreground"
+                        >
+                            <X className="w-4 h-4" />
+                        </button>
+                    </div>
                 </div>
 
                 {/* Search */}
@@ -83,8 +132,21 @@ export function PromptLibrarySidebar({ onClose }: PromptLibrarySidebarProps) {
                                 : "bg-slate-100 text-muted-foreground hover:bg-slate-200"
                         )}
                     >
-                        All ({PROMPT_LIBRARY.length})
+                        All ({allPrompts.length})
                     </button>
+                    {customPrompts.length > 0 && (
+                        <button
+                            onClick={() => setActiveCategory("custom")}
+                            className={cn(
+                                "px-2.5 py-1 rounded-full text-[11px] font-medium transition-colors",
+                                activeCategory === "custom"
+                                    ? "bg-orange-500 text-white"
+                                    : "bg-orange-50 text-orange-600 hover:bg-orange-100"
+                            )}
+                        >
+                            My Prompts ({customPrompts.length})
+                        </button>
+                    )}
                     {PROMPT_CATEGORIES.map((cat) => {
                         const meta = CATEGORY_META[cat]
                         const count = getPromptsByCategory(cat).length
@@ -119,24 +181,35 @@ export function PromptLibrarySidebar({ onClose }: PromptLibrarySidebarProps) {
             <ScrollArea className="flex-1">
                 <div className="p-3 space-y-4">
                     {Object.entries(groupedPrompts).map(([category, prompts]) => {
-                        const meta = CATEGORY_META[category as PromptCategory]
-                        if (!meta) return null
+                        const isCustomGroup = category === "_custom"
+                        const meta = isCustomGroup ? null : CATEGORY_META[category as PromptCategory]
 
                         return (
                             <div key={category}>
                                 <div className="flex items-center gap-2 px-1 mb-2">
-                                    <div
-                                        className="w-2 h-2 rounded-full"
-                                        style={{
-                                            backgroundColor:
-                                                CATEGORY_ACCENT_COLORS[
-                                                    category as PromptCategory
-                                                ],
-                                        }}
-                                    />
-                                    <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
-                                        {meta.label}
-                                    </span>
+                                    {isCustomGroup ? (
+                                        <>
+                                            <User className="w-3 h-3 text-orange-500" />
+                                            <span className="text-[11px] font-semibold text-orange-600 uppercase tracking-wider">
+                                                My Prompts
+                                            </span>
+                                        </>
+                                    ) : meta ? (
+                                        <>
+                                            <div
+                                                className="w-2 h-2 rounded-full"
+                                                style={{
+                                                    backgroundColor:
+                                                        CATEGORY_ACCENT_COLORS[
+                                                            category as PromptCategory
+                                                        ],
+                                                }}
+                                            />
+                                            <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
+                                                {meta.label}
+                                            </span>
+                                        </>
+                                    ) : null}
                                 </div>
 
                                 <div className="space-y-1">
@@ -146,6 +219,7 @@ export function PromptLibrarySidebar({ onClose }: PromptLibrarySidebarProps) {
                                             CATEGORY_ACCENT_COLORS[
                                                 prompt.category
                                             ]
+                                        const isCustom = "isCustom" in prompt
 
                                         return (
                                             <div
@@ -176,6 +250,18 @@ export function PromptLibrarySidebar({ onClose }: PromptLibrarySidebarProps) {
                                                         {prompt.description}
                                                     </p>
                                                 </div>
+                                                {isCustom && (
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation()
+                                                            e.preventDefault()
+                                                            handleDeleteCustom(prompt.id)
+                                                        }}
+                                                        className="p-1 rounded hover:bg-red-50 text-muted-foreground hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all flex-shrink-0"
+                                                    >
+                                                        <Trash2 className="w-3 h-3" />
+                                                    </button>
+                                                )}
                                             </div>
                                         )
                                     })}
@@ -189,6 +275,17 @@ export function PromptLibrarySidebar({ onClose }: PromptLibrarySidebarProps) {
                             <p className="text-sm text-muted-foreground">
                                 No prompts found
                             </p>
+                            {activeCategory === "custom" && (
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={onCreatePrompt}
+                                    className="mt-2 gap-1.5 text-xs"
+                                >
+                                    <Plus className="w-3.5 h-3.5" />
+                                    Create your first prompt
+                                </Button>
+                            )}
                         </div>
                     )}
                 </div>
