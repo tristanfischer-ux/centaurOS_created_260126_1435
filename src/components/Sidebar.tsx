@@ -37,8 +37,8 @@ const workNavigation = [
     { name: "Home", href: "/dashboard", icon: Home, tooltip: "Your personalized command center with insights and quick actions" },
     { name: "Inbox", href: "/home", icon: Inbox, tooltip: "Messages, activity feed, and conversations" },
     { name: "Updates", href: "/new-inbox", icon: Bell, tooltip: "All notes, comments, and changes across your tasks and objectives" },
-    { name: "Objectives", href: "/objectives", icon: Target, tooltip: "Set and track high-level strategic goals" },
-    { name: "Tasks", href: "/tasks", icon: CheckSquare, tooltip: "Manage and assign actionable items" },
+    { name: "Objectives", href: "/new-objectives", icon: Target, tooltip: "Set and track high-level strategic goals" },
+    { name: "Tasks", href: "/new-tasks", icon: CheckSquare, tooltip: "Manage and assign actionable items" },
     { name: "Team", href: "/team", icon: Users, tooltip: "Team members, roles, and capacity" },
     { name: "Agents", href: "/agents", icon: Bot, tooltip: "AI prompt workflows — build, chain, and copy prompts" },
 ]
