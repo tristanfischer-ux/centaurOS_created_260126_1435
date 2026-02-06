@@ -18,6 +18,7 @@ import {
     CalendarDays,
     ArrowLeft,
     X,
+    Heart,
     Bot,
     Sparkles,
     BarChart3,
@@ -26,10 +27,14 @@ import {
     MinusCircle,
 } from 'lucide-react'
 import Link from 'next/link'
+import { saveMarketplaceListing, unsaveMarketplaceListing } from '@/actions/marketplace'
+import { toast } from 'sonner'
 import type { MarketplaceListing } from '@/actions/marketplace'
 
 interface MarketplaceCompareViewProps {
     listings: MarketplaceListing[]
+    savedIds: Set<string>
+    onSaveToggle: (id: string) => void
     onBack: () => void
     onRemove: (id: string) => void
 }
@@ -224,9 +229,27 @@ function getBestIndex(listings: MarketplaceListing[], key: string): number | nul
 
 export function MarketplaceCompareView({
     listings,
+    savedIds,
+    onSaveToggle,
     onBack,
     onRemove,
 }: MarketplaceCompareViewProps) {
+    const handleSave = async (listingId: string) => {
+        const isSaved = savedIds.has(listingId)
+        try {
+            const result = isSaved
+                ? await unsaveMarketplaceListing(listingId)
+                : await saveMarketplaceListing(listingId)
+            if (result.error) {
+                toast.error(result.error)
+            } else {
+                onSaveToggle(listingId)
+                toast.success(isSaved ? 'Removed from favourites' : 'Added to favourites')
+            }
+        } catch {
+            toast.error('Failed to update')
+        }
+    }
     const rows = getComparisonRows(listings)
     const colCount = listings.length
 
@@ -266,14 +289,28 @@ export function MarketplaceCompareView({
                                         style={{ width: `${Math.floor(100 / (colCount + 1))}%` }}
                                     >
                                         <div className="flex flex-col items-center gap-2 relative">
-                                            {/* Remove button */}
-                                            <button
-                                                onClick={() => onRemove(listing.id)}
-                                                className="absolute -top-1 -right-1 w-6 h-6 rounded-full bg-muted hover:bg-destructive/10 hover:text-destructive flex items-center justify-center transition-colors"
-                                                aria-label={`Remove ${listing.title} from comparison`}
-                                            >
-                                                <X className="w-3.5 h-3.5" />
-                                            </button>
+                                            {/* Save + Remove buttons */}
+                                            <div className="absolute -top-1 -right-1 flex items-center gap-1">
+                                                <button
+                                                    onClick={() => handleSave(listing.id)}
+                                                    className={cn(
+                                                        'w-7 h-7 rounded-full flex items-center justify-center transition-all',
+                                                        savedIds.has(listing.id)
+                                                            ? 'bg-red-500 text-white shadow-sm'
+                                                            : 'bg-muted text-muted-foreground hover:bg-red-50 hover:text-red-500'
+                                                    )}
+                                                    aria-label={savedIds.has(listing.id) ? 'Remove from favourites' : 'Add to favourites'}
+                                                >
+                                                    <Heart className={cn('w-3.5 h-3.5', savedIds.has(listing.id) && 'fill-current')} />
+                                                </button>
+                                                <button
+                                                    onClick={() => onRemove(listing.id)}
+                                                    className="w-7 h-7 rounded-full bg-muted hover:bg-destructive/10 hover:text-destructive flex items-center justify-center transition-colors"
+                                                    aria-label={`Remove ${listing.title} from comparison`}
+                                                >
+                                                    <X className="w-3.5 h-3.5" />
+                                                </button>
+                                            </div>
 
                                             {/* Avatar */}
                                             <div className={cn(
