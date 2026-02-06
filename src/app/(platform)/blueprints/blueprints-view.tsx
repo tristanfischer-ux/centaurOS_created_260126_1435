@@ -336,7 +336,7 @@ export function BlueprintsView({
                   </div>
                 </div>
                 <Button asChild className="bg-international-orange hover:bg-international-orange/90">
-                  <Link href="/marketplace-v2">
+                  <Link href="/marketplace">
                     Browse Marketplace
                     <ArrowRight className="ml-2 h-4 w-4" />
                   </Link>

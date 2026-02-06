@@ -268,7 +268,7 @@ export function FunctionCard({ businessFunction, onUpdate }: FunctionCardProps) 
                         </Dialog>
 
                         {businessFunction.coverage_status === 'gap' && (
-                            <Link href="/marketplace-v2">
+                            <Link href="/marketplace">
                                 <Button variant="ghost" size="sm" className="text-primary">
                                     <ShoppingBag className="h-3.5 w-3.5 mr-1" />
                                     Find Provider
