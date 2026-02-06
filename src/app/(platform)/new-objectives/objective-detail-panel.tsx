@@ -67,10 +67,10 @@ export function ObjectiveDetailPanel({ objective, onClose }: ObjectiveDetailPane
   const completedTasks = objective.tasks.filter(t => t.status === 'Completed')
 
   return (
-    <div className="h-full flex flex-col bg-white border-l border-slate-100 overflow-hidden">
+    <div className="h-full flex flex-col bg-white border-l border-slate-100 w-full max-w-full overflow-hidden">
       {/* Header */}
-      <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
-        <h2 className="text-base font-semibold text-foreground truncate pr-4">
+      <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 min-w-0">
+        <h2 className="text-base font-semibold text-foreground truncate pr-4 min-w-0">
           {objective.title}
         </h2>
         <Button variant="ghost" size="icon" onClick={onClose} className="flex-shrink-0 h-8 w-8">
@@ -78,8 +78,8 @@ export function ObjectiveDetailPanel({ objective, onClose }: ObjectiveDetailPane
         </Button>
       </div>
 
-      <ScrollArea className="flex-1 w-full">
-        <div className="p-5 space-y-6 overflow-hidden">
+      <ScrollArea className="flex-1 w-full max-w-full">
+        <div className="p-5 space-y-6 w-full max-w-full overflow-hidden">
           {/* Progress Section */}
           <div className="flex items-center gap-4">
             <ProgressRing progress={objective.progress} size={64} strokeWidth={5} variant={variant} />
@@ -106,12 +106,12 @@ export function ObjectiveDetailPanel({ objective, onClose }: ObjectiveDetailPane
           {objective.description && (
             <>
               <Separator />
-              <div className="space-y-2">
+              <div className="space-y-2 min-w-0 w-full">
                 <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                  <FileText className="h-3.5 w-3.5" />
+                  <FileText className="h-3.5 w-3.5 flex-shrink-0" />
                   Description
                 </div>
-                <p className="text-sm text-foreground leading-relaxed break-words">
+                <p className="text-sm text-foreground leading-relaxed break-words overflow-wrap-anywhere whitespace-pre-wrap" style={{ overflowWrap: 'anywhere', wordBreak: 'break-word' }}>
                   {objective.description}
                 </p>
               </div>
@@ -120,15 +120,15 @@ export function ObjectiveDetailPanel({ objective, onClose }: ObjectiveDetailPane
 
           {/* Extended description */}
           {objective.extended_description && (
-            <div className="space-y-2">
+            <div className="space-y-2 min-w-0 w-full">
               <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
                 Details
               </div>
-              <div className="text-sm text-foreground leading-relaxed break-words max-w-none">
+              <p className="text-sm text-foreground leading-relaxed break-words whitespace-pre-wrap" style={{ overflowWrap: 'anywhere', wordBreak: 'break-word' }}>
                 {objective.extended_description.length > 500
                   ? objective.extended_description.slice(0, 500) + '...'
                   : objective.extended_description}
-              </div>
+              </p>
             </div>
           )}
 
