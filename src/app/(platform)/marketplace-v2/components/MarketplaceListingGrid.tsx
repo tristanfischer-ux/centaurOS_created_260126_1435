@@ -5,7 +5,6 @@ import { MarketCardV2 } from './MarketCardV2'
 import { EmptyState } from '@/components/ui/empty-state'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Checkbox } from '@/components/ui/checkbox'
 import { cn } from '@/lib/utils'
 import {
     getCategoryBadgeClasses,
@@ -135,15 +134,22 @@ function ListRow({
             )}
             onClick={() => onViewDetail(listing)}
         >
-            {/* Compare checkbox */}
-            <div onClick={(e) => e.stopPropagation()} className="shrink-0">
-                <Checkbox
-                    checked={isSelectedForCompare}
-                    onCheckedChange={() => onToggleCompare(listing.id)}
-                    aria-label={`Select ${listing.title} for comparison`}
-                    className="h-4 w-4"
-                />
-            </div>
+            {/* Compare toggle */}
+            <button
+                onClick={(e) => {
+                    e.stopPropagation()
+                    onToggleCompare(listing.id)
+                }}
+                className={cn(
+                    'w-8 h-8 rounded-full flex items-center justify-center transition-all shrink-0',
+                    isSelectedForCompare
+                        ? 'bg-international-orange text-white shadow-md'
+                        : 'bg-muted text-muted-foreground opacity-0 group-hover:opacity-100'
+                )}
+                aria-label={isSelectedForCompare ? 'Remove from comparison' : 'Add to comparison'}
+            >
+                <Scale className={cn('w-3.5 h-3.5', isSelectedForCompare && 'fill-current')} />
+            </button>
 
             {/* Avatar */}
             <div className={cn(
@@ -374,34 +380,15 @@ export function MarketplaceListingGrid({
             {viewMode === 'cards' && (
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
                     {listings.map((listing) => (
-                        <div key={listing.id} className="relative">
-                            {/* Compare checkbox overlay on card */}
-                            <div
-                                className="absolute top-3 left-3 z-10"
-                                onClick={(e) => e.stopPropagation()}
-                            >
-                                <Checkbox
-                                    checked={selectedForCompare.has(listing.id)}
-                                    onCheckedChange={() => toggleCompare(listing.id)}
-                                    aria-label={`Select ${listing.title} for comparison`}
-                                    className={cn(
-                                        'h-5 w-5 border-2 bg-background/80 backdrop-blur-sm',
-                                        selectedForCompare.has(listing.id) && 'border-international-orange'
-                                    )}
-                                />
-                            </div>
-                            <div className={cn(
-                                'rounded-xl transition-all',
-                                selectedForCompare.has(listing.id) && 'ring-2 ring-international-orange/50'
-                            )}>
-                                <MarketCardV2
-                                    listing={listing}
-                                    isSaved={savedIds.has(listing.id)}
-                                    onSaveToggle={onSaveToggle}
-                                    onViewDetail={onViewDetail}
-                                />
-                            </div>
-                        </div>
+                        <MarketCardV2
+                            key={listing.id}
+                            listing={listing}
+                            isSaved={savedIds.has(listing.id)}
+                            isSelectedForCompare={selectedForCompare.has(listing.id)}
+                            onSaveToggle={onSaveToggle}
+                            onViewDetail={onViewDetail}
+                            onToggleCompare={toggleCompare}
+                        />
                     ))}
                 </div>
             )}

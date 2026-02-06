@@ -22,6 +22,7 @@ import {
     Zap,
     MapPin,
     Users,
+    Scale,
 } from 'lucide-react'
 import { saveMarketplaceListing, unsaveMarketplaceListing } from '@/actions/marketplace'
 import { toast } from 'sonner'
@@ -30,8 +31,10 @@ import type { MarketplaceListing } from '@/actions/marketplace'
 interface MarketCardV2Props {
     listing: MarketplaceListing
     isSaved: boolean
+    isSelectedForCompare?: boolean
     onSaveToggle: (id: string) => void
     onViewDetail: (listing: MarketplaceListing) => void
+    onToggleCompare?: (id: string) => void
 }
 
 /** Get icon for AI subcategories */
@@ -100,8 +103,10 @@ function getAvailability(attrs: Record<string, unknown>): string | null {
 export const MarketCardV2 = memo(function MarketCardV2({
     listing,
     isSaved,
+    isSelectedForCompare = false,
     onSaveToggle,
     onViewDetail,
+    onToggleCompare,
 }: MarketCardV2Props) {
     const [isSaving, setIsSaving] = useState(false)
     const [localSaved, setLocalSaved] = useState(isSaved)
@@ -151,24 +156,46 @@ export const MarketCardV2 = memo(function MarketCardV2({
             className={cn(
                 'group relative flex flex-col border shadow-sm overflow-hidden bg-background cursor-pointer',
                 'hover:shadow-lg hover:-translate-y-0.5 hover:border-muted-foreground/20',
-                'transition-all duration-200 ease-out'
+                'transition-all duration-200 ease-out',
+                isSelectedForCompare && 'ring-2 ring-international-orange/50 border-international-orange/30'
             )}
             onClick={() => onViewDetail(listing)}
         >
-            {/* Save button - top right */}
-            <button
-                onClick={handleSave}
-                disabled={isSaving}
-                className={cn(
-                    'absolute top-3 right-3 z-10 w-9 h-9 rounded-full flex items-center justify-center transition-all duration-200',
-                    localSaved
-                        ? 'bg-red-500 text-white shadow-md'
-                        : 'bg-background/80 backdrop-blur-sm text-muted-foreground opacity-0 group-hover:opacity-100 shadow-sm border'
+            {/* Action buttons - top right */}
+            <div className="absolute top-3 right-3 z-10 flex items-center gap-1.5">
+                {/* Compare button */}
+                {onToggleCompare && (
+                    <button
+                        onClick={(e) => {
+                            e.stopPropagation()
+                            onToggleCompare(listing.id)
+                        }}
+                        className={cn(
+                            'w-9 h-9 rounded-full flex items-center justify-center transition-all duration-200',
+                            isSelectedForCompare
+                                ? 'bg-international-orange text-white shadow-md'
+                                : 'bg-background/80 backdrop-blur-sm text-muted-foreground opacity-0 group-hover:opacity-100 shadow-sm border'
+                        )}
+                        aria-label={isSelectedForCompare ? 'Remove from comparison' : 'Add to comparison'}
+                    >
+                        <Scale className={cn('w-4 h-4', isSelectedForCompare && 'fill-current')} />
+                    </button>
                 )}
-                aria-label={localSaved ? 'Remove from saved' : 'Save for later'}
-            >
-                <Heart className={cn('w-4 h-4', localSaved && 'fill-current')} />
-            </button>
+                {/* Save button */}
+                <button
+                    onClick={handleSave}
+                    disabled={isSaving}
+                    className={cn(
+                        'w-9 h-9 rounded-full flex items-center justify-center transition-all duration-200',
+                        localSaved
+                            ? 'bg-red-500 text-white shadow-md'
+                            : 'bg-background/80 backdrop-blur-sm text-muted-foreground opacity-0 group-hover:opacity-100 shadow-sm border'
+                    )}
+                    aria-label={localSaved ? 'Remove from saved' : 'Save for later'}
+                >
+                    <Heart className={cn('w-4 h-4', localSaved && 'fill-current')} />
+                </button>
+            </div>
 
             <CardContent className="flex flex-col flex-1 p-5">
                 {/* Top section: Avatar + Meta */}
