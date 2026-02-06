@@ -21,7 +21,8 @@ import {
     ArrowRight,
     CheckCircle2,
     XCircle,
-    RefreshCw
+    RefreshCw,
+    BarChart3
 } from "lucide-react"
 
 // NOTE: For StatsCard, we pass icon names as strings to avoid
@@ -53,7 +54,7 @@ export default async function AdminDashboardPage() {
     return (
         <div className="space-y-6">
             {/* Stats Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 <StatsCard
                     iconName="ClipboardList"
                     label="Pending Applications"
@@ -80,11 +81,12 @@ export default async function AdminDashboardPage() {
             </div>
             
             {/* Platform Health Banner */}
-            <Card className={stats.platformHealth === 'critical' 
-                ? 'border-destructive bg-status-error-light' 
-                : stats.platformHealth === 'degraded' 
-                ? 'border-status-warning bg-status-warning-light'
-                : ''
+            <Card className={
+                stats.platformHealth === 'critical' 
+                    ? 'border-destructive/50 bg-gradient-to-r from-red-50/80 to-red-50/20 shadow-sm' 
+                    : stats.platformHealth === 'degraded' 
+                    ? 'border-status-warning/50 bg-gradient-to-r from-amber-50/80 to-amber-50/20 shadow-sm'
+                    : 'border-emerald-200/50 bg-gradient-to-r from-emerald-50/60 to-emerald-50/10 shadow-sm'
             }>
                 <CardContent className="p-4">
                     <div className="flex items-center justify-between">
@@ -103,7 +105,7 @@ export default async function AdminDashboardPage() {
                             />
                         </div>
                         <Link href="/admin/health">
-                            <Button variant="secondary" size="sm">
+                            <Button variant="secondary" size="sm" className="bg-white/80 hover:bg-white shadow-sm">
                                 View Details
                                 <ArrowRight className="h-4 w-4 ml-2" />
                             </Button>
@@ -115,12 +117,17 @@ export default async function AdminDashboardPage() {
             {/* Main Content Grid */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {/* Pending Applications */}
-                <Card>
-                    <CardHeader>
+                <Card className="border-slate-200 shadow-[0_2px_15px_rgba(0,0,0,0.03)] overflow-hidden">
+                    <CardHeader className="bg-gradient-to-r from-orange-50/60 to-transparent border-b border-slate-100">
                         <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                                <ClipboardList className="h-5 w-5 text-muted-foreground" />
-                                <CardTitle>Pending Applications</CardTitle>
+                            <div className="flex items-center gap-3">
+                                <div className="p-2 bg-orange-100 rounded-lg">
+                                    <ClipboardList className="h-4 w-4 text-international-orange" />
+                                </div>
+                                <div>
+                                    <CardTitle className="text-base">Pending Applications</CardTitle>
+                                    <CardDescription>Supplier applications awaiting review</CardDescription>
+                                </div>
                             </div>
                             <Link href="/admin/applications">
                                 <Button variant="ghost" size="sm">
@@ -129,9 +136,8 @@ export default async function AdminDashboardPage() {
                                 </Button>
                             </Link>
                         </div>
-                        <CardDescription>Supplier applications awaiting review</CardDescription>
                     </CardHeader>
-                    <CardContent>
+                    <CardContent className="p-6">
                         {pendingApps && pendingApps.length > 0 ? (
                             <div className="space-y-3">
                                 {pendingApps.slice(0, 5).map((app) => (
@@ -157,24 +163,28 @@ export default async function AdminDashboardPage() {
                 </Card>
                 
                 {/* Open Disputes */}
-                <Card>
-                    <CardHeader>
+                <Card className="border-slate-200 shadow-[0_2px_15px_rgba(0,0,0,0.03)] overflow-hidden">
+                    <CardHeader className="bg-gradient-to-r from-red-50/60 to-transparent border-b border-slate-100">
                         <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                                <AlertTriangle className="h-5 w-5 text-muted-foreground" />
-                                <CardTitle>Open Disputes</CardTitle>
+                            <div className="flex items-center gap-3">
+                                <div className="p-2 bg-red-100 rounded-lg">
+                                    <AlertTriangle className="h-4 w-4 text-red-600" />
+                                </div>
+                                <div>
+                                    <CardTitle className="text-base">Open Disputes</CardTitle>
+                                    <CardDescription>Disputes requiring attention</CardDescription>
+                                </div>
                             </div>
                             <Badge variant="secondary">{openDisputes?.length || 0} open</Badge>
                         </div>
-                        <CardDescription>Disputes requiring attention</CardDescription>
                     </CardHeader>
-                    <CardContent>
+                    <CardContent className="p-6">
                         {openDisputes && openDisputes.length > 0 ? (
                             <div className="space-y-3">
                                 {openDisputes.slice(0, 5).map((dispute) => (
                                     <div 
                                         key={dispute.id}
-                                        className="p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
+                                        className="p-3 rounded-lg bg-slate-50 hover:bg-slate-100/80 transition-colors border border-slate-100"
                                     >
                                         <div className="flex items-start justify-between gap-2">
                                             <div className="min-w-0 flex-1">
@@ -214,27 +224,31 @@ export default async function AdminDashboardPage() {
             </div>
             
             {/* Recent Activity */}
-            <Card>
-                <CardHeader>
-                    <div className="flex items-center gap-2">
-                        <Clock className="h-5 w-5 text-muted-foreground" />
-                        <CardTitle>Recent Activity</CardTitle>
+            <Card className="border-slate-200 shadow-[0_2px_15px_rgba(0,0,0,0.03)] overflow-hidden">
+                <CardHeader className="bg-gradient-to-r from-slate-50/80 to-transparent border-b border-slate-100">
+                    <div className="flex items-center gap-3">
+                        <div className="p-2 bg-slate-100 rounded-lg">
+                            <Clock className="h-4 w-4 text-slate-600" />
+                        </div>
+                        <div>
+                            <CardTitle className="text-base">Recent Activity</CardTitle>
+                            <CardDescription>Latest admin actions</CardDescription>
+                        </div>
                     </div>
-                    <CardDescription>Latest admin actions</CardDescription>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="p-6">
                     {recentActivity && recentActivity.length > 0 ? (
-                        <div className="space-y-2">
+                        <div className="space-y-1">
                             {recentActivity.map((activity) => (
                                 <div 
                                     key={activity.id}
-                                    className="flex items-center gap-3 p-2 rounded text-sm"
+                                    className="flex items-center gap-3 p-2.5 rounded-lg hover:bg-slate-50 transition-colors text-sm"
                                 >
-                                    <div className="p-1.5 rounded bg-muted">
+                                    <div className="p-1.5 rounded-lg bg-slate-100">
                                         {getActivityIcon(activity.action)}
                                     </div>
                                     <div className="flex-1 min-w-0">
-                                        <span className="text-foreground">
+                                        <span className="text-foreground font-medium">
                                             {formatActivityAction(activity.action)}
                                         </span>
                                         <span className="text-muted-foreground mx-1">
@@ -263,33 +277,47 @@ export default async function AdminDashboardPage() {
             </Card>
             
             {/* Quick Actions */}
-            <Card>
-                <CardHeader>
-                    <CardTitle>Quick Actions</CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <div className="flex flex-wrap gap-3">
-                        <Link href="/admin/applications">
-                            <Button variant="secondary">
-                                <ClipboardList className="h-4 w-4 mr-2" />
-                                Review Applications
-                            </Button>
-                        </Link>
-                        <Link href="/admin/health">
-                            <Button variant="secondary">
-                                <Activity className="h-4 w-4 mr-2" />
-                                View System Health
-                            </Button>
-                        </Link>
-                        <Link href="/admin/settings">
-                            <Button variant="secondary">
-                                <RefreshCw className="h-4 w-4 mr-2" />
-                                Admin Settings
-                            </Button>
-                        </Link>
-                    </div>
-                </CardContent>
-            </Card>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <Link href="/admin/applications" className="group">
+                    <Card className="h-full border-slate-200 hover:border-international-orange/40 hover:shadow-md transition-all duration-200 cursor-pointer">
+                        <CardContent className="p-5 flex items-start gap-4">
+                            <div className="p-2.5 bg-orange-100 rounded-lg group-hover:bg-orange-200/70 transition-colors">
+                                <ClipboardList className="h-5 w-5 text-international-orange" />
+                            </div>
+                            <div>
+                                <p className="font-medium text-foreground group-hover:text-international-orange transition-colors">Review Applications</p>
+                                <p className="text-sm text-muted-foreground mt-0.5">Manage supplier applications and approvals</p>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </Link>
+                <Link href="/admin/health" className="group">
+                    <Card className="h-full border-slate-200 hover:border-emerald-400/40 hover:shadow-md transition-all duration-200 cursor-pointer">
+                        <CardContent className="p-5 flex items-start gap-4">
+                            <div className="p-2.5 bg-emerald-100 rounded-lg group-hover:bg-emerald-200/70 transition-colors">
+                                <Activity className="h-5 w-5 text-emerald-600" />
+                            </div>
+                            <div>
+                                <p className="font-medium text-foreground group-hover:text-emerald-600 transition-colors">System Health</p>
+                                <p className="text-sm text-muted-foreground mt-0.5">Monitor platform health and performance</p>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </Link>
+                <Link href="/admin/analytics" className="group">
+                    <Card className="h-full border-slate-200 hover:border-blue-400/40 hover:shadow-md transition-all duration-200 cursor-pointer">
+                        <CardContent className="p-5 flex items-start gap-4">
+                            <div className="p-2.5 bg-blue-100 rounded-lg group-hover:bg-blue-200/70 transition-colors">
+                                <BarChart3 className="h-5 w-5 text-blue-600" />
+                            </div>
+                            <div>
+                                <p className="font-medium text-foreground group-hover:text-blue-600 transition-colors">Analytics</p>
+                                <p className="text-sm text-muted-foreground mt-0.5">Platform-wide metrics and insights</p>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </Link>
+            </div>
         </div>
     )
 }

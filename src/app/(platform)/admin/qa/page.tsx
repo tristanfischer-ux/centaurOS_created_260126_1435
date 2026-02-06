@@ -8,21 +8,8 @@ import { QATestPanel } from "./qa-test-panel"
 export default async function QATestsPage() {
     return (
         <div className="space-y-6">
-            {/* Header */}
-            <div>
-                <div className="flex items-center gap-2 mb-1">
-                    <FlaskConical className="h-5 w-5 text-international-orange" />
-                    <h2 className="text-xl font-semibold text-foreground">
-                        QA Testing
-                    </h2>
-                </div>
-                <p className="text-sm text-muted-foreground">
-                    Run &quot;Day in the Life&quot; E2E tests for Executive, Founder, and Apprentice personas
-                </p>
-            </div>
-            
             {/* Info Banner */}
-            <Card className="border-status-info bg-status-info-light">
+            <Card className="border-status-info/50 bg-gradient-to-r from-blue-50/80 to-blue-50/20 shadow-sm">
                 <CardContent className="p-4">
                     <div className="flex items-start gap-3">
                         <AlertCircle className="h-5 w-5 text-status-info shrink-0 mt-0.5" />

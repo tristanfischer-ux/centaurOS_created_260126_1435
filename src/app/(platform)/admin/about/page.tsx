@@ -178,50 +178,66 @@ export default function AdminAboutPage() {
             
             {/* Stats Overview */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <Card>
-                    <CardContent className="pt-6">
+                <Card className="border-slate-200 shadow-[0_2px_15px_rgba(0,0,0,0.03)] overflow-hidden">
+                    <CardHeader className="from-blue-50/60 bg-blue-100">
+                        <CardTitle className="flex items-center gap-2">
+                            <div className="p-2 bg-blue-100 rounded-lg"><Code className="h-4 w-4 text-blue-600" /></div>
+                            Version
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-6">
                         <div className="flex items-center justify-between">
                             <div>
-                                <p className="text-sm text-muted-foreground">Version</p>
                                 <p className="text-2xl font-bold text-foreground">v{APP_VERSION}</p>
                             </div>
-                            <Code className="h-8 w-8 text-muted-foreground" />
                         </div>
                     </CardContent>
                 </Card>
                 
-                <Card>
-                    <CardContent className="pt-6">
+                <Card className="border-slate-200 shadow-[0_2px_15px_rgba(0,0,0,0.03)] overflow-hidden">
+                    <CardHeader className="from-blue-50/60 bg-blue-100">
+                        <CardTitle className="flex items-center gap-2">
+                            <div className="p-2 bg-blue-100 rounded-lg"><Target className="h-4 w-4 text-blue-600" /></div>
+                            Total Features
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-6">
                         <div className="flex items-center justify-between">
                             <div>
-                                <p className="text-sm text-muted-foreground">Total Features</p>
                                 <p className="text-2xl font-bold text-foreground">{totalFeatures}</p>
                             </div>
-                            <Target className="h-8 w-8 text-muted-foreground" />
                         </div>
                     </CardContent>
                 </Card>
                 
-                <Card>
-                    <CardContent className="pt-6">
+                <Card className="border-slate-200 shadow-[0_2px_15px_rgba(0,0,0,0.03)] overflow-hidden">
+                    <CardHeader className="from-blue-50/60 bg-blue-100">
+                        <CardTitle className="flex items-center gap-2">
+                            <div className="p-2 bg-blue-100 rounded-lg"><Sparkles className="h-4 w-4 text-blue-600" /></div>
+                            New Features
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-6">
                         <div className="flex items-center justify-between">
                             <div>
-                                <p className="text-sm text-muted-foreground">New Features</p>
                                 <p className="text-2xl font-bold text-international-orange">{newFeatures.length}</p>
                             </div>
-                            <Sparkles className="h-8 w-8 text-international-orange" />
                         </div>
                     </CardContent>
                 </Card>
                 
-                <Card>
-                    <CardContent className="pt-6">
+                <Card className="border-slate-200 shadow-[0_2px_15px_rgba(0,0,0,0.03)] overflow-hidden">
+                    <CardHeader className="from-blue-50/60 bg-blue-100">
+                        <CardTitle className="flex items-center gap-2">
+                            <div className="p-2 bg-blue-100 rounded-lg"><EyeOff className="h-4 w-4 text-blue-600" /></div>
+                            Hidden Features
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-6">
                         <div className="flex items-center justify-between">
                             <div>
-                                <p className="text-sm text-muted-foreground">Hidden Features</p>
                                 <p className="text-2xl font-bold text-muted-foreground">{hiddenFeatures.length}</p>
                             </div>
-                            <EyeOff className="h-8 w-8 text-muted-foreground" />
                         </div>
                     </CardContent>
                 </Card>
@@ -229,10 +245,10 @@ export default function AdminAboutPage() {
             
             {/* New Features Section */}
             {newFeatures.length > 0 && (
-                <Card>
-                    <CardHeader>
+                <Card className="border-slate-200 shadow-[0_2px_15px_rgba(0,0,0,0.03)] overflow-hidden">
+                    <CardHeader className="from-amber-50/60 bg-amber-100">
                         <CardTitle className="flex items-center gap-2">
-                            <Sparkles className="h-5 w-5 text-international-orange" />
+                            <div className="p-2 bg-amber-100 rounded-lg"><Sparkles className="h-4 w-4 text-amber-600" /></div>
                             What&apos;s New
                         </CardTitle>
                         <CardDescription>
@@ -248,10 +264,10 @@ export default function AdminAboutPage() {
             )}
             
             {/* Hidden Features Section */}
-            <Card>
-                <CardHeader>
+            <Card className="border-slate-200 shadow-[0_2px_15px_rgba(0,0,0,0.03)] overflow-hidden">
+                <CardHeader className="from-amber-50/60 bg-amber-100">
                     <CardTitle className="flex items-center gap-2">
-                        <EyeOff className="h-5 w-5 text-muted-foreground" />
+                        <div className="p-2 bg-amber-100 rounded-lg"><EyeOff className="h-4 w-4 text-amber-600" /></div>
                         Hidden Features
                     </CardTitle>
                     <CardDescription>
@@ -267,10 +283,10 @@ export default function AdminAboutPage() {
             </Card>
             
             {/* Full Changelog */}
-            <Card>
-                <CardHeader>
+            <Card className="border-slate-200 shadow-[0_2px_15px_rgba(0,0,0,0.03)] overflow-hidden">
+                <CardHeader className="from-slate-50/80">
                     <CardTitle className="flex items-center gap-2">
-                        <Clock className="h-5 w-5 text-muted-foreground" />
+                        <div className="p-2 bg-slate-100 rounded-lg"><Clock className="h-4 w-4 text-slate-600" /></div>
                         Full Changelog
                     </CardTitle>
                     <CardDescription>
@@ -295,14 +311,14 @@ export default function AdminAboutPage() {
             </Card>
             
             {/* System Information */}
-            <Card>
-                <CardHeader>
+            <Card className="border-slate-200 shadow-[0_2px_15px_rgba(0,0,0,0.03)] overflow-hidden">
+                <CardHeader className="from-emerald-50/60 bg-emerald-100">
                     <CardTitle className="flex items-center gap-2">
-                        <Code className="h-5 w-5 text-muted-foreground" />
+                        <div className="p-2 bg-emerald-100 rounded-lg"><Code className="h-4 w-4 text-emerald-600" /></div>
                         System Information
                     </CardTitle>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="p-6">
                     <dl className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
                         <div>
                             <dt className="text-muted-foreground">Version</dt>

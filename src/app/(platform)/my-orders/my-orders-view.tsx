@@ -7,12 +7,16 @@ import {
     CheckCircle,
     XCircle,
     Search,
-    ArrowUpDown
+    ArrowUpDown,
+    AlertCircle,
+    TrendingUp,
+    Package
 } from 'lucide-react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 import {
     Select,
     SelectContent,
@@ -22,6 +26,7 @@ import {
 } from '@/components/ui/select'
 import { OrderSummaryCard } from '@/components/buyer/OrderSummaryCard'
 import { EmptyState } from '@/components/ui/empty-state'
+import { toast } from 'sonner'
 import type { OrderSummary } from '@/types/booking'
 
 // ==========================================
@@ -32,6 +37,7 @@ interface MyOrdersViewProps {
     activeOrders: OrderSummary[]
     completedOrders: OrderSummary[]
     cancelledOrders: OrderSummary[]
+    errors?: string[]
 }
 
 // ==========================================
@@ -41,11 +47,17 @@ interface MyOrdersViewProps {
 export function MyOrdersView({
     activeOrders,
     completedOrders,
-    cancelledOrders
+    cancelledOrders,
+    errors = []
 }: MyOrdersViewProps) {
     const router = useRouter()
     const [searchQuery, setSearchQuery] = useState('')
     const [sortBy, setSortBy] = useState<'newest' | 'oldest' | 'amount'>('newest')
+
+    // Summary stats
+    const totalOrders = activeOrders.length + completedOrders.length + cancelledOrders.length
+    const totalSpend = [...activeOrders, ...completedOrders].reduce((sum, o) => sum + o.totalAmount, 0)
+    const currency = activeOrders[0]?.currency || completedOrders[0]?.currency || 'GBP'
 
     // Filter and sort orders
     const filterOrders = (orders: OrderSummary[]) => {
@@ -84,7 +96,7 @@ export function MyOrdersView({
 
     // Handlers
     const handleViewDetails = (orderId: string) => {
-        router.push(`/my-orders/${orderId}`)
+        router.push(`/orders/${orderId}`)
     }
 
     const handleMessageProvider = (orderId: string) => {
@@ -92,11 +104,13 @@ export function MyOrdersView({
         const order = [...activeOrders, ...completedOrders, ...cancelledOrders].find(o => o.id === orderId)
         if (order?.conversationId) {
             router.push(`/messages/${order.conversationId}`)
+        } else {
+            toast.info('No conversation found. View the order details to start a new message.')
         }
     }
 
     const handleLeaveReview = (orderId: string) => {
-        router.push(`/my-orders/${orderId}?action=review`)
+        router.push(`/orders/${orderId}?action=review`)
     }
 
     // Empty state renderer
@@ -155,21 +169,65 @@ export function MyOrdersView({
         )
     }
 
+    const formatCurrency = (amount: number) => {
+        return `${currency} ${amount.toLocaleString('en-GB', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
+    }
+
     return (
         <div className="space-y-6">
+            {/* Error Banner */}
+            {errors.length > 0 && (
+                <Alert variant="destructive">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription>
+                        {errors.length === 1 
+                            ? errors[0]
+                            : `Failed to load some orders: ${errors.join('; ')}`
+                        }
+                    </AlertDescription>
+                </Alert>
+            )}
+
+            {/* Summary Stats */}
+            {totalOrders > 0 && (
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                    <div className="p-4 rounded-xl bg-slate-50 border border-slate-100">
+                        <div className="flex items-center gap-2 mb-1">
+                            <Package className="h-4 w-4 text-muted-foreground" />
+                            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Total Orders</span>
+                        </div>
+                        <p className="text-2xl font-semibold text-foreground">{totalOrders}</p>
+                    </div>
+                    <div className="p-4 rounded-xl bg-slate-50 border border-slate-100">
+                        <div className="flex items-center gap-2 mb-1">
+                            <TrendingUp className="h-4 w-4 text-muted-foreground" />
+                            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Total Spend</span>
+                        </div>
+                        <p className="text-2xl font-semibold text-foreground">{formatCurrency(totalSpend)}</p>
+                    </div>
+                    <div className="p-4 rounded-xl bg-slate-50 border border-slate-100 hidden sm:block">
+                        <div className="flex items-center gap-2 mb-1">
+                            <ShoppingBag className="h-4 w-4 text-muted-foreground" />
+                            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Active</span>
+                        </div>
+                        <p className="text-2xl font-semibold text-foreground">{activeOrders.length}</p>
+                    </div>
+                </div>
+            )}
+
             {/* Search and Filters */}
-            <div className="flex flex-col sm:flex-row gap-4">
+            <div className="flex flex-col sm:flex-row gap-3">
                 <div className="relative flex-1">
                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
                         placeholder="Search orders..."
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        className="pl-10"
+                        className="pl-10 border-slate-200"
                     />
                 </div>
                 <Select value={sortBy} onValueChange={(value) => setSortBy(value as typeof sortBy)}>
-                    <SelectTrigger className="w-full sm:w-[180px]">
+                    <SelectTrigger className="w-full sm:w-[180px] border-slate-200">
                         <ArrowUpDown className="h-4 w-4 mr-2" />
                         <SelectValue placeholder="Sort by" />
                     </SelectTrigger>
@@ -188,7 +246,7 @@ export function MyOrdersView({
                         <ShoppingBag className="h-4 w-4" />
                         Active
                         {activeOrders.length > 0 && (
-                            <Badge variant="secondary" className="ml-1">
+                            <Badge variant="secondary" className="ml-1 bg-international-orange/10 text-international-orange">
                                 {activeOrders.length}
                             </Badge>
                         )}
@@ -197,7 +255,7 @@ export function MyOrdersView({
                         <CheckCircle className="h-4 w-4" />
                         Completed
                         {completedOrders.length > 0 && (
-                            <Badge variant="secondary" className="ml-1">
+                            <Badge variant="secondary" className="ml-1 bg-emerald-50 text-emerald-600">
                                 {completedOrders.length}
                             </Badge>
                         )}

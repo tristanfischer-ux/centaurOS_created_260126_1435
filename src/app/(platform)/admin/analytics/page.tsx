@@ -46,7 +46,7 @@ export default function AdminAnalyticsPage() {
   }
 
   return (
-    <div className="container max-w-7xl mx-auto py-8 px-4">
+    <div className="space-y-6">
       <AdminDashboard
         analytics={analytics}
         period={period}

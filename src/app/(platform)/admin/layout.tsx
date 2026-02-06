@@ -2,31 +2,9 @@ import { createClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
 import Link from "next/link"
 import { isAdmin } from "@/lib/admin/access"
-import { cn } from "@/lib/utils"
-import { 
-    LayoutDashboard, 
-    ClipboardList, 
-    Activity, 
-    ShieldAlert,
-    ArrowLeft,
-    Info,
-    BarChart3,
-    Shield,
-    Settings,
-    FlaskConical
-} from "lucide-react"
+import { ShieldAlert, ArrowLeft } from "lucide-react"
 import { Button } from "@/components/ui/button"
-
-const adminNavigation = [
-    { name: "Overview", href: "/admin", icon: LayoutDashboard },
-    { name: "Applications", href: "/admin/applications", icon: ClipboardList },
-    { name: "Platform Health", href: "/admin/health", icon: Activity },
-    { name: "QA Testing", href: "/admin/qa", icon: FlaskConical },
-    { name: "Analytics", href: "/admin/analytics", icon: BarChart3 },
-    { name: "GDPR", href: "/admin/gdpr", icon: Shield },
-    { name: "Settings", href: "/admin/settings", icon: Settings },
-    { name: "About", href: "/admin/about", icon: Info },
-]
+import { AdminNav } from "./admin-nav"
 
 export default async function AdminLayout({
     children,
@@ -70,61 +48,38 @@ export default async function AdminLayout({
     return (
         <div className="flex flex-col gap-6">
             {/* Admin Header */}
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b pb-4">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-slate-100">
                 <div>
-                    <div className="flex items-center gap-2 mb-1">
-                        <ShieldAlert className="h-5 w-5 text-international-orange" />
-                        <span className="text-sm font-medium text-international-orange uppercase tracking-wider">
-                            Admin Panel
-                        </span>
+                    <div className="flex items-center gap-3 mb-1">
+                        <div className="h-8 w-1 bg-international-orange rounded-full shadow-[0_0_8px_rgba(234,88,12,0.6)]" />
+                        <div>
+                            <div className="flex items-center gap-2 mb-0.5">
+                                <ShieldAlert className="h-4 w-4 text-international-orange" />
+                                <span className="text-xs font-medium text-international-orange uppercase tracking-wider">
+                                    Admin Panel
+                                </span>
+                            </div>
+                            <h1 className="text-2xl sm:text-3xl font-display font-semibold text-foreground tracking-tight">
+                                Operations Dashboard
+                            </h1>
+                        </div>
                     </div>
-                    <h1 className="text-2xl font-bold text-foreground">
-                        Operations Dashboard
-                    </h1>
                 </div>
-                <Link href="/dashboard">
-                    <Button variant="ghost" size="sm">
+                <Link href="/updates">
+                    <Button variant="outline" size="sm" className="border-slate-200 hover:bg-slate-50">
                         <ArrowLeft className="h-4 w-4 mr-2" />
                         Back to App
                     </Button>
                 </Link>
             </div>
             
-            {/* Admin Navigation */}
-            <nav className="flex items-center gap-1 overflow-x-auto pb-2">
-                {adminNavigation.map((item) => (
-                    <AdminNavLink key={item.href} href={item.href}>
-                        <item.icon className="h-4 w-4" />
-                        {item.name}
-                    </AdminNavLink>
-                ))}
-            </nav>
+            {/* Admin Navigation - Client component for active state */}
+            <AdminNav />
             
             {/* Content */}
             <div className="flex-1">
                 {children}
             </div>
         </div>
-    )
-}
-
-function AdminNavLink({ 
-    href, 
-    children 
-}: { 
-    href: string
-    children: React.ReactNode 
-}) {
-    return (
-        <Link
-            href={href}
-            className={cn(
-                "flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg",
-                "text-muted-foreground hover:text-foreground hover:bg-muted",
-                "transition-colors"
-            )}
-        >
-            {children}
-        </Link>
     )
 }

@@ -81,12 +81,14 @@ export function ReportPreferences({ hasTelegramLinked }: ReportPreferencesProps)
     
     if (loading) {
         return (
-            <Card className="bg-background border-muted">
-                <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                        <BarChart3 className="h-5 w-5 text-electric-blue" />
-                        Daily Pulse
-                    </CardTitle>
+            <Card className="bg-background border-slate-200 shadow-[0_2px_15px_rgba(0,0,0,0.03)] overflow-hidden">
+                <CardHeader className="bg-gradient-to-r from-blue-50/60 to-transparent border-b border-slate-100">
+                    <div className="flex items-center gap-3">
+                        <div className="p-2 bg-blue-100 rounded-lg">
+                            <BarChart3 className="h-5 w-5 text-blue-600" />
+                        </div>
+                        <CardTitle>Daily Pulse</CardTitle>
+                    </div>
                 </CardHeader>
                 <CardContent className="flex justify-center py-8">
                     <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -100,22 +102,26 @@ export function ReportPreferences({ hasTelegramLinked }: ReportPreferencesProps)
     }
     
     return (
-        <Card className="bg-background border-muted">
-            <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                    <BarChart3 className="h-5 w-5 text-electric-blue" />
-                    Daily Pulse
-                </CardTitle>
-                <CardDescription>
-                    Configure how and when you receive your daily productivity summary
-                </CardDescription>
+        <Card className="bg-background border-slate-200 shadow-[0_2px_15px_rgba(0,0,0,0.03)] overflow-hidden">
+            <CardHeader className="bg-gradient-to-r from-blue-50/60 to-transparent border-b border-slate-100">
+                <div className="flex items-center gap-3">
+                    <div className="p-2 bg-blue-100 rounded-lg">
+                        <BarChart3 className="h-5 w-5 text-blue-600" />
+                    </div>
+                    <div>
+                        <CardTitle>Daily Pulse</CardTitle>
+                        <CardDescription>
+                            Configure how and when you receive your daily productivity summary
+                        </CardDescription>
+                    </div>
+                </div>
             </CardHeader>
-            <CardContent className="space-y-6">
+            <CardContent className="p-6 space-y-6">
                 {/* Delivery Channels */}
-                <div className="space-y-4">
-                    <Label className="text-sm font-medium">Delivery Channels</Label>
+                <div className="space-y-3">
+                    <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Delivery Channels</Label>
                     
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between p-3 rounded-lg hover:bg-slate-50 transition-colors">
                         <div className="space-y-0.5">
                             <Label htmlFor="telegram-reports" className="font-normal">Telegram</Label>
                             <p className="text-xs text-muted-foreground">
@@ -132,7 +138,7 @@ export function ReportPreferences({ hasTelegramLinked }: ReportPreferencesProps)
                         />
                     </div>
                     
-                    <div className="flex items-center justify-between opacity-50">
+                    <div className="flex items-center justify-between p-3 rounded-lg opacity-50">
                         <div className="space-y-0.5">
                             <Label htmlFor="email-reports" className="font-normal">Email</Label>
                             <p className="text-xs text-muted-foreground">
@@ -146,6 +152,8 @@ export function ReportPreferences({ hasTelegramLinked }: ReportPreferencesProps)
                         />
                     </div>
                 </div>
+                
+                <div className="border-t border-slate-100" />
                 
                 {/* Timing */}
                 <div className="space-y-2">
@@ -170,11 +178,13 @@ export function ReportPreferences({ hasTelegramLinked }: ReportPreferencesProps)
                     </p>
                 </div>
                 
+                <div className="border-t border-slate-100" />
+                
                 {/* Content Preferences */}
-                <div className="space-y-4">
-                    <Label className="text-sm font-medium">Include in Report</Label>
+                <div className="space-y-3">
+                    <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Include in Report</Label>
                     
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between p-3 rounded-lg hover:bg-slate-50 transition-colors">
                         <div className="space-y-0.5">
                             <Label htmlFor="include-summary" className="font-normal">Summary</Label>
                             <p className="text-xs text-muted-foreground">
@@ -188,7 +198,7 @@ export function ReportPreferences({ hasTelegramLinked }: ReportPreferencesProps)
                         />
                     </div>
                     
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between p-3 rounded-lg hover:bg-slate-50 transition-colors">
                         <div className="space-y-0.5">
                             <Label htmlFor="include-trends" className="font-normal">Trends</Label>
                             <p className="text-xs text-muted-foreground">
@@ -202,7 +212,7 @@ export function ReportPreferences({ hasTelegramLinked }: ReportPreferencesProps)
                         />
                     </div>
                     
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between p-3 rounded-lg hover:bg-slate-50 transition-colors">
                         <div className="space-y-0.5">
                             <Label htmlFor="include-insights" className="font-normal">Insights</Label>
                             <p className="text-xs text-muted-foreground">
@@ -216,7 +226,7 @@ export function ReportPreferences({ hasTelegramLinked }: ReportPreferencesProps)
                         />
                     </div>
                     
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between p-3 rounded-lg hover:bg-slate-50 transition-colors">
                         <div className="space-y-0.5">
                             <Label htmlFor="include-team" className="font-normal">Team Activity</Label>
                             <p className="text-xs text-muted-foreground">

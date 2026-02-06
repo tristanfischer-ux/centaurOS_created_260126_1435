@@ -29,24 +29,16 @@ export default async function PlatformHealthPage() {
     
     return (
         <div className="space-y-6">
-            {/* Header */}
-            <div>
-                <h2 className="text-xl font-semibold text-foreground">
-                    Platform Health
-                </h2>
-                <p className="text-sm text-muted-foreground">
-                    System status and health indicators
-                </p>
-            </div>
-            
             {/* Health Status Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {/* Database Status */}
-                <Card>
-                    <CardHeader>
+                <Card className="border-slate-200 shadow-[0_2px_15px_rgba(0,0,0,0.03)] overflow-hidden">
+                    <CardHeader className="bg-gradient-to-r from-blue-50/60 to-transparent border-b border-slate-100">
                         <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                                <Database className="h-5 w-5 text-muted-foreground" />
+                            <div className="flex items-center gap-3">
+                                <div className="p-2 bg-blue-100 rounded-lg">
+                                    <Database className="h-4 w-4 text-blue-600" />
+                                </div>
                                 <CardTitle>Database</CardTitle>
                             </div>
                             <HealthIndicator
@@ -76,11 +68,13 @@ export default async function PlatformHealthPage() {
                 </Card>
                 
                 {/* Stripe Webhooks Status */}
-                <Card>
-                    <CardHeader>
+                <Card className="border-slate-200 shadow-[0_2px_15px_rgba(0,0,0,0.03)] overflow-hidden">
+                    <CardHeader className="bg-gradient-to-r from-violet-50/60 to-transparent border-b border-slate-100">
                         <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                                <CreditCard className="h-5 w-5 text-muted-foreground" />
+                            <div className="flex items-center gap-3">
+                                <div className="p-2 bg-violet-100 rounded-lg">
+                                    <CreditCard className="h-4 w-4 text-violet-600" />
+                                </div>
                                 <CardTitle>Stripe Webhooks</CardTitle>
                             </div>
                             <HealthIndicator
@@ -123,17 +117,21 @@ export default async function PlatformHealthPage() {
             </div>
             
             {/* Metrics Overview */}
-            <Card>
-                <CardHeader>
-                    <div className="flex items-center gap-2">
-                        <Activity className="h-5 w-5 text-muted-foreground" />
-                        <CardTitle>System Metrics</CardTitle>
+            <Card className="border-slate-200 shadow-[0_2px_15px_rgba(0,0,0,0.03)] overflow-hidden">
+                <CardHeader className="bg-gradient-to-r from-emerald-50/60 to-transparent border-b border-slate-100">
+                    <div className="flex items-center gap-3">
+                        <div className="p-2 bg-emerald-100 rounded-lg">
+                            <Activity className="h-4 w-4 text-emerald-600" />
+                        </div>
+                        <div>
+                            <CardTitle>System Metrics</CardTitle>
+                            <CardDescription>Key performance indicators</CardDescription>
+                        </div>
                     </div>
-                    <CardDescription>Key performance indicators</CardDescription>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="p-6">
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-                        <div className="p-4 rounded-lg bg-muted/50">
+                        <div className="p-4 rounded-lg bg-slate-50 border border-slate-100">
                             <div className="flex items-center gap-2 mb-2">
                                 <RefreshCw className="h-4 w-4 text-muted-foreground" />
                                 <span className="text-sm text-muted-foreground">Failed Payments</span>
@@ -146,7 +144,7 @@ export default async function PlatformHealthPage() {
                             </p>
                         </div>
                         
-                        <div className="p-4 rounded-lg bg-muted/50">
+                        <div className="p-4 rounded-lg bg-slate-50 border border-slate-100">
                             <div className="flex items-center gap-2 mb-2">
                                 <CreditCard className="h-4 w-4 text-muted-foreground" />
                                 <span className="text-sm text-muted-foreground">Webhook Backlog</span>
@@ -163,7 +161,7 @@ export default async function PlatformHealthPage() {
                             </p>
                         </div>
                         
-                        <div className="p-4 rounded-lg bg-muted/50">
+                        <div className="p-4 rounded-lg bg-slate-50 border border-slate-100">
                             <div className="flex items-center gap-2 mb-2">
                                 <AlertCircle className="h-4 w-4 text-muted-foreground" />
                                 <span className="text-sm text-muted-foreground">Error Types</span>
@@ -180,21 +178,25 @@ export default async function PlatformHealthPage() {
             </Card>
             
             {/* Recent Errors */}
-            <Card>
-                <CardHeader>
-                    <div className="flex items-center gap-2">
-                        <AlertCircle className="h-5 w-5 text-muted-foreground" />
-                        <CardTitle>Recent Error Log</CardTitle>
+            <Card className="border-slate-200 shadow-[0_2px_15px_rgba(0,0,0,0.03)] overflow-hidden">
+                <CardHeader className="bg-gradient-to-r from-red-50/60 to-transparent border-b border-slate-100">
+                    <div className="flex items-center gap-3">
+                        <div className="p-2 bg-red-100 rounded-lg">
+                            <AlertCircle className="h-4 w-4 text-red-600" />
+                        </div>
+                        <div>
+                            <CardTitle>Recent Error Log</CardTitle>
+                            <CardDescription>Error metrics from platform monitoring</CardDescription>
+                        </div>
                     </div>
-                    <CardDescription>Error metrics from platform monitoring</CardDescription>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="p-6">
                     {health.recentErrors.length > 0 ? (
                         <div className="space-y-3">
                             {health.recentErrors.map((error, index) => (
                                 <div 
                                     key={index}
-                                    className="flex items-center justify-between p-3 rounded-lg bg-muted/50"
+                                    className="flex items-center justify-between p-3 rounded-lg bg-slate-50 border border-slate-100 hover:bg-slate-100/50 transition-colors"
                                 >
                                     <div className="flex items-center gap-3">
                                         <AlertCircle className={`h-4 w-4 ${error.count > 5 ? 'text-destructive' : 'text-status-warning'}`} />
@@ -224,11 +226,11 @@ export default async function PlatformHealthPage() {
             </Card>
             
             {/* Health Summary */}
-            <Card>
-                <CardHeader>
+            <Card className="border-slate-200 shadow-[0_2px_15px_rgba(0,0,0,0.03)] overflow-hidden">
+                <CardHeader className="bg-gradient-to-r from-slate-50/80 to-transparent border-b border-slate-100">
                     <CardTitle>Health Summary</CardTitle>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="p-6">
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <HealthIndicator
                             status={health.database.status}

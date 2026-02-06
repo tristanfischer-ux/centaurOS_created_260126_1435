@@ -77,18 +77,21 @@ export function AIProviders() {
     const providers = Object.values(PROVIDER_REGISTRY)
 
     return (
-        <Card className="bg-background border-muted shadow-[0_2px_15px_rgba(0,0,0,0.03)]">
-            <CardHeader>
-                <div className="flex items-center gap-2">
-                    <KeyRound className="h-5 w-5 text-international-orange" />
-                    <CardTitle>AI Providers</CardTitle>
+        <Card className="bg-background border-slate-200 shadow-[0_2px_15px_rgba(0,0,0,0.03)] overflow-hidden">
+            <CardHeader className="bg-gradient-to-r from-violet-50/60 to-transparent border-b border-slate-100">
+                <div className="flex items-center gap-3">
+                    <div className="p-2 bg-violet-100 rounded-lg">
+                        <KeyRound className="h-5 w-5 text-violet-600" />
+                    </div>
+                    <div>
+                        <CardTitle>AI Providers</CardTitle>
+                        <CardDescription>
+                            Connect your own AI provider API keys. Keys are encrypted with AES-256-GCM.
+                        </CardDescription>
+                    </div>
                 </div>
-                <CardDescription>
-                    Connect your own AI provider API keys. Keys are encrypted and stored securely.
-                    Each provider unlocks different capabilities in the workflow builder.
-                </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="p-6 space-y-4">
                 {loading ? (
                     <div className="flex items-center justify-center py-8">
                         <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
@@ -105,8 +108,8 @@ export function AIProviders() {
                                 <div
                                     key={provider.id}
                                     className={cn(
-                                        "p-4 rounded-lg border transition-colors",
-                                        storedKey ? "border-emerald-200 bg-emerald-50/50" : "border-muted",
+                                        "p-4 rounded-lg border transition-all duration-200",
+                                        storedKey ? "border-emerald-200 bg-emerald-50/30" : "border-slate-200 hover:border-slate-300 hover:shadow-sm",
                                         isEditing && "ring-2 ring-international-orange/30 border-international-orange/50"
                                     )}
                                 >

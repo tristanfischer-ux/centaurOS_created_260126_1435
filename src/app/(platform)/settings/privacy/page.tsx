@@ -57,10 +57,8 @@ async function PrivacySettingsContent() {
 
 export default function PrivacySettingsPage() {
   return (
-    <div className="container max-w-4xl py-8">
-      <Suspense fallback={<LoadingState />}>
-        <PrivacySettingsContent />
-      </Suspense>
-    </div>
+    <Suspense fallback={<LoadingState />}>
+      <PrivacySettingsContent />
+    </Suspense>
   )
 }
