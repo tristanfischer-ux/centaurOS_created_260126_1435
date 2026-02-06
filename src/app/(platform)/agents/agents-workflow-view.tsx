@@ -699,7 +699,7 @@ function AgentsFlowInner() {
     }, [selectedNodeId, handleRunNode, handleRunChain, handleSave])
 
     return (
-        <div className="flex flex-col h-[calc(100vh-2rem)] -m-4 sm:-m-6 lg:-m-8">
+        <div className="flex flex-col h-full">
             {/* Toolbar */}
             <WorkflowToolbar
                 workflowName={workflowName}
