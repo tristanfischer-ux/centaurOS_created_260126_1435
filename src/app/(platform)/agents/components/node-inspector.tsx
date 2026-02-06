@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useState, useCallback, useEffect, useRef } from "react"
-import { X, Copy, Check, Trash2, Play, RotateCcw, ChevronDown, ChevronRight, CheckCircle, ArrowRight } from "lucide-react"
+import { X, Copy, Check, Trash2, Play, RotateCcw, ChevronDown, ChevronRight, CheckCircle, ArrowRight, Sparkles, Brain, Globe, Image as ImageIcon, Mic, Cpu, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -10,7 +10,279 @@ import { getCustomPromptById } from "../lib/custom-prompts"
 import { CATEGORY_META, CATEGORY_ACCENT_COLORS, type PromptCategory, type ExecutionStatus, type AttachedFile } from "../lib/agent-types"
 import { getIcon } from "./prompt-node"
 import { FileDropZone } from "./file-drop-zone"
+import { PROVIDER_REGISTRY, getProvidersForModality, getModelsForModality, getDefaultModel, type AIProviderId, type OutputModality, OUTPUT_MODALITIES } from "@/lib/ai-providers/types"
+import { parseSlideDeckFromText, downloadSlideDeck } from "@/lib/ai-providers/slide-renderer"
 import type { Node } from "@xyflow/react"
+
+const PROVIDER_ICON_MAP: Record<string, React.ComponentType<{ className?: string; style?: React.CSSProperties }>> = {
+    Sparkles, Brain, Globe, Image: ImageIcon, Mic, Cpu,
+}
+
+const MODALITY_LABELS: Record<OutputModality, string> = {
+    text: "Text",
+    image: "Image",
+    audio: "Audio",
+    video: "Video",
+    slides: "Slides",
+}
+
+// ─── Provider & Model Selector ──────────────────────────────────────
+
+function ProviderModelSelector({
+    nodeId,
+    currentProviderId,
+    currentModelId,
+    currentModality,
+    onUpdateProvider,
+}: {
+    nodeId: string
+    currentProviderId?: string
+    currentModelId?: string
+    currentModality?: OutputModality
+    onUpdateProvider: (nodeId: string, providerId: string, modelId: string, modality: string) => void
+}) {
+    const modality: OutputModality = currentModality ?? "text"
+    const providerId = (currentProviderId ?? "openai") as AIProviderId
+    // Slides use text providers
+    const lookupModality = modality === "slides" ? "text" : modality
+    const availableProviders = getProvidersForModality(lookupModality)
+    const availableModels = getModelsForModality(providerId, lookupModality)
+    const modelId = currentModelId ?? getDefaultModel(providerId, lookupModality)?.id ?? ""
+
+    const handleModalityChange = (newModality: OutputModality) => {
+        // Slides use text providers
+        const lookupModality = newModality === "slides" ? "text" : newModality
+        const providers = getProvidersForModality(lookupModality)
+        const firstProvider = providers[0]
+        if (!firstProvider) return
+        const defaultModel = getDefaultModel(firstProvider.id, lookupModality)
+        onUpdateProvider(nodeId, firstProvider.id, defaultModel?.id ?? "", newModality)
+    }
+
+    const handleProviderChange = (newProviderId: string) => {
+        const defaultModel = getDefaultModel(newProviderId as AIProviderId, modality)
+        onUpdateProvider(nodeId, newProviderId, defaultModel?.id ?? "", modality)
+    }
+
+    const handleModelChange = (newModelId: string) => {
+        onUpdateProvider(nodeId, providerId, newModelId, modality)
+    }
+
+    const providerMeta = PROVIDER_REGISTRY[providerId]
+    const ProviderIcon = PROVIDER_ICON_MAP[providerMeta?.icon ?? "Sparkles"] ?? Sparkles
+
+    return (
+        <div className="space-y-2.5">
+            <label className="text-xs font-semibold text-foreground">AI Provider</label>
+
+            {/* Modality pills */}
+            <div className="flex gap-1 flex-wrap">
+                {OUTPUT_MODALITIES.map((m) => {
+                    // Slides use text providers, so always show if text providers exist
+                    const providers = m === "slides" ? getProvidersForModality("text") : getProvidersForModality(m)
+                    if (providers.length === 0) return null
+                    return (
+                        <button
+                            key={m}
+                            onClick={() => handleModalityChange(m)}
+                            className={`px-2 py-1 rounded text-[10px] font-medium transition-colors ${
+                                modality === m
+                                    ? "bg-blue-100 text-blue-700 border border-blue-200"
+                                    : "bg-slate-50 text-muted-foreground hover:bg-slate-100 border border-transparent"
+                            }`}
+                        >
+                            {MODALITY_LABELS[m]}
+                        </button>
+                    )
+                })}
+            </div>
+
+            {/* Provider + Model selectors side by side */}
+            <div className="grid grid-cols-2 gap-2">
+                <div>
+                    <label className="text-[10px] text-muted-foreground font-medium mb-1 block">Provider</label>
+                    <select
+                        value={providerId}
+                        onChange={(e) => handleProviderChange(e.target.value)}
+                        className="w-full h-8 rounded-md border border-slate-200 bg-white px-2 text-xs focus:ring-2 focus:ring-blue-500/20 focus:border-blue-300"
+                    >
+                        {availableProviders.map((p) => (
+                            <option key={p.id} value={p.id}>{p.name}</option>
+                        ))}
+                    </select>
+                </div>
+                <div>
+                    <label className="text-[10px] text-muted-foreground font-medium mb-1 block">Model</label>
+                    <select
+                        value={modelId}
+                        onChange={(e) => handleModelChange(e.target.value)}
+                        className="w-full h-8 rounded-md border border-slate-200 bg-white px-2 text-xs focus:ring-2 focus:ring-blue-500/20 focus:border-blue-300"
+                    >
+                        {availableModels.map((m) => (
+                            <option key={m.id} value={m.id}>{m.name}</option>
+                        ))}
+                    </select>
+                </div>
+            </div>
+
+            {/* Active provider badge */}
+            <div className="flex items-center gap-1.5 p-1.5 rounded-md bg-slate-50 border border-slate-100">
+                <ProviderIcon className="h-3.5 w-3.5" style={{ color: providerMeta?.color }} />
+                <span className="text-[10px] text-muted-foreground">
+                    {providerMeta?.name} · {availableModels.find(m => m.id === modelId)?.name ?? modelId}
+                </span>
+            </div>
+        </div>
+    )
+}
+
+// ─── Media Output Display ───────────────────────────────────────────
+
+function MediaOutput({ data }: {
+    data: {
+        imageUrl?: string
+        audioUrl?: string
+        videoUrl?: string
+        outputModality?: string
+        output?: string
+    }
+}) {
+    const [downloading, setDownloading] = useState(false)
+    if (data.imageUrl) {
+        return (
+            <div className="space-y-2">
+                <label className="text-xs font-semibold text-foreground">Generated Image</label>
+                <div className="rounded-lg overflow-hidden border border-slate-200 bg-slate-50">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                        src={data.imageUrl}
+                        alt="AI generated image"
+                        className="w-full h-auto"
+                    />
+                </div>
+                <div className="flex gap-2">
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        className="text-[10px] h-7"
+                        onClick={() => {
+                            const a = document.createElement("a")
+                            a.href = data.imageUrl!
+                            a.download = `generated-${Date.now()}.png`
+                            a.click()
+                        }}
+                    >
+                        Download
+                    </Button>
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        className="text-[10px] h-7"
+                        onClick={() => navigator.clipboard.writeText(data.imageUrl!)}
+                    >
+                        Copy URL
+                    </Button>
+                </div>
+            </div>
+        )
+    }
+
+    if (data.audioUrl) {
+        return (
+            <div className="space-y-2">
+                <label className="text-xs font-semibold text-foreground">Generated Audio</label>
+                <audio controls className="w-full" src={data.audioUrl}>
+                    <track kind="captions" />
+                </audio>
+                <Button
+                    variant="outline"
+                    size="sm"
+                    className="text-[10px] h-7"
+                    onClick={() => {
+                        const a = document.createElement("a")
+                        a.href = data.audioUrl!
+                        a.download = `generated-${Date.now()}.mp3`
+                        a.click()
+                    }}
+                >
+                    Download Audio
+                </Button>
+            </div>
+        )
+    }
+
+    if (data.videoUrl) {
+        return (
+            <div className="space-y-2">
+                <label className="text-xs font-semibold text-foreground">Generated Video</label>
+                <div className="rounded-lg overflow-hidden border border-slate-200 bg-black">
+                    <video controls className="w-full" src={data.videoUrl}>
+                        <track kind="captions" />
+                    </video>
+                </div>
+                <Button
+                    variant="outline"
+                    size="sm"
+                    className="text-[10px] h-7"
+                    onClick={() => {
+                        const a = document.createElement("a")
+                        a.href = data.videoUrl!
+                        a.download = `generated-${Date.now()}.mp4`
+                        a.click()
+                    }}
+                >
+                    Download Video
+                </Button>
+            </div>
+        )
+    }
+
+    // Slide deck output
+    if (data.outputModality === "slides" && data.output) {
+        const deck = parseSlideDeckFromText(data.output)
+        if (deck) {
+            return (
+                <div className="space-y-2">
+                    <label className="text-xs font-semibold text-foreground">Generated Slide Deck</label>
+                    <div className="p-3 rounded-lg bg-orange-50 border border-orange-200">
+                        <p className="text-sm font-medium text-foreground">{deck.title}</p>
+                        <p className="text-xs text-muted-foreground mt-1">{deck.slides.length} slides</p>
+                        <div className="mt-2 space-y-1 max-h-32 overflow-y-auto">
+                            {deck.slides.map((s, i) => (
+                                <div key={i} className="text-[10px] text-muted-foreground flex items-center gap-1.5">
+                                    <span className="w-4 h-4 rounded bg-white border border-orange-200 flex items-center justify-center text-[8px] font-medium flex-shrink-0">
+                                        {i + 1}
+                                    </span>
+                                    <span className="truncate">{s.title}</span>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        className="text-[10px] h-7 gap-1"
+                        disabled={downloading}
+                        onClick={async () => {
+                            setDownloading(true)
+                            try {
+                                await downloadSlideDeck(deck)
+                            } catch (err) {
+                                console.error("Failed to generate PPTX:", err)
+                            }
+                            setDownloading(false)
+                        }}
+                    >
+                        {downloading ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
+                        {downloading ? "Generating..." : "Download PPTX"}
+                    </Button>
+                </div>
+            )
+        }
+    }
+
+    return null
+}
 
 interface NodeInspectorProps {
     node: Node
@@ -19,6 +291,7 @@ interface NodeInspectorProps {
     onUpdateInput: (nodeId: string, input: string) => void
     onUpdateOutput: (nodeId: string, output: string) => void
     onUpdateFiles: (nodeId: string, files: AttachedFile[]) => void
+    onUpdateProvider: (nodeId: string, providerId: string, modelId: string, modality: string) => void
     onDelete: (nodeId: string) => void
     onRunNode: (nodeId: string) => void
     onApproveNode: (nodeId: string) => void
@@ -32,6 +305,7 @@ export function NodeInspector({
     onUpdateInput,
     onUpdateOutput,
     onUpdateFiles,
+    onUpdateProvider,
     onDelete,
     onRunNode,
     onApproveNode,
@@ -49,6 +323,12 @@ export function NodeInspector({
         executionStatus?: ExecutionStatus
         error?: string
         attachedFiles?: AttachedFile[]
+        providerId?: string
+        modelId?: string
+        outputModality?: string
+        imageUrl?: string
+        audioUrl?: string
+        videoUrl?: string
     }
 
     const prompt = data.promptId
@@ -256,6 +536,15 @@ export function NodeInspector({
                         )}
                     </div>
 
+                    {/* ─── Provider & Model Selector ───────────────────────── */}
+                    <ProviderModelSelector
+                        nodeId={node.id}
+                        currentProviderId={data.providerId}
+                        currentModelId={data.modelId}
+                        currentModality={data.outputModality as OutputModality | undefined}
+                        onUpdateProvider={onUpdateProvider}
+                    />
+
                     {/* ─── Prompt Text Section ─────────────────────────────── */}
                     <div>
                         <div className="flex items-center justify-between mb-2">
@@ -352,6 +641,11 @@ export function NodeInspector({
                                 </div>
                             )}
                         </div>
+                    )}
+
+                    {/* ─── Media Output (image/audio/video/slides) ─────── */}
+                    {(data.imageUrl || data.audioUrl || data.videoUrl || (data.outputModality === "slides" && data.output)) && (
+                        <MediaOutput data={data} />
                     )}
 
                     {/* Tags */}

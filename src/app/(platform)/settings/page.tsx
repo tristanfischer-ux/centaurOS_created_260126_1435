@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label"
 import { redirect } from 'next/navigation'
 import { TelegramLink } from '@/components/settings/telegram-link'
 import { ReportPreferences } from '@/components/settings/report-preferences'
+import { AIProviders } from '@/components/settings/ai-providers'
 import { HelpCircle, GraduationCap, Book, Keyboard, MessageSquare, FileText, ExternalLink } from 'lucide-react'
 import Link from 'next/link'
 
@@ -81,6 +82,8 @@ export default async function SettingsPage() {
                     </div>
                 </CardContent>
             </Card>
+
+            <AIProviders />
 
             <TelegramLink 
                 initialLink={telegramLink} 

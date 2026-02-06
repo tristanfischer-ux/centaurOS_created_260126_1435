@@ -189,6 +189,13 @@ export interface PromptNodeData {
     executionStatus?: ExecutionStatus
     error?: string
     attachedFiles?: AttachedFile[]
+    // Multi-provider support
+    providerId?: string   // e.g. "openai", "anthropic", "google"
+    modelId?: string      // e.g. "gpt-4o", "claude-sonnet-4-20250514"
+    outputModality?: string // "text" | "image" | "audio" | "video" | "slides"
+    imageUrl?: string     // for image outputs
+    audioUrl?: string     // for audio outputs
+    videoUrl?: string     // for video outputs
 }
 
 // ─── Workflow Types ──────────────────────────────────────────────────
