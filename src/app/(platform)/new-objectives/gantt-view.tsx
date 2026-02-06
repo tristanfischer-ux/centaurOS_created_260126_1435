@@ -79,6 +79,7 @@ function ObjListTable({
   onExpanderClick,
   sortedTasks,
   onSelectObjective,
+  onSelectTask,
   collapsedObjectives,
   onToggleCollapse,
 }: {
@@ -87,6 +88,7 @@ function ObjListTable({
   onExpanderClick: (task: GanttTask) => void
   sortedTasks: ExtendedGanttTask[]
   onSelectObjective: (id: string) => void
+  onSelectTask?: (taskId: string) => void
   collapsedObjectives: Set<string>
   onToggleCollapse: (id: string) => void
 }) {
@@ -112,6 +114,8 @@ function ObjListTable({
               if (isObj) {
                 onSelectObjective(task.id)
                 onToggleCollapse(task.id)
+              } else {
+                onSelectTask?.(task.id)
               }
               onExpanderClick(task)
             }}
@@ -243,9 +247,10 @@ interface ObjectivesGanttViewProps {
   objectives: ObjectiveWithTasks[]
   selectedId: string | null
   onSelect: (id: string) => void
+  onTaskSelect?: (taskId: string) => void
 }
 
-export function ObjectivesGanttView({ objectives, selectedId, onSelect }: ObjectivesGanttViewProps) {
+export function ObjectivesGanttView({ objectives, selectedId, onSelect, onTaskSelect }: ObjectivesGanttViewProps) {
   const [viewMode, setViewMode] = useState<ViewMode>(ViewMode.Week)
   const [dateOffset, setDateOffset] = useState<Date>(new Date())
   const [collapsedObjectives, setCollapsedObjectives] = useState<Set<string>>(new Set())
@@ -353,11 +358,15 @@ export function ObjectivesGanttView({ objectives, selectedId, onSelect }: Object
     return result
   }, [objectives, collapsedObjectives])
 
-  // Click handler
+  // Click handler (for clicking bars in the chart)
   const handleClick = useCallback((task: GanttTask) => {
     const ext = task as ExtendedGanttTask
-    if (ext.isObjective) onSelect(task.id)
-  }, [onSelect])
+    if (ext.isObjective) {
+      onSelect(task.id)
+    } else {
+      onTaskSelect?.(task.id)
+    }
+  }, [onSelect, onTaskSelect])
 
   // Expander click handler (for gantt library)
   const handleExpanderClick = useCallback((task: GanttTask) => {
@@ -374,11 +383,12 @@ export function ObjectivesGanttView({ objectives, selectedId, onSelect }: Object
         {...props}
         sortedTasks={ganttTasks}
         onSelectObjective={onSelect}
+        onSelectTask={onTaskSelect}
         collapsedObjectives={collapsedObjectives}
         onToggleCollapse={toggleCollapse}
       />
     ),
-    [ganttTasks, onSelect, collapsedObjectives, toggleCollapse]
+    [ganttTasks, onSelect, onTaskSelect, collapsedObjectives, toggleCollapse]
   )
 
   // ─── Empty state ────────────────────────────────────────────────
