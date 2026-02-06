@@ -17,15 +17,23 @@ import {
 } from "@/components/marketing/animations";
 
 // Domain configuration
-const APP_DOMAIN = process.env.NEXT_PUBLIC_APP_DOMAIN || 'https://forgeos.io';
+const APP_DOMAIN = process.env.NEXT_PUBLIC_APP_DOMAIN || 'https://centauros.io';
 
 export default function MarketingPage() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   return (
     <div className="min-h-screen bg-background text-foreground">
+      {/* Skip Navigation - Accessibility */}
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:px-4 focus:py-2 focus:bg-accent focus:text-accent-foreground focus:rounded-md"
+      >
+        Skip to main content
+      </a>
+
       {/* Navigation */}
-      <nav className="bg-background">
+      <nav className="bg-background" aria-label="Main navigation">
         <div className="max-w-7xl mx-auto px-6 py-4 md:py-6 flex items-center justify-between">
           <Link href="/" className="text-lg md:text-xl font-bold tracking-tight">
             FRACTIONAL FORGE
@@ -33,16 +41,16 @@ export default function MarketingPage() {
           
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center gap-8">
-            <a href="#people" className="text-sm text-muted-foreground hover:text-foreground uppercase tracking-wider">
+            <a href="#people" className="text-sm text-muted-foreground hover:text-foreground uppercase tracking-wider transition-colors">
               The People
             </a>
-            <a href="#network" className="text-sm text-muted-foreground hover:text-foreground uppercase tracking-wider">
+            <a href="#network" className="text-sm text-muted-foreground hover:text-foreground uppercase tracking-wider transition-colors">
               The Network
             </a>
-            <a href="#os" className="text-sm text-muted-foreground hover:text-foreground uppercase tracking-wider">
+            <a href="#os" className="text-sm text-muted-foreground hover:text-foreground uppercase tracking-wider transition-colors">
               The OS
             </a>
-            <a href={`${APP_DOMAIN}/login`} className="text-sm text-muted-foreground hover:text-foreground uppercase tracking-wider">
+            <a href={`${APP_DOMAIN}/login`} className="text-sm text-muted-foreground hover:text-foreground uppercase tracking-wider transition-colors">
               Login
             </a>
           </div>
@@ -50,8 +58,9 @@ export default function MarketingPage() {
           {/* Mobile Hamburger Button */}
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="md:hidden p-2 text-muted-foreground hover:text-foreground"
-            aria-label="Toggle menu"
+            className="md:hidden p-2 min-h-[44px] min-w-[44px] flex items-center justify-center text-muted-foreground hover:text-foreground"
+            aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}
+            aria-expanded={mobileMenuOpen}
           >
             {mobileMenuOpen ? (
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -67,32 +76,32 @@ export default function MarketingPage() {
 
         {/* Mobile Menu */}
         {mobileMenuOpen && (
-          <div className="md:hidden border-t border bg-background">
-            <div className="px-6 py-4 flex flex-col gap-4">
+          <div className="md:hidden border-t border-muted bg-background">
+            <div className="px-6 py-4 flex flex-col gap-2">
               <a 
                 href="#people" 
-                className="text-sm text-muted-foreground hover:text-foreground uppercase tracking-wider py-2"
+                className="text-sm text-muted-foreground hover:text-foreground uppercase tracking-wider py-3 min-h-[44px] flex items-center transition-colors"
                 onClick={() => setMobileMenuOpen(false)}
               >
                 The People
               </a>
               <a 
                 href="#network" 
-                className="text-sm text-muted-foreground hover:text-foreground uppercase tracking-wider py-2"
+                className="text-sm text-muted-foreground hover:text-foreground uppercase tracking-wider py-3 min-h-[44px] flex items-center transition-colors"
                 onClick={() => setMobileMenuOpen(false)}
               >
                 The Network
               </a>
               <a 
                 href="#os" 
-                className="text-sm text-muted-foreground hover:text-foreground uppercase tracking-wider py-2"
+                className="text-sm text-muted-foreground hover:text-foreground uppercase tracking-wider py-3 min-h-[44px] flex items-center transition-colors"
                 onClick={() => setMobileMenuOpen(false)}
               >
                 The OS
               </a>
               <a 
                 href={`${APP_DOMAIN}/login`}
-                className="text-sm text-muted-foreground hover:text-foreground uppercase tracking-wider py-2"
+                className="text-sm text-muted-foreground hover:text-foreground uppercase tracking-wider py-3 min-h-[44px] flex items-center transition-colors"
                 onClick={() => setMobileMenuOpen(false)}
               >
                 Login
@@ -102,6 +111,8 @@ export default function MarketingPage() {
         )}
       </nav>
 
+      {/* Main Content */}
+      <main id="main-content">
       {/* Hero Section */}
       <HeroSection />
 
@@ -114,8 +125,8 @@ export default function MarketingPage() {
 
           <StaggerContainer className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-8">
             {/* Founders */}
-            <AnimatedCard className="border border-slate-200 bg-background p-4 sm:p-6 md:p-8 flex flex-col">
-              <div className="h-48 md:h-64 mb-4 md:mb-6 bg-muted border border-slate-200 relative overflow-hidden">
+            <AnimatedCard className="border bg-background p-4 sm:p-6 md:p-8 flex flex-col">
+              <div className="h-48 md:h-64 mb-4 md:mb-6 bg-muted border relative overflow-hidden">
                 <Image
                   src="/images/founder-hologram.png"
                   alt="Founders Decide"
@@ -136,14 +147,14 @@ export default function MarketingPage() {
                   href={`${APP_DOMAIN}/login`}
                   whileHover={buttonHover}
                   whileTap={buttonTap}
-                  className="flex-1 bg-muted hover:bg-secondary text-foreground py-2.5 md:py-3 text-center text-xs font-mono font-bold tracking-widest uppercase transition-colors"
+                  className="flex-1 bg-muted hover:bg-secondary text-foreground py-2.5 md:py-3 text-center text-xs font-mono font-bold tracking-widest uppercase transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                 >
                   Login
                 </motion.a>
                 <motion.div whileHover={buttonHover} whileTap={buttonTap} className="flex-1">
                   <Link
                     href="/join/founder"
-                    className="block bg-foreground hover:bg-international-orange text-background py-2.5 md:py-3 text-center text-xs font-mono font-bold tracking-widest uppercase transition-colors"
+                    className="block bg-foreground hover:bg-international-orange text-background py-2.5 md:py-3 text-center text-xs font-mono font-bold tracking-widest uppercase transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                   >
                     Begin Induction
                   </Link>
@@ -152,8 +163,8 @@ export default function MarketingPage() {
             </AnimatedCard>
 
             {/* Executives */}
-            <AnimatedCard className="border border-slate-200 bg-background p-4 sm:p-6 md:p-8 flex flex-col">
-              <div className="h-48 md:h-64 mb-4 md:mb-6 bg-muted border border-slate-200 relative overflow-hidden">
+            <AnimatedCard className="border bg-background p-4 sm:p-6 md:p-8 flex flex-col">
+              <div className="h-48 md:h-64 mb-4 md:mb-6 bg-muted border relative overflow-hidden">
                 <Image
                   src="/images/executive-pilot.png"
                   alt="Executives Evaluate"
@@ -174,14 +185,14 @@ export default function MarketingPage() {
                   href={`${APP_DOMAIN}/login`}
                   whileHover={buttonHover}
                   whileTap={buttonTap}
-                  className="flex-1 bg-muted hover:bg-secondary text-foreground py-2.5 md:py-3 text-center text-xs font-mono font-bold tracking-widest uppercase transition-colors"
+                  className="flex-1 bg-muted hover:bg-secondary text-foreground py-2.5 md:py-3 text-center text-xs font-mono font-bold tracking-widest uppercase transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                 >
                   Login
                 </motion.a>
                 <motion.div whileHover={buttonHover} whileTap={buttonTap} className="flex-1">
                   <Link
                     href="/join/executive"
-                    className="block bg-foreground hover:bg-international-orange text-background py-2.5 md:py-3 text-center text-xs font-mono font-bold tracking-widest uppercase transition-colors"
+                    className="block bg-foreground hover:bg-international-orange text-background py-2.5 md:py-3 text-center text-xs font-mono font-bold tracking-widest uppercase transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                   >
                     Join Cadre
                   </Link>
@@ -190,8 +201,8 @@ export default function MarketingPage() {
             </AnimatedCard>
 
             {/* Apprentices */}
-            <AnimatedCard className="border border-slate-200 bg-background p-4 sm:p-6 md:p-8 flex flex-col sm:col-span-2 lg:col-span-1">
-              <div className="h-48 md:h-64 mb-4 md:mb-6 bg-muted border border-slate-200 relative overflow-hidden">
+            <AnimatedCard className="border bg-background p-4 sm:p-6 md:p-8 flex flex-col sm:col-span-2 lg:col-span-1">
+              <div className="h-48 md:h-64 mb-4 md:mb-6 bg-muted border relative overflow-hidden">
                 <Image
                   src="/images/apprentice-engineer.png"
                   alt="Apprentices Do"
@@ -212,14 +223,14 @@ export default function MarketingPage() {
                   href={`${APP_DOMAIN}/login`}
                   whileHover={buttonHover}
                   whileTap={buttonTap}
-                  className="flex-1 bg-muted hover:bg-secondary text-foreground py-2.5 md:py-3 text-center text-xs font-mono font-bold tracking-widest uppercase transition-colors"
+                  className="flex-1 bg-muted hover:bg-secondary text-foreground py-2.5 md:py-3 text-center text-xs font-mono font-bold tracking-widest uppercase transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                 >
                   Login
                 </motion.a>
                 <motion.div whileHover={buttonHover} whileTap={buttonTap} className="flex-1">
                   <Link
                     href="/join/apprentice"
-                    className="block bg-foreground hover:bg-international-orange text-background py-2.5 md:py-3 text-center text-xs font-mono font-bold tracking-widest uppercase transition-colors"
+                    className="block bg-foreground hover:bg-international-orange text-background py-2.5 md:py-3 text-center text-xs font-mono font-bold tracking-widest uppercase transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                   >
                     Enter Guild
                   </Link>
@@ -239,11 +250,11 @@ export default function MarketingPage() {
 
           <StaggerContainer className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-8">
             {/* VCs */}
-            <AnimatedCard className="border border-slate-200 bg-background p-4 sm:p-6 md:p-8 flex flex-col">
-              <div className="h-48 md:h-64 mb-4 md:mb-6 bg-muted border border-slate-200 relative overflow-hidden">
+            <AnimatedCard className="border bg-background p-4 sm:p-6 md:p-8 flex flex-col">
+              <div className="h-48 md:h-64 mb-4 md:mb-6 bg-muted border relative overflow-hidden">
                 <Image
                   src="/images/vc-dashboard.png"
-                  alt="VCs"
+                  alt="Venture capital portfolio dashboard showing startup metrics"
                   fill
                   className="object-cover"
                 />
@@ -261,14 +272,14 @@ export default function MarketingPage() {
                   href={`${APP_DOMAIN}/login`}
                   whileHover={buttonHover}
                   whileTap={buttonTap}
-                  className="flex-1 bg-muted hover:bg-secondary text-foreground py-2.5 md:py-3 text-center text-xs font-mono font-bold tracking-widest uppercase transition-colors"
+                  className="flex-1 bg-muted hover:bg-secondary text-foreground py-2.5 md:py-3 text-center text-xs font-mono font-bold tracking-widest uppercase transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                 >
                   Login
                 </motion.a>
                 <motion.div whileHover={buttonHover} whileTap={buttonTap} className="flex-1">
                   <Link
                     href="/join/vc"
-                    className="block bg-foreground hover:bg-international-orange text-background py-2.5 md:py-3 text-center text-xs font-mono font-bold tracking-widest uppercase transition-colors"
+                    className="block bg-foreground hover:bg-international-orange text-background py-2.5 md:py-3 text-center text-xs font-mono font-bold tracking-widest uppercase transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                   >
                     Apply
                   </Link>
@@ -277,8 +288,8 @@ export default function MarketingPage() {
             </AnimatedCard>
 
             {/* Suppliers / Factories */}
-            <AnimatedCard className="border border-slate-200 bg-background p-4 sm:p-6 md:p-8 flex flex-col">
-              <div className="h-48 md:h-64 mb-4 md:mb-6 bg-muted border border-slate-200 relative overflow-hidden">
+            <AnimatedCard className="border bg-background p-4 sm:p-6 md:p-8 flex flex-col">
+              <div className="h-48 md:h-64 mb-4 md:mb-6 bg-muted border relative overflow-hidden">
                 <Image
                   src="/images/3d-printed-part.png"
                   alt="Marketplace Suppliers"
@@ -299,14 +310,14 @@ export default function MarketingPage() {
                   href={`${APP_DOMAIN}/login`}
                   whileHover={buttonHover}
                   whileTap={buttonTap}
-                  className="flex-1 bg-muted hover:bg-secondary text-foreground py-2.5 md:py-3 text-center text-xs font-mono font-bold tracking-widest uppercase transition-colors"
+                  className="flex-1 bg-muted hover:bg-secondary text-foreground py-2.5 md:py-3 text-center text-xs font-mono font-bold tracking-widest uppercase transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                 >
                   Login
                 </motion.a>
                 <motion.div whileHover={buttonHover} whileTap={buttonTap} className="flex-1">
                   <Link
                     href="/join/supplier"
-                    className="block bg-foreground hover:bg-international-orange text-background py-2.5 md:py-3 text-center text-xs font-mono font-bold tracking-widest uppercase transition-colors"
+                    className="block bg-foreground hover:bg-international-orange text-background py-2.5 md:py-3 text-center text-xs font-mono font-bold tracking-widest uppercase transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                   >
                     Start Selling
                   </Link>
@@ -315,11 +326,11 @@ export default function MarketingPage() {
             </AnimatedCard>
 
             {/* Universities */}
-            <AnimatedCard className="border border-slate-200 bg-background p-4 sm:p-6 md:p-8 flex flex-col sm:col-span-2 lg:col-span-1">
-              <div className="h-48 md:h-64 mb-4 md:mb-6 bg-muted border border-slate-200 relative overflow-hidden">
+            <AnimatedCard className="border bg-background p-4 sm:p-6 md:p-8 flex flex-col sm:col-span-2 lg:col-span-1">
+              <div className="h-48 md:h-64 mb-4 md:mb-6 bg-muted border relative overflow-hidden">
                 <Image
                   src="/images/university-lab.png"
-                  alt="Universities"
+                  alt="University research lab with advanced prototyping equipment"
                   fill
                   className="object-cover"
                 />
@@ -337,14 +348,14 @@ export default function MarketingPage() {
                   href={`${APP_DOMAIN}/login`}
                   whileHover={buttonHover}
                   whileTap={buttonTap}
-                  className="flex-1 bg-muted hover:bg-secondary text-foreground py-2.5 md:py-3 text-center text-xs font-mono font-bold tracking-widest uppercase transition-colors"
+                  className="flex-1 bg-muted hover:bg-secondary text-foreground py-2.5 md:py-3 text-center text-xs font-mono font-bold tracking-widest uppercase transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                 >
                   Login
                 </motion.a>
                 <motion.div whileHover={buttonHover} whileTap={buttonTap} className="flex-1">
                   <Link
                     href="/join/university"
-                    className="block bg-foreground hover:bg-international-orange text-background py-2.5 md:py-3 text-center text-xs font-mono font-bold tracking-widest uppercase transition-colors"
+                    className="block bg-foreground hover:bg-international-orange text-background py-2.5 md:py-3 text-center text-xs font-mono font-bold tracking-widest uppercase transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                   >
                     Partner
                   </Link>
@@ -364,11 +375,11 @@ export default function MarketingPage() {
 
           <StaggerContainer className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-8">
             {/* The Entity */}
-            <AnimatedCard className="border border-slate-200 bg-background p-4 sm:p-6 md:p-8 flex flex-col">
-              <div className="h-48 md:h-64 mb-4 md:mb-6 bg-muted border border-slate-200 relative overflow-hidden">
+            <AnimatedCard className="border bg-background p-4 sm:p-6 md:p-8 flex flex-col">
+              <div className="h-48 md:h-64 mb-4 md:mb-6 bg-muted border relative overflow-hidden">
                 <Image
                   src="/images/hero-centaur-alt.png"
-                  alt="The Entity"
+                  alt="Fractional Forge operating company providing the legal and operational framework"
                   fill
                   className="object-cover"
                 />
@@ -383,11 +394,11 @@ export default function MarketingPage() {
             </AnimatedCard>
 
             {/* The System */}
-            <AnimatedCard className="border border-slate-200 bg-background p-4 sm:p-6 md:p-8 flex flex-col">
-              <div className="h-48 md:h-64 mb-4 md:mb-6 bg-muted border border-slate-200 relative overflow-hidden">
+            <AnimatedCard className="border bg-background p-4 sm:p-6 md:p-8 flex flex-col">
+              <div className="h-48 md:h-64 mb-4 md:mb-6 bg-muted border relative overflow-hidden">
                 <Image
                   src="/images/centaur-os-core.png"
-                  alt="The System"
+                  alt="CentaurOS platform interface coordinating teams and resources"
                   fill
                   className="object-cover"
                 />
@@ -402,11 +413,11 @@ export default function MarketingPage() {
             </AnimatedCard>
 
             {/* The Community */}
-            <AnimatedCard className="border border-slate-200 bg-background p-4 sm:p-6 md:p-8 flex flex-col sm:col-span-2 lg:col-span-1">
-              <div className="h-48 md:h-64 mb-4 md:mb-6 bg-muted border border-slate-200 relative overflow-hidden">
+            <AnimatedCard className="border bg-background p-4 sm:p-6 md:p-8 flex flex-col sm:col-span-2 lg:col-span-1">
+              <div className="h-48 md:h-64 mb-4 md:mb-6 bg-muted border relative overflow-hidden">
                 <Image
                   src="/images/guild-workshop-new.png"
-                  alt="The Community"
+                  alt="Guild workshop space where teams collaborate and build"
                   fill
                   className="object-cover"
                 />
@@ -423,8 +434,10 @@ export default function MarketingPage() {
         </div>
       </section>
 
+      </main>
+
       {/* Footer */}
-      <footer className="py-8 md:py-12 border-t border bg-muted">
+      <footer className="py-8 md:py-12 border-t border-muted bg-muted">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 text-center">
           <p className="text-sm text-muted-foreground">
             &copy; {new Date().getFullYear()} Fractional Forge Ltd. All rights reserved.
@@ -454,7 +467,7 @@ function HeroSection() {
           initial="hidden"
           animate="visible"
           variants={fadeInScale}
-          className="inline-flex items-center gap-2 mb-6 md:mb-8 px-4 py-2 border border-slate-200 bg-card"
+          className="inline-flex items-center gap-2 mb-6 md:mb-8 px-4 py-2 border bg-card"
         >
           <span className="w-2 h-2 rounded-full bg-electric-blue animate-pulse" />
           <span className="text-electric-blue text-xs font-mono uppercase tracking-widest">

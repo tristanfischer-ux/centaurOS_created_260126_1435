@@ -9,7 +9,8 @@ import {
   Settings,
   Calendar,
   Home,
-  Lightbulb
+  Lightbulb,
+  Bell
 } from 'lucide-react'
 import type { SlashCommand, CommandResult } from '../types'
 import { navigateResult, errorResult } from '../executor'
@@ -44,9 +45,9 @@ export const gotoCommand: SlashCommand = {
       'dashboard': '/dashboard',
       'dash': '/dashboard',
       'd': '/dashboard',
-      'home': '/home',
-      'h': '/home',
-      'inbox': '/home',
+      'home': '/dashboard',
+      'h': '/dashboard',
+      'inbox': '/updates',
       'tasks': '/tasks',
       't': '/tasks',
       'objectives': '/objectives',
@@ -60,8 +61,9 @@ export const gotoCommand: SlashCommand = {
       'm': '/marketplace',
       'settings': '/settings',
       's': '/settings',
-      'messages': '/home',
-      'msg': '/home',
+      'messages': '/updates',
+      'msg': '/updates',
+      'updates': '/updates',
       'timeline': '/timeline',
       'tl': '/timeline',
       'inspiration': '/blueprints',
@@ -199,9 +201,20 @@ export const homeCommand: SlashCommand = {
   usage: '/home',
   icon: Home,
   category: 'navigation',
+  execute: async (): Promise<CommandResult> => {
+    return navigateResult('/dashboard')
+  }
+}
+
+export const updatesCommand: SlashCommand = {
+  name: 'updates',
+  description: 'Go to Updates',
+  usage: '/updates',
+  icon: Bell,
+  category: 'navigation',
   aliases: ['inbox', 'messages'],
   execute: async (): Promise<CommandResult> => {
-    return navigateResult('/home')
+    return navigateResult('/updates')
   }
 }
 
@@ -239,6 +252,7 @@ export const navigationCommands: SlashCommand[] = [
   marketplaceCommand,
   settingsCommand,
   homeCommand,
+  updatesCommand,
   timelineCommand,
   inspirationCommand
 ]

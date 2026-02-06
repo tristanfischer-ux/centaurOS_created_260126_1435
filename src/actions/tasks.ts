@@ -694,7 +694,7 @@ export async function addTaskComment(taskId: string, content: string) {
 
     revalidatePath('/tasks')
     revalidatePath('/messages')
-    revalidatePath('/home')
+    revalidatePath('/updates')
     return { success: true }
 }
 

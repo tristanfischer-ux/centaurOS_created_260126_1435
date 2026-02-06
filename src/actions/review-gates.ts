@@ -213,7 +213,7 @@ export async function createReviewGate(
     // Revalidate relevant paths
     if (input.task_id) revalidatePath('/tasks')
     if (input.objective_id) revalidatePath('/objectives')
-    revalidatePath('/home')
+    revalidatePath('/updates')
 
     return { data: data as ReviewGate, error: null }
   } catch (err) {
@@ -256,7 +256,7 @@ export async function submitReview(
 
     revalidatePath('/tasks')
     revalidatePath('/objectives')
-    revalidatePath('/home')
+    revalidatePath('/updates')
 
     return { data: data as ReviewGate, error: null }
   } catch (err) {
@@ -291,7 +291,7 @@ export async function assignReviewer(
     }
 
     revalidatePath('/tasks')
-    revalidatePath('/home')
+    revalidatePath('/updates')
 
     return { error: null }
   } catch (err) {

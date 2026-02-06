@@ -21,7 +21,7 @@ ALTER TABLE objectives ADD COLUMN IF NOT EXISTS is_private boolean DEFAULT false
 
 -- 2. Task shares table
 CREATE TABLE IF NOT EXISTS task_shares (
-    id uuid DEFAULT uuid_generate_v4() PRIMARY KEY,
+    id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
     task_id uuid NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
     shared_with_user_id uuid REFERENCES profiles(id) ON DELETE CASCADE,
     shared_with_team_id uuid REFERENCES teams(id) ON DELETE CASCADE,
@@ -41,7 +41,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS task_shares_team_unique
 
 -- 3. Objective shares table
 CREATE TABLE IF NOT EXISTS objective_shares (
-    id uuid DEFAULT uuid_generate_v4() PRIMARY KEY,
+    id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
     objective_id uuid NOT NULL REFERENCES objectives(id) ON DELETE CASCADE,
     shared_with_user_id uuid REFERENCES profiles(id) ON DELETE CASCADE,
     shared_with_team_id uuid REFERENCES teams(id) ON DELETE CASCADE,

@@ -652,7 +652,7 @@ export function BlueprintsView({
                 title="Executive View"
                 description="See coverage across all blueprints. Track milestones and organizational gaps."
                 linkText="Today → Overview"
-                href="/home"
+                href="/updates"
               />
             </div>
           </CardContent>

@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
-import { Users, CheckSquare, Store, Settings, Target, MoreHorizontal, Lightbulb, Inbox, Home, Bot } from "lucide-react"
+import { Users, CheckSquare, Store, Settings, Target, MoreHorizontal, Lightbulb, Bell, Home, Bot } from "lucide-react"
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -25,14 +25,14 @@ function isRouteActive(pathname: string, href: string): boolean {
 // Simplified navigation - Primary nav items shown in bottom bar
 const mainNavigation = [
     { name: "Home", shortName: "Home", href: "/dashboard", icon: Home },
-    { name: "Inbox", shortName: "Inbox", href: "/home", icon: Inbox },
-    { name: "Tasks", shortName: "Tasks", href: "/tasks", icon: CheckSquare },
+    { name: "Updates", shortName: "Updates", href: "/updates", icon: Bell },
+    { name: "Tasks", shortName: "Tasks", href: "/new-tasks", icon: CheckSquare },
 ]
 
 // Items in the "More" dropdown (Objectives + Discovery + Settings)
 const moreNavigation = [
     { name: "Team", href: "/team", icon: Users },
-    { name: "Objectives", href: "/objectives", icon: Target },
+    { name: "Objectives", href: "/new-objectives", icon: Target },
     { name: "Agents", href: "/agents", icon: Bot },
     { name: "Inspiration", href: "/inspiration", icon: Lightbulb },
     { name: "Marketplace", href: "/marketplace", icon: Store },

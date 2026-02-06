@@ -2,12 +2,17 @@ import type { NextConfig } from "next";
 
 import { withSentryConfig } from "@sentry/nextjs";
 import withPWAInit from "next-pwa";
+import withBundleAnalyzer from "@next/bundle-analyzer";
 
 const withPWA = withPWAInit({
   dest: "public",
   register: true,
   skipWaiting: true,
   disable: process.env.NODE_ENV === "development",
+});
+
+const analyzeBundles = withBundleAnalyzer({
+  enabled: process.env.ANALYZE === "true",
 });
 
 const nextConfig: NextConfig = {
@@ -22,6 +27,23 @@ const nextConfig: NextConfig = {
   
   // Disable X-Powered-By header for security
   poweredByHeader: false,
+
+  // Image optimization: serve modern formats with long cache TTL
+  images: {
+    formats: ["image/avif", "image/webp"],
+    minimumCacheTTL: 60 * 60 * 24 * 30, // 30 days
+  },
+
+  // Tree-shake heavy barrel-export packages for smaller bundles
+  experimental: {
+    optimizePackageImports: [
+      "lucide-react",
+      "date-fns",
+      "recharts",
+      "framer-motion",
+      "react-day-picker",
+    ],
+  },
   
   // Security headers
   async headers() {
@@ -82,7 +104,8 @@ const nextConfig: NextConfig = {
 };
 
 // Wrap with Sentry for error tracking and source maps
-export default withSentryConfig(withPWA(nextConfig), {
+// Chain: nextConfig -> PWA -> Bundle Analyzer -> Sentry
+export default withSentryConfig(analyzeBundles(withPWA(nextConfig)), {
   // Sentry organization and project
   org: process.env.SENTRY_ORG,
   project: process.env.SENTRY_PROJECT,
