@@ -17,14 +17,10 @@ const analyzeBundles = withBundleAnalyzer({
 
 const nextConfig: NextConfig = {
   output: "standalone",
-  // Silence Turbopack/Webpack conflict warning
+  // Turbopack config for dev mode (build uses webpack via --webpack flag)
   turbopack: {},
-
-  // Transpile @xyflow packages so Turbopack processes their ESM source
-  // instead of their UMD bundles which use dynamic require() calls
-  transpilePackages: ["@xyflow/react", "@xyflow/system"],
   
-  // Skip type checking during build (types need regeneration)
+  // Skip type checking during build (run separately via tsc --noEmit)
   typescript: {
     ignoreBuildErrors: true,
   },
