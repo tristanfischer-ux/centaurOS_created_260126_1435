@@ -1,7 +1,7 @@
 'use client'
 
 import { cn } from '@/lib/utils'
-import { Users, Package, Wrench, Bot, LayoutGrid } from 'lucide-react'
+import { Users, Package, Wrench, LayoutGrid } from 'lucide-react'
 import type { MarketplaceCategory } from '../hooks/useMarketplaceState'
 
 const CATEGORY_CONFIG: Record<MarketplaceCategory, {
@@ -12,7 +12,6 @@ const CATEGORY_CONFIG: Record<MarketplaceCategory, {
     People: { icon: Users, activeClasses: 'bg-international-orange text-white' },
     Products: { icon: Package, activeClasses: 'bg-secondary-foreground text-background' },
     Services: { icon: Wrench, activeClasses: 'bg-electric-blue text-white' },
-    AI: { icon: Bot, activeClasses: 'bg-status-info text-white' },
 }
 
 interface MarketplaceCategoryNavProps {
@@ -26,7 +25,7 @@ export function MarketplaceCategoryNav({
     onCategoryChange,
     counts,
 }: MarketplaceCategoryNavProps) {
-    const categories: MarketplaceCategory[] = ['All', 'People', 'Products', 'Services', 'AI']
+    const categories: MarketplaceCategory[] = ['All', 'People', 'Products', 'Services']
 
     return (
         <nav aria-label="Marketplace categories" className="flex items-center gap-2 overflow-x-auto pb-1 -mx-1 px-1">
@@ -52,7 +51,7 @@ export function MarketplaceCategoryNav({
                         aria-label={`${cat === 'All' ? 'All categories' : cat} (${count})`}
                     >
                         <Icon className="h-4 w-4" aria-hidden="true" />
-                        <span>{cat === 'AI' ? 'AI Tools' : cat}</span>
+                        <span>{cat}</span>
                         <span className={cn(
                             'text-xs px-1.5 py-0.5 rounded-full min-w-[24px] text-center',
                             isActive

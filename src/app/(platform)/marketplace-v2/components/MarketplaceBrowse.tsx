@@ -8,6 +8,8 @@ import { MarketplaceFilterPanel } from './MarketplaceFilterPanel'
 import { MarketplaceListingGrid } from './MarketplaceListingGrid'
 import { MarketplaceDetailDialog } from './MarketplaceDetailDialog'
 import { MarketplaceRecommendations } from './MarketplaceRecommendations'
+import { MarketplaceIntentPrompt } from './MarketplaceIntentPrompt'
+import { MarketplaceCategoryGuide } from './MarketplaceCategoryGuide'
 import { FeaturedBanner } from './FeaturedBanner'
 import { MarketplaceSavedView } from './MarketplaceSavedView'
 import { MarketplaceCompareView } from './MarketplaceCompareView'
@@ -20,6 +22,7 @@ import {
     Scale,
 } from 'lucide-react'
 import type { MarketplaceListing, MarketplaceRecommendation } from '@/actions/marketplace'
+import type { FoundryContext } from '@/actions/foundry-context'
 
 type MarketplaceTab = 'browse' | 'saved' | 'compare'
 
@@ -28,6 +31,7 @@ interface MarketplaceBrowseProps {
     recommendations: MarketplaceRecommendation[]
     initialSavedIds: string[]
     initialSavedListings: MarketplaceListing[]
+    foundryContext?: FoundryContext
 }
 
 const TABS: { id: MarketplaceTab; label: string; icon: React.ElementType }[] = [
@@ -40,6 +44,7 @@ export function MarketplaceBrowse({
     recommendations: initialRecommendations,
     initialSavedIds,
     initialSavedListings,
+    foundryContext,
 }: MarketplaceBrowseProps) {
     const state = useMarketplaceState({ initialListings, initialSavedIds })
     const [activeTab, setActiveTab] = useState<MarketplaceTab>('browse')
@@ -47,8 +52,9 @@ export function MarketplaceBrowse({
     const [compareOrigin, setCompareOrigin] = useState<'browse' | 'saved'>('browse')
 
     // Top-rated listings: verified, sorted by rating then bookings, limit 4
+    // Excludes AI listings to match the filtered browse experience
     const featuredListings = initialListings
-        .filter(l => l.is_verified)
+        .filter(l => l.is_verified && l.category !== 'AI')
         .sort((a, b) => {
             const ratingA = (a.attributes?.rating_average as number) || 0
             const ratingB = (b.attributes?.rating_average as number) || 0
@@ -77,6 +83,17 @@ export function MarketplaceBrowse({
             toast.error('Failed to dismiss')
         }
     }, [])
+
+    // Handle intent search from the prompt component
+    const handleIntentSearch = useCallback((query: string) => {
+        state.setSearchQuery(query)
+    }, [state])
+
+    // Handle subcategory selection from the category guide
+    const handleGuideSubcategorySelect = useCallback((subcategory: string) => {
+        state.toggleSubcategory(subcategory)
+        state.setShowFilters(true)
+    }, [state])
 
     // Enter compare mode from browse
     const handleCompareFromBrowse = useCallback((listings: MarketplaceListing[]) => {
@@ -130,7 +147,7 @@ export function MarketplaceBrowse({
                         </h1>
                     </div>
                     <p className="text-muted-foreground text-sm ml-4">
-                        Find expert talent, products, services, and AI tools to grow your business
+                        Find expert talent, products, and services to grow your business
                     </p>
                 </div>
             </div>
@@ -184,6 +201,13 @@ export function MarketplaceBrowse({
             {/* Browse tab content */}
             {activeTab === 'browse' && (
                 <>
+                    {/* Intent-driven entry point: "What do you need help with?" */}
+                    <MarketplaceIntentPrompt
+                        foundryContext={foundryContext}
+                        onSearch={handleIntentSearch}
+                        onCategoryChange={state.handleCategoryChange}
+                    />
+
                     {/* AI Recommendations */}
                     <MarketplaceRecommendations
                         recommendations={initialRecommendations}
@@ -191,7 +215,7 @@ export function MarketplaceBrowse({
                         onDismiss={handleDismissRecommendation}
                     />
 
-                    {/* Featured banner - only when no filters active */}
+                    {/* Featured banner - only when no filters active and on "All" */}
                     {!state.hasActiveFilters && featuredListings.length > 0 && state.activeCategory === 'All' && (
                         <FeaturedBanner
                             listings={featuredListings}
@@ -204,6 +228,14 @@ export function MarketplaceBrowse({
                         activeCategory={state.activeCategory}
                         onCategoryChange={state.handleCategoryChange}
                         counts={state.categoryCounts}
+                    />
+
+                    {/* Guided category landing: "What kind of person are you looking for?" */}
+                    <MarketplaceCategoryGuide
+                        activeCategory={state.activeCategory}
+                        foundryContext={foundryContext}
+                        onSelectSubcategory={handleGuideSubcategorySelect}
+                        hasFiltersActive={state.hasActiveFilters || state.selectedSubcategories.size > 0}
                     />
 
                     {/* Search + Sort + Filters */}

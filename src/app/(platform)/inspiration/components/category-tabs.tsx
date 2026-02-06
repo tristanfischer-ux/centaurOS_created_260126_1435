@@ -3,17 +3,18 @@
 import {
   Sparkles,
   Target,
-  Boxes,
   CircuitBoard,
+  TrendingUp,
   Heart,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 // ---------------------------------------------------------------------------
-// CategoryTabs – compact pill-style tab navigation for the Inspiration page
+// CategoryTabs – intent-driven tab navigation for the Inspiration page
+// Tabs organised around user needs rather than content source.
 // ---------------------------------------------------------------------------
 
-export type TabId = 'for-you' | 'business' | 'subsystems' | 'industry' | 'saved'
+export type TabId = 'for-you' | 'by-need' | 'by-industry' | 'popular' | 'saved'
 
 interface Tab {
   id: TabId
@@ -29,19 +30,22 @@ interface Tab {
 interface CategoryTabsProps {
   activeTab: TabId
   onTabChange: (tab: TabId) => void
-  businessCount: number
-  subsystemsCount: number
+  byNeedCount: number
   industryCount: number
+  popularCount: number
   savedCount: number
+  /** Number of identified gaps to display as a badge on "By Need" */
+  gapCount?: number
 }
 
 export function CategoryTabs({
   activeTab,
   onTabChange,
-  businessCount,
-  subsystemsCount,
+  byNeedCount,
   industryCount,
+  popularCount,
   savedCount,
+  gapCount,
 }: CategoryTabsProps) {
   const tabs: Tab[] = [
     {
@@ -53,30 +57,30 @@ export function CategoryTabs({
         'bg-international-orange/10 text-international-orange border-international-orange',
     },
     {
-      id: 'business',
-      label: 'Business',
+      id: 'by-need',
+      label: 'By Need',
       icon: Target,
-      count: businessCount,
+      count: gapCount && gapCount > 0 ? gapCount : byNeedCount,
       iconColor: 'text-electric-blue',
       activeClasses:
         'bg-electric-blue/10 text-electric-blue border-electric-blue',
     },
     {
-      id: 'subsystems',
-      label: 'Subsystems',
-      icon: Boxes,
-      count: subsystemsCount,
-      iconColor: 'text-status-success',
-      activeClasses:
-        'bg-status-success-light text-status-success-dark border-status-success',
-    },
-    {
-      id: 'industry',
-      label: 'Industry',
+      id: 'by-industry',
+      label: 'By Industry',
       icon: CircuitBoard,
       count: industryCount,
       iconColor: 'text-chart-5',
       activeClasses: 'bg-chart-5/10 text-chart-5 border-chart-5',
+    },
+    {
+      id: 'popular',
+      label: 'Popular',
+      icon: TrendingUp,
+      count: popularCount,
+      iconColor: 'text-status-success',
+      activeClasses:
+        'bg-status-success-light text-status-success-dark border-status-success',
     },
     {
       id: 'saved',

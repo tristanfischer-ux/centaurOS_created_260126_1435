@@ -3,6 +3,7 @@ import { InspirationPageNew } from './inspiration-page-new'
 import { Skeleton } from '@/components/ui/skeleton'
 import { getBlueprintTemplates } from '@/actions/blueprints'
 import { getObjectivePacks, getSavedPackIds } from '@/actions/packs'
+import { getFoundryContext } from '@/actions/foundry-context'
 
 export const metadata = {
   title: 'Inspiration | ForgeOS',
@@ -10,15 +11,12 @@ export const metadata = {
     'Discover what to do next. Turn ideas into objectives and tasks for your team.',
 }
 
-// NOTE: The old InspirationView is still in inspiration-view.tsx.
-// To roll back, just switch the import above back to:
-//   import { InspirationView } from './inspiration-view'
-
 async function InspirationData() {
-  const [templatesResult, packsResult, savedPacksResult] = await Promise.all([
+  const [templatesResult, packsResult, savedPacksResult, foundryContext] = await Promise.all([
     getBlueprintTemplates(),
     getObjectivePacks(),
     getSavedPackIds(),
+    getFoundryContext(),
   ])
 
   return (
@@ -26,6 +24,7 @@ async function InspirationData() {
       templates={templatesResult.data || []}
       packs={packsResult.packs || []}
       initialSavedPackIds={Array.from(savedPacksResult.savedIds || [])}
+      foundryContext={foundryContext}
     />
   )
 }

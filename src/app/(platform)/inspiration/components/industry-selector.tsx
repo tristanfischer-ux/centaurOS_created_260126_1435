@@ -21,20 +21,38 @@ interface IndustrySelectorProps {
   templates: BlueprintTemplate[]
   savedPackIds: Set<string>
   onSaveToggle: (packId: string, isSaved: boolean) => void
+  /** When set, auto-selects the matching industry on first render */
+  defaultIndustry?: string
 }
 
 export function IndustrySelector({
   templates,
   savedPackIds,
   onSaveToggle,
+  defaultIndustry,
 }: IndustrySelectorProps) {
   const [selected, setSelected] = useState<BlueprintTemplate | null>(null)
   const [packs, setPacks] = useState<ObjectivePack[]>([])
   const [loading, setLoading] = useState(false)
+  const [autoSelected, setAutoSelected] = useState(false)
 
   const industryTemplates = templates.filter(t =>
     INDUSTRY_CATEGORIES.has(t.product_category),
   )
+
+  // Auto-select user's industry on first render
+  useEffect(() => {
+    if (autoSelected || !defaultIndustry || industryTemplates.length === 0) return
+    const slug = defaultIndustry.toLowerCase().replace(/\s+/g, '-')
+    const match = industryTemplates.find(t =>
+      t.product_category.toLowerCase() === slug ||
+      t.name.toLowerCase().includes(defaultIndustry.toLowerCase())
+    )
+    if (match) {
+      setSelected(match)
+      setAutoSelected(true)
+    }
+  }, [defaultIndustry, industryTemplates, autoSelected])
 
   // Fetch packs when an industry is selected
   useEffect(() => {

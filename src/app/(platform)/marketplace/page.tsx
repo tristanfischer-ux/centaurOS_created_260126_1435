@@ -2,6 +2,7 @@ import { Suspense } from 'react'
 import { getMarketplaceListings, getSavedMarketplaceListings } from '@/actions/marketplace'
 import { createClient } from '@/lib/supabase/server'
 import { getFoundryIdCached } from '@/lib/supabase/foundry-context'
+import { getFoundryContext } from '@/actions/foundry-context'
 import { MarketplaceBrowse } from '../marketplace-v2/components/MarketplaceBrowse'
 import { Skeleton } from '@/components/ui/skeleton'
 import type { MarketplaceListing, MarketplaceRecommendation } from '@/actions/marketplace'
@@ -14,7 +15,7 @@ function MarketplaceLoading() {
             <Skeleton className="h-10 w-64" />
             <Skeleton className="h-12 w-full max-w-lg" />
             <div className="flex gap-3">
-                {[1, 2, 3, 4, 5].map((i) => (
+                {[1, 2, 3, 4].map((i) => (
                     <Skeleton key={i} className="h-9 w-24 rounded-full" />
                 ))}
             </div>
@@ -33,19 +34,28 @@ export default async function MarketplacePage() {
     let savedIds: string[] = []
     let savedListings: MarketplaceListing[] = []
 
-    // Fetch listings
-    try {
-        listings = await getMarketplaceListings()
-    } catch (err) {
-        console.error('[Marketplace] Failed to fetch listings:', err)
+    // Fetch listings and foundry context in parallel
+    const [listingsResult, foundryContext] = await Promise.allSettled([
+        getMarketplaceListings(),
+        getFoundryContext(),
+    ])
+
+    if (listingsResult.status === 'fulfilled') {
+        listings = listingsResult.value
+    } else {
+        console.error('[Marketplace] Failed to fetch listings:', listingsResult.reason)
     }
 
+    const ctx = foundryContext.status === 'fulfilled' ? foundryContext.value : null
+
     // Fetch foundry context for optional features
-    let foundryId: string | null = null
-    try {
-        foundryId = await getFoundryIdCached()
-    } catch {
-        // Non-critical
+    let foundryId: string | null = ctx?.foundryId || null
+    if (!foundryId) {
+        try {
+            foundryId = await getFoundryIdCached()
+        } catch {
+            // Non-critical
+        }
     }
 
     // Fetch recommendations, saved IDs, and full saved listings in parallel
@@ -81,6 +91,7 @@ export default async function MarketplacePage() {
                 recommendations={recommendations}
                 initialSavedIds={savedIds}
                 initialSavedListings={savedListings}
+                foundryContext={ctx || undefined}
             />
         </Suspense>
     )

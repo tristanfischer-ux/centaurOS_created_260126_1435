@@ -7,6 +7,7 @@ import {
   CheckCircle2,
   CheckSquare,
   ArrowRight,
+  Sparkles,
 } from 'lucide-react'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -26,9 +27,11 @@ interface PackCardProps {
   pack: ObjectivePack
   isSaved?: boolean
   onSaveToggle?: (packId: string, isSaved: boolean) => void
+  /** Short contextual line explaining why this pack is relevant to the user */
+  whyTag?: string
 }
 
-export function PackCard({ pack, isSaved = false, onSaveToggle }: PackCardProps) {
+export function PackCard({ pack, isSaved = false, onSaveToggle, whyTag }: PackCardProps) {
   const Icon = getPackIcon(pack.icon_name)
   const taskCount = pack.items?.length || 0
   const previewTasks = pack.items?.slice(0, 3) || []
@@ -119,12 +122,19 @@ export function PackCard({ pack, isSaved = false, onSaveToggle }: PackCardProps)
             )}
           </CardHeader>
 
-          {/* ---- Body: description + sample tasks ---- */}
+          {/* ---- Body: description + why tag + sample tasks ---- */}
           <CardContent className="flex-1 flex flex-col pt-0">
             {pack.description && (
               <p className="text-sm text-muted-foreground mb-3 line-clamp-2">
                 {pack.description}
               </p>
+            )}
+
+            {whyTag && (
+              <div className="flex items-center gap-1.5 mb-3 px-2 py-1.5 rounded-md bg-international-orange/5 border border-international-orange/10">
+                <Sparkles className="h-3 w-3 text-international-orange shrink-0" />
+                <span className="text-xs text-international-orange font-medium line-clamp-1">{whyTag}</span>
+              </div>
             )}
 
             {previewTasks.length > 0 && (

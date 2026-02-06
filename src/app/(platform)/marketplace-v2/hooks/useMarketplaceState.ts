@@ -4,7 +4,7 @@ import { useState, useMemo, useCallback, useEffect } from 'react'
 import { useSearchParams, useRouter, usePathname } from 'next/navigation'
 import type { MarketplaceListing } from '@/actions/marketplace'
 
-export type MarketplaceCategory = 'All' | 'People' | 'Products' | 'Services' | 'AI'
+export type MarketplaceCategory = 'All' | 'People' | 'Products' | 'Services'
 export type SortOption = 'relevance' | 'rating' | 'price_low' | 'price_high' | 'newest'
 
 export const CATEGORIES: { id: MarketplaceCategory; label: string; icon: string }[] = [
@@ -12,7 +12,6 @@ export const CATEGORIES: { id: MarketplaceCategory; label: string; icon: string 
     { id: 'People', label: 'People', icon: 'Users' },
     { id: 'Products', label: 'Products', icon: 'Package' },
     { id: 'Services', label: 'Services', icon: 'Wrench' },
-    { id: 'AI', label: 'AI Tools', icon: 'Bot' },
 ]
 
 export const SORT_OPTIONS: { value: SortOption; label: string }[] = [
@@ -103,9 +102,15 @@ export function useMarketplaceState({ initialListings, initialSavedIds }: UseMar
         return debouncedQuery.trim() !== '' || selectedSubcategories.size > 0 || sortBy !== 'relevance'
     }, [debouncedQuery, selectedSubcategories, sortBy])
 
+    // Exclude AI listings from browsing (kept in DB for future use)
+    const browseListings = useMemo(
+        () => initialListings.filter(l => l.category !== 'AI'),
+        [initialListings]
+    )
+
     // Filter and sort listings
     const filteredListings = useMemo(() => {
-        let filtered = initialListings
+        let filtered = browseListings
 
         // Category filter
         if (activeCategory !== 'All') {
@@ -158,24 +163,24 @@ export function useMarketplaceState({ initialListings, initialSavedIds }: UseMar
         }
 
         return filtered
-    }, [initialListings, activeCategory, selectedSubcategories, debouncedQuery, sortBy])
+    }, [browseListings, activeCategory, selectedSubcategories, debouncedQuery, sortBy])
 
     // Available subcategories for current category
     const availableSubcategories = useMemo(() => {
         const catListings = activeCategory === 'All'
-            ? initialListings
-            : initialListings.filter(l => l.category === activeCategory)
+            ? browseListings
+            : browseListings.filter(l => l.category === activeCategory)
         return [...new Set(catListings.map(l => l.subcategory))].sort()
-    }, [initialListings, activeCategory])
+    }, [browseListings, activeCategory])
 
     // Category counts
     const categoryCounts = useMemo(() => {
-        const counts: Record<string, number> = { All: initialListings.length }
-        for (const listing of initialListings) {
+        const counts: Record<string, number> = { All: browseListings.length }
+        for (const listing of browseListings) {
             counts[listing.category] = (counts[listing.category] || 0) + 1
         }
         return counts
-    }, [initialListings])
+    }, [browseListings])
 
     return {
         // State
