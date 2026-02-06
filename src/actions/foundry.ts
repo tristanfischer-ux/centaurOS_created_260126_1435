@@ -10,7 +10,6 @@
  */
 
 import { createClient } from '@/lib/supabase/server'
-import { createAdminClient } from '@/lib/supabase/admin'
 import { revalidatePath } from 'next/cache'
 import type { FoundryPurposeData } from '@/types/foundry'
 
@@ -104,17 +103,10 @@ export async function updateFoundryPurpose(
   }
   
   try {
-    // Update foundry purpose_data using admin client to bypass RLS
+    // Update foundry purpose_data using the authenticated user's client
+    // RLS policy "Founders can update their foundry" permits this operation
     // SECURITY: Auth checks above verify user is authenticated, owns this foundry, and is a Founder
-    let adminClient
-    try {
-      adminClient = createAdminClient()
-    } catch (adminError) {
-      console.error('[FoundryActions] Failed to create admin client:', adminError)
-      return { success: false, error: 'Server configuration error' }
-    }
-    
-    const { data, error: updateError } = await adminClient
+    const { data, error: updateError } = await supabase
       .from('foundries')
       .update({ 
         purpose_data: purposeData as any // JSONB field
@@ -129,7 +121,7 @@ export async function updateFoundryPurpose(
         error: updateError.message,
         code: updateError.code,
       })
-      return { success: false, error: 'Failed to update company purpose' }
+      return { success: false, error: `Failed to update company purpose: ${updateError.message}` }
     }
     
     // AUDIT: Log the purpose update
@@ -141,8 +133,9 @@ export async function updateFoundryPurpose(
       hasVision: !!purposeData.vision,
     })
     
-    // Revalidate objectives page where purpose is displayed
+    // Revalidate objectives pages where purpose is displayed
     revalidatePath('/objectives')
+    revalidatePath('/new-objectives')
     revalidatePath(`/foundry/${foundryId}`)
     
     return { 

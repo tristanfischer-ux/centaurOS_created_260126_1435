@@ -297,109 +297,35 @@ function PeopleSection({ attrs }: { attrs: Record<string, any> }) {
 function AISection({ attrs }: { attrs: Record<string, any> }) {
     return (
         <div className="space-y-4">
-            {/* Integrations */}
-            {attrs.integrations && (
-                <section>
-                    <h2 className="text-lg font-semibold text-foreground flex items-center gap-2 mb-2">
-                        <Layers className="h-5 w-5" />
-                        Integrations
-                    </h2>
-                    {Array.isArray(attrs.integrations) ? (
-                        <div className="flex flex-wrap gap-2">
-                            {attrs.integrations.map((integration: string, i: number) => (
-                                <Badge key={i} variant="secondary" className="bg-accent text-accent-foreground">
-                                    {integration}
-                                </Badge>
-                            ))}
-                        </div>
-                    ) : (
-                        <p className="text-muted-foreground">{attrs.integrations}</p>
-                    )}
-                </section>
-            )}
-
-            {/* Use Cases */}
-            {attrs.use_cases && (
+            {/* Capabilities */}
+            {attrs.capabilities && (
                 <section>
                     <h2 className="text-lg font-semibold text-foreground flex items-center gap-2 mb-2">
                         <Brain className="h-5 w-5" />
-                        Use Cases
+                        Capabilities
                     </h2>
-                    {Array.isArray(attrs.use_cases) ? (
+                    {Array.isArray(attrs.capabilities) ? (
                         <div className="flex flex-wrap gap-2">
-                            {attrs.use_cases.map((useCase: string, i: number) => (
-                                <Badge key={i} variant="secondary" className="bg-accent text-accent-foreground">
-                                    {useCase}
+                            {attrs.capabilities.map((cap: string, i: number) => (
+                                <Badge key={i} variant="secondary">
+                                    {cap}
                                 </Badge>
                             ))}
                         </div>
                     ) : (
-                        <p className="text-muted-foreground">{attrs.use_cases}</p>
+                        <p className="text-muted-foreground">{attrs.capabilities}</p>
                     )}
                 </section>
             )}
 
-            {/* Model Info */}
-            {(attrs.model || attrs.provider) && (
+            {/* Model / Technology */}
+            {attrs.model && (
                 <section>
                     <h2 className="text-lg font-semibold text-foreground flex items-center gap-2 mb-2">
                         <Cpu className="h-5 w-5" />
-                        Model Details
+                        Technology
                     </h2>
-                    <div className="grid grid-cols-2 gap-4">
-                        {attrs.model && (
-                            <Card>
-                                <CardContent className="pt-6">
-                                    <p className="text-xs text-muted-foreground mb-1">Model</p>
-                                    <p className="font-medium text-foreground">{attrs.model}</p>
-                                </CardContent>
-                            </Card>
-                        )}
-                        {attrs.provider && (
-                            <Card>
-                                <CardContent className="pt-6">
-                                    <p className="text-xs text-muted-foreground mb-1">Provider</p>
-                                    <p className="font-medium text-foreground">{attrs.provider}</p>
-                                </CardContent>
-                            </Card>
-                        )}
-                    </div>
-                </section>
-            )}
-
-            {/* Performance metrics */}
-            {(attrs.accuracy || attrs.latency || attrs.throughput) && (
-                <section>
-                    <h2 className="text-lg font-semibold text-foreground flex items-center gap-2 mb-2">
-                        <BarChart3 className="h-5 w-5" />
-                        Performance
-                    </h2>
-                    <div className="grid grid-cols-3 gap-4">
-                        {attrs.accuracy && (
-                            <Card className="bg-status-success-light border-status-success">
-                                <CardContent className="pt-6 text-center">
-                                    <p className="text-xl font-bold text-status-success-dark">{attrs.accuracy}</p>
-                                    <p className="text-xs text-muted-foreground mt-1">Accuracy</p>
-                                </CardContent>
-                            </Card>
-                        )}
-                        {attrs.latency && (
-                            <Card className="bg-status-info-light border-status-info">
-                                <CardContent className="pt-6 text-center">
-                                    <p className="text-xl font-bold text-status-info-dark">{attrs.latency}</p>
-                                    <p className="text-xs text-muted-foreground mt-1">Latency</p>
-                                </CardContent>
-                            </Card>
-                        )}
-                        {attrs.throughput && (
-                            <Card className="bg-accent/10 border-accent/20">
-                                <CardContent className="pt-6 text-center">
-                                    <p className="text-xl font-bold text-accent-foreground">{attrs.throughput}</p>
-                                    <p className="text-xs text-muted-foreground mt-1">Throughput</p>
-                                </CardContent>
-                            </Card>
-                        )}
-                    </div>
+                    <p className="text-muted-foreground">{attrs.model}</p>
                 </section>
             )}
         </div>

@@ -12,7 +12,7 @@ import Image from "next/image"
 
 export interface PreviewListing {
     id: string
-    category: 'People' | 'Products' | 'Services' | 'AI'
+    category: 'People' | 'Products' | 'Services'
     subcategory: string
     title: string
     description: string
@@ -27,33 +27,20 @@ interface MarketplacePreviewCardProps {
     onJoinClick: () => void
 }
 
-// Get icon for AI subcategory
-function getAITypeIcon(subcategory: string) {
-    switch (subcategory) {
-        case 'Agent': return Bot
-        case 'Assistant': return Sparkles
-        case 'Analyzer': return BarChart3
-        case 'Automation': return Zap
-        default: return Bot
-    }
-}
-
 export function MarketplacePreviewCard({ listing, onJoinClick }: MarketplacePreviewCardProps) {
     // Badge styles matching the category color scheme
     const categoryBadgeStyles: Record<string, string> = {
         'People': 'bg-orange-100 text-orange-700',      // Orange - warm, human
         'Products': 'bg-slate-100 text-slate-700',      // Slate - industrial
         'Services': 'bg-blue-100 text-blue-700',        // Blue - tech, digital
-        'AI': 'bg-violet-50 text-violet-700'            // Violet - AI distinction
     }
 
     const attrs = listing.attributes || {}
     const isPerson = listing.category === 'People'
-    const isAI = listing.category === 'AI'
     const isProduct = listing.category === 'Products'
+    const isAI = false // AI category not yet available in preview listings
+    const AITypeIcon = Bot // Placeholder icon for AI listings
     const isMachineCapacity = isProduct && listing.subcategory === 'Machine Capacity'
-
-    const AITypeIcon = isAI ? getAITypeIcon(listing.subcategory) : null
     const ctaText = isPerson ? 'Join to Connect' : 'Join to Book'
 
     // Calculate rating display

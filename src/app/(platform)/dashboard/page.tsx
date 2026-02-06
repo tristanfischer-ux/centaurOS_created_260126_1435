@@ -59,6 +59,7 @@ export default async function DashboardPage() {
   // Fetch all dashboard data in parallel
   const [
     myTasksResult,
+    myMultiAssignedTaskIdsResult,
     objectivesResult,
     teamPresenceResult,
     recentActivityResult,
@@ -71,7 +72,7 @@ export default async function DashboardPage() {
     unreadCountsResult,
     featuredListingsResult,
   ] = await Promise.all([
-    // My current tasks
+    // My current tasks (primary assignee)
     supabase
       .from('tasks')
       .select(`
@@ -81,8 +82,14 @@ export default async function DashboardPage() {
       `)
       .eq('foundry_id', foundryId)
       .eq('assignee_id', user.id)
-      .neq('status', 'Completed')
+      .not('status', 'in', '("Completed","Rejected")')
       .order('end_date', { ascending: true, nullsFirst: false }),
+    
+    // My tasks via multi-assignee table (matches get_daily_pulse logic)
+    supabase
+      .from('task_assignees')
+      .select('task_id')
+      .eq('profile_id', user.id),
     
     // Active objectives with progress
     supabase
@@ -105,7 +112,7 @@ export default async function DashboardPage() {
     // Task completion statistics (last 7 days)
     fetchTaskCompletionStats(supabase, foundryId, user.id, last7Days),
     
-    // Overdue tasks
+    // Overdue tasks (exclude Completed/Rejected to match daily pulse)
     supabase
       .from('tasks')
       .select(`
@@ -115,11 +122,11 @@ export default async function DashboardPage() {
       .eq('foundry_id', foundryId)
       .not('end_date', 'is', null)
       .lt('end_date', todayStart.toISOString())
-      .neq('status', 'Completed')
+      .not('status', 'in', '("Completed","Rejected")')
       .order('end_date', { ascending: true })
       .limit(10),
     
-    // Tasks due today
+    // Tasks due today (exclude Completed/Rejected to match daily pulse)
     supabase
       .from('tasks')
       .select(`
@@ -129,10 +136,10 @@ export default async function DashboardPage() {
       .eq('foundry_id', foundryId)
       .gte('end_date', todayStart.toISOString())
       .lte('end_date', todayEnd.toISOString())
-      .neq('status', 'Completed')
+      .not('status', 'in', '("Completed","Rejected")')
       .order('end_date', { ascending: true }),
     
-    // Tasks due this week
+    // Tasks due this week (exclude Completed/Rejected to match daily pulse)
     supabase
       .from('tasks')
       .select(`
@@ -142,7 +149,7 @@ export default async function DashboardPage() {
       .eq('foundry_id', foundryId)
       .gt('end_date', todayEnd.toISOString())
       .lte('end_date', weekEnd.toISOString())
-      .neq('status', 'Completed')
+      .not('status', 'in', '("Completed","Rejected")')
       .order('end_date', { ascending: true }),
     
     // Blockers from standups (executives only)
@@ -185,15 +192,48 @@ export default async function DashboardPage() {
   // Build workflow template previews from the static templates
   const workflowTemplates = getWorkflowTemplatePreviews()
 
-  // Generate daily focus message
-  const myTasks = myTasksResult.data || []
+  // Merge primary-assigned tasks with multi-assigned tasks to get complete "my tasks" list.
+  // This matches the logic in get_daily_pulse() which checks both assignee_id AND task_assignees.
+  const primaryTasks = myTasksResult.data || []
+  const multiAssignedTaskIds = new Set(
+    (myMultiAssignedTaskIdsResult.data || []).map(r => r.task_id)
+  )
+  const primaryTaskIds = new Set(primaryTasks.map(t => t.id))
+  const additionalTaskIds = [...multiAssignedTaskIds].filter(id => !primaryTaskIds.has(id))
+  
+  let myTasks = primaryTasks
+  if (additionalTaskIds.length > 0) {
+    const { data: additionalTasks } = await supabase
+      .from('tasks')
+      .select(`
+        id, title, status, start_date, end_date, task_number, created_at,
+        objective:objectives!objective_id(id, title, status),
+        creator:profiles!creator_id(id, full_name)
+      `)
+      .eq('foundry_id', foundryId)
+      .in('id', additionalTaskIds)
+      .not('status', 'in', '("Completed","Rejected")')
+      .order('end_date', { ascending: true, nullsFirst: false })
+    
+    myTasks = [...primaryTasks, ...(additionalTasks || [])]
+  }
+
   const objectives = objectivesResult.data || []
   const overdueTasks = overdueTasksResult.data || []
   const tasksDueToday = tasksDueTodayResult.data || []
+
+  // Build a Set of all "my task" IDs for filtering foundry-wide lists
+  const allMyTaskIds = new Set(myTasks.map(t => t.id))
+
+  // Filter due-today and overdue to only MY tasks, so the greeting and stat card agree
+  const myTasksDueToday = tasksDueToday.filter(t => allMyTaskIds.has(t.id))
+  const myOverdueTasks = overdueTasks.filter(t => allMyTaskIds.has(t.id))
+
+  // Generate daily focus using user-specific counts (not foundry-wide)
   const dailyFocus = generateDailyFocus({
     myTaskCount: myTasks.length,
-    todayTaskCount: tasksDueToday.length,
-    overdueCount: overdueTasks.length,
+    todayTaskCount: myTasksDueToday.length,
+    overdueCount: myOverdueTasks.length,
     objectiveCount: objectives.length,
     unreadCount: unreadCountsResult.total,
   })
