@@ -15,6 +15,7 @@ export default function TeamLoading() {
                 </div>
                 <div className="flex items-center gap-2">
                     <Skeleton className="h-9 w-9 rounded-md" />
+                    <Skeleton className="h-9 w-32 rounded-md" />
                     <Skeleton className="h-9 w-28 rounded-md" />
                     <Skeleton className="h-9 w-28 rounded-md" />
                 </div>
@@ -35,9 +36,17 @@ export default function TeamLoading() {
                 ))}
             </div>
 
+            {/* Insights Bar */}
+            <div className="flex gap-3 overflow-hidden">
+                {[1, 2, 3, 4].map((i) => (
+                    <Skeleton key={i} className="h-12 w-48 rounded-xl shrink-0" />
+                ))}
+            </div>
+
             {/* Tab Bar */}
             <div className="flex items-center justify-between border-b border-muted pb-3">
                 <div className="flex gap-1 bg-muted/50 p-1 rounded-xl">
+                    <Skeleton className="h-8 w-24 rounded-lg" />
                     <Skeleton className="h-8 w-24 rounded-lg" />
                     <Skeleton className="h-8 w-20 rounded-lg" />
                 </div>
