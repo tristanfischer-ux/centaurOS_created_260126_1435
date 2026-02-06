@@ -90,7 +90,29 @@ interface PromptNodeData {
     output?: string
     executionStatus?: ExecutionStatus
     attachedFiles?: { name: string }[]
+    providerId?: string
+    modelId?: string
+    outputModality?: string
+    imageUrl?: string
+    audioUrl?: string
+    videoUrl?: string
     [key: string]: unknown
+}
+
+const MODALITY_ICONS: Record<string, { icon: LucideIcon; color: string }> = {
+    text: { icon: FileText, color: "#3b82f6" },
+    image: { icon: Image, color: "#a855f7" },
+    audio: { icon: Play, color: "#000000" },
+    video: { icon: Video, color: "#ef4444" },
+}
+
+const PROVIDER_LABELS: Record<string, string> = {
+    openai: "OpenAI",
+    anthropic: "Claude",
+    google: "Gemini",
+    stability: "SDXL",
+    elevenlabs: "ElevenLabs",
+    replicate: "Replicate",
 }
 
 function PromptNodeComponent({ data, selected }: NodeProps) {
@@ -195,6 +217,41 @@ function PromptNodeComponent({ data, selected }: NodeProps) {
                                 Output
                             </span>
                         )}
+                    </div>
+                )}
+
+                {/* Provider / modality badge */}
+                {nodeData.providerId && nodeData.providerId !== "openai" && (
+                    <div className="flex items-center gap-1 mt-1.5">
+                        <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-medium bg-slate-50 text-slate-500 border border-slate-100">
+                            {PROVIDER_LABELS[nodeData.providerId] ?? nodeData.providerId}
+                        </span>
+                        {nodeData.outputModality && nodeData.outputModality !== "text" && (() => {
+                            const modalityCfg = MODALITY_ICONS[nodeData.outputModality!]
+                            if (!modalityCfg) return null
+                            const ModalityIcon = modalityCfg.icon
+                            return (
+                                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-medium bg-slate-50 text-slate-500 border border-slate-100">
+                                    <ModalityIcon className="w-2.5 h-2.5" style={{ color: modalityCfg.color }} />
+                                    {nodeData.outputModality}
+                                </span>
+                            )
+                        })()}
+                    </div>
+                )}
+                {!nodeData.providerId && nodeData.outputModality && nodeData.outputModality !== "text" && (
+                    <div className="flex items-center gap-1 mt-1.5">
+                        {(() => {
+                            const modalityCfg = MODALITY_ICONS[nodeData.outputModality!]
+                            if (!modalityCfg) return null
+                            const ModalityIcon = modalityCfg.icon
+                            return (
+                                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-medium bg-slate-50 text-slate-500 border border-slate-100">
+                                    <ModalityIcon className="w-2.5 h-2.5" style={{ color: modalityCfg.color }} />
+                                    {nodeData.outputModality}
+                                </span>
+                            )
+                        })()}
                     </div>
                 )}
             </div>
