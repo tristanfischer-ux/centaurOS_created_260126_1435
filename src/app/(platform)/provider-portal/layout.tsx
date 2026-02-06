@@ -185,7 +185,7 @@ export default async function ProviderPortalLayout({ children }: ProviderPortalL
                     {/* Back to marketplace link */}
                     <div className="px-3 pt-4">
                         <Link 
-                            href="/marketplace-v2" 
+                            href="/marketplace" 
                             className="text-xs text-muted-foreground hover:text-foreground transition-colors"
                         >
                             &larr; Back to Marketplace

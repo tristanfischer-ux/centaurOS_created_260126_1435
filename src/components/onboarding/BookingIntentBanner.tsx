@@ -123,7 +123,7 @@ export function BookingIntentBanner({ intents }: BookingIntentBannerProps) {
                   </Button>
                 </Link>
               ) : (
-                <Link href="/marketplace-v2">
+                <Link href="/marketplace">
                   <Button size="sm" className="bg-orange-600 hover:bg-orange-700">
                     Browse Marketplace
                     <ArrowRight className="h-4 w-4 ml-2" />

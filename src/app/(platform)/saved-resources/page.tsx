@@ -10,5 +10,5 @@ import { redirect } from "next/navigation"
  * This redirect ensures old bookmarks and links continue to work.
  */
 export default function SavedResourcesPage() {
-    redirect("/marketplace-v2?tab=saved")
+    redirect("/marketplace?tab=saved")
 }

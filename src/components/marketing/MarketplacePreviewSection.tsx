@@ -130,7 +130,7 @@ export function MarketplacePreviewSection({ listings, onBookClick }: Marketplace
                         className="text-white/60 hover:text-white text-sm font-mono uppercase tracking-widest"
                         asChild
                     >
-                        <Link href="/marketplace-v2">
+                        <Link href="/marketplace">
                             View Full Marketplace
                             <ArrowRight className="w-4 h-4 ml-2" />
                         </Link>
