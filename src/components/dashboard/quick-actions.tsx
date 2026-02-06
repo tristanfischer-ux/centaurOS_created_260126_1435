@@ -32,7 +32,7 @@ export function QuickActions({ foundryId }: QuickActionsProps) {
     {
       label: 'Messages',
       icon: MessageSquare,
-      href: '/home',
+      href: '/updates',
       color: 'from-green-500 to-green-600',
       bgColor: 'bg-green-50',
       hoverColor: 'hover:from-green-600 hover:to-green-700'

@@ -1,6 +1,9 @@
-import { redirect } from "next/navigation"
+import { redirect } from 'next/navigation'
 
-// Redirect /inbox to /home - Inbox functionality is now part of the Home page
-export default async function InboxPage() {
-    redirect("/home")
+/**
+ * Legacy /inbox route - redirects to /updates.
+ * Kept for backward compatibility with bookmarks and cached links.
+ */
+export default function InboxPage(): never {
+  redirect('/updates')
 }

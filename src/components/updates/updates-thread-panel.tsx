@@ -161,7 +161,7 @@ export function UpdatesThreadPanel({
   const linkHref = isTask
     ? `/tasks?taskId=${source.id}`
     : isConversation
-      ? `/home`
+      ? `/updates`
       : `/objectives`
 
   // Choose icon and color based on source type

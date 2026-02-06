@@ -1,7 +1,7 @@
 'use client'
 
 /**
- * UpdatesLayout - Main client layout for the Updates (New Inbox) page.
+ * UpdatesLayout - Main client layout for the Updates page.
  *
  * @description Two-panel responsive layout:
  * - Large (1280px+): Feed left, thread right, side by side

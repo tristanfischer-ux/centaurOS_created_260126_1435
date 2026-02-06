@@ -444,7 +444,7 @@ export async function startDirectMessage(
     // Get full conversation with participants
     const fullConversation = await getConversation(supabase, conversation.id)
 
-    revalidatePath('/home')
+    revalidatePath('/updates')
     revalidatePath('/messages')
     
     return { success: true, data: fullConversation || undefined }
@@ -531,7 +531,7 @@ export async function startTaskDiscussion(
     const fullConversation = await getConversation(supabase, conversation.id)
 
     revalidatePath('/tasks')
-    revalidatePath('/home')
+    revalidatePath('/updates')
     
     return { success: true, data: fullConversation || undefined }
   } catch (error) {
@@ -611,7 +611,7 @@ export async function startObjectiveDiscussion(
     const fullConversation = await getConversation(supabase, conversation.id)
 
     revalidatePath('/objectives')
-    revalidatePath('/home')
+    revalidatePath('/updates')
     
     return { success: true, data: fullConversation || undefined }
   } catch (error) {
@@ -700,7 +700,7 @@ export async function contactExpert(
     const fullConversation = await getConversation(supabase, conversation.id)
 
     revalidatePath('/marketplace')
-    revalidatePath('/home')
+    revalidatePath('/updates')
     
     return { success: true, data: fullConversation || undefined }
   } catch (error) {

@@ -16,7 +16,7 @@ import type { ReactionGroup } from '@/actions/reactions'
 import { formatDistanceToNow } from 'date-fns'
 import { isImageFile, getFileIcon } from '@/lib/file-upload'
 import Image from 'next/image'
-import '@/components/inbox/message-animations.css'
+import '@/components/messaging/message-animations.css'
 
 interface MessageBubbleProps {
   message: MessageWithSender

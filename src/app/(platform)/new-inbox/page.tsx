@@ -1,48 +1,9 @@
-import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
-import { getActivityFeed } from '@/actions/activity'
-import { getFoundryIdCached } from '@/lib/supabase/foundry-context'
-import { UpdatesLayout } from './updates-layout'
-
-export const revalidate = 60
 
 /**
- * New Inbox (Updates) Page - Server Component
- *
- * @description Fetches the initial activity feed and passes it to the
- * client layout. This is a server component that handles auth and
- * initial data fetching.
+ * Legacy /new-inbox route - redirects to /updates.
+ * Kept for backward compatibility with cached links.
  */
-export default async function NewInboxPage() {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) {
-    redirect('/login')
-  }
-
-  const foundryId = await getFoundryIdCached()
-  if (!foundryId) {
-    redirect('/login')
-  }
-
-  // Fetch initial activity feed
-  const result = await getActivityFeed({
-    limit: 50,
-    filter: 'all',
-    showAllFoundryActivity: true,
-    includeSystemLogs: false
-  })
-
-  const initialItems = result.success && result.data ? result.data : []
-
-  return (
-    <UpdatesLayout
-      initialItems={initialItems}
-      userId={user.id}
-      foundryId={foundryId}
-    />
-  )
+export default function NewInboxPage(): never {
+  redirect('/updates')
 }
