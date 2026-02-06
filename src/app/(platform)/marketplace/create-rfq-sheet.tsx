@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/sheet'
 import { Plus } from 'lucide-react'
 import { RFQCreator } from '@/components/rfq/RFQCreator'
+import { RFQTemplatePicker } from '@/components/rfq/RFQTemplatePicker'
 import { toast } from 'sonner'
 
 interface CreateRFQSheetProps {
@@ -31,10 +32,14 @@ export function CreateRFQSheet({
   trigger,
 }: CreateRFQSheetProps) {
   const [open, setOpen] = useState(false)
+  const [showTemplates, setShowTemplates] = useState(true)
+  const [prefillCategory, setPrefillCategory] = useState(initialCategory || '')
+  const [prefillDescription, setPrefillDescription] = useState(initialDescription || '')
   const router = useRouter()
 
   const handleSuccess = (rfqId: string) => {
     setOpen(false)
+    setShowTemplates(true)
     toast.success('RFQ created successfully', {
       description: 'Suppliers will be notified based on your urgency settings.',
       action: {
@@ -46,10 +51,20 @@ export function CreateRFQSheet({
 
   const handleCancel = () => {
     setOpen(false)
+    setShowTemplates(true)
+  }
+
+  const handleTemplateSelect = (template: { title: string; category: string; description: string; rfqType: string }) => {
+    setPrefillCategory(template.category)
+    setPrefillDescription(`${template.title}\n\n${template.description}`)
+    setShowTemplates(false)
   }
 
   return (
-    <Sheet open={open} onOpenChange={setOpen}>
+    <Sheet open={open} onOpenChange={(v) => {
+      setOpen(v)
+      if (!v) setShowTemplates(true)
+    }}>
       {trigger ? (
         <div onClick={() => setOpen(true)}>{trigger}</div>
       ) : (
@@ -70,10 +85,28 @@ export function CreateRFQSheet({
           </SheetDescription>
         </SheetHeader>
         
-        <div className="h-[100dvh] overflow-hidden">
+        <div className="h-[100dvh] overflow-y-auto">
+          {/* Template picker shown initially */}
+          {showTemplates && (
+            <div className="p-6 border-b">
+              <RFQTemplatePicker
+                onSelect={handleTemplateSelect}
+              />
+              <div className="mt-4 text-center">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-xs text-muted-foreground"
+                  onClick={() => setShowTemplates(false)}
+                >
+                  Skip templates, start from scratch
+                </Button>
+              </div>
+            </div>
+          )}
           <RFQCreator
-            initialCategory={initialCategory}
-            initialDescription={initialDescription}
+            initialCategory={prefillCategory}
+            initialDescription={prefillDescription}
             targetSupplierId={targetSupplierId}
             defaultPreviewOpen={true}
             showPreviewToggle={true}

@@ -42,6 +42,7 @@ import { getMyRFQs } from "@/actions/rfq"
 import { getSavedResources, getSavedMarketplaceListings, getSavedListingIds } from "@/actions/marketplace"
 import { RFQCard } from "@/components/rfq/RFQCard"
 import { RFQSummary } from "@/types/rfq"
+import { HireExpertCTA } from "@/components/marketplace/HireExpertCTA"
 
 interface MarketplaceRecommendation {
     id: string
@@ -1066,6 +1067,11 @@ export function MarketplaceView({
                             </div>
                         </div>
                     </Card>
+                )}
+
+                {/* Hire Expert / Apprentice / Manufacturing CTA */}
+                {activeTab === 'People' && (
+                    <HireExpertCTA variant="compact" className="mb-4" />
                 )}
 
                 <div className="w-full">

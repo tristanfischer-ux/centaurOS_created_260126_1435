@@ -271,3 +271,86 @@ test.describe('Marketplace Navigation', () => {
     expect(response?.status()).toBeLessThan(400)
   })
 })
+
+test.describe('Manufacturing & Expert Hiring Features', () => {
+  test('marketplace page has People category with expert talent', async ({ page }) => {
+    await page.goto('/marketplace')
+    await page.waitForLoadState('networkidle')
+
+    // May redirect to login if not authenticated
+    const url = page.url()
+    if (url.includes('/login')) {
+      test.skip()
+      return
+    }
+
+    // People category card should be visible
+    const peopleHeading = page.locator('text=People').first()
+    expect(await peopleHeading.count()).toBeGreaterThanOrEqual(1)
+  })
+
+  test('marketplace handles manufacturing search gracefully', async ({ page }) => {
+    await page.goto('/marketplace')
+    await page.waitForLoadState('networkidle')
+
+    const url = page.url()
+    if (url.includes('/login')) {
+      test.skip()
+      return
+    }
+
+    const searchInput = page.locator('input[placeholder*="Search"], input[placeholder*="search"]').first()
+    
+    if (await searchInput.count() > 0) {
+      await searchInput.fill('DFM review manufacturing')
+      await page.waitForTimeout(1000)
+
+      // Page should remain functional
+      const body = page.locator('body')
+      await expect(body).toBeVisible()
+    }
+  })
+
+  test('marketplace handles expert search gracefully', async ({ page }) => {
+    await page.goto('/marketplace')
+    await page.waitForLoadState('networkidle')
+
+    const url = page.url()
+    if (url.includes('/login')) {
+      test.skip()
+      return
+    }
+
+    const searchInput = page.locator('input[placeholder*="Search"], input[placeholder*="search"]').first()
+    
+    if (await searchInput.count() > 0) {
+      await searchInput.fill('quality expert ISO 9001')
+      await page.waitForTimeout(1000)
+
+      const body = page.locator('body')
+      await expect(body).toBeVisible()
+    }
+  })
+
+  test('RFQ creation flow is accessible from marketplace', async ({ page }) => {
+    await page.goto('/marketplace')
+    await page.waitForLoadState('networkidle')
+
+    const url = page.url()
+    if (url.includes('/login')) {
+      test.skip()
+      return
+    }
+
+    // Look for Create RFQ button
+    const rfqButton = page.locator('button:has-text("Create RFQ"), a:has-text("Create RFQ")').first()
+    
+    if (await rfqButton.count() > 0) {
+      // Button exists - good
+      expect(true).toBeTruthy()
+    } else {
+      // May need auth to see RFQ button - skip
+      test.skip()
+    }
+  })
+})

@@ -15,6 +15,7 @@ import { ActionItemsSection } from './action-items-section'
 import { TasksDueSection } from './tasks-due-section'
 import { TeamActivitySection } from './team-activity-section'
 import { HomeAnalytics } from './home-analytics'
+import { ReviewGateWidget } from '@/components/review-gates/ReviewGateWidget'
 import { Skeleton } from '@/components/ui/skeleton'
 
 interface ActionTask {
@@ -158,6 +159,9 @@ export function HomeSummaryPanel({
           tasksDueThisWeek={tasksDueThisWeek}
           isExecutiveOrFounder={isExecutiveOrFounder}
         />
+        
+        {/* Review Gates - Human-in-the-loop */}
+        <ReviewGateWidget />
         
         {/* Action Items */}
         <ActionItemsSection

@@ -59,6 +59,19 @@ import {
 } from "lucide-react"
 import { PrivacyShareControl, PrivacyBadge, type ShareTarget } from "@/components/ui/privacy-share-control"
 import { Database } from "@/types/database.types"
+import dynamic from "next/dynamic"
+import type { ReviewGate } from "@/types/review-gates"
+
+// Lazy-load review gate components to avoid pulling server action imports
+// into the Jest test bundle (next/cache -> Request not defined in Jest)
+const ReviewGateBanner = dynamic(
+    () => import("@/components/review-gates/ReviewGateBanner").then(m => m.ReviewGateBanner),
+    { ssr: false }
+)
+const AddReviewGateDialog = dynamic(
+    () => import("@/components/review-gates/AddReviewGateDialog").then(m => m.AddReviewGateDialog),
+    { ssr: false }
+)
 
 interface Member {
     id: string
@@ -122,6 +135,7 @@ export function FullTaskView({ open, onOpenChange, task, members, currentUserId,
     const [comments, setComments] = useState<Comment[]>([])
     const [history, setHistory] = useState<TaskHistoryItem[]>([])
     const [attachments, setAttachments] = useState<any[]>([])
+    const [reviewGates, setReviewGates] = useState<ReviewGate[]>([])
     const [isLoading, setIsLoading] = useState(true)
     const [newComment, setNewComment] = useState("")
     const [isSending, setIsSending] = useState(false)
@@ -194,6 +208,13 @@ export function FullTaskView({ open, onOpenChange, task, members, currentUserId,
                 if (sharesRes.data) {
                     setEditedSharedWith(sharesRes.data.map(s => ({ type: s.type, id: s.id })))
                 }
+            }
+
+            // Fetch review gates (dynamic import to avoid Jest issues)
+            const { getReviewGatesForTask } = await import("@/actions/review-gates")
+            const gatesRes = await getReviewGatesForTask(task.id)
+            if (!gatesRes.error) {
+                setReviewGates(gatesRes.data)
             }
 
             setIsLoading(false)
@@ -629,6 +650,37 @@ export function FullTaskView({ open, onOpenChange, task, members, currentUserId,
                 {/* Main Content - Scrollable */}
                 <div className="flex-1 overflow-y-auto">
                     <div className="p-6 space-y-6">
+                        {/* Review Gates Section */}
+                        {(reviewGates.length > 0 || !isLoading) && (
+                            <div className="space-y-2">
+                                <div className="flex items-center justify-between">
+                                    {reviewGates.length > 0 && (
+                                        <h3 className="text-sm font-semibold text-foreground uppercase tracking-wider flex items-center gap-2">
+                                            <ShieldCheck className="h-4 w-4 text-status-info" /> Review Gates
+                                        </h3>
+                                    )}
+                                    <AddReviewGateDialog
+                                        taskId={task.id}
+                                        teamMembers={members.map(m => ({ id: m.id, full_name: m.full_name, role: m.role }))}
+                                        onCreated={async () => {
+                                            const { getReviewGatesForTask } = await import("@/actions/review-gates")
+                                            const res = await getReviewGatesForTask(task.id)
+                                            if (!res.error) setReviewGates(res.data)
+                                        }}
+                                    />
+                                </div>
+                                <ReviewGateBanner
+                                    gates={reviewGates}
+                                    currentUserId={currentUserId}
+                                    onUpdate={async () => {
+                                        const { getReviewGatesForTask } = await import("@/actions/review-gates")
+                                        const res = await getReviewGatesForTask(task.id)
+                                        if (!res.error) setReviewGates(res.data)
+                                    }}
+                                />
+                            </div>
+                        )}
+
                         {/* Top Section: Description + Details */}
                         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                             {/* Description */}

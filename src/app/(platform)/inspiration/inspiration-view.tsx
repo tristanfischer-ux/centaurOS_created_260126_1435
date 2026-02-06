@@ -53,6 +53,7 @@ import { getTemplateDomains } from '@/actions/blueprints'
 import { toast } from 'sonner'
 import { UsePackDialog } from '@/components/blueprints/use-pack-dialog'
 import Link from 'next/link'
+import { HireExpertCTA } from '@/components/marketplace/HireExpertCTA'
 
 type CategoryId = 'business' | 'subsystems' | 'industry' | null
 
@@ -1769,6 +1770,72 @@ export function InspirationView({ templates = [], packs = [], initialSavedPackId
               <ArrowRight className="w-4 h-4 transition-transform duration-200 group-hover:translate-x-1" />
             </button>
           </div>
+        </div>
+      </div>
+
+      {/* Manufacturing Readiness & Expert Hiring Module */}
+      <div className="mb-8 space-y-4">
+        <div className="flex items-center gap-2">
+          <Boxes className="h-5 w-5 text-status-success" />
+          <h2 className="text-base font-semibold">Manufacturing & Expert Resources</h2>
+        </div>
+        <p className="text-sm text-muted-foreground">
+          Push for manufacturing readiness. Hire domain experts and apprentices to keep humans in the loop.
+        </p>
+        <HireExpertCTA variant="full" />
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mt-2">
+          <Link href="/marketplace?tab=browse&search=DFM+review">
+            <Card className="group hover:border-status-success/40 transition-colors cursor-pointer h-full">
+              <CardContent className="p-3 flex items-center gap-2.5">
+                <div className="h-8 w-8 rounded-lg bg-status-success-light flex items-center justify-center shrink-0">
+                  <CheckCircle2 className="h-4 w-4 text-status-success" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-xs font-medium">DFM Review</p>
+                  <p className="text-[10px] text-muted-foreground">Design for Manufacturing</p>
+                </div>
+              </CardContent>
+            </Card>
+          </Link>
+          <Link href="/marketplace?tab=browse&search=quality+ISO">
+            <Card className="group hover:border-chart-5/40 transition-colors cursor-pointer h-full">
+              <CardContent className="p-3 flex items-center gap-2.5">
+                <div className="h-8 w-8 rounded-lg bg-chart-5/10 flex items-center justify-center shrink-0">
+                  <Target className="h-4 w-4 text-chart-5" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-xs font-medium">Quality Systems</p>
+                  <p className="text-[10px] text-muted-foreground">ISO 9001 / AS9100</p>
+                </div>
+              </CardContent>
+            </Card>
+          </Link>
+          <Link href="/marketplace?tab=browse&search=supplier+audit">
+            <Card className="group hover:border-status-warning/40 transition-colors cursor-pointer h-full">
+              <CardContent className="p-3 flex items-center gap-2.5">
+                <div className="h-8 w-8 rounded-lg bg-status-warning-light flex items-center justify-center shrink-0">
+                  <Truck className="h-4 w-4 text-status-warning" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-xs font-medium">Supply Chain</p>
+                  <p className="text-[10px] text-muted-foreground">Supplier qualification</p>
+                </div>
+              </CardContent>
+            </Card>
+          </Link>
+          <Link href="/rfq/create">
+            <Card className="group hover:border-electric-blue/40 transition-colors cursor-pointer h-full">
+              <CardContent className="p-3 flex items-center gap-2.5">
+                <div className="h-8 w-8 rounded-lg bg-electric-blue-light flex items-center justify-center shrink-0">
+                  <FileText className="h-4 w-4 text-electric-blue" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-xs font-medium">Create RFQ</p>
+                  <p className="text-[10px] text-muted-foreground">Request for Quote</p>
+                </div>
+              </CardContent>
+            </Card>
+          </Link>
         </div>
       </div>
 
