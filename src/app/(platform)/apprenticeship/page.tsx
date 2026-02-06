@@ -9,7 +9,7 @@ import { NoEnrollmentState } from '@/components/apprenticeship/no-enrollment-sta
 import { redirect } from 'next/navigation'
 
 export const metadata = {
-  title: 'Apprenticeship | CentaurOS',
+  title: 'Apprenticeship | ForgeOS',
   description: 'Your apprenticeship dashboard - track progress, log OTJT hours, and complete learning modules.'
 }
 

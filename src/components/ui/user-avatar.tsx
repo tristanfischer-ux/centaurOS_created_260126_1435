@@ -6,7 +6,7 @@ import { cn, getInitials } from "@/lib/utils"
 import { Bot } from "lucide-react"
 
 /**
- * Role-based avatar colors for CentaurOS
+ * Role-based avatar colors for ForgeOS
  * Following the design philosophy: bright, airy, optimistic
  * Uses orange hierarchy: Founder (dark orange) > Executive (light orange) > Apprentice (neutral)
  */
@@ -87,7 +87,7 @@ const iconSizeClasses = {
 }
 
 /**
- * UserAvatar - Standardized avatar component for CentaurOS
+ * UserAvatar - Standardized avatar component for ForgeOS
  * 
  * Features:
  * - Consistent initials (first name + last name)

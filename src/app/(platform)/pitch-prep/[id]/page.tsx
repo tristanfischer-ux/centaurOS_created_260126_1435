@@ -6,7 +6,7 @@ import { PitchPrepDetailView } from './pitch-prep-detail-view'
 import { PitchPrepRequest } from '@/types/pitch-prep'
 
 export const metadata: Metadata = {
-  title: 'Pitch Prep Request | CentaurOS',
+  title: 'Pitch Prep Request | ForgeOS',
   description: 'View your pitch preparation request',
 }
 

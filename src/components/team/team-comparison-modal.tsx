@@ -83,7 +83,7 @@ function getBandwidth(member: TeamMemberForComparison): {
 const ATTRIBUTE_SECTIONS = {
     'PRICING & AVAILABILITY': ['bandwidth', 'activeTasks'],
     'EXPERIENCE': ['completedTasks', 'rejectedTasks', 'role'],
-    'SKILLS & LOCATION': ['email', 'centaur'],
+    'SKILLS & LOCATION': ['email', 'aiPairing'],
     'OTHER': ['bio']
 } as const
 
@@ -355,7 +355,7 @@ export function TeamComparisonModal({
  */
 function MemberHeader({ member }: { member: TeamMemberForComparison }) {
     const isAI = member.role === 'AI_Agent'
-    const isCentaur = !!member.paired_ai_id
+    const isPaired = !!member.paired_ai_id
     
     return (
         <div className="flex items-start gap-3">
@@ -373,7 +373,7 @@ function MemberHeader({ member }: { member: TeamMemberForComparison }) {
                         size="lg"
                     />
                 )}
-                {isCentaur && (
+                {isPaired && (
                     <div className="absolute -bottom-1 -right-1 bg-status-warning rounded-full p-0.5 border-2 border-background">
                         <Zap className="w-2.5 h-2.5 text-white fill-white" />
                     </div>
@@ -460,7 +460,7 @@ function MemberComparisonCard({
     bestValues: Record<string, { value: number; memberId: string; direction: 'higher' | 'lower' } | null>
 }) {
     const isAI = member.role === 'AI_Agent'
-    const isCentaur = !!member.paired_ai_id
+    const isPaired = !!member.paired_ai_id
     
     return (
         <Card className="p-4">
@@ -479,7 +479,7 @@ function MemberComparisonCard({
                             size="lg"
                         />
                     )}
-                    {isCentaur && (
+                    {isPaired && (
                         <div className="absolute -bottom-1 -right-1 bg-status-warning rounded-full p-0.5 border-2 border-background">
                             <Zap className="w-2.5 h-2.5 text-white fill-white" />
                         </div>
@@ -555,7 +555,7 @@ function getMemberValue(member: TeamMemberForComparison, key: string): string | 
             return member.rejectedTasks
         case 'bandwidth':
             return getBandwidth(member).label
-        case 'centaur':
+        case 'aiPairing':
             if (member.role === 'AI_Agent') return 'N/A'
             if (member.paired_ai_id && member.pairedAI?.[0]) {
                 return `Paired with ${member.pairedAI[0].full_name}`
@@ -579,7 +579,7 @@ function formatAttributeName(key: string): string {
         pendingTasks: 'Pending',
         rejectedTasks: 'Rejected',
         bandwidth: 'Bandwidth',
-        centaur: 'AI Pairing'
+        aiPairing: 'AI Pairing'
     }
     return names[key] || key.replace(/_/g, ' ')
 }
@@ -663,8 +663,8 @@ function renderValue(
         )
     }
     
-    // Special rendering for centaur status
-    if (key === 'centaur') {
+    // Special rendering for AI pairing status
+    if (key === 'aiPairing') {
         if (member.paired_ai_id && member.pairedAI?.[0]) {
             return (
                 <span className="inline-flex items-center gap-1.5">

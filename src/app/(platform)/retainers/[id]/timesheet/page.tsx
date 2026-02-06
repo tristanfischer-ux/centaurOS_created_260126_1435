@@ -23,7 +23,7 @@ import { format, startOfWeek, addDays } from 'date-fns'
 // ==========================================
 
 export const metadata: Metadata = {
-  title: 'Timesheet | CentaurOS',
+  title: 'Timesheet | ForgeOS',
   description: 'Manage weekly timesheet',
 }
 

@@ -56,7 +56,7 @@ export const FEATURE_REGISTRY: Feature[] = [
         category: 'integration',
         status: 'stable',
         isVisibleInNav: true,
-        changelog: 'Added Telegram bot integration. Link your Telegram account in Settings to create objectives via voice or text messages. AI-powered parsing automatically structures your input into objectives with tasks, dates, and assignees.'
+        changelog: 'Added Telegram bot integration. Link your Telegram account in Settings to create objectives via voice or text messages. Smart parsing automatically structures your input into objectives with tasks, dates, and assignees.'
     },
     {
         id: 'extended-descriptions',
@@ -99,7 +99,7 @@ export const FEATURE_REGISTRY: Feature[] = [
         category: 'communication',
         status: 'stable',
         isVisibleInNav: true,
-        changelog: 'Introduced the Advisory section for community Q&A. Post questions, get expert answers, and share knowledge with other centaurs.'
+        changelog: 'Introduced the Advisory section for community Q&A. Post questions, get expert answers, and share knowledge with other users.'
     },
     {
         id: 'apprenticeship',
@@ -224,7 +224,7 @@ export const FEATURE_REGISTRY: Feature[] = [
         category: 'marketplace',
         status: 'stable',
         isVisibleInNav: true,
-        changelog: 'Launched the Centaur Marketplace. Browse, compare, and hire vetted service providers with AI-powered matching.'
+        changelog: 'Launched the ForgeOS Marketplace. Browse, compare, and hire vetted service providers with intelligent matching.'
     },
     {
         id: 'objectives',
@@ -262,7 +262,7 @@ export const FEATURE_REGISTRY: Feature[] = [
     {
         id: 'today',
         name: 'Today View',
-        description: 'Daily focus dashboard with AI-powered briefing',
+        description: 'Daily focus dashboard with personalized briefing',
         route: '/today',
         releasedAt: new Date('2025-12-05'),
         category: 'core',

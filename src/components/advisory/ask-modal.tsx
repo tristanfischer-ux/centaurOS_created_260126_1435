@@ -295,7 +295,7 @@ export function AskModal({ onSubmit, trigger }: AskModalProps) {
                                     <span className="font-medium text-sm">Share with Network</span>
                                 </div>
                                 <p className="text-xs text-muted-foreground">
-                                    Visible to the entire Centaur network
+                                    Visible to the entire Forge network
                                 </p>
                             </button>
                         </div>

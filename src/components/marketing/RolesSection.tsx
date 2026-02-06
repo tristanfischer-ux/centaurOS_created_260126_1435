@@ -29,13 +29,13 @@ const roles = [
 
 export function RolesSection() {
     return (
-        <section className="py-24 bg-background border-t border" id="centaurs">
+        <section className="py-24 bg-background border-t border" id="roles">
             <div className="max-w-7xl mx-auto px-6">
                 <div className="mb-16">
-                    <span className="text-xs font-bold tracking-[0.3em] text-international-orange uppercase block mb-6 font-centaur-mono">
-                        The Centaurs
+                    <span className="text-xs font-bold tracking-[0.3em] text-international-orange uppercase block mb-6 font-forge-mono">
+                        The Roles
                     </span>
-                    <h2 className="text-4xl md:text-5xl font-centaur font-medium text-foreground leading-tight mb-6">
+                    <h2 className="text-4xl md:text-5xl font-forge font-medium text-foreground leading-tight mb-6">
                         Select Your Architecture.
                     </h2>
                 </div>
@@ -55,10 +55,10 @@ export function RolesSection() {
 
                             {/* Content */}
                             <div className="flex-1">
-                                <span className="text-xs font-centaur-mono font-bold text-international-orange tracking-widest mb-2 block">
+                                <span className="text-xs font-forge-mono font-bold text-international-orange tracking-widest mb-2 block">
                                     {role.title}
                                 </span>
-                                <h3 className="text-2xl font-centaur font-semibold text-foreground mb-4">
+                                <h3 className="text-2xl font-forge font-semibold text-foreground mb-4">
                                     {role.subtitle}
                                 </h3>
                                 <p className="text-muted-foreground leading-relaxed text-sm mb-8 font-sans">

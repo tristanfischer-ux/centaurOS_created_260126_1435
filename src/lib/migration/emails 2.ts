@@ -1,8 +1,8 @@
 // Email templates for migration invitations and notifications
 import { MigrationInvite, MigrationEmailData } from "@/types/migration"
 
-const APP_NAME = "CentaurOS Marketplace"
-const SUPPORT_EMAIL = "support@centauros.com"
+const APP_NAME = "ForgeOS Marketplace"
+const SUPPORT_EMAIL = "support@forgeos.io"
 
 /**
  * Generate the initial migration invitation email

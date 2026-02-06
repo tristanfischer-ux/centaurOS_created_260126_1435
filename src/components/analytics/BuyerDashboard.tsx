@@ -247,7 +247,7 @@ export function BuyerDashboard({
                   {formatCurrency(analytics.totalSavings, analytics.currency)}
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  Via Centaur discounts
+                  Via Forge discounts
                 </p>
               </div>
             </div>

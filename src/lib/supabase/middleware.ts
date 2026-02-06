@@ -14,6 +14,7 @@ const PUBLIC_ROUTES = [
     '/api/webhooks',
     '/api/marketplace/preview',
     '/access-revoked',  // Access revoked page for deactivated users
+    '/workspace-picker', // Multi-foundry workspace selector
 ]
 
 // Routes that require admin (Executive/Founder) role
@@ -83,20 +84,41 @@ export async function updateSession(request: NextRequest) {
     })
 
     // Special handling for app domain root: authenticated users go to their portal
-    if (hostname.includes('centauros.io') && pathname === '/') {
+    if (hostname.includes('forgeos.io') && pathname === '/') {
         if (user) {
-            // Check user's account type to determine redirect destination
+            // Check user's account type and active foundry to determine redirect
             const { data: profile } = await supabase
                 .from('profiles')
-                .select('account_type')
+                .select('account_type, active_foundry_id')
                 .eq('id', user.id)
                 .single()
             
             const redirectUrl = request.nextUrl.clone()
-            // Suppliers go to supplier portal, others to timeline (Gantt view)
-            redirectUrl.pathname = profile?.account_type === 'supplier' 
-                ? '/supplier-portal' 
-                : '/timeline'
+            
+            // Suppliers go to supplier portal
+            if (profile?.account_type === 'supplier') {
+                redirectUrl.pathname = '/supplier-portal'
+                return NextResponse.redirect(redirectUrl)
+            }
+            
+            // Check foundry membership count for multi-foundry users
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const { count } = await (supabase as any)
+                .from('foundry_memberships')
+                .select('*', { count: 'exact', head: true })
+                .eq('user_id', user.id)
+            
+            const foundryCount = count || 0
+            
+            // Multiple foundries without active selection - show picker
+            if (foundryCount > 1 && !profile?.active_foundry_id) {
+                redirectUrl.pathname = '/workspace-picker'
+                return NextResponse.redirect(redirectUrl)
+            }
+            
+            // Otherwise go to dashboard (or last visited page from cookie)
+            const lastVisited = request.cookies.get('forge-last-path')?.value
+            redirectUrl.pathname = lastVisited && lastVisited !== '/' ? lastVisited : '/dashboard'
             return NextResponse.redirect(redirectUrl)
         }
         // User not logged in, let middleware below handle redirect to marketing
@@ -104,7 +126,7 @@ export async function updateSession(request: NextRequest) {
 
     if (!user && !isPublicRoute) {
         // no user, redirect to login page on marketing domain
-        const marketingDomain = process.env.NEXT_PUBLIC_MARKETING_DOMAIN || 'https://centaurdynamics.io'
+        const marketingDomain = process.env.NEXT_PUBLIC_MARKETING_DOMAIN || 'https://fractionalforge.io'
         const loginUrl = new URL('/login', marketingDomain)
         return NextResponse.redirect(loginUrl)
     }

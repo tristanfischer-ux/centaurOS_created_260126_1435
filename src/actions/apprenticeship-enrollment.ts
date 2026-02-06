@@ -386,7 +386,7 @@ async function createRequiredDocuments(enrollmentId: string) {
       enrollment_id: enrollmentId,
       document_type: 'commitment_statement',
       title: 'Commitment Statement',
-      description: 'Three-way agreement between you, your employer, and CentaurOS as training provider.',
+      description: 'Three-way agreement between you, your employer, and ForgeOS as training provider.',
       status: 'draft',
       created_by: user?.id
     },
@@ -444,7 +444,7 @@ async function createInductionObjective(
     },
     {
       title: '📋 Sign Commitment Statement',
-      description: 'Three-way agreement between you, your employer, and CentaurOS outlining training responsibilities.',
+      description: 'Three-way agreement between you, your employer, and ForgeOS outlining training responsibilities.',
       end_date: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString(),
       risk_level: 'High'
     },

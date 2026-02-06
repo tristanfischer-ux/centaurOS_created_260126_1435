@@ -1,7 +1,7 @@
 /**
  * Slash Commands Module
  * 
- * This module provides a Slack-style slash command system for CentaurOS messaging.
+ * This module provides a Slack-style slash command system for ForgeOS messaging.
  * 
  * Usage:
  * ```tsx

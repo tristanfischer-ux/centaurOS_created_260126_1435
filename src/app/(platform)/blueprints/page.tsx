@@ -8,7 +8,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { createClient } from '@/lib/supabase/server'
 
 export const metadata = {
-  title: 'Inspiration | CentaurOS',
+  title: 'Inspiration | ForgeOS',
   description: 'Get ideas on what to do next. Discover opportunities, find experts, and turn insights into action.',
 }
 

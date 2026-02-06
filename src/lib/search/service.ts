@@ -102,7 +102,7 @@ export async function searchMarketplace(params: SearchParams): Promise<SearchRes
           avgResponseTimeHours: provider.avg_response_time_hours,
           completionRate: provider.completion_rate,
           totalOrders: provider.total_orders,
-          centaurDiscount: provider.centaur_discount_percent,
+          forgeDiscount: provider.forge_discount_percent,
           lastActive: provider.updated_at,
         } : undefined,
       })
@@ -125,7 +125,7 @@ export async function searchMarketplace(params: SearchParams): Promise<SearchRes
           total_reviews: provider.total_reviews,
           response_rate: provider.response_rate,
           completion_rate: provider.completion_rate,
-          centaur_discount: provider.centaur_discount_percent,
+          forge_discount: provider.forge_discount_percent,
           last_active: provider.updated_at,
           day_rate: provider.day_rate,
           currency: provider.currency || 'GBP',
@@ -215,7 +215,7 @@ interface ProviderDataMap {
     avg_response_time_hours: number | null
     completion_rate: number | null
     total_orders: number
-    centaur_discount_percent: number | null
+    forge_discount_percent: number | null
     day_rate: number | null
     currency: string | null
     updated_at: string | null
@@ -242,7 +242,7 @@ async function fetchProviderData(
         response_rate,
         avg_response_time_hours,
         completion_rate,
-        centaur_discount_percent,
+        forge_discount_percent,
         day_rate,
         currency,
         updated_at
@@ -295,7 +295,7 @@ async function fetchProviderData(
         avg_response_time_hours: provider.avg_response_time_hours,
         completion_rate: provider.completion_rate,
         total_orders: orderCountMap[provider.id] || 0,
-        centaur_discount_percent: provider.centaur_discount_percent,
+        forge_discount_percent: provider.forge_discount_percent,
         day_rate: provider.day_rate,
         currency: provider.currency,
         updated_at: provider.updated_at,

@@ -100,7 +100,7 @@ export function TeamComparisonBar({
                     <div className="flex gap-3 min-w-min">
                         {selectedMembers.map(member => {
                             const colorClasses = getRoleColors(member.role)
-                            const isCentaur = !!member.paired_ai_id
+                            const isPaired = !!member.paired_ai_id
                             
                             return (
                                 <div 
@@ -118,7 +118,7 @@ export function TeamComparisonBar({
                                             size="sm"
                                             className="h-8 w-8"
                                         />
-                                        {isCentaur && (
+                                        {isPaired && (
                                             <div className="absolute -bottom-1 -right-1 bg-status-warning rounded-full p-0.5">
                                                 <Zap className="w-2 h-2 text-white fill-white" />
                                             </div>

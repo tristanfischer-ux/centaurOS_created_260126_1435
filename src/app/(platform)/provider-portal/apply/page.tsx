@@ -156,7 +156,7 @@ export default function ProviderApplicationPage() {
                         </div>
                         <h1 className="text-2xl font-bold mb-2">Application Submitted!</h1>
                         <p className="text-muted-foreground mb-6 max-w-md mx-auto">
-                            Thank you for applying to become a provider on CentaurOS Marketplace.
+                            Thank you for applying to become a provider on ForgeOS Marketplace.
                             We&apos;ll review your application and get back to you within 2-3 business days.
                         </p>
                         <div className="space-y-3">
@@ -200,7 +200,7 @@ export default function ProviderApplicationPage() {
                     </div>
                     <CardTitle className="text-2xl">Become a Provider</CardTitle>
                     <CardDescription>
-                        Join the CentaurOS Marketplace and connect with innovative foundries
+                        Join the ForgeOS Marketplace and connect with innovative foundries
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">

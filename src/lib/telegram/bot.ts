@@ -1,5 +1,5 @@
 /**
- * Telegram Bot Client for CentaurOS
+ * Telegram Bot Client for ForgeOS
  * Handles sending messages, inline keyboards, and file downloads
  */
 
@@ -241,13 +241,13 @@ export function escapeHtml(text: string): string {
  * Send welcome message with linking instructions
  */
 export async function sendWelcomeMessage(chatId: number, verificationCode: string): Promise<void> {
-    const message = `👋 <b>Welcome to CentaurOS!</b>
+    const message = `👋 <b>Welcome to ForgeOS!</b>
 
-To link your Telegram account, enter this code in CentaurOS Settings:
+To link your Telegram account, enter this code in ForgeOS Settings:
 
 <code>${verificationCode}</code>
 
-Or scan the QR code in your CentaurOS settings page.
+Or scan the QR code in your ForgeOS settings page.
 
 Once linked, you can send me:
 • 💬 Text messages with your goals
@@ -268,7 +268,7 @@ I'll turn them into structured objectives with tasks for your review!`
 export async function sendLinkedConfirmation(chatId: number, userName: string): Promise<void> {
     const message = `✅ <b>Account Linked Successfully!</b>
 
-Welcome, ${escapeHtml(userName)}! Your Telegram is now connected to CentaurOS.
+Welcome, ${escapeHtml(userName)}! Your Telegram is now connected to ForgeOS.
 
 <b>How to use:</b>
 • Send me a text message with any goal, idea, or project
@@ -320,9 +320,9 @@ export async function sendObjectiveCreatedMessage(
 
 <b>${escapeHtml(objectiveTitle)}</b>
 
-${taskCount} tasks have been added to your CentaurOS account.
+${taskCount} tasks have been added to your ForgeOS account.
 
-View it in CentaurOS → Objectives`
+View it in ForgeOS → Objectives`
 
     await sendMessage({
         chat_id: chatId,
@@ -607,7 +607,7 @@ export function createIdeaKeyboard(ideaId: string): InlineKeyboardMarkup {
 export function formatIdeaCaptured(content: string): string {
     const truncated = content.length > 200 ? content.substring(0, 200) + '...' : content
     
-    return `💡 <b>Idea Captured!</b>\n\n"${escapeHtml(truncated)}"\n\n<i>Find it in CentaurOS → Ideas, or use /ideas to see all</i>`
+    return `💡 <b>Idea Captured!</b>\n\n"${escapeHtml(truncated)}"\n\n<i>Find it in ForgeOS → Ideas, or use /ideas to see all</i>`
 }
 
 /**
@@ -628,7 +628,7 @@ export function formatIdeasList(ideas: { id: string; content: string; created_at
     })
 
     if (ideas.length > 10) {
-        message += `<i>... and ${ideas.length - 10} more. View all in CentaurOS.</i>`
+        message += `<i>... and ${ideas.length - 10} more. View all in ForgeOS.</i>`
     }
 
     return message

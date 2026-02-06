@@ -16,15 +16,15 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     
     if (!profile) {
         return {
-            title: 'Profile Not Found | CentaurOS',
+            title: 'Profile Not Found | ForgeOS',
         }
     }
     
     const name = profile.user_name || 'Executive'
-    const description = profile.headline || profile.bio?.slice(0, 160) || `View ${name}'s profile on CentaurOS`
+    const description = profile.headline || profile.bio?.slice(0, 160) || `View ${name}'s profile on ForgeOS`
     
     return {
-        title: `${name} | CentaurOS`,
+        title: `${name} | ForgeOS`,
         description,
         openGraph: {
             title: `${name} - ${profile.headline || 'Fractional Executive'}`,

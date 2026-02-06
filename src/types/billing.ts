@@ -1,5 +1,5 @@
 /**
- * Billing system types for CentaurOS
+ * Billing system types for ForgeOS
  * Covers saved payment methods, credit balance, fee configuration,
  * payment retry, and payout preferences
  */

@@ -1,7 +1,7 @@
 /**
  * Notification System
  * 
- * Multi-channel notification service for CentaurOS Marketplace
+ * Multi-channel notification service for ForgeOS Marketplace
  * 
  * @example
  * ```typescript

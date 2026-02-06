@@ -6,7 +6,7 @@ import { ArrowLeft } from 'lucide-react'
 import { RFQCreator } from '@/components/rfq/RFQCreator'
 
 export const metadata = {
-  title: 'Create RFQ | CentaurOS',
+  title: 'Create RFQ | ForgeOS',
   description: 'Create a new request for quote',
 }
 

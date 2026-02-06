@@ -13,12 +13,12 @@ export function TalentSection() {
                     </h3>
                     <div className="prose prose-lg text-muted-foreground font-sans font-light">
                         <p>
-                            A Centaur is not a junior. A Centaur is a pilot.
+                            A member is not a junior. A member is a pilot.
                             We recruit the brightest young minds—top 1% of engineering talent—and train them to command AI tools that replace entire departments.
                         </p>
                         <p>
                             They don't write code; they architect systems. They don't push pixels; they design experiences.
-                            Backed by our AI stack, a single Centaur delivers the output of a 5-person senior engineering pod.
+                            Backed by our AI stack, a single member delivers the output of a 5-person senior engineering pod.
                         </p>
                     </div>
 
@@ -27,7 +27,7 @@ export function TalentSection() {
                             <GraduationCap className="w-6 h-6 text-foreground" />
                         </div>
                         <div className="font-mono text-xs uppercase text-muted-foreground">
-                            <div className="text-foreground font-bold">Centaur Academy Verified</div>
+                            <div className="text-foreground font-bold">Forge Academy Verified</div>
                             <div>Acceptance Rate: 0.8%</div>
                         </div>
                     </div>

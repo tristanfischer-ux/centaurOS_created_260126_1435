@@ -243,7 +243,7 @@ export function TelegramLink({ initialLink, botUsername }: TelegramLinkProps) {
                                 <li>• Send text messages to create objectives</li>
                                 <li>• Send voice notes describing your goals</li>
                                 <li>• Review and confirm structured tasks</li>
-                                <li>• Get objectives added to CentaurOS instantly</li>
+                                <li>• Get objectives added to ForgeOS instantly</li>
                             </ul>
                         </div>
 

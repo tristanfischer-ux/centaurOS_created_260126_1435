@@ -4,7 +4,7 @@ import { redirect } from 'next/navigation'
 import { PitchPrepForm } from '@/components/pitch-prep'
 
 export const metadata: Metadata = {
-  title: 'Create Pitch Prep Request | CentaurOS',
+  title: 'Create Pitch Prep Request | ForgeOS',
   description: 'Submit a pitch preparation request to get investor-ready',
 }
 

@@ -555,7 +555,7 @@ export async function createObjectiveFromSubsystem(input: {
     const { data: aiAgent } = await supabase
         .from('profiles')
         .select('id')
-        .eq('email', 'ai-agent@centauros.ai')
+        .eq('email', 'ai-agent@forgeos.ai')
         .single()
 
     // Create the objective
@@ -601,7 +601,7 @@ export async function createObjectiveFromSubsystem(input: {
                     ? 'experts and advisors' 
                     : 'suppliers and service providers'
                 const categories = task.marketplace_filter.categories?.join(', ') || 'relevant categories'
-                description += `\n\n---\n**Marketplace Discovery Task**\nSearch the CentaurOS marketplace for ${filterType} in: ${categories}`
+                description += `\n\n---\n**Marketplace Discovery Task**\nSearch the ForgeOS marketplace for ${filterType} in: ${categories}`
             }
 
             return {

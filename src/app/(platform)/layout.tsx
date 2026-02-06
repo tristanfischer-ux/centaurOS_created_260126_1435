@@ -13,6 +13,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { PresenceProvider } from "@/components/PresenceProvider";
 import { ZoomProvider, MobileZoomControl, ZoomableContent } from "@/components/ZoomProvider";
 import { createClient } from "@/lib/supabase/server";
+import { getUserFoundries } from "@/lib/supabase/foundry-context";
 import { redirect } from "next/navigation";
 
 export default async function PlatformLayout({
@@ -30,12 +31,17 @@ export default async function PlatformLayout({
         redirect("/login");
     }
 
-    // Fetch profile to get foundry_id and user info
-    const { data: profile, error: profileError } = await supabase
-        .from("profiles")
-        .select("foundry_id, full_name, role, account_type")
-        .eq("id", user.id)
-        .single();
+    // Fetch profile and foundry memberships in parallel
+    const [profileResult, userFoundries] = await Promise.all([
+        supabase
+            .from("profiles")
+            .select("foundry_id, active_foundry_id, full_name, role, account_type")
+            .eq("id", user.id)
+            .single(),
+        getUserFoundries(),
+    ]);
+
+    const { data: profile, error: profileError } = profileResult;
 
     if (profileError) {
         console.error("Failed to fetch user profile:", profileError.message);
@@ -84,7 +90,7 @@ export default async function PlatformLayout({
                         <CommandPalette />
                         <KeyboardShortcutsDialog />
                         <MobileZoomControl />
-                        <Sidebar foundryName={foundryName} foundryId={foundryId} userName={profile?.full_name || user.email || "User"} userRole={profile?.role || "Member"} isAdmin={profile?.role === "Founder" || profile?.role === "Executive" || hasAdminAccess} />
+                        <Sidebar foundryName={foundryName} foundryId={foundryId} userName={profile?.full_name || user.email || "User"} userRole={profile?.role || "Member"} isAdmin={profile?.role === "Founder" || profile?.role === "Executive" || hasAdminAccess} userFoundries={userFoundries} />
                         <ZoomableContent className="flex-1 overflow-y-auto bg-background">
                             <main className="p-4 sm:p-6 lg:p-8 pb-32 lg:pb-8">
                                 <ErrorBoundary>

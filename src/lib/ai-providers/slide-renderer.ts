@@ -29,7 +29,7 @@ export async function generatePptx(deck: SlideDeckContent): Promise<Blob> {
 
     // Configure presentation
     pptx.layout = "LAYOUT_WIDE" // 13.33 x 7.5 inches
-    pptx.author = "CentaurOS"
+    pptx.author = "ForgeOS"
     pptx.title = deck.title
 
     for (let i = 0; i < deck.slides.length; i++) {

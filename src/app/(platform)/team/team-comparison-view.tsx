@@ -24,7 +24,7 @@ import Link from "next/link"
 import { InviteMemberDialog } from "./invite-member-dialog"
 import { PendingInvitations } from "./pending-invitations"
 import { FeatureTip } from "@/components/onboarding"
-import { pairCentaur, unpairCentaur } from "@/actions/team"
+import { pairAIAgent, unpairAIAgent } from "@/actions/team"
 import { toast } from "sonner"
 import { FullProfileView } from "@/components/team/full-profile-view"
 import {
@@ -336,7 +336,7 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
             if (draggedMember.role === 'AI_Agent' && targetMember.role !== 'AI_Agent') {
                 setPairingMemberId(targetMember.id)
                 startTransition(async () => {
-                    const res = await pairCentaur(targetMember.id, draggedMember.id)
+                    const res = await pairAIAgent(targetMember.id, draggedMember.id)
                     if (res?.error) toast.error(res.error)
                     else toast.success(`Paired ${targetMember.full_name} with ${draggedMember.full_name}`)
                     setPairingMemberId(null)
@@ -348,7 +348,7 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
             if (draggedMember.role !== 'AI_Agent' && targetMember.role === 'AI_Agent') {
                 setPairingMemberId(draggedMember.id)
                 startTransition(async () => {
-                    const res = await pairCentaur(draggedMember.id, targetMember.id)
+                    const res = await pairAIAgent(draggedMember.id, targetMember.id)
                     if (res?.error) toast.error(res.error)
                     else toast.success(`Paired ${draggedMember.full_name} with ${targetMember.full_name}`)
                     setPairingMemberId(null)
@@ -509,7 +509,7 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                                 aria-label="Unpair Agent"
                                 onClick={() => {
                                     startTransition(async () => {
-                                        await unpairCentaur(member.id)
+                                        await unpairAIAgent(member.id)
                                         toast.success("Agent unpaired")
                                     })
                                 }}

@@ -50,7 +50,7 @@ const BADGE_CONFIG: Record<BadgeType, BadgeConfig> = {
     verified_partner: {
         icon: Shield,
         label: 'Verified Partner',
-        description: 'Vetted and approved by CentaurOS team',
+        description: 'Vetted and approved by ForgeOS team',
         color: 'text-violet-600',
         bgColor: 'bg-violet-50',
     },

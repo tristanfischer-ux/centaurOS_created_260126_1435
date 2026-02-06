@@ -6,7 +6,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import type { BlueprintTemplate, DomainTreeNode } from '@/types/blueprints'
 
 export const metadata = {
-  title: 'Explore Tech Trees | CentaurOS',
+  title: 'Explore Tech Trees | ForgeOS',
   description: 'Browse all technology trees. See what you need to know to build rockets, robots, electronics, and more.',
 }
 

@@ -124,7 +124,7 @@ export async function signup(formData: FormData) {
   }
 
   // Get the base URL for email redirect
-  const siteUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_SITE_URL || 'https://centauros.io'
+  const siteUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_SITE_URL || 'https://forgeos.io'
 
   // 1. Create auth user
   const { data: authData, error: authError } = await supabase.auth.signUp({
@@ -153,7 +153,7 @@ export async function signup(formData: FormData) {
   let foundryId: string;
   let accountType: 'team_builder' | 'supplier' | null = null;
 
-  // 2. Create foundry for Founders, create business for Suppliers, or use shared "centaur-guild" for others
+  // 2. Create foundry for Founders, create business for Suppliers, or use shared "forge-guild" for others
   if (role === "founder" && companyName) {
     accountType = 'team_builder'; // Founders are team builders
     
@@ -187,14 +187,14 @@ export async function signup(formData: FormData) {
     accountType = 'supplier'; // Suppliers get supplier account type
     
     // Suppliers join a dedicated supplier foundry (isolated from team management)
-    foundryId = "centaur-suppliers";
+    foundryId = "forge-suppliers";
     
     // Note: businessName and businessType are captured for later use when creating their listing
   } else {
     accountType = 'team_builder'; // Executives and Apprentices are team builders
     
     // Executives and Apprentices join the shared Guild
-    foundryId = "centaur-guild";
+    foundryId = "forge-guild";
   }
 
   // 3. Create profile
@@ -207,6 +207,7 @@ export async function signup(formData: FormData) {
     full_name: fullName,
     role: memberRole,
     foundry_id: foundryId,
+    active_foundry_id: foundryId,
     account_type: accountType,
   });
 
@@ -214,6 +215,16 @@ export async function signup(formData: FormData) {
     console.error("Profile creation error:", profileError);
     // Don't fail completely - auth user exists, profile can be created later
   }
+
+  // 3b. Create foundry_memberships record for multi-foundry support
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  await (supabase as any).from("foundry_memberships").insert({
+    user_id: authData.user.id,
+    foundry_id: foundryId,
+    role: memberRole,
+    is_primary: true,
+    joined_at: new Date().toISOString(),
+  });
 
   // 3a. For suppliers, store their business info in onboarding_data for later use
   if (role === 'supplier' && businessName) {

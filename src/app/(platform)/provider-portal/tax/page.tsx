@@ -111,7 +111,7 @@ export default async function TaxSettingsPage() {
                   <div className="rounded-lg border p-4">
                     <h4 className="font-medium mb-2">Self-Billing</h4>
                     <p className="text-sm text-muted-foreground">
-                      Centaur OS generates invoices on your behalf when orders
+                      Forge OS generates invoices on your behalf when orders
                       complete. This is known as self-billing and requires your
                       VAT details to be correctly configured.
                     </p>

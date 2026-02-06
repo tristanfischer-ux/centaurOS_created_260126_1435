@@ -56,7 +56,7 @@ export default async function ProviderPortalLayout({ children }: ProviderPortalL
                         </div>
                         <CardTitle className="text-2xl">Become a Provider</CardTitle>
                         <CardDescription className="text-base mt-2">
-                            Start selling your services on the CentaurOS Marketplace. 
+                            Start selling your services on the ForgeOS Marketplace. 
                             Connect with foundries looking for your expertise.
                         </CardDescription>
                     </CardHeader>

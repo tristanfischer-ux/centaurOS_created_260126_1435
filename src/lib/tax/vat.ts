@@ -242,20 +242,20 @@ export function formatVATRate(rate: number): string {
 
 /**
  * Calculate platform fee VAT
- * Platform charges include VAT when Centaur is VAT registered
+ * Platform charges include VAT when Fractional Forge is VAT registered
  * @param platformFee Platform fee amount (net)
- * @param centaurVATRegistered Whether Centaur OS is VAT registered
+ * @param forgeVATRegistered Whether Fractional Forge is VAT registered
  * @returns Platform fee with VAT breakdown
  */
 export function calculatePlatformFeeVAT(
   platformFee: number,
-  centaurVATRegistered: boolean = true
+  forgeVATRegistered: boolean = true
 ): {
   netFee: number
   vatAmount: number
   grossFee: number
 } {
-  if (!centaurVATRegistered) {
+  if (!forgeVATRegistered) {
     return {
       netFee: platformFee,
       vatAmount: 0,

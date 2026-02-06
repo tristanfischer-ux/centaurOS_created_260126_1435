@@ -116,7 +116,7 @@ export async function createApprenticeTrainingTasks() {
   
   if (!user) return { error: 'Unauthorized' }
   
-  // Get user's foundry (should be centaur-guild for apprentices)
+  // Get user's foundry (should be forge-guild for apprentices)
   const foundry_id = await getFoundryIdCached()
   if (!foundry_id) return { error: 'User not in a foundry' }
   

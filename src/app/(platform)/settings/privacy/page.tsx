@@ -10,7 +10,7 @@ import { PrivacySettings } from "@/components/gdpr"
 import { Loader2 } from "lucide-react"
 
 export const metadata = {
-  title: "Privacy Settings - CentaurOS",
+  title: "Privacy Settings - ForgeOS",
   description: "Manage your privacy settings and data requests",
 }
 

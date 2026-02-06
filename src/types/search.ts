@@ -50,7 +50,7 @@ export interface SearchResult {
     total_reviews: number
     response_rate: number | null
     completion_rate: number | null
-    centaur_discount: number | null
+    forge_discount: number | null
     last_active: string | null
     day_rate: number | null
     currency: string
@@ -67,7 +67,7 @@ export interface SearchScores {
   rating: number         // 15% - average rating
   responseRate: number   // 15% - response rate to inquiries
   completionRate: number // 10% - order completion rate
-  discount: number       // 5% - Centaur discount offered
+  discount: number       // 5% - Forge discount offered
   recency: number        // 5% - recent activity
 }
 

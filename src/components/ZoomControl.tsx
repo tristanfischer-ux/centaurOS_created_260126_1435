@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils"
 
 const ZOOM_LEVELS = [80, 90, 100, 110, 120, 130, 140, 150]
 const DEFAULT_ZOOM = 100
-const STORAGE_KEY = "centaur-zoom-level"
+const STORAGE_KEY = "forge-zoom-level"
 
 interface ZoomControlProps {
     className?: string

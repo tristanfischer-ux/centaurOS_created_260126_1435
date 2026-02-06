@@ -7,7 +7,7 @@ import { Database } from '@/types/database.types'
 import { rateLimit, getClientIP } from '@/lib/security/rate-limit'
 
 // SECURITY: Zod schema for input validation
-const CentaurMatchRequestSchema = z.object({
+const ForgeMatchRequestSchema = z.object({
     memberId: z.string().uuid(),
 })
 
@@ -15,7 +15,7 @@ const CentaurMatchRequestSchema = z.object({
 type Profile = Database['public']['Tables']['profiles']['Row']
 type MarketplaceListing = Database['public']['Tables']['marketplace_listings']['Row']
 
-interface CentaurMatchRequest {
+interface ForgeMatchRequest {
     memberId: string
 }
 
@@ -27,7 +27,7 @@ interface AISuggestion {
     useCases: string[]
 }
 
-interface CentaurMatchResponse {
+interface ForgeMatchResponse {
     member: {
         name: string
         role: string
@@ -46,7 +46,7 @@ const openai = new OpenAI({
 
 export async function POST(
     request: NextRequest
-): Promise<NextResponse<CentaurMatchResponse | ErrorResponse>> {
+): Promise<NextResponse<ForgeMatchResponse | ErrorResponse>> {
     try {
         // Create Supabase client and authenticate
         const supabase = await createClient()
@@ -62,7 +62,7 @@ export async function POST(
         // SECURITY: Rate limit AI endpoints (10 requests per minute per user)
         const headersList = await headers()
         const clientIP = getClientIP(headersList)
-        const rateLimitResult = await rateLimit('api', `centaur-match:${user.id}`, { limit: 10, window: 60 })
+        const rateLimitResult = await rateLimit('api', `forge-match:${user.id}`, { limit: 10, window: 60 })
         if (!rateLimitResult.success) {
             return NextResponse.json(
                 { error: 'Rate limit exceeded. Please wait before requesting more matches.' },
@@ -72,7 +72,7 @@ export async function POST(
 
         // SECURITY: Parse and validate request body with Zod
         const body = await request.json()
-        const validation = CentaurMatchRequestSchema.safeParse(body)
+        const validation = ForgeMatchRequestSchema.safeParse(body)
         
         if (!validation.success) {
             return NextResponse.json(
@@ -154,8 +154,8 @@ export async function POST(
             isVerified: listing.is_verified
         }))
 
-        // Generate centaur matching suggestions using GPT-4o
-        const systemPrompt = `You are an expert at matching humans with AI tools to form effective "centaur" partnerships - human-AI teams that leverage the strengths of both.
+        // Generate talent matching suggestions using GPT-4o
+        const systemPrompt = `You are an expert at matching humans with AI tools to form effective partnerships - human-AI teams that leverage the strengths of both.
 
 Your task is to analyze a human team member's profile and suggest the top 3 AI tools that would best complement their skills and role.
 
@@ -163,7 +163,7 @@ Consider:
 1. Skills gaps - AI tools that can fill in areas where the human may need support
 2. Role enhancement - AI that amplifies what the human is already good at
 3. Workload balance - If the human has high workload, prioritize AI that automates or assists
-4. Complementary capabilities - Form a "complete centaur" where human creativity meets AI execution
+4. Complementary capabilities - Form a complete team where human creativity meets AI execution
 
 Return ONLY a raw JSON array (no markdown formatting) with exactly 3 suggestions:
 [
@@ -177,7 +177,7 @@ Return ONLY a raw JSON array (no markdown formatting) with exactly 3 suggestions
 ]
 
 If there are fewer than 3 AI tools available, return suggestions for all available tools.
-Score compatibility from 1-10 where 10 is a perfect centaur match.`
+Score compatibility from 1-10 where 10 is a perfect match.`
 
         const userPrompt = `## Human Team Member Profile
 Name: ${memberProfile.name}
@@ -189,7 +189,7 @@ Bio: ${memberProfile.bio || 'Not provided'}
 ## Available AI Tools
 ${JSON.stringify(aiTools, null, 2)}
 
-Please suggest the top 3 AI tools that would form the best centaur partnership with this human.`
+Please suggest the top 3 AI tools that would form the best partnership with this human.`
 
         const completion = await openai.chat.completions.create({
             model: 'gpt-4o',
@@ -250,9 +250,9 @@ Please suggest the top 3 AI tools that would form the best centaur partnership w
         })
 
     } catch (error) {
-        console.error('Centaur matching failed:', error)
+        console.error('Forge matching failed:', error)
         return NextResponse.json(
-            { error: 'Failed to generate centaur matches' },
+            { error: 'Failed to generate talent matches' },
             { status: 500 }
         )
     }

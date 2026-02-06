@@ -207,7 +207,7 @@ export function FeatureTip({
     align?: 'left' | 'right'
 }) {
     const [dismissed, setDismissed] = useState(true)
-    const storageKey = `centauros:tip:${id}`
+    const storageKey = `forgeos:tip:${id}`
 
     useEffect(() => {
         try {

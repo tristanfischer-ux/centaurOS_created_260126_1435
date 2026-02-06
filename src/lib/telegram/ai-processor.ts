@@ -73,7 +73,7 @@ export async function parseTextToObjective(text: string): Promise<ParsedObjectiv
         messages: [
             {
                 role: 'system',
-                content: `You are an expert project manager and executive assistant for CentaurOS, a human-AI collaboration platform.
+                content: `You are an expert project manager and executive assistant for ForgeOS, a fractional workforce operating system.
 
 Your task is to transform the user's input (an idea, goal, or project description) into a structured objective with actionable tasks.
 
@@ -167,7 +167,7 @@ export async function generateHelpResponse(text: string): Promise<string> {
         messages: [
             {
                 role: 'system',
-                content: `You are CentaurOS assistant via Telegram. The user sent a message that doesn't seem to be a goal or objective request.
+                content: `You are ForgeOS assistant via Telegram. The user sent a message that doesn't seem to be a goal or objective request.
 
 Respond helpfully and briefly. If they seem confused, explain:
 - They can send a text describing a goal/project

@@ -28,16 +28,16 @@ import { renderInvoiceToHTML } from './templates'
 
 type TypedSupabaseClient = SupabaseClient<Database>
 
-// Centaur OS company details (platform operator)
-const CENTAUR_COMPANY: CompanyDetails = {
-  name: 'Centaur OS Ltd',
+// Fractional Forge company details (platform operator)
+const FORGE_COMPANY: CompanyDetails = {
+  name: 'Fractional Forge Ltd',
   address: '123 Innovation Street',
   city: 'London',
   postcode: 'EC1A 1BB',
   country: 'GB',
   vatNumber: 'GB123456789', // Replace with real VAT number
   companyNumber: '12345678',
-  email: 'billing@centauros.com',
+  email: 'billing@fractionalforge.io',
 }
 
 /**
@@ -269,7 +269,7 @@ export async function generateSellerSelfBill(
       status: 'generated',
       issueDate: new Date().toISOString(),
       dueDate: new Date().toISOString(), // Immediate - funds held in escrow
-      seller: CENTAUR_COMPANY, // Platform is the "buyer" issuing self-bill
+      seller: FORGE_COMPANY, // Platform is the "buyer" issuing self-bill
       buyer: sellerDetails, // Seller receives this
       lineItems,
       subtotal: netToSeller - sellerVAT,
@@ -278,7 +278,7 @@ export async function generateSellerSelfBill(
       currency: order.currency,
       taxTreatment: order.tax_treatment as TaxTreatment,
       reverseChargeApplies: false,
-      notes: 'Self-billing invoice issued by Centaur OS on your behalf.',
+      notes: 'Self-billing invoice issued by Fractional Forge on your behalf.',
       createdAt: new Date().toISOString(),
       generatedAt: new Date().toISOString(),
     }
@@ -292,7 +292,7 @@ export async function generateSellerSelfBill(
 
 /**
  * Generate platform fee invoice
- * Invoice from Centaur OS to the seller for platform fees
+ * Invoice from ForgeOS to the seller for platform fees
  * @param supabase Supabase client
  * @param orderId Order ID
  * @returns Generated platform fee invoice
@@ -371,7 +371,7 @@ export async function generatePlatformFeeInvoice(
       status: 'generated',
       issueDate: new Date().toISOString(),
       dueDate: new Date().toISOString(), // Deducted at source
-      seller: CENTAUR_COMPANY, // Platform is the seller of services
+      seller: FORGE_COMPANY, // Platform is the seller of services
       buyer: sellerDetails, // Seller is billed for fees
       lineItems,
       subtotal: feeVAT.netFee,

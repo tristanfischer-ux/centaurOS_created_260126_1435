@@ -7,7 +7,7 @@ import { getFoundryIdCached } from '@/lib/supabase/foundry-context'
 
 /**
  * Get all available apprentices from the Guild pool
- * These are apprentices in the "centaur-guild" foundry who can be assigned to projects
+ * These are apprentices in the "forge-guild" foundry who can be assigned to projects
  */
 export async function getGuildApprentices(): Promise<{
   apprentices: Array<{
@@ -50,7 +50,7 @@ export async function getGuildApprentices(): Promise<{
       bio,
       skills
     `)
-    .eq('foundry_id', 'centaur-guild')
+    .eq('foundry_id', 'forge-guild')
     .eq('role', 'Apprentice')
     .order('full_name')
   
@@ -124,7 +124,7 @@ export async function assignApprenticeToProject(
     return { success: false, error: 'Apprentice not found' }
   }
   
-  if (apprentice.foundry_id !== 'centaur-guild' || apprentice.role !== 'Apprentice') {
+  if (apprentice.foundry_id !== 'forge-guild' || apprentice.role !== 'Apprentice') {
     return { success: false, error: 'Only Guild apprentices can be assigned to projects' }
   }
   

@@ -117,7 +117,7 @@ export async function createBankTransferRequest(
           },
         },
       },
-      description: description || 'CentaurOS Account Balance Top-up',
+      description: description || 'ForgeOS Account Balance Top-up',
       metadata: {
         type: 'bank_transfer_topup',
         user_id: userId,
@@ -423,7 +423,7 @@ function extractBankTransferInstructions(
       accountNumber: addr.account_number,
       iban: addr.iban,
       bic: addr.bic,
-      accountHolderName: 'CentaurOS Limited',
+      accountHolderName: 'Fractional Forge Limited',
       bankName: 'Stripe Partner Bank',
     })),
     reference: instructions.reference || paymentIntent.id,

@@ -5,7 +5,7 @@ import type { QATestEnvironment, TriggerQATestResponse } from '@/types/qa.types'
 
 // GitHub API configuration
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN
-const GITHUB_REPO = process.env.GITHUB_REPO || 'your-org/centauros'
+const GITHUB_REPO = process.env.GITHUB_REPO || 'your-org/forgeos'
 const GITHUB_WORKFLOW_FILE = 'qa-day-in-life.yml'
 
 /**

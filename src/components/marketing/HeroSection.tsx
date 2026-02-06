@@ -7,11 +7,11 @@ export function HeroSection() {
     return (
         <section className="relative min-h-screen flex items-center justify-center bg-background overflow-hidden blueprint-grid">
 
-            {/* Centaur Hero Visual - Original Asset */}
+            {/* Hero Visual - Original Asset */}
             <div className="absolute inset-0 z-0 flex items-center justify-center opacity-100 pointer-events-none mt-20">
                 <Image
                     src="/images/centaur_no_stump.png"
-                    alt="Centaur Diagram"
+                    alt="ForgeOS Diagram"
                     width={1100}
                     height={1100}
                     className="object-contain"

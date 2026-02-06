@@ -1,5 +1,5 @@
 /**
- * Telegram Bot Integration for CentaurOS
+ * Telegram Bot Integration for ForgeOS
  * 
  * This module provides:
  * - Telegram Bot API client for sending messages

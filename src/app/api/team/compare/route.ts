@@ -176,7 +176,7 @@ Your task is to analyze the provided team members and recommend who would be the
 1. Current workload (fewer active tasks = more capacity)
 2. Track record (completed tasks, rejection rate)
 3. Role fit (some roles are better suited for certain tasks)
-4. Centaur pairing (AI-paired members may handle certain tasks better)
+4. AI pairing (AI-paired members may handle certain tasks better)
 
 Guidelines:
 - Prioritize team members with capacity (lower active + pending tasks)
@@ -196,8 +196,8 @@ Return ONLY a raw JSON object (no markdown formatting) with this exact structure
         // Format members for the prompt
         const membersDescription = members.map((member, index) => {
             const bandwidth = calculateBandwidth(member.activeTasks, member.pendingTasks);
-            const centaurStatus = member.paired_ai_id && member.pairedAI?.[0]
-                ? `Centaur (paired with ${member.pairedAI[0].full_name})`
+            const aiPairingStatus = member.paired_ai_id && member.pairedAI?.[0]
+                ? `AI-Paired (with ${member.pairedAI[0].full_name})`
                 : 'Not paired with AI';
             
             return `${index + 1}. **${member.full_name || 'Unknown'}** (ID: ${member.id})
@@ -207,7 +207,7 @@ Return ONLY a raw JSON object (no markdown formatting) with this exact structure
    Pending Tasks: ${member.pendingTasks}
    Completed Tasks: ${member.completedTasks}
    Rejected Tasks: ${member.rejectedTasks}
-   AI Pairing: ${centaurStatus}
+   AI Pairing: ${aiPairingStatus}
    ${member.bio ? `Bio: ${member.bio.substring(0, 200)}${member.bio.length > 200 ? '...' : ''}` : ''}`;
         }).join("\n\n");
 

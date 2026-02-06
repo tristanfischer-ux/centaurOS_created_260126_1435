@@ -1,6 +1,6 @@
 /**
  * Telegram Bot API Types
- * Subset of types needed for CentaurOS integration
+ * Subset of types needed for ForgeOS integration
  */
 
 export interface TelegramUser {

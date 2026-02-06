@@ -171,7 +171,7 @@ export async function POST(req: NextRequest): Promise<NextResponse<AISearchRespo
             messages: [
                 {
                     role: "system",
-                    content: `You are a marketplace search assistant for CentaurOS, a platform connecting businesses with fractional talent, products, services, and AI tools.
+                    content: `You are a marketplace search assistant for ForgeOS, a platform connecting businesses with fractional talent, products, services, and AI tools.
 
 Your task is to extract structured search filters from natural language queries.
 

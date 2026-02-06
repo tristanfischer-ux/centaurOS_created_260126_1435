@@ -79,11 +79,11 @@ export async function login(formData: FormData) {
 
     revalidatePath('/', 'layout')
     
-    // Check user's account type to determine redirect destination
+    // Check user's account type and foundry memberships to determine redirect
     if (loggedInUser) {
         const { data: profile } = await supabase
             .from('profiles')
-            .select('account_type')
+            .select('account_type, active_foundry_id')
             .eq('id', loggedInUser.id)
             .single()
         
@@ -91,9 +91,27 @@ export async function login(formData: FormData) {
         if (profile?.account_type === 'supplier') {
             redirect('/supplier-portal')
         }
+
+        // Check how many foundries the user belongs to
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { count } = await (supabase as any)
+            .from('foundry_memberships')
+            .select('*', { count: 'exact', head: true })
+            .eq('user_id', loggedInUser.id)
+
+        const foundryCount = count || 0
+
+        // Multiple foundries and no active one selected - show workspace picker
+        if (foundryCount > 1 && !profile?.active_foundry_id) {
+            redirect('/workspace-picker')
+        }
+
+        // Single foundry or active foundry set - go to dashboard
+        if (foundryCount >= 1) {
+            redirect('/dashboard')
+        }
     }
     
-    // Default: team builders and users without account type go to objectives
-    // This shows the "Discover ForgeOS" objective for new users
-    redirect('/objectives')
+    // Default: users without foundry memberships go to dashboard
+    redirect('/dashboard')
 }

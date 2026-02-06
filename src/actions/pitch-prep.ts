@@ -19,7 +19,7 @@ import {
 /**
  * Create a new pitch preparation request
  * 
- * LEGAL NOTE: This is a preparation service only. CentaurOS does not
+ * LEGAL NOTE: This is a preparation service only. ForgeOS does not
  * provide investment advice or facilitate securities transactions.
  */
 export async function createPitchPrepRequest(params: CreatePitchPrepParams): Promise<{

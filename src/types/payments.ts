@@ -1,5 +1,5 @@
 /**
- * Payment system types for CentaurOS marketplace
+ * Payment system types for ForgeOS marketplace
  */
 
 // Payment status enum matching database

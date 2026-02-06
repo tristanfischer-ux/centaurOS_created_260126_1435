@@ -16,7 +16,7 @@ export function TrustSafetySection() {
 
                 <p className="text-xl md:text-2xl font-light text-muted-foreground max-w-3xl mx-auto mb-12">
                     Speed without safety is negligence. Every critical output is verified by a Senior Fractional Executive before it reaches you.
-                    The 'Centaur Stamp' is our guarantee of quality.
+                    The 'Forge Stamp' is our guarantee of quality.
                 </p>
 
                 <div className="grid md:grid-cols-3 gap-8 max-w-4xl mx-auto font-mono text-sm text-muted-foreground">

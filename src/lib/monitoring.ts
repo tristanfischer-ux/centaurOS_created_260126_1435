@@ -190,7 +190,7 @@ export const SENTRY_CONFIG = {
   // Tag all errors with app info
   initialScope: {
     tags: {
-      app: 'centauros',
+      app: 'forgeos',
     },
   },
 }

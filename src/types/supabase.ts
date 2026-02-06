@@ -2542,7 +2542,7 @@ export type Database = {
           auto_response_message: string | null
           avg_response_time_hours: number | null
           bio: string | null
-          centaur_discount_percent: number | null
+          forge_discount_percent: number | null
           completion_rate: number | null
           created_at: string | null
           currency: string | null
@@ -2570,7 +2570,7 @@ export type Database = {
           auto_response_message?: string | null
           avg_response_time_hours?: number | null
           bio?: string | null
-          centaur_discount_percent?: number | null
+          forge_discount_percent?: number | null
           completion_rate?: number | null
           created_at?: string | null
           currency?: string | null
@@ -2598,7 +2598,7 @@ export type Database = {
           auto_response_message?: string | null
           avg_response_time_hours?: number | null
           bio?: string | null
-          centaur_discount_percent?: number | null
+          forge_discount_percent?: number | null
           completion_rate?: number | null
           created_at?: string | null
           currency?: string | null
@@ -4010,7 +4010,7 @@ export type Database = {
           avg_rating: number | null
           avg_response_time_hours: number | null
           category: Database["public"]["Enums"]["marketplace_category"] | null
-          centaur_discount_percent: number | null
+          forge_discount_percent: number | null
           completion_rate: number | null
           currency: string | null
           day_rate: number | null

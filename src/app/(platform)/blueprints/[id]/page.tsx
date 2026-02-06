@@ -13,7 +13,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { DomainCoverageWithDetails } from '@/types/blueprints'
 
 export const metadata = {
-  title: 'Blueprint | CentaurOS',
+  title: 'Blueprint | ForgeOS',
 }
 
 interface BlueprintDetailPageProps {

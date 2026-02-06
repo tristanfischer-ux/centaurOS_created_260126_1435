@@ -7,7 +7,7 @@
  * - Rating: 15%
  * - Response Rate: 15%
  * - Completion Rate: 10%
- * - Centaur Discount: 5%
+ * - Forge Discount: 5%
  * - Recency: 5%
  */
 
@@ -271,12 +271,12 @@ export function calculateCompletionScore(
 }
 
 // ==========================================
-// CENTAUR DISCOUNT SCORE (5%)
+// FORGE DISCOUNT SCORE (5%)
 // ==========================================
 
 /**
  * Calculate discount score
- * Providers offering better Centaur discounts get higher scores
+ * Providers offering better Forge discounts get higher scores
  */
 export function calculateDiscountScore(discountPercent: number | null | undefined): number {
   if (discountPercent === null || discountPercent === undefined || discountPercent <= 0) {
@@ -351,7 +351,7 @@ export interface ScoringInput {
     avgResponseTimeHours?: number | null
     completionRate?: number | null
     totalOrders?: number
-    centaurDiscount?: number | null
+    forgeDiscount?: number | null
     lastActive?: string | null
   }
 }
@@ -376,7 +376,7 @@ export function calculateAllScores(input: ScoringInput): {
       input.provider?.completionRate,
       input.provider?.totalOrders
     ),
-    discount: calculateDiscountScore(input.provider?.centaurDiscount),
+    discount: calculateDiscountScore(input.provider?.forgeDiscount),
     recency: calculateRecencyScore(input.provider?.lastActive),
   }
 

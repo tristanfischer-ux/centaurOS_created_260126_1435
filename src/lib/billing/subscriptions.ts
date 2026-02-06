@@ -56,7 +56,7 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionTier, SubscriptionPlan> = {
   free: {
     tier: 'free',
     name: 'Free',
-    description: 'Get started with CentaurOS',
+    description: 'Get started with ForgeOS',
     priceMonthlyGBP: 0,
     priceAnnualGBP: 0,
     features: [

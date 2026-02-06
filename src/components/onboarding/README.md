@@ -138,7 +138,7 @@ await recordMarketplaceAction('book_listing', listingId)
 The component uses two storage mechanisms:
 
 1. **localStorage** - For immediate UI state (prevents flash of modal on page load)
-   - Key: `centauros:marketplace:onboarding:completed`
+   - Key: `forgeos:marketplace:onboarding:completed`
 
 2. **Database (profiles.onboarding_data)** - For persistent tracking and analytics
    - Synced via `completeMarketplaceOnboarding()` server action
@@ -204,7 +204,7 @@ export default async function MarketplacePage() {
 
 To test the onboarding modal:
 
-1. Clear localStorage: `localStorage.removeItem('centauros:marketplace:onboarding:completed')`
+1. Clear localStorage: `localStorage.removeItem('forgeos:marketplace:onboarding:completed')`
 2. Clear database: Update your profile's `onboarding_data` to remove `marketplace_tour_completed`
 3. Or use `forceShow={true}` prop
 
@@ -213,7 +213,7 @@ To test the onboarding modal:
 The modal uses shadcn/ui Dialog component with:
 - Max width: `sm:max-w-2xl`
 - Max height: `max-h-[90vh]` with scroll
-- Blueprint-themed design matching CentaurOS aesthetic
+- Blueprint-themed design matching ForgeOS aesthetic
 
 ### Related Components
 

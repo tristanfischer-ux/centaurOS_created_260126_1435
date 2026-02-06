@@ -169,7 +169,7 @@ export default function AdminAboutPage() {
                     </span>
                 </div>
                 <h1 className="text-2xl font-bold text-foreground">
-                    About CentaurOS
+                    About ForgeOS
                 </h1>
                 <p className="text-muted-foreground mt-1">
                     Feature changelog, version history, and hidden features discovery

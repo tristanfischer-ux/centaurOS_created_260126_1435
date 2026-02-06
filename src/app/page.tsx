@@ -17,7 +17,7 @@ import {
 } from "@/components/marketing/animations";
 
 // Domain configuration
-const APP_DOMAIN = process.env.NEXT_PUBLIC_APP_DOMAIN || 'https://centauros.io';
+const APP_DOMAIN = process.env.NEXT_PUBLIC_APP_DOMAIN || 'https://forgeos.io';
 
 export default function MarketingPage() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -398,7 +398,7 @@ export default function MarketingPage() {
               <div className="h-48 md:h-64 mb-4 md:mb-6 bg-muted border relative overflow-hidden">
                 <Image
                   src="/images/centaur-os-core.png"
-                  alt="CentaurOS platform interface coordinating teams and resources"
+                  alt="ForgeOS platform interface coordinating teams and resources"
                   fill
                   className="object-cover"
                 />

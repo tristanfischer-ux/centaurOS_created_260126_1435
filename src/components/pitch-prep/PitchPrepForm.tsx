@@ -216,7 +216,7 @@ export function PitchPrepForm({ onSuccess, onCancel, className }: PitchPrepFormP
       <Alert className="bg-status-info-light border-status-info">
         <Info className="h-4 w-4 text-status-info" />
         <AlertDescription className="text-status-info-dark">
-          <strong>Preparation Service Only:</strong> CentaurOS helps you prepare for investor conversations. 
+          <strong>Preparation Service Only:</strong> ForgeOS helps you prepare for investor conversations. 
           We do not provide investment advice or facilitate securities transactions. 
           All investment discussions happen directly between you and investors off-platform.
         </AlertDescription>

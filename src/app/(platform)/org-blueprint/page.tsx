@@ -9,7 +9,7 @@ import {
 } from "@/actions/org-blueprint"
 
 export const metadata = {
-    title: "Org Blueprint | CentaurOS",
+    title: "Org Blueprint | ForgeOS",
     description: "Map your organizational capabilities and identify coverage gaps",
 }
 

@@ -7,7 +7,7 @@ import { RetainerSetup } from '@/components/retainers'
 import { createClient } from '@/lib/supabase/server'
 
 export const metadata: Metadata = {
-  title: 'Set Up Retainer | CentaurOS',
+  title: 'Set Up Retainer | ForgeOS',
   description: 'Set up a new retainer agreement',
 }
 

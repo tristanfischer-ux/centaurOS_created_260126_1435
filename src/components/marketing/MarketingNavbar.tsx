@@ -28,10 +28,10 @@ export function MarketingNavbar() {
                 {/* Logo */}
                 <Link href="/" className="group flex items-center gap-2">
                     <div className="w-8 h-8 bg-foreground rounded-full flex items-center justify-center group-hover:bg-international-orange transition-colors">
-                        <span className="text-background text-xs font-mono font-bold">C</span>
+                        <span className="text-background text-xs font-mono font-bold">F</span>
                     </div>
                     <span className="text-foreground text-sm font-bold tracking-[0.3em] uppercase group-hover:text-international-orange transition-colors">
-                        CENTAUR DYNAMICS
+                        FRACTIONAL FORGE
                     </span>
                 </Link>
 

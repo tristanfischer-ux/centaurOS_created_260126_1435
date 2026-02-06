@@ -71,7 +71,7 @@ export async function createMember(formData: FormData) {
     return { success: true }
 }
 
-export async function pairCentaur(humanId: string, aiId: string) {
+export async function pairAIAgent(humanId: string, aiId: string) {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return { error: 'Unauthorized' }
@@ -121,7 +121,7 @@ export async function pairCentaur(humanId: string, aiId: string) {
     return { success: true }
 }
 
-export async function unpairCentaur(humanId: string) {
+export async function unpairAIAgent(humanId: string) {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return { error: 'Unauthorized' }

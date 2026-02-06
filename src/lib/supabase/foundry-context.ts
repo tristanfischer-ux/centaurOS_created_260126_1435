@@ -32,6 +32,13 @@ if (typeof setInterval !== 'undefined') {
   setInterval(cleanupCache, 5 * 60 * 1000)
 }
 
+/**
+ * Get the user's currently active foundry ID.
+ * Resolution order:
+ * 1. profiles.active_foundry_id (explicitly selected workspace)
+ * 2. Primary foundry from foundry_memberships
+ * 3. Legacy profiles.foundry_id (backward compatibility)
+ */
 export async function getFoundryIdCached(): Promise<string | null> {
   const supabase = await createClient()
   
@@ -44,16 +51,19 @@ export async function getFoundryIdCached(): Promise<string | null> {
     return cached.foundryId
   }
 
-  // Always fetch from database (never trust app_metadata which could be client-writable)
+  // Fetch active foundry - prefers active_foundry_id, falls back to foundry_id
   const { data: profile, error } = await supabase
     .from('profiles')
-    .select('foundry_id')
+    .select('foundry_id, active_foundry_id')
     .eq('id', user.id)
     .single()
 
-  if (error || !profile?.foundry_id) {
+  if (error || !profile) {
     return null
   }
+
+  const foundryId = profile.active_foundry_id || profile.foundry_id
+  if (!foundryId) return null
 
   // Update cache (with size check)
   if (foundryCache.size >= MAX_CACHE_SIZE) {
@@ -61,11 +71,11 @@ export async function getFoundryIdCached(): Promise<string | null> {
   }
   
   foundryCache.set(user.id, {
-    foundryId: profile.foundry_id,
+    foundryId,
     timestamp: Date.now()
   })
 
-  return profile.foundry_id
+  return foundryId
 }
 
 export function clearFoundryCache(userId?: string) {
@@ -74,4 +84,49 @@ export function clearFoundryCache(userId?: string) {
   } else {
     foundryCache.clear()
   }
+}
+
+/**
+ * Get all foundries for the current user
+ */
+export async function getUserFoundries(): Promise<Array<{
+  foundryId: string
+  foundryName: string
+  role: string
+  isPrimary: boolean
+  isActive: boolean
+  memberCount: number
+  joinedAt: string
+}>> {
+  const supabase = await createClient()
+  
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return []
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (supabase as any)
+    .rpc('get_user_foundries', { p_user_id: user.id })
+
+  if (error || !data) {
+    console.error('Failed to get user foundries:', error)
+    return []
+  }
+
+  return data.map((f: {
+    foundry_id: string
+    foundry_name: string
+    role: string
+    is_primary: boolean
+    is_active: boolean
+    member_count: number
+    joined_at: string
+  }) => ({
+    foundryId: f.foundry_id,
+    foundryName: f.foundry_name,
+    role: f.role,
+    isPrimary: f.is_primary,
+    isActive: f.is_active,
+    memberCount: Number(f.member_count),
+    joinedAt: f.joined_at,
+  }))
 }

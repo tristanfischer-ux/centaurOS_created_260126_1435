@@ -44,7 +44,7 @@ const EMAIL_TEMPLATES: Record<EmailTemplate, (data: Record<string, unknown>) => 
                 </div>
                 ${data.actionUrl ? `<a href="${data.actionUrl}" style="display: inline-block; background: #0066cc; color: white; padding: 12px 24px; border-radius: 6px; text-decoration: none;">View RFQ</a>` : ''}
                 <hr style="border: none; border-top: 1px solid #eee; margin: 24px 0;" />
-                <p style="color: #888; font-size: 12px;">You're receiving this because you're registered as a supplier on CentaurOS Marketplace.</p>
+                <p style="color: #888; font-size: 12px;">You're receiving this because you're registered as a supplier on ForgeOS Marketplace.</p>
             </div>
         `
     }),
@@ -223,7 +223,7 @@ const EMAIL_TEMPLATES: Record<EmailTemplate, (data: Record<string, unknown>) => 
     }),
     
     team_invitation: (data) => ({
-        subject: `You're invited to join ${data.foundryName || 'a company'} on CentaurOS`,
+        subject: `You're invited to join ${data.foundryName || 'a company'} on ForgeOS`,
         html: `
             <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
                 <div style="background: linear-gradient(135deg, #1e293b 0%, #334155 100%); padding: 32px; border-radius: 8px 8px 0 0; text-align: center;">
@@ -232,7 +232,7 @@ const EMAIL_TEMPLATES: Record<EmailTemplate, (data: Record<string, unknown>) => 
                 <div style="background: #f8fafc; padding: 32px; border-radius: 0 0 8px 8px;">
                     <p style="color: #475569; font-size: 16px; margin: 0 0 24px 0;">
                         <strong>${data.invitedByName || 'Someone'}</strong> has invited you to join 
-                        <strong>${data.foundryName || 'their company'}</strong> on CentaurOS as <strong>${data.role || 'a team member'}</strong>.
+                        <strong>${data.foundryName || 'their company'}</strong> on ForgeOS as <strong>${data.role || 'a team member'}</strong>.
                     </p>
                     
                     <div style="background: white; padding: 20px; border-radius: 8px; border: 1px solid #e2e8f0; margin-bottom: 24px;">
@@ -274,14 +274,14 @@ const EMAIL_TEMPLATES: Record<EmailTemplate, (data: Record<string, unknown>) => 
     }),
     
     generic: (data) => ({
-        subject: String(data.subject || data.title || 'Notification from CentaurOS'),
+        subject: String(data.subject || data.title || 'Notification from ForgeOS'),
         html: `
             <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
                 <h2 style="color: #1a1a1a;">${data.title || 'Notification'}</h2>
                 <p style="color: #666;">${data.body || data.message || ''}</p>
                 ${data.actionUrl ? `<a href="${data.actionUrl}" style="display: inline-block; background: #0066cc; color: white; padding: 12px 24px; border-radius: 6px; text-decoration: none; margin-top: 16px;">View Details</a>` : ''}
                 <hr style="border: none; border-top: 1px solid #eee; margin: 24px 0;" />
-                <p style="color: #888; font-size: 12px;">This email was sent by CentaurOS Marketplace.</p>
+                <p style="color: #888; font-size: 12px;">This email was sent by ForgeOS Marketplace.</p>
             </div>
         `
     })
@@ -320,7 +320,7 @@ export async function sendEmail(options: EmailOptions): Promise<ChannelSendResul
         // const resend = new Resend(process.env.RESEND_API_KEY)
         // 
         // const { data, error } = await resend.emails.send({
-        //     from: 'CentaurOS <noreply@centauros.io>',
+        //     from: 'ForgeOS <noreply@forgeos.io>',
         //     to: [to],
         //     subject: templateSubject,
         //     html: html

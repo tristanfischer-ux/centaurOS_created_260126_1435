@@ -20,7 +20,7 @@ import { RetainerStatus } from '@/types/retainers'
 export const dynamic = 'force-dynamic'
 
 export const metadata: Metadata = {
-  title: 'Retainers | CentaurOS',
+  title: 'Retainers | ForgeOS',
   description: 'Manage your retainer agreements',
 }
 

@@ -4,7 +4,7 @@ import { Toaster as Sonner } from "sonner"
 
 type ToasterProps = React.ComponentProps<typeof Sonner>
 
-// CentaurOS enforces light mode - no theme switching
+// ForgeOS enforces light mode - no theme switching
 const Toaster = ({ ...props }: ToasterProps) => {
     return (
         <Sonner

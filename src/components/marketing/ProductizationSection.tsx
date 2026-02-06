@@ -10,7 +10,7 @@ const network = [
     {
         label: "FACTORIES",
         title: "THE VIRTUAL FACTORY.",
-        description: "Monetize latent capacity. Connect your machines to Centaur OS. Receive pre-vetted, production-ready files: no sales friction, just print, ship, and bank.",
+        description: "Monetize latent capacity. Connect your machines to Forge OS. Receive pre-vetted, production-ready files: no sales friction, just print, ship, and bank.",
         gradient: "from-purple-900/20 to-transparent",
     },
     {

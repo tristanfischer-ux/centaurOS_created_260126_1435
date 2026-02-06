@@ -14,7 +14,7 @@ export type CoverageType =
     | 'ai_tool'            // Covered by an AI tool
     | 'founder'            // Founder is handling it directly
     | 'outsourced'         // Fully outsourced to a vendor
-    | 'marketplace'        // Sourced via CentaurOS marketplace
+    | 'marketplace'        // Sourced via ForgeOS marketplace
 
 // Priority level for uncovered functions
 export type GapPriority = 'critical' | 'high' | 'medium' | 'low'

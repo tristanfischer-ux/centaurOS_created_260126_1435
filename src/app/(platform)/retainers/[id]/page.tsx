@@ -37,7 +37,7 @@ import { format } from 'date-fns'
 // ==========================================
 
 export const metadata: Metadata = {
-  title: 'Retainer Details | CentaurOS',
+  title: 'Retainer Details | ForgeOS',
   description: 'View retainer agreement details',
 }
 

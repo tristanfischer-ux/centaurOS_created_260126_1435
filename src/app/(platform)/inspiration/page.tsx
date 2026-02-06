@@ -5,7 +5,7 @@ import { getBlueprintTemplates } from '@/actions/blueprints'
 import { getObjectivePacks, getSavedPackIds } from '@/actions/packs'
 
 export const metadata = {
-  title: 'Inspiration | CentaurOS',
+  title: 'Inspiration | ForgeOS',
   description:
     'Discover what to do next. Turn ideas into objectives and tasks for your team.',
 }

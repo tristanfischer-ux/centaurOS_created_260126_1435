@@ -455,7 +455,7 @@ export function MarketplaceView({
         setAgentSuggestions([])
         
         try {
-            const response = await fetch('/api/marketplace/centaur-match', {
+            const response = await fetch('/api/marketplace/forge-match', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ memberId })
@@ -1505,7 +1505,7 @@ export function MarketplaceView({
                                                 disabled={!selectedMemberId || agentMatchLoading}
                                                 className="bg-status-info hover:bg-status-info/90"
                                             >
-                                                {centaurMatchLoading ? (
+                                                {agentMatchLoading ? (
                                                     <>
                                                         <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                                                         Analyzing...
@@ -1523,7 +1523,7 @@ export function MarketplaceView({
                                         {agentSuggestions.length > 0 && (
                                             <div className="space-y-3 pt-3 border-t border-status-info/20">
                                                 <h4 className="text-sm font-medium text-status-info-dark">Recommended AI Partners</h4>
-                                                {centaurSuggestions.map((suggestion, idx) => {
+                                                {agentSuggestions.map((suggestion, idx) => {
                                                     const listing = initialListings.find(l => l.id === suggestion.listingId)
                                                     return (
                                                         <div key={suggestion.listingId} className="bg-background rounded-lg p-3 border border-status-info/20">

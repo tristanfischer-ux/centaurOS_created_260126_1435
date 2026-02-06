@@ -163,7 +163,7 @@ async function handleMessage(message: TelegramMessage) {
     if (!link || !link.verified_at) {
         await sendMessage({
             chat_id: chatId,
-            text: `⚠️ Your Telegram isn't linked to CentaurOS yet.\n\nUse /start to get linking instructions, or enter your verification code with:\n/link YOUR_CODE`,
+            text: `⚠️ Your Telegram isn't linked to ForgeOS yet.\n\nUse /start to get linking instructions, or enter your verification code with:\n/link YOUR_CODE`,
         })
         return
     }
@@ -528,14 +528,14 @@ async function handleStartCommand(
         return
     }
 
-    // Send instructions - user needs to generate code from CentaurOS settings
+    // Send instructions - user needs to generate code from ForgeOS settings
     await sendMessage({
         chat_id: chatId,
-        text: `👋 <b>Welcome to CentaurOS!</b>
+        text: `👋 <b>Welcome to ForgeOS!</b>
 
 To link your Telegram account:
 
-1️⃣ Go to CentaurOS → Settings
+1️⃣ Go to ForgeOS → Settings
 2️⃣ Click "Link Telegram Account"
 3️⃣ Scan the QR code, or
 4️⃣ Send me: <code>/link YOUR_CODE</code>
@@ -575,7 +575,7 @@ async function handleLinkCommand(
     if (link.verification_expires_at && new Date(link.verification_expires_at) < new Date()) {
         await sendMessage({
             chat_id: chatId,
-            text: '❌ This verification code has expired. Please generate a new one in CentaurOS Settings.',
+            text: '❌ This verification code has expired. Please generate a new one in ForgeOS Settings.',
         })
         return
     }
@@ -694,7 +694,7 @@ async function handleConfirm(
         await editMessage({
             chat_id: chatId,
             message_id: messageId,
-            text: `✅ <b>Objective Created!</b>\n\n<b>${escapeHtml(objective.title)}</b>\n\n${objective.tasks.length} tasks added to your CentaurOS account.\n\n<i>View in CentaurOS → Objectives</i>`,
+            text: `✅ <b>Objective Created!</b>\n\n<b>${escapeHtml(objective.title)}</b>\n\n${objective.tasks.length} tasks added to your ForgeOS account.\n\n<i>View in ForgeOS → Objectives</i>`,
             parse_mode: 'HTML',
         })
     } catch (error) {
@@ -1383,7 +1383,7 @@ async function handleSettingsCommand(chatId: number, profileId: string) {
  * Handle /help command
  */
 async function handleHelpCommand(chatId: number) {
-    const helpText = `🤖 <b>CentaurOS Telegram Bot</b>
+    const helpText = `🤖 <b>ForgeOS Telegram Bot</b>
 
 <b>📋 Task Management</b>
 /tasks - View your task list
@@ -1408,7 +1408,7 @@ Just send me a message describing your goal, project, or objective - I'll turn i
 <b>🎤 Voice Messages</b>
 Send a voice note and I'll transcribe it and create an objective from it.
 
-<i>Need more help? Visit CentaurOS → Help</i>`
+<i>Need more help? Visit ForgeOS → Help</i>`
 
     await sendMessage({
         chat_id: chatId,
@@ -1702,10 +1702,10 @@ async function handleDecisionViewCallback(
     await answerCallbackQuery(query.id)
     
     // Open in app
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://centaur-os.com'
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://forgeos.io'
     await sendMessage({
         chat_id: chatId,
-        text: `👁 <b>View in App</b>\n\nOpen CentaurOS to see full details:\n${appUrl}/decisions/${decisionId}`,
+        text: `👁 <b>View in App</b>\n\nOpen ForgeOS to see full details:\n${appUrl}/decisions/${decisionId}`,
         parse_mode: 'HTML',
     })
 }
@@ -1971,5 +1971,5 @@ async function handleSettingsToggleCallback(
 
 // GET endpoint for webhook verification (Telegram doesn't use this, but good to have)
 export async function GET() {
-    return NextResponse.json({ status: 'ok', service: 'CentaurOS Telegram Bot' })
+    return NextResponse.json({ status: 'ok', service: 'ForgeOS Telegram Bot' })
 }

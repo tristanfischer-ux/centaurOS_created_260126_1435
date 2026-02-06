@@ -1,6 +1,6 @@
 /**
  * Design System: Animations & Transitions
- * Standardized motion patterns for CentaurOS
+ * Standardized motion patterns for ForgeOS
  */
 
 export const transitions = {

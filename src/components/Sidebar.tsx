@@ -4,9 +4,10 @@ import React from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
-import { Users, CheckSquare, Store, Target, ShieldAlert, Settings, Lightbulb, ShoppingBag, Bot, Home, Bell } from "lucide-react"
+import { Users, CheckSquare, Store, Target, ShieldAlert, Settings, Lightbulb, ShoppingBag, Bot, Home, Bell, UserCircle } from "lucide-react"
 import { NotificationCenter } from "@/components/NotificationCenter"
 import { UnreadIndicator } from "@/components/today/UnreadIndicator"
+import { FoundrySwitcher } from "@/components/FoundrySwitcher"
 // ThemeToggle removed - ForgeOS enforces light mode per design philosophy
 import { FocusModeToggle } from "@/components/FocusModeToggle"
 import { ZoomControl } from "@/components/ZoomControl"
@@ -39,7 +40,7 @@ const workNavigation = [
     { name: "Objectives", href: "/new-objectives", icon: Target, tooltip: "Set and track high-level strategic goals" },
     { name: "Tasks", href: "/new-tasks", icon: CheckSquare, tooltip: "Manage and assign actionable items" },
     { name: "Team", href: "/team", icon: Users, tooltip: "Team members, roles, and capacity" },
-    { name: "Agents", href: "/agents", icon: Bot, tooltip: "AI prompt workflows — build, chain, and copy prompts" },
+    { name: "Agents", href: "/agents", icon: Bot, tooltip: "Prompt workflows — build, chain, and copy prompts" },
 ]
 
 // Discovery: finding help and resources
@@ -49,18 +50,28 @@ const discoveryNavigation = [
     { name: "My Orders", href: "/my-orders", icon: ShoppingBag, tooltip: "View and manage your marketplace orders" },
 ]
 
-// Settings only - accessible but not prominent
+// Profile & Settings
 const settingsNavigation = [
+    { name: "My Profile", href: "/my-profile", icon: UserCircle, tooltip: "Manage your marketplace profile and presence" },
     { name: "Settings", href: "/settings", icon: Settings, tooltip: "Account and app settings" },
 ]
 
-export function Sidebar({ foundryName, foundryId, userName, userRole, isAdmin }: { foundryName?: string; foundryId?: string; userName?: string; userRole?: string; isAdmin?: boolean }) {
+interface FoundryInfo {
+    foundryId: string
+    foundryName: string
+    role: string
+    isPrimary: boolean
+    isActive: boolean
+    memberCount: number
+}
+
+export function Sidebar({ foundryName, foundryId, userName, userRole, isAdmin, userFoundries }: { foundryName?: string; foundryId?: string; userName?: string; userRole?: string; isAdmin?: boolean; userFoundries?: FoundryInfo[] }) {
     const pathname = usePathname()
     const { setZoom } = useZoomContext()
 
     return (
         <div className="hidden md:flex h-screen w-64 flex-col bg-background border-r border-slate-100 text-foreground">
-            {/* App Header - Centaur Dynamics Branding */}
+            {/* App Header - Fractional Forge Branding */}
             <div className="px-5 pt-8 pb-6">
                 <div className="flex items-center justify-between">
                     <Link href="/dashboard" className="group flex items-center gap-2">
@@ -76,26 +87,17 @@ export function Sidebar({ foundryName, foundryId, userName, userRole, isAdmin }:
                 </div>
             </div>
 
-            {/* Foundry & User Info - Combined */}
+            {/* Foundry & User Info - With Multi-Foundry Switcher */}
+            <FoundrySwitcher
+                foundries={userFoundries || []}
+                currentFoundryId={foundryId}
+                currentFoundryName={foundryName}
+                userName={userName}
+                userRole={userRole}
+            />
+            {/* Unread messages indicator */}
             <div className="px-4 pb-4">
-                <div className="text-sm font-semibold text-foreground uppercase tracking-wider truncate">
-                    {foundryName || "Centaur Inc."}
-                </div>
-                <div className="text-[10px] text-muted-foreground font-mono mt-0.5 tracking-wide">
-                    {foundryId || "Loading..."}
-                </div>
-                <div className="mt-3 flex items-center gap-2">
-                    <div className="text-sm text-muted-foreground truncate">
-                        {userName || "Loading..."}
-                    </div>
-                    <span className="text-[10px] text-international-orange font-mono uppercase px-1.5 py-0.5 bg-orange-50 border border-orange-200 font-semibold tracking-wide">
-                        {userRole || "Member"}
-                    </span>
-                </div>
-                {/* Unread messages indicator */}
-                <div className="mt-3">
-                    <UnreadIndicator />
-                </div>
+                <UnreadIndicator />
             </div>
 
             <nav className="flex-1 space-y-1.5 px-3 py-3">

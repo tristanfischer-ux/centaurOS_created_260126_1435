@@ -210,7 +210,7 @@ export async function checkBadgeEligibility(
                 badgeType,
                 eligible: false,
                 alreadyHas: false,
-                progressDescription: 'Awarded by CentaurOS team after vetting',
+                progressDescription: 'Awarded by ForgeOS team after vetting',
             }
         
         case 'rising_star':

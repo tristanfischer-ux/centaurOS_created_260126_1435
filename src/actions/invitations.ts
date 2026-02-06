@@ -69,7 +69,7 @@ export async function createInvitation(
   }
   
   // Get the foundry UUID from the foundry_id
-  // The foundry_id in profiles is a text field that may be a UUID or a string like "centaur-guild"
+  // The foundry_id in profiles is a text field that may be a UUID or a string like "forge-guild"
   const { data: foundry, error: foundryError } = await supabase
     .from('foundries')
     .select('id, name')
@@ -245,10 +245,28 @@ export async function acceptInvitation(token: string): Promise<{
     }
   }
   
-  // Update the user's profile to join the new foundry
+  // Add user to the foundry via foundry_memberships (supports multi-foundry)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error: membershipError } = await (supabase as any)
+    .from('foundry_memberships')
+    .upsert({
+      user_id: user.id,
+      foundry_id: invitation.foundryId,
+      role: invitation.role,
+      is_primary: false, // Don't override their primary foundry
+      joined_at: new Date().toISOString(),
+    }, { onConflict: 'user_id,foundry_id' })
+
+  if (membershipError) {
+    console.error('Failed to create membership:', membershipError)
+    return { success: false, error: 'Failed to join company' }
+  }
+
+  // Set as active foundry and update legacy fields for backward compatibility
   const { error: updateError } = await supabase
     .from('profiles')
     .update({
+      active_foundry_id: invitation.foundryId,
       foundry_id: invitation.foundryId,
       role: invitation.role,
     })
@@ -256,7 +274,7 @@ export async function acceptInvitation(token: string): Promise<{
   
   if (updateError) {
     console.error('Failed to update profile:', updateError)
-    return { success: false, error: 'Failed to join company' }
+    // Non-fatal - membership was already created
   }
   
   // Mark the invitation as accepted
@@ -338,11 +356,24 @@ export async function signupWithInvitation(formData: FormData): Promise<void> {
     full_name: fullName,
     role: invitation.role,
     foundry_id: invitation.foundryId,
+    active_foundry_id: invitation.foundryId,
   })
   
   if (profileError) {
     console.error('Profile creation error:', profileError)
   }
+
+  // Create foundry membership record
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  await (supabase as any)
+    .from('foundry_memberships')
+    .insert({
+      user_id: authData.user.id,
+      foundry_id: invitation.foundryId,
+      role: invitation.role,
+      is_primary: true,
+      joined_at: new Date().toISOString(),
+    })
   
   // Mark invitation as accepted
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

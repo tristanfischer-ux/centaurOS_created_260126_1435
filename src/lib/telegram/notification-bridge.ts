@@ -1,7 +1,7 @@
 /**
  * Telegram Notification Bridge
  * 
- * Bridges CentaurOS notifications to Telegram for users who have linked their accounts.
+ * Bridges ForgeOS notifications to Telegram for users who have linked their accounts.
  * Called from notification creation triggers or directly from server actions.
  */
 

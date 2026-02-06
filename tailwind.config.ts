@@ -23,7 +23,7 @@ const config: Config = {
             colors: {
                 background: 'hsl(var(--background))',
                 foreground: 'hsl(var(--foreground))',
-                // Centaur Dynamics Brand Colors
+                // Fractional Forge Brand Colors
                 'international-orange': {
                     DEFAULT: '#ff4500',
                     hover: '#e03e00',
@@ -127,8 +127,8 @@ const config: Config = {
                 display: ['Centaur-Display', 'var(--font-playfair)', 'serif'],
                 sans: ['var(--font-inter)', 'sans-serif'],
                 mono: ['Centaur-Mono', 'var(--font-jetbrains)', 'monospace'],
-                'centaur': ['Centaur-Display', 'serif'],
-                'centaur-mono': ['Centaur-Mono', 'monospace'],
+                'forge': ['Centaur-Display', 'serif'],
+                'forge-mono': ['Centaur-Mono', 'monospace'],
             },
             letterSpacing: {
                 'ultra-wide': '0.2em',

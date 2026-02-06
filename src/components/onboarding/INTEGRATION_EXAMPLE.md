@@ -146,7 +146,7 @@ To test the onboarding modal again:
 
 ```javascript
 // In browser console
-localStorage.removeItem('centauros:marketplace:onboarding:completed')
+localStorage.removeItem('forgeos:marketplace:onboarding:completed')
 location.reload()
 ```
 
@@ -271,7 +271,7 @@ Then add corresponding content in the render section:
 ### Modal doesn't show
 
 1. Check onboarding status: `await getMarketplaceOnboardingStatus()`
-2. Clear localStorage: `localStorage.removeItem('centauros:marketplace:onboarding:completed')`
+2. Clear localStorage: `localStorage.removeItem('forgeos:marketplace:onboarding:completed')`
 3. Check database: Ensure `onboarding_data` field exists in profiles table
 4. Run migration: `supabase db push` or apply migration `20260129120100_onboarding_tracking.sql`
 

@@ -14,30 +14,30 @@ import {
 import { cn } from '@/lib/utils'
 import { VisuallyHidden } from '@radix-ui/react-visually-hidden'
 
-const SUPPLIER_ONBOARDING_KEY = 'centauros_supplier_onboarding_completed'
+const SUPPLIER_ONBOARDING_KEY = 'forgeos_supplier_onboarding_completed'
 
 const supplierSteps = [
   {
-    title: 'Welcome, Supplier',
-    description: 'Your dedicated portal for managing your marketplace presence. Everything you need is here—orders, requests, and your listing.',
+    title: 'Welcome to the Forge',
+    description: 'Your dedicated portal for managing your marketplace presence. You\'ll find everything here — orders, requests for quotes, analytics, and your listing.',
     icon: Package,
     color: 'text-international-orange'
   },
   {
-    title: 'Create Your Listing',
-    description: 'Set up your profile to showcase your products or services. Add photos, descriptions, and pricing to attract buyers.',
+    title: 'Build a Great Profile',
+    description: 'Go to "My Profile" to set up your marketplace presence. Add a compelling headline, detailed description, professional photos, and competitive pricing. Complete profiles get 5x more views.',
     icon: FileText,
     color: 'text-international-orange'
   },
   {
-    title: 'Get Discovered',
-    description: 'Buyers will send you RFQs (Requests for Quote). Respond quickly to win orders and build your reputation.',
+    title: 'Get Discovered by Buyers',
+    description: 'Buyers will find you through search, categories, and RFQs (Requests for Quote). Respond quickly and professionally — your response rate affects your ranking.',
     icon: Search,
     color: 'text-international-orange'
   },
   {
-    title: 'Your Portal Awaits',
-    description: 'Track orders, respond to requests, and grow your business—all from one place. Let\'s get started!',
+    title: 'Grow Your Business',
+    description: 'Track orders, manage capacity, view analytics, and build your reputation through reviews. The more you deliver, the higher you rank.',
     icon: LayoutDashboard,
     color: 'text-international-orange'
   }

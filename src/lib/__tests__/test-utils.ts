@@ -1,5 +1,5 @@
 /**
- * Jest Test Utilities for CentaurOS
+ * Jest Test Utilities for ForgeOS
  * 
  * Provides helpers for:
  * - Mock Stripe client

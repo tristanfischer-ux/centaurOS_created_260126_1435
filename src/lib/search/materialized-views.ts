@@ -35,7 +35,7 @@ SELECT
   pp.timezone,
   pp.headline AS provider_headline,
   pp.bio AS provider_bio,
-  pp.centaur_discount_percent,
+  pp.forge_discount_percent,
   pp.stripe_onboarding_complete,
   
   -- Computed scores
@@ -83,7 +83,7 @@ SELECT
   END AS completion_score,
   
   -- Discount score
-  COALESCE(pp.centaur_discount_percent, 0) / 50.0 AS discount_score,
+  COALESCE(pp.forge_discount_percent, 0) / 50.0 AS discount_score,
   
   -- Recency score (based on last activity)
   CASE 
@@ -142,7 +142,7 @@ SELECT
       WHEN pp.completion_rate >= 90 THEN 0.8
       ELSE 0.4
     END) * 0.10 +
-    (COALESCE(pp.centaur_discount_percent, 0) / 50.0) * 0.05 +
+    (COALESCE(pp.forge_discount_percent, 0) / 50.0) * 0.05 +
     (CASE 
       WHEN pp.updated_at > NOW() - INTERVAL '7 days' THEN 1.0
       WHEN pp.updated_at > NOW() - INTERVAL '30 days' THEN 0.5

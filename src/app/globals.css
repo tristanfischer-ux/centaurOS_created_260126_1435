@@ -5,7 +5,7 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 @font-face {
-  font-family: 'Centaur-Display';
+  font-family: 'Forge-Display';
   src: url('/fonts/centaur-font-1.woff2') format('woff2');
   font-weight: 100 900;
   font-display: swap;
@@ -13,7 +13,7 @@
 }
 
 @font-face {
-  font-family: 'Centaur-Mono';
+  font-family: 'Forge-Mono';
   src: url('/fonts/centaur-font-2.woff2') format('woff2');
   font-weight: 100 900;
   font-display: swap;
@@ -67,7 +67,7 @@
   --color-foundry-950: #ffffff;
   /* White - previously darkest, now main bg */
 
-  /* Centaur Dynamics Brand Colors */
+  /* Fractional Forge Brand Colors */
   --color-international-orange: #ff4500;
   --color-electric-blue: #3b82f6;
 
@@ -112,7 +112,7 @@
 
 @layer base {
   :root {
-    /* Centaur Dynamics - Light Mode */
+    /* Fractional Forge - Light Mode */
     --background: 0 0% 100%;
     /* Pure White */
     --foreground: 222 47% 11%;
@@ -302,7 +302,7 @@ textarea {
 }
 
 /* ============================================
-   CENTAUR DYNAMICS BRAND UTILITIES
+   FRACTIONAL FORGE BRAND UTILITIES
    ============================================ */
 
 /* Industrial Background Patterns */
