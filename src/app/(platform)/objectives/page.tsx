@@ -29,12 +29,10 @@ export default async function ObjectivesPage() {
         redirect('/login')
     }
 
-    // Fetch foundry with purpose_data
-    const { data: foundry } = await supabase
-        .from('foundries')
-        .select('id, name, purpose_data')
-        .eq('id', profile.foundry_id)
-        .single()
+    // Fetch foundry with purpose_data via RPC (bypasses RLS issue on foundries table)
+    const { data: foundry } = await supabase.rpc('ensure_foundry_exists', {
+        p_foundry_id: profile.foundry_id,
+    })
 
     // Fetch objectives
     const { data: objectives, error } = await supabase
@@ -129,7 +127,7 @@ export default async function ObjectivesPage() {
             </div>
 
             <CompanyPurposeWrapper
-                purposeData={foundry?.purpose_data as FoundryPurposeData | null}
+                purposeData={(foundry as { purpose_data?: FoundryPurposeData | null } | null)?.purpose_data ?? null}
                 isFounder={profile.role === 'Founder'}
                 foundryId={profile.foundry_id}
                 userId={user.id}

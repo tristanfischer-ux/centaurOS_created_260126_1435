@@ -23,12 +23,10 @@ export default async function NewObjectivesPage() {
     redirect('/login')
   }
 
-  // Fetch foundry with purpose_data for company purpose display
-  const { data: foundry } = await supabase
-    .from('foundries')
-    .select('id, name, purpose_data')
-    .eq('id', profile.foundry_id)
-    .single()
+  // Fetch foundry with purpose_data via RPC (bypasses RLS issue on foundries table)
+  const { data: foundry } = await supabase.rpc('ensure_foundry_exists', {
+    p_foundry_id: profile.foundry_id,
+  })
 
   // Fetch objectives
   // Note: is_private may not be in generated types but exists in DB via migration
@@ -164,7 +162,7 @@ export default async function NewObjectivesPage() {
       teams={teams}
       currentUserId={user.id}
       currentUserRole={profile.role}
-      purposeData={foundry?.purpose_data as FoundryPurposeData | null}
+      purposeData={(foundry as { purpose_data?: FoundryPurposeData | null } | null)?.purpose_data ?? null}
       isFounder={profile.role === 'Founder'}
       foundryId={profile.foundry_id}
     />

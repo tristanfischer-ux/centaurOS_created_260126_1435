@@ -197,12 +197,10 @@ export async function getFoundryPurpose(
   }
   
   try {
-    // Fetch foundry with purpose_data
-    const { data, error: fetchError } = await supabase
-      .from('foundries')
-      .select('id, name, purpose_data')
-      .eq('id', foundryId)
-      .single()
+    // Fetch foundry with purpose_data via RPC (bypasses RLS issue on foundries table)
+    const { data, error: fetchError } = await supabase.rpc('ensure_foundry_exists', {
+      p_foundry_id: foundryId,
+    })
     
     if (fetchError) {
       console.error('[FoundryActions] Failed to fetch purpose:', {
@@ -215,7 +213,7 @@ export async function getFoundryPurpose(
     return { 
       success: true, 
       error: null,
-      data: data.purpose_data as FoundryPurposeData | null
+      data: (data as { purpose_data?: FoundryPurposeData | null })?.purpose_data ?? null
     }
   } catch (error) {
     console.error('[FoundryActions] Unexpected error fetching purpose:', {
