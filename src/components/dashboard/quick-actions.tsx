@@ -1,50 +1,82 @@
 'use client'
 
 import Link from 'next/link'
-import { Plus, Target, MessageSquare, Users, Zap } from 'lucide-react'
+import { Plus, Target, Bell, Users, Zap, Store, Lightbulb, Workflow } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 interface QuickActionsProps {
   foundryId: string
 }
 
+interface ActionItem {
+  label: string
+  icon: React.ComponentType<{ className?: string }>
+  href: string
+  color: string
+  bgColor: string
+}
+
 /**
- * Quick Actions Panel - One-click access to common tasks
+ * Quick Actions Panel - Two sections:
+ * 1. "Do" - Operational quick actions (create tasks, objectives, etc.)
+ * 2. "Discover" - Revenue-driving actions (marketplace, inspiration, workflows)
+ * 
+ * The Discover section uses warm/inviting colours to draw the eye naturally.
  */
 export function QuickActions({ foundryId }: QuickActionsProps) {
-  const actions = [
+  const doActions: ActionItem[] = [
     {
       label: 'New Task',
       icon: Plus,
-      href: '/tasks',
+      href: '/new-tasks',
       color: 'from-blue-500 to-blue-600',
       bgColor: 'bg-blue-50',
-      hoverColor: 'hover:from-blue-600 hover:to-blue-700'
     },
     {
       label: 'New Objective',
       icon: Target,
-      href: '/objectives',
+      href: '/new-objectives',
       color: 'from-purple-500 to-purple-600',
       bgColor: 'bg-purple-50',
-      hoverColor: 'hover:from-purple-600 hover:to-purple-700'
     },
     {
-      label: 'Messages',
-      icon: MessageSquare,
+      label: 'Updates',
+      icon: Bell,
       href: '/updates',
       color: 'from-green-500 to-green-600',
       bgColor: 'bg-green-50',
-      hoverColor: 'hover:from-green-600 hover:to-green-700'
     },
     {
       label: 'Team',
       icon: Users,
       href: '/team',
-      color: 'from-orange-500 to-orange-600',
-      bgColor: 'bg-orange-50',
-      hoverColor: 'hover:from-orange-600 hover:to-orange-700'
-    }
+      color: 'from-slate-500 to-slate-600',
+      bgColor: 'bg-slate-50',
+    },
+  ]
+
+  const discoverActions: ActionItem[] = [
+    {
+      label: 'Marketplace',
+      icon: Store,
+      href: '/marketplace',
+      color: 'from-emerald-500 to-emerald-600',
+      bgColor: 'bg-emerald-50',
+    },
+    {
+      label: 'Inspiration',
+      icon: Lightbulb,
+      href: '/inspiration',
+      color: 'from-amber-500 to-amber-600',
+      bgColor: 'bg-amber-50',
+    },
+    {
+      label: 'Workflows',
+      icon: Workflow,
+      href: '/agents',
+      color: 'from-international-orange to-orange-600',
+      bgColor: 'bg-international-orange/10',
+    },
   ]
   
   return (
@@ -57,52 +89,70 @@ export function QuickActions({ foundryId }: QuickActionsProps) {
           </div>
           <div>
             <h2 className="text-lg font-semibold text-foreground">Quick Actions</h2>
-            <p className="text-sm text-muted-foreground">Jump to common tasks</p>
+            <p className="text-sm text-muted-foreground">Jump to what matters</p>
           </div>
         </div>
       </div>
       
-      {/* Action Buttons */}
-      <div className="p-6 grid grid-cols-2 gap-3">
-        {actions.map((action) => (
-          <Link
-            key={action.label}
-            href={action.href}
-            className={cn(
-              "group relative overflow-hidden rounded-xl p-4 transition-all duration-300",
-              "border border-slate-200 hover:border-transparent hover:shadow-lg",
-              "flex flex-col items-center justify-center gap-2 text-center"
-            )}
-          >
-            {/* Gradient Background (on hover) */}
-            <div className={cn(
-              "absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-gradient-to-br",
-              action.color
-            )} />
-            
-            {/* Content */}
-            <div className="relative">
-              <div className={cn(
-                "inline-flex p-3 rounded-xl transition-all duration-300",
-                action.bgColor,
-                "group-hover:bg-white/20"
-              )}>
-                <action.icon className={cn(
-                  "w-6 h-6 transition-colors duration-300",
-                  "text-slate-600 group-hover:text-white"
-                )} />
-              </div>
-            </div>
-            
-            <span className={cn(
-              "relative text-sm font-medium transition-colors duration-300",
-              "text-foreground group-hover:text-white"
-            )}>
-              {action.label}
-            </span>
-          </Link>
-        ))}
+      {/* Do Section */}
+      <div className="p-4 pb-2">
+        <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-3 px-1">Do</p>
+        <div className="grid grid-cols-2 gap-2">
+          {doActions.map((action) => (
+            <ActionButton key={action.label} action={action} />
+          ))}
+        </div>
+      </div>
+
+      {/* Discover Section */}
+      <div className="p-4 pt-2">
+        <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-3 px-1">Discover</p>
+        <div className="grid grid-cols-3 gap-2">
+          {discoverActions.map((action) => (
+            <ActionButton key={action.label} action={action} />
+          ))}
+        </div>
       </div>
     </div>
+  )
+}
+
+function ActionButton({ action }: { action: ActionItem }) {
+  return (
+    <Link
+      href={action.href}
+      className={cn(
+        "group relative overflow-hidden rounded-xl p-3 transition-all duration-300",
+        "border border-slate-200 hover:border-transparent hover:shadow-lg",
+        "flex flex-col items-center justify-center gap-1.5 text-center"
+      )}
+    >
+      {/* Gradient Background (on hover) */}
+      <div className={cn(
+        "absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-gradient-to-br",
+        action.color
+      )} />
+      
+      {/* Content */}
+      <div className="relative">
+        <div className={cn(
+          "inline-flex p-2.5 rounded-xl transition-all duration-300",
+          action.bgColor,
+          "group-hover:bg-white/20"
+        )}>
+          <action.icon className={cn(
+            "w-5 h-5 transition-colors duration-300",
+            "text-slate-600 group-hover:text-white"
+          )} />
+        </div>
+      </div>
+      
+      <span className={cn(
+        "relative text-xs font-medium transition-colors duration-300",
+        "text-foreground group-hover:text-white"
+      )}>
+        {action.label}
+      </span>
+    </Link>
   )
 }
