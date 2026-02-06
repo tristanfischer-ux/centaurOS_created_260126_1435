@@ -1,7 +1,7 @@
 import type { PromptTemplate } from "./agent-types"
 
 /**
- * Complete prompt library: 122 prompts across 12 categories.
+ * Complete prompt library: 132 prompts across 12 categories.
  * Weighted toward startup and early-stage company needs.
  *
  * Each prompt follows best-practice structure:
@@ -4092,6 +4092,519 @@ Also include:
         outputLabel: "Data dictionary",
         tags: ["data-dictionary", "governance", "documentation", "schema"],
         suggestedNext: [],
+    },
+
+    // ═══════════════════════════════════════════════════════════════════
+    // AWESOME-CEO INSPIRED PROMPTS (10)
+    // Source: github.com/kuchin/awesome-ceo curated resources
+    // ═══════════════════════════════════════════════════════════════════
+    {
+        id: "strategy-crisis-response",
+        title: "Crisis Response Planner",
+        description: "Create a prioritized crisis management and runway extension plan based on Sequoia's 'Adapting to Endure' framework",
+        category: "strategy",
+        icon: "ShieldAlert",
+        defaultPrompt: `You are a battle-tested startup advisor who has guided 50+ companies through cash crises, drawing on Sequoia Capital's "Adapting to Endure" framework.
+
+{{input}}
+
+Based on the company situation above, create a Crisis Response Plan:
+
+**1. Honest Runway Assessment**
+- Calculate true runway in WEEKS (not months)
+- Factor in: committed revenue at risk, accounts receivable timing, upcoming large expenses
+- Flag any "hope-based" projections that should be replaced with conservative estimates
+
+**2. Three Scenarios**
+- **Base Case**: Current trajectory with no changes
+- **Bear Case**: Lose 20% of revenue + key hire leaves + sales cycle doubles
+- **Worst Case**: 50% revenue drop + major customer churn
+- For each: runway remaining, decision trigger points, survival probability
+
+**3. Top 3 Cost Reduction Levers** (ranked by impact × reversibility)
+- For each lever: monthly savings, implementation timeline, risk to core business, reversibility
+- Include: vendor renegotiation opportunities, hiring freeze impact, compensation adjustments
+
+**4. Communication Plan**
+- Team all-hands talking points (transparent, specific, forward-looking)
+- Board/investor update template (honest assessment + clear action plan)
+- Customer communication if service is affected
+
+**5. 90-Day Recovery Milestones**
+- Week 1-2: Immediate cost actions
+- Week 3-4: Revenue protection and acceleration
+- Month 2-3: New trajectory confirmation
+
+Be direct and specific. Founders in crisis need clarity, not comfort.`,
+        inputLabel: "Current financials, burn rate, team size, and situation",
+        outputLabel: "Crisis response plan with scenarios",
+        tags: ["crisis", "runway", "cash-management", "sequoia", "survival", "cost-cutting"],
+        suggestedNext: ["strategy-scenario-planner", "finance-cash-flow", "finance-procurement"],
+    },
+    {
+        id: "product-mom-test",
+        title: "Mom Test Interview Designer",
+        description: "Generate anti-bias customer interview questions following Rob Fitzpatrick's Mom Test methodology",
+        category: "product",
+        icon: "MessageCircle",
+        defaultPrompt: `You are an expert in Rob Fitzpatrick's "The Mom Test" methodology — the gold standard for customer discovery interviews that avoid false positives.
+
+{{input}}
+
+The 3 rules of The Mom Test:
+1. Talk about THEIR life, not your idea
+2. Ask about specifics in the past, not hypotheticals about the future
+3. Talk less and listen more
+
+Generate a Mom Test Interview Guide:
+
+**Interview Setup** (2-3 sentences on how to frame the conversation)
+
+**10 Anti-Bias Questions** (following Mom Test rules strictly)
+For each question:
+- The question itself
+- Why this question works (what bias it avoids)
+- Follow-up probes to go deeper
+- Red flag answers that indicate false positive
+
+**Questions MUST follow these rules:**
+- ❌ Never ask "Would you use X?" or "Do you think X is a good idea?"
+- ❌ Never mention your product or solution
+- ❌ Never ask about hypothetical future behavior
+- ✅ Ask about past behavior: "Walk me through the last time you..."
+- ✅ Ask about current solutions: "What do you currently do about...?"
+- ✅ Ask about money: "How much do you spend on...?"
+- ✅ Ask about pain: "What's the hardest part about...?"
+
+**Commitment Escalation Ladder**
+After the interview, how to test real interest through:
+1. Time commitment (will they do a follow-up call?)
+2. Reputation commitment (will they introduce you to others with this problem?)
+3. Financial commitment (will they pre-order or sign an LOI?)
+
+**Analysis Template**
+How to code and cluster responses across multiple interviews.`,
+        inputLabel: "Product idea, target customer, and problem hypothesis",
+        outputLabel: "Mom Test interview guide with 10 questions",
+        tags: ["mom-test", "customer-discovery", "interviews", "validation", "anti-bias"],
+        suggestedNext: ["product-persona", "startup-pmf-assessment", "startup-lean-canvas"],
+    },
+    {
+        id: "hr-executive-scorecard",
+        title: "Executive Scorecard Builder",
+        description: "Create a structured executive hiring scorecard using Keith Rabois's methodology from PayPal, Square, and Khosla Ventures",
+        category: "hr",
+        icon: "ClipboardCheck",
+        defaultPrompt: `You are an expert in executive hiring using Keith Rabois's methodology (PayPal, Square, Khosla Ventures) and have helped hire 100+ C-level executives.
+
+{{input}}
+
+Create a complete Executive Hiring Scorecard:
+
+**1. Role Definition (The "Press Release" Method)**
+Write the press release you'd publish 12 months after they start. What did they accomplish? What metrics moved? This defines what "great" looks like.
+
+**2. Scoring Criteria** (5-7 dimensions)
+For each criterion:
+- **Criterion name** and weight (1-5)
+- **Must-Have vs Nice-to-Have** classification
+- **What "10/10" looks like** (specific behavioral example)
+- **What "5/10" looks like** (acceptable but not exceptional)
+- **Red flag indicators** (automatic disqualification)
+
+Suggested dimensions for this role:
+- Domain expertise
+- Leadership & team building
+- Strategic thinking
+- Execution speed
+- Cultural alignment
+- Communication (up, down, and across)
+- Specific technical/functional skills
+
+**3. Back-Channel Reference Questions** (ask people NOT on the reference list)
+- "On a scale of 1-10, how likely are you to hire this person again?" (below 8 = red flag)
+- 5 additional probing questions specific to this role
+
+**4. Work Trial Design** (2-hour simulation)
+A real-world exercise that simulates their actual first-month challenge. Include:
+- The scenario and materials they receive
+- What you're evaluating (decision-making process, not just output)
+- Scoring rubric for the trial
+
+**5. Interview Panel Structure**
+- Who interviews for what criteria
+- Behavioral questions for each interviewer
+- Debrief format using the scorecard`,
+        inputLabel: "Role title, company stage, team size, and key challenges",
+        outputLabel: "Executive hiring scorecard with evaluation framework",
+        tags: ["executive-hiring", "scorecard", "keith-rabois", "interviews", "talent"],
+        suggestedNext: ["hr-job-description", "hr-compensation", "hr-interview-questions"],
+    },
+    {
+        id: "fundraising-pitch-deck-reviewer",
+        title: "Pitch Deck Slide Reviewer",
+        description: "Review and improve pitch deck slides against patterns from 30+ successful startup decks",
+        category: "fundraising",
+        icon: "Presentation",
+        defaultPrompt: `You are a pitch deck coach who has analyzed 200+ successful seed and Series A decks (Airbnb, Buffer, LinkedIn, Intercom, Front) and advised on 50+ funded raises.
+
+{{input}}
+
+Review this pitch deck content and provide:
+
+**Slide-by-Slide Scoring** (1-10 for each)
+For each slide, evaluate:
+- **Clarity** (1-10): Can an investor understand this in 3 seconds?
+- **Credibility** (1-10): Does this feel backed by evidence, not hope?
+- **Emotional Impact** (1-10): Does this make investors lean forward?
+- **What works**: Strongest element of this slide
+- **What to cut**: Anything that dilutes the message
+- **Specific rewrite**: How to improve the weakest element
+
+**Narrative Flow Assessment**
+- Does the deck tell a story? (Problem → Solution → Why Now → Market → Traction → Team → Ask)
+- Where does the narrative break? Which transitions feel forced?
+- Is there a clear "aha moment" in the first 3 slides?
+
+**Comparison to Best Practices**
+- Which legendary deck does this most resemble (and what to learn from it)?
+- The #1 thing missing that would strengthen the entire deck
+- How this deck would land in a 3-minute pitch vs a 30-minute meeting
+
+**Red Flags an Investor Would Catch**
+- Missing information that raises questions
+- Claims that feel unsupported
+- Slides that work against you
+
+Provide an overall readiness score (1-10) with the top 3 changes that would most improve it.`,
+        inputLabel: "Pitch deck content (slide by slide)",
+        outputLabel: "Deck review with scores and improvements",
+        tags: ["pitch-deck", "review", "fundraising", "presentation", "investor"],
+        suggestedNext: ["fundraising-investor-qa", "fundraising-valuation", "fundraising-warm-intro"],
+    },
+    {
+        id: "startup-network-effects",
+        title: "Network Effects Analyzer",
+        description: "Analyze whether your product has network effects and design a cold start launch strategy based on Andrew Chen's framework",
+        category: "startup-strategy",
+        icon: "Network",
+        defaultPrompt: `You are a network effects strategist who has advised marketplace, platform, and social product companies, drawing on Andrew Chen's "The Cold Start Problem" framework (a16z).
+
+{{input}}
+
+Analyze this product's network effects potential:
+
+**1. Network Effect Classification**
+- **Type**: Direct, Indirect, Data, Platform, or None
+- **Strength**: Strong (winner-take-all), Moderate (winner-take-most), Weak (marginal advantage)
+- **Evidence**: What specific behavior shows the network effect is real?
+- If NO network effect exists, suggest how one could be designed in
+
+**2. The Atomic Network**
+- What is the smallest viable group of users that creates a self-sustaining experience?
+- How large is this atomic unit? (Uber: 1 neighborhood, Slack: 1 team, Airbnb: 1 city)
+- What density is needed within the atomic network for it to "light up"?
+
+**3. The Cold Start Problem**
+- Which side is harder to attract? (the "hard side")
+- Why would the first user join when nobody else is there?
+- What's the "come for the tool, stay for the network" strategy?
+
+**4. Launch Strategy**
+- **Single-player mode**: What utility exists without the network? (Instagram = photo editor, LinkedIn = online resume)
+- **Supply seeding**: How to build supply before demand (specific tactics)
+- **Density over breadth**: Which atomic network to launch in first and why
+- **Tipping point**: What metric indicates the network is self-sustaining?
+
+**5. Growth Mechanics**
+- Viral coefficient (K-factor) estimation and improvement levers
+- Organic vs paid acquisition mix recommendation
+- Network effect reinforcement loops (how growth begets more growth)
+
+**6. Competitive Moat Assessment**
+- How defensible is this network effect once established?
+- What would a competitor need to overcome it?
+- Historical analogies (which companies won/lost similar battles and why)`,
+        inputLabel: "Product description, user types, and current traction",
+        outputLabel: "Network effects analysis and launch strategy",
+        tags: ["network-effects", "cold-start", "marketplace", "platform", "viral", "andrew-chen"],
+        suggestedNext: ["startup-pmf-assessment", "startup-first-100-customers", "startup-gtm-strategy"],
+    },
+    {
+        id: "startup-schedule-optimizer",
+        title: "Weekly Schedule Optimizer",
+        description: "Design an optimal weekly schedule using Paul Graham's Maker/Manager framework and the Mochary Method",
+        category: "startup-strategy",
+        icon: "Calendar",
+        defaultPrompt: `You are a CEO productivity coach who combines Paul Graham's "Maker's Schedule, Manager's Schedule" framework with Matt Mochary's CEO time management methodology.
+
+{{input}}
+
+Design an optimized weekly schedule:
+
+**1. Time Audit**
+Based on the responsibilities described, categorize each into:
+- **Maker work** (requires 4+ hour uninterrupted blocks): strategy, product design, deep analysis, writing
+- **Manager work** (30-60 min slots): 1:1s, team meetings, decisions, email
+- **Energy drains** (should be delegated or eliminated)
+- **Energy gains** (should be protected and expanded)
+
+**2. Weekly Schedule Design**
+
+Create a Monday-Friday schedule with:
+- **Maker blocks** (minimum 2× per week, 4 hours each, morning preferred)
+- **Manager blocks** (batched meetings, afternoon preferred)
+- **CEO rituals**: Weekly 1:1s, team standup, strategic thinking time, board prep
+- **Buffer zones** between maker and manager blocks (30 min transitions)
+- **Protected time**: No-meeting mornings, focus Fridays, or equivalent
+
+**3. Meeting Cadence**
+- Which meetings are essential (keep) vs habitual (cut)?
+- Recommended weekly 1:1 schedule with direct reports
+- Monthly and quarterly rhythms (board prep, all-hands, strategy reviews)
+
+**4. Communication Protocol**
+- When to use async (Slack/email) vs sync (meeting)
+- Response time expectations by channel
+- "Office hours" for ad-hoc requests (replacing interrupt culture)
+
+**5. Energy Management**
+- Schedule high-cognitive tasks during personal peak hours
+- Place routine decisions in low-energy slots
+- Build in recovery time after intense maker blocks
+
+**Key Principle**: A single meeting in the middle of a maker block destroys the entire block. The goal is to create LONG uninterrupted stretches, not just free hours scattered throughout the day.`,
+        inputLabel: "Role, team size, responsibilities, and current pain points",
+        outputLabel: "Optimized weekly schedule and protocols",
+        tags: ["schedule", "productivity", "maker-manager", "paul-graham", "mochary", "time-management"],
+        suggestedNext: ["startup-okr-writer", "startup-90-day-plan", "startup-weekly-standup"],
+    },
+    {
+        id: "fundraising-series-a-readiness",
+        title: "Series A Readiness Scorer",
+        description: "Score your Series A readiness across the dimensions VCs evaluate most, based on YC's diligence checklist",
+        category: "fundraising",
+        icon: "Award",
+        defaultPrompt: `You are a Series A fundraising advisor who has guided 30+ companies through successful Series A raises, using YC's Series A Diligence Checklist as your framework.
+
+{{input}}
+
+Score this company's Series A readiness:
+
+**Overall Readiness Score**: X/10
+
+**Dimension-by-Dimension Assessment** (score each 1-10):
+
+1. **Traction** (weight: 25%)
+   - Revenue/usage metrics vs Series A benchmarks for this market
+   - Growth rate (is 15-20% MoM sustained for 3+ months?)
+   - Quality of revenue (recurring vs one-time, concentration risk)
+   - Score: X/10 | Gap to close: [specific]
+
+2. **Retention & PMF** (weight: 25%)
+   - Cohort retention curves (flat = good, improving = great, declining = not ready)
+   - Net revenue retention for B2B (>100% = strong)
+   - Organic growth % (word-of-mouth signal)
+   - Score: X/10 | Gap to close: [specific]
+
+3. **Unit Economics** (weight: 15%)
+   - CAC payback period (<12 months for B2B, <6 months for consumer)
+   - LTV/CAC ratio (>3x target)
+   - Gross margin trajectory
+   - Score: X/10 | Gap to close: [specific]
+
+4. **Team** (weight: 15%)
+   - Key hires in place vs needed
+   - Founder-market fit evidence
+   - Ability to recruit top talent
+   - Score: X/10 | Gap to close: [specific]
+
+5. **Market & Competition** (weight: 10%)
+   - TAM/SAM clarity and credibility
+   - Competitive differentiation sustainability
+   - Timing advantage
+   - Score: X/10 | Gap to close: [specific]
+
+6. **Operational Readiness** (weight: 10%)
+   - Data room completeness (20+ documents)
+   - Board and governance structure
+   - Financial reporting sophistication
+   - Score: X/10 | Gap to close: [specific]
+
+**Top 3 Gaps to Close Before Raising**
+For each gap: what to do, how long it will take, and what "good enough" looks like.
+
+**Recommended Timeline**
+When to start the raise, how long it will take, and what to accomplish in the interim.`,
+        inputLabel: "Current metrics, team, traction, and financials",
+        outputLabel: "Series A readiness score and gap analysis",
+        tags: ["series-a", "fundraising", "readiness", "diligence", "yc", "metrics"],
+        suggestedNext: ["fundraising-pitch-deck", "fundraising-data-room", "fundraising-target-list"],
+    },
+    {
+        id: "hr-remote-culture",
+        title: "Remote Culture Playbook",
+        description: "Design a remote team culture playbook with async norms, rituals, and documentation practices",
+        category: "hr",
+        icon: "Globe",
+        defaultPrompt: `You are a remote work culture expert who has helped scale distributed teams at companies like GitLab, Zapier, and Buffer, drawing on Nathan Barry's "10 ideas for distributed teams" and GitLab's handbook-first approach.
+
+{{input}}
+
+Design a Remote Culture Playbook:
+
+**1. Async-First Communication Norms**
+- Default to async for 80% of communication
+- When async is appropriate vs when sync (meeting) is required
+- Expected response times by channel and urgency level
+- How to write effective async messages (context-rich, actionable, clear ask)
+
+**2. Meeting Protocol**
+- Which meetings are essential for remote teams (and which to kill)
+- Meeting hygiene rules: agenda required, notes captured, recording available
+- Timezone-respectful scheduling (no meetings outside overlap hours)
+- Camera-on vs camera-optional guidelines
+
+**3. Virtual Rituals & Social Connection**
+- Weekly: virtual coffee roulette, show-and-tell, wins channel
+- Monthly: team retrospective, culture awards, learning sessions
+- Quarterly: virtual offsite structure (2-3 hours, not a full day)
+- Annual: in-person gathering recommendations (budget and format)
+
+**4. Documentation-First Culture**
+- "If it's not written down, it didn't happen" principle
+- How to implement handbook-first decision making (GitLab model)
+- Templates: decision logs, meeting notes, project briefs, RFCs
+- Knowledge base structure and ownership
+
+**5. Onboarding for Remote Hires**
+- First-week schedule (buddy system, daily check-ins, tool setup)
+- 30-60-90 day plan template for remote context
+- How to build relationships without hallway conversations
+- Common remote onboarding pitfalls and how to avoid them
+
+**6. Performance & Trust**
+- Output-based evaluation (what was delivered, not hours logged)
+- How to maintain visibility without micromanagement
+- Regular 1:1 framework for remote managers
+- Signs of remote isolation and intervention strategies
+
+Customize all recommendations for the specific team size and timezone spread described.`,
+        inputLabel: "Team size, timezones, current tools, and culture challenges",
+        outputLabel: "Remote culture playbook with rituals and norms",
+        tags: ["remote", "culture", "async", "distributed", "rituals", "gitlab", "handbook"],
+        suggestedNext: ["hr-culture", "hr-onboarding", "hr-handbook"],
+    },
+    {
+        id: "fundraising-valuation-negotiation",
+        title: "Valuation Negotiation Coach",
+        description: "Prepare for valuation discussions with VCs using Mark Suster's negotiation framework",
+        category: "fundraising",
+        icon: "Scale",
+        defaultPrompt: `You are a fundraising negotiation coach who has advised founders through 100+ term sheet negotiations, drawing on Mark Suster's "How to Talk About Valuation When a VC Asks" and extensive deal experience.
+
+{{input}}
+
+Prepare a Valuation Negotiation Strategy:
+
+**1. Pre-Negotiation Preparation**
+- Your company's defensible valuation range (floor and ceiling) with supporting data
+- Comparable recent raises in your market/stage
+- Your BATNA (Best Alternative to Negotiated Agreement): what happens if this deal doesn't close?
+
+**2. When a VC Asks "What's Your Valuation?"**
+Scenario-specific responses:
+
+- **First meeting**: How to deflect gracefully ("We're focused on finding the right partner first...")
+- **After partner meeting**: When and how to anchor ("Based on our traction and comparable raises...")
+- **Multiple interested parties**: How to use competition without being manipulative
+- **Single interested party**: How to negotiate from a weaker position
+
+**3. Anchoring Strategy**
+- Whether to name a number first (and when NOT to)
+- How to frame your anchor with supporting evidence
+- The "range" technique vs specific number: which to use when
+- How to respond when they counter below your floor
+
+**4. Common VC Negotiation Tactics** (and how to handle each)
+- "The market has shifted" (valuation compression)
+- "We don't do that valuation at this stage"
+- "Let's use a note/SAFE to avoid the valuation discussion"
+- "We need a bigger option pool" (hidden dilution)
+- Extended timeline (creating urgency pressure)
+
+**5. Term Sheet Red Flags**
+- Terms that matter more than valuation (liquidation preferences, anti-dilution, board seats)
+- What to negotiate hard on vs where to compromise
+- When to walk away
+
+**6. Closing the Deal**
+- How to create healthy urgency without burning bridges
+- Exploding offer etiquette (when it's appropriate)
+- The post-term-sheet dance: what happens between signing and closing
+
+Be specific and tactical. Founders need scripts, not theory.`,
+        inputLabel: "Stage, traction metrics, round size, and investor interest level",
+        outputLabel: "Valuation negotiation strategy and scripts",
+        tags: ["valuation", "negotiation", "term-sheet", "mark-suster", "fundraising-strategy"],
+        suggestedNext: ["fundraising-term-sheet", "fundraising-cap-table", "fundraising-valuation"],
+    },
+    {
+        id: "finance-equity-advisor",
+        title: "Equity Allocation Advisor",
+        description: "Design an equity allocation framework with option pools, equity bands, and vesting terms based on Index Ventures' data",
+        category: "finance",
+        icon: "PieChart",
+        defaultPrompt: `You are a startup compensation expert who advises on equity strategy using Index Ventures' "Rewarding Talent" framework and Dan Luu's "Options vs Cash" analysis.
+
+{{input}}
+
+Design an Equity Allocation Framework:
+
+**1. Option Pool Sizing**
+- Recommended pool size (% of fully diluted) for this stage and headcount plan
+- How much of the pool you'll use before next fundraise
+- Impact on founder dilution (show the math)
+- Pre-money vs post-money pool creation implications
+
+**2. Equity Bands by Role and Level**
+Create a table with recommended equity ranges:
+
+| Role | Level | Equity Range (% FD) | Typical Cash Trade-off |
+For: Engineering, Product, Design, Sales, Marketing, Operations, Finance, and C-level
+At: Early (first 10), Growth (10-50), Scale (50+) stages
+
+**3. Vesting Structure Recommendations**
+- Standard 4-year / 1-year cliff with rationale
+- Monthly vs quarterly vesting after cliff
+- Acceleration provisions:
+  - Single trigger (change of control only)
+  - Double trigger (change of control + termination)
+  - Recommended approach for this stage
+
+**4. Exercise and Post-Termination Terms**
+- Standard 90-day exercise window vs extended (7-10 year) window
+- Pros and cons of early exercise (83(b) election)
+- Buyback policy for departed employees
+- Tax implications: ISO vs NSO decision framework
+
+**5. Equity Offers: How to Present**
+- Dollar value framing vs percentage framing (and when to use which)
+- Scenario analysis template showing potential outcomes (1x, 5x, 10x exit)
+- Common employee questions and how to answer them
+- The "equity education session" — what to cover in 30 minutes
+
+**6. Cash vs Equity Trade-offs**
+- When to offer more equity / less cash (and vice versa)
+- How to handle candidates who don't value equity
+- Market rate adjustments for high-cost vs low-cost locations
+- Refresh grant strategy for retention
+
+Base all recommendations on the specific stage, location, and industry described.`,
+        inputLabel: "Team size, stage, total raised, headcount plan, and location",
+        outputLabel: "Equity allocation framework with bands and terms",
+        tags: ["equity", "options", "compensation", "vesting", "index-ventures", "cap-table"],
+        suggestedNext: ["fundraising-cap-table", "hr-compensation", "finance-model-narrator"],
     },
 ]
 

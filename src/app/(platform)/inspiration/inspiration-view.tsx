@@ -95,7 +95,7 @@ const getCategoryStats = (packs: ObjectivePack[], categoryFilters: string[]) => 
 
 // Category filter mapping - includes all database categories
 const CATEGORY_FILTERS = {
-  business: ['sales', 'legal', 'compliance', 'hr', 'operations', 'finance', 'growth', 'startup', 'product', 'marketing'],
+  business: ['sales', 'legal', 'compliance', 'hr', 'operations', 'finance', 'growth', 'startup', 'product', 'marketing', 'fundraising'],
   subsystems: ['engineering', 'security', 'infrastructure'],
 } as const
 

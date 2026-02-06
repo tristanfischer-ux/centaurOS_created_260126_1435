@@ -2,7 +2,7 @@ import type { WorkflowTemplate } from "./agent-types"
 
 /**
  * Pre-built workflow templates that users can load onto the canvas.
- * 5 startup-focused + 7 general business.
+ * 7 startup-focused + 7 general business.
  *
  * Node positions are calculated to create a clean vertical flow with 200px spacing.
  */
@@ -274,6 +274,96 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
                 "Map",
                 "GitBranch",
                 "Map",
+            ]
+        ),
+        edges: makeEdges(6),
+    },
+
+    // ── Awesome-CEO Inspired Templates ─────────────────────────────
+    {
+        id: "cash-crisis-playbook",
+        name: "Cash Crisis Playbook",
+        description:
+            "When runway gets short, act fast. Based on Sequoia's 'Adapting to Endure' framework: assess cash position, plan crisis response, model scenarios, renegotiate vendors, and communicate with board and team.",
+        category: "startup",
+        icon: "ShieldAlert",
+        nodeCount: 6,
+        nodes: makeNodes(
+            [
+                "finance-cash-flow",
+                "strategy-crisis-response",
+                "strategy-scenario-planner",
+                "finance-procurement",
+                "strategy-board-presentation",
+                "startup-90-day-plan",
+            ],
+            [
+                "Cash Flow Assessment",
+                "Crisis Response Plan",
+                "Scenario Planning",
+                "Vendor Renegotiation",
+                "Board Communication",
+                "Recovery 90-Day Plan",
+            ],
+            [
+                "finance",
+                "strategy",
+                "strategy",
+                "finance",
+                "strategy",
+                "startup-strategy",
+            ],
+            [
+                "DollarSign",
+                "ShieldAlert",
+                "GitBranch",
+                "Handshake",
+                "Presentation",
+                "Map",
+            ]
+        ),
+        edges: makeEdges(6),
+    },
+    {
+        id: "pitch-deck-creation",
+        name: "Pitch Deck Creation",
+        description:
+            "Build an investor-ready pitch deck from scratch: size your market, analyze your competitive moat, build financial projections, craft the narrative slide by slide, get expert review, and prepare for investor Q&A.",
+        category: "startup",
+        icon: "Presentation",
+        nodeCount: 6,
+        nodes: makeNodes(
+            [
+                "startup-market-sizing",
+                "startup-competitive-moat",
+                "fundraising-financial-projections",
+                "fundraising-pitch-deck",
+                "fundraising-pitch-deck-reviewer",
+                "fundraising-investor-qa",
+            ],
+            [
+                "Market Sizing (TAM/SAM/SOM)",
+                "Competitive Moat Analysis",
+                "3-Year Financial Projections",
+                "Pitch Deck Narrative",
+                "Deck Review & Scoring",
+                "Investor Q&A Prep",
+            ],
+            [
+                "startup-strategy",
+                "startup-strategy",
+                "fundraising",
+                "fundraising",
+                "fundraising",
+                "fundraising",
+            ],
+            [
+                "PieChart",
+                "Shield",
+                "TrendingUp",
+                "Presentation",
+                "CheckCircle",
+                "HelpCircle",
             ]
         ),
         edges: makeEdges(6),
