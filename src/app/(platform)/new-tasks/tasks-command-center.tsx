@@ -20,6 +20,7 @@ import { BoardView } from './board-view'
 import { ListView } from './list-view'
 import { TaskDetailPanel } from './task-detail-panel'
 import { CreateTaskDialog } from '../tasks/create-task-dialog'
+import { TasksGanttView } from './gantt-view'
 import type { TaskWithData, Member, Team } from './types'
 
 const LARGE_BREAKPOINT = 1280
@@ -340,7 +341,11 @@ export function TasksCommandCenter({
             />
           )}
           {viewMode === 'timeline' && (
-            <TimelinePlaceholder tasks={filteredTasks} />
+            <TasksGanttView
+              tasks={filteredTasks}
+              selectedId={selectedId}
+              onSelect={handleSelect}
+            />
           )}
         </div>
 
@@ -368,69 +373,4 @@ export function TasksCommandCenter({
   )
 }
 
-// Timeline placeholder (uses simple horizontal bars)
-function TimelinePlaceholder({ tasks }: { tasks: TaskWithData[] }) {
-  const activeTasks = tasks.filter(t => t.status !== 'Rejected')
-
-  if (activeTasks.length === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center py-20 text-center">
-        <div className="h-16 w-16 rounded-2xl bg-muted/50 flex items-center justify-center mb-4">
-          <GanttChartSquare className="h-8 w-8 text-muted-foreground/40" />
-        </div>
-        <h3 className="text-base font-semibold text-foreground mb-1">No tasks to display</h3>
-        <p className="text-sm text-muted-foreground">Create tasks with due dates to see the timeline.</p>
-      </div>
-    )
-  }
-
-  const statusColors: Record<string, string> = {
-    Pending: 'bg-muted-foreground/40',
-    Accepted: 'bg-status-info',
-    Pending_Peer_Review: 'bg-status-warning',
-    Pending_Executive_Approval: 'bg-status-warning',
-    Amended_Pending_Approval: 'bg-status-warning',
-    Completed: 'bg-status-success',
-    Rejected: 'bg-status-error',
-  }
-
-  return (
-    <div className="bg-white rounded-xl border border-slate-100 overflow-hidden">
-      <div className="px-5 py-3 border-b border-slate-100 bg-muted/30">
-        <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-          Task Timeline
-        </div>
-      </div>
-      <div className="divide-y divide-slate-50">
-        {activeTasks.slice(0, 50).map(task => {
-          const isOverdue = task.end_date && task.status !== 'Completed' && new Date(task.end_date) < new Date()
-          return (
-            <div key={task.id} className="flex items-center gap-4 px-5 py-2.5 hover:bg-muted/30 transition-colors">
-              <div className={cn('h-2 w-2 rounded-full flex-shrink-0', statusColors[task.status] || 'bg-muted')} />
-              <span className="text-sm text-foreground truncate flex-1 min-w-0">
-                {task.title}
-              </span>
-              <div className="w-32 flex-shrink-0">
-                <div className="w-full h-1.5 bg-muted/50 rounded-full overflow-hidden">
-                  <div
-                    className={cn('h-full rounded-full', statusColors[task.status] || 'bg-muted')}
-                    style={{ width: `${task.progress || 0}%` }}
-                  />
-                </div>
-              </div>
-              {task.end_date && (
-                <span className={cn(
-                  'text-[11px] tabular-nums flex-shrink-0 w-20 text-right',
-                  isOverdue ? 'text-status-error font-medium' : 'text-muted-foreground'
-                )}>
-                  {new Date(task.end_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
-                </span>
-              )}
-            </div>
-          )
-        })}
-      </div>
-    </div>
-  )
-}
 

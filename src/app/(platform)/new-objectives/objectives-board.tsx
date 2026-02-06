@@ -14,6 +14,7 @@ import { ObjectiveCard } from './objective-card'
 import { ObjectiveDetailPanel } from './objective-detail-panel'
 import { ObjectivesTreeView } from './objectives-tree-view'
 import { CreateObjectiveDialog } from '../objectives/create-objective-dialog'
+import { ObjectivesGanttView } from './gantt-view'
 import type { ObjectiveWithTasks, Member, Team } from './types'
 
 const LARGE_BREAKPOINT = 1280
@@ -215,7 +216,11 @@ export function ObjectivesBoard({
             />
           )}
           {viewMode === 'timeline' && (
-            <TimelineView objectives={filteredObjectives} />
+            <ObjectivesGanttView
+              objectives={filteredObjectives}
+              selectedId={selectedId}
+              onSelect={handleSelect}
+            />
           )}
         </div>
 
@@ -283,98 +288,3 @@ function BoardView({
   )
 }
 
-// Simplified timeline view (placeholder that shows a visual timeline)
-function TimelineView({ objectives }: { objectives: ObjectiveWithTasks[] }) {
-  if (objectives.length === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center py-20 text-center">
-        <div className="h-16 w-16 rounded-2xl bg-muted/50 flex items-center justify-center mb-4">
-          <GanttChartSquare className="h-8 w-8 text-muted-foreground/40" />
-        </div>
-        <h3 className="text-base font-semibold text-foreground mb-1">No objectives to display</h3>
-        <p className="text-sm text-muted-foreground">Create objectives with tasks to see the timeline view.</p>
-      </div>
-    )
-  }
-
-  // Simple horizontal timeline representation
-  const now = new Date()
-
-  return (
-    <div className="bg-white rounded-xl border border-slate-100 overflow-hidden">
-      {/* Header */}
-      <div className="px-5 py-3 border-b border-slate-100 bg-muted/30">
-        <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-          Objective Timeline
-        </div>
-      </div>
-
-      <div className="divide-y divide-slate-50">
-        {objectives.map(obj => {
-          // Find earliest task start and latest task end
-          const taskDates = obj.tasks
-            .filter(t => t.end_date)
-            .map(t => new Date(t.end_date!))
-
-          const earliestDate = obj.tasks
-            .filter(t => t.start_date)
-            .map(t => new Date(t.start_date!))
-            .sort((a, b) => a.getTime() - b.getTime())[0]
-
-          const latestDate = taskDates.sort((a, b) => b.getTime() - a.getTime())[0]
-
-          const startLabel = earliestDate
-            ? earliestDate.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
-            : 'No start'
-          const endLabel = latestDate
-            ? latestDate.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
-            : 'No deadline'
-
-          const healthColors: Record<string, string> = {
-            'on-track': 'bg-status-success',
-            'at-risk': 'bg-status-warning',
-            'off-track': 'bg-status-error',
-            'completed': 'bg-status-success',
-            'not-started': 'bg-muted-foreground/30',
-          }
-
-          return (
-            <div key={obj.id} className="flex items-center gap-4 px-5 py-3 hover:bg-muted/30 transition-colors">
-              {/* Health dot */}
-              <div className={cn('h-2.5 w-2.5 rounded-full flex-shrink-0', healthColors[obj.health])} />
-
-              {/* Title */}
-              <div className="w-48 flex-shrink-0">
-                <span className="text-sm font-medium text-foreground truncate block">
-                  {obj.title}
-                </span>
-              </div>
-
-              {/* Timeline bar */}
-              <div className="flex-1 relative h-6">
-                <div className="absolute inset-y-0 left-0 right-0 flex items-center">
-                  <div className="w-full h-2 bg-muted/50 rounded-full overflow-hidden">
-                    <div
-                      className={cn('h-full rounded-full transition-all duration-500', healthColors[obj.health])}
-                      style={{ width: `${obj.progress}%` }}
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Date range */}
-              <div className="text-[11px] text-muted-foreground tabular-nums flex-shrink-0 w-36 text-right">
-                {startLabel} — {endLabel}
-              </div>
-
-              {/* Progress */}
-              <div className="text-xs font-semibold tabular-nums w-10 text-right flex-shrink-0">
-                {obj.progress}%
-              </div>
-            </div>
-          )
-        })}
-      </div>
-    </div>
-  )
-}
