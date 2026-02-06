@@ -39,7 +39,6 @@ export function MarketplacePreviewCard({ listing, onJoinClick }: MarketplacePrev
     const isPerson = listing.category === 'People'
     const isProduct = listing.category === 'Products'
     const isAI = false // AI category not yet available in preview listings
-    const AITypeIcon = Bot // Placeholder icon for AI listings
     const isMachineCapacity = isProduct && listing.subcategory === 'Machine Capacity'
     const ctaText = isPerson ? 'Join to Connect' : 'Join to Book'
 
@@ -68,8 +67,8 @@ export function MarketplacePreviewCard({ listing, onJoinClick }: MarketplacePrev
             <CardContent className="p-4 flex-1">
                 {/* Header with category and AI icon */}
                 <div className="flex items-center gap-2 mb-2">
-                    {isAI && AITypeIcon && (
-                        <AITypeIcon className="w-4 h-4 text-violet-600" />
+                    {isAI && (
+                        <Bot className="w-4 h-4 text-violet-600" />
                     )}
                     <Badge 
                         variant="secondary" 
