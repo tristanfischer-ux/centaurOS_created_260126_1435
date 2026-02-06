@@ -16,7 +16,7 @@ import {
     LogOut, Inbox, Activity, ThumbsUp, Lock, ScrollText, Image, Type,
     Film, Camera, Play, Database, LayoutDashboard, ClipboardList,
     Swords, MessageCircle, Clock, LayoutGrid, ImageIcon,
-    Loader2, Check, AlertOctagon, Eye, Paperclip,
+    Loader2, Check, AlertOctagon, Eye, Paperclip, UserCheck,
 } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
 
@@ -267,3 +267,127 @@ function PromptNodeComponent({ data, selected }: NodeProps) {
 }
 
 export const PromptNode = memo(PromptNodeComponent)
+
+// ─── Human-Task Node ─────────────────────────────────────────────────
+
+/** Human-task accent color — Electric Blue */
+const HUMAN_TASK_ACCENT = "#3b82f6"
+
+interface HumanTaskNodeData {
+    label?: string
+    description?: string
+    guidance?: string
+    checklist?: string[]
+    checklistCompleted?: boolean[]
+    executionStatus?: ExecutionStatus
+    isHumanTask?: boolean
+    [key: string]: unknown
+}
+
+/**
+ * Visual node for human-in-the-loop steps.
+ *
+ * @description Renders a distinctive people-focused node with a blue accent,
+ * person icon, and "Your turn" badge. These represent steps where a person
+ * takes action (briefing, reviewing, deciding) rather than automated generation.
+ */
+function HumanTaskNodeComponent({ data, selected }: NodeProps) {
+    const nodeData = data as HumanTaskNodeData
+    const status = nodeData.executionStatus ?? "idle"
+
+    const completedCount = (nodeData.checklistCompleted ?? []).filter(Boolean).length
+    const totalChecklist = (nodeData.checklist ?? []).length
+    const isAllDone = totalChecklist > 0 && completedCount === totalChecklist
+
+    const badgeLabel = status === "approved"
+        ? "Done"
+        : status === "review"
+            ? "Your turn"
+            : totalChecklist > 0
+                ? `${completedCount}/${totalChecklist}`
+                : null
+
+    const badgeBg = status === "approved" ? "bg-emerald-100" : "bg-blue-100"
+    const badgeText = status === "approved" ? "text-emerald-700" : "text-blue-700"
+    const ringClass = status === "approved"
+        ? "ring-2 ring-emerald-400/60"
+        : status === "review"
+            ? "ring-2 ring-blue-400/60"
+            : ""
+
+    return (
+        <div
+            className={`
+                group relative bg-white rounded-xl border-2 shadow-sm
+                transition-all duration-200 w-[260px]
+                hover:shadow-md hover:-translate-y-0.5
+                ${selected ? "shadow-lg ring-2 ring-blue-400/50 -translate-y-0.5" : "border-blue-200"}
+                ${!selected && ringClass ? ringClass : ""}
+            `}
+            style={{
+                borderLeftColor: HUMAN_TASK_ACCENT,
+                borderLeftWidth: "4px",
+            }}
+        >
+            {/* Input handle */}
+            <Handle
+                type="target"
+                position={Position.Top}
+                className="!w-3 !h-3 !bg-blue-400 !border-2 !border-white !-top-1.5"
+            />
+
+            <div className="p-3">
+                {/* Header */}
+                <div className="flex items-start gap-2.5">
+                    <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 bg-blue-50">
+                        {status === "approved" ? (
+                            <CheckCircle className="w-4 h-4 text-emerald-600" />
+                        ) : (
+                            <UserCheck className="w-4 h-4 text-blue-600" />
+                        )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-foreground truncate leading-tight">
+                            {nodeData.label || "Team Step"}
+                        </p>
+                        <p className="text-[10px] font-medium mt-0.5 text-blue-600">
+                            People
+                        </p>
+                    </div>
+                </div>
+
+                {/* Guidance text */}
+                {nodeData.guidance && (
+                    <p className="text-[11px] text-muted-foreground mt-2 leading-relaxed line-clamp-2">
+                        {nodeData.guidance}
+                    </p>
+                )}
+
+                {/* Status indicators */}
+                {badgeLabel && (
+                    <div className="flex items-center gap-1.5 mt-2">
+                        <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-semibold ${badgeBg} ${badgeText}`}>
+                            {status === "approved" ? (
+                                <Check className="w-2.5 h-2.5" />
+                            ) : status === "review" ? (
+                                <UserCheck className="w-2.5 h-2.5" />
+                            ) : (
+                                <ListChecks className="w-2.5 h-2.5" />
+                            )}
+                            {badgeLabel}
+                        </span>
+                    </div>
+                )}
+            </div>
+
+            {/* Output handle */}
+            <Handle
+                type="source"
+                position={Position.Bottom}
+                className="!w-3 !h-3 !bg-blue-400 !border-2 !border-white !-bottom-1.5"
+            />
+        </div>
+    )
+}
+
+export const HumanTaskNode = memo(HumanTaskNodeComponent)

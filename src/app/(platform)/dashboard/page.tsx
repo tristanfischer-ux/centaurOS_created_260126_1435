@@ -68,7 +68,8 @@ export default async function DashboardPage() {
     tasksDueThisWeekResult,
     blockersResult,
     pendingDecisionsResult,
-    unreadCountsResult
+    unreadCountsResult,
+    featuredListingsResult,
   ] = await Promise.all([
     // My current tasks
     supabase
@@ -170,8 +171,32 @@ export default async function DashboardPage() {
     : Promise.resolve({ data: [] }),
     
     // Unread message counts
-    fetchUnreadCounts(supabase, foundryId, user.id)
+    fetchUnreadCounts(supabase, foundryId, user.id),
+
+    // Featured marketplace listings (for Marketplace Spotlight)
+    supabase
+      .from('marketplace_listings')
+      .select('id, title, description, category, subcategory, is_verified, image_url, attributes')
+      .eq('is_verified', true)
+      .order('created_at', { ascending: false })
+      .limit(3),
   ])
+
+  // Build workflow template previews from the static templates
+  const workflowTemplates = getWorkflowTemplatePreviews()
+
+  // Generate daily focus message
+  const myTasks = myTasksResult.data || []
+  const objectives = objectivesResult.data || []
+  const overdueTasks = overdueTasksResult.data || []
+  const tasksDueToday = tasksDueTodayResult.data || []
+  const dailyFocus = generateDailyFocus({
+    myTaskCount: myTasks.length,
+    todayTaskCount: tasksDueToday.length,
+    overdueCount: overdueTasks.length,
+    objectiveCount: objectives.length,
+    unreadCount: unreadCountsResult.total,
+  })
   
   return (
     <DashboardClient
@@ -182,20 +207,100 @@ export default async function DashboardPage() {
         avatarUrl: profile?.avatar_url || null
       }}
       foundryId={foundryId}
-      myTasks={myTasksResult.data || []}
-      objectives={objectivesResult.data || []}
+      myTasks={myTasks}
+      objectives={objectives}
       teamPresence={teamPresenceResult}
       recentActivity={recentActivityResult}
       taskCompletionStats={taskCompletionStatsResult}
-      overdueTasks={overdueTasksResult.data || []}
-      tasksDueToday={tasksDueTodayResult.data || []}
+      overdueTasks={overdueTasks}
+      tasksDueToday={tasksDueToday}
       tasksDueThisWeek={tasksDueThisWeekResult.data || []}
       blockers={blockersResult.data || []}
       pendingDecisions={pendingDecisionsResult.data || []}
       unreadCounts={unreadCountsResult}
       isExecutiveOrFounder={isExecutiveOrFounder}
+      featuredListings={featuredListingsResult.data || []}
+      workflowTemplates={workflowTemplates}
+      dailyFocus={dailyFocus}
     />
   )
+}
+
+/**
+ * Get a curated selection of workflow template previews.
+ * These come from the static WORKFLOW_TEMPLATES list.
+ */
+function getWorkflowTemplatePreviews() {
+  // Import the templates inline to avoid circular deps
+  // We just need a few representative ones for the preview
+  const featured = [
+    {
+      id: 'seed-round-fundraise',
+      name: 'Seed Round Fundraise',
+      description: 'The full raise pipeline: from vision to post-raise comms.',
+      category: 'startup',
+      nodeCount: 8,
+      icon: 'TrendingUp',
+    },
+    {
+      id: 'go-to-market-launch',
+      name: 'Go-to-Market Launch',
+      description: 'Plan and execute a product launch from positioning to post-launch analysis.',
+      category: 'marketing',
+      nodeCount: 6,
+      icon: 'Rocket',
+    },
+    {
+      id: 'hiring-pipeline',
+      name: 'Hiring Pipeline',
+      description: 'End-to-end hiring from role definition through offer letter.',
+      category: 'hiring',
+      nodeCount: 5,
+      icon: 'Users',
+    },
+  ]
+  return featured
+}
+
+/**
+ * Generate a contextual daily focus message based on the user's current state.
+ * This replaces the generic "Here's what's happening in your foundry today".
+ */
+function generateDailyFocus({
+  myTaskCount,
+  todayTaskCount,
+  overdueCount,
+  objectiveCount,
+  unreadCount,
+}: {
+  myTaskCount: number
+  todayTaskCount: number
+  overdueCount: number
+  objectiveCount: number
+  unreadCount: number
+}): string {
+  // Priority: overdue > due today > general
+  if (overdueCount > 0) {
+    return `You have ${overdueCount} overdue ${overdueCount === 1 ? 'task' : 'tasks'}. Let's clear those first.`
+  }
+
+  if (todayTaskCount > 0 && objectiveCount > 0) {
+    return `${todayTaskCount} ${todayTaskCount === 1 ? 'task' : 'tasks'} due today across ${objectiveCount} active ${objectiveCount === 1 ? 'objective' : 'objectives'}.`
+  }
+
+  if (todayTaskCount > 0) {
+    return `${todayTaskCount} ${todayTaskCount === 1 ? 'task is' : 'tasks are'} due today. Here's your plan.`
+  }
+
+  if (myTaskCount > 0 && objectiveCount > 0) {
+    return `${myTaskCount} active ${myTaskCount === 1 ? 'task' : 'tasks'} and ${objectiveCount} ${objectiveCount === 1 ? 'objective' : 'objectives'} in progress.`
+  }
+
+  if (myTaskCount === 0 && objectiveCount === 0) {
+    return 'Your slate is clean. Time to set some objectives and get moving.'
+  }
+
+  return `Here's what's happening in your foundry today.`
 }
 
 /**

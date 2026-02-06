@@ -105,6 +105,33 @@ export async function getDecryptedKey(userId: string, providerId: string): Promi
     }
 }
 
+/**
+ * Lightweight check: does the user have any API key configured?
+ *
+ * @description Returns a boolean so the Agents page can show a guidance
+ * banner when no keys are set up. No sensitive data is returned.
+ *
+ * @returns {Promise<boolean>} true if at least one key exists
+ */
+export async function checkHasAnyProviderKey(): Promise<boolean> {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+
+    if (!user) return false
+
+    const { count, error } = await supabase
+        .from("ai_provider_keys")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", user.id)
+
+    if (error) {
+        console.error("[ai-providers] Check key existence error:", error)
+        return false
+    }
+
+    return (count ?? 0) > 0
+}
+
 // ─── Provider Preferences ────────────────────────────────────────────
 
 export async function saveProviderPreference(

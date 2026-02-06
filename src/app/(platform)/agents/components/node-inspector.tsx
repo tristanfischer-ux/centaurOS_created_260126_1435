@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useState, useCallback, useEffect, useRef } from "react"
-import { X, Copy, Check, Trash2, Play, RotateCcw, ChevronDown, ChevronRight, CheckCircle, ArrowRight, Sparkles, Brain, Globe, Image as ImageIcon, Mic, Cpu, Loader2 } from "lucide-react"
+import { X, Copy, Check, Trash2, Play, RotateCcw, ChevronDown, ChevronRight, CheckCircle, ArrowRight, Sparkles, Brain, Globe, Image as ImageIcon, Mic, Cpu, Loader2, UserCheck, Square, CheckSquare } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -73,7 +73,7 @@ function ProviderModelSelector({
 
     return (
         <div className="space-y-2.5">
-            <label className="text-xs font-semibold text-foreground">AI Provider</label>
+            <label className="text-xs font-semibold text-foreground">Provider</label>
 
             {/* Modality pills */}
             <div className="flex gap-1 flex-wrap">
@@ -156,7 +156,7 @@ function MediaOutput({ data }: {
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                         src={data.imageUrl}
-                        alt="AI generated image"
+                        alt="Generated image"
                         className="w-full h-auto"
                     />
                 </div>
@@ -292,6 +292,7 @@ interface NodeInspectorProps {
     onUpdateOutput: (nodeId: string, output: string) => void
     onUpdateFiles: (nodeId: string, files: AttachedFile[]) => void
     onUpdateProvider: (nodeId: string, providerId: string, modelId: string, modality: string) => void
+    onUpdateChecklist?: (nodeId: string, completed: boolean[]) => void
     onDelete: (nodeId: string) => void
     onRunNode: (nodeId: string) => void
     onApproveNode: (nodeId: string) => void
@@ -306,6 +307,7 @@ export function NodeInspector({
     onUpdateOutput,
     onUpdateFiles,
     onUpdateProvider,
+    onUpdateChecklist,
     onDelete,
     onRunNode,
     onApproveNode,
@@ -329,6 +331,28 @@ export function NodeInspector({
         imageUrl?: string
         audioUrl?: string
         videoUrl?: string
+        // Human-task fields
+        isHumanTask?: boolean
+        guidance?: string
+        checklist?: string[]
+        checklistCompleted?: boolean[]
+    }
+
+    // Human-task nodes get a completely different inspector
+    const isHumanTask = node.type === "human-task" || data.isHumanTask
+
+    if (isHumanTask) {
+        return (
+            <HumanTaskInspector
+                node={node}
+                data={data}
+                onClose={onClose}
+                onDelete={onDelete}
+                onApproveNode={onApproveNode}
+                onApproveAndContinue={onApproveAndContinue}
+                onUpdateChecklist={onUpdateChecklist}
+            />
+        )
     }
 
     const prompt = data.promptId
@@ -588,7 +612,7 @@ export function NodeInspector({
                                     <ChevronRight className="w-3.5 h-3.5 text-muted-foreground" />
                                 )}
                                 <label className="text-xs font-semibold text-foreground cursor-pointer">
-                                    AI Output
+                                    Output
                                 </label>
                                 {status === "running" && (
                                     <span className="ml-auto text-[10px] text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded-full animate-pulse">
@@ -762,6 +786,207 @@ export function NodeInspector({
                         </>
                     )}
                 </Button>
+
+                <Button
+                    onClick={() => onDelete(node.id)}
+                    variant="ghost"
+                    className="w-full gap-2 text-muted-foreground hover:text-destructive"
+                >
+                    <Trash2 className="w-4 h-4" /> Remove from workflow
+                </Button>
+            </div>
+        </div>
+    )
+}
+
+// ─── Human-Task Inspector ────────────────────────────────────────────
+
+/**
+ * Inspector panel for human-task nodes.
+ *
+ * @description Shows task guidance, an interactive checklist, and a
+ * "Mark Complete" button. No prompt editor, provider selector, or
+ * output area — this is purely a person's checkpoint.
+ */
+function HumanTaskInspector({
+    node,
+    data,
+    onClose,
+    onDelete,
+    onApproveNode,
+    onApproveAndContinue,
+    onUpdateChecklist,
+}: {
+    node: Node
+    data: {
+        label?: string
+        description?: string
+        guidance?: string
+        checklist?: string[]
+        checklistCompleted?: boolean[]
+        executionStatus?: ExecutionStatus
+    }
+    onClose: () => void
+    onDelete: (nodeId: string) => void
+    onApproveNode: (nodeId: string) => void
+    onApproveAndContinue: (nodeId: string) => void
+    onUpdateChecklist?: (nodeId: string, completed: boolean[]) => void
+}) {
+    const status = data.executionStatus ?? "idle"
+    const checklist = data.checklist ?? []
+    const [completed, setCompleted] = useState<boolean[]>(
+        data.checklistCompleted ?? new Array(checklist.length).fill(false)
+    )
+
+    // Sync when node changes
+    useEffect(() => {
+        setCompleted(data.checklistCompleted ?? new Array(checklist.length).fill(false))
+    }, [node.id, data.checklistCompleted, checklist.length])
+
+    const toggleItem = useCallback((index: number) => {
+        setCompleted(prev => {
+            const next = [...prev]
+            next[index] = !next[index]
+            onUpdateChecklist?.(node.id, next)
+            return next
+        })
+    }, [node.id, onUpdateChecklist])
+
+    const allDone = checklist.length === 0 || completed.every(Boolean)
+    const isReview = status === "review"
+    const isDone = status === "approved"
+
+    return (
+        <div className="w-96 border-l border-slate-100 bg-white flex flex-col h-full">
+            {/* Header */}
+            <div className="p-4 border-b border-slate-100">
+                <div className="flex items-center justify-between mb-3">
+                    <span className="text-[11px] font-medium uppercase tracking-wider text-blue-600">
+                        People
+                    </span>
+                    <button
+                        onClick={onClose}
+                        className="p-1 rounded-md hover:bg-slate-100 text-muted-foreground"
+                    >
+                        <X className="w-4 h-4" />
+                    </button>
+                </div>
+
+                <div className="flex items-start gap-3">
+                    <div className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 bg-blue-50">
+                        <UserCheck className="w-5 h-5 text-blue-600" />
+                    </div>
+                    <div>
+                        <h3 className="text-sm font-semibold text-foreground">
+                            {data.label || "Team Step"}
+                        </h3>
+                        {data.description && (
+                            <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">
+                                {data.description}
+                            </p>
+                        )}
+                    </div>
+                </div>
+            </div>
+
+            {/* Content */}
+            <ScrollArea className="flex-1">
+                <div className="p-4 space-y-4">
+                    {/* Guidance */}
+                    {data.guidance && (
+                        <div className="p-3 rounded-lg bg-blue-50 border border-blue-100">
+                            <p className="text-[10px] font-semibold text-blue-600 uppercase tracking-wider mb-1.5">
+                                What to do
+                            </p>
+                            <p className="text-xs text-blue-800 leading-relaxed whitespace-pre-line">
+                                {data.guidance}
+                            </p>
+                        </div>
+                    )}
+
+                    {/* Checklist */}
+                    {checklist.length > 0 && (
+                        <div>
+                            <label className="text-xs font-semibold text-foreground mb-2 block">
+                                Checklist
+                            </label>
+                            <div className="space-y-1.5">
+                                {checklist.map((item, i) => (
+                                    <button
+                                        key={i}
+                                        onClick={() => toggleItem(i)}
+                                        className={`flex items-start gap-2.5 w-full text-left p-2 rounded-lg transition-colors ${
+                                            completed[i]
+                                                ? "bg-emerald-50 border border-emerald-100"
+                                                : "bg-slate-50 border border-slate-100 hover:bg-slate-100"
+                                        }`}
+                                    >
+                                        {completed[i] ? (
+                                            <CheckSquare className="w-4 h-4 text-emerald-600 flex-shrink-0 mt-0.5" />
+                                        ) : (
+                                            <Square className="w-4 h-4 text-muted-foreground flex-shrink-0 mt-0.5" />
+                                        )}
+                                        <span className={`text-xs leading-relaxed ${
+                                            completed[i] ? "text-emerald-700 line-through" : "text-foreground"
+                                        }`}>
+                                            {item}
+                                        </span>
+                                    </button>
+                                ))}
+                            </div>
+                            <p className="text-[10px] text-muted-foreground mt-2">
+                                {completed.filter(Boolean).length} of {checklist.length} completed
+                            </p>
+                        </div>
+                    )}
+
+                    {/* Done state */}
+                    {isDone && (
+                        <div className="p-3 rounded-lg bg-emerald-50 border border-emerald-100 text-center">
+                            <CheckCircle className="w-5 h-5 text-emerald-600 mx-auto mb-1" />
+                            <p className="text-xs font-medium text-emerald-700">Step completed</p>
+                        </div>
+                    )}
+                </div>
+            </ScrollArea>
+
+            {/* Footer actions */}
+            <div className="p-4 border-t border-slate-100 space-y-2">
+                {isReview && (
+                    <div className="space-y-2 mb-2">
+                        <Button
+                            onClick={() => onApproveAndContinue(node.id)}
+                            className="w-full gap-2 text-xs"
+                            style={{ backgroundColor: "#059669" }}
+                            disabled={!allDone && checklist.length > 0}
+                        >
+                            <ArrowRight className="w-4 h-4" />
+                            {checklist.length > 0 && !allDone
+                                ? "Complete checklist first"
+                                : "Mark Complete & Continue"}
+                        </Button>
+                        <Button
+                            onClick={() => onApproveNode(node.id)}
+                            variant="outline"
+                            className="w-full gap-1.5 text-xs"
+                            disabled={!allDone && checklist.length > 0}
+                        >
+                            <CheckCircle className="w-3.5 h-3.5" />
+                            Mark Complete & Stop
+                        </Button>
+                    </div>
+                )}
+
+                {!isReview && !isDone && (
+                    <Button
+                        onClick={() => onApproveAndContinue(node.id)}
+                        className="w-full gap-2"
+                        style={{ backgroundColor: "#3b82f6" }}
+                    >
+                        <CheckCircle className="w-4 h-4" />
+                        Mark Complete
+                    </Button>
+                )}
 
                 <Button
                     onClick={() => onDelete(node.id)}

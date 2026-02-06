@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
 import { AgentsWorkflowView } from "./agents-workflow-view"
+import { checkHasAnyProviderKey } from "@/actions/ai-providers"
 
 export const revalidate = 60
 
@@ -14,6 +15,8 @@ export default async function AgentsPage() {
         redirect("/login")
     }
 
+    const hasApiKey = await checkHasAnyProviderKey()
+
     return (
         <div className="flex flex-col h-[calc(100vh-2rem)] -m-4 sm:-m-6 lg:-m-8">
             {/* Page header with orange accent bar */}
@@ -25,13 +28,13 @@ export default async function AgentsPage() {
                     </h1>
                 </div>
                 <p className="text-muted-foreground text-sm mt-1 ml-4">
-                    Build and run AI prompt workflows
+                    Automate your team&apos;s recurring work
                 </p>
             </div>
 
             {/* Workflow view fills remaining space */}
             <div className="flex-1 min-h-0">
-                <AgentsWorkflowView />
+                <AgentsWorkflowView hasApiKey={hasApiKey} />
             </div>
         </div>
     )

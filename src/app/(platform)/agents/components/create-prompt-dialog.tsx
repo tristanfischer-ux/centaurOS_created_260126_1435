@@ -21,7 +21,7 @@ export function CreatePromptDialog({ open, onOpenChange, onPromptCreated }: Crea
     const [category, setCategory] = useState<PromptCategory>("strategy")
     const [promptText, setPromptText] = useState("")
     const [inputLabel, setInputLabel] = useState("Your input")
-    const [outputLabel, setOutputLabel] = useState("AI output")
+    const [outputLabel, setOutputLabel] = useState("Output")
     const [tagInput, setTagInput] = useState("")
     const [tags, setTags] = useState<string[]>([])
 
@@ -31,7 +31,7 @@ export function CreatePromptDialog({ open, onOpenChange, onPromptCreated }: Crea
         setCategory("strategy")
         setPromptText("")
         setInputLabel("Your input")
-        setOutputLabel("AI output")
+        setOutputLabel("Output")
         setTagInput("")
         setTags([])
     }, [])
@@ -61,7 +61,7 @@ export function CreatePromptDialog({ open, onOpenChange, onPromptCreated }: Crea
             icon: CATEGORY_META[category].icon,
             defaultPrompt: promptText.trim(),
             inputLabel: inputLabel.trim() || "Your input",
-            outputLabel: outputLabel.trim() || "AI output",
+            outputLabel: outputLabel.trim() || "Output",
             tags,
             suggestedNext: [],
         })

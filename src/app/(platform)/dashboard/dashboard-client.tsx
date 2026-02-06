@@ -9,6 +9,9 @@ import { ActivityFeed } from '@/components/dashboard/activity-feed'
 import { QuickActions } from '@/components/dashboard/quick-actions'
 import { ProductivityChart } from '@/components/dashboard/productivity-chart'
 import { StatsCards } from '@/components/dashboard/stats-cards'
+import { RecommendedForYou } from '@/components/dashboard/recommended-for-you'
+import { MarketplaceSpotlight } from '@/components/dashboard/marketplace-spotlight'
+import { WorkflowTemplatesPreview } from '@/components/dashboard/workflow-templates-preview'
 
 interface User {
   id: string
@@ -84,6 +87,27 @@ interface UnreadCounts {
   total: number
 }
 
+interface FeaturedListing {
+  id: string
+  title: string
+  description: string | null
+  category: string
+  subcategory: string
+  is_verified: boolean | null
+  image_url: string | null
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  attributes: any
+}
+
+interface WorkflowTemplate {
+  id: string
+  name: string
+  description: string
+  category: string
+  nodeCount: number
+  icon: string
+}
+
 export interface DashboardClientProps {
   user: User
   foundryId: string
@@ -99,12 +123,26 @@ export interface DashboardClientProps {
   pendingDecisions: Task[]
   unreadCounts: UnreadCounts
   isExecutiveOrFounder: boolean
+  featuredListings: FeaturedListing[]
+  workflowTemplates: WorkflowTemplate[]
+  dailyFocus: string
 }
 
 /**
  * Dashboard Client Component
  * 
- * Beautiful command center with personalized widgets and stunning visualizations
+ * Redesigned command center that drives action:
+ * - Hero with daily focus and clickable metrics
+ * - Priority queue + Quick Actions with Discovery section
+ * - Objectives with contextual nudges
+ * - Recommended for You (revenue driver)
+ * - Marketplace Spotlight (revenue driver)
+ * - Workflow Templates (revenue driver)
+ * - Team pulse + Activity feed
+ * - Productivity chart
+ * 
+ * Mobile ordering prioritises: Priority Queue -> Quick Actions -> 
+ * Recommendations -> Objectives -> Marketplace -> Workflows -> Team -> Activity
  */
 export function DashboardClient({
   user,
@@ -120,7 +158,10 @@ export function DashboardClient({
   blockers,
   pendingDecisions,
   unreadCounts,
-  isExecutiveOrFounder
+  isExecutiveOrFounder,
+  featuredListings,
+  workflowTemplates,
+  dailyFocus,
 }: DashboardClientProps) {
   const [selectedView, setSelectedView] = useState<'overview' | 'tasks' | 'team'>('overview')
   
@@ -145,6 +186,8 @@ export function DashboardClient({
         todayTasks={todayTasks}
         overdueCount={overdueCount}
         unreadCount={unreadCounts.total}
+        activeObjectives={activeObjectives}
+        dailyFocus={dailyFocus}
         onViewChange={setSelectedView}
         selectedView={selectedView}
       />
@@ -168,8 +211,8 @@ export function DashboardClient({
         {/* Main Content Grid */}
         {selectedView === 'overview' && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Left Column - Priority & Actions */}
-            <div className="lg:col-span-1 space-y-6">
+            {/* Left Column - Actions & Priority */}
+            <div className="lg:col-span-1 space-y-6 order-2 lg:order-1">
               <QuickActions foundryId={foundryId} />
               <PriorityQueue
                 myTasks={myTasks}
@@ -177,16 +220,24 @@ export function DashboardClient({
                 tasksDueToday={tasksDueToday}
                 userId={user.id}
               />
-            </div>
-            
-            {/* Middle Column - Objectives & Charts */}
-            <div className="lg:col-span-1 space-y-6">
-              <ObjectiveCards objectives={objectives} />
               <ProductivityChart data={taskCompletionStats} />
             </div>
             
-            {/* Right Column - Team & Activity */}
-            <div className="lg:col-span-1 space-y-6">
+            {/* Middle Column - Objectives & Recommendations */}
+            <div className="lg:col-span-1 space-y-6 order-1 lg:order-2">
+              <RecommendedForYou
+                objectives={objectives}
+                teamSize={teamPresence.length}
+                taskCount={totalTasks}
+                hasWorkflows={false}
+              />
+              <ObjectiveCards objectives={objectives} />
+            </div>
+            
+            {/* Right Column - Discovery (Revenue) & Team */}
+            <div className="lg:col-span-1 space-y-6 order-3">
+              <MarketplaceSpotlight featuredListings={featuredListings} />
+              <WorkflowTemplatesPreview templates={workflowTemplates} />
               <TeamPulse teamMembers={teamPresence} />
               <ActivityFeed activities={recentActivity} />
             </div>
@@ -201,7 +252,10 @@ export function DashboardClient({
               tasksDueToday={tasksDueToday}
               userId={user.id}
             />
-            <ProductivityChart data={taskCompletionStats} />
+            <div className="space-y-6">
+              <ObjectiveCards objectives={objectives} />
+              <ProductivityChart data={taskCompletionStats} />
+            </div>
           </div>
         )}
         

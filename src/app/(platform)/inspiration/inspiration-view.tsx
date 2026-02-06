@@ -646,7 +646,7 @@ function IndustryDetailView({
   const [loadingDomains, setLoadingDomains] = useState(true)
   
   // Card size state - matches PackCard pattern
-  const [defaultDomainSize, setDefaultDomainSize] = useState<'small' | 'medium' | 'full'>('medium')
+  const [defaultDomainSize, setDefaultDomainSize] = useState<'small' | 'medium' | 'full'>('full')
   const [domainSizes, setDomainSizes] = useState<Record<string, 'small' | 'medium' | 'full'>>({})
   
   // Handle individual card size changes
@@ -863,7 +863,7 @@ function IndustryPacksView({
   }, [searchQuery])
   
   // Card size state - same pattern as main InspirationView
-  const [defaultCardSize, setDefaultCardSize] = useState<PackCardSize>('medium')
+  const [defaultCardSize, setDefaultCardSize] = useState<PackCardSize>('full')
   const [cardSizes, setCardSizes] = useState<Record<string, PackCardSize>>({})
   
   // Handle individual card size changes
@@ -1462,7 +1462,7 @@ export function InspirationView({ templates = [], packs = [], initialSavedPackId
   }, [searchQuery])
   
   // Card size state
-  const [defaultCardSize, setDefaultCardSize] = useState<PackCardSize>('medium')
+  const [defaultCardSize, setDefaultCardSize] = useState<PackCardSize>('full')
   const [cardSizes, setCardSizes] = useState<Record<string, PackCardSize>>({})
   
   // Handle individual card size changes

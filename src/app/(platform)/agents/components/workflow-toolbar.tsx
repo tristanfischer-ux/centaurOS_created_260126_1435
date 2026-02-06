@@ -12,6 +12,9 @@ import {
     Play,
     Square,
     Loader2,
+    AlignVerticalSpaceAround,
+    Trash2,
+    HelpCircle,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -35,6 +38,9 @@ interface WorkflowToolbarProps {
     onStopChain: () => void
     isChainRunning: boolean
     chainProgress?: { current: number; total: number }
+    onAutoArrange?: () => void
+    onClearCanvas?: () => void
+    onOpenHelp?: () => void
 }
 
 export function WorkflowToolbar({
@@ -51,6 +57,9 @@ export function WorkflowToolbar({
     onStopChain,
     isChainRunning,
     chainProgress,
+    onAutoArrange,
+    onClearCanvas,
+    onOpenHelp,
 }: WorkflowToolbarProps) {
     const [copied, setCopied] = useState(false)
     const [saved, setSaved] = useState(false)
@@ -137,6 +146,41 @@ export function WorkflowToolbar({
                     </TooltipTrigger>
                     <TooltipContent>Load a pre-built workflow</TooltipContent>
                 </Tooltip>
+
+                {nodeCount > 0 && (
+                    <>
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={onAutoArrange}
+                                    className="gap-1.5 text-xs"
+                                    disabled={nodeCount === 0}
+                                >
+                                    <AlignVerticalSpaceAround className="w-3.5 h-3.5" />
+                                    Tidy Up
+                                </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Auto-arrange nodes into a clean layout</TooltipContent>
+                        </Tooltip>
+
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={onClearCanvas}
+                                    className="gap-1.5 text-xs text-muted-foreground hover:text-destructive"
+                                >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                    Clear
+                                </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Remove all nodes from canvas</TooltipContent>
+                        </Tooltip>
+                    </>
+                )}
 
                 <div className="h-5 w-px bg-slate-200" />
 
@@ -227,6 +271,19 @@ export function WorkflowToolbar({
                         </>
                     )}
                 </Button>
+
+                <Tooltip>
+                    <TooltipTrigger asChild>
+                        <button
+                            onClick={onOpenHelp}
+                            className="p-2 rounded-lg hover:bg-slate-100 text-muted-foreground transition-colors"
+                            aria-label="Help and keyboard shortcuts"
+                        >
+                            <HelpCircle className="w-4 h-4" />
+                        </button>
+                    </TooltipTrigger>
+                    <TooltipContent>Help & keyboard shortcuts</TooltipContent>
+                </Tooltip>
             </div>
         </div>
     )

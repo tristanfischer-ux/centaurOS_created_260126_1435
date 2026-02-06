@@ -49,11 +49,18 @@ export function UpdatesLayout({
   const [filter, setFilter] = useState<ActivityFilter>('all')
   const [isLoading, setIsLoading] = useState(false)
 
-  // Selection state
+  // Selection state — preload the most recent update so the right panel isn't empty
   const [selectedSource, setSelectedSource] = useState<{
     type: 'task' | 'objective' | 'conversation'
     id: string
-  } | null>(null)
+  } | null>(() => {
+    if (initialItems.length === 0) return null
+    const firstItem = initialItems[0]
+    return {
+      type: firstItem.source.type as 'task' | 'objective' | 'conversation',
+      id: firstItem.source.id
+    }
+  })
 
   // Layout state
   const [screenSize, setScreenSize] = useState<'large' | 'medium' | 'small'>('large')

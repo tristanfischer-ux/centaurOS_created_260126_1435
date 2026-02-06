@@ -17,14 +17,18 @@ import {
     useReactFlow,
 } from "@xyflow/react"
 import "@xyflow/react/dist/style.css"
+import Dagre from "@dagrejs/dagre"
 import { toast } from "sonner"
+import Link from "next/link"
+import { Info, X as XIcon } from "lucide-react"
 
-import { PromptNode } from "./components/prompt-node"
+import { PromptNode, HumanTaskNode } from "./components/prompt-node"
 import { PromptLibrarySidebar } from "./components/prompt-library-sidebar"
 import { NodeInspector } from "./components/node-inspector"
 import { WorkflowToolbar } from "./components/workflow-toolbar"
 import { WorkflowTemplatesDialog } from "./components/workflow-templates-dialog"
 import { CreatePromptDialog } from "./components/create-prompt-dialog"
+import { AgentsHelpDialog } from "./components/agents-help-dialog"
 import { getPromptById } from "./lib/prompt-library"
 import { loadCustomPrompts, getCustomPromptById } from "./lib/custom-prompts"
 import type { PromptCategory, Workflow, WorkflowTemplate, CustomPrompt, AttachedFile, ExecutionStatus } from "./lib/agent-types"
@@ -59,7 +63,7 @@ function saveActiveId(id: string) {
 }
 
 // ─── Custom node types ────────────────────────────────────────────
-const nodeTypes = { prompt: PromptNode }
+const nodeTypes = { prompt: PromptNode, "human-task": HumanTaskNode }
 
 // ─── Generate unique ID ───────────────────────────────────────────
 let idCounter = 0
@@ -101,10 +105,41 @@ function getUpstreamOutput(nodeId: string, nodes: Node[], edges: Edge[]): string
     return (sourceNode.data as { output?: string }).output
 }
 
+// ─── Auto-layout using dagre ──────────────────────────────────────
+const NODE_WIDTH = 220
+const NODE_HEIGHT = 80
+
+function getLayoutedElements(nodes: Node[], edges: Edge[], direction: "TB" | "LR" = "TB"): { nodes: Node[]; edges: Edge[] } {
+    const g = new Dagre.graphlib.Graph().setDefaultEdgeLabel(() => ({}))
+    g.setGraph({ rankdir: direction, nodesep: 60, ranksep: 80 })
+
+    for (const node of nodes) {
+        g.setNode(node.id, { width: NODE_WIDTH, height: NODE_HEIGHT })
+    }
+    for (const edge of edges) {
+        g.setEdge(edge.source, edge.target)
+    }
+
+    Dagre.layout(g)
+
+    const layoutedNodes = nodes.map((node) => {
+        const pos = g.node(node.id)
+        return {
+            ...node,
+            position: {
+                x: pos.x - NODE_WIDTH / 2,
+                y: pos.y - NODE_HEIGHT / 2,
+            },
+        }
+    })
+
+    return { nodes: layoutedNodes, edges }
+}
+
 // ─── Inner flow (needs ReactFlowProvider) ─────────────────────────
-function AgentsFlowInner() {
+function AgentsFlowInner({ hasApiKey }: { hasApiKey: boolean }) {
     const reactFlowWrapper = useRef<HTMLDivElement>(null)
-    const { screenToFlowPosition } = useReactFlow()
+    const { screenToFlowPosition, fitView } = useReactFlow()
 
     // ── State ──────────────────────────────────────────────────────
     const [nodes, setNodes, onNodesChange] = useNodesState<Node>([])
@@ -114,6 +149,8 @@ function AgentsFlowInner() {
     const [inspectorOpen, setInspectorOpen] = useState(false)
     const [templatesOpen, setTemplatesOpen] = useState(false)
     const [createPromptOpen, setCreatePromptOpen] = useState(false)
+    const [helpOpen, setHelpOpen] = useState(false)
+    const [apiBannerDismissed, setApiBannerDismissed] = useState(false)
 
     // Workflow metadata
     const [workflowId, setWorkflowId] = useState<string>("")
@@ -303,6 +340,12 @@ function AgentsFlowInner() {
         [updateNodeData]
     )
 
+    const handleUpdateChecklist = useCallback(
+        (nodeId: string, completed: boolean[]) =>
+            updateNodeData(nodeId, { checklistCompleted: completed }),
+        [updateNodeData]
+    )
+
     // ── Delete node ────────────────────────────────────────────────
     const handleDeleteNode = useCallback(
         (nodeId: string) => {
@@ -317,6 +360,42 @@ function AgentsFlowInner() {
         },
         [setNodes, setEdges, selectedNodeId]
     )
+
+    // ── Delete multiple nodes (keyboard Delete/Backspace) ─────────
+    const onNodesDelete = useCallback(
+        (deletedNodes: Node[]) => {
+            const ids = new Set(deletedNodes.map((n) => n.id))
+            setEdges((eds) =>
+                eds.filter((e) => !ids.has(e.source) && !ids.has(e.target))
+            )
+            if (selectedNodeId && ids.has(selectedNodeId)) {
+                setSelectedNodeId(null)
+                setInspectorOpen(false)
+            }
+        },
+        [setEdges, selectedNodeId]
+    )
+
+    // ── Clear entire canvas ──────────────────────────────────────
+    const handleClearCanvas = useCallback(() => {
+        setNodes([])
+        setEdges([])
+        setSelectedNodeId(null)
+        setInspectorOpen(false)
+        toast.success("Canvas cleared")
+    }, [setNodes, setEdges])
+
+    // ── Auto-arrange nodes using dagre ────────────────────────────
+    const handleAutoArrange = useCallback(() => {
+        const { nodes: layoutedNodes, edges: layoutedEdges } = getLayoutedElements(nodes, edges, "TB")
+        setNodes(layoutedNodes)
+        setEdges(layoutedEdges)
+        // Allow React to render the new positions, then fit view
+        requestAnimationFrame(() => {
+            fitView({ padding: 0.2, duration: 300 })
+        })
+        toast.success("Layout tidied up")
+    }, [nodes, edges, setNodes, setEdges, fitView])
 
     // ── Save workflow ──────────────────────────────────────────────
     const handleSave = useCallback(() => {
@@ -353,17 +432,28 @@ function AgentsFlowInner() {
             const newId = `wf_${Date.now()}`
             setWorkflowId(newId)
             setWorkflowName(template.name)
-            setNodes(template.nodes as Node[])
-            setEdges(
-                template.edges.map((e) => ({
-                    ...e,
-                    style: { stroke: "#3b82f6", strokeWidth: 2 },
-                })) as Edge[]
+
+            const styledEdges = template.edges.map((e) => ({
+                ...e,
+                style: { stroke: "#3b82f6", strokeWidth: 2 },
+            })) as Edge[]
+
+            // Auto-layout template nodes so they always look clean
+            const { nodes: layoutedNodes, edges: layoutedEdges } = getLayoutedElements(
+                template.nodes as Node[],
+                styledEdges,
+                "TB"
             )
+            setNodes(layoutedNodes)
+            setEdges(layoutedEdges)
             setTemplatesOpen(false)
             saveActiveId(newId)
+
+            requestAnimationFrame(() => {
+                fitView({ padding: 0.2, duration: 300 })
+            })
         },
-        [setNodes, setEdges]
+        [setNodes, setEdges, fitView]
     )
 
     // ── New workflow ───────────────────────────────────────────────
@@ -616,14 +706,23 @@ function AgentsFlowInner() {
             }
 
             const nextNodeId = nextEdge.target
-            // Select and run next node
+            const nextNode = nodes.find((n) => n.id === nextNodeId)
+
+            // Select and open inspector for the next node
             setSelectedNodeId(nextNodeId)
             setInspectorOpen(true)
+
+            // Human-task nodes pause for the person — no API call needed
+            if (nextNode?.type === "human-task") {
+                updateNodeData(nextNodeId, { executionStatus: "review" })
+                setIsChainRunning(true)
+                return
+            }
 
             abortControllerRef.current = new AbortController()
             await executeNode(nextNodeId, abortControllerRef.current.signal)
         },
-        [edges, updateNodeData, executeNode]
+        [nodes, edges, updateNodeData, executeNode]
     )
 
     // ── Run chain (HITL step-through) ─────────────────────────────
@@ -644,11 +743,19 @@ function AgentsFlowInner() {
         }
 
         const nodeId = orderedIds[startIdx]
+        const targetNode = nodes.find((n) => n.id === nodeId)
         setChainProgress({ current: startIdx + 1, total: orderedIds.length })
 
         // Select the node and open inspector
         setSelectedNodeId(nodeId)
         setInspectorOpen(true)
+
+        // Human-task nodes pause for the person — no API call
+        if (targetNode?.type === "human-task") {
+            updateNodeData(nodeId, { executionStatus: "review" })
+            setIsChainRunning(true)
+            return
+        }
 
         // Try to execute — executeNode will block if root node has no input
         abortControllerRef.current = new AbortController()
@@ -662,7 +769,7 @@ function AgentsFlowInner() {
         }
 
         // Chain continues via handleApproveAndContinue (HITL pattern)
-    }, [nodes, edges, executeNode])
+    }, [nodes, edges, executeNode, updateNodeData])
 
     // ── Stop chain ────────────────────────────────────────────────
     const handleStopChain = useCallback(() => {
@@ -675,6 +782,10 @@ function AgentsFlowInner() {
     // ── Keyboard shortcuts ────────────────────────────────────────
     useEffect(() => {
         const handler = (e: KeyboardEvent) => {
+            // Don't trigger shortcuts when typing in inputs/textareas
+            const target = e.target as HTMLElement
+            const isTyping = target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable
+
             // Cmd+Enter: Run selected node
             if ((e.metaKey || e.ctrlKey) && e.key === "Enter" && !e.shiftKey) {
                 if (selectedNodeId) {
@@ -692,6 +803,11 @@ function AgentsFlowInner() {
                 e.preventDefault()
                 handleSave()
                 toast.success("Workflow saved")
+            }
+            // ? : Open help (only when not typing)
+            if (e.key === "?" && !isTyping) {
+                e.preventDefault()
+                setHelpOpen(true)
             }
         }
         window.addEventListener("keydown", handler)
@@ -715,7 +831,30 @@ function AgentsFlowInner() {
                 onStopChain={handleStopChain}
                 isChainRunning={isChainRunning}
                 chainProgress={chainProgress}
+                onAutoArrange={handleAutoArrange}
+                onClearCanvas={handleClearCanvas}
+                onOpenHelp={() => setHelpOpen(true)}
             />
+
+            {/* API key banner — shown when user has no keys configured */}
+            {!hasApiKey && !apiBannerDismissed && (
+                <div className="flex items-center gap-3 px-4 py-2.5 bg-status-info-light border-b border-status-info/20 flex-shrink-0">
+                    <Info className="w-4 h-4 text-status-info flex-shrink-0" />
+                    <p className="text-xs text-foreground flex-1">
+                        <strong>Connect a provider</strong> to run workflows.{" "}
+                        <Link href="/settings#ai-providers" className="text-status-info hover:underline font-medium">
+                            Go to Settings
+                        </Link>
+                    </p>
+                    <button
+                        onClick={() => setApiBannerDismissed(true)}
+                        className="p-1 rounded hover:bg-white/50 text-muted-foreground"
+                        aria-label="Dismiss"
+                    >
+                        <XIcon className="w-3.5 h-3.5" />
+                    </button>
+                </div>
+            )}
 
             <div className="flex flex-1 overflow-hidden">
                 {/* Sidebar */}
@@ -738,9 +877,12 @@ function AgentsFlowInner() {
                         onConnect={onConnect}
                         onNodeClick={onNodeClick}
                         onPaneClick={onPaneClick}
+                        onNodesDelete={onNodesDelete}
                         onDragOver={onDragOver}
                         onDrop={onDrop}
                         nodeTypes={nodeTypes}
+                        deleteKeyCode={["Backspace", "Delete"]}
+                        selectionOnDrag
                         fitView
                         proOptions={{ hideAttribution: true }}
                         defaultEdgeOptions={{
@@ -789,10 +931,10 @@ function AgentsFlowInner() {
                         />
                     </ReactFlow>
 
-                    {/* Empty state */}
+                    {/* Empty state with guided steps */}
                     {nodes.length === 0 && (
                         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                            <div className="text-center max-w-md pointer-events-auto">
+                            <div className="text-center max-w-lg pointer-events-auto">
                                 <div className="w-16 h-16 rounded-2xl bg-orange-50 border border-orange-100 flex items-center justify-center mx-auto mb-4">
                                     <svg
                                         className="w-8 h-8 text-orange-400"
@@ -809,11 +951,36 @@ function AgentsFlowInner() {
                                     </svg>
                                 </div>
                                 <h3 className="font-display text-lg font-semibold text-foreground mb-2">
-                                    Build your AI workflow
+                                    Build a workflow for your team
                                 </h3>
-                                <p className="text-sm text-muted-foreground mb-4 leading-relaxed">
-                                    Drag prompts from the sidebar, connect them into chains, add your data, then hit <strong>Run Chain</strong> to execute with AI. Review each step before continuing.
+                                <p className="text-sm text-muted-foreground mb-5 leading-relaxed">
+                                    Chain steps together so your people can focus on the decisions that matter.
                                 </p>
+
+                                {/* 3-step visual guide */}
+                                <div className="flex items-start gap-2 mb-6 text-left mx-auto max-w-md">
+                                    <div className="flex flex-col items-center gap-1 flex-1">
+                                        <div className="w-8 h-8 rounded-full bg-international-orange text-white flex items-center justify-center text-xs font-bold">1</div>
+                                        <div className="h-px w-full bg-slate-200 mt-1 mb-1" />
+                                        <p className="text-[11px] font-medium text-foreground text-center">Drag prompts</p>
+                                        <p className="text-[10px] text-muted-foreground text-center">From the sidebar onto the canvas</p>
+                                    </div>
+                                    <div className="text-muted-foreground mt-2 flex-shrink-0">&#8594;</div>
+                                    <div className="flex flex-col items-center gap-1 flex-1">
+                                        <div className="w-8 h-8 rounded-full bg-international-orange text-white flex items-center justify-center text-xs font-bold">2</div>
+                                        <div className="h-px w-full bg-slate-200 mt-1 mb-1" />
+                                        <p className="text-[11px] font-medium text-foreground text-center">Connect & add data</p>
+                                        <p className="text-[10px] text-muted-foreground text-center">Link nodes and paste your content</p>
+                                    </div>
+                                    <div className="text-muted-foreground mt-2 flex-shrink-0">&#8594;</div>
+                                    <div className="flex flex-col items-center gap-1 flex-1">
+                                        <div className="w-8 h-8 rounded-full bg-international-orange text-white flex items-center justify-center text-xs font-bold">3</div>
+                                        <div className="h-px w-full bg-slate-200 mt-1 mb-1" />
+                                        <p className="text-[11px] font-medium text-foreground text-center">Run & review</p>
+                                        <p className="text-[10px] text-muted-foreground text-center">Results generated, you review each step</p>
+                                    </div>
+                                </div>
+
                                 <div className="flex items-center justify-center gap-3">
                                     <button
                                         onClick={() => setTemplatesOpen(true)}
@@ -828,6 +995,10 @@ function AgentsFlowInner() {
                                         Create a prompt
                                     </button>
                                 </div>
+
+                                <p className="text-[10px] text-muted-foreground mt-4">
+                                    Press <kbd className="px-1 py-0.5 rounded bg-muted border text-[9px] font-mono">?</kbd> for keyboard shortcuts and tips
+                                </p>
                             </div>
                         </div>
                     )}
@@ -846,6 +1017,7 @@ function AgentsFlowInner() {
                         onUpdateOutput={handleUpdateNodeOutput}
                         onUpdateFiles={handleUpdateNodeFiles}
                         onUpdateProvider={handleUpdateNodeProvider}
+                        onUpdateChecklist={handleUpdateChecklist}
                         onDelete={handleDeleteNode}
                         onRunNode={handleRunNode}
                         onApproveNode={handleApproveNode}
@@ -867,15 +1039,21 @@ function AgentsFlowInner() {
                 onOpenChange={setCreatePromptOpen}
                 onPromptCreated={handlePromptCreated}
             />
+
+            {/* Help dialog */}
+            <AgentsHelpDialog
+                open={helpOpen}
+                onOpenChange={setHelpOpen}
+            />
         </div>
     )
 }
 
 // ─── Exported wrapper with provider ───────────────────────────────
-export function AgentsWorkflowView() {
+export function AgentsWorkflowView({ hasApiKey }: { hasApiKey: boolean }) {
     return (
         <ReactFlowProvider>
-            <AgentsFlowInner />
+            <AgentsFlowInner hasApiKey={hasApiKey} />
         </ReactFlowProvider>
     )
 }
