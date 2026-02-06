@@ -904,7 +904,7 @@ export interface ThreadItem {
  */
 export interface ThreadData {
   source: {
-    type: 'task' | 'objective'
+    type: 'task' | 'objective' | 'conversation'
     id: string
     title: string
     task_number?: number
@@ -921,25 +921,32 @@ export interface ThreadData {
       id: string
       title: string
     } | null
+    /** Participants for conversation threads */
+    participants?: Array<{
+      id: string
+      full_name: string | null
+      avatar_url: string | null
+      role: string | null
+    }>
   }
   items: ThreadItem[]
 }
 
 /**
- * Fetches the full comment thread for a specific task or objective.
+ * Fetches the full comment/message thread for a task, objective, or conversation.
  *
- * @description Used by the Updates thread panel to show all notes/comments
- * for a selected activity item. Returns source metadata (status, assignees,
- * due date) plus all comments in chronological order with read status.
+ * @description Used by the Updates thread panel to show all notes/comments/messages
+ * for a selected activity item. Returns source metadata plus all items in
+ * chronological order with read status.
  *
- * @param sourceType - Whether this is a 'task' or 'objective' thread
- * @param sourceId - The UUID of the task or objective
- * @returns Thread data with source metadata and all comments
+ * @param sourceType - Whether this is a 'task', 'objective', or 'conversation' thread
+ * @param sourceId - The UUID of the task, objective, or conversation
+ * @returns Thread data with source metadata and all comments/messages
  *
- * @security Requires authenticated user with foundry membership
+ * @security Requires authenticated user with foundry membership or conversation participation
  */
 export async function getThreadForSource(
-  sourceType: 'task' | 'objective',
+  sourceType: 'task' | 'objective' | 'conversation',
   sourceId: string
 ): Promise<{ success: boolean; data?: ThreadData; error?: string }> {
   try {
@@ -1036,6 +1043,98 @@ export async function getThreadForSource(
               .map((a: { profile: { id: string; full_name: string | null; avatar_url: string | null; role: string | null } | null }) => a.profile)
               .filter(Boolean) as ThreadData['source']['assignees'],
             objective: taskObj
+          },
+          items
+        }
+      }
+    }
+
+    // Conversation thread
+    if (sourceType === 'conversation') {
+      // AUTH: Verify user participates in this conversation
+      const { data: conversation, error: convError } = await supabase
+        .from('conversations')
+        .select('id, title, conversation_type, status, buyer_id, seller_id, task_id, objective_id')
+        .eq('id', sourceId)
+        .single()
+
+      if (convError || !conversation) {
+        return { success: false, error: 'Conversation not found' }
+      }
+
+      // SECURITY: Verify the user is a participant
+      const isBuyerOrSeller = conversation.buyer_id === user.id || conversation.seller_id === user.id
+      if (!isBuyerOrSeller) {
+        // Check conversation_participants table as fallback
+        const { data: participant } = await supabase
+          .from('conversation_participants')
+          .select('id')
+          .eq('conversation_id', sourceId)
+          .eq('user_id', user.id)
+          .maybeSingle()
+
+        if (!participant) {
+          return { success: false, error: 'Access denied' }
+        }
+      }
+
+      // Build a display title from conversation data
+      const convTitle = conversation.title || 'Direct Message'
+
+      // Fetch all messages for this conversation
+      const { data: messages } = await supabase
+        .from('messages')
+        .select(`
+          id, content, created_at,
+          sender:profiles!sender_id(id, full_name, avatar_url, role)
+        `)
+        .eq('conversation_id', sourceId)
+        .order('created_at', { ascending: true })
+
+      // Fetch participants for metadata display
+      const participantIds = [conversation.buyer_id, conversation.seller_id].filter(Boolean) as string[]
+      const { data: participantProfiles } = await supabase
+        .from('profiles')
+        .select('id, full_name, avatar_url, role')
+        .in('id', participantIds)
+
+      const items: ThreadItem[] = (messages || [])
+        .filter((m: { sender: unknown }) => m.sender !== null)
+        .map((m: {
+          id: string
+          content: string
+          created_at: string | null
+          sender: { id: string; full_name: string | null; avatar_url: string | null; role: string | null }
+        }) => ({
+          id: m.id,
+          content: m.content,
+          created_at: m.created_at || new Date().toISOString(),
+          is_system_log: false,
+          is_unread: false, // Messages don't have per-message read tracking
+          author: {
+            id: m.sender.id,
+            full_name: m.sender.full_name,
+            avatar_url: m.sender.avatar_url,
+            role: m.sender.role
+          }
+        }))
+
+      return {
+        success: true,
+        data: {
+          source: {
+            type: 'conversation',
+            id: conversation.id,
+            title: convTitle,
+            status: conversation.status ?? undefined,
+            participants: (participantProfiles || []).map((p: {
+              id: string; full_name: string | null; avatar_url: string | null; role: string | null
+            }) => ({
+              id: p.id,
+              full_name: p.full_name,
+              avatar_url: p.avatar_url,
+              role: p.role
+            }))
           },
           items
         }

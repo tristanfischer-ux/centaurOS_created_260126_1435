@@ -24,6 +24,7 @@ import {
   Loader2,
   CheckSquare,
   Target,
+  MessageSquare,
   Calendar,
   Users,
   ExternalLink,
@@ -37,8 +38,8 @@ import type { ThreadData, ThreadItem } from '@/actions/activity'
 import type { ActivitySourceType } from '@/types/activity'
 
 interface UpdatesThreadPanelProps {
-  /** Source type (task or objective) */
-  sourceType: 'task' | 'objective'
+  /** Source type (task, objective, or conversation) */
+  sourceType: 'task' | 'objective' | 'conversation'
   /** Source ID */
   sourceId: string
   /** Current user ID (to identify own messages) */
@@ -70,16 +71,21 @@ export function UpdatesThreadPanel({
       if (result.success && result.data) {
         setThreadData(result.data)
 
-        // Mark unread items as read
-        const unreadItems = result.data.items
-          .filter(item => item.is_unread)
-          .map(item => ({
-            type: (sourceType === 'task' ? 'task_comment' : 'objective_comment') as 'task_comment' | 'objective_comment',
-            commentId: item.id
-          }))
+        // Mark unread items as read (conversations don't have per-message read tracking)
+        if (sourceType !== 'conversation') {
+          const unreadItems = result.data.items
+            .filter(item => item.is_unread)
+            .map(item => ({
+              type: (sourceType === 'task' ? 'task_comment' : 'objective_comment') as 'task_comment' | 'objective_comment',
+              commentId: item.id
+            }))
 
-        if (unreadItems.length > 0) {
-          await markMultipleActivityRead(unreadItems)
+          if (unreadItems.length > 0) {
+            await markMultipleActivityRead(unreadItems)
+            onItemsRead?.()
+          }
+        } else {
+          // For conversations, just notify parent that we've viewed them
           onItemsRead?.()
         }
       }
@@ -151,7 +157,19 @@ export function UpdatesThreadPanel({
 
   const { source, items } = threadData
   const isTask = source.type === 'task'
-  const linkHref = isTask ? `/tasks?taskId=${source.id}` : `/objectives`
+  const isConversation = source.type === 'conversation'
+  const linkHref = isTask
+    ? `/tasks?taskId=${source.id}`
+    : isConversation
+      ? `/home`
+      : `/objectives`
+
+  // Choose icon and color based on source type
+  const sourceIcon = isTask
+    ? { Icon: CheckSquare, colorClass: 'bg-electric-blue/10', iconColor: 'text-electric-blue' }
+    : isConversation
+      ? { Icon: MessageSquare, colorClass: 'bg-status-info-light', iconColor: 'text-status-info' }
+      : { Icon: Target, colorClass: 'bg-international-orange/10', iconColor: 'text-international-orange' }
 
   return (
     <div className="flex flex-col h-full">
@@ -161,13 +179,9 @@ export function UpdatesThreadPanel({
           <div className="flex items-start gap-3 min-w-0">
             <div className={cn(
               'flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center',
-              isTask ? 'bg-electric-blue/10' : 'bg-international-orange/10'
+              sourceIcon.colorClass
             )}>
-              {isTask ? (
-                <CheckSquare className="h-4 w-4 text-electric-blue" />
-              ) : (
-                <Target className="h-4 w-4 text-international-orange" />
-              )}
+              <sourceIcon.Icon className={cn('h-4 w-4', sourceIcon.iconColor)} />
             </div>
             <div className="min-w-0">
               <h3 className="text-sm font-semibold text-foreground truncate">
@@ -182,13 +196,18 @@ export function UpdatesThreadPanel({
                   {source.objective.title}
                 </p>
               )}
+              {isConversation && source.participants && source.participants.length > 0 && (
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {source.participants.map(p => p.full_name || 'Unknown').join(', ')}
+                </p>
+              )}
             </div>
           </div>
 
           <Link
             href={linkHref}
             className="flex-shrink-0 text-muted-foreground hover:text-foreground transition-colors"
-            title={`Open in ${isTask ? 'Tasks' : 'Objectives'}`}
+            title={`Open in ${isTask ? 'Tasks' : isConversation ? 'Inbox' : 'Objectives'}`}
           >
             <ExternalLink className="h-4 w-4" />
           </Link>
@@ -229,6 +248,27 @@ export function UpdatesThreadPanel({
               {source.assignees.length > 3 && (
                 <span className="text-xs text-muted-foreground ml-1">
                   +{source.assignees.length - 3}
+                </span>
+              )}
+            </div>
+          )}
+          {source.participants && source.participants.length > 0 && (
+            <div className="flex items-center gap-1">
+              <Users className="h-3 w-3 text-muted-foreground" />
+              <div className="flex -space-x-1">
+                {source.participants.slice(0, 3).map((participant) => (
+                  <UserAvatar
+                    key={participant.id}
+                    name={participant.full_name || '?'}
+                    role={participant.role}
+                    avatarUrl={participant.avatar_url}
+                    size="xs"
+                  />
+                ))}
+              </div>
+              {source.participants.length > 3 && (
+                <span className="text-xs text-muted-foreground ml-1">
+                  +{source.participants.length - 3}
                 </span>
               )}
             </div>
