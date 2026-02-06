@@ -25,7 +25,7 @@ function DetailRow({ icon: Icon, label, children }: { icon: React.ComponentType<
         <div className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider mb-0.5">
           {label}
         </div>
-        <div className="text-sm text-foreground">
+        <div className="text-sm text-foreground break-words">
           {children}
         </div>
       </div>
@@ -38,7 +38,7 @@ export function TaskDetailPanel({ task, onClose }: TaskDetailPanelProps) {
   const statusBadge = getStatusBadgeClass(task.status)
 
   return (
-    <div className="h-full flex flex-col bg-white border-l border-slate-100">
+    <div className="h-full flex flex-col bg-white border-l border-slate-100 overflow-hidden">
       {/* Header */}
       <div className="flex items-start justify-between gap-3 px-5 py-4 border-b border-slate-100">
         <div className="min-w-0 flex-1 space-y-2">
@@ -60,7 +60,7 @@ export function TaskDetailPanel({ task, onClose }: TaskDetailPanelProps) {
               </span>
             )}
           </div>
-          <h2 className="text-base font-semibold text-foreground leading-snug">
+          <h2 className="text-base font-semibold text-foreground leading-snug break-words">
             {task.title}
           </h2>
         </div>
@@ -69,8 +69,8 @@ export function TaskDetailPanel({ task, onClose }: TaskDetailPanelProps) {
         </Button>
       </div>
 
-      <ScrollArea className="flex-1">
-        <div className="p-5 space-y-4">
+      <ScrollArea className="flex-1 w-full">
+        <div className="p-5 space-y-4 overflow-hidden">
           {/* Description */}
           {task.description && (
             <div className="space-y-1.5">
@@ -78,7 +78,7 @@ export function TaskDetailPanel({ task, onClose }: TaskDetailPanelProps) {
                 <FileText className="h-3.5 w-3.5" />
                 Description
               </div>
-              <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">
+              <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap break-words">
                 {task.description}
               </p>
             </div>
