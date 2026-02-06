@@ -1,13 +1,18 @@
 import { Suspense } from 'react'
-import { InspirationView } from './inspiration-view'
+import { InspirationPageNew } from './inspiration-page-new'
 import { Skeleton } from '@/components/ui/skeleton'
 import { getBlueprintTemplates } from '@/actions/blueprints'
 import { getObjectivePacks, getSavedPackIds } from '@/actions/packs'
 
 export const metadata = {
   title: 'Inspiration | CentaurOS',
-  description: 'Get ideas on what to do next. Discover opportunities, find experts, and turn insights into action.',
+  description:
+    'Discover what to do next. Turn ideas into objectives and tasks for your team.',
 }
+
+// NOTE: The old InspirationView is still in inspiration-view.tsx.
+// To roll back, just switch the import above back to:
+//   import { InspirationView } from './inspiration-view'
 
 async function InspirationData() {
   const [templatesResult, packsResult, savedPacksResult] = await Promise.all([
@@ -16,14 +21,11 @@ async function InspirationData() {
     getSavedPackIds(),
   ])
 
-  // Convert Set to array for serialization
-  const initialSavedPackIds = Array.from(savedPacksResult.savedIds || [])
-
   return (
-    <InspirationView 
+    <InspirationPageNew
       templates={templatesResult.data || []}
       packs={packsResult.packs || []}
-      initialSavedPackIds={initialSavedPackIds}
+      initialSavedPackIds={Array.from(savedPacksResult.savedIds || [])}
     />
   )
 }
@@ -38,17 +40,24 @@ export default function InspirationPage() {
 
 function InspirationSkeleton() {
   return (
-    <div className="space-y-8">
-      {/* Header skeleton */}
-      <div className="space-y-4 pb-4 border-b border-muted">
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="space-y-3 pb-4 border-b border-muted">
         <Skeleton className="h-8 w-48" />
         <Skeleton className="h-5 w-96" />
       </div>
-      
-      {/* Category cards skeleton */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {[1, 2, 3].map((i) => (
-          <Skeleton key={i} className="h-64 w-full" />
+
+      {/* Tabs */}
+      <div className="flex gap-2">
+        {Array.from({ length: 5 }).map((_, i) => (
+          <Skeleton key={i} className="h-10 w-28 rounded-full" />
+        ))}
+      </div>
+
+      {/* Cards grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        {Array.from({ length: 8 }).map((_, i) => (
+          <Skeleton key={i} className="h-72 rounded-lg" />
         ))}
       </div>
     </div>

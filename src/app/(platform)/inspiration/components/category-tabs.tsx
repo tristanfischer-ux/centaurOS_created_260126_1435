@@ -1,0 +1,129 @@
+'use client'
+
+import {
+  Sparkles,
+  Target,
+  Boxes,
+  CircuitBoard,
+  Heart,
+} from 'lucide-react'
+import { cn } from '@/lib/utils'
+
+// ---------------------------------------------------------------------------
+// CategoryTabs – compact pill-style tab navigation for the Inspiration page
+// ---------------------------------------------------------------------------
+
+export type TabId = 'for-you' | 'business' | 'subsystems' | 'industry' | 'saved'
+
+interface Tab {
+  id: TabId
+  label: string
+  icon: React.ElementType
+  count?: number
+  /** Tailwind classes applied when the tab is active */
+  activeClasses: string
+  /** Colour applied to the icon when the tab is *not* active */
+  iconColor: string
+}
+
+interface CategoryTabsProps {
+  activeTab: TabId
+  onTabChange: (tab: TabId) => void
+  businessCount: number
+  subsystemsCount: number
+  industryCount: number
+  savedCount: number
+}
+
+export function CategoryTabs({
+  activeTab,
+  onTabChange,
+  businessCount,
+  subsystemsCount,
+  industryCount,
+  savedCount,
+}: CategoryTabsProps) {
+  const tabs: Tab[] = [
+    {
+      id: 'for-you',
+      label: 'For You',
+      icon: Sparkles,
+      iconColor: 'text-international-orange',
+      activeClasses:
+        'bg-international-orange/10 text-international-orange border-international-orange',
+    },
+    {
+      id: 'business',
+      label: 'Business',
+      icon: Target,
+      count: businessCount,
+      iconColor: 'text-electric-blue',
+      activeClasses:
+        'bg-electric-blue/10 text-electric-blue border-electric-blue',
+    },
+    {
+      id: 'subsystems',
+      label: 'Subsystems',
+      icon: Boxes,
+      count: subsystemsCount,
+      iconColor: 'text-status-success',
+      activeClasses:
+        'bg-status-success-light text-status-success-dark border-status-success',
+    },
+    {
+      id: 'industry',
+      label: 'Industry',
+      icon: CircuitBoard,
+      count: industryCount,
+      iconColor: 'text-chart-5',
+      activeClasses: 'bg-chart-5/10 text-chart-5 border-chart-5',
+    },
+    {
+      id: 'saved',
+      label: 'Saved',
+      icon: Heart,
+      count: savedCount,
+      iconColor: 'text-muted-foreground',
+      activeClasses:
+        'bg-international-orange/10 text-international-orange border-international-orange',
+    },
+  ]
+
+  return (
+    <div className="flex flex-wrap gap-2" role="tablist">
+      {tabs.map((tab) => {
+        const Icon = tab.icon
+        const isActive = activeTab === tab.id
+
+        return (
+          <button
+            key={tab.id}
+            role="tab"
+            aria-selected={isActive}
+            onClick={() => onTabChange(tab.id)}
+            className={cn(
+              'inline-flex items-center gap-2 px-4 py-2.5 rounded-full text-sm font-medium',
+              'border transition-all duration-200 select-none',
+              isActive
+                ? cn(tab.activeClasses, 'shadow-sm')
+                : 'border-transparent text-muted-foreground hover:text-foreground hover:bg-muted',
+            )}
+          >
+            <Icon className={cn('h-4 w-4', !isActive && tab.iconColor)} />
+            {tab.label}
+            {tab.count !== undefined && tab.count > 0 && (
+              <span
+                className={cn(
+                  'text-xs tabular-nums px-1.5 py-0.5 rounded-full min-w-[1.25rem] text-center',
+                  isActive ? 'bg-white/60 dark:bg-white/20' : 'bg-muted',
+                )}
+              >
+                {tab.count}
+              </span>
+            )}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
