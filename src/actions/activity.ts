@@ -880,3 +880,240 @@ export async function getActivityFeed(options?: {
     }
   }
 }
+
+/**
+ * Thread item for the updates thread panel.
+ * Represents a single comment/note in a task or objective thread.
+ */
+export interface ThreadItem {
+  id: string
+  content: string
+  created_at: string
+  is_system_log: boolean
+  is_unread: boolean
+  author: {
+    id: string
+    full_name: string | null
+    avatar_url: string | null
+    role: string | null
+  }
+}
+
+/**
+ * Full thread data including source metadata for the thread panel.
+ */
+export interface ThreadData {
+  source: {
+    type: 'task' | 'objective'
+    id: string
+    title: string
+    task_number?: number
+    status?: string
+    progress?: number | null
+    end_date?: string | null
+    assignees?: Array<{
+      id: string
+      full_name: string | null
+      avatar_url: string | null
+      role: string | null
+    }>
+    objective?: {
+      id: string
+      title: string
+    } | null
+  }
+  items: ThreadItem[]
+}
+
+/**
+ * Fetches the full comment thread for a specific task or objective.
+ *
+ * @description Used by the Updates thread panel to show all notes/comments
+ * for a selected activity item. Returns source metadata (status, assignees,
+ * due date) plus all comments in chronological order with read status.
+ *
+ * @param sourceType - Whether this is a 'task' or 'objective' thread
+ * @param sourceId - The UUID of the task or objective
+ * @returns Thread data with source metadata and all comments
+ *
+ * @security Requires authenticated user with foundry membership
+ */
+export async function getThreadForSource(
+  sourceType: 'task' | 'objective',
+  sourceId: string
+): Promise<{ success: boolean; data?: ThreadData; error?: string }> {
+  try {
+    const supabase = await createClient()
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+
+    if (authError || !user) {
+      return { success: false, error: 'Not authenticated' }
+    }
+
+    const foundryId = await getFoundryIdCached()
+    if (!foundryId) {
+      return { success: false, error: 'Foundry not found' }
+    }
+
+    if (sourceType === 'task') {
+      // AUTH: Verify task belongs to user's foundry
+      const { data: task, error: taskError } = await supabase
+        .from('tasks')
+        .select(`
+          id, title, task_number, status, progress, end_date,
+          objective:objectives!tasks_objective_id_fkey(id, title)
+        `)
+        .eq('id', sourceId)
+        .eq('foundry_id', foundryId)
+        .single()
+
+      if (taskError || !task) {
+        return { success: false, error: 'Task not found' }
+      }
+
+      // Fetch assignees
+      const { data: assignees } = await supabase
+        .from('task_assignees')
+        .select('profile:profiles!task_assignees_profile_id_fkey(id, full_name, avatar_url, role)')
+        .eq('task_id', sourceId)
+
+      // Fetch all comments for this task
+      const { data: comments } = await supabase
+        .from('task_comments')
+        .select(`
+          id, content, created_at, is_system_log,
+          user:profiles!user_id(id, full_name, avatar_url, role)
+        `)
+        .eq('task_id', sourceId)
+        .order('created_at', { ascending: true })
+
+      // Fetch read status
+      const commentIds = comments?.map(c => c.id) || []
+      const { data: reads } = await (supabase as AnySupabaseClient)
+        .from('task_comment_reads')
+        .select('comment_id')
+        .eq('user_id', user.id)
+        .in('comment_id', commentIds)
+
+      const readIds = new Set(reads?.map((r: { comment_id: string }) => r.comment_id) || [])
+
+      const items: ThreadItem[] = (comments || [])
+        .filter((c: { user: unknown }) => c.user !== null)
+        .map((c: {
+          id: string
+          content: string
+          created_at: string | null
+          is_system_log: boolean | null
+          user: { id: string; full_name: string | null; avatar_url: string | null; role: string | null }
+        }) => ({
+          id: c.id,
+          content: c.content,
+          created_at: c.created_at || new Date().toISOString(),
+          is_system_log: c.is_system_log || false,
+          is_unread: !readIds.has(c.id) && c.user.id !== user.id,
+          author: {
+            id: c.user.id,
+            full_name: c.user.full_name,
+            avatar_url: c.user.avatar_url,
+            role: c.user.role
+          }
+        }))
+
+      const taskObj = task.objective as { id: string; title: string } | null
+
+      return {
+        success: true,
+        data: {
+          source: {
+            type: 'task',
+            id: task.id,
+            title: task.title,
+            task_number: task.task_number ?? undefined,
+            status: task.status ?? undefined,
+            progress: task.progress,
+            end_date: task.end_date,
+            assignees: (assignees || [])
+              .map((a: { profile: { id: string; full_name: string | null; avatar_url: string | null; role: string | null } | null }) => a.profile)
+              .filter(Boolean) as ThreadData['source']['assignees'],
+            objective: taskObj
+          },
+          items
+        }
+      }
+    }
+
+    // Objective thread
+    const { data: objective, error: objError } = await (supabase as AnySupabaseClient)
+      .from('objectives')
+      .select('id, title, status, progress')
+      .eq('id', sourceId)
+      .eq('foundry_id', foundryId)
+      .single()
+
+    if (objError || !objective) {
+      return { success: false, error: 'Objective not found' }
+    }
+
+    // Fetch all comments for this objective
+    const { data: objComments } = await (supabase as AnySupabaseClient)
+      .from('objective_comments')
+      .select(`
+        id, content, created_at, is_system_log,
+        user:profiles!user_id(id, full_name, avatar_url, role)
+      `)
+      .eq('objective_id', sourceId)
+      .order('created_at', { ascending: true })
+
+    // Fetch read status
+    const objCommentIds = objComments?.map((c: { id: string }) => c.id) || []
+    const { data: objReads } = await (supabase as AnySupabaseClient)
+      .from('objective_comment_reads')
+      .select('comment_id')
+      .eq('user_id', user.id)
+      .in('comment_id', objCommentIds)
+
+    const readObjIds = new Set(objReads?.map((r: { comment_id: string }) => r.comment_id) || [])
+
+    const objItems: ThreadItem[] = (objComments || [])
+      .filter((c: { user: unknown }) => c.user !== null)
+      .map((c: {
+        id: string
+        content: string
+        created_at: string | null
+        is_system_log: boolean | null
+        user: { id: string; full_name: string | null; avatar_url: string | null; role: string | null }
+      }) => ({
+        id: c.id,
+        content: c.content,
+        created_at: c.created_at || new Date().toISOString(),
+        is_system_log: c.is_system_log || false,
+        is_unread: !readObjIds.has(c.id) && c.user.id !== user.id,
+        author: {
+          id: c.user.id,
+          full_name: c.user.full_name,
+          avatar_url: c.user.avatar_url,
+          role: c.user.role
+        }
+      }))
+
+    return {
+      success: true,
+      data: {
+        source: {
+          type: 'objective',
+          id: objective.id,
+          title: objective.title,
+          status: objective.status ?? undefined,
+          progress: objective.progress ?? null
+        },
+        items: objItems
+      }
+    }
+  } catch (error) {
+    console.error('getThreadForSource error:', error)
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to get thread'
+    }
+  }
+}
