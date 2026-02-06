@@ -1,5 +1,5 @@
 import { Suspense } from 'react'
-import { getMarketplaceListings } from '@/actions/marketplace'
+import { getMarketplaceListings, getSavedMarketplaceListings } from '@/actions/marketplace'
 import { createClient } from '@/lib/supabase/server'
 import { getFoundryIdCached } from '@/lib/supabase/foundry-context'
 import { MarketplaceBrowse } from './components/MarketplaceBrowse'
@@ -31,6 +31,7 @@ export default async function MarketplaceV2Page() {
     let listings: MarketplaceListing[] = []
     let recommendations: MarketplaceRecommendation[] = []
     let savedIds: string[] = []
+    let savedListings: MarketplaceListing[] = []
 
     // Fetch listings
     try {
@@ -47,16 +48,17 @@ export default async function MarketplaceV2Page() {
         // Non-critical
     }
 
-    // Fetch recommendations + saved listing IDs in parallel
+    // Fetch recommendations, saved IDs, and full saved listings in parallel
     if (foundryId) {
         const supabase = await createClient()
 
-        const [recsResult, savedResult] = await Promise.allSettled([
+        const [recsResult, savedResult, savedListingsResult] = await Promise.allSettled([
             supabase.rpc('get_marketplace_recommendations', {
                 p_foundry_id: foundryId,
                 p_limit: 5,
             }),
             supabase.from('saved_marketplace_listings').select('listing_id'),
+            getSavedMarketplaceListings(),
         ])
 
         if (recsResult.status === 'fulfilled' && recsResult.value.data) {
@@ -66,6 +68,10 @@ export default async function MarketplaceV2Page() {
         if (savedResult.status === 'fulfilled' && savedResult.value.data) {
             savedIds = savedResult.value.data.map((r: { listing_id: string }) => r.listing_id)
         }
+
+        if (savedListingsResult.status === 'fulfilled' && savedListingsResult.value.data) {
+            savedListings = savedListingsResult.value.data
+        }
     }
 
     return (
@@ -74,6 +80,7 @@ export default async function MarketplaceV2Page() {
                 initialListings={listings}
                 recommendations={recommendations}
                 initialSavedIds={savedIds}
+                initialSavedListings={savedListings}
             />
         </Suspense>
     )
