@@ -30,12 +30,14 @@ import { formatDistanceToNowStrict } from 'date-fns'
 import type { ActivityItem } from '@/types/activity'
 
 interface UpdatesFeedItemProps {
-  /** The activity item to render */
+  /** The most recent activity item for this source */
   item: ActivityItem
   /** Whether this item is currently selected */
   isSelected: boolean
-  /** Number of unread notes in this thread (if grouped) */
+  /** Number of unread events for this source */
   unreadCount?: number
+  /** Total number of activity events for this source */
+  totalUpdates?: number
   /** Click handler */
   onClick: () => void
 }
@@ -82,11 +84,12 @@ function formatTime(dateStr: string): string {
 export function UpdatesFeedItem({
   item,
   isSelected,
-  unreadCount,
+  unreadCount = 0,
+  totalUpdates = 1,
   onClick
 }: UpdatesFeedItemProps) {
   const { icon: TypeIcon, colorClass } = getItemIcon(item)
-  const isUnread = item.is_unread
+  const isUnread = unreadCount > 0 || item.is_unread
   const timeAgo = formatTime(item.created_at)
 
   return (
@@ -161,7 +164,15 @@ export function UpdatesFeedItem({
             </div>
 
             <div className="flex items-center gap-1.5">
-              {unreadCount && unreadCount > 1 && (
+              {totalUpdates > 1 && (
+                <Badge
+                  variant="secondary"
+                  className="text-[10px] px-1.5 py-0"
+                >
+                  {totalUpdates} updates
+                </Badge>
+              )}
+              {unreadCount > 0 && (
                 <Badge className="bg-international-orange text-white text-[10px] px-1.5 py-0">
                   {unreadCount} new
                 </Badge>

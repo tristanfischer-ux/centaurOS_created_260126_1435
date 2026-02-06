@@ -23,7 +23,7 @@ import {
   Target,
   Filter
 } from 'lucide-react'
-import { isToday, isYesterday, isThisWeek, startOfDay } from 'date-fns'
+import { isToday, isYesterday, isThisWeek } from 'date-fns'
 import { UpdatesFeedItem } from './updates-feed-item'
 import { FeedEmptyState } from './updates-empty-state'
 import type { ActivityItem, ActivityFilter } from '@/types/activity'
@@ -43,32 +43,87 @@ interface UpdatesFeedProps {
   onFilterChange: (filter: ActivityFilter) => void
 }
 
+/** An activity item enriched with counts from grouping by source. */
+interface GroupedActivityItem {
+  /** The most recent activity item for this source (used for display). */
+  item: ActivityItem
+  /** Total number of activity events for this source. */
+  totalUpdates: number
+  /** Number of unread events for this source. */
+  unreadCount: number
+}
+
 interface TimeGroup {
   label: string
-  items: ActivityItem[]
+  items: GroupedActivityItem[]
 }
 
 /**
- * Groups activity items by time period: Today, Yesterday, This Week, Earlier.
+ * Groups raw activity items by their source (task/objective/conversation).
+ *
+ * @description Each source appears only once, represented by its most recent
+ * event. Items are sorted newest-first so the most recent source floats to top.
+ *
+ * @returns Deduplicated items with totalUpdates and unreadCount per source.
  */
-function groupByTimePeriod(items: ActivityItem[]): TimeGroup[] {
-  const groups: Record<string, ActivityItem[]> = {
+function groupBySource(items: ActivityItem[]): GroupedActivityItem[] {
+  const sourceMap = new Map<string, { items: ActivityItem[]; unreadCount: number }>()
+
+  for (const item of items) {
+    const key = `${item.source.type}:${item.source.id}`
+    const existing = sourceMap.get(key)
+    if (existing) {
+      existing.items.push(item)
+      if (item.is_unread) existing.unreadCount++
+    } else {
+      sourceMap.set(key, {
+        items: [item],
+        unreadCount: item.is_unread ? 1 : 0
+      })
+    }
+  }
+
+  // For each source, pick the most recent item as the representative
+  const grouped: GroupedActivityItem[] = []
+  for (const entry of sourceMap.values()) {
+    // Items come sorted newest-first from the server, so [0] is most recent
+    const newest = entry.items[0]
+    grouped.push({
+      item: newest,
+      totalUpdates: entry.items.length,
+      unreadCount: entry.unreadCount
+    })
+  }
+
+  // Sort by most recent activity (newest first)
+  grouped.sort((a, b) =>
+    new Date(b.item.created_at).getTime() - new Date(a.item.created_at).getTime()
+  )
+
+  return grouped
+}
+
+/**
+ * Groups already-consolidated items by time period: Today, Yesterday, This Week, Earlier.
+ */
+function groupByTimePeriod(items: GroupedActivityItem[]): TimeGroup[] {
+  const groups: Record<string, GroupedActivityItem[]> = {
     today: [],
     yesterday: [],
     thisWeek: [],
     earlier: []
   }
 
-  for (const item of items) {
-    const date = new Date(item.created_at)
+  for (const grouped of items) {
+    const date = new Date(grouped.item.created_at)
     if (isToday(date)) {
-      groups.today.push(item)
+      groups.today.push(grouped)
     } else if (isYesterday(date)) {
-      groups.yesterday.push(item)
+      groups.yesterday.push(grouped)
     } else if (isThisWeek(date, { weekStartsOn: 1 })) {
-      groups.thisWeek.push(item)
+      groups.thisWeek.push(grouped)
     } else {
-      groups.earlier.push(item)
+      groups.earlier.push(grouped)
     }
   }
 
@@ -94,30 +149,28 @@ export function UpdatesFeed({
 }: UpdatesFeedProps) {
   const [searchQuery, setSearchQuery] = useState('')
 
-  // Filter and search items
+  // Step 1: Group items by source (deduplicate tasks/objectives)
+  const groupedItems = useMemo(() => groupBySource(items), [items])
+
+  // Step 2: Apply search filter to grouped items
   const filteredItems = useMemo(() => {
-    let result = items
+    if (!searchQuery.trim()) return groupedItems
 
-    // Apply search filter
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase()
-      result = result.filter(item =>
-        item.source.title.toLowerCase().includes(query) ||
-        item.content.toLowerCase().includes(query) ||
-        item.author.full_name?.toLowerCase().includes(query)
-      )
-    }
+    const query = searchQuery.toLowerCase()
+    return groupedItems.filter(({ item }) =>
+      item.source.title.toLowerCase().includes(query) ||
+      item.content.toLowerCase().includes(query) ||
+      item.author.full_name?.toLowerCase().includes(query)
+    )
+  }, [groupedItems, searchQuery])
 
-    return result
-  }, [items, searchQuery])
-
-  // Group by time period
+  // Step 3: Group by time period
   const timeGroups = useMemo(() => groupByTimePeriod(filteredItems), [filteredItems])
 
-  // Count unread items
-  const unreadCount = items.filter(i => i.is_unread).length
-  const taskCount = items.filter(i => i.source.type === 'task').length
-  const objectiveCount = items.filter(i => i.source.type === 'objective').length
+  // Counts based on grouped (deduplicated) sources
+  const unreadCount = groupedItems.filter(g => g.unreadCount > 0).length
+  const taskCount = groupedItems.filter(g => g.item.source.type === 'task').length
+  const objectiveCount = groupedItems.filter(g => g.item.source.type === 'objective').length
 
   return (
     <div className="flex flex-col h-full">
@@ -181,12 +234,14 @@ export function UpdatesFeed({
                 </div>
 
                 {/* Items in this group */}
-                {group.items.map((item) => (
+                {group.items.map((grouped) => (
                   <UpdatesFeedItem
-                    key={item.id}
-                    item={item}
-                    isSelected={selectedItemId === `${item.source.type}:${item.source.id}`}
-                    onClick={() => onSelectItem(item)}
+                    key={`${grouped.item.source.type}:${grouped.item.source.id}`}
+                    item={grouped.item}
+                    isSelected={selectedItemId === `${grouped.item.source.type}:${grouped.item.source.id}`}
+                    unreadCount={grouped.unreadCount}
+                    totalUpdates={grouped.totalUpdates}
+                    onClick={() => onSelectItem(grouped.item)}
                   />
                 ))}
               </div>
