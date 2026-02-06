@@ -7,12 +7,14 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { PROMPT_CATEGORIES, CATEGORY_META, type PromptCategory, type CustomPrompt } from "../lib/agent-types"
-import { addCustomPrompt, DEFAULT_CUSTOM_PROMPT } from "../lib/custom-prompts"
+import { DEFAULT_CUSTOM_PROMPT } from "../lib/custom-prompts"
+import { saveAgentCustomPrompt } from "@/actions/agent-workflows"
+import type { AgentCustomPromptRow } from "@/actions/agent-workflows"
 
 interface CreatePromptDialogProps {
     open: boolean
     onOpenChange: (open: boolean) => void
-    onPromptCreated: (prompt: CustomPrompt) => void
+    onPromptCreated: (prompt: CustomPrompt, dbRow?: AgentCustomPromptRow) => void
 }
 
 export function CreatePromptDialog({ open, onOpenChange, onPromptCreated }: CreatePromptDialogProps) {
@@ -51,25 +53,54 @@ export function CreatePromptDialog({ open, onOpenChange, onPromptCreated }: Crea
         [tags]
     )
 
-    const handleCreate = useCallback(() => {
-        if (!title.trim() || !promptText.trim()) return
+    const [isCreating, setIsCreating] = useState(false)
 
-        const newPrompt = addCustomPrompt({
-            title: title.trim(),
-            description: description.trim(),
-            category,
-            icon: CATEGORY_META[category].icon,
-            defaultPrompt: promptText.trim(),
-            inputLabel: inputLabel.trim() || "Your input",
-            outputLabel: outputLabel.trim() || "Output",
-            tags,
-            suggestedNext: [],
-        })
+    const handleCreate = useCallback(async () => {
+        if (!title.trim() || !promptText.trim() || isCreating) return
+        setIsCreating(true)
 
-        onPromptCreated(newPrompt)
-        resetForm()
-        onOpenChange(false)
-    }, [title, description, category, promptText, inputLabel, outputLabel, tags, onPromptCreated, resetForm, onOpenChange])
+        try {
+            const { data: dbRow, error } = await saveAgentCustomPrompt({
+                title: title.trim(),
+                description: description.trim(),
+                category,
+                icon: CATEGORY_META[category].icon,
+                default_prompt: promptText.trim(),
+                input_label: inputLabel.trim() || "Your input",
+                output_label: outputLabel.trim() || "Output",
+                tags,
+                suggested_next: [],
+            })
+
+            if (error || !dbRow) {
+                console.error("[CreatePrompt] Failed to save:", error)
+                return
+            }
+
+            // Build a local CustomPrompt for UI
+            const localPrompt: CustomPrompt = {
+                id: dbRow.id,
+                title: dbRow.title,
+                description: dbRow.description,
+                category: dbRow.category as PromptCategory,
+                icon: dbRow.icon,
+                defaultPrompt: dbRow.default_prompt,
+                inputLabel: dbRow.input_label,
+                outputLabel: dbRow.output_label,
+                tags: dbRow.tags as string[],
+                suggestedNext: dbRow.suggested_next as string[],
+                isCustom: true,
+                createdAt: dbRow.created_at,
+                updatedAt: dbRow.updated_at,
+            }
+
+            onPromptCreated(localPrompt, dbRow)
+            resetForm()
+            onOpenChange(false)
+        } finally {
+            setIsCreating(false)
+        }
+    }, [title, description, category, promptText, inputLabel, outputLabel, tags, isCreating, onPromptCreated, resetForm, onOpenChange])
 
     const isValid = title.trim().length > 0 && promptText.trim().length > 0
 

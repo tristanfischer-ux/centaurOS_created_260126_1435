@@ -1,68 +1,60 @@
+/**
+ * @file custom-prompts.ts
+ *
+ * @description Utility module for custom prompts. Provides conversion
+ * between database rows (AgentCustomPromptRow) and the client-side
+ * CustomPrompt type, plus lookup helpers that operate on in-memory arrays.
+ *
+ * Previously this module read/wrote localStorage directly. Now all
+ * persistence goes through server actions in src/actions/agent-workflows.ts.
+ */
+
 import type { CustomPrompt, PromptCategory } from "./agent-types"
+import type { AgentCustomPromptRow } from "@/actions/agent-workflows"
 
-const STORAGE_KEY = "forgeos-custom-prompts"
+// ─── Conversion: DB row → client CustomPrompt ────────────────────────
 
-// ─── CRUD ────────────────────────────────────────────────────────────
-
-export function loadCustomPrompts(): CustomPrompt[] {
-    if (typeof window === "undefined") return []
-    try {
-        const raw = localStorage.getItem(STORAGE_KEY)
-        return raw ? JSON.parse(raw) : []
-    } catch {
-        return []
-    }
-}
-
-export function saveCustomPrompts(prompts: CustomPrompt[]) {
-    if (typeof window === "undefined") return
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(prompts))
-}
-
-export function addCustomPrompt(
-    prompt: Omit<CustomPrompt, "id" | "isCustom" | "createdAt" | "updatedAt">
-): CustomPrompt {
-    const now = new Date().toISOString()
-    const newPrompt: CustomPrompt = {
-        ...prompt,
-        id: `custom_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+/**
+ * Convert a database row into the client-side CustomPrompt shape.
+ *
+ * @param row - Database row from agent_custom_prompts table
+ * @returns CustomPrompt usable by components
+ */
+export function dbCustomPromptToLocal(row: AgentCustomPromptRow): CustomPrompt {
+    return {
+        id: row.id,
+        title: row.title,
+        description: row.description ?? "",
+        category: (row.category ?? "strategy") as PromptCategory,
+        icon: row.icon ?? "Sparkles",
+        defaultPrompt: row.default_prompt ?? "",
+        inputLabel: row.input_label ?? "Your input",
+        outputLabel: row.output_label ?? "AI output",
+        tags: (row.tags ?? []) as string[],
+        suggestedNext: (row.suggested_next ?? []) as string[],
         isCustom: true,
-        createdAt: now,
-        updatedAt: now,
+        createdAt: row.created_at,
+        updatedAt: row.updated_at,
     }
-    const existing = loadCustomPrompts()
-    existing.push(newPrompt)
-    saveCustomPrompts(existing)
-    return newPrompt
 }
 
-export function updateCustomPrompt(id: string, updates: Partial<CustomPrompt>): CustomPrompt | null {
-    const prompts = loadCustomPrompts()
-    const idx = prompts.findIndex((p) => p.id === id)
-    if (idx === -1) return null
+// ─── Lookup helpers (operate on in-memory arrays) ────────────────────
 
-    prompts[idx] = {
-        ...prompts[idx],
-        ...updates,
-        updatedAt: new Date().toISOString(),
-    }
-    saveCustomPrompts(prompts)
-    return prompts[idx]
+/**
+ * Find a custom prompt by ID from a provided array.
+ *
+ * @param id - The prompt ID to look up
+ * @param prompts - Array of CustomPrompt objects to search
+ * @returns The matching CustomPrompt or undefined
+ */
+export function getCustomPromptById(
+    id: string,
+    prompts: CustomPrompt[] = []
+): CustomPrompt | undefined {
+    return prompts.find((p) => p.id === id)
 }
 
-export function deleteCustomPrompt(id: string): boolean {
-    const prompts = loadCustomPrompts()
-    const filtered = prompts.filter((p) => p.id !== id)
-    if (filtered.length === prompts.length) return false
-    saveCustomPrompts(filtered)
-    return true
-}
-
-export function getCustomPromptById(id: string): CustomPrompt | undefined {
-    return loadCustomPrompts().find((p) => p.id === id)
-}
-
-// ─── Defaults for new custom prompt ──────────────────────────────────
+// ─── Defaults for new custom prompt form ─────────────────────────────
 
 export const DEFAULT_CUSTOM_PROMPT: Omit<CustomPrompt, "id" | "isCustom" | "createdAt" | "updatedAt"> = {
     title: "",

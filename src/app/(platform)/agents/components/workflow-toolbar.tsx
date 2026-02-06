@@ -15,6 +15,8 @@ import {
     AlignVerticalSpaceAround,
     Trash2,
     HelpCircle,
+    ChevronDown,
+    FolderOpen,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -23,11 +25,19 @@ import {
     TooltipContent,
     TooltipTrigger,
 } from "@/components/ui/tooltip"
+import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+} from "@/components/ui/popover"
+import { ScrollArea } from "@/components/ui/scroll-area"
+import type { AgentWorkflowRow } from "@/actions/agent-workflows"
 
 interface WorkflowToolbarProps {
     workflowName: string
     onNameChange: (name: string) => void
     onSave: () => void
+    isSaving?: boolean
     onNew: () => void
     onOpenTemplates: () => void
     onCopyAll: () => void
@@ -41,12 +51,39 @@ interface WorkflowToolbarProps {
     onAutoArrange?: () => void
     onClearCanvas?: () => void
     onOpenHelp?: () => void
+    /** Saved workflows from the database */
+    savedWorkflows?: AgentWorkflowRow[]
+    /** Currently active workflow's database ID (null if unsaved) */
+    activeWorkflowId?: string | null
+    /** Load a saved workflow */
+    onLoadWorkflow?: (workflow: AgentWorkflowRow) => void
+    /** Delete a saved workflow */
+    onDeleteWorkflow?: (workflowId: string) => void
+}
+
+/**
+ * Format a relative time string from a date.
+ */
+function formatRelativeTime(dateStr: string): string {
+    const date = new Date(dateStr)
+    const now = new Date()
+    const diffMs = now.getTime() - date.getTime()
+    const diffMins = Math.floor(diffMs / 60000)
+    const diffHours = Math.floor(diffMins / 60)
+    const diffDays = Math.floor(diffHours / 24)
+
+    if (diffMins < 1) return "just now"
+    if (diffMins < 60) return `${diffMins}m ago`
+    if (diffHours < 24) return `${diffHours}h ago`
+    if (diffDays < 7) return `${diffDays}d ago`
+    return date.toLocaleDateString("en-US", { month: "short", day: "numeric" })
 }
 
 export function WorkflowToolbar({
     workflowName,
     onNameChange,
     onSave,
+    isSaving,
     onNew,
     onOpenTemplates,
     onCopyAll,
@@ -60,9 +97,14 @@ export function WorkflowToolbar({
     onAutoArrange,
     onClearCanvas,
     onOpenHelp,
+    savedWorkflows = [],
+    activeWorkflowId,
+    onLoadWorkflow,
+    onDeleteWorkflow,
 }: WorkflowToolbarProps) {
     const [copied, setCopied] = useState(false)
     const [saved, setSaved] = useState(false)
+    const [workflowPickerOpen, setWorkflowPickerOpen] = useState(false)
 
     const handleCopy = useCallback(() => {
         onCopyAll()
@@ -70,8 +112,8 @@ export function WorkflowToolbar({
         setTimeout(() => setCopied(false), 2000)
     }, [onCopyAll])
 
-    const handleSave = useCallback(() => {
-        onSave()
+    const handleSave = useCallback(async () => {
+        await onSave()
         setSaved(true)
         setTimeout(() => setSaved(false), 2000)
     }, [onSave])
@@ -146,6 +188,91 @@ export function WorkflowToolbar({
                     </TooltipTrigger>
                     <TooltipContent>Load a pre-built workflow</TooltipContent>
                 </Tooltip>
+
+                {/* My Workflows dropdown */}
+                {savedWorkflows.length > 0 && (
+                    <Popover open={workflowPickerOpen} onOpenChange={setWorkflowPickerOpen}>
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <PopoverTrigger asChild>
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="gap-1.5 text-xs"
+                                    >
+                                        <FolderOpen className="w-3.5 h-3.5" />
+                                        My Workflows
+                                        <ChevronDown className="w-3 h-3 opacity-60" />
+                                    </Button>
+                                </PopoverTrigger>
+                            </TooltipTrigger>
+                            <TooltipContent>Open a saved workflow</TooltipContent>
+                        </Tooltip>
+                        <PopoverContent align="end" className="w-72 p-0">
+                            <div className="px-3 py-2.5 border-b border-slate-100">
+                                <p className="text-xs font-semibold text-foreground">
+                                    Saved Workflows
+                                </p>
+                                <p className="text-[10px] text-muted-foreground">
+                                    {savedWorkflows.length} workflow{savedWorkflows.length !== 1 ? "s" : ""}
+                                </p>
+                            </div>
+                            <ScrollArea className="max-h-[280px]">
+                                <div className="p-1">
+                                    {savedWorkflows.map((wf) => {
+                                        const isActive = wf.id === activeWorkflowId
+                                        const nodeCount = Array.isArray(wf.nodes) ? wf.nodes.length : 0
+                                        return (
+                                            <div
+                                                key={wf.id}
+                                                className={`group flex items-center gap-2 px-2.5 py-2 rounded-md transition-colors cursor-pointer ${
+                                                    isActive
+                                                        ? "bg-orange-50 border border-orange-200"
+                                                        : "hover:bg-slate-50"
+                                                }`}
+                                                onClick={() => {
+                                                    if (!isActive && onLoadWorkflow) {
+                                                        onLoadWorkflow(wf)
+                                                    }
+                                                    setWorkflowPickerOpen(false)
+                                                }}
+                                            >
+                                                <div className="flex-1 min-w-0">
+                                                    <p className={`text-xs font-medium truncate ${
+                                                        isActive ? "text-international-orange" : "text-foreground"
+                                                    }`}>
+                                                        {wf.name}
+                                                    </p>
+                                                    <p className="text-[10px] text-muted-foreground">
+                                                        {nodeCount} step{nodeCount !== 1 ? "s" : ""} · {formatRelativeTime(wf.updated_at)}
+                                                    </p>
+                                                </div>
+                                                {isActive && (
+                                                    <span className="text-[9px] font-medium text-international-orange bg-orange-100 px-1.5 py-0.5 rounded-full flex-shrink-0">
+                                                        Active
+                                                    </span>
+                                                )}
+                                                {!isActive && onDeleteWorkflow && (
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation()
+                                                            onDeleteWorkflow(wf.id)
+                                                            // Don't close popover — let user see the list update
+                                                        }}
+                                                        className="p-1 rounded hover:bg-red-50 text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-all flex-shrink-0"
+                                                        aria-label={`Delete ${wf.name}`}
+                                                    >
+                                                        <Trash2 className="w-3 h-3" />
+                                                    </button>
+                                                )}
+                                            </div>
+                                        )
+                                    })}
+                                </div>
+                            </ScrollArea>
+                        </PopoverContent>
+                    </Popover>
+                )}
 
                 {nodeCount > 0 && (
                     <>
@@ -254,6 +381,7 @@ export function WorkflowToolbar({
                 <Button
                     size="sm"
                     onClick={handleSave}
+                    disabled={isSaving}
                     className="gap-1.5 text-xs"
                     style={
                         saved
@@ -261,7 +389,11 @@ export function WorkflowToolbar({
                             : { backgroundColor: "#ff4500" }
                     }
                 >
-                    {saved ? (
+                    {isSaving ? (
+                        <>
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" /> Saving...
+                        </>
+                    ) : saved ? (
                         <>
                             <Check className="w-3.5 h-3.5" /> Saved
                         </>

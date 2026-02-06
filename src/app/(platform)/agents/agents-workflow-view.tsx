@@ -29,37 +29,21 @@ import { WorkflowTemplatesDialog } from "./components/workflow-templates-dialog"
 import { CreatePromptDialog } from "./components/create-prompt-dialog"
 import { AgentsHelpDialog } from "./components/agents-help-dialog"
 import { getPromptById } from "./lib/prompt-library"
-import { loadCustomPrompts, getCustomPromptById } from "./lib/custom-prompts"
+import { dbCustomPromptToLocal, getCustomPromptById } from "./lib/custom-prompts"
+import {
+    saveAgentWorkflow,
+    deleteAgentWorkflow,
+    migrateLocalWorkflows,
+    migrateLocalCustomPrompts,
+} from "@/actions/agent-workflows"
+import type { AgentWorkflowRow, AgentCustomPromptRow } from "@/actions/agent-workflows"
 import type { PromptCategory, Workflow, WorkflowTemplate, CustomPrompt, AttachedFile, ExecutionStatus } from "./lib/agent-types"
 
-// ─── localStorage persistence ─────────────────────────────────────
-const STORAGE_KEY = "forgeos-agent-workflows"
-const ACTIVE_KEY = "forgeos-active-workflow"
-
-function loadWorkflows(): Workflow[] {
-    if (typeof window === "undefined") return []
-    try {
-        const raw = localStorage.getItem(STORAGE_KEY)
-        return raw ? JSON.parse(raw) : []
-    } catch {
-        return []
-    }
-}
-
-function saveWorkflows(workflows: Workflow[]) {
-    if (typeof window === "undefined") return
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(workflows))
-}
-
-function loadActiveId(): string | null {
-    if (typeof window === "undefined") return null
-    return localStorage.getItem(ACTIVE_KEY)
-}
-
-function saveActiveId(id: string) {
-    if (typeof window === "undefined") return
-    localStorage.setItem(ACTIVE_KEY, id)
-}
+// ─── localStorage keys (used only for one-time migration) ─────────
+const LS_WORKFLOWS_KEY = "forgeos-agent-workflows"
+const LS_CUSTOM_PROMPTS_KEY = "forgeos-custom-prompts"
+const LS_ACTIVE_KEY = "forgeos-active-workflow"
+const LS_MIGRATED_KEY = "forgeos-agent-migrated-to-db"
 
 // ─── Custom node types ────────────────────────────────────────────
 const nodeTypes = { prompt: PromptNode, "human-task": HumanTaskNode }
@@ -214,7 +198,15 @@ function getLayoutedElements(
 }
 
 // ─── Inner flow (needs ReactFlowProvider) ─────────────────────────
-function AgentsFlowInner({ hasApiKey }: { hasApiKey: boolean }) {
+function AgentsFlowInner({
+    hasApiKey,
+    initialWorkflows,
+    initialCustomPrompts,
+}: {
+    hasApiKey: boolean
+    initialWorkflows: AgentWorkflowRow[]
+    initialCustomPrompts: AgentCustomPromptRow[]
+}) {
     const reactFlowWrapper = useRef<HTMLDivElement>(null)
     const { screenToFlowPosition, fitView } = useReactFlow()
 
@@ -229,40 +221,110 @@ function AgentsFlowInner({ hasApiKey }: { hasApiKey: boolean }) {
     const [helpOpen, setHelpOpen] = useState(false)
     const [apiBannerDismissed, setApiBannerDismissed] = useState(false)
 
-    // Workflow metadata
-    const [workflowId, setWorkflowId] = useState<string>("")
-    const [workflowName, setWorkflowName] = useState("Untitled Workflow")
-    const [workflows, setWorkflows] = useState<Workflow[]>([])
+    // Workflow metadata — initialised from server-fetched data
+    const [dbWorkflowId, setDbWorkflowId] = useState<string | null>(
+        initialWorkflows.length > 0 ? initialWorkflows[0].id : null
+    )
+    const [workflowName, setWorkflowName] = useState(
+        initialWorkflows.length > 0 ? initialWorkflows[0].name : "Untitled Workflow"
+    )
+    const [savedWorkflows, setSavedWorkflows] = useState<AgentWorkflowRow[]>(initialWorkflows)
 
-    // Custom prompts
-    const [customPrompts, setCustomPrompts] = useState<CustomPrompt[]>([])
+    // Custom prompts from database
+    const [dbCustomPrompts, setDbCustomPrompts] = useState<AgentCustomPromptRow[]>(initialCustomPrompts)
+    const customPrompts: CustomPrompt[] = useMemo(
+        () => dbCustomPrompts.map(dbCustomPromptToLocal),
+        [dbCustomPrompts]
+    )
 
     // Chain execution state
     const [isChainRunning, setIsChainRunning] = useState(false)
     const [chainProgress, setChainProgress] = useState<{ current: number; total: number } | undefined>()
     const abortControllerRef = useRef<AbortController | null>(null)
     const pendingContinueRef = useRef<string | null>(null)
+    const [isSaving, setIsSaving] = useState(false)
 
-    // Load saved workflows and custom prompts on mount
+    // Load initial workflow nodes/edges from first saved workflow
     useEffect(() => {
-        const saved = loadWorkflows()
-        setWorkflows(saved)
-        setCustomPrompts(loadCustomPrompts())
+        if (initialWorkflows.length > 0) {
+            const first = initialWorkflows[0]
+            setNodes(first.nodes as unknown as Node[])
+            setEdges(first.edges as unknown as Edge[])
+        }
+    }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-        const activeId = loadActiveId()
-        if (activeId) {
-            const active = saved.find((w) => w.id === activeId)
-            if (active) {
-                setWorkflowId(active.id)
-                setWorkflowName(active.name)
-                setNodes(active.nodes as Node[])
-                setEdges(active.edges as Edge[])
-                return
+    // ── One-time migration from localStorage ────────────────────────
+    useEffect(() => {
+        if (typeof window === "undefined") return
+        if (localStorage.getItem(LS_MIGRATED_KEY)) return
+
+        const migrateAsync = async () => {
+            try {
+                // Migrate workflows
+                const rawWf = localStorage.getItem(LS_WORKFLOWS_KEY)
+                if (rawWf) {
+                    const localWorkflows = JSON.parse(rawWf) as Workflow[]
+                    if (localWorkflows.length > 0) {
+                        const { data } = await migrateLocalWorkflows(
+                            localWorkflows.map((wf) => ({
+                                name: wf.name,
+                                description: wf.description,
+                                nodes: wf.nodes,
+                                edges: wf.edges,
+                            }))
+                        )
+                        if (data && data.length > 0) {
+                            setSavedWorkflows((prev) => [...data, ...prev])
+                            // Load the first migrated workflow if canvas is empty
+                            if (nodes.length === 0) {
+                                setDbWorkflowId(data[0].id)
+                                setWorkflowName(data[0].name)
+                                setNodes(data[0].nodes as Node[])
+                                setEdges(data[0].edges as Edge[])
+                            }
+                        }
+                    }
+                }
+
+                // Migrate custom prompts
+                const rawCp = localStorage.getItem(LS_CUSTOM_PROMPTS_KEY)
+                if (rawCp) {
+                    const localPrompts = JSON.parse(rawCp) as CustomPrompt[]
+                    if (localPrompts.length > 0) {
+                        const { data } = await migrateLocalCustomPrompts(
+                            localPrompts.map((p) => ({
+                                title: p.title,
+                                description: p.description,
+                                category: p.category,
+                                icon: p.icon,
+                                default_prompt: p.defaultPrompt,
+                                input_label: p.inputLabel,
+                                output_label: p.outputLabel,
+                                tags: p.tags,
+                                suggested_next: p.suggestedNext,
+                            }))
+                        )
+                        if (data) {
+                            setDbCustomPrompts((prev) => [...data, ...prev])
+                        }
+                    }
+                }
+
+                // Mark migration as done and clean up localStorage
+                localStorage.setItem(LS_MIGRATED_KEY, "true")
+                localStorage.removeItem(LS_WORKFLOWS_KEY)
+                localStorage.removeItem(LS_CUSTOM_PROMPTS_KEY)
+                localStorage.removeItem(LS_ACTIVE_KEY)
+            } catch (err) {
+                console.error("[AgentsFlow] localStorage migration failed:", {
+                    error: err instanceof Error ? err.message : "Unknown error",
+                })
+                // Don't mark as migrated so it retries next time
             }
         }
-        const newId = `wf_${Date.now()}`
-        setWorkflowId(newId)
-    }, [setNodes, setEdges])
+
+        migrateAsync()
+    }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
     // ── Selected node ──────────────────────────────────────────────
     const selectedNode = useMemo(
@@ -299,8 +361,8 @@ function AgentsFlowInner({ hasApiKey }: { hasApiKey: boolean }) {
 
     // ── Helper to resolve a prompt (library or custom) ────────────
     const resolvePrompt = useCallback((promptId: string) => {
-        return getPromptById(promptId) ?? getCustomPromptById(promptId) ?? null
-    }, [])
+        return getPromptById(promptId) ?? getCustomPromptById(promptId, customPrompts) ?? null
+    }, [customPrompts])
 
     // ── Drag-and-drop from sidebar ────────────────────────────────
     const onDragOver = useCallback((event: React.DragEvent) => {
@@ -474,40 +536,61 @@ function AgentsFlowInner({ hasApiKey }: { hasApiKey: boolean }) {
         toast.success("Layout tidied up")
     }, [nodes, edges, setNodes, setEdges, fitView])
 
-    // ── Save workflow ──────────────────────────────────────────────
-    const handleSave = useCallback(() => {
-        const workflow: Workflow = {
-            id: workflowId,
-            name: workflowName,
-            description: "",
-            nodes: nodes.map((n) => ({
+    // ── Save workflow (to Supabase) ──────────────────────────────────
+    const handleSave = useCallback(async () => {
+        if (isSaving) return
+        setIsSaving(true)
+
+        try {
+            const serializedNodes = nodes.map((n) => ({
                 id: n.id,
                 type: (n.type ?? "prompt") as "prompt" | "trigger" | "output",
                 position: n.position,
                 data: n.data as Workflow["nodes"][number]["data"],
-            })),
-            edges: edges.map((e) => ({
+            }))
+            const serializedEdges = edges.map((e) => ({
                 id: e.id,
                 source: e.source,
                 target: e.target,
                 animated: e.animated,
-            })),
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-        }
+            }))
 
-        const updated = workflows.filter((w) => w.id !== workflowId)
-        updated.push(workflow)
-        setWorkflows(updated)
-        saveWorkflows(updated)
-        saveActiveId(workflowId)
-    }, [workflowId, workflowName, nodes, edges, workflows])
+            const { data, error } = await saveAgentWorkflow({
+                id: dbWorkflowId,
+                name: workflowName,
+                description: "",
+                nodes: serializedNodes,
+                edges: serializedEdges,
+            })
+
+            if (error) {
+                toast.error("Failed to save workflow", { description: error })
+                return
+            }
+
+            if (data) {
+                // Update local state with the saved row
+                setDbWorkflowId(data.id)
+                setSavedWorkflows((prev) => {
+                    const filtered = prev.filter((w) => w.id !== data.id)
+                    return [data, ...filtered]
+                })
+            }
+        } catch (err) {
+            console.error("[AgentsFlow] Save failed:", {
+                error: err instanceof Error ? err.message : "Unknown error",
+            })
+            toast.error("Failed to save workflow")
+        } finally {
+            setIsSaving(false)
+        }
+    }, [dbWorkflowId, workflowName, nodes, edges, isSaving])
 
     // ── Load template ──────────────────────────────────────────────
     const handleLoadTemplate = useCallback(
         (template: WorkflowTemplate) => {
-            const newId = `wf_${Date.now()}`
-            setWorkflowId(newId)
+            // New unsaved workflow — will get a DB id on first Save
+            setDbWorkflowId(null)
             setWorkflowName(template.name)
 
             const styledEdges = template.edges.map((e) => ({
@@ -524,7 +607,6 @@ function AgentsFlowInner({ hasApiKey }: { hasApiKey: boolean }) {
             setNodes(layoutedNodes)
             setEdges(layoutedEdges)
             setTemplatesOpen(false)
-            saveActiveId(newId)
 
             requestAnimationFrame(() => {
                 fitView({ padding: 0.2, duration: 300 })
@@ -535,15 +617,59 @@ function AgentsFlowInner({ hasApiKey }: { hasApiKey: boolean }) {
 
     // ── New workflow ───────────────────────────────────────────────
     const handleNew = useCallback(() => {
-        const newId = `wf_${Date.now()}`
-        setWorkflowId(newId)
+        setDbWorkflowId(null)
         setWorkflowName("Untitled Workflow")
         setNodes([])
         setEdges([])
         setSelectedNodeId(null)
         setInspectorOpen(false)
-        saveActiveId(newId)
     }, [setNodes, setEdges])
+
+    // ── Load a saved workflow from database ─────────────────────────
+    const handleLoadWorkflow = useCallback(
+        (workflow: AgentWorkflowRow) => {
+            setDbWorkflowId(workflow.id)
+            setWorkflowName(workflow.name)
+
+            const styledEdges = (workflow.edges as Edge[]).map((e) => ({
+                ...e,
+                style: { stroke: "#3b82f6", strokeWidth: 2 },
+            })) as Edge[]
+
+            setNodes(workflow.nodes as Node[])
+            setEdges(styledEdges)
+            setSelectedNodeId(null)
+            setInspectorOpen(false)
+
+            requestAnimationFrame(() => {
+                fitView({ padding: 0.2, duration: 300 })
+            })
+        },
+        [setNodes, setEdges, fitView]
+    )
+
+    // ── Delete a saved workflow ──────────────────────────────────────
+    const handleDeleteWorkflow = useCallback(
+        async (workflowId: string) => {
+            const { error } = await deleteAgentWorkflow(workflowId)
+            if (error) {
+                toast.error("Failed to delete workflow", { description: error })
+                return
+            }
+            setSavedWorkflows((prev) => prev.filter((w) => w.id !== workflowId))
+            // If we deleted the currently active workflow, reset to blank canvas
+            if (dbWorkflowId === workflowId) {
+                setDbWorkflowId(null)
+                setWorkflowName("Untitled Workflow")
+                setNodes([])
+                setEdges([])
+                setSelectedNodeId(null)
+                setInspectorOpen(false)
+            }
+            toast.success("Workflow deleted")
+        },
+        [dbWorkflowId, setNodes, setEdges]
+    )
 
     // ── Copy all prompts as chained text ───────────────────────────
     const handleCopyAll = useCallback(() => {
@@ -571,16 +697,18 @@ function AgentsFlowInner({ hasApiKey }: { hasApiKey: boolean }) {
     }, [nodes, edges, resolvePrompt])
 
     // ── Custom prompts refresh ────────────────────────────────────
-    const handleCustomPromptsChange = useCallback(() => {
-        setCustomPrompts(loadCustomPrompts())
+    const handleCustomPromptsChange = useCallback((updatedPrompts: AgentCustomPromptRow[]) => {
+        setDbCustomPrompts(updatedPrompts)
     }, [])
 
     const handlePromptCreated = useCallback(
-        (prompt: CustomPrompt) => {
-            handleCustomPromptsChange()
+        (prompt: CustomPrompt, dbRow?: AgentCustomPromptRow) => {
+            if (dbRow) {
+                setDbCustomPrompts((prev) => [dbRow, ...prev])
+            }
             toast.success(`Created "${prompt.title}"`)
         },
-        [handleCustomPromptsChange]
+        []
     )
 
     // ═══════════════════════════════════════════════════════════════
@@ -898,6 +1026,7 @@ function AgentsFlowInner({ hasApiKey }: { hasApiKey: boolean }) {
                 workflowName={workflowName}
                 onNameChange={setWorkflowName}
                 onSave={handleSave}
+                isSaving={isSaving}
                 onNew={handleNew}
                 onOpenTemplates={() => setTemplatesOpen(true)}
                 onCopyAll={handleCopyAll}
@@ -911,6 +1040,10 @@ function AgentsFlowInner({ hasApiKey }: { hasApiKey: boolean }) {
                 onAutoArrange={handleAutoArrange}
                 onClearCanvas={handleClearCanvas}
                 onOpenHelp={() => setHelpOpen(true)}
+                savedWorkflows={savedWorkflows}
+                activeWorkflowId={dbWorkflowId}
+                onLoadWorkflow={handleLoadWorkflow}
+                onDeleteWorkflow={handleDeleteWorkflow}
             />
 
             {/* API key banner — shown when user has no keys configured */}
@@ -940,6 +1073,7 @@ function AgentsFlowInner({ hasApiKey }: { hasApiKey: boolean }) {
                         onClose={() => setSidebarOpen(false)}
                         onCreatePrompt={() => setCreatePromptOpen(true)}
                         customPrompts={customPrompts}
+                        dbCustomPrompts={dbCustomPrompts}
                         onCustomPromptsChange={handleCustomPromptsChange}
                     />
                 )}
@@ -1127,10 +1261,22 @@ function AgentsFlowInner({ hasApiKey }: { hasApiKey: boolean }) {
 }
 
 // ─── Exported wrapper with provider ───────────────────────────────
-export function AgentsWorkflowView({ hasApiKey }: { hasApiKey: boolean }) {
+export function AgentsWorkflowView({
+    hasApiKey,
+    initialWorkflows,
+    initialCustomPrompts,
+}: {
+    hasApiKey: boolean
+    initialWorkflows: AgentWorkflowRow[]
+    initialCustomPrompts: AgentCustomPromptRow[]
+}) {
     return (
         <ReactFlowProvider>
-            <AgentsFlowInner hasApiKey={hasApiKey} />
+            <AgentsFlowInner
+                hasApiKey={hasApiKey}
+                initialWorkflows={initialWorkflows}
+                initialCustomPrompts={initialCustomPrompts}
+            />
         </ReactFlowProvider>
     )
 }

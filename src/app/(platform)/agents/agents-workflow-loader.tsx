@@ -2,6 +2,7 @@
 
 import dynamic from "next/dynamic"
 import { Skeleton } from "@/components/ui/skeleton"
+import type { AgentWorkflowRow, AgentCustomPromptRow } from "@/actions/agent-workflows"
 
 /**
  * Client-side dynamic loader for the AgentsWorkflowView.
@@ -28,15 +29,28 @@ const AgentsWorkflowView = dynamic(
     }
 )
 
+interface AgentsWorkflowViewLoaderProps {
+    /** Whether the user has configured an AI provider key */
+    hasApiKey: boolean
+    /** Workflows pre-fetched from the database on the server */
+    initialWorkflows: AgentWorkflowRow[]
+    /** Custom prompts pre-fetched from the database on the server */
+    initialCustomPrompts: AgentCustomPromptRow[]
+}
+
 /**
  * Wrapper that passes props through to the dynamically loaded view.
- *
- * @param props.hasApiKey - Whether the user has configured an AI provider key
  */
 export function AgentsWorkflowViewLoader({
     hasApiKey,
-}: {
-    hasApiKey: boolean
-}) {
-    return <AgentsWorkflowView hasApiKey={hasApiKey} />
+    initialWorkflows,
+    initialCustomPrompts,
+}: AgentsWorkflowViewLoaderProps) {
+    return (
+        <AgentsWorkflowView
+            hasApiKey={hasApiKey}
+            initialWorkflows={initialWorkflows}
+            initialCustomPrompts={initialCustomPrompts}
+        />
+    )
 }

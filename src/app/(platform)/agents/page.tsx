@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
 import { checkHasAnyProviderKey } from "@/actions/ai-providers"
+import { getAgentWorkflows, getAgentCustomPrompts } from "@/actions/agent-workflows"
 import { AgentsWorkflowViewLoader } from "./agents-workflow-loader"
 
 export const revalidate = 60
@@ -15,14 +16,21 @@ export default async function AgentsPage() {
         redirect("/login")
     }
 
-    let hasApiKey = false
-    try {
-        hasApiKey = await checkHasAnyProviderKey()
-    } catch (err) {
+    // Fetch API key status, saved workflows, and custom prompts in parallel
+    const [hasApiKeyResult, workflowsResult, customPromptsResult] = await Promise.allSettled([
+        checkHasAnyProviderKey(),
+        getAgentWorkflows(),
+        getAgentCustomPrompts(),
+    ])
+
+    const hasApiKey = hasApiKeyResult.status === "fulfilled" ? hasApiKeyResult.value : false
+    const savedWorkflows = workflowsResult.status === "fulfilled" ? (workflowsResult.value.data ?? []) : []
+    const savedCustomPrompts = customPromptsResult.status === "fulfilled" ? (customPromptsResult.value.data ?? []) : []
+
+    if (hasApiKeyResult.status === "rejected") {
         console.error("[AgentsPage] Failed to check API key status:", {
-            error: err instanceof Error ? err.message : "Unknown error",
+            error: hasApiKeyResult.reason instanceof Error ? hasApiKeyResult.reason.message : "Unknown error",
         })
-        // Continue with hasApiKey = false — user will see the banner
     }
 
     return (
@@ -42,7 +50,11 @@ export default async function AgentsPage() {
 
             {/* Workflow view fills remaining space (loaded client-only) */}
             <div className="flex-1 min-h-0">
-                <AgentsWorkflowViewLoader hasApiKey={hasApiKey} />
+                <AgentsWorkflowViewLoader
+                    hasApiKey={hasApiKey}
+                    initialWorkflows={savedWorkflows}
+                    initialCustomPrompts={savedCustomPrompts}
+                />
             </div>
         </div>
     )

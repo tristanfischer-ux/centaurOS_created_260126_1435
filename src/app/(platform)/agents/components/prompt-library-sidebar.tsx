@@ -7,7 +7,8 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Button } from "@/components/ui/button"
 import { PROMPT_LIBRARY, searchPrompts, getPromptsByCategory } from "../lib/prompt-library"
 import { CATEGORY_META, PROMPT_CATEGORIES, CATEGORY_ACCENT_COLORS, type PromptCategory, type CustomPrompt, type PromptTemplate } from "../lib/agent-types"
-import { loadCustomPrompts, deleteCustomPrompt } from "../lib/custom-prompts"
+import { deleteAgentCustomPrompt } from "@/actions/agent-workflows"
+import type { AgentCustomPromptRow } from "@/actions/agent-workflows"
 import { getIcon } from "./prompt-node"
 import { cn } from "@/lib/utils"
 
@@ -15,10 +16,11 @@ interface PromptLibrarySidebarProps {
     onClose: () => void
     onCreatePrompt: () => void
     customPrompts: CustomPrompt[]
-    onCustomPromptsChange: () => void
+    dbCustomPrompts: AgentCustomPromptRow[]
+    onCustomPromptsChange: (updated: AgentCustomPromptRow[]) => void
 }
 
-export function PromptLibrarySidebar({ onClose, onCreatePrompt, customPrompts, onCustomPromptsChange }: PromptLibrarySidebarProps) {
+export function PromptLibrarySidebar({ onClose, onCreatePrompt, customPrompts, dbCustomPrompts, onCustomPromptsChange }: PromptLibrarySidebarProps) {
     const [searchQuery, setSearchQuery] = useState("")
     const [activeCategory, setActiveCategory] = useState<PromptCategory | "all" | "custom">("all")
 
@@ -76,9 +78,14 @@ export function PromptLibrarySidebar({ onClose, onCreatePrompt, customPrompts, o
         event.dataTransfer.effectAllowed = "move"
     }
 
-    const handleDeleteCustom = (id: string) => {
-        deleteCustomPrompt(id)
-        onCustomPromptsChange()
+    const handleDeleteCustom = async (id: string) => {
+        const { error } = await deleteAgentCustomPrompt(id)
+        if (error) {
+            console.error("[PromptSidebar] Failed to delete custom prompt:", { id, error })
+            return
+        }
+        // Update parent state by removing the deleted prompt
+        onCustomPromptsChange(dbCustomPrompts.filter((p) => p.id !== id))
     }
 
     return (

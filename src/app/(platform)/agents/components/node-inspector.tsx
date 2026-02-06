@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { getPromptById } from "../lib/prompt-library"
-import { getCustomPromptById } from "../lib/custom-prompts"
 import { CATEGORY_META, CATEGORY_ACCENT_COLORS, type PromptCategory, type ExecutionStatus, type AttachedFile } from "../lib/agent-types"
 import { getIcon } from "./prompt-node"
 import { FileDropZone } from "./file-drop-zone"
@@ -355,8 +354,10 @@ export function NodeInspector({
         )
     }
 
+    // Resolve prompt template metadata from the built-in library.
+    // Custom prompts have their data embedded directly on the node.
     const prompt = data.promptId
-        ? (getPromptById(data.promptId) ?? getCustomPromptById(data.promptId))
+        ? getPromptById(data.promptId)
         : null
     const category = data.category ?? "startup-strategy"
     const meta = CATEGORY_META[category]
