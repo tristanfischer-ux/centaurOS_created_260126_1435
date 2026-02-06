@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation'
 import { ObjectivesBoard } from './objectives-board'
 import type { FoundryPurposeData } from '@/types/foundry'
 
-export const revalidate = 60
+export const dynamic = 'force-dynamic'
 
 export default async function NewObjectivesPage() {
   const supabase = await createClient()
