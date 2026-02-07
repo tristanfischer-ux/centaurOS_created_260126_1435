@@ -10,7 +10,7 @@ import { CATEGORY_META, CATEGORY_ACCENT_COLORS, type PromptCategory, type Execut
 import { getIcon } from "./prompt-node"
 import { FileDropZone } from "./file-drop-zone"
 import { PROVIDER_REGISTRY, getProvidersForModality, getModelsForModality, getDefaultModel, type AIProviderId, type OutputModality, OUTPUT_MODALITIES } from "@/lib/ai-providers/types"
-import { parseSlideDeckFromText, downloadSlideDeck } from "@/lib/ai-providers/slide-renderer"
+import { parseSlideDeckFromText } from "@/lib/ai-providers/slide-parser"
 import type { Node } from "@xyflow/react"
 
 const PROVIDER_ICON_MAP: Record<string, React.ComponentType<{ className?: string; style?: React.CSSProperties }>> = {
@@ -265,6 +265,8 @@ function MediaOutput({ data }: {
                         onClick={async () => {
                             setDownloading(true)
                             try {
+                                // Dynamic import to avoid bundling pptxgenjs (node:https/fs) at compile time
+                                const { downloadSlideDeck } = await import("@/lib/ai-providers/slide-renderer")
                                 await downloadSlideDeck(deck)
                             } catch (err) {
                                 console.error("Failed to generate PPTX:", err)

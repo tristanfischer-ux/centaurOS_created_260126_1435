@@ -44,6 +44,7 @@ const nextConfig: NextConfig = {
       "react-day-picker",
     ],
   },
+
   
   // Security headers
   async headers() {
