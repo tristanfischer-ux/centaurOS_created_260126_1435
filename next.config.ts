@@ -20,7 +20,9 @@ const nextConfig: NextConfig = {
   // Turbopack config for dev mode (build uses webpack via --webpack flag)
   turbopack: {},
   
-  // Skip type checking during build (run separately via tsc --noEmit)
+  // Type checking runs separately via `npm run typecheck` in CI
+  // Build-time type checking disabled until existing errors are resolved
+  // See: .github/workflows/docker-build.yml for CI type check step
   typescript: {
     ignoreBuildErrors: true,
   },

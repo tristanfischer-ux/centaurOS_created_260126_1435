@@ -28,6 +28,48 @@ const config: Config = {
         '**/__tests__/**/*.test.[jt]s?(x)',
         '**/?(*.)+(spec|test).[jt]s?(x)',
     ],
+
+    // Coverage configuration
+    collectCoverageFrom: [
+        'src/lib/**/*.{ts,tsx}',
+        'src/actions/**/*.{ts,tsx}',
+        '!src/**/__tests__/**',
+        '!src/**/test-utils.*',
+        '!src/types/**',
+    ],
+    coverageDirectory: 'coverage',
+    coverageReporters: ['text', 'text-summary', 'lcov', 'json-summary'],
+
+    // Coverage thresholds - ratchet up as we add more tests
+    // Start low to match current coverage, increase over time
+    coverageThreshold: {
+        // Global minimum thresholds
+        global: {
+            branches: 1,
+            functions: 1,
+            lines: 1,
+            statements: 1,
+        },
+        // Higher thresholds for critical shared code
+        'src/lib/utils.ts': {
+            branches: 80,
+            functions: 100,
+            lines: 90,
+            statements: 90,
+        },
+        'src/lib/supabase/foundry-context.ts': {
+            branches: 50,
+            functions: 60,
+            lines: 60,
+            statements: 60,
+        },
+        'src/lib/server-action-utils.ts': {
+            branches: 80,
+            functions: 100,
+            lines: 90,
+            statements: 90,
+        },
+    },
 }
 
 // createJestConfig is exported this way to ensure that next/jest can load the Next.js config which is async

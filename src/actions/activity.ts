@@ -420,7 +420,7 @@ export async function getActivityUnreadCount(): Promise<{
 
     let messageCount = 0
     if (conversations && conversations.length > 0) {
-      const conversationIds = conversations.map(c => c.conversation_id)
+      const conversationIds = conversations.map((c: { conversation_id: string }) => c.conversation_id)
       
       // Single batch query for all messages across all conversations
       const { data: allMessages } = await supabase
@@ -431,10 +431,10 @@ export async function getActivityUnreadCount(): Promise<{
       
       if (allMessages) {
         // Filter messages by last_read_at in memory
-        const conversationMap = new Map(conversations.map(c => [c.conversation_id, c.last_read_at || '1970-01-01']))
+        const conversationMap = new Map(conversations.map((c: { conversation_id: string; last_read_at: string | null }) => [c.conversation_id, c.last_read_at || '1970-01-01']))
         messageCount = allMessages.filter(msg => {
           const lastReadAt = conversationMap.get(msg.conversation_id)
-          return lastReadAt && msg.created_at > lastReadAt
+          return lastReadAt && msg.created_at && msg.created_at > lastReadAt
         }).length
       }
     }

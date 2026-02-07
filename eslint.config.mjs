@@ -23,6 +23,7 @@ const eslintConfig = defineConfig([
     "src/actions/__tests__/activity.test.ts",
     // Generated Playwright report/trace artifacts
     "playwright-report/**",
+    "playwright-report */**",
     "test-results/**",
   ]),
   // Downgrade non-critical rules to warnings for CI to pass
