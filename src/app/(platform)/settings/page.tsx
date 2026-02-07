@@ -7,6 +7,8 @@ import { redirect } from 'next/navigation'
 import { TelegramLink } from '@/components/settings/telegram-link'
 import { ReportPreferences } from '@/components/settings/report-preferences'
 import { AIProviders } from '@/components/settings/ai-providers'
+import { CompanyProfileCard } from '@/components/settings/company-profile-card'
+import type { CompanyProfile } from '@/types/foundry'
 import { HelpCircle, GraduationCap, Book, Keyboard, MessageSquare, FileText, ExternalLink } from 'lucide-react'
 import Link from 'next/link'
 
@@ -46,6 +48,15 @@ export default async function SettingsPage() {
 
     const botUsername = process.env.TELEGRAM_BOT_USERNAME || 'ForgeOSBot'
 
+    // Fetch company profile data for the foundry
+    let companyProfile: CompanyProfile | null = null
+    if (profile?.foundry_id) {
+        const { data: foundryData } = await supabase.rpc('ensure_foundry_exists', {
+            p_foundry_id: profile.foundry_id,
+        })
+        companyProfile = (foundryData as { company_profile?: CompanyProfile | null })?.company_profile ?? null
+    }
+
     return (
         <div className="space-y-6">
             <div className="pb-4 border-b border-muted">
@@ -82,6 +93,13 @@ export default async function SettingsPage() {
                     </div>
                 </CardContent>
             </Card>
+
+            <CompanyProfileCard
+                companyProfile={companyProfile}
+                foundryId={profile?.foundry_id || ''}
+                userId={user.id}
+                isFounder={profile?.role === 'Founder'}
+            />
 
             <AIProviders />
 

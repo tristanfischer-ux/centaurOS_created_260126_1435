@@ -8,6 +8,7 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { OfflineIndicator } from "@/components/OfflineIndicator";
 import { OnboardingModal } from "@/components/OnboardingModal";
 import { ExecutiveProfilePrompt, VerificationSuccessToast } from "@/components/onboarding";
+import { ActivityTracker } from "@/components/ActivityTracker";
 import { Suspense } from "react";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { PresenceProvider } from "@/components/PresenceProvider";
@@ -102,6 +103,7 @@ export default async function PlatformLayout({
                         <PWARegister />
                         <DragDropPolyfill />
                         <OfflineIndicator />
+                        <ActivityTracker />
                         <OnboardingModal userRole={profile?.role} accountType={profile?.account_type} />
                         <ExecutiveProfilePrompt userRole={profile?.role} />
                         <Suspense fallback={null}>

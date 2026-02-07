@@ -103,6 +103,11 @@ export interface GenerateAnswerInput {
     category?: AdvisoryCategory
     // Additional context about the foundry
     foundry_context?: {
+        /** Foundry ID — when provided (with user_id), triggers the AI Context Builder */
+        foundry_id?: string
+        /** User ID — used together with foundry_id for AI Context Builder */
+        user_id?: string
+        // Legacy fields (used as fallback when foundry_id is not provided)
         industry?: string
         stage?: string
         team_size?: number
