@@ -25,7 +25,7 @@ import {
   Shapes,
   Sparkles,
   Zap,
-  DollarSign,
+  PoundSterling,
 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -72,7 +72,7 @@ function CostIndicator({ tier }: { tier: CostTier }) {
   return (
     <div className="flex items-center gap-0.5" title={`Cost: ${tier}`}>
       {[1, 2, 3, 4].map(i => (
-        <DollarSign
+        <PoundSterling
           key={i}
           className={cn(
             'h-3 w-3',

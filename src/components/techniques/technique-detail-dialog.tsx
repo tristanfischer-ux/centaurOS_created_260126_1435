@@ -22,9 +22,13 @@ import {
   CheckCircle2,
   XCircle,
   ArrowRight,
+  ArrowLeft,
   FileText,
-  ExternalLink,
-  DollarSign,
+  Search,
+  Briefcase,
+  BookOpen,
+  ArrowLeftRight,
+  PoundSterling,
   Clock,
   Ruler,
   Layers,
@@ -64,7 +68,7 @@ function CostDisplay({ tier }: { tier: CostTier }) {
     <div className="flex items-center gap-1.5">
       <div className="flex items-center gap-0.5">
         {[1, 2, 3, 4].map(i => (
-          <DollarSign
+          <PoundSterling
             key={i}
             className={cn(
               'h-3.5 w-3.5',
@@ -315,8 +319,14 @@ export function TechniqueDetailDialog({
         <div className="px-6 py-4 flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
           <Button asChild variant="default" className="flex-1 sm:flex-none">
             <Link href={`/marketplace?technique=${technique.slug}`}>
-              <ExternalLink className="h-4 w-4 mr-2" />
+              <Search className="h-4 w-4 mr-2" />
               Find Suppliers
+            </Link>
+          </Button>
+          <Button asChild variant="outline" className="flex-1 sm:flex-none">
+            <Link href={`/marketplace?cat=People&q=${encodeURIComponent(technique.name)}`}>
+              <Briefcase className="h-4 w-4 mr-2" />
+              Find an Expert
             </Link>
           </Button>
           <Button asChild variant="outline" className="flex-1 sm:flex-none">

@@ -1139,10 +1139,10 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
             {
                 type: "human-task",
                 label: "Ship, announce, and measure",
-                guidance: "The feature isn't done until it's shipped, announced, and measured. Close the loop.",
+                guidance: "Your UI Copy and Release Notes have been generated. Click each step above to review, edit, and export.\n\nThe feature isn't done until it's shipped, announced, and measured. Use the generated release notes as your customer announcement.",
                 checklist: [
                     "QA the feature on staging before release",
-                    "Publish release notes to customers",
+                    "Publish the generated Release Notes to customers",
                     "Update documentation and help center",
                     "Set up analytics tracking for success metrics",
                     "Schedule 2-week post-launch review",
@@ -1169,7 +1169,7 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
             {
                 type: "human-task",
                 label: "Prepare account review data",
-                guidance: "Pull together everything you know about this customer before the review. The goal is to have a complete picture of account health.",
+                guidance: "Pull together everything you know about this customer before the review. The goal is to have a complete picture of account health.\n\nOnce you've completed the checklist, open the next step (Account Health Score) and paste your usage data, support history, contract details, and notes into its Input Data field.",
                 checklist: [
                     "Export usage/engagement data for this account",
                     "Review support tickets and NPS responses",
@@ -1182,7 +1182,7 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
             {
                 type: "human-task",
                 label: "Internal alignment on account strategy",
-                guidance: "Before the customer meeting, align your internal team on the account strategy. What's the goal for this customer in the next quarter?",
+                guidance: "The previous steps generated an Account Health Score and Churn Risk Analysis. Click each step above to review and export.\n\nBefore the customer meeting, align your internal team on the account strategy. What's the goal for this customer in the next quarter?",
                 checklist: [
                     "Review health score and churn risk with CS team",
                     "Align on retention or expansion strategy",
@@ -1196,10 +1196,10 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
             {
                 type: "human-task",
                 label: "Conduct QBR and follow up",
-                guidance: "Run the customer QBR with a focus on value delivered and future plans. Follow up within 24 hours with a summary and action items.",
+                guidance: "Your Renewal Proposal, NPS Follow-up, and Customer Communication templates have been generated. Click each step above to review, edit, and export.\n\nRun the customer QBR with a focus on value delivered and future plans. Use the generated materials as your starting point.",
                 checklist: [
                     "Conduct QBR meeting with customer stakeholders",
-                    "Send meeting summary within 24 hours",
+                    "Send follow-up using the generated Customer Communication template",
                     "File action items and assign owners",
                     "Update CRM with account status and next steps",
                 ],
@@ -1225,7 +1225,7 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
             {
                 type: "human-task",
                 label: "Identify applicable regulations",
-                guidance: "Before diving into compliance, identify which regulations actually apply to your business. Over-compliance wastes resources; under-compliance creates risk.",
+                guidance: "Before diving into compliance, identify which regulations actually apply to your business. Over-compliance wastes resources; under-compliance creates risk.\n\nOnce you've completed the checklist, open the next step (Compliance Checklist) and paste your jurisdictions, regulations, and thresholds into its Input Data field.",
                 checklist: [
                     "List all jurisdictions where you operate or have customers",
                     "Identify industry-specific regulations (HIPAA, PCI-DSS, etc.)",
@@ -1239,7 +1239,7 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
             {
                 type: "human-task",
                 label: "Legal review of generated documents",
-                guidance: "AI-generated legal documents are a starting point, NOT final. Have every document reviewed by a qualified lawyer before publishing.",
+                guidance: "The previous steps generated a Compliance Checklist, Privacy Policy, and Terms of Service. Click each step above to review and export.\n\nCRITICAL: AI-generated legal documents are a starting point, NOT final. Have every document reviewed by a qualified lawyer before publishing.",
                 checklist: [
                     "Send compliance checklist to legal counsel for review",
                     "Have privacy policy reviewed by a privacy lawyer",
@@ -1252,9 +1252,9 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
             {
                 type: "human-task",
                 label: "Implement and maintain compliance",
-                guidance: "Compliance is not a one-time event. Set up ongoing processes to maintain compliance as your business and regulations evolve.",
+                guidance: "Your Regulatory Impact Assessment and IP Protection Strategy have been generated. Click each step above to review and export.\n\nCompliance is not a one-time event. Use these outputs alongside your lawyer-reviewed documents to set up ongoing compliance.",
                 checklist: [
-                    "Publish approved legal documents on your website",
+                    "Publish lawyer-approved legal documents on your website",
                     "Set up quarterly compliance review cadence",
                     "Train team on key compliance obligations",
                     "Create a process for tracking regulatory changes",
@@ -1281,7 +1281,7 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
             {
                 type: "human-task",
                 label: "Compile quarterly investor data",
-                guidance: "Investors want transparency, consistency, and honesty. Gather the data that tells a complete picture — good and bad.",
+                guidance: "Investors want transparency, consistency, and honesty. Gather the data that tells a complete picture — good and bad.\n\nOnce you've completed the checklist, open the next step (Investor Update Letter) and paste your metrics, wins, challenges, and team changes into its Input Data field.",
                 checklist: [
                     "Export key metrics: revenue, growth rate, burn, runway",
                     "Summarise top 3 wins and top 3 challenges this quarter",
@@ -1295,7 +1295,7 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
             {
                 type: "human-task",
                 label: "Review with co-founder before sending",
-                guidance: "Never send investor communications without a second pair of eyes. Tone, accuracy, and messaging matter.",
+                guidance: "The previous steps generated an Investor Update Letter, Metrics Dashboard, and Board Update. Click each step above to review and export.\n\nNever send investor communications without a second pair of eyes. Tone, accuracy, and messaging matter.",
                 checklist: [
                     "Review investor letter with co-founder for tone and accuracy",
                     "Verify all metrics match your internal data",
@@ -1308,7 +1308,7 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
             {
                 type: "human-task",
                 label: "Send and follow up",
-                guidance: "Send the update, then track engagement. Investors who respond are your warmest leads for the next raise.",
+                guidance: "Your Data Room Update and Traction Narrative have been generated. Click each step above to review, edit, and export.\n\nSend the update, then track engagement. Investors who respond are your warmest leads for the next raise.",
                 checklist: [
                     "Send investor update to all shareholders",
                     "Send board update to board members",
@@ -1339,7 +1339,7 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
             {
                 type: "human-task",
                 label: "Describe your product and requirements",
-                guidance: "The quality of manufacturing recommendations depends entirely on the quality of your input. Be as specific as possible about your product, constraints, and goals.",
+                guidance: "The quality of manufacturing recommendations depends entirely on the quality of your input. Be as specific as possible about your product, constraints, and goals.\n\nOnce you've completed the checklist, open the next step (Manufacturing Technique Selection) and paste your product description, volumes, budgets, and requirements into its Input Data field.",
                 checklist: [
                     "Write a detailed product description (size, weight, features, complexity)",
                     "Define target production volume (prototype, 100, 1k, 10k, 100k+)",
@@ -1354,7 +1354,7 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
             {
                 type: "human-task",
                 label: "Review technique and material recommendations",
-                guidance: "Before proceeding to costing and DFM, validate that the recommended technique and material actually fit your constraints. This is the most important decision in the entire workflow.",
+                guidance: "The previous steps generated a Manufacturing Technique Selection and Material Recommendation. Click each step above to review and export.\n\nBefore proceeding to costing and DFM, validate that the recommended technique and material actually fit your constraints. This is the most important decision in the entire workflow.",
                 checklist: [
                     "Validate the recommended technique fits your volume and budget",
                     "Confirm the material meets your functional requirements",
@@ -1369,7 +1369,7 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
             {
                 type: "human-task",
                 label: "Review RFQ spec and send to suppliers",
-                guidance: "The RFQ spec is your primary communication tool with suppliers. A well-written RFQ gets better quotes, faster responses, and fewer misunderstandings.",
+                guidance: "Your Cost Estimation, DFM Review, and RFQ Specification have been generated. Click each step above to review, edit, and export.\n\nThe RFQ spec is your primary communication tool with suppliers. A well-written RFQ gets better quotes, faster responses, and fewer misunderstandings.",
                 checklist: [
                     "Review the RFQ spec for completeness and accuracy",
                     "Add your company-specific details (contact info, commercial terms)",
