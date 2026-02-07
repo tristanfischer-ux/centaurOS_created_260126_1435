@@ -18,11 +18,11 @@ export const MARKETPLACE_SUBCATEGORIES: Record<MarketplaceCategory, string[]> = 
         'Specialist'
     ],
     Products: [
-        'Manufacturing',
-        'Fabrication',
-        'Electronics',
-        'Materials',
-        'Components'
+        'Manufacturer',
+        'Machine Capacity',
+        'Material',
+        'Post-Processing',
+        'Quality'
     ],
     Services: [
         'Legal',

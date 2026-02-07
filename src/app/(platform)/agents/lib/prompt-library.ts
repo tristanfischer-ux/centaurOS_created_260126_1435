@@ -759,37 +759,83 @@ Tone: confident but honest. Data-driven. No fluff.
         description: "Write a compelling pitch deck narrative, slide by slide",
         category: "fundraising",
         icon: "Presentation",
-        defaultPrompt: `You are a pitch deck expert who has helped raise $500M+ across 100+ rounds.
+        defaultPrompt: `You are a pitch deck expert who has helped raise $500M+ across 100+ rounds. You also have an eye for visual design — you know that a great deck is 50% narrative and 50% visual impact.
 
 {{input}}
 
-**If the input is detailed** (metrics, team bios, competitive data), create a ready-to-use pitch deck narrative.
+**If the input is detailed** (metrics, team bios, competitive data), create a ready-to-use pitch deck narrative with visual direction.
 **If the input is sparse** (just an idea or rough description), create a structured framework with placeholders clearly marked as [FILL IN: specific data needed] and focus on the narrative arc and messaging strategy.
 
-Write the narrative for a pitch deck (slide by slide):
+Write the narrative for a pitch deck (slide by slide). For EACH slide provide ALL of the following:
 
-**Slide 1: Title** — Company name, one-line description, round details
-**Slide 2: Problem** — The pain point, who feels it, how big it is (make it visceral)
-**Slide 3: Solution** — Your product, how it works (keep it simple)
-**Slide 4: Demo/Product** — Key screenshots or feature highlights to describe
-**Slide 5: Market** — TAM/SAM/SOM with credible sources
-**Slide 6: Business Model** — How you make money, pricing, unit economics
-**Slide 7: Traction** — The hockey stick (or evidence of momentum)
-**Slide 8: Competition** — Why you win (NOT a feature comparison grid)
-**Slide 9: Team** — Why THIS team can execute (relevant experience, unfair advantages)
-**Slide 10: Financials** — Projections, key assumptions, path to profitability
-**Slide 11: The Ask** — How much you're raising, what you'll do with it, milestones it unlocks
-**Slide 12: Vision** — The big picture — what does the world look like if you win?
+1. **Headline** — max 10 words, the single takeaway (should tell the story alone)
+2. **Content** — 3-5 bullet points, max 8 words per bullet
+3. **Speaker Notes** — what the presenter says out loud (conversational, 3-4 sentences)
+4. **Visual Direction** — describe exactly what should appear on the slide visually:
+   - **Layout**: e.g., "Title + single hero stat centered", "Two-column: text left, image right", "Full-bleed photo with white text overlay"
+   - **Visual Element**: specific chart, diagram, image, or icon description. Be precise enough that a designer or AI tool (Gamma, Napkin AI, Beautiful.ai) could create it directly. E.g., "Bar chart: 3 bars showing TAM ($15B), SAM ($2B), SOM ($200M) in descending order, brand orange color"
+   - **Mood**: e.g., "Bold and confident — large numbers, dark background", "Clean and minimal — lots of whitespace", "Warm and human — team photo, casual setting"
 
-For each slide: provide the headline, 3-5 bullet points, and speaker notes.
+---
 
-**Example Problem slide headline:**
-"Enterprise teams waste 12 hours/week switching between 7+ tools to manage one project."
+**Slide 1: Title**
+Topic: Company name, one-line description, round details
 
-**Example Traction slide framing:**
-"$1.2M ARR • 340% YoY growth • 95% net revenue retention • 0 paid acquisition — 100% product-led"
+**Slide 2: Problem**
+Topic: The pain point, who feels it, how big it is (make it visceral)
 
-**Before finalizing, verify:** (1) Does each slide tell ONE clear story? (2) Would an investor understand the business from the headlines alone? (3) Is the ask slide specific enough (amount, use of funds, milestones)? (4) Does the traction slide show momentum, not just snapshots?`,
+**Slide 3: Solution**
+Topic: Your product, how it works (keep it simple)
+
+**Slide 4: Demo/Product**
+Topic: Key screenshots or feature highlights
+
+**Slide 5: Market**
+Topic: TAM/SAM/SOM with credible sources
+
+**Slide 6: Business Model**
+Topic: How you make money, pricing, unit economics
+
+**Slide 7: Traction**
+Topic: The hockey stick (or evidence of momentum)
+
+**Slide 8: Competition**
+Topic: Why you win (NOT a feature comparison grid)
+
+**Slide 9: Team**
+Topic: Why THIS team can execute
+
+**Slide 10: Financials**
+Topic: Projections, key assumptions, path to profitability
+
+**Slide 11: The Ask**
+Topic: How much you're raising, what you'll do with it, milestones
+
+**Slide 12: Vision**
+Topic: The big picture — what does the world look like if you win?
+
+---
+
+**Example of a complete slide:**
+
+### Slide 2: Problem
+**Headline:** "Manufacturers Lose 25% of Revenue to Invisible Waste"
+
+**Content:**
+- £4.2B lost annually across UK SME manufacturers
+- Average 12 disconnected systems per factory floor
+- 40% of lead time is pure waiting (not work)
+
+**Speaker Notes:** "Let me paint a picture. Walk into any mid-size factory and you'll find operators toggling between 12 different systems just to track one order. The result? A quarter of their revenue disappears into waste they can't even see."
+
+**Visual Direction:**
+- **Layout:** Full-bleed dark background with one large stat centered, supporting bullets below
+- **Visual Element:** Animated counter or large "25%" in bold white, then 3 icon-stat pairs below (factory icon + £4.2B, chain icon + 12 systems, clock icon + 40% waiting)
+- **Mood:** Dramatic and urgent — dark background, red/orange accent on the key number, creates tension that the Solution slide will resolve
+
+---
+
+**Before finalizing, verify:** (1) Could someone build these slides in Gamma or Canva using ONLY your Visual Direction? (2) Do the headlines alone tell the full story? (3) Is every Visual Element specific enough to render? (4) Does each slide have ONE clear visual focus (not 5 competing elements)?`,
         inputLabel: "Company details, metrics & round info",
         outputLabel: "Pitch deck narrative (12 slides)",
         tags: ["pitch-deck", "fundraising", "investors", "slides"],
@@ -2576,20 +2622,25 @@ First, analyze: What is this prospect's #1 business priority right now? What's t
 - Include: decision timeline, stakeholders needed, what you'll prepare
 
 **For each slide, provide:**
-- Headline (max 8 words — the takeaway if they read nothing else)
-- 3-5 talking points (what the presenter SAYS)
-- Visual suggestion (what's ON the slide — less is more)
-- Transition to next slide (the connecting sentence)
+- **Headline** (max 8 words — the takeaway if they read nothing else)
+- **Content** (3-5 bullet points, max 5 words per bullet on the actual slide)
+- **Speaker Notes** (what the presenter SAYS — conversational, 3-4 sentences)
+- **Transition** (the connecting sentence to the next slide)
+- **Visual Direction** — describe exactly what should appear on the slide:
+  - **Layout**: e.g., "Single large stat with supporting text below", "Before/After split screen", "3-step process flow horizontal"
+  - **Visual Element**: be specific enough for Gamma, Napkin AI, or a designer to build it. E.g., "Animated counter: £4.2B fading in large, then subtitle 'lost annually' below. Industry icons (factory, warehouse, logistics) faded in background"
+  - **Mood**: e.g., "Provocative — dark background, large white numbers, challenge their status quo", "Warm — show a real person using the product, natural lighting"
 
 **Deck rules:**
 - Total: 20 minutes max (10 min present, 10 min discuss)
 - Max 5 words per bullet on slides (detailed content in speaker notes)
 - One idea per slide — no "and also..."
 - Data > adjectives ("3x faster" not "much faster")
+- ONE visual focus per slide — if someone squints, they should still get the message
 
 **Example Slide 2 headline:** "Your industry is spending $4.2B/year on a process that's 80% automatable."
 
-**Before finalizing, verify:** (1) Could this deck be presented without reading every word on the slides? (2) Is the ROI story specific enough for their CFO? (3) Is there ONE clear next step at the end?`,
+**Before finalizing, verify:** (1) Could someone build these slides in Gamma or Canva using ONLY your Visual Direction? (2) Is the ROI story specific enough for their CFO? (3) Is there ONE clear next step at the end? (4) Is every Visual Element specific enough to render without guessing?`,
         inputLabel: "Product, prospect & deal details",
         outputLabel: "Sales deck outline",
         tags: ["sales-deck", "presentation", "pitch", "deal"],
@@ -3350,27 +3401,79 @@ For each scenario:
         description: "Write a compelling board presentation with strategic narrative",
         category: "strategy",
         icon: "Presentation",
-        defaultPrompt: `You are a board presentation specialist who has prepared 200+ board decks for venture-backed companies, following the "data-driven narrative" format that top VCs like Sequoia and Benchmark expect from their portfolio CEOs.
+        defaultPrompt: `You are a board presentation specialist who has prepared 200+ board decks for venture-backed companies, following the "data-driven narrative" format that top VCs like Sequoia and Benchmark expect from their portfolio CEOs. You also know that great board decks are highly visual — numbers should pop, trends should be obvious at a glance, and every slide should have ONE clear focal point.
 
 {{input}}
 
-Write a board presentation:
+Write a board presentation. For EACH slide provide ALL of the following:
 
-**Slide 1:** Executive summary (3 bullets)
-**Slide 2:** Key metrics dashboard
-**Slide 3:** Progress vs. OKRs
-**Slide 4:** Financial overview (revenue, burn, runway)
-**Slide 5:** Product update (shipped, in progress, planned)
-**Slide 6:** Go-to-market update
-**Slide 7:** Team update
-**Slide 8:** Key challenges & risks
-**Slide 9:** Strategic decisions needed
-**Slide 10:** Ask / next quarter priorities
+1. **Headline** — max 10 words, the single takeaway
+2. **Content** — key points, max 5-8 words per bullet, data-driven
+3. **Speaker Notes** — what the CEO says aloud (3-4 sentences, strategic tone)
+4. **Visual Direction** — describe exactly what should appear on the slide:
+   - **Layout**: e.g., "Dashboard grid: 2x3 metric cards", "Single large chart with 3 callouts", "Traffic light status table"
+   - **Visual Element**: specific chart, table, or diagram with exact data. E.g., "Line chart: revenue last 4 quarters ($180K, $240K, $350K, $480K) with trend line, green when above target, red when below"
+   - **Mood**: e.g., "Data-rich but clean — board members should grasp the story in 3 seconds", "Transparent — red/amber/green status indicators, don't hide bad news"
 
-For each slide: headline, content, speaking notes.
+---
+
+**Slide 1: Executive Summary**
+Topic: TL;DR in 3 bullets — where we are, what's working, what needs attention
+
+**Slide 2: Key Metrics Dashboard**
+Topic: The 6-8 metrics that define the business right now
+
+**Slide 3: Progress vs. OKRs**
+Topic: What we committed to, what we delivered, what slipped
+
+**Slide 4: Financial Overview**
+Topic: Revenue, burn rate, runway, cash position
+
+**Slide 5: Product Update**
+Topic: Shipped, in progress, planned — with timeline
+
+**Slide 6: Go-to-Market Update**
+Topic: Pipeline, conversion rates, customer acquisition
+
+**Slide 7: Team Update**
+Topic: Hires, departures, org health, key roles open
+
+**Slide 8: Key Challenges & Risks**
+Topic: Be transparent — what could go wrong and what we're doing about it
+
+**Slide 9: Strategic Decisions Needed**
+Topic: 2-3 decisions that require board input, with options and trade-offs
+
+**Slide 10: Next Quarter Priorities & Ask**
+Topic: Top 3 priorities, specific asks from the board
+
+---
+
+**Example of a complete slide:**
+
+### Slide 2: Key Metrics Dashboard
+**Headline:** "Strong Growth, But Churn Needs Attention"
+
+**Content:**
+- ARR: £480K (+34% QoQ)
+- MRR: £40K
+- Net Revenue Retention: 108%
+- Gross Margin: 82%
+- Monthly Churn: 4.2% (target: <3%)
+- Runway: 18 months
+
+**Speaker Notes:** "The headline numbers are strong — ARR up 34% quarter over quarter, gross margins holding at 82%. But I want to flag churn. We're at 4.2% monthly, above our 3% target. I'll dig into why in the challenges slide, but the short version is the October price increase hit SMB harder than expected."
+
+**Visual Direction:**
+- **Layout:** Dashboard grid — 2 rows × 3 columns of metric cards, each card showing metric name, current value, trend arrow, and sparkline
+- **Visual Element:** 6 metric cards. Each card: large number (e.g., "£480K"), small label below ("ARR"), trend arrow (green up / red down), and a tiny sparkline showing last 4 quarters. Use green cards for metrics on-target, amber for watch items, red for metrics below target. Churn card should be amber/red.
+- **Mood:** Clean, professional, information-dense but scannable — like a Bloomberg terminal for your company
+
+---
+
 Tone: strategic, data-driven, transparent about challenges.
 
-**Before finalizing, verify:** (1) Are bad news and challenges presented honestly? (2) Does every "strategic decision needed" have clear options with pros/cons? (3) Would the CEO be comfortable presenting this without edits? (4) Is the ask specific enough for board members to help?`,
+**Before finalizing, verify:** (1) Could someone build these slides in Gamma or Canva using ONLY your Visual Direction? (2) Are bad news and challenges presented honestly? (3) Does every "strategic decision needed" have clear options with pros/cons? (4) Is every Visual Element specific enough to render (exact numbers, chart types, colours)?`,
         inputLabel: "Company metrics & quarterly updates",
         outputLabel: "Board presentation",
         tags: ["board", "presentation", "governance", "quarterly"],
@@ -6438,10 +6541,11 @@ For each:
 **Data Highlights** (3-5 metrics worth calling out)
 For each:
 - Metric name, current value, trend direction, and comparison (vs. target, vs. last period, vs. benchmark)
-- Visualization recommendation (for the deck version)
+- **Chart Spec**: describe the ideal visualization for this metric, e.g., "Sparkline: last 6 months, upward trend, green" or "Gauge chart: 82% target attainment, amber zone" or "Bar chart: this quarter vs. last quarter vs. target, grouped"
 
 **Risks & Concerns** (2-3 items that need executive attention)
 - What could go wrong, likelihood, and proposed mitigation
+- **Visual Spec**: "Traffic light table: Risk | Likelihood | Impact | Mitigation — use red/amber/green backgrounds for severity"
 
 **Recommendations** (prioritized and decisive)
 | Priority | Recommendation | Expected Impact | Owner | By When |
@@ -6450,6 +6554,22 @@ For each:
 
 **Next Steps** (3-5 specific actions)
 - Who does what by when — name specific roles, not vague "the team"
+
+---
+
+**Visualization Guide** (add this section at the end)
+
+After the written summary, provide a **"Deck-Ready Visual Direction"** section that describes how this executive summary would translate into 3-4 presentation slides if it were being presented:
+
+For each slide:
+- **Slide title**: max 8 words
+- **Layout**: e.g., "3 large stat cards side by side", "Table with RAG status column"
+- **Visual Element**: specific chart or diagram with data. E.g., "Line chart: revenue trend Q1-Q4 ($180K, $240K, $350K, $480K), target line at $300K shown as dashed"
+- **Mood**: e.g., "Confident — green tones, upward momentum", "Cautious — amber highlights on risk items"
+
+This section lets the reader quickly convert the written summary into a visual presentation using tools like Gamma, Napkin AI, or Canva.
+
+---
 
 **Writing rules:**
 - One page maximum (if printing) or 500 words (if digital)
@@ -6461,7 +6581,7 @@ For each:
 **Example TL;DR:**
 "• Q4 revenue hit $1.2M, 15% above target, driven by enterprise expansion. • Customer churn increased to 4.2% (from 3.1% in Q3) — concentrated in the SMB segment after the October price increase. • Recommend: Launch a targeted SMB retention campaign by Feb 15 and defer the next price increase to Q3."
 
-**Before finalizing, verify:** (1) Does the TL;DR work as a standalone communication? (2) Are recommendations specific enough that the reader knows exactly what to approve? (3) Could someone who only reads the first 3 sentences brief their boss accurately?`,
+**Before finalizing, verify:** (1) Does the TL;DR work as a standalone communication? (2) Are recommendations specific enough that the reader knows exactly what to approve? (3) Could someone who only reads the first 3 sentences brief their boss accurately? (4) Is the Visualization Guide specific enough that someone could build a slide deck from it without re-reading the full summary?`,
         inputLabel: "Full report or data",
         outputLabel: "Executive summary",
         tags: ["executive-summary", "report", "analysis", "insights"],

@@ -42,6 +42,7 @@ import {
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import { Markdown } from "@/components/ui/markdown"
 import {
     generateWorkflowMarkdown,
     generateNodeMarkdown,
@@ -248,8 +249,8 @@ function ResultStep({
                                     <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">
                                         Output
                                     </p>
-                                    <div className="p-3 rounded-lg bg-muted/50 border text-xs leading-relaxed whitespace-pre-wrap break-words max-h-80 overflow-y-auto">
-                                        {data.output}
+                                    <div className="p-3 rounded-lg bg-muted/50 border text-xs leading-relaxed max-h-80 overflow-y-auto">
+                                        <Markdown content={data.output!} className="text-xs [&_h1]:text-base [&_h2]:text-sm [&_h3]:text-xs [&_table]:text-[11px] [&_th]:px-2 [&_th]:py-1 [&_td]:px-2 [&_td]:py-1 [&_table]:border-collapse [&_th]:border [&_th]:border-slate-200 [&_td]:border [&_td]:border-slate-200 [&_th]:bg-muted [&_th]:font-semibold" />
                                     </div>
                                 </div>
                             ) : (

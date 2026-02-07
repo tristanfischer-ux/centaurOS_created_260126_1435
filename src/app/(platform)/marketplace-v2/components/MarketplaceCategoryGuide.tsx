@@ -48,11 +48,11 @@ const CATEGORY_GUIDES: Record<Exclude<MarketplaceCategory, 'All'>, {
         question: 'What kind of product are you sourcing?',
         icon: Package,
         options: [
-            { label: 'Manufacturing', subcategory: 'Manufacturing', description: 'Contract manufacturing and production' },
-            { label: 'Fabrication', subcategory: 'Fabrication', description: 'Custom parts and prototyping' },
-            { label: 'Electronics', subcategory: 'Electronics', description: 'PCBs, assemblies, and electronic components' },
-            { label: 'Materials', subcategory: 'Materials', description: 'Raw materials and supplies' },
-            { label: 'Components', subcategory: 'Components', description: 'Off-the-shelf parts and components' },
+            { label: 'Manufacturer', subcategory: 'Manufacturer', description: 'Contract manufacturing and production' },
+            { label: 'Machine Capacity', subcategory: 'Machine Capacity', description: 'CNC, 3D printing, and machine time' },
+            { label: 'Material', subcategory: 'Material', description: 'Raw materials and supplies' },
+            { label: 'Post-Processing', subcategory: 'Post-Processing', description: 'Finishing, coating, and treatment' },
+            { label: 'Quality', subcategory: 'Quality', description: 'Testing, inspection, and certification' },
         ],
     },
 }

@@ -67,6 +67,17 @@ export function Markdown({ content, className }: MarkdownProps) {
         ),
         strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
         em: ({ children }) => <em className="italic">{children}</em>,
+        hr: () => <hr className="my-3 border-t border-slate-200" />,
+        table: ({ children }) => (
+          <div className="my-2 overflow-x-auto">
+            <table className="w-full border-collapse text-sm">{children}</table>
+          </div>
+        ),
+        thead: ({ children }) => <thead className="bg-muted">{children}</thead>,
+        tbody: ({ children }) => <tbody>{children}</tbody>,
+        tr: ({ children }) => <tr className="border-b border-slate-200">{children}</tr>,
+        th: ({ children }) => <th className="px-3 py-1.5 text-left font-semibold border border-slate-200">{children}</th>,
+        td: ({ children }) => <td className="px-3 py-1.5 border border-slate-200">{children}</td>,
         }}
       >
         {content}

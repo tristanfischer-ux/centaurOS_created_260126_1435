@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useState, useCallback, useEffect, useRef } from "react"
-import { X, Copy, Check, Trash2, Play, RotateCcw, ChevronDown, ChevronRight, CheckCircle, ArrowRight, Sparkles, Brain, Globe, Image as ImageIcon, Mic, Cpu, Loader2, UserCheck, Square, CheckSquare, Download } from "lucide-react"
+import { X, Copy, Check, Trash2, Play, RotateCcw, ChevronDown, ChevronRight, CheckCircle, ArrowRight, Sparkles, Brain, Globe, Image as ImageIcon, Mic, Cpu, Loader2, UserCheck, Square, CheckSquare, Download, Pencil, Eye } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -14,6 +14,7 @@ import {
 import { getPromptById } from "../lib/prompt-library"
 import { CATEGORY_META, CATEGORY_ACCENT_COLORS, type PromptCategory, type ExecutionStatus, type AttachedFile } from "../lib/agent-types"
 import { getIcon } from "./prompt-node"
+import { Markdown } from "@/components/ui/markdown"
 import { FileDropZone } from "./file-drop-zone"
 import { PROVIDER_REGISTRY, getProvidersForModality, getModelsForModality, getDefaultModel, type AIProviderId, type OutputModality, OUTPUT_MODALITIES } from "@/lib/ai-providers/types"
 import { parseSlideDeckFromText } from "@/lib/ai-providers/slide-parser"
@@ -383,6 +384,7 @@ export function NodeInspector({
     const [copiedOutput, setCopiedOutput] = useState(false)
     const [inputExpanded, setInputExpanded] = useState(true)
     const [outputExpanded, setOutputExpanded] = useState(true)
+    const [isEditingOutput, setIsEditingOutput] = useState(false)
     const outputRef = useRef<HTMLTextAreaElement>(null)
 
     // Sync with node data when node changes
@@ -644,16 +646,29 @@ export function NodeInspector({
                                         </div>
                                     )}
 
-                                    <Textarea
-                                        ref={outputRef}
-                                        value={data.output || ""}
-                                        onChange={(e) => handleOutputChange(e.target.value)}
-                                        className={`min-h-[150px] text-xs leading-relaxed resize-y ${
-                                            status === "running" ? "opacity-80" : ""
-                                        } ${isReview ? "border-amber-200 bg-amber-50/30" : ""}`}
-                                        placeholder={status === "running" ? "Generating..." : "Output will appear here..."}
-                                        readOnly={status === "running"}
-                                    />
+                                    {/* Output: rendered markdown by default, editable textarea on toggle */}
+                                    {status === "running" || isEditingOutput ? (
+                                        <Textarea
+                                            ref={outputRef}
+                                            value={data.output || ""}
+                                            onChange={(e) => handleOutputChange(e.target.value)}
+                                            className={`min-h-[150px] text-xs leading-relaxed resize-y ${
+                                                status === "running" ? "opacity-80" : ""
+                                            } ${isReview ? "border-amber-200 bg-amber-50/30" : ""}`}
+                                            placeholder={status === "running" ? "Generating..." : "Output will appear here..."}
+                                            readOnly={status === "running"}
+                                        />
+                                    ) : data.output ? (
+                                        <div className={`rounded-lg border p-3 max-h-[400px] overflow-y-auto text-xs leading-relaxed ${
+                                            isReview ? "border-amber-200 bg-amber-50/30" : "bg-muted/30"
+                                        }`}>
+                                            <Markdown content={data.output} className="text-xs [&_h1]:text-base [&_h2]:text-sm [&_h3]:text-xs [&_table]:text-[11px] [&_th]:px-2 [&_th]:py-1 [&_td]:px-2 [&_td]:py-1 [&_table]:border-collapse [&_th]:border [&_th]:border-slate-200 [&_td]:border [&_td]:border-slate-200 [&_th]:bg-muted [&_th]:font-semibold" />
+                                        </div>
+                                    ) : (
+                                        <p className="text-xs text-muted-foreground italic p-3">
+                                            Output will appear here...
+                                        </p>
+                                    )}
 
                                     {isReview && (
                                         <p className="text-[10px] text-amber-600">
@@ -663,6 +678,15 @@ export function NodeInspector({
 
                                     {data.output && status !== "running" && (
                                         <div className="flex items-center gap-1">
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={() => setIsEditingOutput(!isEditingOutput)}
+                                                className="h-6 px-2 text-[10px] gap-1"
+                                            >
+                                                {isEditingOutput ? <Eye className="w-3 h-3" /> : <Pencil className="w-3 h-3" />}
+                                                {isEditingOutput ? "Preview" : "Edit"}
+                                            </Button>
                                             <Button
                                                 variant="ghost"
                                                 size="sm"
