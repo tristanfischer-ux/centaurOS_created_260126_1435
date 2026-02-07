@@ -182,7 +182,7 @@ export function UpdatesLayout({
   // ----- LARGE SCREEN: Two panels side by side -----
   if (screenSize === 'large') {
     return (
-      <div className="flex flex-col h-[calc(100vh-2rem)] -m-4 sm:-m-6 lg:-m-8">
+      <div className="flex flex-col h-[calc(100dvh-2rem)] -m-4 sm:-m-6 lg:-m-8">
         {/* Header */}
         <div className="p-4 sm:p-6 lg:p-8 pb-4 border-b border-slate-100">
           <UpdatesHeader
@@ -228,7 +228,7 @@ export function UpdatesLayout({
   // ----- MEDIUM SCREEN: Narrower feed + thread -----
   if (screenSize === 'medium') {
     return (
-      <div className="flex flex-col h-[calc(100vh-2rem)] -m-4 sm:-m-6 lg:-m-8">
+      <div className="flex flex-col h-[calc(100dvh-2rem)] -m-4 sm:-m-6 lg:-m-8">
         {/* Header */}
         <div className="p-4 sm:p-6 pb-4 border-b border-slate-100">
           <UpdatesHeader
@@ -273,7 +273,7 @@ export function UpdatesLayout({
 
   // ----- SMALL SCREEN (Mobile): Single column, tap to navigate -----
   return (
-    <div className="flex flex-col h-[calc(100vh-2rem)] -m-4">
+    <div className="flex flex-col h-[calc(100dvh-2rem)] -m-4">
       {showThread && selectedSource ? (
         // Thread view (full screen)
         <div className="flex flex-col h-full">

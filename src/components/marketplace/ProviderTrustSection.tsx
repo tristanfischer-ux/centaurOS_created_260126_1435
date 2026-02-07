@@ -136,7 +136,7 @@ export const ProviderTrustSection = memo(function ProviderTrustSection({
             </CardHeader>
             <CardContent className="pt-4">
                 <Tabs value={activeTab} onValueChange={setActiveTab}>
-                    <TabsList className="grid w-full grid-cols-4 h-9">
+                    <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 h-auto sm:h-9">
                         <TabsTrigger value="overview" className="text-xs">Overview</TabsTrigger>
                         <TabsTrigger value="reviews" className="text-xs">
                             Reviews {ratingSummary?.totalReviews ? `(${ratingSummary.totalReviews})` : ''}

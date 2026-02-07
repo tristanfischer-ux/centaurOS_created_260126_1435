@@ -235,7 +235,7 @@ export const TeamMemberCard = memo(function TeamMemberCard({
                             ? "bg-orange-500 text-white shadow-md" 
                             : isHovered 
                                 ? "bg-background text-muted-foreground shadow-md border opacity-100"
-                                : "opacity-0 group-hover:opacity-100"
+                                : "sm:opacity-0 sm:group-hover:opacity-100"
                     )}
                     title={isSelected ? "Remove from comparison" : "Add to comparison"}
                 >

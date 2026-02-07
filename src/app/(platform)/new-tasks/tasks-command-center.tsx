@@ -351,7 +351,7 @@ export function TasksCommandCenter({
 
         {/* Right: Detail panel */}
         {showDetailPanel && (
-          <div className="w-[360px] flex-shrink-0 rounded-xl border border-slate-100 overflow-hidden h-[calc(100vh-340px)] sticky top-8">
+          <div className="w-[360px] flex-shrink-0 rounded-xl border border-slate-100 overflow-hidden h-[calc(100dvh-340px)] sticky top-8">
             <TaskDetailPanel
               task={selectedTask}
               onClose={() => setSelectedId(null)}

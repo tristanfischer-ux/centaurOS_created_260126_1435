@@ -162,7 +162,7 @@ export function BoardView({ tasks, selectedId, onSelect }: BoardViewProps) {
 
           {/* Column body */}
           <div className="bg-muted/20 rounded-b-xl border border-t-0 border-slate-100 p-2 flex-1 min-h-[200px]">
-            <ScrollArea className="h-[calc(100vh-420px)]">
+            <ScrollArea className="h-[calc(100dvh-420px)]">
               <div className="space-y-2">
                 {col.tasks.length === 0 ? (
                   <div className="text-center py-8 text-xs text-muted-foreground">

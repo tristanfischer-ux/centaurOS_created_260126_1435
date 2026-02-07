@@ -49,7 +49,7 @@ export function FloatingAdminBox({ foundryId, isFounder, hasAdminAccess }: Float
             
             {/* Expanded state - full panel */}
             {isExpanded && (
-                <Card className="fixed bottom-4 left-4 z-50 w-[420px] max-h-[600px] bg-background border-foundry-200 shadow-2xl overflow-hidden flex flex-col">
+                <Card className="fixed bottom-4 left-4 right-4 sm:right-auto z-50 w-auto sm:w-[420px] max-h-[80dvh] sm:max-h-[600px] bg-background border-foundry-200 shadow-2xl overflow-hidden flex flex-col">
                     {/* Header */}
                     <div className="flex items-center justify-between p-4 border-b border-foundry-100 bg-foundry-50">
                         <div className="flex items-center gap-2">

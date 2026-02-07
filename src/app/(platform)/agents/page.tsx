@@ -34,7 +34,7 @@ export default async function AgentsPage() {
     }
 
     return (
-        <div className="flex flex-col h-[calc(100vh-2rem)] -m-4 sm:-m-6 lg:-m-8">
+        <div className="flex flex-col h-[calc(100dvh-2rem)] -m-4 sm:-m-6 lg:-m-8">
             {/* Page header with orange accent bar */}
             <div className="px-4 sm:px-6 lg:px-8 pt-4 sm:pt-6 lg:pt-8 pb-4 border-b border-muted">
                 <div className="flex items-center gap-3">

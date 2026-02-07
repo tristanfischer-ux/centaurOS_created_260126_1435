@@ -418,7 +418,7 @@ export function KnowledgeSidebar({
         exit={{ x: '100%', opacity: 0 }}
         transition={{ type: 'spring', damping: 25, stiffness: 200 }}
         className={cn(
-          "w-[420px] bg-background border-l shadow-2xl flex flex-col h-full",
+          "w-full sm:w-[420px] bg-background border-l shadow-2xl flex flex-col h-full",
           className
         )}
       >

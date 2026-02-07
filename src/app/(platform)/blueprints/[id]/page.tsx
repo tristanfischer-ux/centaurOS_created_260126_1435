@@ -61,14 +61,14 @@ function BlueprintDetailSkeleton() {
       </div>
 
       {/* Summary cards */}
-      <div className="grid grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         {[1, 2, 3, 4].map((i) => (
           <Skeleton key={i} className="h-24 rounded-lg" />
         ))}
       </div>
 
       {/* Main content */}
-      <div className="grid grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
         <div className="col-span-2">
           <Skeleton className="h-[500px] rounded-lg" />
         </div>

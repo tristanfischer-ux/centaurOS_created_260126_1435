@@ -203,7 +203,7 @@ export function MessagesPageClient({
   // Show conversation thread if selected
   if (selectedConversationId) {
     return (
-      <div className="h-[calc(100vh-8rem)] flex flex-col">
+      <div className="h-[calc(100dvh-8rem)] flex flex-col">
         <div className="p-2 border-b">
           <Button variant="ghost" size="sm" onClick={handleBack} className="gap-2">
             <ArrowLeft className="h-4 w-4" />
