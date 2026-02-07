@@ -122,7 +122,11 @@ export async function createAdvisoryQuestion(data: {
                 question_title: data.title,
                 question_body: data.body,
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                category: data.category as any
+                category: data.category as any,
+                foundry_context: {
+                    foundry_id: foundryId,
+                    user_id: user.id,
+                },
             })
 
             if (aiResult.result && !aiResult.error) {

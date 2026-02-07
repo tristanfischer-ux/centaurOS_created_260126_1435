@@ -8,6 +8,7 @@ import {
     ConfidenceLevel,
     AdvisoryCategory
 } from '@/types/advisory'
+import { buildAIContext } from '@/lib/ai-context/builder'
 
 const openai = new OpenAI({
     apiKey: process.env.OPENAI_API_KEY || "dummy-key-for-build",
@@ -65,12 +66,23 @@ Return ONLY a raw JSON object (no markdown formatting) with this structure:
     ]
 }`
 
-        const contextSection = input.foundry_context ? `
+        // Build rich company context from the AI Context Builder
+        let contextSection = ''
+        if (input.foundry_context?.foundry_id && input.foundry_context?.user_id) {
+            contextSection = await buildAIContext(
+                input.foundry_context.foundry_id,
+                input.foundry_context.user_id,
+                { includeActivity: true, includeObjectives: true }
+            )
+        } else if (input.foundry_context) {
+            // Fallback to legacy manual context if no foundry_id provided
+            contextSection = `
 Context about the business:
 - Industry: ${input.foundry_context.industry || 'Not specified'}
 - Stage: ${input.foundry_context.stage || 'Not specified'}
 - Team Size: ${input.foundry_context.team_size || 'Not specified'}
-- Location: ${input.foundry_context.location || 'Not specified'}` : ''
+- Location: ${input.foundry_context.location || 'Not specified'}`
+        }
 
         const previousContext = input.previous_answers?.length 
             ? `\nPrevious answers in this conversation:\n${input.previous_answers.join('\n---\n')}`

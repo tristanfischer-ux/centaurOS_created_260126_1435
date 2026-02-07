@@ -11,7 +11,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
-import type { FoundryPurposeData } from '@/types/foundry'
+import type { FoundryPurposeData, CompanyProfile } from '@/types/foundry'
 
 export interface ActionResult {
   success: boolean
@@ -223,6 +223,191 @@ export async function getFoundryPurpose(
     return { 
       success: false, 
       error: 'An unexpected error occurred' 
+    }
+  }
+}
+
+// --- Company Profile Actions ---
+
+/**
+ * Updates the foundry's company profile (stage, size, revenue, funding status).
+ * 
+ * @description Allows founders to set structured company context so the AI
+ * can provide more relevant recommendations across advisory, marketplace,
+ * and workflow features.
+ * 
+ * @param {string} foundryId - The foundry to update
+ * @param {CompanyProfile} profileData - Complete company profile data
+ * 
+ * @returns {Promise<ActionResult>} Success status with error message if failed
+ * 
+ * @security Only founders can update company profile
+ * @audit Logs company_profile_updated event
+ */
+export async function updateCompanyProfile(
+  foundryId: string,
+  profileData: CompanyProfile
+): Promise<ActionResult> {
+  const supabase = await createClient()
+
+  // AUTH: Verify user is authenticated
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) {
+    return { success: false, error: 'Not authenticated' }
+  }
+
+  // AUTH: Get current user's profile to check role
+  const { data: currentProfile, error: profileError } = await supabase
+    .from('profiles')
+    .select('id, role, foundry_id')
+    .eq('id', user.id)
+    .single()
+
+  if (profileError || !currentProfile) {
+    console.error('[FoundryActions] Failed to fetch user profile:', {
+      userId: user.id,
+      error: profileError?.message,
+    })
+    return { success: false, error: 'User profile not found' }
+  }
+
+  // AUTH: Verify user belongs to this foundry
+  if (currentProfile.foundry_id !== foundryId) {
+    console.warn('[FoundryActions] Foundry isolation violation attempt (company profile):', {
+      userId: user.id,
+      userFoundryId: currentProfile.foundry_id,
+      targetFoundryId: foundryId,
+    })
+    return { success: false, error: 'Cannot update profile for different foundry' }
+  }
+
+  // AUTH: Only founders can update company profile
+  if (currentProfile.role !== 'Founder') {
+    console.warn('[FoundryActions] Non-founder attempted to update company profile:', {
+      userId: user.id,
+      role: currentProfile.role,
+      foundryId,
+    })
+    return { success: false, error: 'Only founders can update company profile' }
+  }
+
+  // VALIDATION: Ensure metadata is set
+  if (!profileData.updatedAt || !profileData.updatedBy) {
+    return { success: false, error: 'Update metadata is required' }
+  }
+
+  try {
+    const { data, error: rpcError } = await supabase.rpc('update_company_profile', {
+      p_foundry_id: foundryId,
+      p_company_profile: profileData as unknown as Record<string, unknown>,
+    })
+
+    if (rpcError) {
+      console.error('[FoundryActions] Failed to update company profile via RPC:', {
+        foundryId,
+        error: rpcError.message,
+        code: rpcError.code,
+      })
+      return { success: false, error: `Failed to update company profile: ${rpcError.message}` }
+    }
+
+    // AUDIT: Log the profile update
+    console.info('[FoundryActions] Company profile updated:', {
+      foundryId,
+      updatedBy: user.id,
+      hasEmployeeCount: !!profileData.employee_count,
+      hasRevenueRange: !!profileData.revenue_range,
+      hasFundingStatus: !!profileData.funding_status,
+    })
+
+    // Revalidate pages that use company context
+    revalidatePath('/settings')
+    revalidatePath('/objectives')
+    revalidatePath('/advisory')
+
+    return {
+      success: true,
+      error: null,
+      data,
+    }
+  } catch (error) {
+    console.error('[FoundryActions] Unexpected error updating company profile:', {
+      foundryId,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    })
+    return {
+      success: false,
+      error: 'An unexpected error occurred',
+    }
+  }
+}
+
+/**
+ * Fetches foundry company profile data.
+ * 
+ * @description Retrieves the foundry's structured company profile.
+ * Accessible by all members of the foundry.
+ * 
+ * @param {string} foundryId - The foundry to fetch profile for
+ * 
+ * @returns {Promise<ActionResult>} Success status with company profile data or error
+ * 
+ * @security Users can only fetch profile for their own foundry (foundry isolation)
+ */
+export async function getCompanyProfile(
+  foundryId: string
+): Promise<ActionResult> {
+  const supabase = await createClient()
+
+  // AUTH: Verify user is authenticated
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) {
+    return { success: false, error: 'Not authenticated' }
+  }
+
+  // AUTH: Get current user's profile to verify foundry membership
+  const { data: currentProfile, error: profileError } = await supabase
+    .from('profiles')
+    .select('foundry_id')
+    .eq('id', user.id)
+    .single()
+
+  if (profileError || !currentProfile) {
+    return { success: false, error: 'User profile not found' }
+  }
+
+  // AUTH: Verify user belongs to the foundry
+  if (currentProfile.foundry_id !== foundryId) {
+    return { success: false, error: 'Cannot access profile for different foundry' }
+  }
+
+  try {
+    // Fetch foundry data via RPC (bypasses RLS issue on foundries table)
+    const { data, error: fetchError } = await supabase.rpc('ensure_foundry_exists', {
+      p_foundry_id: foundryId,
+    })
+
+    if (fetchError) {
+      console.error('[FoundryActions] Failed to fetch company profile:', {
+        foundryId,
+        error: fetchError.message,
+      })
+      return { success: false, error: 'Failed to fetch company profile' }
+    }
+
+    return {
+      success: true,
+      error: null,
+      data: (data as { company_profile?: CompanyProfile | null })?.company_profile ?? null,
+    }
+  } catch (error) {
+    console.error('[FoundryActions] Unexpected error fetching company profile:', {
+      foundryId,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    })
+    return {
+      success: false,
+      error: 'An unexpected error occurred',
     }
   }
 }

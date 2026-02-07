@@ -47,3 +47,83 @@ export interface FoundryPurposeData {
  * Partial update type for foundry purpose (used in server actions)
  */
 export type UpdateFoundryPurposeData = Partial<Omit<FoundryPurposeData, 'updatedAt' | 'updatedBy'>>
+
+// --- Company Profile ---
+
+/** How many employees the company has */
+export type EmployeeCount = 'just_me' | '2-5' | '6-15' | '16-50' | '51-200' | '200+'
+
+/** Annual revenue range */
+export type RevenueRange = 'pre_revenue' | 'under_100k' | '100k_500k' | '500k_1m' | '1m_5m' | '5m_plus'
+
+/** Current funding status */
+export type FundingStatus = 'bootstrapped' | 'pre_seed' | 'seed' | 'series_a' | 'series_b_plus' | 'profitable'
+
+/** Primary business model */
+export type BusinessModel = 'saas' | 'marketplace' | 'services' | 'hardware' | 'hybrid' | 'other'
+
+/**
+ * Structured company profile stored in foundries.company_profile JSONB column.
+ * Used by the AI Context Builder to personalise recommendations.
+ */
+export interface CompanyProfile {
+  /** Company size */
+  employee_count: EmployeeCount | null
+  /** Annual revenue bracket */
+  revenue_range: RevenueRange | null
+  /** Current funding stage */
+  funding_status: FundingStatus | null
+  /** Whether the company is actively seeking funding */
+  seeking_funding: boolean | null
+  /** Year the company was founded */
+  founded_year: number | null
+  /** City / country */
+  location: string | null
+  /** Company website URL */
+  website: string | null
+  /** Primary business model */
+  business_model: BusinessModel | null
+
+  // Metadata
+  /** ISO timestamp of last update */
+  updatedAt: string
+  /** User ID who last edited */
+  updatedBy: string
+}
+
+/** Display labels for enum values */
+export const EMPLOYEE_COUNT_LABELS: Record<EmployeeCount, string> = {
+  just_me: 'Just me',
+  '2-5': '2–5',
+  '6-15': '6–15',
+  '16-50': '16–50',
+  '51-200': '51–200',
+  '200+': '200+',
+}
+
+export const REVENUE_RANGE_LABELS: Record<RevenueRange, string> = {
+  pre_revenue: 'Pre-revenue',
+  under_100k: 'Under £100k',
+  '100k_500k': '£100k – £500k',
+  '500k_1m': '£500k – £1m',
+  '1m_5m': '£1m – £5m',
+  '5m_plus': '£5m+',
+}
+
+export const FUNDING_STATUS_LABELS: Record<FundingStatus, string> = {
+  bootstrapped: 'Bootstrapped',
+  pre_seed: 'Pre-seed',
+  seed: 'Seed',
+  series_a: 'Series A',
+  series_b_plus: 'Series B+',
+  profitable: 'Profitable',
+}
+
+export const BUSINESS_MODEL_LABELS: Record<BusinessModel, string> = {
+  saas: 'SaaS',
+  marketplace: 'Marketplace',
+  services: 'Services',
+  hardware: 'Hardware',
+  hybrid: 'Hybrid',
+  other: 'Other',
+}

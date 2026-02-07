@@ -5,6 +5,7 @@ import { z } from "zod";
 import { zodResponseFormat } from "openai/helpers/zod";
 import { createClient } from "@/lib/supabase/server";
 import { rateLimit, getClientIP } from "@/lib/security/rate-limit";
+import { buildAIContext } from "@/lib/ai-context/builder";
 
 const openai = new OpenAI({
     apiKey: process.env.OPENAI_API_KEY || "dummy-key-for-build",
@@ -147,6 +148,21 @@ export async function POST(req: NextRequest): Promise<NextResponse<AISearchRespo
             );
         }
 
+        // Build company context for more relevant search understanding
+        let businessContext = ''
+        const { data: profile } = await supabase
+            .from('profiles')
+            .select('foundry_id')
+            .eq('id', user.id)
+            .single()
+
+        if (profile?.foundry_id) {
+            businessContext = await buildAIContext(profile.foundry_id, user.id, {
+                includeActivity: false, // Keep search fast
+                includeObjectives: false,
+            })
+        }
+
         // Call OpenAI to extract structured filters
         // @ts-expect-error types for beta.chat.completions.parse are conflicting
         const completion = await openai.beta.chat.completions.parse({
@@ -157,6 +173,7 @@ export async function POST(req: NextRequest): Promise<NextResponse<AISearchRespo
                     content: `You are a marketplace search assistant for ForgeOS, a platform connecting businesses with fractional talent, products, services, and AI tools.
 
 Your task is to extract structured search filters from natural language queries.
+${businessContext ? `\nThe user's business context (use this to infer intent and prioritise relevant results):\n${businessContext}` : ''}
 
 MARKETPLACE CATEGORIES:
 1. **People** - Fractional executives, consultants, contractors, virtual assistants, specialists

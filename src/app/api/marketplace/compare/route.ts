@@ -4,6 +4,7 @@ import { z } from "zod";
 import { Json } from "@/types/database.types";
 import { createClient } from "@/lib/supabase/server";
 import { rateLimit } from "@/lib/security/rate-limit";
+import { buildAIContext } from "@/lib/ai-context/builder";
 
 // SECURITY: Zod schema for input validation
 const MarketplaceListingSchema = z.object({
@@ -140,11 +141,27 @@ Return ONLY a raw JSON object (no markdown formatting) with this exact structure
    Description: ${item.description || "No description provided"}${attributesStr}`;
         }).join("\n\n");
 
-        const contextSection = foundryContext 
-            ? `\nBusiness Context:
+        // Build rich company context from the AI Context Builder
+        let contextSection = ''
+        const { data: userProfile } = await supabase
+            .from('profiles')
+            .select('foundry_id')
+            .eq('id', user.id)
+            .single()
+
+        if (userProfile?.foundry_id) {
+            contextSection = await buildAIContext(userProfile.foundry_id, user.id, {
+                includeActivity: false, // Keep comparison fast
+                includeObjectives: true,
+            })
+        }
+
+        // Fallback to legacy context if no AI context was built
+        if (!contextSection && foundryContext) {
+            contextSection = `\nBusiness Context:
 - Industry: ${foundryContext.industry || "Not specified"}
 - Stage: ${foundryContext.stage || "Not specified"}`
-            : "";
+        }
 
         const userPrompt = `Please compare these ${items.length} marketplace listings and recommend the best option:
 
