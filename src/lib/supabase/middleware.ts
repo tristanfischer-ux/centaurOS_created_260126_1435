@@ -12,7 +12,6 @@ const PUBLIC_ROUTES = [
     '/invite',
     '/api/health',
     '/api/webhooks',
-    '/api/marketplace/preview',
     '/access-revoked',  // Access revoked page for deactivated users
     '/workspace-picker', // Multi-foundry workspace selector
 ]
