@@ -31,11 +31,12 @@ async function BlueprintsData() {
     getAdvisoryQuestions({ limit: 10 }),
     getObjectivePacks(),
     getUniversalSubsystems(),
-    // Fetch team members for task assignment
+    // Fetch team members for task assignment (exclude AI agents)
     foundryId ? supabase
       .from('profiles')
       .select('id, full_name, role, email, avatar_url')
       .eq('foundry_id', foundryId)
+      .neq('role', 'AI_Agent')
       .order('full_name')
       : Promise.resolve({ data: null }),
   ])

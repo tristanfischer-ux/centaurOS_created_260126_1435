@@ -32,6 +32,17 @@ export async function createObjective(formData: FormData) {
     // AI Import tasks (JSON strings)
     const aiTasksJson = formData.getAll('aiTasks') as string[]
 
+    // Parse task assignee selections (packItemId -> userId or 'unassigned')
+    const taskAssigneesJson = formData.get('taskAssignees') as string | null
+    let taskAssignees: Record<string, string> = {}
+    if (taskAssigneesJson) {
+        try {
+            taskAssignees = JSON.parse(taskAssigneesJson)
+        } catch (parseError) {
+            console.error('[ObjectiveService] Failed to parse taskAssignees:', parseError)
+        }
+    }
+
     // Validate using Zod schema
     const rawData = {
         title: title || '',
@@ -142,28 +153,6 @@ export async function createObjective(formData: FormData) {
                 return { error: 'One or more pack items are missing required fields (title)' }
             }
 
-            // Check if any tasks need AI Agent assignment
-            const needsAIAgent = packItems.some(t => t.role === 'AI_Agent')
-            let aiAgentId: string | null = null
-            
-            if (needsAIAgent) {
-                const { data: aiAgents, error: aiAgentError } = await supabase
-                    .from('profiles')
-                    .select('id')
-                    .eq('role', 'AI_Agent')
-                    .limit(1)
-                
-                if (aiAgentError) {
-                    console.error('Error fetching AI Agent:', aiAgentError)
-                    // Non-fatal: continue without AI agent assignment, will assign to creator
-                } else {
-                    aiAgentId = aiAgents?.[0]?.id || null
-                    if (!aiAgentId) {
-                        console.warn('AI Agent role tasks found but no AI Agent profile exists. Assigning to creator.')
-                    }
-                }
-            }
-
             // Create task objects from pack items
             const now = new Date()
             const nextWeek = new Date(now)
@@ -175,8 +164,11 @@ export async function createObjective(formData: FormData) {
                     throw new Error(`Pack item ${item.id} has invalid title`)
                 }
 
-                // Determine assignee: AI Agent if role matches and exists, otherwise creator
-                const assigneeId = (item.role === 'AI_Agent' && aiAgentId) ? aiAgentId : user.id
+                // Determine assignee from user selection, fallback to creator
+                const selectedAssignee = taskAssignees[item.id]
+                const assigneeId = (selectedAssignee && selectedAssignee !== 'unassigned')
+                    ? selectedAssignee
+                    : user.id
 
                 return {
                     title: item.title.trim(),
@@ -197,15 +189,6 @@ export async function createObjective(formData: FormData) {
 
     // B. From AI Import
     if (aiTasksJson.length > 0) {
-        // Find AI Agent if needed
-        let aiAgentId = null
-        const { data: aiAgents } = await supabase
-            .from('profiles')
-            .select('id')
-            .eq('role', 'AI_Agent')
-            .limit(1)
-        aiAgentId = aiAgents?.[0]?.id || null
-
         const aiTasks = aiTasksJson.map(str => {
             try {
                 return JSON.parse(str)
@@ -234,7 +217,7 @@ export async function createObjective(formData: FormData) {
                 creator_id: user.id,
                 foundry_id,
                 status: 'Pending' as const,
-                assignee_id: task.role === 'AI_Agent' ? aiAgentId : user.id // Assign to creator by default
+                assignee_id: user.id
             }))
         ]
     }
@@ -551,13 +534,6 @@ export async function createObjectiveFromSubsystem(input: {
         input.selectedTaskIndices.includes(index)
     )
 
-    // Get AI Agent profile for AI_Agent role assignments
-    const { data: aiAgent } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('email', 'ai-agent@forgeos.ai')
-        .single()
-
     // Create the objective
     const objectiveTitle = input.packTitle
     const objectiveDescription = input.packSummary || `Objective pack for ${input.subsystemName}`
@@ -584,15 +560,13 @@ export async function createObjectiveFromSubsystem(input: {
 
         // 2. Create tasks from the selected pack tasks
         const tasksToInsert = selectedTasks.map((task) => {
-            // Determine assignee based on role
+            // Assign Executive tasks to creator, leave Apprentice tasks
+            // unassigned for manual team assignment
             let assignee_id: string | null = null
-            if (task.role === 'AI_Agent' && aiAgent?.id) {
-                assignee_id = aiAgent.id
-            } else if (task.role === 'Executive') {
-                // Assign to creator (typically the executive/founder)
+            if (task.role === 'Executive') {
                 assignee_id = user.id
             }
-            // Apprentice tasks left unassigned for team assignment
+            // Apprentice and other tasks left unassigned for team assignment
 
             // Add marketplace context to description if it's a marketplace task
             let description = task.description

@@ -17,12 +17,22 @@ import { getTemplateIcon, getDifficultyColor, INDUSTRY_CATEGORIES } from './util
 // Packs for the selected industry are loaded lazily on selection.
 // ---------------------------------------------------------------------------
 
+interface TeamMember {
+  id: string
+  full_name: string
+  role: string
+  email: string
+  avatar_url?: string | null
+}
+
 interface IndustrySelectorProps {
   templates: BlueprintTemplate[]
   savedPackIds: Set<string>
   onSaveToggle: (packId: string, isSaved: boolean) => void
   /** When set, auto-selects the matching industry on first render */
   defaultIndustry?: string
+  /** Team members available for task assignment */
+  members?: TeamMember[]
 }
 
 export function IndustrySelector({
@@ -30,6 +40,7 @@ export function IndustrySelector({
   savedPackIds,
   onSaveToggle,
   defaultIndustry,
+  members = [],
 }: IndustrySelectorProps) {
   const [selected, setSelected] = useState<BlueprintTemplate | null>(null)
   const [packs, setPacks] = useState<ObjectivePack[]>([])
@@ -146,6 +157,7 @@ export function IndustrySelector({
                 pack={pack}
                 isSaved={savedPackIds.has(pack.id)}
                 onSaveToggle={onSaveToggle}
+                members={members}
               />
             ))}
           </div>

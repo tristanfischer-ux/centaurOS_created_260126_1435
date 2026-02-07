@@ -23,15 +23,25 @@ import { getDifficultyColor, getPackIcon } from './utils'
 // Click anywhere → opens UsePackDialog.  Heart button → save / unsave.
 // ---------------------------------------------------------------------------
 
+interface TeamMember {
+  id: string
+  full_name: string
+  role: string
+  email: string
+  avatar_url?: string | null
+}
+
 interface PackCardProps {
   pack: ObjectivePack
   isSaved?: boolean
   onSaveToggle?: (packId: string, isSaved: boolean) => void
   /** Short contextual line explaining why this pack is relevant to the user */
   whyTag?: string
+  /** Team members available for task assignment */
+  members?: TeamMember[]
 }
 
-export function PackCard({ pack, isSaved = false, onSaveToggle, whyTag }: PackCardProps) {
+export function PackCard({ pack, isSaved = false, onSaveToggle, whyTag, members = [] }: PackCardProps) {
   const Icon = getPackIcon(pack.icon_name)
   const taskCount = pack.items?.length || 0
   const previewTasks = pack.items?.slice(0, 3) || []
@@ -74,6 +84,7 @@ export function PackCard({ pack, isSaved = false, onSaveToggle, whyTag }: PackCa
   return (
     <UsePackDialog
       pack={pack}
+      members={members}
       trigger={
         <Card className="group relative flex flex-col h-full cursor-pointer transition-all duration-200 hover:shadow-lg hover:border-electric-blue/40 hover:-translate-y-0.5">
           {/* ---- Save / heart button ---- */}

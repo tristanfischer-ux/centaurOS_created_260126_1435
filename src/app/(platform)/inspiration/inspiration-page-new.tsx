@@ -229,11 +229,20 @@ const NEED_CATEGORIES = [
 // Main Inspiration page component
 // ---------------------------------------------------------------------------
 
+interface TeamMember {
+  id: string
+  full_name: string
+  role: string
+  email: string
+  avatar_url?: string | null
+}
+
 interface InspirationPageNewProps {
   templates?: BlueprintTemplate[]
   packs?: ObjectivePack[]
   initialSavedPackIds?: string[]
   foundryContext?: FoundryContext
+  members?: TeamMember[]
 }
 
 export function InspirationPageNew({
@@ -241,6 +250,7 @@ export function InspirationPageNew({
   packs = [],
   initialSavedPackIds = [],
   foundryContext,
+  members = [],
 }: InspirationPageNewProps) {
   // Tab state
   const [activeTab, setActiveTab] = useState<TabId>('for-you')
@@ -478,6 +488,7 @@ export function InspirationPageNew({
                     isSaved={savedPackIds.has(pack.id)}
                     onSaveToggle={handleSaveToggle}
                     whyTag={whyTag}
+                    members={members}
                   />
                 ))}
               </div>
@@ -682,6 +693,7 @@ export function InspirationPageNew({
                   pack={pack}
                   isSaved={savedPackIds.has(pack.id)}
                   onSaveToggle={handleSaveToggle}
+                  members={members}
                 />
               ))}
             </div>
@@ -698,6 +710,7 @@ export function InspirationPageNew({
           savedPackIds={savedPackIds}
           onSaveToggle={handleSaveToggle}
           defaultIndustry={ctx?.industry || undefined}
+          members={members}
         />
       )}
 
@@ -726,6 +739,7 @@ export function InspirationPageNew({
                 pack={pack}
                 isSaved={savedPackIds.has(pack.id)}
                 onSaveToggle={handleSaveToggle}
+                members={members}
               />
             ))}
           </div>
@@ -755,6 +769,7 @@ export function InspirationPageNew({
                   pack={pack}
                   isSaved={true}
                   onSaveToggle={handleSaveToggle}
+                  members={members}
                 />
               ))}
             </div>

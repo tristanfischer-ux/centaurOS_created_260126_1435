@@ -16,9 +16,6 @@ import {
   ChevronDown,
   ChevronUp,
   Info,
-  User,
-  Users,
-  Bot,
   CircleDashed,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -97,6 +94,8 @@ export function UsePackDialog({ pack, trigger, members = [] }: UsePackDialogProp
       selectedTaskIds.forEach(id => {
         formData.append('selectedTaskIds', id)
       })
+      // Pass task assignee selections so they're persisted
+      formData.append('taskAssignees', JSON.stringify(taskAssignees))
 
       const result = await createObjective(formData)
 
@@ -352,7 +351,9 @@ export function UsePackDialog({ pack, trigger, members = [] }: UsePackDialogProp
                                         <span>Unassigned</span>
                                       </div>
                                     </SelectItem>
-                                    {members.map((member) => (
+                                    {members
+                                      .filter((member) => member.role !== 'AI_Agent')
+                                      .map((member) => (
                                       <SelectItem key={member.id} value={member.id} className="py-2.5">
                                         <div className="flex items-center gap-2">
                                           <UserAvatar
@@ -368,14 +369,6 @@ export function UsePackDialog({ pack, trigger, members = [] }: UsePackDialogProp
                                         </div>
                                       </SelectItem>
                                     ))}
-                                    <SelectItem value="agent" className="py-2.5">
-                                      <div className="flex items-center gap-2">
-                                        <div className="h-6 w-6 rounded-full bg-purple-100 flex items-center justify-center shrink-0">
-                                          <Bot className="h-3.5 w-3.5 text-purple-600" />
-                                        </div>
-                                        <span>AI Agent</span>
-                                      </div>
-                                    </SelectItem>
                                   </SelectContent>
                                 </Select>
                                 {item.description && (
