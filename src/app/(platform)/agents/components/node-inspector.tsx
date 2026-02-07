@@ -1020,6 +1020,29 @@ function HumanTaskInspector({
                         </div>
                     )}
 
+                    {/* Data flow hint — helps users understand what happens next */}
+                    {!isDone && (
+                        <div className="p-3 rounded-lg bg-amber-50/60 border border-amber-100">
+                            <p className="text-[10px] font-semibold text-amber-700 uppercase tracking-wider mb-1.5">
+                                What happens next
+                            </p>
+                            <ul className="space-y-1.5 text-xs text-amber-800 leading-relaxed">
+                                <li className="flex items-start gap-2">
+                                    <span className="text-amber-500 mt-0.5">•</span>
+                                    <span>Complete the checklist, then <strong>Mark Complete</strong> to continue the workflow</span>
+                                </li>
+                                <li className="flex items-start gap-2">
+                                    <span className="text-amber-500 mt-0.5">•</span>
+                                    <span>The next AI step will run automatically using outputs from previous steps</span>
+                                </li>
+                                <li className="flex items-start gap-2">
+                                    <span className="text-amber-500 mt-0.5">•</span>
+                                    <span>To add your own data or notes, open the next step and paste into its <strong>Input Data</strong> field before running</span>
+                                </li>
+                            </ul>
+                        </div>
+                    )}
+
                     {/* Done state */}
                     {isDone && (
                         <div className="p-3 rounded-lg bg-emerald-50 border border-emerald-100 text-center">

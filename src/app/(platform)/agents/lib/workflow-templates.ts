@@ -94,7 +94,7 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
             {
                 type: "human-task",
                 label: "Gather your fundraising context",
-                guidance: "Before the workflow runs, pull together the key information your team needs to tell a compelling fundraising story.",
+                guidance: "Before the workflow runs, pull together the key information your team needs to tell a compelling fundraising story.\n\nOnce you've completed the checklist, open the next step (Vision & Mission) and paste your company details, metrics, and story into its Input Data field — this powers all the AI-generated content that follows.",
                 checklist: [
                     "Company stage, traction metrics, and team bios",
                     "Target raise amount and use-of-funds plan",
@@ -108,7 +108,7 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
             {
                 type: "human-task",
                 label: "Review numbers with your co-founder",
-                guidance: "Pause here and review the generated projections and market sizing with your co-founder or finance lead. Validate assumptions before building the pitch deck.",
+                guidance: "The previous steps generated your Vision & Mission, Market Sizing, and Financial Projections. Click each step above to review the outputs.\n\nValidate assumptions with your co-founder or finance lead before building the pitch deck. You can edit any output directly — corrections will carry forward to the next steps.",
                 checklist: [
                     "Revenue assumptions are realistic and defensible",
                     "Market sizing matches your actual target segments",
@@ -123,7 +123,7 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
             {
                 type: "human-task",
                 label: "Rehearse and send",
-                guidance: "Practice your pitch with your team, personalize the intro emails for each investor, and schedule your first meetings.",
+                guidance: "Your pitch deck narrative, Q&A prep, intro emails, due diligence checklist, and post-raise comms have all been generated. Click each step above to review and export.\n\nPractice your pitch with your team, personalise the intro emails for each investor, and schedule your first meetings.",
                 checklist: [
                     "Rehearse pitch with at least 2 friendly advisors",
                     "Personalise each warm intro email",
@@ -152,7 +152,7 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
             {
                 type: "human-task",
                 label: "Define your ICP and positioning",
-                guidance: "Before building your go-to-market plan, align your team on who you are targeting and how you want to be positioned.",
+                guidance: "Before building your go-to-market plan, align your team on who you are targeting and how you want to be positioned.\n\nOnce you've completed the checklist, open the next step (Product-Market Fit Assessment) and paste your ICP, value proposition, and differentiators into its Input Data field.",
                 checklist: [
                     "Define your ideal customer profile (industry, size, role)",
                     "Articulate your core value proposition in one sentence",
@@ -165,7 +165,7 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
             {
                 type: "human-task",
                 label: "Test messaging with 5 customers",
-                guidance: "Share the generated GTM strategy and landing page copy with real prospects. Their feedback is worth more than any model.",
+                guidance: "The previous steps generated a PMF Assessment, First 100 Customers Plan, and GTM Strategy. Click each step above to review and export these outputs.\n\nShare the strategy and messaging with real prospects. Their feedback is worth more than any model.",
                 checklist: [
                     "Share landing page copy with 5 target customers",
                     "Collect feedback on messaging clarity and appeal",
@@ -179,7 +179,7 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
             {
                 type: "human-task",
                 label: "Launch checklist and go-live",
-                guidance: "Run through the final launch checklist with your team. Make sure everything is ready before you go live.",
+                guidance: "Your landing page copy, product descriptions, social media posts, and email campaign have all been generated. Click each step above to review, edit, and export.\n\nRun through the final launch checklist with your team. Make sure everything is ready before you go live.",
                 checklist: [
                     "Landing page is live and tested on mobile",
                     "Email sequences are loaded and tested",
@@ -208,7 +208,7 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
             {
                 type: "human-task",
                 label: "Set quarterly priorities with leadership",
-                guidance: "Before generating your OKRs, align with your leadership team on the top 3 priorities for this quarter.",
+                guidance: "Before generating your OKRs, align with your leadership team on the top 3 priorities for this quarter.\n\nOnce you've completed the checklist, open the next step (Quarterly OKRs) and paste your priorities, last quarter's results, and department input into its Input Data field.",
                 checklist: [
                     "Review last quarter's results with the team",
                     "Identify the top 3 priorities for this quarter",
@@ -221,7 +221,7 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
             {
                 type: "human-task",
                 label: "Review metrics with your team",
-                guidance: "Walk through the metrics dashboard and standup template with your team leads. Adjust the cadence to match your team's rhythm.",
+                guidance: "The previous steps generated OKRs, a 90-Day Execution Plan, and a Weekly Standup template. Click each step above to review the outputs.\n\nWalk through these with your team leads. Adjust the cadence and metrics to match your team's rhythm.",
                 checklist: [
                     "Review metrics with each department lead",
                     "Agree on weekly standup format and timing",
@@ -234,7 +234,7 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
             {
                 type: "human-task",
                 label: "Send updates and collect feedback",
-                guidance: "Personalise the board and investor updates with your own insights, then send them and track any questions that come back.",
+                guidance: "Your Metrics Dashboard, Board Update, and Investor Update have been generated. Click each step above to review, edit, and export.\n\nPersonalise the updates with your own insights, then send them and track any questions that come back.",
                 checklist: [
                     "Add personal commentary to board update",
                     "Send investor update to all shareholders",
@@ -262,7 +262,7 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
             {
                 type: "human-task",
                 label: "Collect market research and data",
-                guidance: "Gather the raw inputs your business plan needs: market data, competitive intelligence, financial actuals, and customer research.",
+                guidance: "Gather the raw inputs your business plan needs: market data, competitive intelligence, financial actuals, and customer research.\n\nOnce you've completed the checklist, open the next step (Business Model Canvas) and paste your gathered data into its Input Data field — this powers all the AI analysis that follows.",
                 checklist: [
                     "Compile industry reports and market data",
                     "List top 5 competitors with their positioning",
@@ -276,7 +276,7 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
             {
                 type: "human-task",
                 label: "Validate assumptions with advisors",
-                guidance: "Share the business model canvas and competitive analysis with 2-3 trusted advisors. Challenge every assumption.",
+                guidance: "The previous steps generated a Business Model Canvas, Lean Canvas, and Competitive Moat Analysis based on your research. Click each step above to review the outputs.\n\nShare these with 2-3 trusted advisors. Challenge every assumption. If you need to adjust anything, edit the outputs directly before continuing.",
                 checklist: [
                     "Share canvases with at least 2 advisors",
                     "Flag and resolve questionable assumptions",
@@ -287,13 +287,15 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
             { type: "prompt", promptId: "startup-market-sizing", label: "Market Sizing", category: "startup-strategy", icon: "PieChart" },
             { type: "prompt", promptId: "strategy-growth-framework", label: "Growth Strategy", category: "strategy", icon: "TrendingUp" },
             { type: "prompt", promptId: "strategy-business-plan", label: "Business Plan Writer", category: "strategy", icon: "FileText" },
+            { type: "prompt", promptId: "strategy-board-presentation", label: "Stakeholder Presentation", category: "strategy", icon: "Presentation" },
             {
                 type: "human-task",
                 label: "Present plan to stakeholders",
-                guidance: "Walk your co-founders, advisors, or board through the completed business plan. Gather sign-off before executing.",
+                guidance: "Your business plan and stakeholder presentation have been generated. Click each step above to review and export the outputs.\n\nWalk your co-founders, advisors, or board through the completed materials. Use the Export button on each step to download as PDF, DOCX, or Markdown.",
                 checklist: [
                     "Schedule presentation with key stakeholders",
-                    "Prepare summary deck of key findings",
+                    "Review and polish the generated presentation deck",
+                    "Export the business plan and presentation for sharing",
                     "Collect feedback and final sign-off",
                 ],
             },
@@ -318,7 +320,7 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
             {
                 type: "human-task",
                 label: "Gather team signals and data",
-                guidance: "Before analysing a potential pivot, collect the signals from your team and customers that suggest change is needed.",
+                guidance: "Before analysing a potential pivot, collect the signals from your team and customers that suggest change is needed.\n\nOnce you've completed the checklist, open the next step (Metrics Dashboard) and paste your exported metrics and feedback into its Input Data field.",
                 checklist: [
                     "Export current metrics (churn, NPS, activation, revenue)",
                     "Collect qualitative feedback from customer-facing team",
@@ -331,7 +333,7 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
             {
                 type: "human-task",
                 label: "Discuss options with leadership",
-                guidance: "This is a major decision. Review the pivot analysis with your co-founders and key leaders before committing to a direction.",
+                guidance: "The previous steps generated a Metrics Dashboard, PMF assessment, and Pivot Analysis. Click each step above to review the outputs.\n\nThis is a major decision. Review the analysis with your co-founders and key leaders before committing to a direction.",
                 checklist: [
                     "Review pivot options with co-founders",
                     "Assess team capability for each option",
@@ -342,12 +344,13 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
             { type: "prompt", promptId: "strategy-competitive-landscape", label: "Competitive Landscape", category: "strategy", icon: "Map" },
             { type: "prompt", promptId: "strategy-scenario-planner", label: "Scenario Planning", category: "strategy", icon: "GitBranch" },
             { type: "prompt", promptId: "startup-90-day-plan", label: "New 90-Day Plan", category: "startup-strategy", icon: "Map" },
+            { type: "prompt", promptId: "data-executive-summary", label: "Decision Summary", category: "data-analytics", icon: "FileText" },
             {
                 type: "human-task",
                 label: "Communicate decision to team",
-                guidance: "Once you've decided, communicate the pivot (or the decision to stay the course) clearly to your entire team.",
+                guidance: "A Decision Summary has been generated based on the entire analysis. Click the step above to review and export it.\n\nUse this summary as the foundation for your team communication. Personalise it with your own voice and context.",
                 checklist: [
-                    "Prepare all-hands talking points",
+                    "Review and personalise the Decision Summary",
                     "Brief individual team leads first",
                     "Send written communication to full team",
                     "Set up weekly check-ins to track pivot progress",
@@ -374,7 +377,7 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
             {
                 type: "human-task",
                 label: "Assess current cash position",
-                guidance: "Before running the crisis playbook, get an honest picture of where you stand. Pull the real numbers.",
+                guidance: "Before running the crisis playbook, get an honest picture of where you stand. Pull the real numbers.\n\nOnce you've completed the checklist, open the next step (Cash Flow Assessment) and paste your bank balance, burn rate, obligations, and expense data into its Input Data field.",
                 checklist: [
                     "Export current bank balance and burn rate",
                     "List all upcoming payment obligations (30/60/90 days)",
@@ -388,7 +391,7 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
             {
                 type: "human-task",
                 label: "Align with board on approach",
-                guidance: "A cash crisis requires board awareness. Share the analysis and get alignment on the response plan before executing.",
+                guidance: "The previous steps generated a Cash Flow Assessment, Crisis Response Plan, and Scenario Plans. Click each step above to review and export.\n\nA cash crisis requires board awareness. Share the analysis and get alignment on the response plan before executing.",
                 checklist: [
                     "Brief board chair on the situation",
                     "Share crisis response plan with full board",
@@ -402,10 +405,10 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
             {
                 type: "human-task",
                 label: "Execute and brief stakeholders",
-                guidance: "Put the recovery plan into action. Communicate transparently with your team and investors.",
+                guidance: "Your Vendor Renegotiation strategy, Board Communication, and Recovery 90-Day Plan have been generated. Click each step above to review and export.\n\nPut the recovery plan into action. Use the Board Communication as your template for stakeholder updates.",
                 checklist: [
                     "Execute immediate cost reductions",
-                    "Send board update with action plan",
+                    "Send the generated Board Communication with your updates",
                     "Brief team on changes (be transparent)",
                     "Set weekly cash position check-ins",
                 ],
@@ -431,7 +434,7 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
             {
                 type: "human-task",
                 label: "Collect your story and metrics",
-                guidance: "A great pitch deck starts with your real story. Gather the data and narrative elements that make your company unique.",
+                guidance: "A great pitch deck starts with your real story. Gather the data and narrative elements that make your company unique.\n\nOnce you've completed the checklist, open the next step (Market Sizing) and paste your story, metrics, team bios, and ask into its Input Data field — this powers the entire deck.",
                 checklist: [
                     "Write down your founding story in 3 sentences",
                     "Compile key traction metrics (MRR, users, growth rate)",
@@ -445,7 +448,7 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
             {
                 type: "human-task",
                 label: "Get feedback from advisors",
-                guidance: "Before finalising the deck, share the narrative and projections with 2-3 advisors who have fundraising experience.",
+                guidance: "The previous steps generated Market Sizing, Competitive Moat Analysis, and Financial Projections. Click each step above to review and export.\n\nShare these with 2-3 advisors who have fundraising experience before finalising the deck.",
                 checklist: [
                     "Share draft narrative with 2 experienced advisors",
                     "Validate financial projections with your finance lead",
@@ -458,7 +461,7 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
             {
                 type: "human-task",
                 label: "Final review and practice",
-                guidance: "Polish the final deck, rehearse the pitch, and prepare for tough questions.",
+                guidance: "Your Pitch Deck Narrative, Deck Review & Scoring, and Investor Q&A Prep have been generated. Click each step above to review and export.\n\nPolish the final deck, rehearse the pitch, and prepare for tough questions.",
                 checklist: [
                     "Do a full run-through with your co-founder",
                     "Time your pitch (aim for 15-20 minutes)",
@@ -488,7 +491,7 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
             {
                 type: "human-task",
                 label: "Brief: product details and audience",
-                guidance: "Provide the product details, target audience, and campaign goals so the workflow can generate on-brand content.",
+                guidance: "Provide the product details, target audience, and campaign goals so the workflow can generate on-brand content.\n\nOnce you've completed the checklist, open the next step (Product Description) and paste your product brief, audience definition, and brand guidelines into its Input Data field.",
                 checklist: [
                     "Write a product brief (features, benefits, pricing)",
                     "Define the target audience for this campaign",
@@ -502,7 +505,7 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
             {
                 type: "human-task",
                 label: "Review creative with stakeholders",
-                guidance: "Share the generated creative (descriptions, social posts, images) with your marketing lead or brand team for feedback.",
+                guidance: "The previous steps generated a Product Description, Image Prompts, and Social Media Posts. Click each step above to review and export.\n\nShare these with your marketing lead or brand team for feedback before generating the full campaign.",
                 checklist: [
                     "Review product description for accuracy",
                     "Check social media posts match brand voice",
@@ -515,7 +518,7 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
             {
                 type: "human-task",
                 label: "Approve final assets and schedule",
-                guidance: "Give final approval on all campaign assets and schedule them for launch.",
+                guidance: "Your Email Campaign, Landing Page Copy, and Ad Copy have been generated. Click each step above to review, edit, and export.\n\nGive final approval on all campaign assets and schedule them for launch.",
                 checklist: [
                     "Final review of all copy and creative",
                     "Schedule email sends and social posts",
@@ -544,7 +547,7 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
             {
                 type: "human-task",
                 label: "Define content themes and goals",
-                guidance: "Set the strategic direction for your content pipeline before generating anything.",
+                guidance: "Set the strategic direction for your content pipeline before generating anything.\n\nOnce you've completed the checklist, open the next step (Content Calendar) and paste your themes, keywords, and content goals into its Input Data field.",
                 checklist: [
                     "Identify 3-5 content themes for the quarter",
                     "Define target keywords and topics",
@@ -557,7 +560,7 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
             {
                 type: "human-task",
                 label: "Editorial review and approvals",
-                guidance: "Review the generated content with your editorial team. Check for accuracy, brand voice, and SEO quality.",
+                guidance: "The previous steps generated a Content Calendar, Blog Post, and SEO Optimisation. Click each step above to review and export.\n\nReview the generated content with your editorial team. Check for accuracy, brand voice, and SEO quality.",
                 checklist: [
                     "Fact-check all claims and statistics",
                     "Review for brand voice consistency",
@@ -570,7 +573,7 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
             {
                 type: "human-task",
                 label: "Publish and share with team",
-                guidance: "Hit publish, share across channels, and let the team know what went live.",
+                guidance: "Your Social Media Repurposing, Email Newsletter, and Analytics Narrative have been generated. Click each step above to review, edit, and export.\n\nHit publish, share across channels, and let the team know what went live.",
                 checklist: [
                     "Publish blog post and check formatting",
                     "Schedule social media posts",
@@ -599,7 +602,7 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
             {
                 type: "human-task",
                 label: "Define target accounts and personas",
-                guidance: "Identify who you are selling to before generating outreach materials.",
+                guidance: "Identify who you are selling to before generating outreach materials.\n\nOnce you've completed the checklist, open the next step (Lead Qualification) and paste your target account list, buyer personas, and decision-maker details into its Input Data field.",
                 checklist: [
                     "Build a list of 20-50 target accounts",
                     "Define the buyer persona (role, pain points, goals)",
@@ -612,7 +615,7 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
             {
                 type: "human-task",
                 label: "Review messaging with sales lead",
-                guidance: "Have your sales lead or most experienced rep review the outreach templates and objection handling scripts.",
+                guidance: "The previous steps generated Lead Qualification criteria, Cold Outreach templates, and Objection Handling scripts. Click each step above to review and export.\n\nHave your sales lead or most experienced rep review these before generating the demo and proposal materials.",
                 checklist: [
                     "Review cold outreach for tone and authenticity",
                     "Validate objection responses are accurate",
@@ -625,7 +628,7 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
             {
                 type: "human-task",
                 label: "Personalise and begin outreach",
-                guidance: "Personalise each outreach message for the specific account and start your sequences.",
+                guidance: "Your Demo Script, Proposal template, and Case Study have been generated. Click each step above to review, edit, and export.\n\nPersonalise each outreach message for the specific account and start your sequences.",
                 checklist: [
                     "Personalise first 10 outreach emails",
                     "Load templates into your sales tool (e.g. HubSpot)",
@@ -655,7 +658,7 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
             {
                 type: "human-task",
                 label: "Define ICP & product context",
-                guidance: "Before the AI can research and write, it needs to deeply understand what you're selling, who you're selling to, and what makes your offer compelling. The quality of this input directly determines the quality of every email downstream.",
+                guidance: "Before the AI can research and write, it needs to deeply understand what you're selling, who you're selling to, and what makes your offer compelling. The quality of this input directly determines the quality of every email downstream.\n\nOnce you've completed the checklist, open the next step (Prospect Deep Research) and paste all of the above into its Input Data field.",
                 checklist: [
                     "Write a 2-3 sentence product description (what it does, for whom)",
                     "Define your Ideal Customer Profile (industry, company size, funding stage, role titles)",
@@ -670,7 +673,7 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
             {
                 type: "human-task",
                 label: "Review scored leads",
-                guidance: "Review the AI's research and scoring. Approve high-scoring leads for email generation, reject poor fits, and add any context the AI may have missed.",
+                guidance: "The previous steps generated Prospect Research and Lead Scoring. Click each step above to review the outputs.\n\nApprove high-scoring leads for email generation, reject poor fits, and add any context the AI may have missed.",
                 checklist: [
                     "Verify the research brief is factually accurate",
                     "Confirm the lead score feels right based on your domain knowledge",
@@ -686,7 +689,7 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
             {
                 type: "human-task",
                 label: "Final review & send",
-                guidance: "This is your last checkpoint before emails go out. Review every email for accuracy, tone, and personalisation quality. Your reputation is on the line.",
+                guidance: "Your Personalisation Strategy, 4-Email Sequence, Subject Lines, and QA Report have been generated. Click each step above to review and export.\n\nThis is your last checkpoint before emails go out. Review every email for accuracy, tone, and personalisation quality. Your reputation is on the line.",
                 checklist: [
                     "Read every email aloud — does it sound like a real person wrote it?",
                     "Verify all company/prospect references are accurate",
@@ -717,7 +720,7 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
             {
                 type: "human-task",
                 label: "Define role requirements with hiring manager",
-                guidance: "Sit down with the hiring manager to define what they actually need. Great hiring starts with a clear brief.",
+                guidance: "Sit down with the hiring manager to define what they actually need. Great hiring starts with a clear brief.\n\nOnce you've completed the checklist, open the next step (Job Description) and paste the role requirements, skills, seniority level, and comp range into its Input Data field.",
                 checklist: [
                     "Define must-have vs. nice-to-have skills",
                     "Agree on seniority level and reporting line",
@@ -730,7 +733,7 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
             {
                 type: "human-task",
                 label: "Calibrate with interview panel",
-                guidance: "Share the job description and interview questions with everyone who will be involved in the hiring process.",
+                guidance: "The previous steps generated a Job Description and Interview Questions. Click each step above to review and export.\n\nShare these with everyone who will be involved in the hiring process and calibrate on what great looks like.",
                 checklist: [
                     "Review job description with interview panel",
                     "Agree on scoring criteria for interviews",
@@ -743,10 +746,10 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
             {
                 type: "human-task",
                 label: "Finalise offer and onboarding plan",
-                guidance: "Once you have a candidate, finalise the offer details and make sure onboarding is ready.",
+                guidance: "Your Compensation Benchmark, Onboarding Checklist, and Culture Statement have been generated. Click each step above to review and export.\n\nUse the compensation benchmark to finalise your offer and the onboarding checklist to prepare for day 1.",
                 checklist: [
-                    "Prepare written offer with compensation details",
-                    "Set up onboarding schedule for day 1 and week 1",
+                    "Prepare written offer using the Compensation Benchmark",
+                    "Set up onboarding schedule using the generated checklist",
                     "Assign a buddy or mentor for the new hire",
                     "Prepare equipment and access credentials",
                 ],
@@ -772,7 +775,7 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
             {
                 type: "human-task",
                 label: "Collect data from department leads",
-                guidance: "A QBR is only as good as its data. Gather the numbers from each department before generating the review.",
+                guidance: "A QBR is only as good as its data. Gather the numbers from each department before generating the review.\n\nOnce you've completed the checklist, open the next step (KPI Dashboard) and paste your KPIs, financials, OKR progress, and key wins/challenges into its Input Data field.",
                 checklist: [
                     "Collect KPIs from each department lead",
                     "Export financial data (P&L, cash flow, ARR)",
@@ -786,7 +789,7 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
             {
                 type: "human-task",
                 label: "Discuss findings with leadership",
-                guidance: "Walk through the QBR materials with your leadership team before presenting to the board.",
+                guidance: "The previous steps generated a KPI Dashboard, Financial Summary, and SWOT Analysis. Click each step above to review and export.\n\nWalk through these with your leadership team before presenting to the board.",
                 checklist: [
                     "Review KPIs and flag any concerning trends",
                     "Discuss SWOT findings and strategic implications",
@@ -798,11 +801,11 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
             {
                 type: "human-task",
                 label: "Present to board or all-hands",
-                guidance: "Deliver the QBR to your board, investors, or team. Make it a conversation, not a monologue.",
+                guidance: "Your OKR Progress report and Board Presentation have been generated. Click each step above to review, edit, and export.\n\nUse the Board Presentation as your deck. Deliver the QBR to your board, investors, or team. Make it a conversation, not a monologue.",
                 checklist: [
                     "Schedule and send calendar invite",
+                    "Review and personalise the generated Board Presentation",
                     "Do a dry run of the presentation",
-                    "Prepare for likely questions",
                     "Send follow-up summary after the meeting",
                 ],
             },
@@ -827,7 +830,7 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
             {
                 type: "human-task",
                 label: "Map your customer journey",
-                guidance: "Before building onboarding materials, understand the journey your customers actually take.",
+                guidance: "Before building onboarding materials, understand the journey your customers actually take.\n\nOnce you've completed the checklist, open the next step (User Personas) and paste your customer journey map, drop-off points, and customer feedback into its Input Data field.",
                 checklist: [
                     "Map the current customer journey (sign-up to value)",
                     "Identify the biggest drop-off points",
@@ -839,7 +842,7 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
             {
                 type: "human-task",
                 label: "Review with customer success team",
-                guidance: "Your CS team talks to customers daily. Review the generated materials with them before going live.",
+                guidance: "The previous steps generated User Personas and an FAQ. Click each step above to review and export.\n\nYour CS team talks to customers daily. Review the generated materials with them before going live.",
                 checklist: [
                     "Review personas with CS team for accuracy",
                     "Validate FAQs cover the real questions customers ask",
@@ -852,10 +855,10 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
             {
                 type: "human-task",
                 label: "Launch onboarding and monitor",
-                guidance: "Deploy the onboarding sequence and set up monitoring to track how new customers progress.",
+                guidance: "Your Onboarding Emails, Health Scoring model, and NPS Response templates have been generated. Click each step above to review, edit, and export.\n\nDeploy the onboarding sequence and set up monitoring to track how new customers progress.",
                 checklist: [
-                    "Load onboarding emails into your email tool",
-                    "Set up health scoring in your CS platform",
+                    "Load the generated onboarding emails into your email tool",
+                    "Set up health scoring in your CS platform using the generated model",
                     "Create dashboard to track onboarding completion",
                     "Schedule weekly review of onboarding metrics",
                 ],
@@ -881,7 +884,7 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
             {
                 type: "human-task",
                 label: "Define brand values with founding team",
-                guidance: "A brand is built by people, not tools. Start by aligning your founding team on what the brand stands for.",
+                guidance: "A brand is built by people, not tools. Start by aligning your founding team on what the brand stands for.\n\nOnce you've completed the checklist, open the next step (Vision & Mission) and paste your brand values, personality, audience, and visual references into its Input Data field.",
                 checklist: [
                     "Workshop core brand values with founders",
                     "Define brand personality (if your brand were a person)",
@@ -895,7 +898,7 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
             {
                 type: "human-task",
                 label: "Review identity with stakeholders",
-                guidance: "Share the brand voice guide and identity brief with your team and key stakeholders. Brand should feel authentic to everyone.",
+                guidance: "The previous steps generated your Vision & Mission, Brand Voice Guide, and Brand Identity Brief. Click each step above to review and export.\n\nShare these with your team and key stakeholders. Brand should feel authentic to everyone.",
                 checklist: [
                     "Share brand voice guide with team",
                     "Review identity brief with design team",
@@ -908,7 +911,7 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
             {
                 type: "human-task",
                 label: "Approve final brand package",
-                guidance: "Give final approval on all brand materials before launch. This is what the world will see.",
+                guidance: "Your Landing Page Copy, Press Release, and Social Media Visuals have been generated. Click each step above to review, edit, and export.\n\nGive final approval on all brand materials before launch. This is what the world will see.",
                 checklist: [
                     "Final review of all brand materials",
                     "Approve landing page for launch",
@@ -939,7 +942,7 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
             {
                 type: "human-task",
                 label: "Pre-offsite preparation",
-                guidance: "Great strategy offsites are won or lost in the preparation. Gather the data and perspectives your team needs to make decisions, not just discuss ideas.",
+                guidance: "Great strategy offsites are won or lost in the preparation. Gather the data and perspectives your team needs to make decisions, not just discuss ideas.\n\nOnce you've completed the checklist, open the next step (SWOT Analysis) and paste your pre-read data, metrics, and priority inputs into its Input Data field.",
                 checklist: [
                     "Circulate pre-read packet: key metrics, market landscape, customer feedback",
                     "Collect individual input on top 3 strategic priorities (async, before the offsite)",
@@ -953,7 +956,7 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
             {
                 type: "human-task",
                 label: "Facilitated strategy discussion",
-                guidance: "This is the core of the offsite. Use the generated materials as conversation starters, not conclusions. The best strategies emerge from honest debate.",
+                guidance: "The previous steps generated a SWOT Analysis, Scenario Plans, and Growth Framework. Click each step above to review and print the outputs for your offsite.\n\nUse these as conversation starters, not conclusions. The best strategies emerge from honest debate.",
                 checklist: [
                     "Walk through SWOT and scenarios as a group — challenge assumptions",
                     "Debate and rank the top 3 strategic bets for the next 12 months",
@@ -964,12 +967,13 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
             { type: "prompt", promptId: "strategy-okr", label: "Strategic OKRs", category: "strategy", icon: "Target" },
             { type: "prompt", promptId: "strategy-initiative-prioritizer", label: "Initiative Prioritization", category: "strategy", icon: "ListOrdered" },
             { type: "prompt", promptId: "strategy-risk-assessment", label: "Risk Assessment", category: "strategy", icon: "AlertTriangle" },
+            { type: "prompt", promptId: "data-executive-summary", label: "Strategy Summary", category: "data-analytics", icon: "FileText" },
             {
                 type: "human-task",
                 label: "Communicate outcomes to the company",
-                guidance: "The offsite only matters if the rest of the company knows what was decided and why. Communicate within 48 hours.",
+                guidance: "A Strategy Summary has been generated consolidating the OKRs, priorities, and risk assessment. Click the step above to review and export it.\n\nUse this as the foundation for your all-hands communication. The offsite only matters if the rest of the company knows what was decided and why. Communicate within 48 hours.",
                 checklist: [
-                    "Write a 1-page summary of strategic decisions made",
+                    "Review and personalise the Strategy Summary",
                     "Schedule all-hands to share the strategic direction",
                     "Publish the OKRs and initiative priorities for the team",
                     "Set up monthly strategy check-ins to track progress",
@@ -996,7 +1000,7 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
             {
                 type: "human-task",
                 label: "Collect monthly data from all departments",
-                guidance: "The monthly business review is only as good as its data. Pull numbers from every department before generating the review.",
+                guidance: "The monthly business review is only as good as its data. Pull numbers from every department before generating the review.\n\nOnce you've completed the checklist, open the next step (KPI Dashboard) and paste all department metrics into its Input Data field.",
                 checklist: [
                     "Revenue, pipeline, and bookings data from sales",
                     "Product metrics: active users, retention, feature adoption",
@@ -1011,7 +1015,7 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
             {
                 type: "human-task",
                 label: "Review with department leads",
-                guidance: "Walk through the numbers with each department lead. The goal is to understand WHY metrics moved, not just THAT they moved.",
+                guidance: "The previous steps generated a KPI Dashboard, Trend Analysis, and Cash Flow Review. Click each step above to review and export.\n\nWalk through the numbers with each department lead. The goal is to understand WHY metrics moved, not just THAT they moved.",
                 checklist: [
                     "Meet with each department lead to review their metrics",
                     "Identify the top 3 wins and top 3 concerns for the month",
@@ -1023,11 +1027,11 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
             {
                 type: "human-task",
                 label: "Present and distribute",
-                guidance: "Share the monthly review with the full leadership team and, optionally, the whole company. Transparency builds trust.",
+                guidance: "Your Executive Summary and Startup Metrics report have been generated. Click each step above to review, edit, and export.\n\nUse the Executive Summary as your MBR document. Share it with leadership and, optionally, the whole company.",
                 checklist: [
+                    "Review and personalise the Executive Summary",
                     "Present MBR to leadership team",
                     "Send summary to full company (if appropriate)",
-                    "Update board dashboard with latest metrics",
                     "File action items and assign owners",
                 ],
             },
@@ -1052,7 +1056,7 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
             {
                 type: "human-task",
                 label: "Prepare for the new hire's arrival",
-                guidance: "Great onboarding starts before Day 1. Make sure everything is ready so the new hire feels expected and valued from the moment they arrive.",
+                guidance: "Great onboarding starts before Day 1. Make sure everything is ready so the new hire feels expected and valued from the moment they arrive.\n\nOnce you've completed the checklist, open the next step (Onboarding Checklist) and paste the role details, start date, and team context into its Input Data field.",
                 checklist: [
                     "Confirm start date, equipment, and access credentials",
                     "Assign an onboarding buddy from the team",
@@ -1066,7 +1070,7 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
             {
                 type: "human-task",
                 label: "Week 1: Daily check-ins",
-                guidance: "The first week sets the tone. Check in daily to make sure the new hire is settling in and has everything they need.",
+                guidance: "The previous steps generated an Onboarding Checklist, Culture Statement, and 90-Day Plan. Click each step above to review and share with the new hire.\n\nThe first week sets the tone. Check in daily to make sure the new hire is settling in and has everything they need.",
                 checklist: [
                     "Day 1: Welcome meeting, team intro, first task assigned",
                     "Day 2-3: Role-specific training and tool setup",
@@ -1079,10 +1083,10 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
             {
                 type: "human-task",
                 label: "30-day review and course correction",
-                guidance: "At 30 days, have a formal check-in. Is the new hire ramping well? Do they need additional support or a course correction?",
+                guidance: "The previous steps generated a 30-Day Review Template and Feedback Collection Plan. Click each step above to review and use.\n\nAt 30 days, have a formal check-in. Use the generated templates to structure the conversation.",
                 checklist: [
-                    "Conduct formal 30-day review with the new hire",
-                    "Collect feedback from buddy and key collaborators",
+                    "Conduct formal 30-day review using the generated template",
+                    "Collect feedback using the generated Feedback Collection Plan",
                     "Adjust the 90-day plan based on progress so far",
                     "Celebrate early wins and address any concerns",
                 ],
@@ -1108,7 +1112,7 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
             {
                 type: "human-task",
                 label: "Gather product requirements and context",
-                guidance: "Before writing the spec, make sure you understand the problem deeply. Talk to customers, review data, and align with stakeholders.",
+                guidance: "Before writing the spec, make sure you understand the problem deeply. Talk to customers, review data, and align with stakeholders.\n\nOnce you've completed the checklist, open the next step (Product Requirements Doc) and paste your customer insights, analytics, constraints, and success metrics into its Input Data field.",
                 checklist: [
                     "Interview 3-5 customers about the problem",
                     "Review relevant analytics and support tickets",
@@ -1122,7 +1126,7 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
             {
                 type: "human-task",
                 label: "Design review with engineering",
-                guidance: "Walk through the PRD and user stories with your engineering team. Catch feasibility issues early — they're 10x cheaper to fix now than after coding starts.",
+                guidance: "The previous steps generated a PRD, User Stories, and Feature Prioritization. Click each step above to review and export.\n\nWalk through these with your engineering team. Catch feasibility issues early — they're 10x cheaper to fix now than after coding starts.",
                 checklist: [
                     "Review PRD with tech lead for feasibility",
                     "Estimate effort for each user story (t-shirt sizing)",

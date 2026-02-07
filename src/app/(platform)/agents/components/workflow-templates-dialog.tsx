@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useCallback, useRef, useEffect } from "react"
+import React, { useState, useCallback } from "react"
 import {
     Dialog,
     DialogContent,
@@ -8,8 +8,9 @@ import {
     DialogTitle,
     DialogDescription,
 } from "@/components/ui/dialog"
+import { ScrollArea } from "@/components/ui/scroll-area"
 import { Button } from "@/components/ui/button"
-import { ArrowRight, ChevronLeft, ChevronRight } from "lucide-react"
+import { ArrowRight, ChevronRight } from "lucide-react"
 import { WORKFLOW_TEMPLATES } from "../lib/workflow-templates"
 import { CATEGORY_ACCENT_COLORS, type PromptCategory } from "../lib/agent-types"
 import { getIcon } from "./prompt-node"
@@ -34,11 +35,11 @@ interface WorkflowTemplatesDialogProps {
 /**
  * Dialog listing all workflow templates, grouped by category.
  *
- * @description Includes a sticky category navigation bar with chevron
- * prev/next buttons so users can jump between categories without scrolling.
- * When a user clicks "Use" on a template, an intro dialog is shown first
- * to explain what the workflow does, why it matters, and the human-in-the-loop
- * pattern. The user can then confirm to load it.
+ * @description Uses an accordion pattern where each category has a clickable
+ * header with a chevron that expands/collapses to reveal its templates.
+ * First category starts expanded. When a user clicks "Use" on a template,
+ * an intro dialog is shown first to explain what the workflow does, why it
+ * matters, and the human-in-the-loop pattern.
  */
 export function WorkflowTemplatesDialog({
     open,
@@ -46,10 +47,9 @@ export function WorkflowTemplatesDialog({
     onSelectTemplate,
 }: WorkflowTemplatesDialogProps) {
     const [previewTemplate, setPreviewTemplate] = useState<WorkflowTemplate | null>(null)
-    const [activeCategoryId, setActiveCategoryId] = useState<string>("startup")
-
-    const scrollContainerRef = useRef<HTMLDivElement>(null)
-    const sectionRefs = useRef<Record<string, HTMLDivElement | null>>({})
+    const [expandedCategories, setExpandedCategories] = useState<Set<string>>(
+        () => new Set(["startup"])
+    )
 
     const categories: CategoryDef[] = [
         {
@@ -72,69 +72,18 @@ export function WorkflowTemplatesDialog({
         },
     ]
 
-    // Track which category section is visible via IntersectionObserver
-    useEffect(() => {
-        if (!open) return
-
-        const container = scrollContainerRef.current
-        if (!container) return
-
-        const observer = new IntersectionObserver(
-            (entries) => {
-                for (const entry of entries) {
-                    if (entry.isIntersecting) {
-                        const id = entry.target.getAttribute("data-category-id")
-                        if (id) setActiveCategoryId(id)
-                    }
-                }
-            },
-            {
-                root: container,
-                // Trigger when top of section is near top of scroll area
-                rootMargin: "-10% 0px -80% 0px",
-                threshold: 0,
+    /** Toggle a category section open or closed. */
+    const toggleCategory = useCallback((categoryId: string) => {
+        setExpandedCategories((prev) => {
+            const next = new Set(prev)
+            if (next.has(categoryId)) {
+                next.delete(categoryId)
+            } else {
+                next.add(categoryId)
             }
-        )
-
-        // Observe each section after a tick (refs need to be set)
-        const timer = setTimeout(() => {
-            for (const cat of categories) {
-                const el = sectionRefs.current[cat.id]
-                if (el) observer.observe(el)
-            }
-        }, 50)
-
-        return () => {
-            clearTimeout(timer)
-            observer.disconnect()
-        }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [open])
-
-    /** Smooth-scroll to a category section. */
-    const scrollToCategory = useCallback((categoryId: string) => {
-        const el = sectionRefs.current[categoryId]
-        if (el) {
-            el.scrollIntoView({ behavior: "smooth", block: "start" })
-            setActiveCategoryId(categoryId)
-        }
+            return next
+        })
     }, [])
-
-    const activeCategoryIndex = categories.findIndex((c) => c.id === activeCategoryId)
-    const isFirstCategory = activeCategoryIndex <= 0
-    const isLastCategory = activeCategoryIndex >= categories.length - 1
-
-    const goToPrevCategory = useCallback(() => {
-        const idx = categories.findIndex((c) => c.id === activeCategoryId)
-        if (idx > 0) scrollToCategory(categories[idx - 1].id)
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [activeCategoryId, scrollToCategory])
-
-    const goToNextCategory = useCallback(() => {
-        const idx = categories.findIndex((c) => c.id === activeCategoryId)
-        if (idx < categories.length - 1) scrollToCategory(categories[idx + 1].id)
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [activeCategoryId, scrollToCategory])
 
     const handleSelectForPreview = useCallback((template: WorkflowTemplate) => {
         setPreviewTemplate(template)
@@ -172,8 +121,8 @@ export function WorkflowTemplatesDialog({
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-3xl max-h-[80vh] p-0 flex flex-col">
-                <DialogHeader className="p-6 pb-4 flex-shrink-0">
+            <DialogContent className="max-w-3xl max-h-[80vh] p-0">
+                <DialogHeader className="p-6 pb-4">
                     <DialogTitle className="font-display text-xl">
                         Workflow Templates
                     </DialogTitle>
@@ -183,104 +132,50 @@ export function WorkflowTemplatesDialog({
                     </DialogDescription>
                 </DialogHeader>
 
-                {/* Sticky category navigation bar */}
-                <div className="flex-shrink-0 px-6 pb-3 border-b border-slate-100">
-                    <div className="flex items-center gap-2">
-                        <button
-                            onClick={goToPrevCategory}
-                            disabled={isFirstCategory}
-                            className={cn(
-                                "p-1.5 rounded-lg transition-colors flex-shrink-0",
-                                isFirstCategory
-                                    ? "text-muted-foreground/30 cursor-not-allowed"
-                                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                            )}
-                            aria-label="Previous category"
-                        >
-                            <ChevronLeft className="w-4 h-4" />
-                        </button>
-
-                        <div className="flex items-center gap-1.5 flex-1 overflow-x-auto">
-                            {categories.map((cat) => {
-                                const isActive = cat.id === activeCategoryId
-                                return (
+                <ScrollArea className="max-h-[60vh] px-6 pb-6">
+                    <div className="space-y-1">
+                        {categories.map((cat) => {
+                            const isExpanded = expandedCategories.has(cat.id)
+                            return (
+                                <div key={cat.id}>
+                                    {/* Accordion header */}
                                     <button
-                                        key={cat.id}
-                                        onClick={() => scrollToCategory(cat.id)}
-                                        className={cn(
-                                            "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors whitespace-nowrap",
-                                            isActive
-                                                ? "bg-international-orange text-white"
-                                                : "bg-muted text-foreground hover:bg-muted/80"
-                                        )}
+                                        onClick={() => toggleCategory(cat.id)}
+                                        className="w-full flex items-center gap-2 py-3 rounded-lg px-2 -mx-2 hover:bg-muted/50 transition-colors group"
+                                        aria-expanded={isExpanded}
                                     >
-                                        {cat.label}
-                                        <span
-                                            className={cn(
-                                                "text-[10px] font-semibold px-1.5 py-0.5 rounded-full min-w-[20px] text-center leading-none",
-                                                isActive
-                                                    ? "bg-white/25 text-white"
-                                                    : "bg-background text-muted-foreground"
-                                            )}
-                                        >
-                                            {cat.templates.length}
+                                        <div className={cn("h-5 w-1 rounded-full flex-shrink-0", cat.accentClass)} />
+                                        <h3 className="text-sm font-semibold text-foreground flex-1 text-left">
+                                            {cat.label}
+                                        </h3>
+                                        <span className="text-xs text-muted-foreground">
+                                            {cat.templates.length} templates
                                         </span>
-                                    </button>
-                                )
-                            })}
-                        </div>
-
-                        <button
-                            onClick={goToNextCategory}
-                            disabled={isLastCategory}
-                            className={cn(
-                                "p-1.5 rounded-lg transition-colors flex-shrink-0",
-                                isLastCategory
-                                    ? "text-muted-foreground/30 cursor-not-allowed"
-                                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                            )}
-                            aria-label="Next category"
-                        >
-                            <ChevronRight className="w-4 h-4" />
-                        </button>
-                    </div>
-                </div>
-
-                {/* Scrollable template list */}
-                <div
-                    ref={scrollContainerRef}
-                    className="overflow-y-auto flex-1 px-6 pb-6"
-                    style={{ maxHeight: "55vh" }}
-                >
-                    <div className="space-y-8 pt-4">
-                        {categories.map((cat) => (
-                            <div
-                                key={cat.id}
-                                ref={(el) => { sectionRefs.current[cat.id] = el }}
-                                data-category-id={cat.id}
-                            >
-                                <div className="flex items-center gap-2 mb-4">
-                                    <div className={cn("h-5 w-1 rounded-full", cat.accentClass)} />
-                                    <h3 className="text-sm font-semibold text-foreground">
-                                        {cat.label}
-                                    </h3>
-                                    <span className="text-xs text-muted-foreground">
-                                        ({cat.templates.length})
-                                    </span>
-                                </div>
-                                <div className="grid gap-3">
-                                    {cat.templates.map((template) => (
-                                        <TemplateCard
-                                            key={template.id}
-                                            template={template}
-                                            onSelect={handleSelectForPreview}
+                                        <ChevronRight
+                                            className={cn(
+                                                "w-4 h-4 text-muted-foreground transition-transform duration-200",
+                                                isExpanded && "rotate-90"
+                                            )}
                                         />
-                                    ))}
+                                    </button>
+
+                                    {/* Collapsible template list */}
+                                    {isExpanded && (
+                                        <div className="grid gap-3 pb-4 pt-1">
+                                            {cat.templates.map((template) => (
+                                                <TemplateCard
+                                                    key={template.id}
+                                                    template={template}
+                                                    onSelect={handleSelectForPreview}
+                                                />
+                                            ))}
+                                        </div>
+                                    )}
                                 </div>
-                            </div>
-                        ))}
+                            )
+                        })}
                     </div>
-                </div>
+                </ScrollArea>
             </DialogContent>
         </Dialog>
     )
