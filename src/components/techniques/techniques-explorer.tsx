@@ -7,7 +7,7 @@
  * @description Interactive encyclopedia of 80+ modern manufacturing
  * techniques. Lets users browse by category, search, filter by cost/
  * batch size, click through to detailed technique info with CTAs,
- * and compare techniques side by side.
+ * compare techniques side by side, and save favourites.
  *
  * @component
  *
@@ -16,7 +16,7 @@
  */
 
 import { useState, useMemo, useEffect, useCallback } from 'react'
-import { Factory, Search, ArrowRight, Store, ArrowLeftRight, X } from 'lucide-react'
+import { Factory, Search, ArrowRight, Store, ArrowLeftRight, X, Heart } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
@@ -33,6 +33,7 @@ import type {
   CostTier,
   BatchSize,
 } from '@/lib/manufacturing-techniques/types'
+import { useSavedTechniques } from '@/hooks/useSavedTechniques'
 import { TechniqueCard } from './technique-card'
 import { TechniqueFilters } from './technique-filters'
 import { TechniqueDetailDialog } from './technique-detail-dialog'
@@ -52,6 +53,7 @@ export function TechniquesExplorer() {
   const [batchSize, setBatchSize] = useState<BatchSize | null>(null)
   const [selectedTechnique, setSelectedTechnique] =
     useState<ManufacturingTechnique | null>(null)
+  const [showSavedOnly, setShowSavedOnly] = useState(false)
 
   // Compare mode state
   const [compareMode, setCompareMode] = useState(false)
@@ -60,6 +62,9 @@ export function TechniquesExplorer() {
   const [compareInitialTechniques, setCompareInitialTechniques] = useState<
     ManufacturingTechnique[]
   >([])
+
+  // Saved techniques (localStorage-backed)
+  const { savedIds, savedCount, toggleSaved, isSaved } = useSavedTechniques()
 
   // Debounce search
   useEffect(() => {
@@ -73,16 +78,19 @@ export function TechniquesExplorer() {
 
   const categoryCounts = useMemo(() => countByCategory(), [])
 
-  const filteredTechniques = useMemo(
-    () =>
-      filterTechniques({
-        category: selectedCategory,
-        costTier,
-        batchSize,
-        query: debouncedSearch || null,
-      }),
-    [selectedCategory, costTier, batchSize, debouncedSearch],
-  )
+  const filteredTechniques = useMemo(() => {
+    let results = filterTechniques({
+      category: selectedCategory,
+      costTier,
+      batchSize,
+      query: debouncedSearch || null,
+    })
+    // Apply saved-only filter
+    if (showSavedOnly) {
+      results = results.filter(t => savedIds.has(t.id))
+    }
+    return results
+  }, [selectedCategory, costTier, batchSize, debouncedSearch, showSavedOnly, savedIds])
 
   // -----------------------------------------------------------------------
   // Handlers
@@ -167,19 +175,43 @@ export function TechniquesExplorer() {
                 part, then connect with suppliers.
               </p>
             </div>
-            {/* Compare mode toggle */}
-            <Button
-              variant={compareMode ? 'default' : 'outline'}
-              size="sm"
-              onClick={toggleCompareMode}
-              className={cn(
-                'shrink-0',
-                compareMode && 'bg-international-orange hover:bg-international-orange/90',
-              )}
-            >
-              <ArrowLeftRight className="h-4 w-4 mr-2" />
-              {compareMode ? 'Exit Compare' : 'Compare'}
-            </Button>
+            {/* Action buttons */}
+            <div className="flex items-center gap-2 shrink-0">
+              {/* Saved filter */}
+              <Button
+                variant={showSavedOnly ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setShowSavedOnly(prev => !prev)}
+                className={cn(
+                  showSavedOnly && 'bg-international-orange hover:bg-international-orange/90',
+                )}
+              >
+                <Heart
+                  className={cn(
+                    'h-4 w-4 mr-2',
+                    showSavedOnly && 'fill-white',
+                  )}
+                />
+                Saved
+                {savedCount > 0 && (
+                  <span className="ml-1.5 text-xs opacity-80">
+                    ({savedCount})
+                  </span>
+                )}
+              </Button>
+              {/* Compare mode toggle */}
+              <Button
+                variant={compareMode ? 'default' : 'outline'}
+                size="sm"
+                onClick={toggleCompareMode}
+                className={cn(
+                  compareMode && 'bg-international-orange hover:bg-international-orange/90',
+                )}
+              >
+                <ArrowLeftRight className="h-4 w-4 mr-2" />
+                {compareMode ? 'Exit Compare' : 'Compare'}
+              </Button>
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -228,24 +260,44 @@ export function TechniquesExplorer() {
       {filteredTechniques.length === 0 ? (
         <Card className="border-dashed">
           <CardContent className="py-12 text-center">
-            <Search className="h-10 w-10 text-muted-foreground mx-auto mb-3 opacity-50" />
-            <h3 className="text-base font-semibold mb-1">No techniques found</h3>
-            <p className="text-sm text-muted-foreground max-w-sm mx-auto mb-3">
-              Try adjusting your search or filters to find manufacturing techniques.
-            </p>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                setSelectedCategory(null)
-                setSearchQuery('')
-                setCostTier(null)
-                setBatchSize(null)
-              }}
-              className="gap-1.5"
-            >
-              Clear all filters
-            </Button>
+            {showSavedOnly ? (
+              <>
+                <Heart className="h-10 w-10 text-muted-foreground mx-auto mb-3 opacity-50" />
+                <h3 className="text-base font-semibold mb-1">No saved techniques yet</h3>
+                <p className="text-sm text-muted-foreground max-w-sm mx-auto mb-3">
+                  Click the heart icon on any technique to save it for later.
+                </p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowSavedOnly(false)}
+                  className="gap-1.5"
+                >
+                  Browse all techniques
+                </Button>
+              </>
+            ) : (
+              <>
+                <Search className="h-10 w-10 text-muted-foreground mx-auto mb-3 opacity-50" />
+                <h3 className="text-base font-semibold mb-1">No techniques found</h3>
+                <p className="text-sm text-muted-foreground max-w-sm mx-auto mb-3">
+                  Try adjusting your search or filters to find manufacturing techniques.
+                </p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setSelectedCategory(null)
+                    setSearchQuery('')
+                    setCostTier(null)
+                    setBatchSize(null)
+                  }}
+                  className="gap-1.5"
+                >
+                  Clear all filters
+                </Button>
+              </>
+            )}
           </CardContent>
         </Card>
       ) : (
@@ -260,6 +312,8 @@ export function TechniquesExplorer() {
               onSelectionChange={selected =>
                 handleToggleCompareSelection(technique.id, selected)
               }
+              isSaved={isSaved(technique.id)}
+              onSaveToggle={toggleSaved}
             />
           ))}
         </div>
@@ -337,6 +391,8 @@ export function TechniquesExplorer() {
         }}
         onViewRelated={handleViewRelated}
         onCompare={handleCompareFromModal}
+        isSaved={selectedTechnique ? isSaved(selectedTechnique.id) : false}
+        onSaveToggle={toggleSaved}
       />
 
       {/* Compare dialog */}

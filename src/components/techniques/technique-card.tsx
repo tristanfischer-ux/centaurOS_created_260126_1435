@@ -27,6 +27,7 @@ import {
   Zap,
   PoundSterling,
   Check,
+  Heart,
 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -100,6 +101,10 @@ interface TechniqueCardProps {
   selected?: boolean
   /** Called when selection changes in compare mode */
   onSelectionChange?: (selected: boolean) => void
+  /** Whether this technique is saved/favourited */
+  isSaved?: boolean
+  /** Called to toggle save state. Receives technique ID. */
+  onSaveToggle?: (techniqueId: string) => void
   /** Additional CSS classes */
   className?: string
 }
@@ -110,6 +115,8 @@ export function TechniqueCard({
   selectable = false,
   selected = false,
   onSelectionChange,
+  isSaved = false,
+  onSaveToggle,
   className,
 }: TechniqueCardProps) {
   const Icon = CATEGORY_ICONS[technique.category]
@@ -147,8 +154,8 @@ export function TechniqueCard({
       }}
     >
       <CardContent className="p-4 space-y-3 relative">
-        {/* Selection checkbox overlay */}
-        {selectable && (
+        {/* Top-right overlay: compare checkbox OR save heart */}
+        {selectable ? (
           <div
             className={cn(
               'absolute top-2 right-2 h-5 w-5 rounded-full border-2 flex items-center justify-center transition-colors',
@@ -159,7 +166,25 @@ export function TechniqueCard({
           >
             {selected && <Check className="h-3 w-3" />}
           </div>
-        )}
+        ) : onSaveToggle ? (
+          <button
+            className="absolute top-2 right-2 p-1 rounded-full hover:bg-muted transition-colors"
+            onClick={e => {
+              e.stopPropagation()
+              onSaveToggle(technique.id)
+            }}
+            aria-label={isSaved ? 'Unsave technique' : 'Save technique'}
+          >
+            <Heart
+              className={cn(
+                'h-4 w-4 transition-colors',
+                isSaved
+                  ? 'fill-international-orange text-international-orange'
+                  : 'text-muted-foreground/40 hover:text-muted-foreground',
+              )}
+            />
+          </button>
+        ) : null}
 
         {/* Header: icon + category badge */}
         <div className="flex items-start justify-between gap-2">
