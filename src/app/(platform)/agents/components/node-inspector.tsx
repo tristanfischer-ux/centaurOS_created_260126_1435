@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useState, useCallback, useEffect, useRef } from "react"
-import { X, Copy, Check, Trash2, Play, RotateCcw, ChevronDown, ChevronRight, CheckCircle, ArrowRight, Sparkles, Brain, Globe, Image as ImageIcon, Mic, Cpu, Loader2, UserCheck, Square, CheckSquare, Download, Pencil, Eye } from "lucide-react"
+import { X, Copy, Check, Trash2, Play, RotateCcw, ChevronDown, ChevronRight, CheckCircle, ArrowRight, Sparkles, Brain, Globe, Image as ImageIcon, Mic, Cpu, Loader2, UserCheck, Square, CheckSquare, Download, Pencil, Eye, ExternalLink, Braces } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -761,6 +761,34 @@ export function NodeInspector({
                                                         className="text-xs gap-2"
                                                     >
                                                         Word (.docx)
+                                                    </DropdownMenuItem>
+                                                    <DropdownMenuItem
+                                                        onClick={() => {
+                                                            const json = JSON.stringify({
+                                                                title: data.label ?? "Step",
+                                                                promptId: data.promptId,
+                                                                input: data.userInput || null,
+                                                                output: data.output,
+                                                            }, null, 2)
+                                                            navigator.clipboard.writeText(json)
+                                                        }}
+                                                        className="text-xs gap-2"
+                                                    >
+                                                        <Braces className="w-3 h-3" />
+                                                        Copy as JSON
+                                                    </DropdownMenuItem>
+                                                    <DropdownMenuItem
+                                                        onClick={() => {
+                                                            // Gamma accepts markdown content via URL
+                                                            const content = data.output || ""
+                                                            const title = data.label || "CentaurOS Output"
+                                                            const gammaUrl = `https://gamma.app/generate?text=${encodeURIComponent(content.slice(0, 8000))}&title=${encodeURIComponent(title)}`
+                                                            window.open(gammaUrl, "_blank", "noopener,noreferrer")
+                                                        }}
+                                                        className="text-xs gap-2"
+                                                    >
+                                                        <ExternalLink className="w-3 h-3" />
+                                                        Open in Gamma
                                                     </DropdownMenuItem>
                                                 </DropdownMenuContent>
                                             </DropdownMenu>

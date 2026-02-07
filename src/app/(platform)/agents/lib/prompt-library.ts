@@ -83,7 +83,22 @@ For each section, provide 3-5 specific, actionable bullet points. Flag any assum
 
 **Important:** Clearly mark any assumption with [ASSUMPTION]. If information is missing from the input, note what you'd need to validate rather than guessing.
 
-**Before finalizing, verify:** (1) Is the revenue model specific enough to calculate unit economics? (2) Are the customer segments narrow enough to target? (3) Does the value proposition clearly explain why customers would switch from current alternatives?`,
+---
+
+**Visual Canvas Layout**
+
+After the 9 sections, provide a **Visual Direction** section that describes how this canvas should look as a single-page visual:
+
+- **Layout:** Classic BMC grid — 5 columns, with Key Partners and Key Activities on the left, Value Proposition in the center (tall), Customer Relationships and Customer Segments on the right, Cost Structure spanning the bottom-left, and Revenue Streams spanning the bottom-right
+- For each cell: provide the **2-3 most important bullet points** (not all 5) that should appear in the visual — brevity is key for a one-page canvas
+- **Colour coding:** Suggest which cells are strongest (green border), which have the most assumptions (amber border), and which are weakest/riskiest (red border)
+- **Mood:** "Clean, structured, one-page — should be printable on A3 and readable from arm's length"
+
+This visual direction allows a designer or AI tool (Gamma, Canva, Miro) to create a beautiful one-page canvas directly from this output.
+
+---
+
+**Before finalizing, verify:** (1) Is the revenue model specific enough to calculate unit economics? (2) Are the customer segments narrow enough to target? (3) Does the value proposition clearly explain why customers would switch from current alternatives? (4) Is the Visual Canvas Layout concise enough to fit on one page?`,
         inputLabel: "Business description",
         outputLabel: "Business Model Canvas",
         tags: ["business-model", "canvas", "strategy", "revenue"],
@@ -118,7 +133,23 @@ First, identify: What is the SINGLE biggest assumption this business depends on?
 
 Highlight which assumptions are RISKIEST and should be tested first.
 
-**Before finalizing, verify:** (1) Are customer segments specific enough to find on LinkedIn? (2) Is the UVP a single clear message, not a feature list? (3) Are the key metrics measurable with current tools? (4) Did you distinguish between assumptions and facts?`,
+---
+
+**Visual Canvas Layout**
+
+After the 9 sections, provide a **Visual Direction** section that describes how this Lean Canvas should look as a single-page visual:
+
+- **Layout:** Lean Canvas grid — 2 rows. Top row: Problem | Solution | UVP | Unfair Advantage | Customer Segments. Bottom row: Key Metrics | Channels | Cost Structure | Revenue Streams
+- For each cell: provide the **1-2 most critical points** that should appear in the visual (not all bullets — just the essence)
+- **Risk highlighting:** Mark the riskiest assumption with a red flag icon/border. Mark validated items with a green check.
+- **Biggest Assumption** should appear as a large callout box above or below the canvas: "RISKIEST ASSUMPTION: [statement] — Test by: [method]"
+- **Mood:** "Lean and focused — this is a working document, not a polished presentation. Sticky-note aesthetic. Yellow for hypotheses, green for validated, red for disproven."
+
+This visual direction allows a designer or AI tool (Gamma, Canva, Miro) to create a visual Lean Canvas directly from this output.
+
+---
+
+**Before finalizing, verify:** (1) Are customer segments specific enough to find on LinkedIn? (2) Is the UVP a single clear message, not a feature list? (3) Are the key metrics measurable with current tools? (4) Did you distinguish between assumptions and facts? (5) Is the Visual Canvas Layout concise enough to fit on one page?`,
         inputLabel: "Product/company overview",
         outputLabel: "Lean Canvas",
         tags: ["lean", "canvas", "validation", "hypothesis"],
@@ -683,7 +714,28 @@ Create a metrics dashboard narrative:
 
 **Data Integrity:** All numbers in the narrative must come from the input. Clearly label benchmarks as [INDUSTRY BENCHMARK] vs. [YOUR DATA]. Never invent metrics.
 
-**Before finalizing, verify:** (1) Does the narrative tell a coherent story, or is it just a list of numbers? (2) Are the recommended actions specific and assignable? (3) Would a board member reading this know the single most important thing to focus on?`,
+---
+
+**Dashboard Visual Direction**
+
+After the narrative, provide a **Visual Direction** section that describes how this dashboard should look as a visual:
+
+- **Layout:** 4-quadrant dashboard — Growth (top-left), Unit Economics (top-right), Engagement (bottom-left), Health Indicators (bottom-right)
+- For each metric, specify the **chart type**:
+  - MRR/ARR: "Line chart with area fill, last 6-12 months, with target line as dashed"
+  - Growth rate: "Bar chart, month-over-month, green bars above target, red below"
+  - CAC/LTV: "Two horizontal bar charts side by side for visual comparison"
+  - Churn: "Line chart with danger zone shaded red above 5%"
+  - Retention cohorts: "Heatmap grid — rows are cohorts, columns are weeks, darker = better retention"
+  - Runway: "Horizontal progress bar showing months remaining, amber when <12, red when <6"
+- **Callout boxes:** "3 green callout cards for celebrations, 3 red/amber callout cards for concerns — each with the metric, the insight, and the action"
+- **Mood:** "Executive dashboard — clean, scannable, RAG (red/amber/green) colour coding throughout. A CEO should grasp the state of the business in 10 seconds."
+
+This visual direction lets the reader create a dashboard in a tool like Gamma, Notion, or Figma directly from this output.
+
+---
+
+**Before finalizing, verify:** (1) Does the narrative tell a coherent story, or is it just a list of numbers? (2) Are the recommended actions specific and assignable? (3) Would a board member reading this know the single most important thing to focus on? (4) Is every chart type in the Visual Direction specific enough to render?`,
         inputLabel: "Raw metrics data",
         outputLabel: "Metrics dashboard narrative",
         tags: ["metrics", "mrr", "churn", "dashboard", "kpi"],
@@ -4155,7 +4207,25 @@ Top 3 KPIs to celebrate. Top 3 to address urgently.
 
 **Data Integrity:** Only present numbers the user has provided. When industry benchmarks are referenced, note they are general ranges, not precise comparables. If data is insufficient for a category, say so rather than filling in estimates.
 
-**Before finalizing, verify:** (1) Does the narrative tell a coherent story, not just list numbers? (2) Are the "address urgently" items truly urgent, or just below target? (3) Would a CEO reading this know the ONE thing to focus on this week?`,
+---
+
+**Dashboard Visual Direction**
+
+After the narrative, provide a **Visual Direction** section describing how this KPI dashboard should look:
+
+- **Layout:** Single-page executive dashboard with 4 rows (Financial, Customer, Operational, People), each row containing 2-3 metric cards
+- **Overall Health indicator:** Large traffic light (green/amber/red) at the top with one-sentence summary
+- For each KPI card:
+  - **Chart type**: e.g., "Gauge chart at 87% of target (green zone)", "Sparkline: last 6 months trend, upward", "Number card: £480K with +12% green arrow"
+  - **RAG status**: green/amber/red border based on target attainment
+- **Bottom section:** Two columns — "Celebrate (green cards)" on the left, "Address urgently (red cards)" on the right, each with the KPI, the issue, and the recommended action
+- **Mood:** "Bloomberg terminal meets boardroom — information-dense but not cluttered. Every number earns its place. RAG colour coding throughout."
+
+This visual direction lets a designer or AI tool (Gamma, Notion, Figma) build the dashboard directly from this output.
+
+---
+
+**Before finalizing, verify:** (1) Does the narrative tell a coherent story, not just list numbers? (2) Are the "address urgently" items truly urgent, or just below target? (3) Would a CEO reading this know the ONE thing to focus on this week? (4) Is the Visual Direction specific enough to build without re-reading the full narrative?`,
         inputLabel: "KPI data & targets",
         outputLabel: "KPI dashboard narrative",
         tags: ["kpi", "dashboard", "metrics", "executive"],
