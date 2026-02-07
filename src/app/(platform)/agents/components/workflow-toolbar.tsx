@@ -195,16 +195,20 @@ export function WorkflowToolbar({
                 <Tooltip>
                     <TooltipTrigger asChild>
                         <Button
-                            variant="ghost"
+                            variant="outline"
                             size="sm"
                             onClick={onOpenTemplates}
-                            className="gap-1.5 text-xs"
+                            className="gap-1.5 text-xs border-international-orange/30 text-international-orange hover:bg-international-orange/5 hover:text-international-orange"
                         >
                             <LayoutTemplate className="w-3.5 h-3.5" />
                             Templates
+                            <span className="relative flex h-2 w-2">
+                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-international-orange opacity-75" />
+                                <span className="relative inline-flex rounded-full h-2 w-2 bg-international-orange" />
+                            </span>
                         </Button>
                     </TooltipTrigger>
-                    <TooltipContent>Load a pre-built workflow</TooltipContent>
+                    <TooltipContent>Browse 28 pre-built workflows</TooltipContent>
                 </Tooltip>
 
                 {/* My Workflows dropdown — always visible so users know where saved workflows live */}

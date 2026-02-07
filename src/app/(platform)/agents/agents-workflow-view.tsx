@@ -1237,7 +1237,11 @@ function AgentsFlowInner({
                                     </button>
                                 </div>
 
-                                <p className="text-[10px] text-muted-foreground mt-4">
+                                <p className="text-xs text-muted-foreground mt-3">
+                                    28 pre-built workflows across fundraising, GTM, operations, and more
+                                </p>
+
+                                <p className="text-[10px] text-muted-foreground mt-2">
                                     Press <kbd className="px-1 py-0.5 rounded bg-muted border text-[9px] font-mono">?</kbd> for keyboard shortcuts and tips
                                 </p>
                             </div>
