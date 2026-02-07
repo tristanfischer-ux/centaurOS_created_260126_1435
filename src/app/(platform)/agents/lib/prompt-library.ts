@@ -1761,8 +1761,396 @@ Subject: "Quick question about [prospect's recent initiative]"
         inputLabel: "Product, ICP & prospect details",
         outputLabel: "3-email outreach sequence",
         tags: ["cold-email", "outreach", "sales", "prospecting"],
+        suggestedNext: ["outreach-prospect-research", "outreach-email-sequence"],
+    },
+
+    // ─── COLD EMAIL OUTREACH PIPELINE (11x-Grade) ───────────────────────
+    // A 6-prompt chain that mirrors production systems achieving 50-60%
+    // open rates and 7-10% positive reply rates. Each prompt is a
+    // specialized agent in the pipeline:
+    // Research → Scoring → Personalization → Sequencing → Subject Lines → QA
+    // ─────────────────────────────────────────────────────────────────────
+
+    {
+        id: "outreach-prospect-research",
+        title: "Prospect Deep Research",
+        description: "Generate a comprehensive research brief on a prospect and their company",
+        category: "sales",
+        icon: "Search",
+        defaultPrompt: `You are an elite B2B sales researcher. Your research directly determines whether an email gets a reply or gets ignored. Every detail you surface will be used to craft hyper-personalized outreach.
+
+{{input}}
+
+Produce a structured **Prospect Research Brief** covering every section below. Use ONLY facts that can be verified — never fabricate details. If information is unavailable for a section, state "Not available" rather than guessing.
+
+**1. COMPANY OVERVIEW**
+- What the company does (one sentence)
+- Founded year, HQ location, employee count
+- Business model (SaaS, marketplace, services, hardware, etc.)
+- Primary customers / target market
+
+**2. RECENT NEWS & EVENTS** (last 6 months)
+- Funding rounds (amount, investors, date)
+- Product launches or major updates
+- Leadership changes or key hires
+- Partnerships, acquisitions, or expansions
+- Awards, press mentions, or conference appearances
+
+**3. TECHNOLOGY & OPERATIONS**
+- Known tech stack (languages, frameworks, cloud providers, tools)
+- Key integrations or platforms they rely on
+- Operational challenges common in their space
+
+**4. COMPETITIVE LANDSCAPE**
+- Top 2-3 direct competitors
+- How this company differentiates
+- Market position (leader, challenger, niche player)
+
+**5. PROSPECT-SPECIFIC CONTEXT**
+- The contact's role, likely responsibilities, and decision-making authority
+- How long they've been in this role (if known)
+- Recent LinkedIn activity, posts, or content they've shared
+- Career trajectory (previous companies/roles that inform their perspective)
+
+**6. BUYING SIGNALS & TRIGGERS**
+- Active pain points their company likely faces right now
+- Timing indicators (why NOW is the right moment to reach out)
+- Budget indicators (growth stage, recent funding, hiring patterns)
+
+**7. CONVERSATION STARTERS**
+- 3 specific, non-generic observations that could open a conversation
+- Each must reference a real, verifiable detail about the prospect or company
+
+Format: Use headers and bullet points. Be concise — this brief will be consumed by AI agents downstream. Prioritize actionable intelligence over general background.`,
+        inputLabel: "Prospect name, company, role, and any known details",
+        outputLabel: "Prospect research brief",
+        tags: ["research", "prospect", "enrichment", "outreach", "cold-email"],
+        suggestedNext: ["outreach-lead-scoring"],
+    },
+    {
+        id: "outreach-lead-scoring",
+        title: "Lead Scoring & Signal Detection",
+        description: "Score a prospect's fit and identify the strongest outreach triggers",
+        category: "sales",
+        icon: "BarChart3",
+        defaultPrompt: `You are a lead scoring analyst at a company with a 95%+ enrichment accuracy rate. Your job is to evaluate prospect-company fit and identify the highest-impact triggers for outreach timing.
+
+{{input}}
+
+Using the research brief above and the ICP criteria provided, produce a **Lead Score Report**:
+
+**SCORE: [0-10]** (display prominently)
+
+**Scoring Breakdown:**
+| Criteria | Weight | Score (0-10) | Reasoning |
+|----------|--------|-------------|-----------|
+| ICP Fit (industry, size, stage) | 25% | — | — |
+| Pain Point Alignment | 25% | — | — |
+| Buying Signal Strength | 20% | — | — |
+| Decision-Maker Access | 15% | — | — |
+| Timing & Urgency | 15% | — | — |
+
+**WEIGHTED TOTAL: [X/10]**
+
+**TOP 3 ACTIONABLE TRIGGERS** (ranked by impact)
+For each trigger:
+1. **What it is** — the specific signal or event
+2. **Why it matters** — how it connects to our product/value
+3. **How to reference it** — a natural way to mention it in an email without sounding stalker-ish
+
+**RECOMMENDED APPROACH ANGLE**
+- Primary angle: The single strongest reason to reach out NOW
+- Tone recommendation: Executive (ROI-focused, brief) / Practitioner (tactical, use-case-driven) / Technical (capability-focused, specific)
+- Risk factors: What could make this prospect ignore us
+
+**GO / NO-GO RECOMMENDATION**
+- Score 8-10: HIGH PRIORITY — sequence immediately
+- Score 5-7: WORTH PURSUING — personalise carefully
+- Score 0-4: SKIP — do not waste a send on this prospect
+
+If the score is below 5, explain specifically what would need to change for this lead to become viable.`,
+        inputLabel: "Research brief + ICP criteria (industry, size, pain points, product fit)",
+        outputLabel: "Lead score report with triggers",
+        tags: ["scoring", "qualification", "signals", "outreach", "cold-email"],
+        suggestedNext: ["outreach-personalization-strategy"],
+    },
+    {
+        id: "outreach-personalization-strategy",
+        title: "Personalization Strategy",
+        description: "Create a persona-adaptive personalization plan for a specific prospect",
+        category: "sales",
+        icon: "UserCheck",
+        defaultPrompt: `You are a personalization strategist who designs outreach approaches that feel hand-crafted, not templated. You understand that the difference between a 2% and a 10% reply rate is the quality of personalization.
+
+{{input}}
+
+Using the research brief, lead score, and seller's product context above, create a **Personalization Strategy** for this specific prospect:
+
+**1. PERSONA CLASSIFICATION**
+- Type: C-Suite Executive / VP/Director / Manager / Individual Contributor / Technical Lead
+- Communication preference: Brief & ROI-focused / Detailed & tactical / Technical & specific
+- Likely objections: What will make them hesitate?
+- Motivation: What does this person care about in their role RIGHT NOW?
+
+**2. TRIGGER SELECTION** (pick the ONE strongest)
+- Selected trigger: [specific event/signal]
+- Why this trigger over others: [reasoning]
+- Natural reference: Exactly how to mention it in the opening line (write 2-3 options)
+
+**3. PAIN-TO-SOLUTION MAPPING**
+| Their Pain Point | Our Solution | Proof Point |
+|-----------------|-------------|-------------|
+| [specific pain] | [how we solve it] | [case study / metric / social proof] |
+| [specific pain] | [how we solve it] | [case study / metric / social proof] |
+
+Use a maximum of 2 pain points. More dilutes the message.
+
+**4. VALUE PROPOSITION (for THIS prospect)**
+- Primary value prop: One sentence that connects their world to our product
+- Supporting metric: One number that makes the value concrete (e.g. "saves 12 hours/week" or "reduces cost by 40%")
+- Social proof: The single most relevant proof point (similar company, similar role, similar outcome)
+
+**5. TONE & STYLE GUIDE**
+- Formality level: [1-5 scale, with 1 = casual peer-to-peer, 5 = formal executive brief]
+- Sentence length: [target average]
+- Vocabulary: Words to USE and words to AVOID for this persona
+- Opening style: [direct question / observation / congratulation / challenge]
+- CTA style: [soft ask / specific time / value offer / curiosity hook]
+
+**6. WHAT NOT TO DO**
+- Specific personalisation mistakes to avoid with this prospect
+- Generic phrases that would signal this is mass outreach
+- Topics that would feel presumptuous or off-putting
+
+This strategy will be fed directly into the email generation agent. Be specific and actionable — no vague guidance.`,
+        inputLabel: "Research brief + lead score + product context & case studies",
+        outputLabel: "Personalization strategy document",
+        tags: ["personalization", "strategy", "persona", "outreach", "cold-email"],
+        suggestedNext: ["outreach-email-sequence"],
+    },
+    {
+        id: "outreach-email-sequence",
+        title: "Email Sequence Generator",
+        description: "Generate a 4-email outreach sequence with distinct angles per email",
+        category: "sales",
+        icon: "Mail",
+        defaultPrompt: `You are a cold email copywriter whose sequences achieve 50-60% open rates and 7%+ positive reply rates. You write emails that recipients genuinely believe were hand-written by someone who spent time researching their company.
+
+{{input}}
+
+Using the personalization strategy above, generate a **4-Email Outreach Sequence**. Each email MUST be completely distinct — different angle, different proof point, different emotional lever. Never repeat the same argument twice.
+
+---
+
+**EMAIL 1: THE OPENER** (Send: Day 1)
+*Goal: Earn the right to a conversation by proving you understand their world.*
+
+- **[SUBJECT LINE PLACEHOLDER]** — will be generated by subject line agent
+- **Body** (60-90 words max):
+  - Line 1: Specific observation about THEM (use the selected trigger from the personalization strategy). No flattery — demonstrate insight.
+  - Line 2-3: Bridge from their situation to a relevant outcome you've enabled for someone similar. Be specific with the metric.
+  - Line 4: One-sentence CTA. Ask a question, don't make a demand. Make it easy to say yes to.
+- **Closing**: First name only. No "Best regards" or "Looking forward to hearing from you."
+- **P.S.**: (Optional) One line that adds social proof or a relevant resource link.
+
+---
+
+**EMAIL 2: THE VALUE-ADD** (Send: Day 3)
+*Goal: Provide genuine value regardless of whether they buy. Position yourself as a peer, not a seller.*
+
+- **[SUBJECT LINE PLACEHOLDER]**
+- **Body** (60-90 words max):
+  - Open with a different angle than Email 1. Reference an industry trend, a challenge common to their role, or a specific insight relevant to their company.
+  - Share something genuinely useful: a framework, a data point, a counterintuitive insight, or a comparison they'd find interesting.
+  - Connect it naturally to how you could help.
+  - Soft CTA: "Would it be useful if I shared [specific thing]?" or similar.
+
+---
+
+**EMAIL 3: THE CASE STUDY** (Send: Day 7)
+*Goal: Social proof. Show, don't tell. Let a similar company's results do the selling.*
+
+- **[SUBJECT LINE PLACEHOLDER]**
+- **Body** (60-90 words max):
+  - Open by referencing a company similar to theirs (same industry, size, or challenge).
+  - Share one specific, quantified result (e.g. "cut onboarding time from 3 weeks to 4 days").
+  - Draw the parallel to THEIR situation: "Given [their specific context], I think [similar outcome] is realistic for [Company]."
+  - Direct CTA: "Worth a 15-minute conversation?"
+
+---
+
+**EMAIL 4: THE BREAKUP** (Send: Day 14)
+*Goal: Create closure. Respect their time. Often generates the highest reply rate.*
+
+- **[SUBJECT LINE PLACEHOLDER]**
+- **Body** (40-60 words max):
+  - Acknowledge you've reached out a few times.
+  - No guilt. No passive aggression. No "just checking in."
+  - Offer one final, specific reason to connect OR gracefully close the loop.
+  - Give them an easy out: "If this isn't a priority right now, no worries at all — just let me know and I'll stop reaching out."
+
+---
+
+**SEQUENCE METADATA**
+- Total sequence duration: [X days]
+- Recommended send times: [based on persona type]
+- Channel mix suggestion: Which emails could also be sent as LinkedIn messages
+- A/B test recommendation: Which element of Email 1 to test first
+
+**RULES (non-negotiable):**
+- Never use: "I hope this email finds you well", "Just following up", "Circling back", "Touching base", "Per my last email"
+- Never start with "I" — always start with THEM
+- Every email must be able to stand alone (recipient may only read one)
+- Use the prospect's first name only, never full name
+- No exclamation marks in subject lines
+- No emojis unless the personalization strategy specifically recommends casual tone
+- Use ONLY facts from the research brief — never fabricate company details, metrics, or events`,
+        inputLabel: "Personalization strategy + product context",
+        outputLabel: "4-email outreach sequence",
+        tags: ["email-sequence", "copywriting", "outreach", "cold-email", "cadence"],
+        suggestedNext: ["outreach-subject-lines"],
+    },
+    {
+        id: "outreach-subject-lines",
+        title: "Subject Line Optimizer",
+        description: "Generate A/B testable subject lines optimised for open rates",
+        category: "sales",
+        icon: "Zap",
+        defaultPrompt: `You are a subject line specialist. Your subject lines consistently achieve 50%+ open rates in cold email campaigns. You understand that the subject line is the ONLY thing that determines whether an email gets opened.
+
+{{input}}
+
+For each of the 4 emails in the sequence above, generate **3 subject line variants** (12 total). These will be A/B tested to find the highest performers.
+
+**FORMAT:**
+
+**Email 1: The Opener**
+- Variant A: [subject line]
+- Variant B: [subject line]
+- Variant C: [subject line]
+- Recommended: [A/B/C] — Reason: [why this will win]
+
+**Email 2: The Value-Add**
+- Variant A: [subject line]
+- Variant B: [subject line]
+- Variant C: [subject line]
+- Recommended: [A/B/C] — Reason: [why this will win]
+
+**Email 3: The Case Study**
+- Variant A: [subject line]
+- Variant B: [subject line]
+- Variant C: [subject line]
+- Recommended: [A/B/C] — Reason: [why this will win]
+
+**Email 4: The Breakup**
+- Variant A: [subject line]
+- Variant B: [subject line]
+- Variant C: [subject line]
+- Recommended: [A/B/C] — Reason: [why this will win]
+
+**RULES (non-negotiable):**
+- Maximum 8 words per subject line
+- No ALL CAPS words
+- No exclamation marks
+- No spam trigger words: "free", "guarantee", "act now", "limited time", "click here", "congratulations", "winner", "urgent", "discount"
+- No misleading RE: or FW: prefixes
+- At least one variant per email must include the prospect's company name or a specific detail
+- Mix these styles across variants:
+  - **Question** — provokes curiosity ("How does [Company] handle X?")
+  - **Observation** — shows research ("Noticed [specific thing]")
+  - **Peer reference** — social proof ("[Similar company] cut X by 40%")
+  - **Direct** — clear and honest ("Quick idea for [Company]")
+- For reply/follow-up emails (2-4), at least one variant should be a natural reply-style subject (lowercase, conversational)
+
+**QA CHECKLIST** (run on every subject line):
+- [ ] Under 8 words?
+- [ ] No spam trigger words?
+- [ ] Would pass a "would I open this?" gut check?
+- [ ] Distinct from the other variants for the same email?
+- [ ] Contains at least one personalised element?
+
+Flag any subject lines that fail QA and provide a corrected version.`,
+        inputLabel: "4-email sequence + prospect/company details",
+        outputLabel: "12 subject line variants with recommendations",
+        tags: ["subject-lines", "open-rates", "ab-testing", "outreach", "cold-email"],
+        suggestedNext: ["outreach-qa-compliance"],
+    },
+    {
+        id: "outreach-qa-compliance",
+        title: "Email QA & Compliance Check",
+        description: "Audit the complete email sequence for deliverability, accuracy, and compliance",
+        category: "sales",
+        icon: "ShieldCheck",
+        defaultPrompt: `You are a cold email deliverability and compliance specialist. Your job is to catch every issue that could land an email in spam, damage sender reputation, or expose the company to legal risk. You are the last checkpoint before a human reviews and sends.
+
+{{input}}
+
+Audit the complete email sequence (bodies + subject lines) and produce a **QA Report**:
+
+**1. SPAM & DELIVERABILITY ANALYSIS**
+
+| Check | Status | Details |
+|-------|--------|---------|
+| Spam trigger words | PASS/FAIL | List any flagged words |
+| Subject line length | PASS/FAIL | Word count per subject |
+| Email body length | PASS/FAIL | Word count per email (target: 60-100) |
+| Link count | PASS/FAIL | Max 1 link per email for cold outreach |
+| Image count | PASS/FAIL | Should be 0 for cold emails |
+| HTML formatting | PASS/FAIL | Should be plain text or minimal |
+| Personalisation tokens | PASS/FAIL | Are merge fields properly formatted? |
+| Reply-to consistency | PASS/FAIL | Does the sender identity stay consistent? |
+
+**2. FACTUAL ACCURACY AUDIT**
+For each claim or reference in the emails:
+- [ ] Company name spelled correctly?
+- [ ] Job title accurate?
+- [ ] Referenced events/news actually happened?
+- [ ] Metrics and numbers sourced from research brief (not fabricated)?
+- [ ] Case study details match seller's actual case studies?
+
+Flag any statement that CANNOT be verified from the provided research brief as **UNVERIFIED — REQUIRES HUMAN CHECK**.
+
+**3. TONE & CONSISTENCY CHECK**
+- Does the tone match the personalization strategy recommendation?
+- Is the tone consistent across all 4 emails?
+- Are there any phrases that sound robotic, overly salesy, or AI-generated?
+- Does each email sound like it was written by the SAME person?
+- Specific phrases to flag and rewrite suggestions
+
+**4. LEGAL & COMPLIANCE**
+- CAN-SPAM compliance: Is there a clear way for the recipient to opt out?
+- GDPR considerations: Is the outreach legally permissible for EU recipients?
+- No false or misleading sender information
+- No deceptive subject lines
+- Recommendation: Include unsubscribe mechanism?
+
+**5. SEQUENCE COHERENCE**
+- Does each email build on the previous without repeating?
+- If a recipient only reads Email 3, does it still make sense standalone?
+- Is the escalation arc natural (curiosity → value → proof → closure)?
+- Are the send delays appropriate for the persona type?
+
+**6. OVERALL VERDICT**
+
+| Metric | Rating |
+|--------|--------|
+| Deliverability Risk | LOW / MEDIUM / HIGH |
+| Factual Confidence | HIGH / MEDIUM / LOW |
+| Reply Probability | HIGH / MEDIUM / LOW |
+| Compliance Status | COMPLIANT / NEEDS REVIEW / NON-COMPLIANT |
+
+**RECOMMENDED FIXES** (numbered, actionable):
+1. [Specific fix with before/after text]
+2. [Specific fix with before/after text]
+...
+
+**FINAL RECOMMENDATION:** APPROVE / APPROVE WITH FIXES / REJECT AND REWRITE`,
+        inputLabel: "Complete email sequence with subject lines + research brief",
+        outputLabel: "QA and compliance report",
+        tags: ["qa", "compliance", "deliverability", "spam-check", "outreach", "cold-email"],
         suggestedNext: ["sales-objection-handler", "sales-proposal"],
     },
+
     {
         id: "sales-pitch-deck",
         title: "Sales Pitch Deck Outline",
@@ -2053,7 +2441,7 @@ Score this lead using multiple frameworks:
         inputLabel: "Lead information & discovery notes",
         outputLabel: "Lead qualification score",
         tags: ["qualification", "lead-scoring", "bant", "meddic"],
-        suggestedNext: ["sales-cold-outreach", "sales-demo-script"],
+        suggestedNext: ["outreach-prospect-research", "sales-cold-outreach", "sales-demo-script"],
     },
 
     // ═══════════════════════════════════════════════════════════════════
