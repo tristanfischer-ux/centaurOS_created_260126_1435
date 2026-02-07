@@ -8,8 +8,25 @@ import { PROVIDER_REGISTRY } from "@/lib/ai-providers/types"
 export const runtime = "nodejs"
 export const maxDuration = 300 // 5 min for video generation
 
-const SYSTEM_PROMPT =
-    "You are a world-class business strategist and AI assistant. Execute the prompt below with precision, depth, and actionable detail. Be thorough and practical."
+const SYSTEM_PROMPT = `You are a world-class business strategist and AI assistant helping startup founders and operators build, grow, and scale their companies.
+
+## Your Standards
+- Be direct and actionable. Every recommendation should be something the reader can act on this week.
+- Write for busy founders — use clear structure, short paragraphs, and bullet points. No filler, no fluff, no corporate speak.
+- Use markdown formatting: headers for sections, tables for comparative data, bold for key terms, bullet points for lists.
+- When presenting numbers, use tables. When comparing options, use tables. When showing timelines, use tables.
+
+## Honesty & Accuracy
+- Clearly distinguish between: (1) data the user provided, (2) widely-accepted industry knowledge, and (3) your estimates or assumptions.
+- Flag assumptions explicitly: "Assumption: ..." or mark estimates with "~" or "[estimated]".
+- Never fabricate specific statistics, company names, or benchmark numbers. If you don't have real data, say so and provide ranges or directional guidance instead.
+- When uncertain, say "I'd recommend validating this with..." rather than presenting guesses as facts.
+
+## Output Quality
+- Prioritize depth on the 2-3 most important points over shallow coverage of everything.
+- End with clear next steps: who does what, by when.
+- If the user's input is missing critical information, note what's missing and work with what you have rather than asking questions (since this is a one-shot prompt, not a conversation).
+- Calibrate your response length to the complexity of the request — don't pad short answers.`
 
 const SLIDES_SYSTEM_PROMPT = `You are a slide deck creator. Generate a structured slide deck in JSON format.
 
@@ -123,13 +140,61 @@ export async function POST(request: Request) {
         )
     }
 
-    // 4. Build the final prompt
-    const finalPrompt = prompt.replace(/\{\{input\}\}/g, input)
+    // 4. Build company context from foundry data
+    let companyContext = ""
+    try {
+        const { data: profile } = await supabase
+            .from("profiles")
+            .select("foundry_id, active_foundry_id")
+            .eq("id", user.id)
+            .single()
 
-    // 5. Route to the right provider based on modality
+        const foundryId = profile?.active_foundry_id || profile?.foundry_id
+        if (foundryId) {
+            const { data: foundry } = await supabase
+                .from("foundries")
+                .select("name, industry, stage, purpose_data")
+                .eq("id", foundryId)
+                .single()
+
+            if (foundry) {
+                const parts: string[] = []
+                if (foundry.name) parts.push(`Company: ${foundry.name}`)
+                if (foundry.industry) parts.push(`Industry: ${foundry.industry}`)
+                if (foundry.stage) parts.push(`Stage: ${foundry.stage}`)
+
+                const purposeData = foundry.purpose_data as {
+                    purpose?: string
+                    mission?: string | null
+                    vision?: string | null
+                } | null
+
+                if (purposeData?.purpose) parts.push(`Purpose: ${purposeData.purpose}`)
+                if (purposeData?.mission) parts.push(`Mission: ${purposeData.mission}`)
+
+                if (parts.length > 0) {
+                    companyContext = `[Company Context: ${parts.join(" | ")}]`
+                }
+            }
+        }
+    } catch (err) {
+        // Non-critical — proceed without company context
+        console.warn("[agents/execute] Could not load company context:", err)
+    }
+
+    // 5. Build the final prompt
+    let finalPrompt = prompt.replace(/\{\{input\}\}/g, input)
+    finalPrompt = finalPrompt.replace(/\{\{company_context\}\}/g, companyContext)
+
+    // 6. Build system prompt with company context
+    const systemPromptWithContext = companyContext
+        ? `${SYSTEM_PROMPT}\n\n## Company Context\n${companyContext}`
+        : SYSTEM_PROMPT
+
+    // 7. Route to the right provider based on modality
     try {
         if (modality === "text") {
-            return await handleTextStreaming(apiKey, providerId, modelId, finalPrompt)
+            return await handleTextStreaming(apiKey, providerId, modelId, finalPrompt, systemPromptWithContext)
         }
         if (modality === "slides") {
             // Slides use text generation with a structured output prompt

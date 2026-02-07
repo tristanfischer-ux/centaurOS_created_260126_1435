@@ -154,6 +154,11 @@ export interface AttachedFile {
 }
 
 // ─── Prompt Template ─────────────────────────────────────────────────
+// Template variables:
+//   {{input}}            - User-provided input text (required)
+//   {{company_context}}  - Auto-populated from user's foundry profile (optional)
+//                          Format: [Company Context: Company: X | Industry: Y | Stage: Z | Purpose: ...]
+//                          Empty string if no foundry data is available
 export interface PromptTemplate {
     id: string
     title: string
