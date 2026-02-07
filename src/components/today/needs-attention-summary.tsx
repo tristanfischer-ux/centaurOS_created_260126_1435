@@ -65,7 +65,7 @@ export function NeedsAttentionSummary({
                 <Badge variant="outline" className="border-destructive text-destructive">
                   {overdueCount}
                 </Badge>
-                <ChevronRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                <ChevronRight className="h-4 w-4 text-muted-foreground sm:opacity-0 sm:group-hover:opacity-100 transition-opacity" />
               </div>
             </Link>
           )}
@@ -83,7 +83,7 @@ export function NeedsAttentionSummary({
                 <Badge variant="outline" className="border-amber-600 text-amber-600">
                   {approvalsCount}
                 </Badge>
-                <ChevronRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                <ChevronRight className="h-4 w-4 text-muted-foreground sm:opacity-0 sm:group-hover:opacity-100 transition-opacity" />
               </div>
             </Link>
           )}
@@ -101,7 +101,7 @@ export function NeedsAttentionSummary({
                 <Badge variant="outline" className="border-destructive text-destructive">
                   {blockersCount}
                 </Badge>
-                <ChevronRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                <ChevronRight className="h-4 w-4 text-muted-foreground sm:opacity-0 sm:group-hover:opacity-100 transition-opacity" />
               </div>
             </Link>
           )}

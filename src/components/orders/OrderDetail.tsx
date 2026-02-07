@@ -104,16 +104,16 @@ export function OrderDetail({
             </CardHeader>
             <CardContent className="space-y-4">
               {/* Buyer */}
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-status-info-light">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-status-info-light">
                     <User className="h-5 w-5 text-status-info" />
                   </div>
-                  <div>
-                    <p className="font-medium">
+                  <div className="min-w-0">
+                    <p className="font-medium truncate">
                       {order.buyer?.full_name || "Unknown Buyer"}
                     </p>
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-xs text-muted-foreground truncate">
                       Buyer · {order.buyer?.email}
                     </p>
                   </div>
@@ -129,18 +129,18 @@ export function OrderDetail({
               <Separator />
 
               {/* Seller */}
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-status-success-light">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-status-success-light">
                     <Store className="h-5 w-5 text-status-success" />
                   </div>
-                  <div>
-                    <p className="font-medium">
+                  <div className="min-w-0">
+                    <p className="font-medium truncate">
                       {order.seller?.display_name ||
                         order.seller?.profile?.full_name ||
                         "Unknown Seller"}
                     </p>
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-xs text-muted-foreground truncate">
                       Seller{" "}
                       {order.seller?.profile?.email &&
                         `· ${order.seller.profile.email}`}
@@ -397,7 +397,7 @@ function MilestoneList({
         <div
           key={milestone.id}
           className={cn(
-            "flex items-center justify-between p-3 rounded-lg border",
+            "flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 rounded-lg border",
             milestone.status === "approved" && "border-status-success bg-status-success-light/50",
             milestone.status === "rejected" && "border-destructive bg-status-error-light/50",
             milestone.status === "submitted" && "border-status-warning bg-status-warning-light/50"
@@ -436,7 +436,7 @@ function MilestoneList({
               )}
             </div>
           </div>
-          <div className="text-right">
+          <div className="text-left sm:text-right flex sm:flex-col items-center sm:items-end gap-2 sm:gap-0 pl-11 sm:pl-0">
             <p className="font-medium">
               {new Intl.NumberFormat("en-GB", {
                 style: "currency",

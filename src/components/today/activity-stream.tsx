@@ -196,7 +196,7 @@ export function ActivityStream({ initialItems, initialCounts, onTaskClick, membe
 
         {/* Filter Tabs */}
         <Tabs value={filter} onValueChange={handleFilterChange}>
-          <TabsList className="w-full grid grid-cols-6">
+          <TabsList className="w-full grid grid-cols-3 sm:grid-cols-6">
             <TabsTrigger value="all" className="text-xs">
               All
               {counts.all > 0 && (

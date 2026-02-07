@@ -19,7 +19,7 @@ export default async function CreateRFQPage() {
   }
 
   return (
-    <div className="h-[calc(100vh-4rem)]">
+    <div className="h-[calc(100dvh-4rem)]">
       {/* Back button - fixed at top */}
       <div className="border-b bg-background">
         <div className="container mx-auto py-3 px-4">

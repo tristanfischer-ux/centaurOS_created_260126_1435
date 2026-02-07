@@ -323,7 +323,7 @@ export function OrdersView({
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <div className="flex items-center justify-center gap-2">
+        <div className="flex items-center justify-center gap-1 sm:gap-2">
           <Button
             variant="secondary"
             size="sm"
@@ -331,7 +331,7 @@ export function OrdersView({
             disabled={page === 0 || isPending}
           >
             <ChevronLeft className="h-4 w-4" />
-            Previous
+            <span className="hidden sm:inline">Previous</span>
           </Button>
           <div className="flex items-center gap-1">
             {Array.from({ length: Math.min(totalPages, 5) }).map((_, i) => {
@@ -364,7 +364,7 @@ export function OrdersView({
             onClick={() => handlePageChange(page + 1)}
             disabled={page >= totalPages - 1 || isPending}
           >
-            Next
+            <span className="hidden sm:inline">Next</span>
             <ChevronRight className="h-4 w-4" />
           </Button>
         </div>

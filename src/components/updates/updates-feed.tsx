@@ -180,7 +180,7 @@ export function UpdatesFeed({
           value={filter}
           onValueChange={(v) => onFilterChange(v as ActivityFilter)}
         >
-          <TabsList className="w-full grid grid-cols-4">
+          <TabsList className="w-full grid grid-cols-2 sm:grid-cols-4">
             <TabsTrigger value="all" className="text-xs gap-1">
               <Filter className="h-3 w-3" />
               All

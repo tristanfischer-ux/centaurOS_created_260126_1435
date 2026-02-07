@@ -173,7 +173,7 @@ export const MarketCard = memo(function MarketCard({
                             ? "bg-red-500 text-white shadow-md"
                             : isHovered
                                 ? "bg-background text-muted-foreground shadow-md border opacity-100"
-                                : "opacity-0 group-hover:opacity-100"
+                                : "sm:opacity-0 sm:group-hover:opacity-100"
                     )}
                     title={localSavedState ? "Remove from saved" : "Save for later"}
                 >
@@ -195,7 +195,7 @@ export const MarketCard = memo(function MarketCard({
                             ? "bg-international-orange text-white shadow-md" 
                             : isHovered 
                                 ? "bg-background text-muted-foreground shadow-md border opacity-100"
-                                : "opacity-0 group-hover:opacity-100"
+                                : "sm:opacity-0 sm:group-hover:opacity-100"
                     )}
                     title={isSelected ? "Remove from comparison" : "Add to comparison"}
                 >

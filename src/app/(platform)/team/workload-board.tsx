@@ -229,7 +229,8 @@ function PersonRow({
 
             {/* Expanded: Task Grid */}
             {isExpanded && (
-                <div className="grid grid-cols-5 gap-px bg-muted/30 border-t border-muted">
+                <div className="overflow-x-auto border-t border-muted">
+                <div className="grid grid-cols-5 gap-px bg-muted/30 min-w-[500px]">
                     {BUCKET_ORDER.map(bucket => (
                         <div
                             key={bucket}
@@ -251,6 +252,7 @@ function PersonRow({
                             )}
                         </div>
                     ))}
+                </div>
                 </div>
             )}
         </div>
@@ -348,7 +350,8 @@ export function WorkloadBoard({ members, allTasks, onMemberClick, onTaskClick }:
             </div>
 
             {/* Board */}
-            <div className="border border-muted rounded-xl overflow-hidden">
+            <div className="border border-muted rounded-xl overflow-x-auto">
+                <div className="min-w-[500px]">
                 {/* Column Headers */}
                 <div className="grid grid-cols-5 gap-px bg-muted/50 border-b border-muted">
                     {BUCKET_ORDER.map(bucket => (
@@ -376,6 +379,7 @@ export function WorkloadBoard({ members, allTasks, onMemberClick, onTaskClick }:
                         onTaskClick={onTaskClick}
                     />
                 ))}
+                </div>
             </div>
         </div>
     )

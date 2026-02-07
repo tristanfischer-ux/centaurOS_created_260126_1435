@@ -282,7 +282,7 @@ export function RetainerCard({
           </div>
 
           {/* Actions */}
-          <div className="flex items-center justify-end gap-2 pt-2">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center sm:justify-end gap-2 pt-2">
             <Button variant="secondary" size="sm" asChild>
               <Link href={`/retainers/${retainer.id}/timesheet`}>
                 <Clock className="h-4 w-4 mr-2" />
