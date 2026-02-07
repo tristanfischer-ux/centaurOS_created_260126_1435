@@ -16,8 +16,8 @@ const analyzeBundles = withBundleAnalyzer({
 });
 
 const nextConfig: NextConfig = {
-  output: "standalone",
-  // Turbopack config for dev mode (build uses webpack via --webpack flag)
+  // Turbopack config for dev mode
+  // Production builds use --webpack (required by next-pwa which injects webpack plugins)
   turbopack: {},
   
   // Type checking runs separately via `npm run typecheck` in CI
@@ -47,7 +47,28 @@ const nextConfig: NextConfig = {
     ],
   },
 
-  
+  // Webpack: stub Node.js built-ins that pptxgenjs imports (node:fs, node:https).
+  // pptxgenjs is only used client-side via dynamic import for PPTX download,
+  // but webpack still resolves its dependencies when building the chunk.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  webpack: (config: any, { isServer, webpack }: any) => {
+    if (!isServer) {
+      // Strip the node: URL scheme so webpack can resolve via fallback
+      config.plugins.push(
+        new webpack.NormalModuleReplacementPlugin(/^node:/, (resource: { request: string }) => {
+          resource.request = resource.request.replace(/^node:/, "")
+        })
+      )
+      // Provide empty modules for Node.js built-ins in the browser
+      config.resolve.fallback = {
+        ...config.resolve.fallback,
+        fs: false,
+        https: false,
+      }
+    }
+    return config
+  },
+
   // Security headers
   async headers() {
     return [
