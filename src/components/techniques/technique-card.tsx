@@ -26,6 +26,7 @@ import {
   Sparkles,
   Zap,
   PoundSterling,
+  Check,
 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -93,12 +94,33 @@ interface TechniqueCardProps {
   technique: ManufacturingTechnique
   /** Called when user clicks the card to view details */
   onClick: () => void
+  /** Whether the card is in selectable (compare) mode */
+  selectable?: boolean
+  /** Whether the card is currently selected for comparison */
+  selected?: boolean
+  /** Called when selection changes in compare mode */
+  onSelectionChange?: (selected: boolean) => void
   /** Additional CSS classes */
   className?: string
 }
 
-export function TechniqueCard({ technique, onClick, className }: TechniqueCardProps) {
+export function TechniqueCard({
+  technique,
+  onClick,
+  selectable = false,
+  selected = false,
+  onSelectionChange,
+  className,
+}: TechniqueCardProps) {
   const Icon = CATEGORY_ICONS[technique.category]
+
+  const handleClick = () => {
+    if (selectable && onSelectionChange) {
+      onSelectionChange(!selected)
+    } else {
+      onClick()
+    }
+  }
 
   return (
     <Card
@@ -106,20 +128,39 @@ export function TechniqueCard({ technique, onClick, className }: TechniqueCardPr
         'cursor-pointer transition-all duration-200',
         'hover:shadow-lg hover:-translate-y-0.5',
         'border hover:border-international-orange/30',
+        selectable && selected && 'border-international-orange ring-1 ring-international-orange/30',
         className,
       )}
-      onClick={onClick}
+      onClick={handleClick}
       role="button"
       tabIndex={0}
-      aria-label={`View details for ${technique.name}`}
+      aria-label={
+        selectable
+          ? `${selected ? 'Deselect' : 'Select'} ${technique.name} for comparison`
+          : `View details for ${technique.name}`
+      }
       onKeyDown={e => {
         if (e.key === 'Enter' || e.key === ' ') {
           e.preventDefault()
-          onClick()
+          handleClick()
         }
       }}
     >
-      <CardContent className="p-4 space-y-3">
+      <CardContent className="p-4 space-y-3 relative">
+        {/* Selection checkbox overlay */}
+        {selectable && (
+          <div
+            className={cn(
+              'absolute top-2 right-2 h-5 w-5 rounded-full border-2 flex items-center justify-center transition-colors',
+              selected
+                ? 'bg-international-orange border-international-orange text-white'
+                : 'border-muted-foreground/30 bg-background',
+            )}
+          >
+            {selected && <Check className="h-3 w-3" />}
+          </div>
+        )}
+
         {/* Header: icon + category badge */}
         <div className="flex items-start justify-between gap-2">
           <div

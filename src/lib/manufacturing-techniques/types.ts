@@ -110,4 +110,6 @@ export interface ManufacturingTechnique {
   applications: string[]
   /** IDs of related techniques */
   relatedTechniques: string[]
+  /** Grokipedia article slug for in-modal embedding (optional) */
+  grokipediaSlug?: string
 }

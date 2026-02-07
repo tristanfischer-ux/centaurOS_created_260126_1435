@@ -4,8 +4,9 @@
  * TechniqueDetailDialog — Full detail view for a manufacturing technique.
  *
  * @description Displays all metadata for a technique including description,
- * how it works, materials, tolerances, pros/cons, applications, and related
- * techniques. Includes CTAs to find suppliers and start an RFQ.
+ * how it works, materials, tolerances, pros/cons, applications, related
+ * techniques, and an optional embedded Grokipedia article. Includes CTAs
+ * to find suppliers, find experts, start an RFQ, and compare techniques.
  *
  * @component
  *
@@ -15,9 +16,11 @@
  *   open={!!selectedTechnique}
  *   onOpenChange={(open) => !open && setSelected(null)}
  *   onViewRelated={setSelected}
+ *   onCompare={handleCompare}
  * />
  */
 
+import { useState, useEffect } from 'react'
 import {
   CheckCircle2,
   XCircle,
@@ -32,6 +35,7 @@ import {
   Clock,
   Ruler,
   Layers,
+  Loader2,
 } from 'lucide-react'
 import {
   Dialog,
@@ -49,6 +53,12 @@ import type { ManufacturingTechnique, CostTier } from '@/lib/manufacturing-techn
 import { CATEGORY_LABELS } from '@/lib/manufacturing-techniques/types'
 import { getTechniqueById } from '@/lib/manufacturing-techniques'
 import { CATEGORY_ICONS, CATEGORY_COLORS } from './technique-card'
+
+// ---------------------------------------------------------------------------
+// Constants
+// ---------------------------------------------------------------------------
+
+const GROKIPEDIA_BASE_URL = 'https://grokipedia.x.ai/articles'
 
 // ---------------------------------------------------------------------------
 // Cost display
@@ -97,6 +107,8 @@ interface TechniqueDetailDialogProps {
   onOpenChange: (open: boolean) => void
   /** Called when user clicks a related technique */
   onViewRelated?: (technique: ManufacturingTechnique) => void
+  /** Called when user wants to compare this technique with others */
+  onCompare?: (technique: ManufacturingTechnique) => void
 }
 
 export function TechniqueDetailDialog({
@@ -104,10 +116,21 @@ export function TechniqueDetailDialog({
   open,
   onOpenChange,
   onViewRelated,
+  onCompare,
 }: TechniqueDetailDialogProps) {
+  const [showGrokipedia, setShowGrokipedia] = useState(false)
+
+  // Reset Grokipedia view when technique changes or dialog closes
+  useEffect(() => {
+    if (!open) setShowGrokipedia(false)
+  }, [open, technique?.id])
+
   if (!technique) return null
 
   const CategoryIcon = CATEGORY_ICONS[technique.category]
+  const grokipediaUrl = technique.grokipediaSlug
+    ? `${GROKIPEDIA_BASE_URL}/${technique.grokipediaSlug}`
+    : null
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -140,202 +163,261 @@ export function TechniqueDetailDialog({
                 )}
               </div>
             </div>
+            {/* Compare button */}
+            {onCompare && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="shrink-0"
+                onClick={() => onCompare(technique)}
+              >
+                <ArrowLeftRight className="h-4 w-4 mr-2" />
+                Compare
+              </Button>
+            )}
           </div>
         </DialogHeader>
 
         <Separator />
 
         {/* ---------------------------------------------------------------- */}
-        {/* Scrollable content                                               */}
+        {/* Content: either Grokipedia iframe or technique details           */}
         {/* ---------------------------------------------------------------- */}
-        <ScrollArea className="flex-1 overflow-y-auto">
-          <div className="px-6 py-5 space-y-6">
-            {/* Description */}
-            <div>
-              <p className="text-sm text-foreground leading-relaxed">
-                {technique.description}
-              </p>
+        {showGrokipedia && grokipediaUrl ? (
+          <div className="flex-1 flex flex-col min-h-0">
+            <div className="flex items-center gap-2 px-6 py-3 border-b">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowGrokipedia(false)}
+              >
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Back to Details
+              </Button>
+              <span className="text-sm text-muted-foreground">Grokipedia</span>
             </div>
-
-            {/* How it works */}
-            <div>
-              <h4 className="text-sm font-semibold mb-2 flex items-center gap-2">
-                <Layers className="h-4 w-4 text-muted-foreground" />
-                How It Works
-              </h4>
-              <p className="text-sm text-muted-foreground leading-relaxed">
-                {technique.howItWorks}
-              </p>
+            <div className="flex-1 relative min-h-[50vh]">
+              <iframe
+                src={grokipediaUrl}
+                className="absolute inset-0 w-full h-full border-0"
+                title={`Grokipedia: ${technique.name}`}
+                sandbox="allow-scripts allow-same-origin allow-popups"
+              />
             </div>
-
-            {/* Key specs grid */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-              <div className="space-y-1">
-                <p className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">
-                  Cost Tier
-                </p>
-                <CostDisplay tier={technique.costTier} />
-              </div>
-              {technique.leadTime && (
-                <div className="space-y-1">
-                  <p className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">
-                    Lead Time
-                  </p>
-                  <div className="flex items-center gap-1.5">
-                    <Clock className="h-3.5 w-3.5 text-muted-foreground" />
-                    <span className="text-sm">{technique.leadTime}</span>
-                  </div>
-                </div>
-              )}
-              {technique.toleranceRange && (
-                <div className="space-y-1">
-                  <p className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">
-                    Tolerance
-                  </p>
-                  <div className="flex items-center gap-1.5">
-                    <Ruler className="h-3.5 w-3.5 text-muted-foreground" />
-                    <span className="text-sm">{technique.toleranceRange}</span>
-                  </div>
-                </div>
-              )}
-              <div className="space-y-1">
-                <p className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">
-                  Batch Size
-                </p>
-                <span className="text-sm">
-                  {technique.batchSize.min === technique.batchSize.max
-                    ? technique.batchSize.min
-                    : `${technique.batchSize.min} → ${technique.batchSize.max}`}
-                </span>
-              </div>
-            </div>
-
-            {/* Surface finish */}
-            {technique.surfaceFinish && (
-              <div>
-                <p className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground mb-1">
-                  Surface Finish
-                </p>
-                <p className="text-sm text-muted-foreground">
-                  {technique.surfaceFinish}
-                </p>
-              </div>
-            )}
-
-            {/* Materials */}
-            <div>
-              <p className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground mb-2">
-                Materials
-              </p>
-              <div className="flex flex-wrap gap-1.5">
-                {technique.materials.map(mat => (
-                  <Badge key={mat} variant="secondary" className="text-xs">
-                    {mat}
-                  </Badge>
-                ))}
-              </div>
-            </div>
-
-            {/* Pros and Cons */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <p className="text-[10px] font-mono uppercase tracking-wider text-status-success mb-2">
-                  Advantages
-                </p>
-                <ul className="space-y-1.5">
-                  {technique.pros.map((pro, i) => (
-                    <li key={i} className="flex items-start gap-2 text-sm">
-                      <CheckCircle2 className="h-4 w-4 text-status-success shrink-0 mt-0.5" />
-                      <span className="text-muted-foreground">{pro}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-              <div>
-                <p className="text-[10px] font-mono uppercase tracking-wider text-destructive mb-2">
-                  Limitations
-                </p>
-                <ul className="space-y-1.5">
-                  {technique.cons.map((con, i) => (
-                    <li key={i} className="flex items-start gap-2 text-sm">
-                      <XCircle className="h-4 w-4 text-destructive shrink-0 mt-0.5" />
-                      <span className="text-muted-foreground">{con}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-
-            {/* Applications */}
-            <div>
-              <p className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground mb-2">
-                Common Applications
-              </p>
-              <div className="flex flex-wrap gap-1.5">
-                {technique.applications.map(app => (
-                  <Badge key={app} variant="outline" className="text-xs">
-                    {app}
-                  </Badge>
-                ))}
-              </div>
-            </div>
-
-            {/* Related techniques */}
-            {technique.relatedTechniques.length > 0 && (
-              <div>
-                <p className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground mb-2">
-                  Related Techniques
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  {technique.relatedTechniques.map(id => {
-                    const related = getTechniqueById(id)
-                    if (!related) return null
-                    return (
-                      <button
-                        key={id}
-                        onClick={() => onViewRelated?.(related)}
-                        className={cn(
-                          'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium',
-                          'border transition-colors',
-                          'hover:border-international-orange/30 hover:bg-international-orange/5',
-                          'text-muted-foreground hover:text-foreground',
-                        )}
-                      >
-                        {related.name}
-                        <ArrowRight className="h-3 w-3" />
-                      </button>
-                    )
-                  })}
-                </div>
-              </div>
-            )}
           </div>
-        </ScrollArea>
+        ) : (
+          <>
+            {/* Scrollable detail content */}
+            <ScrollArea className="flex-1 overflow-y-auto">
+              <div className="px-6 py-5 space-y-6">
+                {/* Description */}
+                <div>
+                  <p className="text-sm text-foreground leading-relaxed">
+                    {technique.description}
+                  </p>
+                </div>
 
-        {/* ---------------------------------------------------------------- */}
-        {/* Footer CTAs                                                      */}
-        {/* ---------------------------------------------------------------- */}
-        <Separator />
-        <div className="px-6 py-4 flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-          <Button asChild variant="default" className="flex-1 sm:flex-none">
-            <Link href={`/marketplace?technique=${technique.slug}`}>
-              <Search className="h-4 w-4 mr-2" />
-              Find Suppliers
-            </Link>
-          </Button>
-          <Button asChild variant="outline" className="flex-1 sm:flex-none">
-            <Link href={`/marketplace?cat=People&q=${encodeURIComponent(technique.name)}`}>
-              <Briefcase className="h-4 w-4 mr-2" />
-              Find an Expert
-            </Link>
-          </Button>
-          <Button asChild variant="outline" className="flex-1 sm:flex-none">
-            <Link href={`/rfq/create?technique=${technique.slug}`}>
-              <FileText className="h-4 w-4 mr-2" />
-              Start RFQ
-            </Link>
-          </Button>
-        </div>
+                {/* How it works */}
+                <div>
+                  <h4 className="text-sm font-semibold mb-2 flex items-center gap-2">
+                    <Layers className="h-4 w-4 text-muted-foreground" />
+                    How It Works
+                  </h4>
+                  <p className="text-sm text-muted-foreground leading-relaxed">
+                    {technique.howItWorks}
+                  </p>
+                </div>
+
+                {/* Key specs grid */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                  <div className="space-y-1">
+                    <p className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">
+                      Cost Tier
+                    </p>
+                    <CostDisplay tier={technique.costTier} />
+                  </div>
+                  {technique.leadTime && (
+                    <div className="space-y-1">
+                      <p className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">
+                        Lead Time
+                      </p>
+                      <div className="flex items-center gap-1.5">
+                        <Clock className="h-3.5 w-3.5 text-muted-foreground" />
+                        <span className="text-sm">{technique.leadTime}</span>
+                      </div>
+                    </div>
+                  )}
+                  {technique.toleranceRange && (
+                    <div className="space-y-1">
+                      <p className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">
+                        Tolerance
+                      </p>
+                      <div className="flex items-center gap-1.5">
+                        <Ruler className="h-3.5 w-3.5 text-muted-foreground" />
+                        <span className="text-sm">{technique.toleranceRange}</span>
+                      </div>
+                    </div>
+                  )}
+                  <div className="space-y-1">
+                    <p className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">
+                      Batch Size
+                    </p>
+                    <span className="text-sm">
+                      {technique.batchSize.min === technique.batchSize.max
+                        ? technique.batchSize.min
+                        : `${technique.batchSize.min} → ${technique.batchSize.max}`}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Surface finish */}
+                {technique.surfaceFinish && (
+                  <div>
+                    <p className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground mb-1">
+                      Surface Finish
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      {technique.surfaceFinish}
+                    </p>
+                  </div>
+                )}
+
+                {/* Materials */}
+                <div>
+                  <p className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground mb-2">
+                    Materials
+                  </p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {technique.materials.map(mat => (
+                      <Badge key={mat} variant="secondary" className="text-xs">
+                        {mat}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Pros and Cons */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-[10px] font-mono uppercase tracking-wider text-status-success mb-2">
+                      Advantages
+                    </p>
+                    <ul className="space-y-1.5">
+                      {technique.pros.map((pro, i) => (
+                        <li key={i} className="flex items-start gap-2 text-sm">
+                          <CheckCircle2 className="h-4 w-4 text-status-success shrink-0 mt-0.5" />
+                          <span className="text-muted-foreground">{pro}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-mono uppercase tracking-wider text-destructive mb-2">
+                      Limitations
+                    </p>
+                    <ul className="space-y-1.5">
+                      {technique.cons.map((con, i) => (
+                        <li key={i} className="flex items-start gap-2 text-sm">
+                          <XCircle className="h-4 w-4 text-destructive shrink-0 mt-0.5" />
+                          <span className="text-muted-foreground">{con}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+
+                {/* Applications */}
+                <div>
+                  <p className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground mb-2">
+                    Common Applications
+                  </p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {technique.applications.map(app => (
+                      <Badge key={app} variant="outline" className="text-xs">
+                        {app}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Related techniques */}
+                {technique.relatedTechniques.length > 0 && (
+                  <div>
+                    <p className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground mb-2">
+                      Related Techniques
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {technique.relatedTechniques.map(id => {
+                        const related = getTechniqueById(id)
+                        if (!related) return null
+                        return (
+                          <button
+                            key={id}
+                            onClick={() => onViewRelated?.(related)}
+                            className={cn(
+                              'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium',
+                              'border transition-colors',
+                              'hover:border-international-orange/30 hover:bg-international-orange/5',
+                              'text-muted-foreground hover:text-foreground',
+                            )}
+                          >
+                            {related.name}
+                            <ArrowRight className="h-3 w-3" />
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Grokipedia link */}
+                {grokipediaUrl && (
+                  <div>
+                    <p className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground mb-2">
+                      Learn More
+                    </p>
+                    <button
+                      onClick={() => setShowGrokipedia(true)}
+                      className={cn(
+                        'inline-flex items-center gap-2 px-4 py-2.5 rounded-lg border w-full sm:w-auto',
+                        'hover:border-electric-blue/30 hover:bg-electric-blue/5 transition-colors',
+                      )}
+                    >
+                      <BookOpen className="h-4 w-4 text-electric-blue" />
+                      <span className="text-sm font-medium">Read Grokipedia Article</span>
+                      <ArrowRight className="h-3 w-3 text-muted-foreground ml-auto sm:ml-0" />
+                    </button>
+                  </div>
+                )}
+              </div>
+            </ScrollArea>
+
+            {/* -------------------------------------------------------------- */}
+            {/* Footer CTAs                                                    */}
+            {/* -------------------------------------------------------------- */}
+            <Separator />
+            <div className="px-6 py-4 flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+              <Button asChild variant="default" className="flex-1 sm:flex-none">
+                <Link href={`/marketplace?technique=${technique.slug}`}>
+                  <Search className="h-4 w-4 mr-2" />
+                  Find Suppliers
+                </Link>
+              </Button>
+              <Button asChild variant="outline" className="flex-1 sm:flex-none">
+                <Link href={`/marketplace?cat=People&q=${encodeURIComponent(technique.name)}`}>
+                  <Briefcase className="h-4 w-4 mr-2" />
+                  Find an Expert
+                </Link>
+              </Button>
+              <Button asChild variant="outline" className="flex-1 sm:flex-none">
+                <Link href={`/rfq/create?technique=${technique.slug}`}>
+                  <FileText className="h-4 w-4 mr-2" />
+                  Start RFQ
+                </Link>
+              </Button>
+            </div>
+          </>
+        )}
       </DialogContent>
     </Dialog>
   )

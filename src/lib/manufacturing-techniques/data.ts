@@ -54,6 +54,7 @@ const ADDITIVE: ManufacturingTechnique[] = [
       'Educational models',
     ],
     relatedTechniques: ['sla', 'sls', 'cff'],
+    grokipediaSlug: 'fused-deposition-modeling',
   },
   {
     id: 'sla',
@@ -91,6 +92,7 @@ const ADDITIVE: ManufacturingTechnique[] = [
       'Master patterns for mold-making',
     ],
     relatedTechniques: ['dlp', 'fdm', 'mjf'],
+    grokipediaSlug: 'stereolithography',
   },
   {
     id: 'dlp',
@@ -164,6 +166,7 @@ const ADDITIVE: ManufacturingTechnique[] = [
       'Aerospace brackets',
     ],
     relatedTechniques: ['mjf', 'slm', 'fdm'],
+    grokipediaSlug: 'selective-laser-sintering',
   },
   {
     id: 'slm',
@@ -202,6 +205,7 @@ const ADDITIVE: ManufacturingTechnique[] = [
       'Heat exchangers',
     ],
     relatedTechniques: ['dmls', 'ebm', 'ded'],
+    grokipediaSlug: 'selective-laser-melting',
   },
   {
     id: 'dmls',
@@ -599,6 +603,7 @@ const SUBTRACTIVE: ManufacturingTechnique[] = [
       'Automotive parts',
     ],
     relatedTechniques: ['cnc-milling-5axis', 'cnc-turning', 'edm-wire'],
+    grokipediaSlug: 'cnc-milling',
   },
   {
     id: 'cnc-milling-5axis',
@@ -635,6 +640,7 @@ const SUBTRACTIVE: ManufacturingTechnique[] = [
       'Automotive prototypes',
     ],
     relatedTechniques: ['cnc-milling-3axis', 'cnc-turning', 'edm-wire'],
+    grokipediaSlug: 'five-axis-cnc-milling',
   },
   {
     id: 'cnc-turning',
@@ -671,6 +677,7 @@ const SUBTRACTIVE: ManufacturingTechnique[] = [
       'Instrument components',
     ],
     relatedTechniques: ['cnc-milling-3axis', 'swiss-turning', 'grinding'],
+    grokipediaSlug: 'cnc-turning',
   },
   {
     id: 'swiss-turning',
@@ -856,6 +863,7 @@ const SUBTRACTIVE: ManufacturingTechnique[] = [
       'Architectural metalwork',
     ],
     relatedTechniques: ['waterjet-cutting', 'plasma-cutting', 'cnc-routing'],
+    grokipediaSlug: 'laser-cutting',
   },
   {
     id: 'plasma-cutting',
@@ -1044,6 +1052,7 @@ const FORMING: ManufacturingTechnique[] = [
       'Toys and consumer products',
     ],
     relatedTechniques: ['compression-molding', 'blow-molding', 'vacuum-forming', 'mim'],
+    grokipediaSlug: 'injection-molding',
   },
   {
     id: 'blow-molding',
@@ -1559,6 +1568,7 @@ const CASTING: ManufacturingTechnique[] = [
       'Pipe fittings',
     ],
     relatedTechniques: ['casting-investment', 'binder-jetting-sand', 'die-casting'],
+    grokipediaSlug: 'sand-casting',
   },
   {
     id: 'casting-investment',
@@ -1597,6 +1607,7 @@ const CASTING: ManufacturingTechnique[] = [
       'Firearm receivers',
     ],
     relatedTechniques: ['sand-casting', 'die-casting', 'sla'],
+    grokipediaSlug: 'investment-casting',
   },
   {
     id: 'die-casting',
@@ -1635,6 +1646,7 @@ const CASTING: ManufacturingTechnique[] = [
       'LED heatsinks',
     ],
     relatedTechniques: ['casting-investment', 'injection-molding', 'sand-casting'],
+    grokipediaSlug: 'die-casting',
   },
   {
     id: 'vacuum-casting-urethane',
@@ -1750,6 +1762,7 @@ const JOINING: ManufacturingTechnique[] = [
       'General fabrication',
     ],
     relatedTechniques: ['welding-tig', 'laser-welding', 'spot-welding'],
+    grokipediaSlug: 'mig-welding',
   },
   {
     id: 'welding-tig',
@@ -2021,6 +2034,7 @@ const SURFACE: ManufacturingTechnique[] = [
       'Sporting equipment',
     ],
     relatedTechniques: ['powder-coating', 'electroplating', 'pvd-coating'],
+    grokipediaSlug: 'anodizing',
   },
   {
     id: 'powder-coating',
