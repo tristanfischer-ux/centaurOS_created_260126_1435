@@ -49,14 +49,20 @@ Why plan mode? If your first fix didn't work, your mental model of the problem i
 ## 5. Session Start
 
 At the start of each session on this project:
-1. Check `~/.memory/carry-forward.md` for pending items across all projects
-2. Check `tasks/lessons.md` for relevant patterns to avoid
-3. Check `tasks/todo.md` for any in-progress work
-4. Check `AGENT_HANDOVER.md` if continuing from another session
+1. **Read `~/.memory/master-preferences.md`** for working style, preferences, and things to avoid
+2. Check `~/.memory/carry-forward.md` for pending items across all projects
+3. Check `tasks/lessons.md` for project-specific patterns to avoid
+4. Check `tasks/todo.md` for any in-progress work
+5. Check `AGENT_HANDOVER.md` if continuing from another session
+
+The master preferences document is the most important read -- it tells you how Tristan likes to work, what he values, and what to avoid. Internalize it before starting any work.
 
 ## 6. Session End / Memory Logging
 
 When completing significant work:
 1. Log entries to `~/.memory/daily/YYYY-MM-DD.md` with appropriate tags (#CentaurOS)
-2. For incomplete work, update carry-forward with clear next steps
-3. See skill: `~/.cursor/skills/project-memory/SKILL.md` for full protocol
+2. **Include Preference Signals** in log entries when corrections or preferences were expressed
+3. **Run distillation:** Analyze today's log entries, extract preference signals, update `~/.memory/master-preferences.md`
+4. For incomplete work, update carry-forward with clear next steps
+5. See skill: `~/.cursor/skills/project-memory/SKILL.md` for logging protocol
+6. See skill: `~/.cursor/skills/preference-distill/SKILL.md` for distillation protocol

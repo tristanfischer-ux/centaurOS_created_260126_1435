@@ -20,7 +20,14 @@ import {
     LayoutGrid,
     Heart,
     Scale,
+    Factory,
+    X,
+    ArrowRight,
 } from 'lucide-react'
+import { Badge } from '@/components/ui/badge'
+import { Card, CardContent } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import Link from 'next/link'
 import type { MarketplaceListing, MarketplaceRecommendation } from '@/actions/marketplace'
 import type { FoundryContext } from '@/actions/foundry-context'
 
@@ -237,6 +244,54 @@ export function MarketplaceBrowse({
                         onSelectSubcategory={handleGuideSubcategorySelect}
                         hasFiltersActive={state.hasActiveFilters || state.selectedSubcategories.size > 0}
                     />
+
+                    {/* Technique filter banner */}
+                    {state.activeTechnique && (
+                        <Card className="bg-gradient-to-r from-international-orange/5 to-background border-international-orange/20">
+                            <CardContent className="py-3">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-8 h-8 rounded-lg bg-international-orange/10 flex items-center justify-center shrink-0">
+                                        <Factory className="h-4 w-4 text-international-orange" />
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-sm font-medium">
+                                            Showing suppliers for{' '}
+                                            <Badge variant="secondary" className="text-xs">
+                                                {state.activeTechnique.name}
+                                            </Badge>
+                                        </p>
+                                        <p className="text-xs text-muted-foreground">
+                                            {state.filteredListings.length === 0
+                                                ? 'No exact matches found yet — browse all suppliers or submit an RFQ.'
+                                                : `${state.filteredListings.length} supplier${state.filteredListings.length === 1 ? '' : 's'} found`}
+                                        </p>
+                                    </div>
+                                    <div className="flex items-center gap-2 shrink-0">
+                                        <Button
+                                            asChild
+                                            variant="outline"
+                                            size="sm"
+                                            className="text-xs border-international-orange/30 text-international-orange hover:bg-international-orange/5"
+                                        >
+                                            <Link href={`/inspiration?tab=techniques`}>
+                                                <ArrowRight className="h-3 w-3 mr-1 rotate-180" />
+                                                Back to Techniques
+                                            </Link>
+                                        </Button>
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={state.clearTechniqueFilter}
+                                            className="text-xs"
+                                        >
+                                            <X className="h-3 w-3 mr-1" />
+                                            Clear
+                                        </Button>
+                                    </div>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    )}
 
                     {/* Search + Sort + Filters */}
                     <MarketplaceSearchToolbar

@@ -2,7 +2,7 @@ import type { WorkflowTemplate, WorkflowNode, WorkflowNodeType } from "./agent-t
 
 /**
  * Pre-built workflow templates that users can load onto the canvas.
- * 7 startup-focused + 7 general business.
+ * 8 startup-focused + 13 general business = 21 total.
  *
  * Every template follows a people-first pattern:
  * - START with a human briefing step (gather context, set direction)
@@ -142,6 +142,8 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
             nodeCount: steps.length,
             nodes,
             edges,
+            whyItMatters: "Most founders waste 3-6 months fundraising because they start outreach before their story is airtight. This workflow builds your entire fundraise pipeline — narrative, projections, deck, Q&A prep, and outreach — in a structured sequence that experienced VCs expect to see.",
+            estimatedTime: "4-8 hours",
         }
     })(),
 
@@ -196,6 +198,8 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
             nodeCount: steps.length,
             nodes,
             edges,
+            whyItMatters: "80% of startups fail at go-to-market, not product. This workflow ensures you validate product-market fit, craft compelling positioning, and build your launch pipeline before spending money on ads and outreach.",
+            estimatedTime: "3-6 hours",
         }
     })(),
 
@@ -248,6 +252,8 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
             nodeCount: steps.length,
             nodes,
             edges,
+            whyItMatters: "The difference between a chaotic startup and a well-run one is operating rhythm. This workflow establishes the cadence of OKRs, sprints, standups, and retrospectives that scale from 5 to 50 people.",
+            estimatedTime: "2-3 hours",
         }
     })(),
 
@@ -302,6 +308,8 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
             nodeCount: steps.length,
             nodes,
             edges,
+            whyItMatters: "Investors and partners need to see structured thinking, not just a great idea. This workflow produces a comprehensive business plan that demonstrates you understand your market, unit economics, and path to profitability.",
+            estimatedTime: "4-8 hours",
         }
     })(),
 
@@ -356,6 +364,8 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
             nodeCount: steps.length,
             nodes,
             edges,
+            whyItMatters: "Pivoting too late burns runway. Pivoting too early abandons potential. This framework forces you to evaluate the evidence objectively and make the decision with clear criteria \u2014 not gut feeling.",
+            estimatedTime: "2-4 hours",
         }
     })(),
 
@@ -411,6 +421,8 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
             nodeCount: steps.length,
             nodes,
             edges,
+            whyItMatters: "When cash gets tight, most founders make emotional cuts that damage the business long-term. This playbook gives you a structured approach to extend runway while protecting your core growth engine.",
+            estimatedTime: "2-3 hours",
         }
     })(),
 
@@ -465,6 +477,8 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
             nodeCount: steps.length,
             nodes,
             edges,
+            whyItMatters: "VCs see 1,000+ decks a year and spend an average of 3 minutes on each. This workflow builds a deck that follows the narrative arc proven to convert \u2014 problem, solution, traction, team, ask \u2014 with the specificity investors demand.",
+            estimatedTime: "3-5 hours",
         }
     })(),
 
@@ -520,6 +534,8 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
             nodeCount: steps.length,
             nodes,
             edges,
+            whyItMatters: "Most product launches fizzle because they treat marketing as an afterthought. This workflow builds a coordinated campaign — product brief, copy, social, email, and ads — so every channel reinforces the same message on launch day.",
+            estimatedTime: "3-5 hours",
         }
     })(),
 
@@ -573,6 +589,8 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
             nodeCount: steps.length,
             nodes,
             edges,
+            whyItMatters: "Consistent content marketing compounds over time, but most teams struggle with ideation and execution cadence. This pipeline generates a quarter\u2019s worth of content themes, outlines, and distribution plans in one focused session.",
+            estimatedTime: "3-5 hours",
         }
     })(),
 
@@ -626,6 +644,8 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
             nodeCount: steps.length,
             nodes,
             edges,
+            whyItMatters: "Random outreach gets random results. This workflow builds a systematic sales pipeline — from lead qualification through personalised outreach, objection handling, and proposal creation — so you can scale what works.",
+            estimatedTime: "3-5 hours",
         }
     })(),
 
@@ -687,6 +707,8 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
             nodeCount: steps.length,
             nodes,
             edges,
+            whyItMatters: "The best sales teams treat outreach as a system, not one-off emails. This pipeline builds your prospect research, personalisation framework, multi-step sequences, and follow-up cadence into a repeatable machine.",
+            estimatedTime: "3-5 hours",
         }
     })(),
 
@@ -740,6 +762,8 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
             nodeCount: steps.length,
             nodes,
             edges,
+            whyItMatters: "Bad hires cost 3-5x their annual salary when you factor in lost time, team disruption, and severance. This workflow builds a structured hiring process — JD, interview questions, scoring rubric, and comp package — so you evaluate candidates consistently.",
+            estimatedTime: "3-5 hours",
         }
     })(),
 
@@ -793,6 +817,8 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
             nodeCount: steps.length,
             nodes,
             edges,
+            whyItMatters: "Companies that run structured QBRs grow 2x faster because they catch problems early and double down on what works. This workflow produces a board-ready review that turns raw data into strategic decisions.",
+            estimatedTime: "3-6 hours",
         }
     })(),
 
@@ -845,6 +871,8 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
             nodeCount: steps.length,
             nodes,
             edges,
+            whyItMatters: "68% of customers leave because they feel you don't care about them. A structured onboarding experience sets the tone for the entire relationship — from first login through to first value delivered.",
+            estimatedTime: "3-5 hours",
         }
     })(),
 
@@ -899,6 +927,466 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
             nodeCount: steps.length,
             nodes,
             edges,
+            whyItMatters: "Your brand is the story people tell about you when you're not in the room. This workflow builds a cohesive brand — voice, identity, copy, and visuals — so every touchpoint reinforces the same message.",
+            estimatedTime: "4-6 hours",
+        }
+    })(),
+
+    // ── New Templates (7) ───────────────────────────────────────────
+
+    (() => {
+        const steps: StepDefinition[] = [
+            {
+                type: "human-task",
+                label: "Pre-offsite preparation",
+                guidance: "Great strategy offsites are won or lost in the preparation. Gather the data and perspectives your team needs to make decisions, not just discuss ideas.",
+                checklist: [
+                    "Circulate pre-read packet: key metrics, market landscape, customer feedback",
+                    "Collect individual input on top 3 strategic priorities (async, before the offsite)",
+                    "Define the offsite's single most important outcome (e.g., 'agree on 3 strategic bets for next year')",
+                    "Book a facilitator or assign one team member to keep discussions on track",
+                ],
+            },
+            { type: "prompt", promptId: "strategy-swot", label: "SWOT Analysis", category: "strategy", icon: "Grid3x3" },
+            { type: "prompt", promptId: "strategy-scenario-planner", label: "Scenario Planning", category: "strategy", icon: "GitBranch" },
+            { type: "prompt", promptId: "strategy-growth-framework", label: "Growth Framework", category: "strategy", icon: "TrendingUp" },
+            {
+                type: "human-task",
+                label: "Facilitated strategy discussion",
+                guidance: "This is the core of the offsite. Use the generated materials as conversation starters, not conclusions. The best strategies emerge from honest debate.",
+                checklist: [
+                    "Walk through SWOT and scenarios as a group — challenge assumptions",
+                    "Debate and rank the top 3 strategic bets for the next 12 months",
+                    "Assign an owner to each strategic bet",
+                    "Identify the biggest risk to each bet and how to mitigate it",
+                ],
+            },
+            { type: "prompt", promptId: "strategy-okr", label: "Strategic OKRs", category: "strategy", icon: "Target" },
+            { type: "prompt", promptId: "strategy-initiative-prioritizer", label: "Initiative Prioritization", category: "strategy", icon: "ListOrdered" },
+            { type: "prompt", promptId: "strategy-risk-assessment", label: "Risk Assessment", category: "strategy", icon: "AlertTriangle" },
+            {
+                type: "human-task",
+                label: "Communicate outcomes to the company",
+                guidance: "The offsite only matters if the rest of the company knows what was decided and why. Communicate within 48 hours.",
+                checklist: [
+                    "Write a 1-page summary of strategic decisions made",
+                    "Schedule all-hands to share the strategic direction",
+                    "Publish the OKRs and initiative priorities for the team",
+                    "Set up monthly strategy check-ins to track progress",
+                ],
+            },
+        ]
+        const { nodes, edges } = buildTemplate(steps)
+        return {
+            id: "strategic-planning-offsite",
+            name: "Strategic Planning Offsite",
+            description: "Run a world-class strategy offsite: SWOT analysis, scenario planning, growth framework, OKR setting, initiative prioritization, and risk assessment — with structured human checkpoints for debate and decisions.",
+            category: "business" as const,
+            icon: "Compass",
+            nodeCount: steps.length,
+            nodes,
+            edges,
+            whyItMatters: "Most strategy offsites end with enthusiasm but no concrete outcomes. This workflow structures the entire process — from pre-read materials through SWOT, scenario planning, OKRs, and prioritisation — so you leave with decisions, not just discussions.",
+            estimatedTime: "4-8 hours",
+        }
+    })(),
+
+    (() => {
+        const steps: StepDefinition[] = [
+            {
+                type: "human-task",
+                label: "Collect monthly data from all departments",
+                guidance: "The monthly business review is only as good as its data. Pull numbers from every department before generating the review.",
+                checklist: [
+                    "Revenue, pipeline, and bookings data from sales",
+                    "Product metrics: active users, retention, feature adoption",
+                    "Marketing metrics: leads, CAC, conversion rates",
+                    "Engineering: velocity, bugs, uptime",
+                    "Finance: cash position, burn rate, P&L actuals vs. budget",
+                ],
+            },
+            { type: "prompt", promptId: "finance-kpi-dashboard", label: "KPI Dashboard", category: "finance", icon: "BarChart3" },
+            { type: "prompt", promptId: "data-trend-analysis", label: "Trend Analysis", category: "data-analytics", icon: "TrendingUp" },
+            { type: "prompt", promptId: "finance-cash-flow", label: "Cash Flow Review", category: "finance", icon: "DollarSign" },
+            {
+                type: "human-task",
+                label: "Review with department leads",
+                guidance: "Walk through the numbers with each department lead. The goal is to understand WHY metrics moved, not just THAT they moved.",
+                checklist: [
+                    "Meet with each department lead to review their metrics",
+                    "Identify the top 3 wins and top 3 concerns for the month",
+                    "Agree on corrective actions for any off-track metrics",
+                ],
+            },
+            { type: "prompt", promptId: "data-executive-summary", label: "Executive Summary", category: "data-analytics", icon: "FileText" },
+            { type: "prompt", promptId: "startup-metrics-dashboard", label: "Startup Metrics", category: "startup-strategy", icon: "BarChart3" },
+            {
+                type: "human-task",
+                label: "Present and distribute",
+                guidance: "Share the monthly review with the full leadership team and, optionally, the whole company. Transparency builds trust.",
+                checklist: [
+                    "Present MBR to leadership team",
+                    "Send summary to full company (if appropriate)",
+                    "Update board dashboard with latest metrics",
+                    "File action items and assign owners",
+                ],
+            },
+        ]
+        const { nodes, edges } = buildTemplate(steps)
+        return {
+            id: "monthly-business-review",
+            name: "Monthly Business Review",
+            description: "Run a structured monthly business review: KPI dashboard, trend analysis, cash flow review, executive summary, and metrics tracking — with leadership review checkpoints.",
+            category: "business" as const,
+            icon: "BarChart3",
+            nodeCount: steps.length,
+            nodes,
+            edges,
+            whyItMatters: "Monthly reviews prevent quarterly surprises. This workflow turns raw department data into a structured review with trend analysis, cash flow check, and executive summary — giving you 30-day feedback loops instead of 90-day ones.",
+            estimatedTime: "2-4 hours",
+        }
+    })(),
+
+    (() => {
+        const steps: StepDefinition[] = [
+            {
+                type: "human-task",
+                label: "Prepare for the new hire's arrival",
+                guidance: "Great onboarding starts before Day 1. Make sure everything is ready so the new hire feels expected and valued from the moment they arrive.",
+                checklist: [
+                    "Confirm start date, equipment, and access credentials",
+                    "Assign an onboarding buddy from the team",
+                    "Block the first week's calendar with key meetings",
+                    "Prepare a welcome message from the hiring manager",
+                ],
+            },
+            { type: "prompt", promptId: "hr-onboarding", label: "Onboarding Checklist", category: "hr", icon: "ListChecks" },
+            { type: "prompt", promptId: "hr-culture", label: "Culture Statement", category: "hr", icon: "Heart" },
+            { type: "prompt", promptId: "startup-90-day-plan", label: "90-Day Plan", category: "startup-strategy", icon: "Map" },
+            {
+                type: "human-task",
+                label: "Week 1: Daily check-ins",
+                guidance: "The first week sets the tone. Check in daily to make sure the new hire is settling in and has everything they need.",
+                checklist: [
+                    "Day 1: Welcome meeting, team intro, first task assigned",
+                    "Day 2-3: Role-specific training and tool setup",
+                    "Day 4-5: First deliverable assigned and buddy check-in",
+                    "End of week: Manager debrief — 'How was your first week?'",
+                ],
+            },
+            { type: "prompt", promptId: "hr-performance-review", label: "30-Day Review Template", category: "hr", icon: "ClipboardCheck" },
+            { type: "prompt", promptId: "hr-360-feedback", label: "Feedback Collection Plan", category: "hr", icon: "RefreshCcw" },
+            {
+                type: "human-task",
+                label: "30-day review and course correction",
+                guidance: "At 30 days, have a formal check-in. Is the new hire ramping well? Do they need additional support or a course correction?",
+                checklist: [
+                    "Conduct formal 30-day review with the new hire",
+                    "Collect feedback from buddy and key collaborators",
+                    "Adjust the 90-day plan based on progress so far",
+                    "Celebrate early wins and address any concerns",
+                ],
+            },
+        ]
+        const { nodes, edges } = buildTemplate(steps)
+        return {
+            id: "new-hire-onboarding",
+            name: "New Hire Onboarding",
+            description: "Onboard a new team member with excellence: pre-arrival prep, onboarding checklist, culture immersion, 90-day plan, and structured 30-day review with feedback collection.",
+            category: "business" as const,
+            icon: "UserPlus",
+            nodeCount: steps.length,
+            nodes,
+            edges,
+            whyItMatters: "The first 90 days determine whether a new hire becomes a long-term contributor or a quick departure. This workflow creates a structured onboarding experience — from pre-arrival prep through 90-day plan and feedback — so new team members reach full productivity faster.",
+            estimatedTime: "2-4 hours",
+        }
+    })(),
+
+    (() => {
+        const steps: StepDefinition[] = [
+            {
+                type: "human-task",
+                label: "Gather product requirements and context",
+                guidance: "Before writing the spec, make sure you understand the problem deeply. Talk to customers, review data, and align with stakeholders.",
+                checklist: [
+                    "Interview 3-5 customers about the problem",
+                    "Review relevant analytics and support tickets",
+                    "Align with engineering on technical constraints",
+                    "Define success metrics for this feature",
+                ],
+            },
+            { type: "prompt", promptId: "product-prd", label: "Product Requirements Doc", category: "product", icon: "FileText" },
+            { type: "prompt", promptId: "product-user-stories", label: "User Stories", category: "product", icon: "Users" },
+            { type: "prompt", promptId: "product-feature-prioritization", label: "Feature Prioritization", category: "product", icon: "ListOrdered" },
+            {
+                type: "human-task",
+                label: "Design review with engineering",
+                guidance: "Walk through the PRD and user stories with your engineering team. Catch feasibility issues early — they're 10x cheaper to fix now than after coding starts.",
+                checklist: [
+                    "Review PRD with tech lead for feasibility",
+                    "Estimate effort for each user story (t-shirt sizing)",
+                    "Identify technical risks and dependencies",
+                    "Agree on MVP scope vs. future enhancements",
+                ],
+            },
+            { type: "prompt", promptId: "creative-ui-copy", label: "UI Copy", category: "creative", icon: "Type" },
+            { type: "prompt", promptId: "product-release-notes", label: "Release Notes (draft)", category: "product", icon: "FileText" },
+            {
+                type: "human-task",
+                label: "Ship, announce, and measure",
+                guidance: "The feature isn't done until it's shipped, announced, and measured. Close the loop.",
+                checklist: [
+                    "QA the feature on staging before release",
+                    "Publish release notes to customers",
+                    "Update documentation and help center",
+                    "Set up analytics tracking for success metrics",
+                    "Schedule 2-week post-launch review",
+                ],
+            },
+        ]
+        const { nodes, edges } = buildTemplate(steps)
+        return {
+            id: "product-spec-to-ship",
+            name: "Product Spec-to-Ship",
+            description: "Take a product idea from spec to ship: PRD, user stories, prioritization, UI copy, release notes — with engineering review and launch checklist.",
+            category: "business" as const,
+            icon: "Package",
+            nodeCount: steps.length,
+            nodes,
+            edges,
+            whyItMatters: "Features that ship without a structured spec process accumulate scope creep and miss deadlines. This workflow takes a product idea from PRD through user stories, prioritisation, and release — with engineering review baked in to catch feasibility issues early.",
+            estimatedTime: "3-6 hours",
+        }
+    })(),
+
+    (() => {
+        const steps: StepDefinition[] = [
+            {
+                type: "human-task",
+                label: "Prepare account review data",
+                guidance: "Pull together everything you know about this customer before the review. The goal is to have a complete picture of account health.",
+                checklist: [
+                    "Export usage/engagement data for this account",
+                    "Review support tickets and NPS responses",
+                    "Check contract terms, renewal date, and expansion opportunities",
+                    "Note any recent conversations or escalations",
+                ],
+            },
+            { type: "prompt", promptId: "cs-health-scorer", label: "Account Health Score", category: "customer-success", icon: "Activity" },
+            { type: "prompt", promptId: "cs-churn-analyzer", label: "Churn Risk Analysis", category: "customer-success", icon: "AlertTriangle" },
+            {
+                type: "human-task",
+                label: "Internal alignment on account strategy",
+                guidance: "Before the customer meeting, align your internal team on the account strategy. What's the goal for this customer in the next quarter?",
+                checklist: [
+                    "Review health score and churn risk with CS team",
+                    "Align on retention or expansion strategy",
+                    "Prepare talking points for the customer meeting",
+                    "Identify any product or support issues to address proactively",
+                ],
+            },
+            { type: "prompt", promptId: "cs-renewal-proposal", label: "Renewal Proposal", category: "customer-success", icon: "FileText" },
+            { type: "prompt", promptId: "cs-nps-response", label: "NPS Follow-up", category: "customer-success", icon: "ThumbsUp" },
+            { type: "prompt", promptId: "cs-email-responder", label: "Customer Communication", category: "customer-success", icon: "Mail" },
+            {
+                type: "human-task",
+                label: "Conduct QBR and follow up",
+                guidance: "Run the customer QBR with a focus on value delivered and future plans. Follow up within 24 hours with a summary and action items.",
+                checklist: [
+                    "Conduct QBR meeting with customer stakeholders",
+                    "Send meeting summary within 24 hours",
+                    "File action items and assign owners",
+                    "Update CRM with account status and next steps",
+                ],
+            },
+        ]
+        const { nodes, edges } = buildTemplate(steps)
+        return {
+            id: "customer-success-review",
+            name: "Customer Success Review",
+            description: "Run a structured customer success review: health scoring, churn risk analysis, renewal proposal, NPS follow-up, and customer communication — with internal alignment and QBR execution.",
+            category: "business" as const,
+            icon: "Heart",
+            nodeCount: steps.length,
+            nodes,
+            edges,
+            whyItMatters: "It costs 5-7x more to acquire a new customer than to retain an existing one. This workflow gives you a structured review process — health score, churn risk, renewal strategy — so you proactively address issues before they become cancellations.",
+            estimatedTime: "2-4 hours",
+        }
+    })(),
+
+    (() => {
+        const steps: StepDefinition[] = [
+            {
+                type: "human-task",
+                label: "Identify applicable regulations",
+                guidance: "Before diving into compliance, identify which regulations actually apply to your business. Over-compliance wastes resources; under-compliance creates risk.",
+                checklist: [
+                    "List all jurisdictions where you operate or have customers",
+                    "Identify industry-specific regulations (HIPAA, PCI-DSS, etc.)",
+                    "Check if GDPR, CCPA, or other data privacy laws apply",
+                    "Determine your company's size thresholds for regulatory obligations",
+                ],
+            },
+            { type: "prompt", promptId: "legal-compliance-checklist", label: "Compliance Checklist", category: "legal", icon: "ClipboardCheck" },
+            { type: "prompt", promptId: "legal-privacy-policy", label: "Privacy Policy", category: "legal", icon: "Shield" },
+            { type: "prompt", promptId: "legal-terms-of-service", label: "Terms of Service", category: "legal", icon: "ScrollText" },
+            {
+                type: "human-task",
+                label: "Legal review of generated documents",
+                guidance: "AI-generated legal documents are a starting point, NOT final. Have every document reviewed by a qualified lawyer before publishing.",
+                checklist: [
+                    "Send compliance checklist to legal counsel for review",
+                    "Have privacy policy reviewed by a privacy lawyer",
+                    "Have terms of service reviewed by a business lawyer",
+                    "Document any jurisdiction-specific modifications needed",
+                ],
+            },
+            { type: "prompt", promptId: "legal-regulatory-impact", label: "Regulatory Impact Assessment", category: "legal", icon: "AlertTriangle" },
+            { type: "prompt", promptId: "legal-ip-protection", label: "IP Protection Strategy", category: "legal", icon: "Lock" },
+            {
+                type: "human-task",
+                label: "Implement and maintain compliance",
+                guidance: "Compliance is not a one-time event. Set up ongoing processes to maintain compliance as your business and regulations evolve.",
+                checklist: [
+                    "Publish approved legal documents on your website",
+                    "Set up quarterly compliance review cadence",
+                    "Train team on key compliance obligations",
+                    "Create a process for tracking regulatory changes",
+                ],
+            },
+        ]
+        const { nodes, edges } = buildTemplate(steps)
+        return {
+            id: "compliance-readiness",
+            name: "Compliance Readiness",
+            description: "Get compliance-ready: regulatory checklist, privacy policy, terms of service, regulatory impact assessment, and IP protection — with mandatory legal review checkpoints.",
+            category: "business" as const,
+            icon: "Shield",
+            nodeCount: steps.length,
+            nodes,
+            edges,
+            whyItMatters: "Compliance gaps don't announce themselves — they surface during due diligence, customer audits, or regulatory investigations. This workflow identifies your obligations, generates draft legal documents, and builds a maintenance process — with mandatory legal review checkpoints.",
+            estimatedTime: "4-8 hours",
+        }
+    })(),
+
+    (() => {
+        const steps: StepDefinition[] = [
+            {
+                type: "human-task",
+                label: "Compile quarterly investor data",
+                guidance: "Investors want transparency, consistency, and honesty. Gather the data that tells a complete picture — good and bad.",
+                checklist: [
+                    "Export key metrics: revenue, growth rate, burn, runway",
+                    "Summarise top 3 wins and top 3 challenges this quarter",
+                    "List key hires, departures, and team changes",
+                    "Note any material changes to strategy or market",
+                ],
+            },
+            { type: "prompt", promptId: "fundraising-investor-update", label: "Investor Update Letter", category: "fundraising", icon: "Mail" },
+            { type: "prompt", promptId: "startup-metrics-dashboard", label: "Metrics Dashboard", category: "startup-strategy", icon: "BarChart3" },
+            { type: "prompt", promptId: "startup-board-update", label: "Board Update", category: "startup-strategy", icon: "Users" },
+            {
+                type: "human-task",
+                label: "Review with co-founder before sending",
+                guidance: "Never send investor communications without a second pair of eyes. Tone, accuracy, and messaging matter.",
+                checklist: [
+                    "Review investor letter with co-founder for tone and accuracy",
+                    "Verify all metrics match your internal data",
+                    "Check that asks (introductions, advice) are specific and actionable",
+                    "Proofread for grammar and formatting",
+                ],
+            },
+            { type: "prompt", promptId: "fundraising-data-room", label: "Data Room Update", category: "fundraising", icon: "FolderOpen" },
+            { type: "prompt", promptId: "fundraising-traction-narrative", label: "Traction Narrative", category: "fundraising", icon: "TrendingUp" },
+            {
+                type: "human-task",
+                label: "Send and follow up",
+                guidance: "Send the update, then track engagement. Investors who respond are your warmest leads for the next raise.",
+                checklist: [
+                    "Send investor update to all shareholders",
+                    "Send board update to board members",
+                    "Update data room with latest documents",
+                    "Track which investors reply and note their feedback",
+                    "Follow up personally with any investor who has questions",
+                ],
+            },
+        ]
+        const { nodes, edges } = buildTemplate(steps)
+        return {
+            id: "investor-relations-cadence",
+            name: "Investor Relations Cadence",
+            description: "Maintain excellent investor relations: quarterly investor update, metrics dashboard, board update, data room refresh, and traction narrative — with review checkpoints before sending.",
+            category: "startup" as const,
+            icon: "Users",
+            nodeCount: steps.length,
+            nodes,
+            edges,
+            whyItMatters: "The founders who raise follow-on rounds fastest are the ones who keep investors engaged between raises. This workflow builds a quarterly cadence — update letter, metrics, board materials, and data room — so your investors are warm when you need them.",
+            estimatedTime: "2-4 hours",
+        }
+    })(),
+
+    // ─── Manufacturing Decision Engine ──────────────────────────────────
+    (() => {
+        const steps: StepDefinition[] = [
+            {
+                type: "human-task",
+                label: "Describe your product and requirements",
+                guidance: "The quality of manufacturing recommendations depends entirely on the quality of your input. Be as specific as possible about your product, constraints, and goals.",
+                checklist: [
+                    "Write a detailed product description (size, weight, features, complexity)",
+                    "Define target production volume (prototype, 100, 1k, 10k, 100k+)",
+                    "Set budget range (prototype budget + production budget)",
+                    "Specify timeline (when do you need first parts? when do you need production volume?)",
+                    "List material preferences or requirements (strength, weight, thermal, aesthetic)",
+                    "Note any regulatory requirements (FDA, CE, UL, RoHS, REACH)",
+                ],
+            },
+            { type: "prompt", promptId: "mfg-technique-selector", label: "Manufacturing Technique Selection", category: "manufacturing", icon: "Factory" },
+            { type: "prompt", promptId: "mfg-material-advisor", label: "Material Recommendation", category: "manufacturing", icon: "Layers" },
+            {
+                type: "human-task",
+                label: "Review technique and material recommendations",
+                guidance: "Before proceeding to costing and DFM, validate that the recommended technique and material actually fit your constraints. This is the most important decision in the entire workflow.",
+                checklist: [
+                    "Validate the recommended technique fits your volume and budget",
+                    "Confirm the material meets your functional requirements",
+                    "Check that cost expectations align with your budget",
+                    "Review the scaling path — does the transition from prototype to production make sense?",
+                    "If anything doesn't fit, adjust your input and re-run the previous steps",
+                ],
+            },
+            { type: "prompt", promptId: "mfg-cost-estimator", label: "Cost Estimation", category: "manufacturing", icon: "Calculator" },
+            { type: "prompt", promptId: "mfg-dfm-review", label: "DFM Review", category: "manufacturing", icon: "ClipboardCheck" },
+            { type: "prompt", promptId: "mfg-rfq-spec-writer", label: "RFQ Specification", category: "manufacturing", icon: "FileText" },
+            {
+                type: "human-task",
+                label: "Review RFQ spec and send to suppliers",
+                guidance: "The RFQ spec is your primary communication tool with suppliers. A well-written RFQ gets better quotes, faster responses, and fewer misunderstandings.",
+                checklist: [
+                    "Review the RFQ spec for completeness and accuracy",
+                    "Add your company-specific details (contact info, commercial terms)",
+                    "Attach any CAD files or drawings referenced in the spec",
+                    "Send the RFQ to 3+ qualified suppliers via the Marketplace",
+                    "Set a response deadline (typically 1-2 weeks for standard parts)",
+                ],
+            },
+        ]
+        const { nodes, edges } = buildTemplate(steps)
+        return {
+            id: "manufacturing-decision-engine",
+            name: "Manufacturing Decision Engine",
+            description: "The complete manufacturing decision workflow: technique selection, material recommendation, cost estimation, DFM review, and RFQ specification — with human checkpoints at every critical decision point.",
+            category: "manufacturing" as const,
+            icon: "Factory",
+            nodeCount: steps.length,
+            nodes,
+            edges,
+            whyItMatters: "Choosing the wrong manufacturing technique costs hardware startups an average of $50K-200K in wasted tooling and 3-6 months of delays. This workflow guides you through technique selection, material choice, cost estimation, and RFQ creation — the same process a $300/hr manufacturing consultant would follow.",
+            estimatedTime: "4-8 hours",
         }
     })(),
 ]

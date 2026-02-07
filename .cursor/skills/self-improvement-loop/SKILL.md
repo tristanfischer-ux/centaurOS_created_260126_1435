@@ -21,9 +21,10 @@ This skill ensures continuous improvement by capturing lessons learned from corr
 Self-Improvement Loop:
 - [ ] 1. Acknowledge the correction
 - [ ] 2. Identify the pattern/mistake
-- [ ] 3. Update tasks/lessons.md
-- [ ] 4. Consider if a rule should be created
-- [ ] 5. Apply the lesson immediately
+- [ ] 3. Update tasks/lessons.md (project-specific)
+- [ ] 4. Log preference signal to daily log (feeds master preferences)
+- [ ] 5. Consider if a rule should be created
+- [ ] 6. Apply the lesson immediately
 ```
 
 ## Step 1: Acknowledge the Correction
@@ -84,7 +85,25 @@ Add an entry to `tasks/lessons.md` using this format:
 **Related files:** src/components/ui/dialog.tsx
 ```
 
-## Step 4: Consider Creating a Rule
+## Step 4: Log Preference Signal to Daily Log
+
+In addition to project-specific lessons.md, log the correction as a **preference signal** in today's daily log (`~/.memory/daily/YYYY-MM-DD.md`). This feeds into the preference distillation pipeline that updates `~/.memory/master-preferences.md`.
+
+Add to the current log entry's **Preference Signals** section:
+
+```markdown
+**Preference Signals:**
+- User corrected: [what was wrong] → [what was right]
+- Pattern: [category from Step 2]
+```
+
+**Why both files?**
+- `tasks/lessons.md` = project-specific, detailed, with prevention steps (quick reference for this codebase)
+- Daily log preference signals = cross-session, feeds the master preferences document (shapes all future sessions)
+
+The daily log signals are analyzed during distillation (see `~/.cursor/skills/preference-distill/SKILL.md`) and used to update the master preferences document that the AI reads at the start of every session.
+
+## Step 5: Consider Creating a Rule
 
 If the mistake:
 - Is likely to recur
@@ -103,7 +122,7 @@ Then create or update a rule in `.cursor/rules/`.
 - Context-specific issues
 - Complex judgment calls
 
-## Step 5: Apply Immediately
+## Step 6: Apply Immediately
 
 Don't just document - fix any instances of the mistake in the current work:
 
@@ -171,6 +190,8 @@ This file captures patterns and mistakes to avoid in future work.
 
 ## Related Skills
 
+- [preference-distill](../preference-distill/SKILL.md) - Distills preference signals into master preferences document
+- [project-memory](../project-memory/SKILL.md) - Daily logging where preference signals are recorded
 - [bug-fix-workflow](../bug-fix-workflow/SKILL.md) - When corrections reveal bugs
 - [code-quality](../code-quality/SKILL.md) - Quality standards to follow
 - [comprehensive-code-review](../comprehensive-code-review/SKILL.md) - Self-review before presenting work

@@ -1,16 +1,23 @@
 "use client"
 
 import React, { useState, useCallback, useEffect, useRef } from "react"
-import { X, Copy, Check, Trash2, Play, RotateCcw, ChevronDown, ChevronRight, CheckCircle, ArrowRight, Sparkles, Brain, Globe, Image as ImageIcon, Mic, Cpu, Loader2, UserCheck, Square, CheckSquare } from "lucide-react"
+import { X, Copy, Check, Trash2, Play, RotateCcw, ChevronDown, ChevronRight, CheckCircle, ArrowRight, Sparkles, Brain, Globe, Image as ImageIcon, Mic, Cpu, Loader2, UserCheck, Square, CheckSquare, Download } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { getPromptById } from "../lib/prompt-library"
 import { CATEGORY_META, CATEGORY_ACCENT_COLORS, type PromptCategory, type ExecutionStatus, type AttachedFile } from "../lib/agent-types"
 import { getIcon } from "./prompt-node"
 import { FileDropZone } from "./file-drop-zone"
 import { PROVIDER_REGISTRY, getProvidersForModality, getModelsForModality, getDefaultModel, type AIProviderId, type OutputModality, OUTPUT_MODALITIES } from "@/lib/ai-providers/types"
 import { parseSlideDeckFromText } from "@/lib/ai-providers/slide-parser"
+import { generateNodeMarkdown, downloadAsFile } from "../lib/export-markdown"
 import type { Node } from "@xyflow/react"
 
 const PROVIDER_ICON_MAP: Record<string, React.ComponentType<{ className?: string; style?: React.CSSProperties }>> = {
@@ -655,15 +662,85 @@ export function NodeInspector({
                                     )}
 
                                     {data.output && status !== "running" && (
-                                        <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            onClick={handleCopyOutput}
-                                            className="h-6 px-2 text-[10px] gap-1"
-                                        >
-                                            {copiedOutput ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
-                                            {copiedOutput ? "Copied" : "Copy output"}
-                                        </Button>
+                                        <div className="flex items-center gap-1">
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={handleCopyOutput}
+                                                className="h-6 px-2 text-[10px] gap-1"
+                                            >
+                                                {copiedOutput ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+                                                {copiedOutput ? "Copied" : "Copy output"}
+                                            </Button>
+                                            <DropdownMenu>
+                                                <DropdownMenuTrigger asChild>
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        className="h-6 px-2 text-[10px] gap-1"
+                                                    >
+                                                        <Download className="w-3 h-3" />
+                                                        Export
+                                                        <ChevronDown className="w-3 h-3" />
+                                                    </Button>
+                                                </DropdownMenuTrigger>
+                                                <DropdownMenuContent align="start">
+                                                    <DropdownMenuItem
+                                                        onClick={() => {
+                                                            const md = generateNodeMarkdown(
+                                                                data.label ?? "Step",
+                                                                data.userInput,
+                                                                data.output
+                                                            )
+                                                            const safeName = (data.label || "step")
+                                                                .toLowerCase()
+                                                                .replace(/[^a-z0-9]+/g, "-")
+                                                                .replace(/^-|-$/g, "")
+                                                            downloadAsFile(md, `${safeName}-output.md`)
+                                                        }}
+                                                        className="text-xs gap-2"
+                                                    >
+                                                        Markdown (.md)
+                                                    </DropdownMenuItem>
+                                                    <DropdownMenuItem
+                                                        onClick={async () => {
+                                                            const { exportAsPDF } = await import("@/lib/export-utils")
+                                                            const md = generateNodeMarkdown(
+                                                                data.label ?? "Step",
+                                                                data.userInput,
+                                                                data.output
+                                                            )
+                                                            const safeName = (data.label || "step")
+                                                                .toLowerCase()
+                                                                .replace(/[^a-z0-9]+/g, "-")
+                                                                .replace(/^-|-$/g, "")
+                                                            await exportAsPDF(md, `${safeName}-output.pdf`)
+                                                        }}
+                                                        className="text-xs gap-2"
+                                                    >
+                                                        PDF (.pdf)
+                                                    </DropdownMenuItem>
+                                                    <DropdownMenuItem
+                                                        onClick={async () => {
+                                                            const { exportAsDOCX } = await import("@/lib/export-utils")
+                                                            const md = generateNodeMarkdown(
+                                                                data.label ?? "Step",
+                                                                data.userInput,
+                                                                data.output
+                                                            )
+                                                            const safeName = (data.label || "step")
+                                                                .toLowerCase()
+                                                                .replace(/[^a-z0-9]+/g, "-")
+                                                                .replace(/^-|-$/g, "")
+                                                            await exportAsDOCX(md, `${safeName}-output.docx`)
+                                                        }}
+                                                        className="text-xs gap-2"
+                                                    >
+                                                        Word (.docx)
+                                                    </DropdownMenuItem>
+                                                </DropdownMenuContent>
+                                            </DropdownMenu>
+                                        </div>
                                     )}
                                 </div>
                             )}

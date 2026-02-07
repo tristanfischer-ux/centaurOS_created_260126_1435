@@ -17,6 +17,9 @@ import {
     HelpCircle,
     ChevronDown,
     FolderOpen,
+    FileText,
+    FileDown,
+    Download,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -30,6 +33,12 @@ import {
     PopoverContent,
     PopoverTrigger,
 } from "@/components/ui/popover"
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import type { AgentWorkflowRow } from "@/actions/agent-workflows"
 
@@ -51,6 +60,10 @@ interface WorkflowToolbarProps {
     onAutoArrange?: () => void
     onClearCanvas?: () => void
     onOpenHelp?: () => void
+    /** Open the consolidated results dialog */
+    onOpenResults?: () => void
+    /** Whether any nodes have output to show in results */
+    hasResults?: boolean
     /** Saved workflows from the database */
     savedWorkflows?: AgentWorkflowRow[]
     /** Currently active workflow's database ID (null if unsaved) */
@@ -59,6 +72,8 @@ interface WorkflowToolbarProps {
     onLoadWorkflow?: (workflow: AgentWorkflowRow) => void
     /** Delete a saved workflow */
     onDeleteWorkflow?: (workflowId: string) => void
+    /** Export all outputs in a given format */
+    onExportAll?: (format: "md" | "pdf" | "docx") => void
 }
 
 /**
@@ -97,10 +112,13 @@ export function WorkflowToolbar({
     onAutoArrange,
     onClearCanvas,
     onOpenHelp,
+    onOpenResults,
+    hasResults,
     savedWorkflows = [],
     activeWorkflowId,
     onLoadWorkflow,
     onDeleteWorkflow,
+    onExportAll,
 }: WorkflowToolbarProps) {
     const [copied, setCopied] = useState(false)
     const [saved, setSaved] = useState(false)
@@ -189,39 +207,57 @@ export function WorkflowToolbar({
                     <TooltipContent>Load a pre-built workflow</TooltipContent>
                 </Tooltip>
 
-                {/* My Workflows dropdown */}
-                {savedWorkflows.length > 0 && (
-                    <Popover open={workflowPickerOpen} onOpenChange={setWorkflowPickerOpen}>
-                        <Tooltip>
-                            <TooltipTrigger asChild>
-                                <PopoverTrigger asChild>
-                                    <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        className="gap-1.5 text-xs"
-                                    >
-                                        <FolderOpen className="w-3.5 h-3.5" />
-                                        My Workflows
-                                        <ChevronDown className="w-3 h-3 opacity-60" />
-                                    </Button>
-                                </PopoverTrigger>
-                            </TooltipTrigger>
-                            <TooltipContent>Open a saved workflow</TooltipContent>
-                        </Tooltip>
-                        <PopoverContent align="end" className="w-72 p-0">
-                            <div className="px-3 py-2.5 border-b border-slate-100">
-                                <p className="text-xs font-semibold text-foreground">
-                                    Saved Workflows
+                {/* My Workflows dropdown — always visible so users know where saved workflows live */}
+                <Popover open={workflowPickerOpen} onOpenChange={setWorkflowPickerOpen}>
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <PopoverTrigger asChild>
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="gap-1.5 text-xs"
+                                >
+                                    <FolderOpen className="w-3.5 h-3.5" />
+                                    My Workflows
+                                    {savedWorkflows.length > 0 && (
+                                        <span className="text-[10px] font-medium bg-international-orange text-white px-1.5 py-0.5 rounded-full min-w-[18px] text-center leading-none">
+                                            {savedWorkflows.length}
+                                        </span>
+                                    )}
+                                    <ChevronDown className="w-3 h-3 opacity-60" />
+                                </Button>
+                            </PopoverTrigger>
+                        </TooltipTrigger>
+                        <TooltipContent>Open a saved workflow</TooltipContent>
+                    </Tooltip>
+                    <PopoverContent align="end" className="w-72 p-0">
+                        <div className="px-3 py-2.5 border-b border-slate-100">
+                            <p className="text-xs font-semibold text-foreground">
+                                Saved Workflows
+                            </p>
+                            <p className="text-[10px] text-muted-foreground">
+                                {savedWorkflows.length > 0
+                                    ? `${savedWorkflows.length} workflow${savedWorkflows.length !== 1 ? "s" : ""}`
+                                    : "No saved workflows yet"
+                                }
+                            </p>
+                        </div>
+                        {savedWorkflows.length === 0 ? (
+                            <div className="px-4 py-6 text-center">
+                                <FolderOpen className="w-8 h-8 text-muted-foreground/40 mx-auto mb-2" />
+                                <p className="text-xs text-muted-foreground mb-1">
+                                    No workflows saved yet
                                 </p>
-                                <p className="text-[10px] text-muted-foreground">
-                                    {savedWorkflows.length} workflow{savedWorkflows.length !== 1 ? "s" : ""}
+                                <p className="text-[10px] text-muted-foreground/70">
+                                    Build a workflow on the canvas and hit Save to keep it here.
                                 </p>
                             </div>
+                        ) : (
                             <ScrollArea className="max-h-[280px]">
                                 <div className="p-1">
                                     {savedWorkflows.map((wf) => {
                                         const isActive = wf.id === activeWorkflowId
-                                        const nodeCount = Array.isArray(wf.nodes) ? wf.nodes.length : 0
+                                        const wfNodeCount = Array.isArray(wf.nodes) ? wf.nodes.length : 0
                                         return (
                                             <div
                                                 key={wf.id}
@@ -244,7 +280,7 @@ export function WorkflowToolbar({
                                                         {wf.name}
                                                     </p>
                                                     <p className="text-[10px] text-muted-foreground">
-                                                        {nodeCount} step{nodeCount !== 1 ? "s" : ""} · {formatRelativeTime(wf.updated_at)}
+                                                        {wfNodeCount} step{wfNodeCount !== 1 ? "s" : ""} · {formatRelativeTime(wf.updated_at)}
                                                     </p>
                                                 </div>
                                                 {isActive && (
@@ -257,7 +293,6 @@ export function WorkflowToolbar({
                                                         onClick={(e) => {
                                                             e.stopPropagation()
                                                             onDeleteWorkflow(wf.id)
-                                                            // Don't close popover — let user see the list update
                                                         }}
                                                         className="p-1 rounded hover:bg-red-50 text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-all flex-shrink-0"
                                                         aria-label={`Delete ${wf.name}`}
@@ -270,9 +305,9 @@ export function WorkflowToolbar({
                                     })}
                                 </div>
                             </ScrollArea>
-                        </PopoverContent>
-                    </Popover>
-                )}
+                        )}
+                    </PopoverContent>
+                </Popover>
 
                 {nodeCount > 0 && (
                     <>
@@ -350,6 +385,69 @@ export function WorkflowToolbar({
                 </Tooltip>
 
                 <div className="h-5 w-px bg-slate-200" />
+
+                <Tooltip>
+                    <TooltipTrigger asChild>
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={onOpenResults}
+                            className="gap-1.5 text-xs"
+                            disabled={!hasResults}
+                        >
+                            <FileText className="w-3.5 h-3.5" />
+                            Results
+                        </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                        View all results and export as Markdown
+                    </TooltipContent>
+                </Tooltip>
+
+                <DropdownMenu>
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <DropdownMenuTrigger asChild>
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="gap-1.5 text-xs"
+                                    disabled={!hasResults}
+                                >
+                                    <Download className="w-3.5 h-3.5" />
+                                    Export All
+                                    <ChevronDown className="w-3 h-3 opacity-60" />
+                                </Button>
+                            </DropdownMenuTrigger>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                            Export all outputs as a single document
+                        </TooltipContent>
+                    </Tooltip>
+                    <DropdownMenuContent align="end">
+                        <DropdownMenuItem
+                            onClick={() => onExportAll?.("md")}
+                            className="text-xs gap-2"
+                        >
+                            <FileText className="w-3.5 h-3.5" />
+                            Markdown (.md)
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                            onClick={() => onExportAll?.("pdf")}
+                            className="text-xs gap-2"
+                        >
+                            <FileDown className="w-3.5 h-3.5" />
+                            PDF (.pdf)
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                            onClick={() => onExportAll?.("docx")}
+                            className="text-xs gap-2"
+                        >
+                            <FileDown className="w-3.5 h-3.5" />
+                            Word (.docx)
+                        </DropdownMenuItem>
+                    </DropdownMenuContent>
+                </DropdownMenu>
 
                 <Tooltip>
                     <TooltipTrigger asChild>

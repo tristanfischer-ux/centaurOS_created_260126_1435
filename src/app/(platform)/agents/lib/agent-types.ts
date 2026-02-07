@@ -14,6 +14,7 @@ export const PROMPT_CATEGORIES = [
     "legal",
     "creative",
     "data-analytics",
+    "manufacturing",
 ] as const
 
 export type PromptCategory = (typeof PROMPT_CATEGORIES)[number]
@@ -124,6 +125,14 @@ export const CATEGORY_META: Record<PromptCategory, CategoryMeta> = {
         borderColor: "border-indigo-300",
         icon: "BarChart3",
     },
+    manufacturing: {
+        id: "manufacturing",
+        label: "Manufacturing & Materials",
+        color: "text-orange-600",
+        bgColor: "bg-orange-50",
+        borderColor: "border-orange-300",
+        icon: "Factory",
+    },
 }
 
 // Color bars for nodes (left accent)
@@ -140,6 +149,7 @@ export const CATEGORY_ACCENT_COLORS: Record<PromptCategory, string> = {
     legal: "#475569",
     creative: "#c026d3",
     "data-analytics": "#4f46e5",
+    manufacturing: "#ea580c",
 }
 
 // ─── Execution States (HITL pattern) ─────────────────────────────────
@@ -240,9 +250,13 @@ export interface WorkflowTemplate {
     id: string
     name: string
     description: string
-    category: "startup" | "business"
+    category: "startup" | "business" | "manufacturing"
     icon: string
     nodeCount: number
     nodes: WorkflowNode[]
     edges: WorkflowEdge[]
+    /** Persuasive copy explaining why this workflow matters — shown in the intro dialog */
+    whyItMatters: string
+    /** Estimated time to complete the full workflow (e.g. "2-4 hours") */
+    estimatedTime?: string
 }

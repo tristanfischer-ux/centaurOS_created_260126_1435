@@ -1,6 +1,6 @@
 "use client"
 
-import React from "react"
+import React, { useState, useCallback } from "react"
 import {
     Dialog,
     DialogContent,
@@ -14,6 +14,7 @@ import { ArrowRight } from "lucide-react"
 import { WORKFLOW_TEMPLATES } from "../lib/workflow-templates"
 import { CATEGORY_ACCENT_COLORS, type PromptCategory } from "../lib/agent-types"
 import { getIcon } from "./prompt-node"
+import { WorkflowTemplateIntroDialog } from "./workflow-template-intro-dialog"
 import type { WorkflowTemplate } from "../lib/agent-types"
 
 interface WorkflowTemplatesDialogProps {
@@ -22,17 +23,63 @@ interface WorkflowTemplatesDialogProps {
     onSelectTemplate: (template: WorkflowTemplate) => void
 }
 
+/**
+ * Dialog listing all workflow templates, grouped by category.
+ *
+ * @description When a user clicks "Use" on a template, an intro dialog
+ * is shown first to explain what the workflow does, why it matters, and
+ * the human-in-the-loop pattern. The user can then confirm to load it.
+ */
 export function WorkflowTemplatesDialog({
     open,
     onOpenChange,
     onSelectTemplate,
 }: WorkflowTemplatesDialogProps) {
+    const [previewTemplate, setPreviewTemplate] = useState<WorkflowTemplate | null>(null)
+
     const startupTemplates = WORKFLOW_TEMPLATES.filter(
         (t) => t.category === "startup"
     )
     const businessTemplates = WORKFLOW_TEMPLATES.filter(
         (t) => t.category === "business"
     )
+    const manufacturingTemplates = WORKFLOW_TEMPLATES.filter(
+        (t) => t.category === "manufacturing"
+    )
+
+    const handleSelectForPreview = useCallback((template: WorkflowTemplate) => {
+        setPreviewTemplate(template)
+    }, [])
+
+    const handleConfirmLoad = useCallback(
+        (template: WorkflowTemplate) => {
+            setPreviewTemplate(null)
+            onOpenChange(false)
+            onSelectTemplate(template)
+        },
+        [onOpenChange, onSelectTemplate]
+    )
+
+    const handleBackToList = useCallback(() => {
+        setPreviewTemplate(null)
+    }, [])
+
+    // Show intro dialog when a template is selected for preview
+    if (previewTemplate) {
+        return (
+            <WorkflowTemplateIntroDialog
+                template={previewTemplate}
+                open={true}
+                onOpenChange={(isOpen) => {
+                    if (!isOpen) {
+                        setPreviewTemplate(null)
+                    }
+                }}
+                onConfirm={handleConfirmLoad}
+                onBack={handleBackToList}
+            />
+        )
+    }
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
@@ -62,7 +109,26 @@ export function WorkflowTemplatesDialog({
                                     <TemplateCard
                                         key={template.id}
                                         template={template}
-                                        onSelect={onSelectTemplate}
+                                        onSelect={handleSelectForPreview}
+                                    />
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Manufacturing templates */}
+                        <div>
+                            <div className="flex items-center gap-2 mb-4">
+                                <div className="h-5 w-1 bg-international-orange rounded-full" />
+                                <h3 className="text-sm font-semibold text-foreground">
+                                    Manufacturing & Materials
+                                </h3>
+                            </div>
+                            <div className="grid gap-3">
+                                {manufacturingTemplates.map((template) => (
+                                    <TemplateCard
+                                        key={template.id}
+                                        template={template}
+                                        onSelect={handleSelectForPreview}
                                     />
                                 ))}
                             </div>
@@ -81,7 +147,7 @@ export function WorkflowTemplatesDialog({
                                     <TemplateCard
                                         key={template.id}
                                         template={template}
-                                        onSelect={onSelectTemplate}
+                                        onSelect={handleSelectForPreview}
                                     />
                                 ))}
                             </div>
@@ -115,7 +181,9 @@ function TemplateCard({
                             backgroundColor:
                                 template.category === "startup"
                                     ? "rgba(234, 88, 12, 0.1)"
-                                    : "rgba(59, 130, 246, 0.1)",
+                                    : template.category === "manufacturing"
+                                      ? "rgba(234, 88, 12, 0.1)"
+                                      : "rgba(59, 130, 246, 0.1)",
                         }}
                     >
                         <Icon
@@ -124,7 +192,9 @@ function TemplateCard({
                                 color:
                                     template.category === "startup"
                                         ? "#ea580c"
-                                        : "#2563eb",
+                                        : template.category === "manufacturing"
+                                          ? "#ea580c"
+                                          : "#2563eb",
                             }}
                         />
                     </div>

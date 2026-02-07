@@ -3,7 +3,8 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
-import { motion, useScroll, useTransform } from "framer-motion";
+import { motion, useScroll, useTransform, AnimatePresence } from "framer-motion";
+import { useEffect } from "react";
 import {
   fadeInUp,
   fadeInScale,
@@ -15,6 +16,12 @@ import {
   StaggerContainer,
   AnimatedCard,
 } from "@/components/marketing/animations";
+import {
+  CATEGORY_LABELS,
+  TECHNIQUE_CATEGORIES,
+  countByCategory,
+  ALL_TECHNIQUES,
+} from "@/lib/manufacturing-techniques";
 
 // Domain configuration
 const APP_DOMAIN = process.env.NEXT_PUBLIC_APP_DOMAIN || 'https://forgeos.io';
@@ -46,6 +53,9 @@ export default function MarketingPage() {
             </a>
             <a href="#network" className="text-sm text-muted-foreground hover:text-foreground uppercase tracking-wider transition-colors">
               The Network
+            </a>
+            <a href="#capabilities" className="text-sm text-muted-foreground hover:text-foreground uppercase tracking-wider transition-colors">
+              Capabilities
             </a>
             <a href="#os" className="text-sm text-muted-foreground hover:text-foreground uppercase tracking-wider transition-colors">
               The OS
@@ -91,6 +101,13 @@ export default function MarketingPage() {
                 onClick={() => setMobileMenuOpen(false)}
               >
                 The Network
+              </a>
+              <a 
+                href="#capabilities" 
+                className="text-sm text-muted-foreground hover:text-foreground uppercase tracking-wider py-3 min-h-[44px] flex items-center transition-colors"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                Capabilities
               </a>
               <a 
                 href="#os" 
@@ -366,6 +383,9 @@ export default function MarketingPage() {
         </div>
       </section>
 
+      {/* MANUFACTURING CAPABILITIES Section */}
+      <ManufacturingCapabilitiesSection />
+
       {/* THE OPERATING SYSTEM Section */}
       <section id="os" className="py-12 md:py-24 bg-background border-t border-muted">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
@@ -457,6 +477,34 @@ export default function MarketingPage() {
 function HeroSection() {
   const { scrollY } = useScroll();
   const parallaxY = useTransform(scrollY, [0, 500], [0, 150]);
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+
+  const heroImages = [
+    {
+      src: "/images/hero-robotic-steel.png",
+      alt: "Robotic arm 3D printing steel structure"
+    },
+    {
+      src: "/images/hero-titanium-printing.png",
+      alt: "Titanium 3D printing system"
+    },
+    {
+      src: "/images/hero-plastic-printing.png",
+      alt: "Advanced polymer 3D printing farm"
+    },
+    {
+      src: "/images/hero-injection-moulding.png",
+      alt: "Clean injection moulding manufacturing"
+    }
+  ];
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentImageIndex((prev) => (prev + 1) % heroImages.length);
+    }, 5000); // Change image every 5 seconds
+
+    return () => clearInterval(interval);
+  }, [heroImages.length]);
 
   return (
     <section className="relative md:min-h-screen flex flex-col md:flex-row items-center justify-center overflow-hidden bg-background">
@@ -509,18 +557,130 @@ function HeroSection() {
         style={{ y: parallaxY }}
         className="relative w-full h-[50vh] md:absolute md:inset-0 md:h-auto will-change-transform"
       >
-        <Image
-          src="/images/hero-centaur-main.png"
-          alt="Hardware at software speed"
-          fill
-          className="object-contain object-center opacity-40"
-          priority
-          sizes="(max-width: 768px) 100vw, (max-width: 1200px) 100vw, 100vw"
-        />
+        <AnimatePresence>
+          <motion.div
+            key={currentImageIndex}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 0.4 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 1 }}
+            className="absolute inset-0"
+          >
+            <Image
+              src={heroImages[currentImageIndex].src}
+              alt={heroImages[currentImageIndex].alt}
+              fill
+              className="object-cover object-center"
+              priority
+              sizes="(max-width: 768px) 100vw, (max-width: 1200px) 100vw, 100vw"
+            />
+          </motion.div>
+        </AnimatePresence>
+        
         {/* Gradient overlay to fade edges */}
         <div className="absolute inset-0 pointer-events-none bg-gradient-to-t from-background via-transparent to-background/80" />
         <div className="absolute inset-0 pointer-events-none bg-gradient-to-r from-background via-transparent to-background" />
       </motion.div>
     </section>
   );
+}
+
+/**
+ * Manufacturing Capabilities section for the marketing landing page.
+ *
+ * @description Shows the breadth of manufacturing techniques accessible
+ * through the platform, grouped by category with technique counts.
+ * Includes a CTA to explore the full Techniques library.
+ */
+function ManufacturingCapabilitiesSection() {
+  const categoryCounts = countByCategory()
+
+  /** Subset of categories highlighted on the landing page */
+  const HIGHLIGHT_CATEGORIES = [
+    'additive',
+    'subtractive',
+    'forming',
+    'casting',
+    'joining',
+    'composite',
+    'electronics',
+    'advanced',
+  ] as const
+
+  /** Short marketing blurbs per category */
+  const CATEGORY_BLURBS: Record<string, string> = {
+    additive: 'From FDM prototypes to metal-sintered flight parts — print what was once impossible.',
+    subtractive: 'CNC milling, laser cutting, EDM wire — precision removal at any scale.',
+    forming: 'Sheet metal, stamping, hydroforming — shape raw stock into production parts.',
+    casting: 'Sand, investment, die-cast — pour metal into any geometry.',
+    joining: 'Welding, brazing, adhesive bonding — assemble complex structures reliably.',
+    composite: 'Carbon fibre, fibreglass, kevlar layups — lightweight strength where it matters.',
+    electronics: 'PCB fab, SMT assembly, semiconductor packaging — from chip to board.',
+    advanced: 'Nano-imprint, bio-printing, 4D printing — the frontier of making.',
+  }
+
+  return (
+    <section
+      id="capabilities"
+      className="py-12 md:py-24 bg-background border-t border-muted"
+    >
+      <div className="max-w-7xl mx-auto px-4 sm:px-6">
+        <AnimatedHeader className="text-3xl sm:text-4xl md:text-5xl font-black mb-4 md:mb-6">
+          THE CAPABILITIES.
+        </AnimatedHeader>
+
+        <motion.p
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true }}
+          variants={fadeInUp}
+          className="text-muted-foreground text-sm md:text-base max-w-3xl mb-8 md:mb-16 leading-relaxed"
+        >
+          Access {ALL_TECHNIQUES.length}+ manufacturing techniques through
+          our network. From rapid prototyping to full-scale production — every
+          process, material, and finish you need to ship hardware.
+        </motion.p>
+
+        <StaggerContainer className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+          {HIGHLIGHT_CATEGORIES.map((cat) => {
+            const count = categoryCounts[cat] ?? 0
+            return (
+              <AnimatedCard
+                key={cat}
+                className="border bg-background p-4 sm:p-6 flex flex-col"
+              >
+                <span className="text-xs text-electric-blue font-mono uppercase tracking-widest mb-2">
+                  {CATEGORY_LABELS[cat]}
+                </span>
+                <h3 className="text-lg md:text-xl font-bold mb-2">
+                  {count} Techniques
+                </h3>
+                <p className="text-muted-foreground text-xs leading-relaxed flex-1">
+                  {CATEGORY_BLURBS[cat]}
+                </p>
+              </AnimatedCard>
+            )
+          })}
+        </StaggerContainer>
+
+        {/* CTA */}
+        <motion.div
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true }}
+          variants={fadeInUp}
+          className="mt-8 md:mt-12 text-center"
+        >
+          <motion.div whileHover={buttonHover} whileTap={buttonTap} className="inline-block">
+            <Link
+              href="/inspiration?tab=techniques"
+              className="inline-block bg-foreground hover:bg-international-orange text-background py-3 px-8 text-xs font-mono font-bold tracking-widest uppercase transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            >
+              Explore All Techniques
+            </Link>
+          </motion.div>
+        </motion.div>
+      </div>
+    </section>
+  )
 }

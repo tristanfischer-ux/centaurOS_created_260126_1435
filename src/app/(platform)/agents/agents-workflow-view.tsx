@@ -28,6 +28,7 @@ import { WorkflowToolbar } from "./components/workflow-toolbar"
 import { WorkflowTemplatesDialog } from "./components/workflow-templates-dialog"
 import { CreatePromptDialog } from "./components/create-prompt-dialog"
 import { AgentsHelpDialog } from "./components/agents-help-dialog"
+import { WorkflowResultsDialog } from "./components/workflow-results-dialog"
 import { getPromptById } from "./lib/prompt-library"
 import { dbCustomPromptToLocal, getCustomPromptById } from "./lib/custom-prompts"
 import {
@@ -219,6 +220,7 @@ function AgentsFlowInner({
     const [templatesOpen, setTemplatesOpen] = useState(false)
     const [createPromptOpen, setCreatePromptOpen] = useState(false)
     const [helpOpen, setHelpOpen] = useState(false)
+    const [resultsOpen, setResultsOpen] = useState(false)
     const [apiBannerDismissed, setApiBannerDismissed] = useState(false)
 
     // Workflow metadata — initialised from server-fetched data
@@ -696,6 +698,31 @@ function AgentsFlowInner({
         navigator.clipboard.writeText(text)
     }, [nodes, edges, resolvePrompt])
 
+    // ── Export all outputs as a single document ──────────────────
+    const handleExportAll = useCallback(
+        async (format: "md" | "pdf" | "docx") => {
+            const { generateWorkflowMarkdown, downloadAsFile } = await import(
+                "./lib/export-markdown"
+            )
+            const md = generateWorkflowMarkdown(workflowName, nodes, edges)
+            const safeName = workflowName
+                .toLowerCase()
+                .replace(/[^a-z0-9]+/g, "-")
+                .replace(/^-|-$/g, "") || "workflow"
+
+            if (format === "md") {
+                downloadAsFile(md, `${safeName}.md`)
+            } else if (format === "pdf") {
+                const { exportAsPDF } = await import("@/lib/export-utils")
+                await exportAsPDF(md, `${safeName}.pdf`)
+            } else if (format === "docx") {
+                const { exportAsDOCX } = await import("@/lib/export-utils")
+                await exportAsDOCX(md, `${safeName}.docx`)
+            }
+        },
+        [workflowName, nodes, edges]
+    )
+
     // ── Custom prompts refresh ────────────────────────────────────
     const handleCustomPromptsChange = useCallback((updatedPrompts: AgentCustomPromptRow[]) => {
         setDbCustomPrompts(updatedPrompts)
@@ -1040,10 +1067,13 @@ function AgentsFlowInner({
                 onAutoArrange={handleAutoArrange}
                 onClearCanvas={handleClearCanvas}
                 onOpenHelp={() => setHelpOpen(true)}
+                onOpenResults={() => setResultsOpen(true)}
+                hasResults={nodes.some((n) => !!(n.data as { output?: string }).output?.trim())}
                 savedWorkflows={savedWorkflows}
                 activeWorkflowId={dbWorkflowId}
                 onLoadWorkflow={handleLoadWorkflow}
                 onDeleteWorkflow={handleDeleteWorkflow}
+                onExportAll={handleExportAll}
             />
 
             {/* API key banner — shown when user has no keys configured */}
@@ -1255,6 +1285,15 @@ function AgentsFlowInner({
             <AgentsHelpDialog
                 open={helpOpen}
                 onOpenChange={setHelpOpen}
+            />
+
+            {/* Results summary dialog */}
+            <WorkflowResultsDialog
+                open={resultsOpen}
+                onOpenChange={setResultsOpen}
+                workflowName={workflowName}
+                nodes={nodes}
+                edges={edges}
             />
         </div>
     )

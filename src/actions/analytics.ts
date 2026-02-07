@@ -429,7 +429,7 @@ export async function refreshPlatformAnalytics(): Promise<{
   const result = await refreshAllAnalytics()
   
   if (result.success) {
-    revalidatePath('/admin/analytics')
+    revalidatePath('/ops/analytics')
   }
   
   return result

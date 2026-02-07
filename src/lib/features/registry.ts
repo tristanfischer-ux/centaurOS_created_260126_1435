@@ -46,6 +46,18 @@ export const NEW_FEATURE_THRESHOLD_DAYS = 14
  * Features are sorted by release date (newest first) in the changelog
  */
 export const FEATURE_REGISTRY: Feature[] = [
+    // === February 2026 Features ===
+    {
+        id: 'manufacturing-techniques',
+        name: 'Manufacturing Techniques Explorer',
+        description: 'Browse 80+ manufacturing techniques with detailed specs, pros/cons, and direct links to find suppliers or start an RFQ',
+        route: '/inspiration',
+        releasedAt: new Date('2026-02-07'),
+        category: 'core',
+        status: 'stable',
+        isVisibleInNav: true,
+        changelog: 'Added Manufacturing Techniques Explorer — an interactive encyclopedia of modern manufacturing processes. Browse by category, filter by cost/batch size/material, and click through to detailed technique info with CTAs to find suppliers or start an RFQ. Available under the Techniques tab in Inspiration.'
+    },
     // === January 2026 Features ===
     {
         id: 'telegram-bot',
@@ -140,7 +152,7 @@ export const FEATURE_REGISTRY: Feature[] = [
         id: 'admin-analytics',
         name: 'Platform Analytics',
         description: 'Advanced analytics dashboard for platform administrators',
-        route: '/admin/analytics',
+        route: '/ops/analytics',
         releasedAt: new Date('2026-01-15'),
         category: 'admin',
         status: 'hidden',

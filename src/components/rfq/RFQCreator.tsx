@@ -44,6 +44,7 @@ import { RFQFileUpload } from './RFQFileUpload'
 import { CategoryFieldGroup, getCategoryGroup } from './CategoryFieldGroup'
 import { SupplierPreviewPanel } from './SupplierPreviewPanel'
 import { generateCompletenessChecks } from './CompletenessIndicator'
+import { RFQTechniqueSelector } from './RFQTechniqueSelector'
 
 interface UploadedFile {
   id: string
@@ -95,6 +96,9 @@ export function RFQCreator({
   const [deadline, setDeadline] = useState('')
   const [urgency, setUrgency] = useState<'urgent' | 'standard'>('standard')
   const [files, setFiles] = useState<UploadedFile[]>([])
+
+  // Manufacturing technique (prefilled via URL ?technique=slug)
+  const [selectedTechniqueId, setSelectedTechniqueId] = useState<string | null>(null)
 
   // Category-specific fields
   const [categoryFields, setCategoryFields] = useState({
@@ -178,6 +182,11 @@ export function RFQCreator({
 
       if (attachmentPaths.length > 0) {
         specs.attachments = attachmentPaths
+      }
+
+      // Add manufacturing technique if selected
+      if (selectedTechniqueId) {
+        specs.manufacturing_technique = selectedTechniqueId
       }
 
       // Add category-specific fields
@@ -433,6 +442,13 @@ export function RFQCreator({
                 disabled={isPending}
               />
             )}
+
+            {/* Manufacturing Technique */}
+            <RFQTechniqueSelector
+              selectedTechniqueId={selectedTechniqueId}
+              onSelect={setSelectedTechniqueId}
+              disabled={isPending}
+            />
 
             {/* Files */}
             <Collapsible defaultOpen>

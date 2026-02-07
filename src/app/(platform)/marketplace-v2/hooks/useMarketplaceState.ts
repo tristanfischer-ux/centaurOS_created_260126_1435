@@ -3,6 +3,8 @@
 import { useState, useMemo, useCallback, useEffect } from 'react'
 import { useSearchParams, useRouter, usePathname } from 'next/navigation'
 import type { MarketplaceListing } from '@/actions/marketplace'
+import { getTechniqueById } from '@/lib/manufacturing-techniques'
+import type { ManufacturingTechnique } from '@/lib/manufacturing-techniques/types'
 
 export type MarketplaceCategory = 'All' | 'People' | 'Products' | 'Services'
 export type SortOption = 'relevance' | 'rating' | 'price_low' | 'price_high' | 'newest'
@@ -44,6 +46,14 @@ export function useMarketplaceState({ initialListings, initialSavedIds }: UseMar
     // Filter state
     const [selectedSubcategories, setSelectedSubcategories] = useState<Set<string>>(new Set())
     const [showFilters, setShowFilters] = useState(false)
+
+    // Technique filter: when arriving from Techniques Explorer via ?technique=slug
+    const techniqueSlug = searchParams?.get('technique') || null
+    const activeTechnique: ManufacturingTechnique | null = useMemo(() => {
+        if (!techniqueSlug) return null
+        // Look up by slug (which matches the id in most cases)
+        return getTechniqueById(techniqueSlug) ?? null
+    }, [techniqueSlug])
 
     // Detail dialog
     const [selectedListing, setSelectedListing] = useState<MarketplaceListing | null>(null)
@@ -99,8 +109,8 @@ export function useMarketplaceState({ initialListings, initialSavedIds }: UseMar
 
     // Check if any filters are active
     const hasActiveFilters = useMemo(() => {
-        return debouncedQuery.trim() !== '' || selectedSubcategories.size > 0 || sortBy !== 'relevance'
-    }, [debouncedQuery, selectedSubcategories, sortBy])
+        return debouncedQuery.trim() !== '' || selectedSubcategories.size > 0 || sortBy !== 'relevance' || activeTechnique !== null
+    }, [debouncedQuery, selectedSubcategories, sortBy, activeTechnique])
 
     // Exclude AI listings from browsing (kept in DB for future use)
     const browseListings = useMemo(
@@ -120,6 +130,36 @@ export function useMarketplaceState({ initialListings, initialSavedIds }: UseMar
         // Subcategory filter
         if (selectedSubcategories.size > 0) {
             filtered = filtered.filter(l => selectedSubcategories.has(l.subcategory))
+        }
+
+        // Technique filter: when arriving from Techniques Explorer
+        if (activeTechnique) {
+            const keywords = [
+                activeTechnique.name.toLowerCase(),
+                activeTechnique.slug.toLowerCase(),
+                ...(activeTechnique.subcategory
+                    ? [activeTechnique.subcategory.toLowerCase()]
+                    : []),
+            ]
+            filtered = filtered.filter(l => {
+                const title = l.title.toLowerCase()
+                const desc = l.description?.toLowerCase() || ''
+                const sub = l.subcategory?.toLowerCase() || ''
+                const attrs = l.attributes || {}
+                const tags: string[] = (attrs.tags || []).map((t: string) => t.toLowerCase())
+                const capabilities: string[] = (
+                    attrs.capabilities || attrs.techniques || []
+                ).map((c: string) => c.toLowerCase())
+
+                return keywords.some(
+                    kw =>
+                        title.includes(kw) ||
+                        desc.includes(kw) ||
+                        sub.includes(kw) ||
+                        tags.some(t => t.includes(kw)) ||
+                        capabilities.some(c => c.includes(kw)),
+                )
+            })
         }
 
         // Search filter
@@ -163,7 +203,7 @@ export function useMarketplaceState({ initialListings, initialSavedIds }: UseMar
         }
 
         return filtered
-    }, [browseListings, activeCategory, selectedSubcategories, debouncedQuery, sortBy])
+    }, [browseListings, activeCategory, selectedSubcategories, debouncedQuery, sortBy, activeTechnique])
 
     // Available subcategories for current category
     const availableSubcategories = useMemo(() => {
@@ -182,6 +222,14 @@ export function useMarketplaceState({ initialListings, initialSavedIds }: UseMar
         return counts
     }, [browseListings])
 
+    // Clear technique filter by navigating without the param
+    const clearTechniqueFilter = useCallback(() => {
+        const params = new URLSearchParams(searchParams?.toString() || '')
+        params.delete('technique')
+        const newURL = params.toString() ? `${pathname}?${params.toString()}` : pathname
+        router.push(newURL, { scroll: false })
+    }, [searchParams, pathname, router])
+
     return {
         // State
         activeCategory,
@@ -192,6 +240,7 @@ export function useMarketplaceState({ initialListings, initialSavedIds }: UseMar
         selectedSubcategories,
         showFilters,
         selectedListing,
+        activeTechnique,
 
         // Computed
         filteredListings,
@@ -208,6 +257,7 @@ export function useMarketplaceState({ initialListings, initialSavedIds }: UseMar
         setShowFilters,
         setSelectedListing,
         clearFilters,
+        clearTechniqueFilter,
     }
 }
 

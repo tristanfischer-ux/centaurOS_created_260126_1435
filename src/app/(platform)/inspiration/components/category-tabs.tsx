@@ -6,6 +6,7 @@ import {
   CircuitBoard,
   TrendingUp,
   Heart,
+  Factory,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -14,7 +15,7 @@ import { cn } from '@/lib/utils'
 // Tabs organised around user needs rather than content source.
 // ---------------------------------------------------------------------------
 
-export type TabId = 'for-you' | 'by-need' | 'by-industry' | 'popular' | 'saved'
+export type TabId = 'for-you' | 'by-need' | 'by-industry' | 'popular' | 'saved' | 'techniques'
 
 interface Tab {
   id: TabId
@@ -34,6 +35,8 @@ interface CategoryTabsProps {
   industryCount: number
   popularCount: number
   savedCount: number
+  /** Number of manufacturing techniques */
+  techniquesCount?: number
   /** Number of identified gaps to display as a badge on "By Need" */
   gapCount?: number
 }
@@ -45,6 +48,7 @@ export function CategoryTabs({
   industryCount,
   popularCount,
   savedCount,
+  techniquesCount,
   gapCount,
 }: CategoryTabsProps) {
   const tabs: Tab[] = [
@@ -72,6 +76,15 @@ export function CategoryTabs({
       count: industryCount,
       iconColor: 'text-chart-5',
       activeClasses: 'bg-chart-5/10 text-chart-5 border-chart-5',
+    },
+    {
+      id: 'techniques',
+      label: 'Techniques',
+      icon: Factory,
+      count: techniquesCount,
+      iconColor: 'text-international-orange',
+      activeClasses:
+        'bg-international-orange/10 text-international-orange border-international-orange',
     },
     {
       id: 'popular',

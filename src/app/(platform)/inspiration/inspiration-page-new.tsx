@@ -33,6 +33,8 @@ import { CategoryTabs, type TabId } from './components/category-tabs'
 import { PackCard } from './components/pack-card'
 import { IndustrySelector } from './components/industry-selector'
 import { INDUSTRY_CATEGORIES, packMatchesCategory } from './components/utils'
+import { TechniquesExplorer } from '@/components/techniques'
+import { ALL_TECHNIQUES } from '@/lib/manufacturing-techniques'
 
 // ---------------------------------------------------------------------------
 // Context-aware recommendation engine
@@ -444,6 +446,7 @@ export function InspirationPageNew({
         industryCount={industryCount}
         popularCount={popularPacks.length}
         savedCount={savedPackIds.size}
+        techniquesCount={ALL_TECHNIQUES.length}
         gapCount={ctx?.gapCategories.length}
       />
 
@@ -697,6 +700,11 @@ export function InspirationPageNew({
           defaultIndustry={ctx?.industry || undefined}
         />
       )}
+
+      {/* ================================================================== */}
+      {/* TECHNIQUES tab — Manufacturing Techniques Explorer                 */}
+      {/* ================================================================== */}
+      {activeTab === 'techniques' && <TechniquesExplorer />}
 
       {/* ================================================================== */}
       {/* POPULAR tab                                                        */}
