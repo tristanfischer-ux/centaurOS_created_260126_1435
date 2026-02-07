@@ -160,6 +160,39 @@ async function generateStabilityImage(opts: ImageGenerationOptions): Promise<Ima
     return { imageUrl: `data:image/png;base64,${base64}` }
 }
 
+async function generateGoogleImage(opts: ImageGenerationOptions): Promise<ImageGenerationResult> {
+    // Gemini 3 Pro Image uses the Gemini API with responseModalities including IMAGE
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${opts.modelId}:generateContent?key=${opts.apiKey}`
+
+    const response = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            contents: [{ parts: [{ text: opts.prompt }] }],
+            generationConfig: {
+                responseModalities: ["IMAGE", "TEXT"],
+            },
+        }),
+        signal: opts.signal,
+    })
+
+    if (!response.ok) {
+        const err = await response.text()
+        throw new Error(`Google AI image error: ${err}`)
+    }
+
+    const data = await response.json()
+    const parts = data.candidates?.[0]?.content?.parts ?? []
+    const imagePart = parts.find((p: { inlineData?: { mimeType: string; data: string } }) => p.inlineData)
+
+    if (!imagePart?.inlineData) {
+        throw new Error("No image data returned from Gemini")
+    }
+
+    const { mimeType, data: base64 } = imagePart.inlineData
+    return { imageUrl: `data:${mimeType};base64,${base64}` }
+}
+
 async function generateReplicateImage(opts: ImageGenerationOptions): Promise<ImageGenerationResult> {
     // Replicate uses a two-step process: create prediction, then poll for result
     const createRes = await fetch("https://api.replicate.com/v1/predictions", {
@@ -317,6 +350,7 @@ const TEXT_PROVIDERS: Partial<Record<AIProviderId, TextStreamFn>> = {
 
 const IMAGE_PROVIDERS: Partial<Record<AIProviderId, ImageGenFn>> = {
     openai: generateOpenAIImage,
+    google: generateGoogleImage,
     stability: generateStabilityImage,
     replicate: generateReplicateImage,
 }

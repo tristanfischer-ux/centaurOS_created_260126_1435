@@ -76,8 +76,8 @@ export async function POST(request: Request) {
         const body = await request.json()
         prompt = body.prompt
         input = body.input ?? ""
-        providerId = body.providerId ?? "openai"
-        modelId = body.modelId ?? "gpt-4o"
+        providerId = body.providerId ?? "anthropic"
+        modelId = body.modelId ?? "claude-opus-4-6"
         modality = body.modality ?? "text"
 
         if (!prompt || typeof prompt !== "string") {
@@ -244,7 +244,7 @@ async function handleTextStreaming(
                     modelId,
                     systemPrompt: customSystemPrompt ?? SYSTEM_PROMPT,
                     userPrompt: finalPrompt,
-                    maxTokens: 4096,
+                    maxTokens: 16384,
                     onChunk(text) {
                         controller.enqueue(encoder.encode(`data: ${JSON.stringify({ text })}\n\n`))
                     },

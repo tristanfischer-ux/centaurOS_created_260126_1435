@@ -61,7 +61,7 @@ export const PROVIDER_REGISTRY: Record<AIProviderId, AIProviderMeta> = {
     anthropic: {
         id: "anthropic",
         name: "Anthropic",
-        description: "Claude 4, Claude 3.5 Sonnet",
+        description: "Claude Opus 4.6, Claude Sonnet 4.5, Claude Haiku 4.5",
         icon: "Brain",
         website: "https://console.anthropic.com",
         capabilities: ["text"],
@@ -69,23 +69,24 @@ export const PROVIDER_REGISTRY: Record<AIProviderId, AIProviderMeta> = {
         color: "#d4a574",
         bgColor: "bg-amber-50",
         models: [
-            { id: "claude-sonnet-4-20250514", name: "Claude Sonnet 4", modality: "text", description: "Best balance of speed and intelligence", maxTokens: 200000, default: true },
-            { id: "claude-3-5-haiku-20241022", name: "Claude 3.5 Haiku", modality: "text", description: "Fast and efficient", maxTokens: 200000 },
+            { id: "claude-opus-4-6", name: "Claude Opus 4.6", modality: "text", description: "Most intelligent — best for strategy, analysis, and complex reasoning", maxTokens: 200000, default: true },
+            { id: "claude-sonnet-4-5", name: "Claude Sonnet 4.5", modality: "text", description: "Best balance of speed and intelligence", maxTokens: 200000 },
+            { id: "claude-haiku-4-5", name: "Claude Haiku 4.5", modality: "text", description: "Fastest with near-frontier intelligence", maxTokens: 200000 },
         ],
     },
     google: {
         id: "google",
         name: "Google",
-        description: "Gemini 2.0, Gemini 1.5 Pro",
+        description: "Gemini 3 Pro Image, Gemini 2.0 Flash",
         icon: "Globe",
         website: "https://aistudio.google.com",
-        capabilities: ["text"],
+        capabilities: ["text", "image"],
         requiresKey: true,
         color: "#4285f4",
         bgColor: "bg-blue-50",
         models: [
             { id: "gemini-2.0-flash", name: "Gemini 2.0 Flash", modality: "text", description: "Fast multimodal model", maxTokens: 1048576, default: true },
-            { id: "gemini-1.5-pro", name: "Gemini 1.5 Pro", modality: "text", description: "Most capable Gemini", maxTokens: 2097152 },
+            { id: "gemini-3-pro-image-preview", name: "Gemini 3 Pro Image", modality: "image", description: "Advanced image generation with text rendering", default: true },
         ],
     },
     stability: {

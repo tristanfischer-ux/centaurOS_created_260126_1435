@@ -16,6 +16,12 @@ const NODE_X = 300
 const NODE_START_Y = 50
 const NODE_SPACING_Y = 160
 
+// ─── Default provider/model for all AI nodes ────────────────────────
+const DEFAULT_PROVIDER = "anthropic"
+const DEFAULT_MODEL = "claude-opus-4-6"
+const IMAGE_PROVIDER = "google"
+const IMAGE_MODEL = "gemini-3-pro-image-preview"
+
 // ─── Node definition types ──────────────────────────────────────────
 
 interface PromptStep {
@@ -24,6 +30,12 @@ interface PromptStep {
     label: string
     category: string
     icon: string
+    /** Override provider (defaults to Anthropic Claude Opus 4.6) */
+    providerId?: string
+    /** Override model ID */
+    modelId?: string
+    /** Override output modality (defaults to "text") */
+    outputModality?: string
 }
 
 interface HumanStep {
@@ -71,6 +83,9 @@ function buildTemplate(steps: StepDefinition[]): {
                 description: "",
                 category: step.category as never,
                 icon: step.icon,
+                providerId: step.providerId ?? DEFAULT_PROVIDER,
+                modelId: step.modelId ?? DEFAULT_MODEL,
+                outputModality: step.outputModality ?? "text",
             },
         }
     })
@@ -116,6 +131,7 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
                 ],
             },
             { type: "prompt", promptId: "fundraising-pitch-deck", label: "Pitch Deck Narrative", category: "fundraising", icon: "Presentation" },
+            { type: "prompt", promptId: "visual-slide-generator", label: "Pitch Deck Slide Visuals", category: "creative", icon: "Image", providerId: IMAGE_PROVIDER, modelId: IMAGE_MODEL, outputModality: "image" },
             { type: "prompt", promptId: "fundraising-investor-qa", label: "Investor Q&A Prep", category: "fundraising", icon: "HelpCircle" },
             { type: "prompt", promptId: "fundraising-warm-intro", label: "Warm Intro Emails", category: "fundraising", icon: "UserPlus" },
             { type: "prompt", promptId: "fundraising-due-diligence", label: "Due Diligence Prep", category: "fundraising", icon: "ClipboardCheck" },
@@ -175,11 +191,12 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
             { type: "prompt", promptId: "marketing-landing-page", label: "Landing Page Copy", category: "marketing", icon: "Layout" },
             { type: "prompt", promptId: "marketing-product-description", label: "Product Descriptions", category: "marketing", icon: "ShoppingBag" },
             { type: "prompt", promptId: "marketing-social-media", label: "Social Media Posts", category: "marketing", icon: "Share2" },
+            { type: "prompt", promptId: "visual-social-graphic", label: "Social Media Graphics", category: "creative", icon: "Image", providerId: IMAGE_PROVIDER, modelId: IMAGE_MODEL, outputModality: "image" },
             { type: "prompt", promptId: "marketing-email-campaign", label: "Email Campaign", category: "marketing", icon: "Mail" },
             {
                 type: "human-task",
                 label: "Launch checklist and go-live",
-                guidance: "Your landing page copy, product descriptions, social media posts, and email campaign have all been generated. Click each step above to review, edit, and export.\n\nRun through the final launch checklist with your team. Make sure everything is ready before you go live.",
+                guidance: "Your landing page copy, product descriptions, social media posts, social graphics, and email campaign have all been generated. Click each step above to review, edit, and export.\n\nRun through the final launch checklist with your team. Make sure everything is ready before you go live.",
                 checklist: [
                     "Landing page is live and tested on mobile",
                     "Email sequences are loaded and tested",
@@ -288,10 +305,11 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
             { type: "prompt", promptId: "strategy-growth-framework", label: "Growth Strategy", category: "strategy", icon: "TrendingUp" },
             { type: "prompt", promptId: "strategy-business-plan", label: "Business Plan Writer", category: "strategy", icon: "FileText" },
             { type: "prompt", promptId: "strategy-board-presentation", label: "Stakeholder Presentation", category: "strategy", icon: "Presentation" },
+            { type: "prompt", promptId: "visual-slide-generator", label: "Presentation Visuals", category: "creative", icon: "Image", providerId: IMAGE_PROVIDER, modelId: IMAGE_MODEL, outputModality: "image" },
             {
                 type: "human-task",
                 label: "Present plan to stakeholders",
-                guidance: "Your business plan and stakeholder presentation have been generated. Click each step above to review and export the outputs.\n\nWalk your co-founders, advisors, or board through the completed materials. Use the Export button on each step to download as PDF, DOCX, or Markdown.",
+                guidance: "Your business plan, stakeholder presentation, and presentation visuals have been generated. Click each step above to review and export the outputs.\n\nWalk your co-founders, advisors, or board through the completed materials. Use the Export button on each step to download as PDF, DOCX, or Markdown.",
                 checklist: [
                     "Schedule presentation with key stakeholders",
                     "Review and polish the generated presentation deck",
@@ -456,12 +474,13 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
                 ],
             },
             { type: "prompt", promptId: "fundraising-pitch-deck", label: "Pitch Deck Narrative", category: "fundraising", icon: "Presentation" },
+            { type: "prompt", promptId: "visual-slide-generator", label: "Pitch Slide Visuals", category: "creative", icon: "Image", providerId: IMAGE_PROVIDER, modelId: IMAGE_MODEL, outputModality: "image" },
             { type: "prompt", promptId: "fundraising-pitch-deck-reviewer", label: "Deck Review & Scoring", category: "fundraising", icon: "CheckCircle" },
             { type: "prompt", promptId: "fundraising-investor-qa", label: "Investor Q&A Prep", category: "fundraising", icon: "HelpCircle" },
             {
                 type: "human-task",
                 label: "Final review and practice",
-                guidance: "Your Pitch Deck Narrative, Deck Review & Scoring, and Investor Q&A Prep have been generated. Click each step above to review and export.\n\nPolish the final deck, rehearse the pitch, and prepare for tough questions.",
+                guidance: "Your Pitch Deck Narrative, Slide Visuals, Deck Review & Scoring, and Investor Q&A Prep have been generated. Click each step above to review and export.\n\nPolish the final deck, rehearse the pitch, and prepare for tough questions.",
                 checklist: [
                     "Do a full run-through with your co-founder",
                     "Time your pitch (aim for 15-20 minutes)",
@@ -501,15 +520,16 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
             },
             { type: "prompt", promptId: "marketing-product-description", label: "Product Description", category: "marketing", icon: "ShoppingBag" },
             { type: "prompt", promptId: "creative-image-prompt", label: "Image Prompts", category: "creative", icon: "Image" },
+            { type: "prompt", promptId: "visual-brand-hero", label: "Product Hero Image", category: "creative", icon: "Image", providerId: IMAGE_PROVIDER, modelId: IMAGE_MODEL, outputModality: "image" },
             { type: "prompt", promptId: "marketing-social-media", label: "Social Media Posts", category: "marketing", icon: "Share2" },
             {
                 type: "human-task",
                 label: "Review creative with stakeholders",
-                guidance: "The previous steps generated a Product Description, Image Prompts, and Social Media Posts. Click each step above to review and export.\n\nShare these with your marketing lead or brand team for feedback before generating the full campaign.",
+                guidance: "The previous steps generated a Product Description, Image Prompts, Hero Image, and Social Media Posts. Click each step above to review and export.\n\nShare these with your marketing lead or brand team for feedback before generating the full campaign.",
                 checklist: [
                     "Review product description for accuracy",
                     "Check social media posts match brand voice",
-                    "Approve image direction and style",
+                    "Review generated hero image and approve direction",
                 ],
             },
             { type: "prompt", promptId: "marketing-email-campaign", label: "Email Campaign", category: "marketing", icon: "Mail" },
@@ -798,10 +818,11 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
             },
             { type: "prompt", promptId: "strategy-okr", label: "OKR Progress", category: "strategy", icon: "Target" },
             { type: "prompt", promptId: "strategy-board-presentation", label: "Board Presentation", category: "strategy", icon: "Presentation" },
+            { type: "prompt", promptId: "visual-slide-generator", label: "Board Presentation Visuals", category: "creative", icon: "Image", providerId: IMAGE_PROVIDER, modelId: IMAGE_MODEL, outputModality: "image" },
             {
                 type: "human-task",
                 label: "Present to board or all-hands",
-                guidance: "Your OKR Progress report and Board Presentation have been generated. Click each step above to review, edit, and export.\n\nUse the Board Presentation as your deck. Deliver the QBR to your board, investors, or team. Make it a conversation, not a monologue.",
+                guidance: "Your OKR Progress report, Board Presentation, and Presentation Visuals have been generated. Click each step above to review, edit, and export.\n\nUse the Board Presentation as your deck. Deliver the QBR to your board, investors, or team. Make it a conversation, not a monologue.",
                 checklist: [
                     "Schedule and send calendar invite",
                     "Review and personalise the generated Board Presentation",
@@ -895,10 +916,11 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
             { type: "prompt", promptId: "startup-vision-mission", label: "Vision & Mission", category: "startup-strategy", icon: "Sparkles" },
             { type: "prompt", promptId: "marketing-brand-voice", label: "Brand Voice Guide", category: "marketing", icon: "MessageSquare" },
             { type: "prompt", promptId: "creative-brand-identity", label: "Brand Identity Brief", category: "creative", icon: "Palette" },
+            { type: "prompt", promptId: "visual-brand-hero", label: "Brand Hero Visual", category: "creative", icon: "Image", providerId: IMAGE_PROVIDER, modelId: IMAGE_MODEL, outputModality: "image" },
             {
                 type: "human-task",
                 label: "Review identity with stakeholders",
-                guidance: "The previous steps generated your Vision & Mission, Brand Voice Guide, and Brand Identity Brief. Click each step above to review and export.\n\nShare these with your team and key stakeholders. Brand should feel authentic to everyone.",
+                guidance: "The previous steps generated your Vision & Mission, Brand Voice Guide, Brand Identity Brief, and a Hero Visual. Click each step above to review and export.\n\nShare these with your team and key stakeholders. Brand should feel authentic to everyone.",
                 checklist: [
                     "Share brand voice guide with team",
                     "Review identity brief with design team",

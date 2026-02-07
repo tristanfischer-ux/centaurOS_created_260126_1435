@@ -783,8 +783,8 @@ function AgentsFlowInner({
                 return false
             }
 
-            const providerId = data.providerId ?? "openai"
-            const modelId = data.modelId ?? "gpt-4o"
+            const providerId = data.providerId ?? "anthropic"
+            const modelId = data.modelId ?? "claude-opus-4-6"
             const modality = data.outputModality ?? "text"
 
             // Set running state — clear any previous media outputs

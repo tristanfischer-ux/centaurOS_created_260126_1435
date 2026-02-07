@@ -8324,6 +8324,86 @@ Adjust weights based on the user's stated priorities and company stage.
         tags: ["make-vs-buy", "outsourcing", "insourcing", "sourcing", "strategy", "hardware"],
         suggestedNext: ["mfg-bom-generator", "mfg-supplier-evaluation", "mfg-cost-estimator"],
     },
+
+    // ═══════════════════════════════════════════════════════════════════
+    // IMAGE GENERATION PROMPTS (for Gemini 3 Pro Image)
+    // ═══════════════════════════════════════════════════════════════════
+    {
+        id: "visual-slide-generator",
+        title: "Presentation Slide Visual",
+        description: "Generate a professional presentation slide visual from content and visual direction",
+        category: "creative",
+        icon: "Image",
+        defaultPrompt: `Create a professional, modern presentation slide image based on the following content. The slide should look like it belongs in a world-class pitch deck or board presentation.
+
+Design requirements:
+- Clean, minimal layout with generous whitespace
+- Dark navy or charcoal background with white/light text for maximum impact
+- Use orange (#FF4500) as the accent color for key data points and highlights
+- Professional sans-serif typography (like Helvetica or Inter)
+- Include relevant data visualisation (charts, graphs, metrics) if the content contains numbers
+- No stock photo clichés — use abstract geometric shapes, gradients, or data-driven graphics
+- 16:9 aspect ratio suitable for presentation slides
+
+Content to visualise:
+{{input}}
+
+Generate one hero slide that captures the most important insight from the content above.`,
+        inputLabel: "Content with visual direction from previous step",
+        outputLabel: "Professional slide visual",
+        tags: ["slide", "presentation", "visual", "image", "deck"],
+        suggestedNext: [],
+    },
+    {
+        id: "visual-brand-hero",
+        title: "Brand Hero Image",
+        description: "Generate a brand hero image for landing pages, campaigns, and marketing materials",
+        category: "creative",
+        icon: "Image",
+        defaultPrompt: `Create a stunning, modern brand hero image suitable for a startup landing page or marketing campaign.
+
+Design requirements:
+- Clean, bright, and optimistic aesthetic
+- Light background with vibrant accent colors
+- Abstract or conceptual — no generic stock photo look
+- Professional quality suitable for a homepage hero section
+- Convey innovation, collaboration, and forward momentum
+- 16:9 aspect ratio
+
+Brand and content context:
+{{input}}
+
+Generate one hero image that captures the brand's essence and would make a visitor stop scrolling.`,
+        inputLabel: "Brand identity brief and visual direction",
+        outputLabel: "Brand hero image",
+        tags: ["brand", "hero", "image", "landing-page", "marketing"],
+        suggestedNext: [],
+    },
+    {
+        id: "visual-social-graphic",
+        title: "Social Media Graphic",
+        description: "Generate eye-catching social media graphics for posts and campaigns",
+        category: "creative",
+        icon: "Image",
+        defaultPrompt: `Create an eye-catching social media graphic that would stop someone mid-scroll on LinkedIn or Instagram.
+
+Design requirements:
+- Bold, high-contrast design
+- Square aspect ratio (1:1) optimised for social feeds
+- Include a short headline or key stat rendered as text IN the image
+- Use orange (#FF4500) as the primary accent colour
+- Clean, modern, professional — not cluttered
+- The visual should communicate the core message even without reading the caption
+
+Content to visualise:
+{{input}}
+
+Generate one social media graphic that captures the most shareable insight from the content above.`,
+        inputLabel: "Social media post content or campaign brief",
+        outputLabel: "Social media graphic",
+        tags: ["social", "graphic", "image", "instagram", "linkedin"],
+        suggestedNext: [],
+    },
 ]
 
 /**
