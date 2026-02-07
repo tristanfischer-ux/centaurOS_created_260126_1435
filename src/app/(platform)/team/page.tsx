@@ -242,14 +242,11 @@ export default async function TeamPage() {
     const founders = membersWithMetrics.filter(p => p.role === 'Founder')
     const executives = membersWithMetrics.filter(p => p.role === 'Executive')
     const apprentices = membersWithMetrics.filter(p => p.role === 'Apprentice')
-    const aiAgents = membersWithMetrics.filter(p => p.role === 'AI_Agent')
-
     return (
         <TeamComparisonView
             founders={founders}
             executives={executives}
             apprentices={apprentices}
-            aiAgents={aiAgents}
             teams={teams || []}
             currentUserId={user.id}
             insights={insights}

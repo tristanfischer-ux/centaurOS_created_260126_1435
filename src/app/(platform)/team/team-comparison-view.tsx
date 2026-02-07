@@ -14,7 +14,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import {
     Check, Users, MoreHorizontal, Pencil, Trash2, Loader2, AlertTriangle,
     LayoutGrid, List, User, MessageSquare, Brain, Unplug, Zap, Search,
-    ArrowRight, UserPlus, Plus, Activity, Bot, ShieldCheck, ChevronRight,
+    ArrowRight, UserPlus, Plus, Activity, ShieldCheck, ChevronRight,
     BarChart3
 } from "lucide-react"
 import { createTeam, addTeamMember, deleteMember } from "@/actions/team"
@@ -148,7 +148,6 @@ interface TeamComparisonViewProps {
     founders: Member[]
     executives: Member[]
     apprentices: Member[]
-    aiAgents: Member[]
     teams: Team[]
     currentUserId: string
     insights?: Insights
@@ -159,7 +158,7 @@ interface TeamComparisonViewProps {
 
 // ─── Main Component ──────────────────────────────
 
-export function TeamComparisonView({ founders, executives, apprentices, aiAgents, teams, currentUserId, insights, unassignedTasks, allTasks }: TeamComparisonViewProps) {
+export function TeamComparisonView({ founders, executives, apprentices, teams, currentUserId, insights, unassignedTasks, allTasks }: TeamComparisonViewProps) {
     // View state
     const [activeTab, setActiveTab] = useState<'members' | 'teams' | 'workload'>('members')
     const [showQuickAssign, setShowQuickAssign] = useState(false)
@@ -205,7 +204,7 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
     useAutoRefresh({ tables: ['profiles', 'teams', 'presence'] })
 
     // Derived data
-    const allMembers = [...founders, ...executives, ...apprentices, ...aiAgents]
+    const allMembers = [...founders, ...executives, ...apprentices]
     const selectedMembers = allMembers.filter(m => selectedIds.has(m.id))
     const quickTeamMembers = allMembers.filter(m => quickTeamMemberIds.includes(m.id))
     const humanMembers = allMembers.filter(m => m.role !== 'AI_Agent')
@@ -214,7 +213,6 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
 
     const totalPeople = allMembers.length
     const totalTeams = teams.filter(t => !t.is_auto_generated).length
-    const totalAI = aiAgents.length
     const pairedCount = humanMembers.filter(m => m.paired_ai_id).length
     const avgCapacity = humanMembers.length > 0
         ? Math.round(humanMembers.reduce((sum, m) => {
@@ -247,7 +245,6 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
     const filteredFounders = filterMembers(founders)
     const filteredExecutives = filterMembers(executives)
     const filteredApprentices = filterMembers(apprentices)
-    const filteredAIAgents = filterMembers(aiAgents)
     const filteredTeams = filterTeams(teams)
 
     // ─── Handlers ──────────────────────────────
@@ -617,7 +614,7 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                                     <div className="absolute inset-0 flex items-center justify-center bg-status-success-light/80 backdrop-blur-[2px] rounded-lg z-10 animate-in fade-in duration-200">
                                         <div className="bg-status-success text-white px-4 py-2 rounded-full text-sm font-medium flex items-center gap-2 shadow-lg">
                                             <Zap className="h-4 w-4 fill-white" />
-                                            {draggedMemberId && aiAgents.some(a => a.id === draggedMemberId) ? 'Pair Agent' : 'Create Team'}
+                                            Create Team
                                         </div>
                                     </div>
                                 )}
@@ -727,15 +724,6 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                     <div>
                         <p className="text-2xl font-display font-bold text-foreground">{totalTeams}</p>
                         <p className="text-xs text-muted-foreground">Teams</p>
-                    </div>
-                </div>
-                <div className="bg-card border border-muted rounded-xl p-4 flex items-center gap-3 hover:shadow-sm transition-shadow">
-                    <div className="h-10 w-10 rounded-xl bg-purple-500/10 flex items-center justify-center shrink-0">
-                        <Bot className="h-5 w-5 text-purple-500" />
-                    </div>
-                    <div>
-                        <p className="text-2xl font-display font-bold text-foreground">{totalAI}</p>
-                        <p className="text-xs text-muted-foreground">AI Agents</p>
                     </div>
                 </div>
                 <div className="bg-card border border-muted rounded-xl p-4 flex items-center gap-3 hover:shadow-sm transition-shadow">
@@ -879,20 +867,6 @@ export function TeamComparisonView({ founders, executives, apprentices, aiAgents
                         accentColor="bg-slate-400"
                         members={filteredApprentices}
                     />
-                    <MemberSection
-                        title="AI Agents"
-                        subtitle="Automation partners"
-                        accentColor="bg-purple-500"
-                        icon={<Brain className="h-4 w-4 text-purple-500" />}
-                        members={filteredAIAgents}
-                    />
-
-                    {/* Drag hint */}
-                    {aiAgents.length > 0 && humanMembers.length > 0 && (
-                        <p className="text-xs text-muted-foreground text-center italic pb-2">
-                            Drag an AI agent onto a person to pair them, or drag two people together to create a team.
-                        </p>
-                    )}
                 </div>
             )}
 
