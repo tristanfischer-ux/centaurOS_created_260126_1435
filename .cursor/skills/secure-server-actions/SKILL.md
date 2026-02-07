@@ -7,9 +7,62 @@ description: Security checklist for Next.js Server Actions in CentaurOS. Use whe
 
 Every server action in CentaurOS MUST follow these security patterns to prevent IDOR, authentication bypass, and data leakage.
 
-## Required Security Checks
+## Recommended: Use `withAuth` / `withUser` Wrappers
 
-Every server action must include these checks IN ORDER:
+The `withAuth` and `withUser` wrappers in `src/lib/server-action-utils.ts` centralize authentication and foundry context boilerplate. **New server actions should use these wrappers** instead of manual auth checks.
+
+```typescript
+import { withAuth, withUser } from '@/lib/server-action-utils'
+
+// For actions requiring foundry context (most actions)
+export async function myAction(input: Input) {
+  return withAuth(async ({ supabase, user, foundryId }) => {
+    // AUTH: User is authenticated (guaranteed by wrapper)
+    // FOUNDRY: foundryId is valid (guaranteed by wrapper)
+    
+    // 1. OWNERSHIP VERIFICATION - Before any read/update/delete by ID
+    const { data: resource } = await supabase
+      .from('table')
+      .select('foundry_id')
+      .eq('id', resourceId)
+      .eq('foundry_id', foundryId)
+      .single()
+    
+    if (!resource) {
+      return { error: 'Resource not found' }
+    }
+    
+    // 2. Perform the actual operation
+    // ...
+    return { success: true, data: result }
+  })
+}
+
+// For user-only actions (no foundry needed, e.g. profile updates)
+export async function updateMyProfile(input: Input) {
+  return withUser(async ({ supabase, user }) => {
+    // AUTH: User is authenticated (guaranteed by wrapper)
+    // No foundry context needed
+    
+    const { error } = await supabase
+      .from('profiles')
+      .update(input)
+      .eq('id', user.id)
+    
+    return { success: !error }
+  })
+}
+```
+
+**Benefits of wrappers:**
+- Single place to update auth logic (reduces blast radius)
+- Consistent error messages for unauthenticated/no-foundry states
+- TypeScript types guarantee context availability in the callback
+- Easier to test (mock `withAuth` instead of Supabase client)
+
+### Manual Pattern (Legacy)
+
+Existing actions may still use the manual pattern. Both are acceptable, but **prefer wrappers for new code**:
 
 ```typescript
 export async function myAction(input: Input): Promise<Result> {
@@ -30,7 +83,7 @@ export async function myAction(input: Input): Promise<Result> {
   // 3. OWNERSHIP VERIFICATION - Before any read/update/delete by ID
   const { data: resource } = await supabase
     .from('table')
-    .select('foundry_id')  // or owner_id, created_by, etc.
+    .select('foundry_id')
     .eq('id', resourceId)
     .single()
   

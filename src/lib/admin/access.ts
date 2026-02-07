@@ -8,13 +8,20 @@ export type { AdminRole, AdminUser }
 type UntypedClient = any
 
 /**
- * Check if a user has admin privileges
- * Checks both admin_users table AND Founder role as fallback
+ * Check if a user has platform admin privileges.
+ * 
+ * @description Platform admin access is strictly controlled via:
+ * 1. The admin_users table (primary source of truth)
+ * 2. PLATFORM_SUPER_ADMIN_EMAIL env var (break-glass safety net)
+ * 
+ * @security Founder/Executive roles do NOT grant platform admin access.
+ * Those roles grant access to the Company Admin hub (/admin) but NOT
+ * to the platform operations dashboard (ops subdomain).
  */
 export async function isAdmin(userId: string): Promise<boolean> {
     const supabase = await createClient() as UntypedClient
     
-    // First check admin_users table
+    // PRIMARY: Check admin_users table
     const { data, error } = await supabase
         .from('admin_users')
         .select('id')
@@ -24,33 +31,33 @@ export async function isAdmin(userId: string): Promise<boolean> {
     // RLS may block non-admins from querying this table entirely,
     // which is expected behavior - don't log it as an error
     if (error) {
-        // Silently handle expected errors:
-        // - PGRST301: RLS access denied
-        // - 42501: insufficient privilege
-        // - infinite recursion: known RLS policy issue (needs migration)
         const isExpectedError = 
             error.code === 'PGRST301' || 
             error.code === '42501' ||
             (error.message && error.message.includes('infinite recursion'))
         
         if (!isExpectedError) {
-            console.error('Error checking admin status:', error.message || error.code)
+            console.error('[AdminAccess] Error checking admin status:', error.message || error.code)
         }
-        // Fall through to check Founder role
+        // Fall through to env var check
     }
     
     if (data) {
         return true
     }
     
-    // Fallback: Check if user is a Founder (Founders should have system admin access)
-    const { data: profile } = await supabase
-        .from('profiles')
-        .select('role')
-        .eq('id', userId)
-        .maybeSingle()
+    // SAFETY NET: Env var for platform owner (break glass)
+    const superAdminEmail = process.env.PLATFORM_SUPER_ADMIN_EMAIL
+    if (superAdminEmail) {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (user?.email === superAdminEmail) {
+            return true
+        }
+    }
     
-    return profile?.role === 'Founder'
+    // SECURITY: No Founder/Executive fallback. Those roles grant Company
+    // Admin access, not platform admin access.
+    return false
 }
 
 /**

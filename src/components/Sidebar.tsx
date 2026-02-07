@@ -4,7 +4,7 @@ import React from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
-import { Users, CheckSquare, Store, Target, ShieldAlert, Lightbulb, ShoppingBag, Bot, Home, Bell } from "lucide-react"
+import { Users, CheckSquare, Store, Target, ShieldAlert, Lightbulb, ShoppingBag, Bot, Home, Bell, Sparkles } from "lucide-react"
 import { NotificationCenter } from "@/components/NotificationCenter"
 import { UnreadIndicator } from "@/components/today/UnreadIndicator"
 import { FoundrySwitcher } from "@/components/FoundrySwitcher"
@@ -49,6 +49,7 @@ const discoveryNavigation = [
     { name: "Inspiration", href: "/inspiration", icon: Lightbulb, tooltip: "Get ideas on what to do next and discover opportunities" },
     { name: "Marketplace", href: "/marketplace", icon: Store, tooltip: "Find experts, suppliers, products, and services" },
     { name: "My Orders", href: "/my-orders", icon: ShoppingBag, tooltip: "View and manage your marketplace orders" },
+    { name: "What's New", href: "/whats-new", icon: Sparkles, tooltip: "Latest features, improvements, and product updates" },
 ]
 
 // Profile & Settings moved to AccountPopover (accessed via user avatar)
@@ -62,7 +63,7 @@ interface FoundryInfo {
     memberCount: number
 }
 
-export function Sidebar({ foundryName, foundryId, userName, userRole, isAdmin, userFoundries }: { foundryName?: string; foundryId?: string; userName?: string; userRole?: string; isAdmin?: boolean; userFoundries?: FoundryInfo[] }) {
+export function Sidebar({ foundryName, foundryId, userName, userRole, isCompanyAdmin, userFoundries }: { foundryName?: string; foundryId?: string; userName?: string; userRole?: string; isCompanyAdmin?: boolean; userFoundries?: FoundryInfo[] }) {
     const pathname = usePathname()
     const { setZoom } = useZoomContext()
 
@@ -172,8 +173,8 @@ export function Sidebar({ foundryName, foundryId, userName, userRole, isAdmin, u
                     )
                 })()}
 
-                {/* System Admin Link - Only visible to admins */}
-                {isAdmin && (
+                {/* Company Admin Link - Only visible to Founders/Executives */}
+                {isCompanyAdmin && (
                     <>
                         <div className="my-4 border-t border-slate-100" />
                         <Link
@@ -192,7 +193,7 @@ export function Sidebar({ foundryName, foundryId, userName, userRole, isAdmin, u
                                 )}
                                 aria-hidden="true"
                             />
-                            System Admin
+                            Company Admin
                         </Link>
                     </>
                 )}

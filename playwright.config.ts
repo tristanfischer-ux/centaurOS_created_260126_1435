@@ -1,5 +1,9 @@
 import { defineConfig, devices } from '@playwright/test'
 import path from 'path'
+import { config } from 'dotenv'
+
+// Load .env.local so test credentials are available
+config({ path: path.join(__dirname, '.env.local') })
 
 // Auth storage paths
 const authDir = path.join(__dirname, '.playwright/auth')

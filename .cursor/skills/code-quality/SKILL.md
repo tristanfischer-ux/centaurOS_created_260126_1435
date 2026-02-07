@@ -13,7 +13,10 @@ Run these checks before committing:
 
 ```bash
 # Full quality check (run all in sequence)
-npm run lint && npx tsc --noEmit && npm run test && npm run build
+npm run lint && npm run typecheck && npm run test && npm run build
+
+# With coverage report
+npm run test:coverage
 ```
 
 ### UI Standards Check (for UI changes)
@@ -76,15 +79,17 @@ console.log('debug');
 ### Run TypeScript Check
 
 ```bash
-# Check for type errors
+# Check for type errors (preferred - uses project script)
+npm run typecheck
+
+# Equivalent manual command
 npx tsc --noEmit
 
 # Check with verbose output
 npx tsc --noEmit --pretty
-
-# Generate declaration files (doesn't check)
-npx tsc --declaration --emitDeclarationOnly
 ```
+
+**Note:** `strictNullChecks` and `noImplicitAny` are enabled in `tsconfig.json`. All new code must handle nullable types and provide explicit type annotations.
 
 ### Fixing Type Errors
 
@@ -282,9 +287,22 @@ npm run test -- --watch
 # Run specific file
 npm run test -- src/lib/__tests__/utils.test.ts
 
-# Run with coverage
-npm run test -- --coverage
+# Run with coverage report
+npm run test:coverage
 ```
+
+### Coverage Thresholds
+
+Jest enforces minimum coverage for critical shared code. Thresholds are defined in `jest.config.ts`:
+
+| File | Branches | Functions | Lines | Statements |
+|------|----------|-----------|-------|------------|
+| Global minimum | 1% | 1% | 1% | 1% |
+| `src/lib/utils.ts` | 80% | 100% | 90% | 90% |
+| `src/lib/supabase/foundry-context.ts` | 50% | 60% | 60% | 60% |
+| `src/lib/server-action-utils.ts` | 80% | 100% | 90% | 90% |
+
+**When adding critical shared code**, add a coverage threshold entry in `jest.config.ts` to prevent regressions. Ratchet thresholds upward as coverage improves.
 
 ### Writing Tests
 
@@ -375,21 +393,24 @@ npm run build -- --analyze
 
 ## Automated Quality Gates
 
-### Pre-commit Hook (if using Husky)
+### Pre-commit Hook (Husky)
 
+The pre-commit hook automatically runs:
 ```bash
 # .husky/pre-commit
 npm run lint
-npx tsc --noEmit
 ```
 
 ### CI Pipeline Checks
 
-The GitHub Actions workflow runs:
+The GitHub Actions workflow (`.github/workflows/docker-build.yml`) runs:
 1. `npm ci` - Install dependencies
-2. `npm run lint` - Lint check
-3. `npm run test` - Unit tests (when enabled)
-4. Docker build
+2. `npm audit` - Security audit
+3. `npm run typecheck` - TypeScript type checking (non-blocking until pre-existing errors resolved)
+4. `npm run lint` - ESLint check
+5. `npm run test` - Unit tests
+6. E2E tests (`@critical` tagged) - **Blocks deployment on failure**
+7. Docker build and push
 
 ## Quick Quality Commands
 
@@ -398,7 +419,7 @@ The GitHub Actions workflow runs:
 npx eslint --fix src/ && npx prettier --write src/
 
 # Check everything
-npm run lint && npx tsc --noEmit && npm run test
+npm run lint && npm run typecheck && npm run test
 
 # Find unused exports
 npx ts-prune

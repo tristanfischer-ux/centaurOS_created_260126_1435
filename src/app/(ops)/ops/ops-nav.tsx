@@ -14,25 +14,32 @@ import {
     Info
 } from "lucide-react"
 
-const adminNavigation = [
-    { name: "Overview", href: "/admin", icon: LayoutDashboard },
-    { name: "Applications", href: "/admin/applications", icon: ClipboardList },
-    { name: "Platform Health", href: "/admin/health", icon: Activity },
-    { name: "QA Testing", href: "/admin/qa", icon: FlaskConical },
-    { name: "Analytics", href: "/admin/analytics", icon: BarChart3 },
-    { name: "GDPR", href: "/admin/gdpr", icon: Shield },
-    { name: "Settings", href: "/admin/settings", icon: Settings },
-    { name: "About", href: "/admin/about", icon: Info },
+/**
+ * Navigation for the Platform Operations dashboard.
+ * 
+ * @description All links use /ops/... paths which map to the internal
+ * file system routes. On the ops subdomain, these resolve correctly
+ * via middleware.
+ */
+const opsNavigation = [
+    { name: "Overview", href: "/ops", icon: LayoutDashboard },
+    { name: "Applications", href: "/ops/applications", icon: ClipboardList },
+    { name: "Platform Health", href: "/ops/health", icon: Activity },
+    { name: "QA Testing", href: "/ops/qa", icon: FlaskConical },
+    { name: "Analytics", href: "/ops/analytics", icon: BarChart3 },
+    { name: "GDPR", href: "/ops/gdpr", icon: Shield },
+    { name: "Settings", href: "/ops/settings", icon: Settings },
+    { name: "About", href: "/ops/about", icon: Info },
 ]
 
-export function AdminNav() {
+export function OpsNav() {
     const pathname = usePathname()
 
     return (
-        <nav className="flex items-center gap-1 overflow-x-auto pb-0 border-b border-slate-100 -mt-2">
-            {adminNavigation.map((item) => {
-                const isActive = item.href === '/admin'
-                    ? pathname === '/admin'
+        <nav className="flex items-center gap-1 overflow-x-auto pb-0 border-b border-slate-100">
+            {opsNavigation.map((item) => {
+                const isActive = item.href === '/ops'
+                    ? pathname === '/ops'
                     : pathname.startsWith(item.href)
 
                 return (

@@ -12,6 +12,26 @@ role: |
 
 This skill covers running, writing, and debugging Playwright E2E tests for CentaurOS.
 
+## CI Integration
+
+**E2E tests now block the CI pipeline.** Tests tagged `@critical` run automatically on every push to `main`/`develop`:
+
+```yaml
+# .github/workflows/docker-build.yml
+- name: Run E2E Tests (Critical Paths)
+  run: npm run test:e2e -- --project=chromium --grep="@critical"
+```
+
+**Tagging critical tests:**
+```typescript
+// Tests that should run in CI should include @critical in the name
+test('should load dashboard @critical', async ({ page }) => {
+  // ...
+});
+```
+
+If E2E tests fail in CI, the deployment is blocked. Fix the failing tests before merging.
+
 ## Running Tests
 
 ### Basic Commands
@@ -386,6 +406,9 @@ test('should redirect to dashboard after login', async ({ page }) => {});
 ```bash
 # Run all tests
 npm run test:e2e
+
+# Run only CI-critical tests (matches what CI runs)
+npm run test:e2e -- --project=chromium --grep="@critical"
 
 # Run single file
 npx playwright test e2e/dashboard.spec.ts

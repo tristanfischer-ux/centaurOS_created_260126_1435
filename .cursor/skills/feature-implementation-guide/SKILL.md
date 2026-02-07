@@ -184,30 +184,46 @@ export async function createFeature(input: CreateFeatureInput) {
 
 ### Step 5: Create Server Actions
 
-Add server actions in `src/actions/feature-name.ts`:
+Add server actions in `src/actions/feature-name.ts`. **Use `withAuth`/`withUser` wrappers** from `src/lib/server-action-utils.ts` to centralize auth boilerplate:
 
 ```typescript
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { createFeature, getFeatureData } from '@/lib/feature-name/service';
+import { withAuth } from '@/lib/server-action-utils';
 
+// AUTH: withAuth guarantees authenticated user + valid foundry context
 export async function createFeatureAction(formData: FormData) {
-  try {
+  return withAuth(async ({ supabase, user, foundryId }) => {
+    // VALIDATION: Parse and validate input
     const input = {
       // Parse formData
+      foundry_id: foundryId,
+      created_by: user.id,
     };
     
-    const result = await createFeature(input);
+    const { data, error } = await supabase
+      .from('feature_name')
+      .insert(input)
+      .select()
+      .single();
+    
+    if (error) {
+      console.error('[FeatureService] Failed to create feature:', error);
+      return { success: false, error: 'Failed to create feature' };
+    }
     
     revalidatePath('/feature-path');
-    return { success: true, data: result };
-  } catch (error) {
-    console.error('Failed to create feature:', error);
-    return { success: false, error: 'Failed to create feature' };
-  }
+    return { success: true, data };
+  });
 }
 ```
+
+**When to use each wrapper:**
+- `withAuth` - Most actions (provides `supabase`, `user`, `foundryId`)
+- `withUser` - User-only actions like profile updates (no foundry needed)
+
+See `src/lib/server-action-utils.ts` for implementation details and `src/lib/__tests__/server-action-utils.test.ts` for test examples.
 
 ### Step 6: Build UI Components
 
@@ -566,27 +582,29 @@ export interface TaskNote {
 // src/actions/task-notes.ts
 'use server'
 
+import { withAuth } from '@/lib/server-action-utils'
+
 export async function addTaskNote(taskId: string, content: string) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) throw new Error('Unauthorized')
-  
-  const foundryId = await getFoundryIdCached()
-  
-  const { data, error } = await supabase
-    .from('task_notes')
-    .insert({
-      task_id: taskId,
-      foundry_id: foundryId,
-      author_id: user.id,
-      content,
-    })
-    .select()
-    .single()
-  
-  if (error) throw error
-  revalidatePath(`/tasks/${taskId}`)
-  return data
+  return withAuth(async ({ supabase, user, foundryId }) => {
+    const { data, error } = await supabase
+      .from('task_notes')
+      .insert({
+        task_id: taskId,
+        foundry_id: foundryId,
+        author_id: user.id,
+        content,
+      })
+      .select()
+      .single()
+    
+    if (error) {
+      console.error('[TaskNotes] Failed to add note:', error)
+      return { error: 'Failed to add note' }
+    }
+    
+    revalidatePath(`/tasks/${taskId}`)
+    return { success: true, data }
+  })
 }
 ```
 

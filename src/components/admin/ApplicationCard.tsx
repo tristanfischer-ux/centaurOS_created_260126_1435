@@ -18,6 +18,8 @@ interface ApplicationCardProps {
     submittedAt: string
     applicantName?: string | null
     className?: string
+    /** Base path for application detail links. Defaults to /ops/applications */
+    basePath?: string
 }
 
 const statusConfig: Record<ApplicationStatus, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
@@ -34,14 +36,15 @@ export function ApplicationCard({
     status,
     submittedAt,
     applicantName,
-    className
+    className,
+    basePath = '/ops/applications'
 }: ApplicationCardProps) {
     const statusInfo = statusConfig[status]
     
     return (
         <Card className={cn("hover:bg-muted/50 transition-colors", className)}>
             <CardContent className="p-4">
-                <Link href={`/admin/applications/${id}`} className="block">
+                <Link href={`${basePath}/${id}`} className="block">
                     <div className="flex items-start justify-between gap-4">
                         <div className="flex items-start gap-3 min-w-0">
                             <div className="p-2 rounded-lg bg-muted shrink-0">

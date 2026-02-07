@@ -13,6 +13,32 @@ export async function middleware(request: NextRequest) {
     const { pathname } = request.nextUrl
     const hostname = request.headers.get('host') || ''
     
+    // SECURITY: Block /ops/* routes on the main domain entirely.
+    // The ops dashboard is only accessible via the ops subdomain.
+    // Returns 404 so it looks like the route doesn't exist.
+    const isOpsDomain = hostname.startsWith('ops.')
+    if (!isOpsDomain && pathname.startsWith('/ops')) {
+        return NextResponse.rewrite(new URL('/not-found', request.url))
+    }
+    
+    // OPS SUBDOMAIN: Restrict to /ops/* routes only
+    if (isOpsDomain) {
+        // Root redirect to /ops dashboard
+        if (pathname === '/') {
+            return NextResponse.redirect(new URL('/ops', request.url))
+        }
+        // Allow /ops/*, /api/*, /_next/*, /login, /auth/* (for auth flow)
+        const isAllowedOnOps = 
+            pathname.startsWith('/ops') || 
+            pathname.startsWith('/api') || 
+            pathname.startsWith('/_next') ||
+            pathname === '/login' ||
+            pathname.startsWith('/auth')
+        if (!isAllowedOnOps) {
+            return NextResponse.redirect(new URL('/ops', request.url))
+        }
+    }
+    
     // Determine if this is a marketing route
     const isMarketingRoute = MARKETING_ROUTES.some(route => 
         pathname === route || pathname.startsWith(`${route}/`)

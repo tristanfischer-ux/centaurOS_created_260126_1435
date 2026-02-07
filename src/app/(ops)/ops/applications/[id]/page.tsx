@@ -82,7 +82,7 @@ export default function ApplicationDetailPage({
         
         if (success) {
             toast.success('Application approved successfully')
-            router.push('/admin/applications')
+            router.push('/ops/applications')
         } else {
             toast.error(error || 'Failed to approve application')
         }
@@ -101,7 +101,7 @@ export default function ApplicationDetailPage({
         
         if (success) {
             toast.success('Application rejected')
-            router.push('/admin/applications')
+            router.push('/ops/applications')
         } else {
             toast.error(error || 'Failed to reject application')
         }
@@ -125,7 +125,7 @@ export default function ApplicationDetailPage({
                 <AlertCircle className="h-12 w-12 text-destructive mx-auto mb-4" />
                 <h2 className="text-lg font-semibold mb-2">Failed to load application</h2>
                 <p className="text-muted-foreground mb-4">{error}</p>
-                <Link href="/admin/applications">
+                <Link href="/ops/applications">
                     <Button variant="secondary">
                         Back to Applications
                     </Button>
@@ -141,14 +141,14 @@ export default function ApplicationDetailPage({
             {/* Breadcrumb Navigation */}
             <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-sm">
                 <Link 
-                    href="/admin" 
+                    href="/ops" 
                     className="text-muted-foreground hover:text-foreground transition-colors"
                 >
-                    Admin
+                    Operations
                 </Link>
                 <ChevronRight className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
                 <Link 
-                    href="/admin/applications" 
+                    href="/ops/applications" 
                     className="text-muted-foreground hover:text-foreground transition-colors"
                 >
                     Applications

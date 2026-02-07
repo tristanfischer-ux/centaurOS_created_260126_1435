@@ -1,12 +1,20 @@
 import { createClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
 import Link from "next/link"
-import { isAdmin } from "@/lib/admin/access"
 import { ShieldAlert, ArrowLeft } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { AdminNav } from "./admin-nav"
 
-export default async function AdminLayout({
+/**
+ * Company Admin Layout
+ * 
+ * @description Layout for the Company Admin hub, accessible to Founders
+ * and Executives. Provides a simple header with back navigation.
+ * 
+ * @security Access controlled by Founder/Executive role check.
+ * This is NOT the platform operations dashboard (that lives on the
+ * ops subdomain with isAdmin() gating).
+ */
+export default async function CompanyAdminLayout({
     children,
 }: Readonly<{
     children: React.ReactNode
@@ -19,10 +27,16 @@ export default async function AdminLayout({
         redirect("/login")
     }
     
-    // Check admin access
-    const hasAdminAccess = await isAdmin(user.id)
+    // AUTH: Check for Founder or Executive role (not platform admin)
+    const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .single()
     
-    if (!hasAdminAccess) {
+    const isCompanyAdmin = profile?.role === 'Founder' || profile?.role === 'Executive'
+    
+    if (!isCompanyAdmin) {
         return (
             <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-4">
                 <div className="p-4 rounded-full bg-status-error-light mb-4">
@@ -32,8 +46,8 @@ export default async function AdminLayout({
                     Access Denied
                 </h1>
                 <p className="text-muted-foreground mb-6 max-w-md">
-                    You do not have permission to access the admin dashboard. 
-                    Please contact a platform administrator if you believe this is an error.
+                    Only Founders and Executives can access the Company Admin area.
+                    Contact your company administrator if you need access.
                 </p>
                 <Link href="/dashboard">
                     <Button variant="secondary">
@@ -47,7 +61,7 @@ export default async function AdminLayout({
     
     return (
         <div className="flex flex-col gap-6">
-            {/* Admin Header */}
+            {/* Company Admin Header */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-slate-100">
                 <div>
                     <div className="flex items-center gap-3 mb-1">
@@ -56,25 +70,22 @@ export default async function AdminLayout({
                             <div className="flex items-center gap-2 mb-0.5">
                                 <ShieldAlert className="h-4 w-4 text-international-orange" />
                                 <span className="text-xs font-medium text-international-orange uppercase tracking-wider">
-                                    Admin Panel
+                                    Company Admin
                                 </span>
                             </div>
                             <h1 className="text-2xl sm:text-3xl font-display font-semibold text-foreground tracking-tight">
-                                Operations Dashboard
+                                Administration
                             </h1>
                         </div>
                     </div>
                 </div>
-                <Link href="/updates">
-                    <Button variant="outline" size="sm" className="border-slate-200 hover:bg-slate-50">
+                <Link href="/dashboard">
+                    <Button variant="outline" size="sm" className="border-slate-200 hover:bg-muted">
                         <ArrowLeft className="h-4 w-4 mr-2" />
                         Back to App
                     </Button>
                 </Link>
             </div>
-            
-            {/* Admin Navigation - Client component for active state */}
-            <AdminNav />
             
             {/* Content */}
             <div className="flex-1">

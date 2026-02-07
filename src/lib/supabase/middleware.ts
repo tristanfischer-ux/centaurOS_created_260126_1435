@@ -16,8 +16,9 @@ const PUBLIC_ROUTES = [
     '/workspace-picker', // Multi-foundry workspace selector
 ]
 
-// Routes that require admin (Executive/Founder) role
-const ADMIN_ROUTES = [
+// Routes that require company admin (Executive/Founder) role
+// Note: Platform ops (/ops/*) is handled separately via subdomain isolation
+const COMPANY_ADMIN_ROUTES = [
     '/admin',
 ]
 
@@ -50,6 +51,11 @@ export async function updateSession(request: NextRequest) {
                         },
                     })
                     // SECURITY: Set secure cookie attributes
+                    // domain is set to parent domain in production to enable
+                    // cross-subdomain auth (main app + ops subdomain)
+                    const cookieDomain = isProduction 
+                        ? (process.env.COOKIE_DOMAIN || undefined)
+                        : undefined
                     cookiesToSet.forEach(({ name, value, options }) =>
                         response.cookies.set(name, value, {
                             ...options,
@@ -57,6 +63,7 @@ export async function updateSession(request: NextRequest) {
                             secure: isProduction, // HTTPS only in production
                             httpOnly: true, // Prevent XSS access to cookies
                             path: '/',
+                            ...(cookieDomain ? { domain: cookieDomain } : {}),
                         })
                     )
                 },
@@ -156,12 +163,12 @@ export async function updateSession(request: NextRequest) {
             return NextResponse.redirect(revokedUrl)
         }
 
-        // Security: Check admin routes require proper role
-        if (profile && ADMIN_ROUTES.some(route => pathname.startsWith(route))) {
-            const isAdmin = profile.role === 'Executive' || profile.role === 'Founder'
+        // Security: Check company admin routes require Founder/Executive role
+        if (profile && COMPANY_ADMIN_ROUTES.some(route => pathname.startsWith(route))) {
+            const isCompanyAdmin = profile.role === 'Executive' || profile.role === 'Founder'
 
-            if (!isAdmin) {
-                // User doesn't have admin access - redirect to timeline with error
+            if (!isCompanyAdmin) {
+                // User doesn't have company admin access - redirect with error
                 console.warn(`[SECURITY] Non-admin user ${user.id} attempted to access ${pathname}`)
                 const redirectUrl = request.nextUrl.clone()
                 redirectUrl.pathname = '/timeline'

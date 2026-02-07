@@ -18,6 +18,23 @@ const SUPPLIER_EMAIL = process.env.TEST_SUPPLIER_EMAIL
 const SUPPLIER_PASSWORD = process.env.TEST_SUPPLIER_PASSWORD
 
 /**
+ * Marks ALL onboarding flows as completed in localStorage.
+ *
+ * @description Without this, every test run hits a blocking onboarding
+ * modal (platform, supplier, marketplace, and welcome tour) which
+ * prevents interaction with the actual application UI.
+ */
+async function dismissAllOnboardingModals(page: any): Promise<void> {
+  await page.evaluate(() => {
+    localStorage.setItem('forgeos_onboarding_completed', 'true')
+    localStorage.setItem('forgeos_intent_selected', 'true')
+    localStorage.setItem('forgeos_supplier_onboarding_completed', 'true')
+    localStorage.setItem('forgeos:onboarding:completed', 'true')
+    localStorage.setItem('forgeos:marketplace:onboarding:completed', 'true')
+  })
+}
+
+/**
  * Logs in as a platform user (Founder, Executive, Apprentice).
  * Expects redirect to /today after login.
  */
@@ -48,10 +65,14 @@ async function loginAsPlatformUser(
   // Wait for redirect to a platform page (today or dashboard)
   await page.waitForURL(/\/(today|dashboard)/, { timeout: 30000 })
   
-  // Verify we're logged in
-  await expect(page.locator('text=Good')).toBeVisible({ timeout: 10000 })
+  // Dismiss all onboarding modals so walkthrough videos show the real app
+  await dismissAllOnboardingModals(page)
   
-  // Save auth state
+  // Reload so the dismissed state takes effect before saving
+  await page.reload()
+  await page.waitForURL(/\/(today|dashboard)/, { timeout: 15000 })
+  
+  // Save auth state (includes cookies + localStorage with onboarding flags)
   await page.context().storageState({ path: storagePath })
   
   console.log(`✓ ${role} authentication saved to ${storagePath}`)
@@ -87,7 +108,14 @@ async function loginAsSupplier(
   // Supplier accounts redirect to supplier-portal
   await page.waitForURL('**/supplier-portal**', { timeout: 30000 })
   
-  // Save auth state
+  // Dismiss all onboarding modals so walkthrough videos show the real app
+  await dismissAllOnboardingModals(page)
+  
+  // Reload so the dismissed state takes effect before saving
+  await page.reload()
+  await page.waitForURL('**/supplier-portal**', { timeout: 15000 })
+  
+  // Save auth state (includes cookies + localStorage with onboarding flags)
   await page.context().storageState({ path: storagePath })
   
   console.log(`✓ Supplier authentication saved to ${storagePath}`)
