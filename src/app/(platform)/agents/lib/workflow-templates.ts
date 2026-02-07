@@ -629,6 +629,67 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
         }
     })(),
 
+    // ─── Cold Email Outreach Pipeline (11x-Grade) ────────────────────────
+    (() => {
+        const steps: StepDefinition[] = [
+            {
+                type: "human-task",
+                label: "Define ICP & product context",
+                guidance: "Before the AI can research and write, it needs to deeply understand what you're selling, who you're selling to, and what makes your offer compelling. The quality of this input directly determines the quality of every email downstream.",
+                checklist: [
+                    "Write a 2-3 sentence product description (what it does, for whom)",
+                    "Define your Ideal Customer Profile (industry, company size, funding stage, role titles)",
+                    "List your top 3 value propositions with supporting metrics",
+                    "Provide 1-2 case study summaries (company name, challenge, result with numbers)",
+                    "Specify tone preference (professional / casual / executive / technical)",
+                    "Add prospect details: name, company, role, email, any known signals",
+                ],
+            },
+            { type: "prompt", promptId: "outreach-prospect-research", label: "Prospect Deep Research", category: "sales", icon: "Search" },
+            { type: "prompt", promptId: "outreach-lead-scoring", label: "Lead Scoring & Signals", category: "sales", icon: "BarChart3" },
+            {
+                type: "human-task",
+                label: "Review scored leads",
+                guidance: "Review the AI's research and scoring. Approve high-scoring leads for email generation, reject poor fits, and add any context the AI may have missed.",
+                checklist: [
+                    "Verify the research brief is factually accurate",
+                    "Confirm the lead score feels right based on your domain knowledge",
+                    "Check that the recommended approach angle aligns with your strategy",
+                    "Add any insider knowledge the AI couldn't find (mutual connections, past interactions)",
+                    "Decision: proceed with email generation or skip this prospect",
+                ],
+            },
+            { type: "prompt", promptId: "outreach-personalization-strategy", label: "Personalization Strategy", category: "sales", icon: "UserCheck" },
+            { type: "prompt", promptId: "outreach-email-sequence", label: "Email Sequence (4 emails)", category: "sales", icon: "Mail" },
+            { type: "prompt", promptId: "outreach-subject-lines", label: "Subject Line Optimizer", category: "sales", icon: "Zap" },
+            { type: "prompt", promptId: "outreach-qa-compliance", label: "QA & Compliance Check", category: "sales", icon: "ShieldCheck" },
+            {
+                type: "human-task",
+                label: "Final review & send",
+                guidance: "This is your last checkpoint before emails go out. Review every email for accuracy, tone, and personalisation quality. Your reputation is on the line.",
+                checklist: [
+                    "Read every email aloud — does it sound like a real person wrote it?",
+                    "Verify all company/prospect references are accurate",
+                    "Select preferred subject line variant for each email (or approve A/B test)",
+                    "Review the QA report and address any flagged issues",
+                    "Confirm send schedule and timing (best days: Tue-Thu, best time: 8-10am prospect's timezone)",
+                    "Load emails into your sending tool and schedule the sequence",
+                ],
+            },
+        ]
+        const { nodes, edges } = buildTemplate(steps)
+        return {
+            id: "cold-email-outreach-pipeline",
+            name: "Cold Email Outreach Pipeline",
+            description: "11x-grade cold email system: deep prospect research, lead scoring, persona-adaptive personalization, 4-email sequence generation, subject line optimization, and deliverability QA. Achieves 50%+ open rates and 7%+ positive reply rates.",
+            category: "business" as const,
+            icon: "Send",
+            nodeCount: steps.length,
+            nodes,
+            edges,
+        }
+    })(),
+
     (() => {
         const steps: StepDefinition[] = [
             {
