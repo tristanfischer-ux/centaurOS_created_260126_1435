@@ -17,6 +17,17 @@
  * Rollback: Restore previous fee values from backup
  */
 
+-- Ensure unique constraint exists for upsert
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint 
+    WHERE conname = 'platform_fee_config_role_order_type_key'
+  ) THEN
+    ALTER TABLE platform_fee_config ADD CONSTRAINT platform_fee_config_role_order_type_key UNIQUE (role, order_type);
+  END IF;
+END $$;
+
 -- Update all fee configurations to 10% standard rate
 UPDATE platform_fee_config
 SET fee_percent = 10, effective_from = NOW()

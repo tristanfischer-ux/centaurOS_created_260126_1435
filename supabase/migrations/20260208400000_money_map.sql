@@ -24,7 +24,7 @@
 -- ============================================================
 CREATE TABLE money_map_revenue_streams (
     id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    foundry_id  UUID NOT NULL REFERENCES foundries(id) ON DELETE CASCADE,
+    foundry_id  TEXT NOT NULL REFERENCES foundries(id) ON DELETE CASCADE,
     name        TEXT NOT NULL,
     category    TEXT NOT NULL DEFAULT 'other'
                 CHECK (category IN ('product', 'service', 'marketplace', 'subscription', 'other')),
@@ -50,7 +50,7 @@ CREATE INDEX idx_mm_revenue_foundry ON money_map_revenue_streams(foundry_id);
 -- ============================================================
 CREATE TABLE money_map_cost_items (
     id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    foundry_id  UUID NOT NULL REFERENCES foundries(id) ON DELETE CASCADE,
+    foundry_id  TEXT NOT NULL REFERENCES foundries(id) ON DELETE CASCADE,
     name        TEXT NOT NULL,
     category    TEXT NOT NULL DEFAULT 'other'
                 CHECK (category IN ('personnel', 'infrastructure', 'marketing', 'operations', 'other')),
@@ -95,7 +95,7 @@ CREATE INDEX idx_mm_link_revenue ON money_map_cost_links(revenue_stream_id);
 -- ============================================================
 CREATE TABLE money_map_snapshots (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    foundry_id      UUID NOT NULL REFERENCES foundries(id) ON DELETE CASCADE,
+    foundry_id      TEXT NOT NULL REFERENCES foundries(id) ON DELETE CASCADE,
     name            TEXT NOT NULL,
     period_label    TEXT NOT NULL,
     snapshot_data   JSONB NOT NULL DEFAULT '{}'::jsonb,
@@ -118,7 +118,7 @@ CREATE POLICY "View own foundry revenue streams"
     ON money_map_revenue_streams FOR SELECT
     USING (
         EXISTS (
-            SELECT 1 FROM foundry_members fm
+            SELECT 1 FROM foundry_memberships fm
             WHERE fm.foundry_id = money_map_revenue_streams.foundry_id
               AND fm.user_id = auth.uid()
         )
@@ -128,7 +128,7 @@ CREATE POLICY "Insert own foundry revenue streams"
     ON money_map_revenue_streams FOR INSERT
     WITH CHECK (
         EXISTS (
-            SELECT 1 FROM foundry_members fm
+            SELECT 1 FROM foundry_memberships fm
             WHERE fm.foundry_id = money_map_revenue_streams.foundry_id
               AND fm.user_id = auth.uid()
         )
@@ -138,7 +138,7 @@ CREATE POLICY "Update own foundry revenue streams"
     ON money_map_revenue_streams FOR UPDATE
     USING (
         EXISTS (
-            SELECT 1 FROM foundry_members fm
+            SELECT 1 FROM foundry_memberships fm
             WHERE fm.foundry_id = money_map_revenue_streams.foundry_id
               AND fm.user_id = auth.uid()
         )
@@ -148,7 +148,7 @@ CREATE POLICY "Delete own foundry revenue streams"
     ON money_map_revenue_streams FOR DELETE
     USING (
         EXISTS (
-            SELECT 1 FROM foundry_members fm
+            SELECT 1 FROM foundry_memberships fm
             WHERE fm.foundry_id = money_map_revenue_streams.foundry_id
               AND fm.user_id = auth.uid()
         )
@@ -161,7 +161,7 @@ CREATE POLICY "View own foundry cost items"
     ON money_map_cost_items FOR SELECT
     USING (
         EXISTS (
-            SELECT 1 FROM foundry_members fm
+            SELECT 1 FROM foundry_memberships fm
             WHERE fm.foundry_id = money_map_cost_items.foundry_id
               AND fm.user_id = auth.uid()
         )
@@ -171,7 +171,7 @@ CREATE POLICY "Insert own foundry cost items"
     ON money_map_cost_items FOR INSERT
     WITH CHECK (
         EXISTS (
-            SELECT 1 FROM foundry_members fm
+            SELECT 1 FROM foundry_memberships fm
             WHERE fm.foundry_id = money_map_cost_items.foundry_id
               AND fm.user_id = auth.uid()
         )
@@ -181,7 +181,7 @@ CREATE POLICY "Update own foundry cost items"
     ON money_map_cost_items FOR UPDATE
     USING (
         EXISTS (
-            SELECT 1 FROM foundry_members fm
+            SELECT 1 FROM foundry_memberships fm
             WHERE fm.foundry_id = money_map_cost_items.foundry_id
               AND fm.user_id = auth.uid()
         )
@@ -191,7 +191,7 @@ CREATE POLICY "Delete own foundry cost items"
     ON money_map_cost_items FOR DELETE
     USING (
         EXISTS (
-            SELECT 1 FROM foundry_members fm
+            SELECT 1 FROM foundry_memberships fm
             WHERE fm.foundry_id = money_map_cost_items.foundry_id
               AND fm.user_id = auth.uid()
         )
@@ -205,7 +205,7 @@ CREATE POLICY "View own foundry cost links"
     USING (
         EXISTS (
             SELECT 1 FROM money_map_cost_items ci
-            JOIN foundry_members fm ON fm.foundry_id = ci.foundry_id
+            JOIN foundry_memberships fm ON fm.foundry_id = ci.foundry_id
             WHERE ci.id = money_map_cost_links.cost_item_id
               AND fm.user_id = auth.uid()
         )
@@ -216,7 +216,7 @@ CREATE POLICY "Insert own foundry cost links"
     WITH CHECK (
         EXISTS (
             SELECT 1 FROM money_map_cost_items ci
-            JOIN foundry_members fm ON fm.foundry_id = ci.foundry_id
+            JOIN foundry_memberships fm ON fm.foundry_id = ci.foundry_id
             WHERE ci.id = money_map_cost_links.cost_item_id
               AND fm.user_id = auth.uid()
         )
@@ -227,7 +227,7 @@ CREATE POLICY "Update own foundry cost links"
     USING (
         EXISTS (
             SELECT 1 FROM money_map_cost_items ci
-            JOIN foundry_members fm ON fm.foundry_id = ci.foundry_id
+            JOIN foundry_memberships fm ON fm.foundry_id = ci.foundry_id
             WHERE ci.id = money_map_cost_links.cost_item_id
               AND fm.user_id = auth.uid()
         )
@@ -238,7 +238,7 @@ CREATE POLICY "Delete own foundry cost links"
     USING (
         EXISTS (
             SELECT 1 FROM money_map_cost_items ci
-            JOIN foundry_members fm ON fm.foundry_id = ci.foundry_id
+            JOIN foundry_memberships fm ON fm.foundry_id = ci.foundry_id
             WHERE ci.id = money_map_cost_links.cost_item_id
               AND fm.user_id = auth.uid()
         )
@@ -251,7 +251,7 @@ CREATE POLICY "View own foundry snapshots"
     ON money_map_snapshots FOR SELECT
     USING (
         EXISTS (
-            SELECT 1 FROM foundry_members fm
+            SELECT 1 FROM foundry_memberships fm
             WHERE fm.foundry_id = money_map_snapshots.foundry_id
               AND fm.user_id = auth.uid()
         )
@@ -261,7 +261,7 @@ CREATE POLICY "Insert own foundry snapshots"
     ON money_map_snapshots FOR INSERT
     WITH CHECK (
         EXISTS (
-            SELECT 1 FROM foundry_members fm
+            SELECT 1 FROM foundry_memberships fm
             WHERE fm.foundry_id = money_map_snapshots.foundry_id
               AND fm.user_id = auth.uid()
         )

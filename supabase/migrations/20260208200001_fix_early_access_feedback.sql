@@ -1,17 +1,8 @@
 /**
- * Migration: Add early_access_feedback table
+ * Migration: Create early_access_feedback table (fix for 20260208200000)
  * 
- * Purpose: Capture contextual feedback from early access users.
- * Feedback categories: bug, idea, confusion, praise.
- * Each submission captures the page route and optional feature name
- * so feedback is actionable and traceable.
- * 
- * Security:
- * - RLS policy: users can insert their own feedback
- * - RLS policy: foundry admins (Founder/Executive) can read feedback from their foundry
- * - Users cannot read or modify other users' feedback
- * 
- * Rollback: DROP TABLE early_access_feedback CASCADE
+ * The original migration failed because it used UUID for foundry_id
+ * but foundries.id is TEXT. This creates the table correctly.
  */
 
 -- Create feedback category enum
@@ -21,7 +12,7 @@ EXCEPTION
   WHEN duplicate_object THEN null;
 END $$;
 
--- Create the feedback table
+-- Create the feedback table with TEXT foundry_id
 CREATE TABLE IF NOT EXISTS early_access_feedback (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
@@ -33,7 +24,7 @@ CREATE TABLE IF NOT EXISTS early_access_feedback (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- Indexes for common query patterns
+-- Indexes
 CREATE INDEX IF NOT EXISTS idx_early_access_feedback_foundry 
   ON early_access_feedback(foundry_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_early_access_feedback_user 
@@ -45,18 +36,21 @@ CREATE INDEX IF NOT EXISTS idx_early_access_feedback_category
 ALTER TABLE early_access_feedback ENABLE ROW LEVEL SECURITY;
 
 -- RLS: Users can insert their own feedback
+DROP POLICY IF EXISTS "Users can submit feedback" ON early_access_feedback;
 CREATE POLICY "Users can submit feedback"
   ON early_access_feedback
   FOR INSERT
   WITH CHECK (auth.uid() = user_id);
 
 -- RLS: Users can view their own feedback
+DROP POLICY IF EXISTS "Users can view own feedback" ON early_access_feedback;
 CREATE POLICY "Users can view own feedback"
   ON early_access_feedback
   FOR SELECT
   USING (auth.uid() = user_id);
 
--- RLS: Foundry admins (Founder/Executive) can view all feedback for their foundry
+-- RLS: Foundry admins can view all feedback for their foundry
+DROP POLICY IF EXISTS "Admins can view foundry feedback" ON early_access_feedback;
 CREATE POLICY "Admins can view foundry feedback"
   ON early_access_feedback
   FOR SELECT
