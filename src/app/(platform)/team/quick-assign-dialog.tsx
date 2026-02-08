@@ -59,10 +59,10 @@ function getRecommendedAssignees(members: AssignableMember[]): AssignableMember[
 
 function getWorkloadLabel(member: AssignableMember): { label: string; className: string } {
     const score = Math.min(100, (member.activeTasks * 20) + (member.pendingTasks * 10))
-    if (score === 0) return { label: 'Idle', className: 'bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:text-blue-400' }
-    if (score <= 40) return { label: 'Available', className: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400' }
-    if (score <= 70) return { label: 'Busy', className: 'bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400' }
-    return { label: 'Overloaded', className: 'bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-400' }
+    if (score === 0) return { label: 'Idle', className: 'bg-status-info-light text-status-info-dark' }
+    if (score <= 40) return { label: 'Available', className: 'bg-status-success-light text-status-success-dark' }
+    if (score <= 70) return { label: 'Busy', className: 'bg-status-warning-light text-status-warning-dark' }
+    return { label: 'Overloaded', className: 'bg-status-error-light text-status-error-dark' }
 }
 
 // ─── Task Assignment Row ─────────────────────────
@@ -87,7 +87,7 @@ function TaskAssignmentRow({
     return (
         <div className={cn(
             "p-4 rounded-xl border border-muted bg-card space-y-3",
-            isOverdue && "border-red-200 bg-red-50/30 dark:border-red-800/30 dark:bg-red-950/10"
+            isOverdue && "border-status-error bg-status-error-light/30"
         )}>
             {/* Task info */}
             <div className="flex items-start justify-between gap-3">
@@ -101,7 +101,7 @@ function TaskAssignmentRow({
                             </span>
                         )}
                         {isOverdue && (
-                            <Badge variant="secondary" className="bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-400 text-[10px] px-1.5 h-4 gap-0.5">
+                            <Badge variant="secondary" className="bg-status-error-light text-status-error-dark text-[10px] px-1.5 h-4 gap-0.5">
                                 <Clock className="h-2.5 w-2.5" />
                                 Overdue
                             </Badge>
@@ -126,7 +126,7 @@ function TaskAssignmentRow({
                                 isSelected
                                     ? "border-international-orange bg-international-orange/10 text-international-orange"
                                     : "border-muted hover:border-muted-foreground/30 hover:bg-muted/50",
-                                isTop && !isSelected && "border-emerald-200 bg-emerald-50/50 dark:border-emerald-800/30 dark:bg-emerald-950/10"
+                                isTop && !isSelected && "border-status-success bg-status-success-light/50"
                             )}
                         >
                             <UserAvatar name={member.full_name} role={member.role} size="xs" />

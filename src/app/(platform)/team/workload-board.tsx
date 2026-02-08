@@ -139,10 +139,10 @@ function CapacityBar({ active, pending }: { active: number; pending: number }) {
             ? 'bg-amber-400'
             : 'bg-red-500'
     const bgColor = score <= 40
-        ? 'bg-emerald-100 dark:bg-emerald-950/30'
+        ? 'bg-status-success-light'
         : score <= 70
-            ? 'bg-amber-100 dark:bg-amber-950/30'
-            : 'bg-red-100 dark:bg-red-950/30'
+            ? 'bg-status-warning-light'
+            : 'bg-status-error-light'
 
     return (
         <div className="flex items-center gap-2 min-w-[120px]">
@@ -181,8 +181,8 @@ function PersonRow({
     return (
         <div className={cn(
             "border-b border-muted last:border-0",
-            isIdle && "bg-blue-50/50 dark:bg-blue-950/10",
-            hasOverdue && !isIdle && "bg-red-50/30 dark:bg-red-950/10"
+            isIdle && "bg-status-info-light/50",
+            hasOverdue && !isIdle && "bg-status-error-light/30"
         )}>
             {/* Person Header */}
             <div
@@ -214,13 +214,13 @@ function PersonRow({
                 {/* Bucket summary badges */}
                 <div className="hidden sm:flex items-center gap-1.5 ml-auto">
                     {hasOverdue && (
-                        <Badge variant="secondary" className="bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-400 text-[10px] px-1.5 h-5 gap-1">
+                        <Badge variant="secondary" className="bg-status-error-light text-status-error-dark text-[10px] px-1.5 h-5 gap-1">
                             <AlertCircle className="h-3 w-3" />
                             {tasksByBucket.overdue.length}
                         </Badge>
                     )}
                     {isIdle && (
-                        <Badge variant="secondary" className="bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:text-blue-400 text-[10px] px-1.5 h-5">
+                        <Badge variant="secondary" className="bg-status-info-light text-status-info-dark text-[10px] px-1.5 h-5">
                             Idle
                         </Badge>
                     )}
@@ -236,7 +236,7 @@ function PersonRow({
                             key={bucket}
                             className={cn(
                                 "p-2 min-h-[60px] bg-background",
-                                bucket === 'overdue' && tasksByBucket.overdue.length > 0 && "bg-red-50/50 dark:bg-red-950/10"
+                                bucket === 'overdue' && tasksByBucket.overdue.length > 0 && "bg-status-error-light/50"
                             )}
                         >
                             {tasksByBucket[bucket].length === 0 ? (
@@ -359,7 +359,7 @@ export function WorkloadBoard({ members, allTasks, onMemberClick, onTaskClick }:
                             key={bucket}
                             className={cn(
                                 "px-3 py-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground text-center",
-                                bucket === 'overdue' && "text-red-600 dark:text-red-400"
+                                bucket === 'overdue' && "text-destructive"
                             )}
                         >
                             {BUCKET_LABELS[bucket]}

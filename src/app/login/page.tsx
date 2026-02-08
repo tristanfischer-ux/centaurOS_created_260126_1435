@@ -42,7 +42,7 @@ function ErrorMessage() {
 }
 
 function LoginForm() {
-    const marketingDomain = process.env.NEXT_PUBLIC_MARKETING_DOMAIN || 'https://fractionalforge.io'
+    const marketingDomain = process.env.NEXT_PUBLIC_MARKETING_DOMAIN || 'https://centaurdynamics.io'
     
     return (
         <div className="w-full max-w-sm mx-auto space-y-8 relative z-10">

@@ -26,7 +26,7 @@ const resend = process.env.RESEND_API_KEY
     ? new Resend(process.env.RESEND_API_KEY)
     : null
 
-const FROM_ADDRESS = process.env.EMAIL_FROM_ADDRESS || 'ForgeOS <noreply@forgeos.io>'
+const FROM_ADDRESS = process.env.EMAIL_FROM_ADDRESS || 'CentaurOS <noreply@centauros.io>'
 
 /**
  * Security: Sanitize all string values in template data to prevent XSS

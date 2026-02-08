@@ -90,7 +90,7 @@ export async function updateSession(request: NextRequest) {
     })
 
     // Special handling for app domain root: authenticated users go to their portal
-    if (hostname.includes('forgeos.io') && pathname === '/') {
+    if ((hostname.includes('centauros.io') || hostname.includes('forgeos.io')) && pathname === '/') {
         if (user) {
             // Check user's account type and active foundry to determine redirect
             const { data: profile } = await supabase
@@ -132,7 +132,7 @@ export async function updateSession(request: NextRequest) {
 
     if (!user && !isPublicRoute) {
         // no user, redirect to login page on marketing domain
-        const marketingDomain = process.env.NEXT_PUBLIC_MARKETING_DOMAIN || 'https://fractionalforge.io'
+        const marketingDomain = process.env.NEXT_PUBLIC_MARKETING_DOMAIN || 'https://centaurdynamics.io'
         const loginUrl = new URL('/login', marketingDomain)
         return NextResponse.redirect(loginUrl)
     }

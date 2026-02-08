@@ -5,6 +5,7 @@
 
 import { stripe } from '@/lib/stripe/client'
 import { createClient } from '@/lib/supabase/server'
+import { getBaseUrl } from '@/lib/domains'
 import Stripe from 'stripe'
 
 // ==========================================
@@ -259,8 +260,8 @@ export async function createSubscriptionCheckout(
           quantity: 1,
         },
       ],
-      success_url: `${process.env.NEXT_PUBLIC_APP_URL}/settings/billing?success=true`,
-      cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}/settings/billing?canceled=true`,
+      success_url: `${getBaseUrl()}/settings/billing?success=true`,
+      cancel_url: `${getBaseUrl()}/settings/billing?canceled=true`,
       metadata: {
         user_id: userId,
         tier,
@@ -303,7 +304,7 @@ export async function createBillingPortalSession(
     
     const session = await stripe.billingPortal.sessions.create({
       customer: profile.stripe_customer_id,
-      return_url: `${process.env.NEXT_PUBLIC_APP_URL}/settings/billing`,
+      return_url: `${getBaseUrl()}/settings/billing`,
     })
     
     return { url: session.url, error: null }

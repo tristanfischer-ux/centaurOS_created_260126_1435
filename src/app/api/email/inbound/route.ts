@@ -40,7 +40,7 @@ function getAdminClient() {
  * Expected payload format (Resend inbound webhooks):
  * {
  *   from: "sender@example.com",
- *   to: "tasks+{user_token}@forgeos.io",
+ *   to: "tasks+{user_token}@centauros.io",
  *   subject: "Email subject becomes task title",
  *   text: "Plain text body",
  *   html: "HTML body"
@@ -81,7 +81,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     }
 
     // Extract the user token from the "to" address
-    // Format: tasks+{user_id_prefix}@forgeos.io
+    // Format: tasks+{user_id_prefix}@centauros.io
     const toMatch = payload.to.match(/tasks\+([a-zA-Z0-9_-]+)@/)
     if (!toMatch) {
         console.warn('[EmailInbound] Invalid to address format:', payload.to)

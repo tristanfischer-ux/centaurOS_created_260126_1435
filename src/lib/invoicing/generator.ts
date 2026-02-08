@@ -37,7 +37,7 @@ const FORGE_COMPANY: CompanyDetails = {
   country: 'GB',
   vatNumber: 'GB123456789', // Replace with real VAT number
   companyNumber: '12345678',
-  email: 'billing@fractionalforge.io',
+  email: 'billing@centaurdynamics.io',
 }
 
 /**

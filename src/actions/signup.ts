@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { rateLimit, getClientIP } from "@/lib/security/rate-limit";
 import { sanitizeEmail, escapeHtml } from "@/lib/security/sanitize";
+import { getBaseUrl } from "@/lib/domains";
 
 // Direct signup roles (Founder, Executive, Apprentice, Supplier)
 type SignupRole = "founder" | "executive" | "apprentice" | "supplier";
@@ -124,7 +125,7 @@ export async function signup(formData: FormData) {
   }
 
   // Get the base URL for email redirect
-  const siteUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_SITE_URL || 'https://forgeos.io'
+  const siteUrl = getBaseUrl()
 
   // 1. Create auth user
   const { data: authData, error: authError } = await supabase.auth.signUp({

@@ -701,7 +701,8 @@ export async function initiateStripeOnboarding(): Promise<{
         }
 
         // If no Stripe account exists, create one
-        const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+        const { getBaseUrl } = await import('@/lib/domains')
+        const appUrl = getBaseUrl()
         
         // In production, this would call Stripe API
         // For now, return a simulated onboarding URL

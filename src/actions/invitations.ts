@@ -10,18 +10,7 @@ import type { Database } from '@/types/database.types'
 
 type MemberRole = Database['public']['Enums']['member_role']
 
-// Get the base URL for invitation links
-function getBaseUrl(): string {
-  // In production, use NEXT_PUBLIC_APP_URL or VERCEL_URL
-  if (process.env.NEXT_PUBLIC_APP_URL) {
-    return process.env.NEXT_PUBLIC_APP_URL
-  }
-  if (process.env.VERCEL_URL) {
-    return `https://${process.env.VERCEL_URL}`
-  }
-  // Development fallback
-  return 'http://localhost:3000'
-}
+import { getBaseUrl } from '@/lib/domains'
 
 // Default invitation expiration: 7 days
 const INVITATION_EXPIRY_DAYS = 7

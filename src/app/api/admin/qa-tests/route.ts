@@ -114,7 +114,8 @@ export async function POST(request: NextRequest) {
     }
     
     // Build callback URL for GitHub to report results
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || request.nextUrl.origin
+    const { getBaseUrl } = await import('@/lib/domains')
+    const baseUrl = getBaseUrl()
     const callbackUrl = `${baseUrl}/api/admin/qa-tests/callback?test_run_id=${testRun.id}`
     
     // Trigger GitHub Actions workflow

@@ -4,7 +4,9 @@ import { createClient } from "@/lib/supabase/server"
 import { revalidatePath } from "next/cache"
 import { createConnectAccount, createAccountLink, getAccountStatus, isAccountReady } from "@/lib/stripe/connect"
 
-const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+import { getBaseUrl } from '@/lib/domains'
+
+const BASE_URL = getBaseUrl()
 
 /**
  * Creates a Stripe Connect account for the current user

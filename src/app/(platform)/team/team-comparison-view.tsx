@@ -680,11 +680,11 @@ export function TeamComparisonView({ founders, executives, apprentices, teams, c
                         <Button
                             variant="outline"
                             onClick={() => setShowQuickAssign(true)}
-                            className="border-amber-200 text-amber-700 hover:bg-amber-50 dark:border-amber-800 dark:text-amber-400 dark:hover:bg-amber-950/30"
+                            className="border-status-warning text-status-warning-dark hover:bg-status-warning-light"
                         >
                             <Zap className="h-4 w-4 mr-2" />
                             Quick Assign
-                            <Badge variant="secondary" className="ml-1.5 text-[10px] px-1.5 h-4 bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400">
+                            <Badge variant="secondary" className="ml-1.5 text-[10px] px-1.5 h-4 bg-status-warning-light text-status-warning-dark">
                                 {unassignedTasks.length}
                             </Badge>
                         </Button>

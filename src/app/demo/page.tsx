@@ -9,7 +9,7 @@ const DEMO_ROLES = [
     name: 'Founder',
     description: 'Test the founder onboarding flow with pre-filled startup details',
     icon: User,
-    email: 'demo.founder@forgeos.io',
+    email: 'demo.founder@centauros.io',
     password: 'DemoFounder2026!'
   },
   {
@@ -17,7 +17,7 @@ const DEMO_ROLES = [
     name: 'Executive',
     description: 'Test the executive cadre application with fractional expertise profile',
     icon: Briefcase,
-    email: 'demo.executive@forgeos.io',
+    email: 'demo.executive@centauros.io',
     password: 'DemoExecutive2026!'
   },
   {
@@ -25,7 +25,7 @@ const DEMO_ROLES = [
     name: 'Apprentice',
     description: 'Test the Guild entry flow for Founder-in-Training apprentices',
     icon: GraduationCap,
-    email: 'demo.apprentice@forgeos.io',
+    email: 'demo.apprentice@centauros.io',
     password: 'DemoApprentice2026!'
   },
   {
@@ -33,7 +33,7 @@ const DEMO_ROLES = [
     name: 'Venture Capital',
     description: 'Test the VC application flow with firm and AUM details',
     icon: Building2,
-    email: 'demo.vc@forgeos.io',
+    email: 'demo.vc@centauros.io',
     password: 'DemoVC2026!'
   },
   {
@@ -41,7 +41,7 @@ const DEMO_ROLES = [
     name: 'Supplier / Factory',
     description: 'Test marketplace supplier onboarding with manufacturing capabilities',
     icon: Factory,
-    email: 'demo.supplier@forgeos.io',
+    email: 'demo.supplier@centauros.io',
     password: 'DemoSupplier2026!'
   },
   {
@@ -49,7 +49,7 @@ const DEMO_ROLES = [
     name: 'University',
     description: 'Test academic partnership application with institution details',
     icon: BookOpen,
-    email: 'demo.university@forgeos.io',
+    email: 'demo.university@centauros.io',
     password: 'DemoUniversity2026!'
   },
   {
@@ -57,7 +57,7 @@ const DEMO_ROLES = [
     name: 'Network Partner',
     description: 'Test network partner application for infrastructure providers',
     icon: Network,
-    email: 'demo.network@forgeos.io',
+    email: 'demo.network@centauros.io',
     password: 'DemoNetwork2026!'
   },
   {
@@ -65,7 +65,7 @@ const DEMO_ROLES = [
     name: 'General Signup',
     description: 'Test the general signup flow without a specific role',
     icon: Users,
-    email: 'demo.general@forgeos.io',
+    email: 'demo.general@centauros.io',
     password: 'DemoGeneral2026!'
   }
 ]

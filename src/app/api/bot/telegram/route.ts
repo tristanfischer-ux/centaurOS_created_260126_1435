@@ -1702,7 +1702,8 @@ async function handleDecisionViewCallback(
     await answerCallbackQuery(query.id)
     
     // Open in app
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://forgeos.io'
+    const { getBaseUrl } = await import('@/lib/domains')
+    const appUrl = getBaseUrl()
     await sendMessage({
         chat_id: chatId,
         text: `👁 <b>View in App</b>\n\nOpen ForgeOS to see full details:\n${appUrl}/decisions/${decisionId}`,

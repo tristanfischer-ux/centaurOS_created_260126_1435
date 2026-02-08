@@ -11,6 +11,7 @@ import {
     TelegramFile,
     ParsedObjective,
 } from './types'
+import { getBaseUrl } from '@/lib/domains'
 
 const TELEGRAM_API_BASE = 'https://api.telegram.org/bot'
 
@@ -466,7 +467,7 @@ export function createTasksListKeyboard(tasks: TaskForDisplay[]): InlineKeyboard
     // Navigation
     buttons.push([
         { text: '🔄 Refresh', callback_data: 'tasks_refresh' },
-        { text: '📱 Open App', url: process.env.NEXT_PUBLIC_APP_URL + '/tasks' },
+        { text: '📱 Open App', url: getBaseUrl() + '/tasks' },
     ])
 
     return { inline_keyboard: buttons }
@@ -659,7 +660,7 @@ export function createSettingsKeyboard(prefs: {
                 { text: '⏰ Change Briefing Time', callback_data: 'settings_briefing_time' },
             ],
             [
-                { text: '📱 Open Full Settings', url: process.env.NEXT_PUBLIC_APP_URL + '/settings' },
+                { text: '📱 Open Full Settings', url: getBaseUrl() + '/settings' },
             ],
         ],
     }
@@ -695,7 +696,7 @@ export async function sendNotificationToTelegram(
 
     const keyboard: InlineKeyboardMarkup | undefined = notification.link ? {
         inline_keyboard: [[
-            { text: '👁 View in App', url: process.env.NEXT_PUBLIC_APP_URL + notification.link },
+            { text: '👁 View in App', url: getBaseUrl() + notification.link },
         ]],
     } : undefined
 

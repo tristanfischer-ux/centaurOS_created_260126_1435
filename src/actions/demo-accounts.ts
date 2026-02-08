@@ -27,7 +27,7 @@ export interface DemoAccountData {
 
 const DEMO_ACCOUNTS: Record<string, DemoAccountData> = {
   founder: {
-    email: 'demo.founder@forgeos.io',
+    email: 'demo.founder@centauros.io',
     password: 'DemoFounder2026!',
     fullName: 'Alex Founder',
     companyName: 'RocketTech Industries',
@@ -35,24 +35,24 @@ const DEMO_ACCOUNTS: Record<string, DemoAccountData> = {
     stage: 'Seed'
   },
   executive: {
-    email: 'demo.executive@forgeos.io',
+    email: 'demo.executive@centauros.io',
     password: 'DemoExecutive2026!',
     fullName: 'Jordan Executive'
   },
   apprentice: {
-    email: 'demo.apprentice@forgeos.io',
+    email: 'demo.apprentice@centauros.io',
     password: 'DemoApprentice2026!',
     fullName: 'Sam Apprentice'
   },
   vc: {
-    email: 'demo.vc@forgeos.io',
+    email: 'demo.vc@centauros.io',
     password: 'DemoVC2026!',
     fullName: 'Taylor Venture',
     firm: 'Demo Ventures',
     aum: '$50M - $100M'
   },
   supplier: {
-    email: 'demo.supplier@forgeos.io',
+    email: 'demo.supplier@centauros.io',
     password: 'DemoSupplier2026!',
     fullName: 'Morgan Manufacturer',
     companyName: 'Precision Parts Co',
@@ -60,7 +60,7 @@ const DEMO_ACCOUNTS: Record<string, DemoAccountData> = {
     location: 'Austin, TX'
   },
   factory: {
-    email: 'demo.supplier@forgeos.io',
+    email: 'demo.supplier@centauros.io',
     password: 'DemoSupplier2026!',
     fullName: 'Morgan Manufacturer',
     companyName: 'Precision Parts Co',
@@ -68,20 +68,20 @@ const DEMO_ACCOUNTS: Record<string, DemoAccountData> = {
     location: 'Austin, TX'
   },
   university: {
-    email: 'demo.university@forgeos.io',
+    email: 'demo.university@centauros.io',
     password: 'DemoUniversity2026!',
     fullName: 'Dr. Casey Academic',
     institution: 'Demo Tech University',
     department: 'Mechanical Engineering'
   },
   network: {
-    email: 'demo.network@forgeos.io',
+    email: 'demo.network@centauros.io',
     password: 'DemoNetwork2026!',
     fullName: 'River Network',
     companyName: 'Global Logistics Partners'
   },
   general: {
-    email: 'demo.general@forgeos.io',
+    email: 'demo.general@centauros.io',
     password: 'DemoGeneral2026!',
     fullName: 'Jamie General'
   }

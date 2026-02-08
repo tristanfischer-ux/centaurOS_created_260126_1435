@@ -132,7 +132,7 @@ export function CategoryTabs({
               <span
                 className={cn(
                   'text-xs tabular-nums px-1.5 py-0.5 rounded-full min-w-[1.25rem] text-center',
-                  isActive ? 'bg-white/60 dark:bg-white/20' : 'bg-muted',
+                  isActive ? 'bg-white/60' : 'bg-muted',
                 )}
               >
                 {tab.count}

@@ -34,17 +34,17 @@ interface InsightCard {
 }
 
 const severityStyles = {
-    critical: "bg-red-50 border-red-200 text-red-800 dark:bg-red-950/30 dark:border-red-800/40 dark:text-red-300",
-    warning: "bg-amber-50 border-amber-200 text-amber-800 dark:bg-amber-950/30 dark:border-amber-800/40 dark:text-amber-300",
-    info: "bg-blue-50 border-blue-200 text-blue-800 dark:bg-blue-950/30 dark:border-blue-800/40 dark:text-blue-300",
-    success: "bg-emerald-50 border-emerald-200 text-emerald-800 dark:bg-emerald-950/30 dark:border-emerald-800/40 dark:text-emerald-300",
+    critical: "bg-status-error-light border-status-error text-status-error-dark",
+    warning: "bg-status-warning-light border-status-warning text-status-warning-dark",
+    info: "bg-status-info-light border-status-info text-status-info-dark",
+    success: "bg-status-success-light border-status-success text-status-success-dark",
 }
 
 const iconStyles = {
-    critical: "text-red-600 dark:text-red-400",
-    warning: "text-amber-600 dark:text-amber-400",
-    info: "text-blue-600 dark:text-blue-400",
-    success: "text-emerald-600 dark:text-emerald-400",
+    critical: "text-status-error",
+    warning: "text-status-warning",
+    info: "text-status-info",
+    success: "text-status-success",
 }
 
 export function SmartInsights({ insights, onMemberClick, onQuickAssignClick }: SmartInsightsProps) {
