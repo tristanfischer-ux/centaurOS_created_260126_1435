@@ -4,7 +4,7 @@ import React from "react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
-import { Users, CheckSquare, Store, Target, ShieldAlert, Lightbulb, ShoppingBag, Bot, Home, Bell, Sparkles, Waypoints, MessageSquarePlus, Plus, Map, Calculator, Banknote, Rocket } from "lucide-react"
+import { Users, CheckSquare, Store, Target, ShieldAlert, Lightbulb, ShoppingBag, Bot, Home, Bell, Sparkles, Waypoints, MessageSquarePlus, Plus, Map, Calculator, Banknote, Rocket, Coins } from "lucide-react"
 import { NotificationCenter } from "@/components/NotificationCenter"
 import { UnreadIndicator } from "@/components/today/UnreadIndicator"
 import { FoundrySwitcher } from "@/components/FoundrySwitcher"
@@ -62,8 +62,7 @@ const discoveryNavigation = [
 // Tools: financial calculators and utilities
 const toolsNavigation = [
     { name: "Launchpad", href: "/launchpad", icon: Rocket, tooltip: "Step-by-step guide to launching and growing your business" },
-    { name: "Money Map", href: "/money-map", icon: Banknote, tooltip: "Visualise how you make money, where you spend it, and true profitability by stream" },
-    { name: "Cost of Delay", href: "/tools/cost-of-delay", icon: Calculator, tooltip: "Visualize whether spending to ship faster saves you money" },
+    { name: "Financial Tools", href: "/tools/financial", icon: Coins, tooltip: "Money Map and Cost of Delay calculator — understand your finances" },
 ]
 
 // Profile & Settings moved to AccountPopover (accessed via user avatar)

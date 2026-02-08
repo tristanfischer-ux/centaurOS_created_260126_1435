@@ -32,6 +32,7 @@ import { MoneyMapSetupWizard } from '@/components/money-map/setup-wizard'
 import { RevenueStreamDialog } from '@/components/money-map/revenue-stream-dialog'
 import { CostItemDialog } from '@/components/money-map/cost-item-dialog'
 import { SnapshotDialog } from '@/components/money-map/snapshot-dialog'
+import { SAMPLE_MONEY_MAP_DATA } from '@/components/money-map/sample-data'
 
 // Actions
 import {
@@ -51,7 +52,12 @@ import type {
   RevenueStream,
 } from '@/types/money-map'
 
-export function MoneyMapClient(): React.ReactElement {
+interface MoneyMapClientProps {
+  /** When true, hides the page header (used when embedded in Financial Tools tab) */
+  hideHeader?: boolean
+}
+
+export function MoneyMapClient({ hideHeader = false }: MoneyMapClientProps): React.ReactElement {
   // Data state
   const [data, setData] = useState<MoneyMapData | null>(null)
   const [snapshots, setSnapshots] = useState<MoneyMapSnapshot[]>([])
@@ -78,11 +84,7 @@ export function MoneyMapClient(): React.ReactElement {
 
       if (mapResult.data) {
         setData(mapResult.data)
-
-        // Show wizard if no revenue streams exist (first-time user)
-        if (mapResult.data.revenue_streams.length === 0) {
-          setIsWizardOpen(true)
-        }
+        // Demo mode shows sample data instead of auto-opening wizard
       }
 
       if (snapshotResult.data) {
@@ -222,52 +224,87 @@ export function MoneyMapClient(): React.ReactElement {
   // -------------------------------------------------------
   return (
     <div className={spacing.section}>
-      {/* Page Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-slate-100">
-        <div className="min-w-0 flex-1">
-          <div className={typography.pageHeader}>
-            <div className={typography.pageHeaderAccent} />
-            <h1 className={typography.h1}>Money Map</h1>
+      {/* Page Header -- hidden when embedded in Financial Tools tab */}
+      {!hideHeader && (
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-slate-100">
+          <div className="min-w-0 flex-1">
+            <div className={typography.pageHeader}>
+              <div className={typography.pageHeaderAccent} />
+              <h1 className={typography.h1}>Money Map</h1>
+            </div>
+            <p className={typography.pageSubtitle}>
+              How you make money, where you spend it, and true profitability by stream
+            </p>
           </div>
-          <p className={typography.pageSubtitle}>
-            How you make money, where you spend it, and true profitability by stream
-          </p>
-        </div>
 
-        <div className="flex items-center gap-2">
-          {!isEmpty && (
-            <>
-              <Button variant="ghost" size="sm" onClick={handleRefresh}>
-                <RefreshCw className="h-4 w-4 mr-1.5" />
-                Refresh
-              </Button>
-              <Button variant="secondary" size="sm" onClick={() => setIsSnapshotDialogOpen(true)}>
-                <Camera className="h-4 w-4 mr-1.5" />
-                Snapshot
-              </Button>
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => {
-                  setEditingStream(null)
-                  setIsRevenueDialogOpen(true)
-                }}
-              >
-                <DollarSign className="h-4 w-4 mr-1.5" />
-                Add Revenue
-              </Button>
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => setIsCostDialogOpen(true)}
-              >
-                <Receipt className="h-4 w-4 mr-1.5" />
-                Add Cost
-              </Button>
-            </>
-          )}
+          <div className="flex items-center gap-2">
+            {!isEmpty && (
+              <>
+                <Button variant="ghost" size="sm" onClick={handleRefresh}>
+                  <RefreshCw className="h-4 w-4 mr-1.5" />
+                  Refresh
+                </Button>
+                <Button variant="secondary" size="sm" onClick={() => setIsSnapshotDialogOpen(true)}>
+                  <Camera className="h-4 w-4 mr-1.5" />
+                  Snapshot
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => {
+                    setEditingStream(null)
+                    setIsRevenueDialogOpen(true)
+                  }}
+                >
+                  <DollarSign className="h-4 w-4 mr-1.5" />
+                  Add Revenue
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => setIsCostDialogOpen(true)}
+                >
+                  <Receipt className="h-4 w-4 mr-1.5" />
+                  Add Cost
+                </Button>
+              </>
+            )}
+          </div>
         </div>
-      </div>
+      )}
+
+      {/* Action buttons when header is hidden (embedded mode) */}
+      {hideHeader && !isEmpty && (
+        <div className="flex items-center justify-end gap-2">
+          <Button variant="ghost" size="sm" onClick={handleRefresh}>
+            <RefreshCw className="h-4 w-4 mr-1.5" />
+            Refresh
+          </Button>
+          <Button variant="secondary" size="sm" onClick={() => setIsSnapshotDialogOpen(true)}>
+            <Camera className="h-4 w-4 mr-1.5" />
+            Snapshot
+          </Button>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => {
+              setEditingStream(null)
+              setIsRevenueDialogOpen(true)
+            }}
+          >
+            <DollarSign className="h-4 w-4 mr-1.5" />
+            Add Revenue
+          </Button>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => setIsCostDialogOpen(true)}
+          >
+            <Receipt className="h-4 w-4 mr-1.5" />
+            Add Cost
+          </Button>
+        </div>
+      )}
 
       {/* Comparison banner */}
       {selectedSnapshot && (
@@ -282,56 +319,79 @@ export function MoneyMapClient(): React.ReactElement {
         </div>
       )}
 
-      {isEmpty ? (
-        /* Empty State */
-        <div className="flex flex-col items-center justify-center py-20 bg-muted/30 rounded-xl">
-          <div className="h-16 w-16 rounded-full bg-muted flex items-center justify-center mb-6">
-            <DollarSign className="h-8 w-8 text-muted-foreground" />
-          </div>
-          <h2 className="text-xl font-display font-semibold text-foreground mb-2">
-            See where your money flows
-          </h2>
-          <p className="text-muted-foreground text-sm text-center max-w-md mb-8">
-            Set up your revenue streams and costs to visualise how your company
-            makes money and where it goes. Get a clear picture of true profitability
-            per revenue stream.
-          </p>
-          <Button onClick={() => setIsWizardOpen(true)}>
-            <Plus className="h-4 w-4 mr-2" />
-            Set Up Money Map
-          </Button>
-        </div>
-      ) : data && (
-        /* Dashboard */
-        <div className={spacing.section}>
-          {/* Summary Cards */}
-          <MoneyMapSummaryCards
-            summary={data.summary}
-            previousSummary={selectedSnapshot?.snapshot_data?.summary ?? null}
-          />
+      {(() => {
+        // Use real data if available, otherwise sample data for demo mode
+        const displayData = isEmpty ? SAMPLE_MONEY_MAP_DATA : data!
+        const isDemo = isEmpty
 
-          {/* Sankey Flow Diagram */}
-          <div>
-            <h2 className="text-lg font-display font-semibold text-foreground mb-4">
-              Money Flow
-            </h2>
-            <MoneyMapSankey data={data} className="border rounded-xl p-4 bg-background" />
-          </div>
+        return (
+          <div className={spacing.section}>
+            {/* Demo mode banner */}
+            {isDemo && (
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 px-5 py-4 rounded-xl bg-electric-blue/5 border border-electric-blue/20">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-foreground">
+                    Viewing sample data for a typical consultancy
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Set up your own revenue streams and costs to see your real numbers.
+                  </p>
+                </div>
+                <Button size="sm" onClick={() => setIsWizardOpen(true)} className="shrink-0">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Set Up My Money Map
+                </Button>
+              </div>
+            )}
 
-          {/* Bottom Row: Table + Chart */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2">
-              <ProfitabilityTable
-                profitability={data.profitability}
-                onEditStream={handleEditStream}
-              />
-            </div>
+            {/* Summary Cards */}
+            <MoneyMapSummaryCards
+              summary={displayData.summary}
+              previousSummary={!isDemo ? (selectedSnapshot?.snapshot_data?.summary ?? null) : null}
+            />
+
+            {/* Sankey Flow Diagram */}
             <div>
-              <CostBreakdownChart costItems={data.cost_items} />
+              <h2 className="text-lg font-display font-semibold text-foreground mb-4">
+                Money Flow
+              </h2>
+              <MoneyMapSankey data={displayData} className="border rounded-xl p-4 bg-background" />
+            </div>
+
+            {/* Bottom Row: Table + Chart */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <div className="lg:col-span-2">
+                <ProfitabilityTable
+                  profitability={displayData.profitability}
+                  onEditStream={isDemo ? undefined : handleEditStream}
+                />
+              </div>
+              <div>
+                <CostBreakdownChart costItems={displayData.cost_items} />
+              </div>
+            </div>
+
+            {/* Insight callout */}
+            <div className="rounded-xl border bg-muted/30 p-6">
+              <h3 className="text-sm font-semibold text-foreground mb-2">How to read your Money Map</h3>
+              <div className="text-sm text-muted-foreground space-y-2">
+                <p>
+                  <strong className="text-foreground">Summary cards</strong> show your total monthly revenue,
+                  costs, net margin, and margin percentage at a glance.
+                </p>
+                <p>
+                  <strong className="text-foreground">The flow diagram</strong> traces how money moves from
+                  revenue streams through cost categories to your bottom line.
+                </p>
+                <p>
+                  <strong className="text-foreground">The profitability table</strong> reveals your true margin
+                  per revenue stream after allocating shared costs — so you know which streams actually make money.
+                </p>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )
+      })()}
 
       {/* Dialogs */}
       <MoneyMapSetupWizard

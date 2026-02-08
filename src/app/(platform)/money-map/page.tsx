@@ -1,9 +1,9 @@
-import { MoneyMapClient } from './money-map-client'
+import { redirect } from 'next/navigation'
 
 /**
- * Money Map page — visualises how the foundry makes money and where it
- * spends money, with full cost allocation across revenue streams.
+ * Money Map page — redirects to the combined Financial Tools page.
+ * Kept for backward compatibility with bookmarks and shared links.
  */
-export default function MoneyMapPage(): React.ReactElement {
-  return <MoneyMapClient />
+export default function MoneyMapPage(): never {
+  redirect('/tools/financial?tab=money-map')
 }
