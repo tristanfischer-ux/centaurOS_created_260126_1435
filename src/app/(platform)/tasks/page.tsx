@@ -6,12 +6,14 @@ import { TasksView } from './tasks-view'
 export const revalidate = 60
 
 interface TasksPageProps {
-    searchParams: Promise<{ taskId?: string }>
+    searchParams: Promise<{ taskId?: string; prefill?: string; prefillObjective?: string }>
 }
 
 export default async function TasksPage({ searchParams }: TasksPageProps) {
     const params = await searchParams
     const taskId = params.taskId
+    const prefillText = params.prefill || undefined
+    const prefillObjectiveId = params.prefillObjective || undefined
 
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
@@ -124,6 +126,8 @@ export default async function TasksPage({ searchParams }: TasksPageProps) {
                 currentUserId={user.id}
                 currentUserRole={currentUserRole}
                 initialTaskId={taskId}
+                prefillTitle={prefillText}
+                prefillObjectiveId={prefillObjectiveId}
         />
     )
 }

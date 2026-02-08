@@ -103,10 +103,14 @@ interface TasksViewProps {
     currentUserRole?: string
     teams: { id: string, name: string }[]
     initialTaskId?: string
+    /** Pre-fill the task title from URL param (e.g. ?prefill=...) */
+    prefillTitle?: string
+    /** Pre-fill the objective ID from URL param (e.g. ?prefillObjective=...) */
+    prefillObjectiveId?: string
 }
 
 // ...
-export function TasksView({ tasks, objectives, members, currentUserId, currentUserRole, teams, initialTaskId }: TasksViewProps) {
+export function TasksView({ tasks, objectives, members, currentUserId, currentUserRole, teams, initialTaskId, prefillTitle, prefillObjectiveId }: TasksViewProps) {
     const [viewMode, setViewMode] = useState<'grid' | 'list' | 'timeline'>('grid')
     const [selectedTask, setSelectedTask] = useState<Task | null>(null)
     const [isSelectionMode, setIsSelectionMode] = useState(false)
@@ -857,6 +861,8 @@ export function TasksView({ tasks, objectives, members, currentUserId, currentUs
                                             members={members}
                                             teams={teams}
                                             currentUserId={currentUserId}
+                                            prefillTitle={prefillTitle}
+                                            prefillObjectiveId={prefillObjectiveId}
                                         />
                                     </FeatureTip>
                                 </>

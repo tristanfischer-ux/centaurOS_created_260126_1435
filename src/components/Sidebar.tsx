@@ -2,9 +2,9 @@
 
 import React from "react"
 import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
-import { Users, CheckSquare, Store, Target, ShieldAlert, Lightbulb, ShoppingBag, Bot, Home, Bell, Sparkles, Waypoints } from "lucide-react"
+import { Users, CheckSquare, Store, Target, ShieldAlert, Lightbulb, ShoppingBag, Bot, Home, Bell, Sparkles, Waypoints, MessageSquarePlus, Plus } from "lucide-react"
 import { NotificationCenter } from "@/components/NotificationCenter"
 import { UnreadIndicator } from "@/components/today/UnreadIndicator"
 import { FoundrySwitcher } from "@/components/FoundrySwitcher"
@@ -14,7 +14,12 @@ import { ZoomControl } from "@/components/ZoomControl"
 import { useZoomContext } from "@/components/ZoomProvider"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { NewBadge } from "@/components/ui/new-badge"
+import { BetaBadge } from "@/components/ui/beta-badge"
 import { AccountPopover } from "@/components/account-popover"
+import { FeedbackDialog } from "@/components/feedback/feedback-dialog"
+import { QuickCaptureDialog } from "@/components/smart/quick-capture-dialog"
+import { isRouteBeta, getFeatureNameByRoute } from "@/lib/features/registry"
+import type { SmartGoalSuggestion } from "@/actions/smart-goals"
 
 /**
  * Determines if a navigation item should be marked as active
@@ -32,7 +37,7 @@ function isRouteActive(pathname: string, href: string): boolean {
 }
 
 // Keep in sync with package.json version
-const APP_VERSION = "1.0.3"
+const APP_VERSION = "0.9.0"
 
 // Work: day-to-day operations
 const workNavigation = [
@@ -66,7 +71,26 @@ interface FoundryInfo {
 
 export function Sidebar({ foundryName, foundryId, userName, userRole, isCompanyAdmin, userFoundries }: { foundryName?: string; foundryId?: string; userName?: string; userRole?: string; isCompanyAdmin?: boolean; userFoundries?: FoundryInfo[] }) {
     const pathname = usePathname()
+    const router = useRouter()
     const { setZoom } = useZoomContext()
+    const [isFeedbackOpen, setIsFeedbackOpen] = React.useState(false)
+    const [feedbackFeatureName, setFeedbackFeatureName] = React.useState<string | undefined>(undefined)
+    const [isQuickCaptureOpen, setIsQuickCaptureOpen] = React.useState(false)
+
+    const openFeedback = (featureName?: string) => {
+        setFeedbackFeatureName(featureName)
+        setIsFeedbackOpen(true)
+    }
+
+    const handleCaptureObjective = (rawIdea: string, suggestion?: SmartGoalSuggestion) => {
+        const prefillText = suggestion?.title || rawIdea
+        router.push(`/new-objectives?prefill=${encodeURIComponent(prefillText)}`)
+    }
+
+    const handleCaptureTask = (rawIdea: string, suggestion?: SmartGoalSuggestion) => {
+        const prefillText = suggestion?.title || rawIdea
+        router.push(`/new-tasks?prefill=${encodeURIComponent(prefillText)}`)
+    }
 
     return (
         <div className="hidden md:flex h-screen w-64 flex-col bg-background border-r border-slate-100 text-foreground">
@@ -80,6 +104,20 @@ export function Sidebar({ foundryName, foundryId, userName, userRole, isCompanyA
                         <span className="w-1.5 h-1.5 rounded-full bg-international-orange animate-pulse shadow-[0_0_8px_rgba(255,69,0,0.6)]"></span>
                     </Link>
                     <div className="flex items-center gap-0.5">
+                        <Tooltip delayDuration={200}>
+                            <TooltipTrigger asChild>
+                                <button
+                                    onClick={() => setIsQuickCaptureOpen(true)}
+                                    className="flex items-center justify-center h-8 w-8 rounded-md text-muted-foreground hover:text-international-orange hover:bg-orange-50 transition-colors"
+                                    aria-label="Capture an idea"
+                                >
+                                    <Plus className="h-4 w-4" />
+                                </button>
+                            </TooltipTrigger>
+                            <TooltipContent side="bottom">
+                                <p>Capture an idea</p>
+                            </TooltipContent>
+                        </Tooltip>
                         <FocusModeToggle compact />
                         <NotificationCenter />
                     </div>
@@ -108,12 +146,20 @@ export function Sidebar({ foundryName, foundryId, userName, userRole, isCompanyA
                 {(() => {
                     const renderNavItem = (item: { name: string; href: string; icon: React.ComponentType<{ className?: string }>; tooltip?: string }) => {
                         const isActive = isRouteActive(pathname, item.href)
+                        const isBeta = isRouteBeta(item.href)
                         
                         // Determine which badge to show
+                        // Priority: Beta badge > Demo badge > New badge
                         let badgeContent = null
                         
-                        if (item.href === '/inspiration' || item.href === '/marketplace') {
-                            // Show "Demo" badge for Inspiration and Marketplace
+                        if (isBeta) {
+                            // Show beta badge with feedback click handler
+                            const featureName = getFeatureNameByRoute(item.href)
+                            badgeContent = (
+                                <BetaBadge onClick={() => openFeedback(featureName)} />
+                            )
+                        } else if (item.href === '/marketplace') {
+                            // Show "Demo" badge for Marketplace
                             badgeContent = <NewBadge customText="Demo" />
                         } else if (item.href !== '/objectives' && item.href !== '/settings') {
                             // Show "New" badge only for routes other than objectives and settings
@@ -206,11 +252,51 @@ export function Sidebar({ foundryName, foundryId, userName, userRole, isCompanyA
                     <ZoomControl onZoomChange={setZoom} />
                 </div>
 
-                {/* Version info */}
-                <div className="text-[10px] text-muted-foreground text-center font-mono tracking-wider opacity-50">
-                    <kbd className="px-1 py-0.5 bg-muted text-[9px]">⌘K</kbd> search · v{APP_VERSION}
+                {/* Early Access badge + Feedback + Version */}
+                <div className="space-y-2">
+                    {/* Early Access badge */}
+                    <div className="flex items-center justify-center gap-2">
+                        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-international-orange/10 text-international-orange text-[10px] font-semibold tracking-wide">
+                            <span className="w-1.5 h-1.5 rounded-full bg-international-orange animate-pulse" />
+                            Early Access
+                        </span>
+                        <span className="text-[10px] text-muted-foreground font-mono opacity-60">
+                            v{APP_VERSION}
+                        </span>
+                    </div>
+                    
+                    {/* Feedback + Search shortcuts */}
+                    <div className="flex items-center justify-center gap-3 text-[10px] text-muted-foreground">
+                        <button
+                            onClick={() => openFeedback()}
+                            className="inline-flex items-center gap-1 hover:text-international-orange transition-colors cursor-pointer"
+                            aria-label="Share feedback"
+                        >
+                            <MessageSquarePlus className="h-3 w-3" />
+                            <span>Feedback</span>
+                        </button>
+                        <span className="opacity-30">·</span>
+                        <span className="opacity-50">
+                            <kbd className="px-1 py-0.5 bg-muted text-[9px]">⌘K</kbd> search
+                        </span>
+                    </div>
                 </div>
             </div>
+
+            {/* Feedback Dialog */}
+            <FeedbackDialog
+                open={isFeedbackOpen}
+                onOpenChange={setIsFeedbackOpen}
+                featureName={feedbackFeatureName}
+            />
+
+            {/* Quick Capture Dialog - Global idea capture */}
+            <QuickCaptureDialog
+                open={isQuickCaptureOpen}
+                onOpenChange={setIsQuickCaptureOpen}
+                onCreateObjective={handleCaptureObjective}
+                onCreateTask={handleCaptureTask}
+            />
         </div>
     )
 }

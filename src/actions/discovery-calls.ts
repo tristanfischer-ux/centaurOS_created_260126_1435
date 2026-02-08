@@ -3,6 +3,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { syncDiscoveryCallToCalendar, checkProviderCalendarAvailability } from '@/actions/google-calendar'
 
 export interface DiscoveryCallSettings {
     id: string
@@ -204,10 +205,10 @@ export async function getAvailableSlots(providerSlug: string, startDate: string,
     }
     
     // Get provider by slug using separate queries instead of .or() with string interpolation
-    let provider = null
+    let provider: { id: string; user_id: string } | null = null
     const { data: bySlug } = await supabase
         .from('provider_profiles')
-        .select('id')
+        .select('id, user_id')
         .eq('profile_slug', sanitizedSlug)
         .single()
     
@@ -216,7 +217,7 @@ export async function getAvailableSlots(providerSlug: string, startDate: string,
     } else {
         const { data: byUsername } = await supabase
             .from('provider_profiles')
-            .select('id')
+            .select('id, user_id')
             .eq('username', sanitizedSlug)
             .single()
         provider = byUsername
@@ -251,6 +252,13 @@ export async function getAvailableSlots(providerSlug: string, startDate: string,
         .lte('scheduled_at', endDate)
         .in('status', ['scheduled', 'confirmed'])
     
+    // Check provider's Google Calendar busy times (graceful — empty if not connected)
+    const googleBusyTimes = await checkProviderCalendarAvailability(
+        provider.user_id,
+        startDate,
+        endDate
+    )
+
     // Generate available time slots
     const availableSlots: { date: string; time: string; datetime: string }[] = []
     const start = new Date(startDate)
@@ -277,19 +285,28 @@ export async function getAvailableSlots(providerSlug: string, startDate: string,
                     // Check if slot is in the future with enough notice
                     if (slotDate <= minNotice) continue
                     
-                    // Check if slot is already booked
+                    const slotEnd = new Date(slotDate)
+                    slotEnd.setMinutes(slotEnd.getMinutes() + settings.call_duration_minutes)
+
+                    // Check if slot is already booked in CentaurOS
                     const isBooked = (existingBookings || []).some(booking => {
                         const bookingStart = new Date(booking.scheduled_at)
                         const bookingEnd = new Date(bookingStart)
                         bookingEnd.setMinutes(bookingEnd.getMinutes() + booking.duration_minutes)
                         
-                        const slotEnd = new Date(slotDate)
-                        slotEnd.setMinutes(slotEnd.getMinutes() + settings.call_duration_minutes)
-                        
                         return slotDate < bookingEnd && slotEnd > bookingStart
                     })
                     
-                    if (!isBooked) {
+                    if (isBooked) continue
+
+                    // Check if slot overlaps with provider's Google Calendar busy times
+                    const isBusyOnGoogle = googleBusyTimes.some(busy => {
+                        const busyStart = new Date(busy.start)
+                        const busyEnd = new Date(busy.end)
+                        return slotDate < busyEnd && slotEnd > busyStart
+                    })
+                    
+                    if (!isBusyOnGoogle) {
                         availableSlots.push({
                             date: slotDate.toISOString().split('T')[0],
                             time: `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`,
@@ -376,8 +393,39 @@ export async function bookDiscoveryCall(input: {
     
     if (error) return { success: false, error: error.message }
     
-    // TODO: Send notification to provider
-    // TODO: Send calendar invite
+    // Sync to Google Calendar with Meet link
+    try {
+        // Fetch profile names for the calendar event
+        const { data: buyerProfile } = await supabase
+            .from('profiles')
+            .select('full_name, email')
+            .eq('id', user.id)
+            .single()
+        const { data: providerProfile } = await supabase
+            .from('profiles')
+            .select('full_name, email')
+            .eq('id', provider.user_id)
+            .single()
+
+        const calResult = await syncDiscoveryCallToCalendar(
+            booking.id,
+            input.scheduledAt,
+            settings.call_duration_minutes,
+            providerProfile?.full_name || 'Provider',
+            buyerProfile?.full_name || 'Buyer',
+            providerProfile?.email || undefined,
+            buyerProfile?.email || undefined
+        )
+
+        // If a Meet link was generated, include it in the response
+        if (calResult.meetLink) {
+            revalidatePath('/dashboard')
+            return { success: true, bookingId: booking.id, meetLink: calResult.meetLink, error: null }
+        }
+    } catch (calError) {
+        console.error('Failed to sync discovery call to Google Calendar:', calError)
+        // Continue - calendar sync failure shouldn't fail booking
+    }
     
     revalidatePath('/dashboard')
     return { success: true, bookingId: booking.id, error: null }

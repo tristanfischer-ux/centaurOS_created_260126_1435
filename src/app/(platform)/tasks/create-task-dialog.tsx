@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react"
 import { Button } from "@/components/ui/button"
-import { Plus, Loader2, Upload, X, FileIcon, Check, ChevronDown, ChevronUp, Target, ChevronsUpDown } from "lucide-react"
+import { Plus, Loader2, Upload, X, FileIcon, Check, ChevronDown, ChevronUp, Target, ChevronsUpDown, Sparkles } from "lucide-react"
 import {
     Dialog,
     DialogContent,
@@ -25,6 +25,9 @@ import { UserAvatar } from "@/components/ui/user-avatar"
 import { PrivacyShareControl, type ShareTarget } from "@/components/ui/privacy-share-control"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command"
+import { SmartHintBar } from "@/components/smart/smart-hint-bar"
+
+import type { SmartGoalContext, SmartGoalSuggestion } from "@/actions/smart-goals"
 
 interface CreateTaskDialogProps {
     objectives: { id: string; title: string }[]
@@ -33,6 +36,18 @@ interface CreateTaskDialogProps {
     currentUserId: string
     defaultObjectiveId?: string
     children?: React.ReactNode
+    /** Pre-fill the task title from contextual CTAs */
+    prefillTitle?: string
+    /** Pre-fill the task description from contextual CTAs */
+    prefillDescription?: string
+    /** Pre-fill the objective ID */
+    prefillObjectiveId?: string
+    /** Source context for AI-powered refinement */
+    prefillContext?: SmartGoalContext
+    /** Control open state externally */
+    externalOpen?: boolean
+    /** Callback when open state changes externally */
+    onExternalOpenChange?: (open: boolean) => void
 }
 
 const MAX_FILES = 5
@@ -45,17 +60,30 @@ const ALLOWED_TYPES = [
     'text/plain', 'text/csv'
 ]
 
-export function CreateTaskDialog({ objectives, members, teams = [], currentUserId, defaultObjectiveId, children }: CreateTaskDialogProps) {
-    const [open, setOpen] = useState(false)
+export function CreateTaskDialog({ objectives, members, teams = [], currentUserId, defaultObjectiveId, children, prefillTitle, prefillDescription, prefillObjectiveId, prefillContext, externalOpen, onExternalOpenChange }: CreateTaskDialogProps) {
+    const [internalOpen, setInternalOpen] = useState(false)
+    const open = externalOpen !== undefined ? externalOpen : internalOpen
+    const setOpenState = onExternalOpenChange || setInternalOpen
     const [isLoading, setIsLoading] = useState(false)
+    const [prefillConsumed, setPrefillConsumed] = useState(false)
+
+    // Auto-open dialog when prefillTitle is provided (e.g. from ?prefill= URL param)
+    useEffect(() => {
+        if (prefillTitle && !prefillConsumed) {
+            setPrefillConsumed(true)
+            setInternalOpen(true)
+        }
+    }, [prefillTitle, prefillConsumed])
     const [showAdvanced, setShowAdvanced] = useState(false)
+    // Track title for SMART hint bar
+    const [titleValue, setTitleValue] = useState("")
     // Default start date to today, deadline to 7 days from now (both clearable)
     const [startDate, setStartDate] = useState<Date | undefined>(() => new Date())
     const [date, setDate] = useState<Date | undefined>(() => addDays(new Date(), 7))
     // Default assignee to current user
     const [selectedAssignees, setSelectedAssignees] = useState<string[]>([currentUserId])
     // Default objective if provided
-    const [selectedObjective, setSelectedObjective] = useState<string>(defaultObjectiveId || "")
+    const [selectedObjective, setSelectedObjective] = useState<string>(defaultObjectiveId || prefillObjectiveId || "")
     const [objectiveOpen, setObjectiveOpen] = useState(false)
     const [files, setFiles] = useState<File[]>([])
     const [isDragging, setIsDragging] = useState(false)
@@ -78,13 +106,13 @@ export function CreateTaskDialog({ objectives, members, teams = [], currentUserI
         if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
             e.preventDefault()
             e.stopPropagation()
-            setOpen(true)
+            setOpenState(true)
         }
     }
 
     // Handle dialog open state change with form reset
     const handleOpenChange = (newOpen: boolean) => {
-        setOpen(newOpen)
+        setOpenState(newOpen)
         if (!newOpen) {
             // Reset state after dialog close animation
             setTimeout(() => {
@@ -92,21 +120,42 @@ export function CreateTaskDialog({ objectives, members, teams = [], currentUserI
                 setStartDate(new Date())
                 setDate(addDays(new Date(), 7))
                 setSelectedAssignees([currentUserId])
-                setSelectedObjective(defaultObjectiveId || "")
+                setSelectedObjective(defaultObjectiveId || prefillObjectiveId || "")
                 setFiles([])
                 setShowAdvanced(false)
                 setDescription('')
+                setTitleValue('')
                 setIsPrivate(false)
                 setSharedWith([])
                 if (titleObjRef.current) titleObjRef.current.value = ''
             }, 300)
         } else {
-            // When opening, set smart defaults
+            // When opening, set smart defaults + prefill
             setStartDate(new Date())
             setDate(addDays(new Date(), 7))
             setSelectedAssignees([currentUserId])
-            setSelectedObjective(defaultObjectiveId || "")
-            setShowAdvanced(false)
+            setSelectedObjective(defaultObjectiveId || prefillObjectiveId || "")
+            setShowAdvanced(!!prefillDescription)
+            if (prefillTitle) {
+                setTitleValue(prefillTitle)
+                // Set input value after render
+                setTimeout(() => {
+                    if (titleObjRef.current) titleObjRef.current.value = prefillTitle
+                }, 50)
+            }
+            if (prefillDescription) {
+                setDescription(prefillDescription)
+            }
+        }
+    }
+
+    /** Handle accepting a SMART suggestion from the hint bar */
+    const handleAcceptSmartSuggestion = (suggestion: SmartGoalSuggestion) => {
+        setTitleValue(suggestion.title)
+        if (titleObjRef.current) titleObjRef.current.value = suggestion.title
+        if (suggestion.description && !description) {
+            setDescription(suggestion.description)
+            setShowAdvanced(true)
         }
     }
 
@@ -193,7 +242,7 @@ export function CreateTaskDialog({ objectives, members, teams = [], currentUserI
                 toast.error(result.error)
             } else {
                 toast.success("Task created")
-                setOpen(false)
+                setOpenState(false)
                 // Reset state
                 setStartDate(undefined)
                 setDate(undefined)
@@ -366,7 +415,10 @@ export function CreateTaskDialog({ objectives, members, teams = [], currentUserI
                                 aria-describedby={titleError ? "title-error" : undefined}
                                 aria-invalid={!!titleError}
                                 className={cn(titleError && "border-destructive")}
-                                onChange={() => setTitleError(null)}
+                                onChange={(e) => {
+                                    setTitleError(null)
+                                    setTitleValue(e.target.value)
+                                }}
                                 autoFocus
                             />
                             {titleError && (
@@ -374,6 +426,14 @@ export function CreateTaskDialog({ objectives, members, teams = [], currentUserI
                                     {titleError}
                                 </p>
                             )}
+
+                            {/* SMART Hint Bar - provides real-time SMART feedback */}
+                            <SmartHintBar
+                                text={titleValue}
+                                type="task"
+                                context={prefillContext}
+                                onAcceptSuggestion={handleAcceptSmartSuggestion}
+                            />
                         </div>
 
                         {/* Assignees - Multi-Select */}
@@ -634,7 +694,7 @@ export function CreateTaskDialog({ objectives, members, teams = [], currentUserI
                         )}
                     </div>
                     <DialogFooter className="gap-2 pt-4 border-t border-slate-100">
-                        <Button variant="secondary" onClick={() => setOpen(false)} disabled={isLoading}>Cancel</Button>
+                        <Button variant="secondary" onClick={() => setOpenState(false)} disabled={isLoading}>Cancel</Button>
                         <Button
                             type="submit"
                             variant="default"

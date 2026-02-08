@@ -35,6 +35,8 @@ import {
 import { Calendar as CalendarComponent } from "@/components/ui/calendar"
 import { addTaskComment, getTaskComments, getTaskAttachments, getTaskHistory, updateTaskDetails, updateTaskAssignees, updateTaskDates, updateTaskStatusAndRisk, updateTaskPrivacy, getTaskShares } from "@/actions/tasks"
 import { uploadTaskAttachment } from "@/actions/attachments"
+import { attachDriveFileToTask } from "@/actions/google-drive"
+import { DriveFilePicker } from "@/components/ui/drive-file-picker"
 import { toast } from "sonner"
 import { cn, getInitials } from "@/lib/utils"
 import { getStatusColor } from "@/lib/status-colors"
@@ -56,6 +58,7 @@ import {
     ChevronDown,
     Lock,
     Unlock,
+    HardDrive,
 } from "lucide-react"
 import { PrivacyShareControl, PrivacyBadge, type ShareTarget } from "@/components/ui/privacy-share-control"
 import { Database } from "@/types/database.types"
@@ -141,6 +144,8 @@ export function FullTaskView({ open, onOpenChange, task, members, currentUserId,
     const [isSending, setIsSending] = useState(false)
     const [isUploading, setIsUploading] = useState(false)
     const [isDragging, setIsDragging] = useState(false)
+    const [isDrivePickerOpen, setIsDrivePickerOpen] = useState(false)
+    const [isAttachingDriveFile, setIsAttachingDriveFile] = useState(false)
     const [currentStatus, setCurrentStatus] = useState(task.status || "Pending")
     const [isUpdatingStatus, setIsUpdatingStatus] = useState(false)
     const [statusPopoverOpen, setStatusPopoverOpen] = useState(false)
@@ -293,6 +298,28 @@ export function FullTaskView({ open, onOpenChange, task, members, currentUserId,
             if (fileInputRef.current) {
                 fileInputRef.current.value = ''
             }
+        }
+    }
+
+    const handleDriveFileSelect = async (file: { id: string; name: string; mimeType: string; webViewLink: string | null }): Promise<void> => {
+        setIsAttachingDriveFile(true)
+        try {
+            const result = await attachDriveFileToTask(task.id, file.id)
+            if (result.error) {
+                toast.error(`Failed to attach: ${result.error}`)
+            } else {
+                toast.success(`Attached ${file.name} from Google Drive`)
+                // Refresh attachments
+                const attachmentsRes = await getTaskAttachments(task.id)
+                if (attachmentsRes.data) {
+                    setAttachments(attachmentsRes.data)
+                }
+            }
+        } catch (error) {
+            console.error('[FullTaskView] Drive file attachment error:', error)
+            toast.error('Failed to attach file from Google Drive')
+        } finally {
+            setIsAttachingDriveFile(false)
         }
     }
 
@@ -933,6 +960,26 @@ export function FullTaskView({ open, onOpenChange, task, members, currentUserId,
                                     </div>
                                 )}
                             </div>
+                            {/* Google Drive Button */}
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                className="w-full border border-dashed border-muted-foreground/30 hover:border-primary"
+                                onClick={() => setIsDrivePickerOpen(true)}
+                                disabled={isAttachingDriveFile}
+                            >
+                                {isAttachingDriveFile ? (
+                                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                                ) : (
+                                    <HardDrive className="h-4 w-4 mr-2" />
+                                )}
+                                {isAttachingDriveFile ? 'Attaching...' : 'Attach from Google Drive'}
+                            </Button>
+                            <DriveFilePicker
+                                open={isDrivePickerOpen}
+                                onOpenChange={setIsDrivePickerOpen}
+                                onSelect={handleDriveFileSelect}
+                            />
                             <input
                                 type="file"
                                 ref={fileInputRef}

@@ -22,9 +22,14 @@ import {
   Moon,
   Sun,
   Eye,
-  EyeOff
+  EyeOff,
+  Lightbulb,
+  Sparkles,
 } from 'lucide-react'
 import { toast } from 'sonner'
+import { QuickCaptureDialog } from '@/components/smart/quick-capture-dialog'
+
+import type { SmartGoalSuggestion } from '@/actions/smart-goals'
 
 interface Task {
   id: string
@@ -46,6 +51,7 @@ interface TeamMember {
 
 export function CommandPalette() {
   const [open, setOpen] = useState(false)
+  const [captureOpen, setCaptureOpen] = useState(false)
   const [tasks, setTasks] = useState<Task[]>([])
   const [objectives, setObjectives] = useState<Objective[]>([])
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([])
@@ -53,6 +59,16 @@ export function CommandPalette() {
   const [userRole, setUserRole] = useState<string | null>(null)
   const router = useRouter()
   const { myPresence, goFocus, goOnline } = usePresenceContext()
+
+  const handleCaptureObjective = useCallback((rawIdea: string, suggestion?: SmartGoalSuggestion) => {
+    const prefillText = suggestion?.title || rawIdea
+    router.push(`/new-objectives?prefill=${encodeURIComponent(prefillText)}`)
+  }, [router])
+
+  const handleCaptureTask = useCallback((rawIdea: string, suggestion?: SmartGoalSuggestion) => {
+    const prefillText = suggestion?.title || rawIdea
+    router.push(`/new-tasks?prefill=${encodeURIComponent(prefillText)}`)
+  }, [router])
 
   const toggleFocusMode = useCallback(() => {
     if (myPresence?.status === 'focus') {
@@ -172,6 +188,7 @@ export function CommandPalette() {
   const isFocusMode = myPresence?.status === 'focus'
 
   return (
+    <>
     <CommandDialog open={open} onOpenChange={setOpen}>
       <CommandInput placeholder="Type a command or search..." />
       <CommandList>
@@ -179,6 +196,11 @@ export function CommandPalette() {
         
         {/* Quick Actions - Most Used */}
         <CommandGroup heading="Quick Actions">
+          <CommandItem onSelect={() => { setOpen(false); setCaptureOpen(true) }}>
+            <Lightbulb className="mr-2 h-4 w-4 text-international-orange" />
+            Capture an Idea
+            <span className="ml-auto text-xs text-muted-foreground">AI-guided</span>
+          </CommandItem>
           <CommandItem onSelect={() => { router.push('/new-tasks'); setOpen(false) }}>
             <Plus className="mr-2 h-4 w-4" />
             New Task
@@ -321,5 +343,14 @@ export function CommandPalette() {
         </CommandGroup>
       </CommandList>
     </CommandDialog>
+
+    {/* Quick Capture Dialog - Opened from command palette */}
+    <QuickCaptureDialog
+      open={captureOpen}
+      onOpenChange={setCaptureOpen}
+      onCreateObjective={handleCaptureObjective}
+      onCreateTask={handleCaptureTask}
+    />
+    </>
   )
 }

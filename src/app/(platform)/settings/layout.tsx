@@ -3,10 +3,11 @@
 import { usePathname } from 'next/navigation'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
-import { Settings, Shield } from 'lucide-react'
+import { Settings, Shield, Puzzle } from 'lucide-react'
 
 const settingsNavigation = [
     { name: 'General', href: '/settings', icon: Settings },
+    { name: 'Integrations', href: '/settings/integrations', icon: Puzzle },
     { name: 'Privacy & Data', href: '/settings/privacy', icon: Shield },
 ]
 

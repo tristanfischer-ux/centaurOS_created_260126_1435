@@ -34,6 +34,7 @@ import {
     CheckCircle2,
 } from 'lucide-react'
 import Link from 'next/link'
+import { ActOnThisButton } from '@/components/smart/act-on-this-button'
 import type { MarketplaceListing } from '@/actions/marketplace'
 
 interface MarketplaceDetailDialogProps {
@@ -243,6 +244,19 @@ export function MarketplaceDetailDialog({ listing, onClose }: MarketplaceDetailD
                                     <MessageSquare className="w-4 h-4" />
                                     Send Message
                                 </Button>
+                            </div>
+
+                            {/* Act on this - turn into objective/task */}
+                            <div className="flex justify-center">
+                                <ActOnThisButton
+                                    context={{
+                                        source: 'marketplace',
+                                        entityTitle: listing.title,
+                                        entityDescription: listing.description || undefined,
+                                    }}
+                                    variant="subtle"
+                                    label="Turn into objective or task"
+                                />
                             </div>
 
                             <p className="text-xs text-center text-muted-foreground">

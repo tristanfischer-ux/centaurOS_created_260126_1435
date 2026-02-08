@@ -28,8 +28,8 @@ interface OnboardingStep {
 const ONBOARDING_STEPS: OnboardingStep[] = [
     {
         id: 'welcome',
-        title: 'Welcome to ForgeOS',
-        description: 'Your command center for building and running modern organizations. Let\'s take a quick tour of the key features.',
+        title: 'Welcome to ForgeOS Early Access',
+        description: 'You\'re joining ForgeOS before v1.0 — the product is evolving fast, and your feedback shapes what comes next. Let\'s take a quick tour.',
         icon: Sparkles,
     },
     {
@@ -62,8 +62,8 @@ const ONBOARDING_STEPS: OnboardingStep[] = [
     },
     {
         id: 'complete',
-        title: 'You\'re Ready!',
-        description: 'You\'ve got the basics. Explore at your own pace, and use Cmd+K to quickly navigate anywhere.',
+        title: 'Welcome to the Build Crew',
+        description: 'You\'ve got the basics. As an early access member, you\'ll see a feedback button in the sidebar — use it anytime. We ship weekly based on what you tell us.',
         icon: Lightbulb,
     },
 ]

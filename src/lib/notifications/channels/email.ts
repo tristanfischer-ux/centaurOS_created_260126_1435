@@ -1,12 +1,32 @@
 /**
  * Email Channel
- * 
- * Handles sending email notifications.
- * Currently a stub - can be integrated with Resend, SendGrid, or AWS SES.
+ *
+ * Handles sending email notifications via Resend.
+ * Falls back to console logging if RESEND_API_KEY is not configured.
+ *
+ * @description Sends transactional emails for notifications, invitations,
+ * marketplace events, and other platform communications.
+ *
+ * @security
+ * - All template data is sanitized to prevent XSS/HTML injection
+ * - API key stored in environment variable, never logged
+ * - From address uses verified domain
+ *
+ * @related
+ * - src/lib/notifications/service.ts - Routes notifications to this channel
+ * - src/actions/invitations.ts - Uses sendInvitationEmail
  */
 
 import { EmailOptions, EmailTemplate, ChannelSendResult } from '../types'
 import { escapeHtml } from '@/lib/security/sanitize'
+import { Resend } from 'resend'
+
+// Initialize Resend client (null if API key not configured)
+const resend = process.env.RESEND_API_KEY
+    ? new Resend(process.env.RESEND_API_KEY)
+    : null
+
+const FROM_ADDRESS = process.env.EMAIL_FROM_ADDRESS || 'ForgeOS <noreply@forgeos.io>'
 
 /**
  * Security: Sanitize all string values in template data to prevent XSS
@@ -288,18 +308,17 @@ const EMAIL_TEMPLATES: Record<EmailTemplate, (data: Record<string, unknown>) => 
 }
 
 /**
- * Send an email notification
- * 
- * NOTE: This is currently a stub. To enable email sending:
- * 1. Install an email provider SDK (e.g., `npm install resend`)
- * 2. Add the API key to environment variables
- * 3. Implement the actual sending logic below
+ * Send an email notification via Resend.
+ * Falls back to console logging when RESEND_API_KEY is not set.
+ *
+ * @param options - Email options including recipient, subject, body, and template
+ * @returns Success status with error message on failure
  */
 export async function sendEmail(options: EmailOptions): Promise<ChannelSendResult> {
     const { to, subject, body, template = 'generic', templateData = {} } = options
 
     try {
-        // Security: Sanitize all template data to prevent XSS/HTML injection
+        // SECURITY: Sanitize all template data to prevent XSS/HTML injection
         const sanitizedData = sanitizeTemplateData({
             subject,
             title: subject,
@@ -311,39 +330,50 @@ export async function sendEmail(options: EmailOptions): Promise<ChannelSendResul
         const templateFn = EMAIL_TEMPLATES[template]
         const { subject: templateSubject, html } = templateFn(sanitizedData)
 
-        // ============================================
-        // STUB: Replace with actual email sending
-        // ============================================
-        // Example with Resend:
-        // 
-        // import { Resend } from 'resend'
-        // const resend = new Resend(process.env.RESEND_API_KEY)
-        // 
-        // const { data, error } = await resend.emails.send({
-        //     from: 'ForgeOS <noreply@forgeos.io>',
-        //     to: [to],
-        //     subject: templateSubject,
-        //     html: html
-        // })
-        // 
-        // if (error) {
-        //     return { success: false, error: error.message }
-        // }
-        // ============================================
+        // Send via Resend if configured
+        if (resend) {
+            const { error } = await resend.emails.send({
+                from: FROM_ADDRESS,
+                to: [to],
+                subject: templateSubject,
+                html: html,
+            })
 
-        // Log email for development
-        console.log('[EMAIL STUB] Would send email:', {
+            if (error) {
+                console.error('[Email] Resend send failed:', {
+                    to,
+                    subject: templateSubject,
+                    template,
+                    error: error.message,
+                })
+                return { success: false, error: error.message }
+            }
+
+            console.info('[Email] Sent successfully:', {
+                to,
+                subject: templateSubject,
+                template,
+            })
+
+            return { success: true }
+        }
+
+        // Fallback: Log email for development when Resend is not configured
+        console.info('[Email] No RESEND_API_KEY configured. Would send:', {
             to,
             subject: templateSubject,
             template,
-            bodyPreview: body.substring(0, 100) + '...'
+            bodyPreview: body.substring(0, 100) + '...',
         })
 
-        // Return success for stub (in production, this would only return after actual send)
         return { success: true }
 
     } catch (err) {
-        console.error('Error sending email:', err)
+        console.error('[Email] Unexpected error:', {
+            to,
+            template,
+            error: err instanceof Error ? err.message : 'Unknown error',
+        })
         return { 
             success: false, 
             error: err instanceof Error ? err.message : 'Failed to send email' 

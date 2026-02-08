@@ -19,6 +19,7 @@ import { FileDropZone } from "./file-drop-zone"
 import { PROVIDER_REGISTRY, getProvidersForModality, getModelsForModality, getDefaultModel, type AIProviderId, type OutputModality, OUTPUT_MODALITIES } from "@/lib/ai-providers/types"
 import { parseSlideDeckFromText } from "@/lib/ai-providers/slide-parser"
 import { generateNodeMarkdown, downloadAsFile } from "../lib/export-markdown"
+import { ActOnThisButton } from "@/components/smart/act-on-this-button"
 import type { Node } from "@xyflow/react"
 
 const PROVIDER_ICON_MAP: Record<string, React.ComponentType<{ className?: string; style?: React.CSSProperties }>> = {
@@ -918,6 +919,20 @@ export function NodeInspector({
                         </>
                     )}
                 </Button>
+
+                {/* Turn output into an objective or task */}
+                {data.output && status !== "running" && (
+                    <ActOnThisButton
+                        context={{
+                            source: 'agents',
+                            entityTitle: data.label || 'Agent Output',
+                            entityDescription: data.output.slice(0, 500),
+                        }}
+                        variant="subtle"
+                        label="Turn into objective or task"
+                        className="w-full"
+                    />
+                )}
 
                 <Button
                     onClick={() => onDelete(node.id)}

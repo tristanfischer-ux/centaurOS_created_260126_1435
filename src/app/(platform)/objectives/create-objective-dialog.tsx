@@ -3,6 +3,7 @@
 import { createObjective } from "@/actions/objectives"
 import { getObjectivePacks, ObjectivePack } from "@/actions/packs"
 import { analyzeBusinessPlan, AnalyzedObjective } from "@/actions/analyze"
+import { smartifyGoal } from "@/actions/smart-goals"
 import { toast } from "sonner"
 import { useEffect, useState, useCallback } from "react"
 import {
@@ -29,7 +30,13 @@ import {
     Search,
     UserPlus,
     ClipboardCheck,
-    Users
+    Users,
+    Sparkles,
+    Lightbulb,
+    BarChart3,
+    ChevronRight,
+    ChevronLeft,
+    CheckCircle2,
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -53,8 +60,21 @@ import { Markdown } from "@/components/ui/markdown"
 import { cn } from "@/lib/utils"
 import { PrivacyShareControl, type ShareTarget } from "@/components/ui/privacy-share-control"
 import { createClient } from "@/lib/supabase/client"
+import { SmartScoreCard, getOverallScore } from "@/components/smart/smart-score-card"
 
-type CreationMode = 'manual' | 'pack' | 'import'
+import type { SmartScore, SmartGoalSuggestion, SmartGoalContext } from "@/actions/smart-goals"
+
+type CreationMode = 'guided' | 'manual' | 'pack' | 'import'
+
+/** Steps for the guided SMART wizard */
+type GuidedStep = 'capture' | 'refine' | 'measure' | 'create'
+
+const GUIDED_STEPS: { id: GuidedStep; title: string; icon: React.ElementType }[] = [
+    { id: 'capture', title: 'Capture', icon: Lightbulb },
+    { id: 'refine', title: 'Refine', icon: Sparkles },
+    { id: 'measure', title: 'Measure', icon: BarChart3 },
+    { id: 'create', title: 'Create', icon: CheckCircle2 },
+]
 
 const PACK_ICONS: Record<string, any> = {
     'briefcase': Briefcase,
@@ -76,12 +96,40 @@ const PACK_ICONS: Record<string, any> = {
 
 interface CreateObjectiveDialogProps {
     children?: React.ReactNode
+    /** Pre-fill the guided wizard with a raw idea (from contextual CTAs) */
+    prefill?: string
+    /** Source context for AI-powered refinement */
+    prefillContext?: SmartGoalContext
+    /** Control open state externally */
+    externalOpen?: boolean
+    /** Callback when open state changes externally */
+    onExternalOpenChange?: (open: boolean) => void
 }
 
-export function CreateObjectiveDialog({ children }: CreateObjectiveDialogProps) {
-    const [open, setOpen] = useState(false)
-    const [mode, setMode] = useState<CreationMode>('manual')
+export function CreateObjectiveDialog({ children, prefill, prefillContext, externalOpen, onExternalOpenChange }: CreateObjectiveDialogProps) {
+    const [internalOpen, setInternalOpen] = useState(false)
+    const open = externalOpen !== undefined ? externalOpen : internalOpen
+    const setOpen = onExternalOpenChange || setInternalOpen
+    const [mode, setMode] = useState<CreationMode>('guided')
     const [isLoading, setIsLoading] = useState(false)
+    const [prefillConsumed, setPrefillConsumed] = useState(false)
+
+    // Auto-open dialog when prefill text is provided (e.g. from ?prefill= URL param)
+    useEffect(() => {
+        if (prefill && !prefillConsumed) {
+            setPrefillConsumed(true)
+            setInternalOpen(true)
+        }
+    }, [prefill, prefillConsumed])
+
+    // Guided SMART wizard state
+    const [guidedStep, setGuidedStep] = useState<GuidedStep>('capture')
+    const [rawIdea, setRawIdea] = useState("")
+    const [isRefining, setIsRefining] = useState(false)
+    const [smartSuggestion, setSmartSuggestion] = useState<SmartGoalSuggestion | null>(null)
+    const [smartScore, setSmartScore] = useState<SmartScore | null>(null)
+    const [measurable, setMeasurable] = useState("")
+    const [suggestedTimeframe, setSuggestedTimeframe] = useState("")
 
     // Manual Data
     const [title, setTitle] = useState("")
@@ -155,15 +203,21 @@ export function CreateObjectiveDialog({ children }: CreateObjectiveDialogProps) 
         if (teams) setDialogTeams(teams)
     }, [])
 
-    // Load packs + members/teams on open
+    // Load packs + members/teams on open; handle prefill
     useEffect(() => {
         if (open) {
             loadPacksCallback()
             loadMembersAndTeams()
+            // If prefill text provided, start in guided mode with it pre-populated
+            if (prefill) {
+                setMode('guided')
+                setRawIdea(prefill)
+                setGuidedStep('capture')
+            }
         } else {
             // Reset state on close
             setTimeout(() => {
-                setMode('manual')
+                setMode('guided')
                 setTitle("")
                 setDescription("")
                 setExtendedDescription("")
@@ -178,9 +232,17 @@ export function CreateObjectiveDialog({ children }: CreateObjectiveDialogProps) 
                 setShowAdvanced(false)
                 setIsPrivate(false)
                 setSharedWith([])
+                // Reset guided state
+                setGuidedStep('capture')
+                setRawIdea("")
+                setSmartSuggestion(null)
+                setSmartScore(null)
+                setMeasurable("")
+                setSuggestedTimeframe("")
+                setIsRefining(false)
             }, 300)
         }
-    }, [open, loadPacksCallback, loadMembersAndTeams])
+    }, [open, loadPacksCallback, loadMembersAndTeams, prefill])
 
     const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0]
@@ -340,8 +402,56 @@ export function CreateObjectiveDialog({ children }: CreateObjectiveDialogProps) 
         }
     }
 
+    // --- Guided SMART wizard handlers ---
+
+    const guidedStepIndex = GUIDED_STEPS.findIndex(s => s.id === guidedStep)
+    const isFirstGuidedStep = guidedStepIndex === 0
+    const isLastGuidedStep = guidedStepIndex === GUIDED_STEPS.length - 1
+
+    /** AI-refine the raw idea into SMART format */
+    const handleSmartRefine = async () => {
+        if (!rawIdea.trim() || isRefining) return
+        setIsRefining(true)
+
+        const result = await smartifyGoal({
+            rawIdea: rawIdea.trim(),
+            type: 'objective',
+            context: prefillContext,
+        })
+
+        if (result.suggestion) {
+            setSmartSuggestion(result.suggestion)
+            setSmartScore(result.suggestion.smartScore)
+            setTitle(result.suggestion.title)
+            setDescription(result.suggestion.description)
+            setMeasurable(result.suggestion.measurable)
+            setSuggestedTimeframe(result.suggestion.suggestedTimeframe || '')
+            setGuidedStep('refine')
+        } else {
+            toast.error(result.error || 'Failed to refine idea')
+        }
+        setIsRefining(false)
+    }
+
+    /** Navigate to next guided step */
+    const goToNextGuidedStep = () => {
+        const nextIndex = guidedStepIndex + 1
+        if (nextIndex < GUIDED_STEPS.length) {
+            setGuidedStep(GUIDED_STEPS[nextIndex].id)
+        }
+    }
+
+    /** Navigate to previous guided step */
+    const goToPrevGuidedStep = () => {
+        const prevIndex = guidedStepIndex - 1
+        if (prevIndex >= 0) {
+            setGuidedStep(GUIDED_STEPS[prevIndex].id)
+        }
+    }
+
     const getModeIcon = (m: CreationMode) => {
         switch (m) {
+            case 'guided': return Sparkles;
             case 'manual': return FileText;
             case 'pack': return Package;
             case 'import': return Upload;
@@ -362,11 +472,13 @@ export function CreateObjectiveDialog({ children }: CreateObjectiveDialogProps) 
                 <div className="p-6 pb-4 bg-muted/50">
                     <DialogHeader>
                         <DialogTitle className="text-xl font-semibold tracking-tight text-foreground">
+                            {mode === 'guided' && "Create a SMART Objective"}
                             {mode === 'manual' && "Define Strategic Objective"}
                             {mode === 'pack' && (selectedPack ? "Configure Objective Pack" : "Select Objective Pack")}
                             {mode === 'import' && "Import from Business Plan"}
                         </DialogTitle>
                         <DialogDescription className="text-muted-foreground">
+                            {mode === 'guided' && "AI-guided creation to make your objective Specific, Measurable, Achievable, Relevant, and Time-bound."}
                             {mode === 'manual' && "Manually define your objective and success criteria."}
                             {mode === 'pack' && !selectedPack && "Choose a pre-configured template to jumpstart your strategy."}
                             {mode === 'pack' && selectedPack && `Review tasks included in the "${selectedPack.title}" pack.`}
@@ -376,12 +488,13 @@ export function CreateObjectiveDialog({ children }: CreateObjectiveDialogProps) 
 
                     {/* Mode Selector - Always show, but make it smaller/less prominent when in a sub-flow */}
                     <div className={cn(
-                        "flex items-center gap-2 mt-6 transition-all",
-                        ((mode === 'pack' && selectedPack) || (mode === 'import' && analyzedObjectives.length > 0)) && "opacity-60 scale-95"
+                        "flex items-center gap-2 mt-6 transition-all flex-wrap",
+                        ((mode === 'guided' && guidedStep !== 'capture') || (mode === 'pack' && selectedPack) || (mode === 'import' && analyzedObjectives.length > 0)) && "opacity-60 scale-95"
                     )}>
-                        {(['manual', 'pack', 'import'] as CreationMode[]).map((m) => {
+                        {(['guided', 'manual', 'pack', 'import'] as CreationMode[]).map((m) => {
                             const Icon = getModeIcon(m)
-                            const isDisabled = (mode === 'pack' && selectedPack && m !== 'pack') || 
+                            const isDisabled = (mode === 'guided' && guidedStep !== 'capture' && m !== 'guided') ||
+                                            (mode === 'pack' && selectedPack && m !== 'pack') || 
                                             (mode === 'import' && analyzedObjectives.length > 0 && m !== 'import')
                             return (
                                 <button
@@ -390,6 +503,11 @@ export function CreateObjectiveDialog({ children }: CreateObjectiveDialogProps) 
                                         if (!isDisabled) {
                                             setMode(m)
                                             // Reset sub-flow state when switching modes
+                                            if (m !== 'guided') {
+                                                setGuidedStep('capture')
+                                                setSmartSuggestion(null)
+                                                setSmartScore(null)
+                                            }
                                             if (m !== 'pack') setSelectedPack(null)
                                             if (m !== 'import') {
                                                 setAnalyzedObjectives([])
@@ -408,7 +526,7 @@ export function CreateObjectiveDialog({ children }: CreateObjectiveDialogProps) 
                                     )}
                                 >
                                     <Icon className="w-4 h-4" />
-                                    {m.charAt(0).toUpperCase() + m.slice(1)}
+                                    {m === 'guided' ? 'Guided' : m.charAt(0).toUpperCase() + m.slice(1)}
                                 </button>
                             )
                         })}
@@ -418,6 +536,239 @@ export function CreateObjectiveDialog({ children }: CreateObjectiveDialogProps) 
                 {/* Main Content Area - min-h-0 enables flex child to shrink and scroll */}
                 <div className="flex-1 min-h-0 overflow-y-auto bg-background">
                     <div className="p-6">
+
+                        {/* GUIDED SMART WIZARD MODE */}
+                        {mode === 'guided' && (
+                            <div className="space-y-6 max-w-2xl mx-auto pt-4">
+                                {/* Progress Stepper */}
+                                <div className="flex items-center gap-2">
+                                    {GUIDED_STEPS.map((step, index) => {
+                                        const StepIcon = step.icon
+                                        const isActive = step.id === guidedStep
+                                        const isCompleted = index < guidedStepIndex
+
+                                        return (
+                                            <div key={step.id} className={cn('flex items-center gap-2 flex-1', index > 0 && 'pl-2')}>
+                                                {index > 0 && (
+                                                    <div className={cn(
+                                                        'h-0.5 flex-1 rounded-full transition-colors',
+                                                        isCompleted ? 'bg-international-orange' : 'bg-muted'
+                                                    )} />
+                                                )}
+                                                <div className={cn(
+                                                    'flex items-center justify-center rounded-full h-8 w-8 transition-colors shrink-0',
+                                                    isActive && 'bg-international-orange text-background',
+                                                    isCompleted && !isActive && 'bg-orange-100 text-international-orange',
+                                                    !isActive && !isCompleted && 'bg-muted text-muted-foreground'
+                                                )}>
+                                                    <StepIcon className="h-4 w-4" />
+                                                </div>
+                                                <span className={cn(
+                                                    'text-xs font-medium hidden sm:block',
+                                                    isActive ? 'text-foreground' : 'text-muted-foreground'
+                                                )}>
+                                                    {step.title}
+                                                </span>
+                                            </div>
+                                        )
+                                    })}
+                                </div>
+
+                                {/* Step 1: Capture */}
+                                {guidedStep === 'capture' && (
+                                    <div className="space-y-4">
+                                        <div>
+                                            <h3 className="text-lg font-semibold mb-2">
+                                                What do you want to achieve?
+                                            </h3>
+                                            <p className="text-sm text-muted-foreground">
+                                                Describe your goal in your own words. Don&apos;t worry about making it perfect -- AI will help you refine it into a SMART objective.
+                                            </p>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label htmlFor="raw-idea">
+                                                Your idea <span className="text-destructive ml-1" aria-label="required">*</span>
+                                            </Label>
+                                            <Textarea
+                                                id="raw-idea"
+                                                placeholder="e.g. I want to get more customers, or I need to build an MVP, or I should hire a fractional CFO..."
+                                                value={rawIdea}
+                                                onChange={(e) => setRawIdea(e.target.value)}
+                                                className="min-h-[120px] resize-none"
+                                                autoFocus
+                                                maxLength={2000}
+                                            />
+                                            <p className="text-xs text-muted-foreground text-right">
+                                                {rawIdea.length} / 2,000 characters
+                                            </p>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Step 2: Refine */}
+                                {guidedStep === 'refine' && smartSuggestion && (
+                                    <div className="space-y-4">
+                                        <div>
+                                            <h3 className="text-lg font-semibold mb-2">
+                                                Here&apos;s your SMART objective
+                                            </h3>
+                                            <p className="text-sm text-muted-foreground">
+                                                AI refined your idea. Edit anything you&apos;d like to change.
+                                            </p>
+                                        </div>
+
+                                        {smartScore && (
+                                            <div className="flex items-center gap-3">
+                                                <SmartScoreCard score={smartScore} suggestions={smartSuggestion.suggestions} />
+                                            </div>
+                                        )}
+
+                                        <div className="space-y-2">
+                                            <Label htmlFor="guided-title">
+                                                Objective Title <span className="text-destructive ml-1" aria-label="required">*</span>
+                                            </Label>
+                                            <Input
+                                                id="guided-title"
+                                                value={title}
+                                                onChange={(e) => setTitle(e.target.value)}
+                                                maxLength={200}
+                                                autoFocus
+                                            />
+                                            <p className="text-xs text-muted-foreground text-right">
+                                                {title.length} / 200 characters
+                                            </p>
+                                        </div>
+
+                                        <div className="space-y-2">
+                                            <Label htmlFor="guided-description">Description</Label>
+                                            <Textarea
+                                                id="guided-description"
+                                                value={description}
+                                                onChange={(e) => setDescription(e.target.value)}
+                                                className="min-h-[80px] resize-none"
+                                                maxLength={500}
+                                            />
+                                            <p className="text-xs text-muted-foreground text-right">
+                                                {description.length} / 500 characters
+                                            </p>
+                                        </div>
+
+                                        {smartSuggestion.suggestions.length > 0 && (
+                                            <div className="rounded-lg border bg-muted/30 p-3 space-y-1">
+                                                <p className="text-xs font-medium text-muted-foreground">Tips to strengthen your objective:</p>
+                                                {smartSuggestion.suggestions.map((tip, i) => (
+                                                    <p key={i} className="text-xs text-muted-foreground">
+                                                        &bull; {tip}
+                                                    </p>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+
+                                {/* Step 3: Measure */}
+                                {guidedStep === 'measure' && (
+                                    <div className="space-y-4">
+                                        <div>
+                                            <h3 className="text-lg font-semibold mb-2">
+                                                How will you know you&apos;ve succeeded?
+                                            </h3>
+                                            <p className="text-sm text-muted-foreground">
+                                                Define the concrete criteria or metrics that prove this objective is complete.
+                                            </p>
+                                        </div>
+
+                                        <div className="space-y-2">
+                                            <Label htmlFor="guided-measurable">
+                                                Success criteria <span className="text-destructive ml-1" aria-label="required">*</span>
+                                            </Label>
+                                            <Textarea
+                                                id="guided-measurable"
+                                                placeholder="e.g. 10 paying customers, $5k MRR, MVP shipped and tested by 5 users..."
+                                                value={measurable}
+                                                onChange={(e) => setMeasurable(e.target.value)}
+                                                className="min-h-[80px] resize-none"
+                                                autoFocus
+                                                maxLength={500}
+                                            />
+                                            <p className="text-xs text-muted-foreground text-right">
+                                                {measurable.length} / 500 characters
+                                            </p>
+                                        </div>
+
+                                        <div className="space-y-2">
+                                            <Label htmlFor="guided-timeframe">Suggested timeframe</Label>
+                                            <Input
+                                                id="guided-timeframe"
+                                                placeholder="e.g. 2 weeks, End of Q1, March 15th"
+                                                value={suggestedTimeframe}
+                                                onChange={(e) => setSuggestedTimeframe(e.target.value)}
+                                                maxLength={200}
+                                            />
+                                            <p className="text-xs text-muted-foreground">
+                                                When should this be completed? Set a realistic deadline.
+                                            </p>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Step 4: Review & Create */}
+                                {guidedStep === 'create' && (
+                                    <div className="space-y-4">
+                                        <div>
+                                            <h3 className="text-lg font-semibold mb-2">
+                                                Review your objective
+                                            </h3>
+                                            <p className="text-sm text-muted-foreground">
+                                                Everything looks good? Hit create to make it official.
+                                            </p>
+                                        </div>
+
+                                        {smartScore && (
+                                            <SmartScoreCard score={smartScore} suggestions={smartSuggestion?.suggestions} />
+                                        )}
+
+                                        <Card>
+                                            <CardContent className="pt-6 space-y-3">
+                                                <div>
+                                                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Title</p>
+                                                    <p className="text-foreground font-medium">{title}</p>
+                                                </div>
+                                                {description && (
+                                                    <div>
+                                                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Description</p>
+                                                        <p className="text-sm text-muted-foreground">{description}</p>
+                                                    </div>
+                                                )}
+                                                {measurable && (
+                                                    <div>
+                                                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Success Criteria</p>
+                                                        <p className="text-sm text-muted-foreground">{measurable}</p>
+                                                    </div>
+                                                )}
+                                                {suggestedTimeframe && (
+                                                    <div>
+                                                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Timeframe</p>
+                                                        <p className="text-sm text-muted-foreground">{suggestedTimeframe}</p>
+                                                    </div>
+                                                )}
+                                            </CardContent>
+                                        </Card>
+
+                                        {/* Privacy & Sharing */}
+                                        <PrivacyShareControl
+                                            isPrivate={isPrivate}
+                                            onPrivateChange={setIsPrivate}
+                                            sharedWith={sharedWith}
+                                            onSharedWithChange={setSharedWith}
+                                            members={dialogMembers}
+                                            teams={dialogTeams}
+                                            currentUserId={currentUserId}
+                                        />
+                                    </div>
+                                )}
+                            </div>
+                        )}
 
                         {/* MANUAL MODE */}
                         {mode === 'manual' && (
@@ -876,25 +1227,113 @@ export function CreateObjectiveDialog({ children }: CreateObjectiveDialogProps) 
 
                 {/* Footer Actions */}
                 <DialogFooter className="p-6 pt-4 bg-muted/50">
-                    <div className="flex-1 text-sm text-muted-foreground">
-                        {mode === 'pack' && selectedPack && "This will create 1 objective and multiple tasks."}
-                        {mode === 'import' && selectedAnalysisIndex !== null && "AI generated tasks will be created."}
-                    </div>
+                    {mode === 'guided' ? (
+                        /* Guided mode: wizard navigation */
+                        <div className="flex w-full items-center justify-between">
+                            <Button
+                                variant="secondary"
+                                onClick={isFirstGuidedStep ? () => setOpen(false) : goToPrevGuidedStep}
+                                disabled={isLoading || isRefining}
+                            >
+                                {isFirstGuidedStep ? 'Cancel' : (
+                                    <>
+                                        <ChevronLeft className="h-4 w-4 mr-1" />
+                                        Back
+                                    </>
+                                )}
+                            </Button>
 
-                    <Button variant="secondary" onClick={() => setOpen(false)} disabled={isLoading}>
-                        Cancel
-                    </Button>
+                            {guidedStep === 'capture' && (
+                                <Button
+                                    onClick={handleSmartRefine}
+                                    disabled={isRefining || rawIdea.trim().length < 5}
+                                    className="min-w-[160px]"
+                                >
+                                    {isRefining ? (
+                                        <>
+                                            <Loader2 className="h-4 w-4 animate-spin" />
+                                            Refining...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Sparkles className="h-4 w-4" />
+                                            Refine with AI
+                                        </>
+                                    )}
+                                </Button>
+                            )}
 
-                    <Button
-                        onClick={handleCreate}
-                        variant="default"
-                        disabled={isLoading || (mode === 'pack' && !selectedPack) || (mode === 'import' && selectedAnalysisIndex === null) || !title.trim()}
-                        className="min-w-[140px] shadow-sm"
-                    >
-                        {isLoading && <Loader2 className="h-4 w-4 animate-spin" />}
-                        {!isLoading && <Plus className="h-4 w-4" />}
-                        {mode === 'manual' ? 'Create Objective' : 'Add Objective and Tasks'}
-                    </Button>
+                            {guidedStep === 'refine' && (
+                                <Button
+                                    onClick={goToNextGuidedStep}
+                                    disabled={!title.trim()}
+                                >
+                                    Next: Measure
+                                    <ChevronRight className="h-4 w-4 ml-1" />
+                                </Button>
+                            )}
+
+                            {guidedStep === 'measure' && (
+                                <Button
+                                    onClick={goToNextGuidedStep}
+                                >
+                                    Next: Review
+                                    <ChevronRight className="h-4 w-4 ml-1" />
+                                </Button>
+                            )}
+
+                            {guidedStep === 'create' && (
+                                <Button
+                                    onClick={() => {
+                                        // Build extended description from measurable + timeframe
+                                        const extDesc = [
+                                            measurable && `## Success Criteria\n${measurable}`,
+                                            suggestedTimeframe && `## Timeframe\n${suggestedTimeframe}`,
+                                        ].filter(Boolean).join('\n\n')
+                                        setExtendedDescription(extDesc)
+                                        handleCreate()
+                                    }}
+                                    disabled={isLoading || !title.trim()}
+                                    className="min-w-[160px]"
+                                >
+                                    {isLoading ? (
+                                        <>
+                                            <Loader2 className="h-4 w-4 animate-spin" />
+                                            Creating...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <CheckCircle2 className="h-4 w-4" />
+                                            Create Objective
+                                        </>
+                                    )}
+                                </Button>
+                            )}
+                        </div>
+                    ) : (
+                        /* Other modes: original footer */
+                        <>
+                            <div className="flex-1 text-sm text-muted-foreground">
+                                {mode === 'pack' && selectedPack && "This will create 1 objective and multiple tasks."}
+                                {mode === 'import' && selectedAnalysisIndex !== null && "AI generated tasks will be created."}
+                            </div>
+
+                            <Button variant="secondary" onClick={() => setOpen(false)} disabled={isLoading}>
+                                Cancel
+                            </Button>
+
+                            <Button
+                                onClick={handleCreate}
+                                variant="default"
+                                disabled={isLoading || (mode === 'pack' && !selectedPack) || (mode === 'import' && selectedAnalysisIndex === null) || !title.trim()}
+                                className="min-w-[140px] shadow-sm"
+                            >
+                                {isLoading && <Loader2 className="h-4 w-4 animate-spin" />}
+                                {!isLoading && <Plus className="h-4 w-4" />}
+                                {mode === 'manual' ? 'Create Objective' : 'Add Objective and Tasks'}
+                            </Button>
+                        </>
+                    )}
                 </DialogFooter>
             </DialogContent>
         </Dialog>

@@ -37,6 +37,7 @@ import { cn } from '@/lib/utils'
 import { CoverageRadar } from '@/components/org-blueprint/coverage-radar'
 import { AssessmentModal } from '@/components/org-blueprint/assessment-modal'
 import { CoverageLegend } from '@/components/org-blueprint/coverage-legend'
+import { ActOnThisButton } from '@/components/smart/act-on-this-button'
 
 type CoverageStatus = 'covered' | 'partial' | 'gap' | 'not_needed'
 type FunctionCategory = 'finance' | 'legal' | 'sales' | 'marketing' | 'product' | 'operations' | 'people' | 'customer' | 'strategy'
@@ -123,9 +124,21 @@ function FunctionCard({
             )}
             
             {businessFunction.coverage_status === 'gap' && (
-                <div className="flex items-center gap-1 text-xs text-status-warning mt-1">
-                    <AlertTriangle className="h-3 w-3" />
-                    <span>Coverage needed</span>
+                <div className="mt-2 space-y-1.5">
+                    <div className="flex items-center gap-1 text-xs text-status-warning">
+                        <AlertTriangle className="h-3 w-3" />
+                        <span>Coverage needed</span>
+                    </div>
+                    <ActOnThisButton
+                        context={{
+                            source: 'blueprint',
+                            entityTitle: businessFunction.name,
+                            entityDescription: businessFunction.description || `Fill the ${businessFunction.category} gap: ${businessFunction.name}`,
+                        }}
+                        variant="subtle"
+                        label="Create objective"
+                        className="h-7 text-xs"
+                    />
                 </div>
             )}
         </motion.div>
@@ -578,6 +591,18 @@ export function OrgBlueprintView({ functions: initialFunctions, summary: initial
                                         )}
                                     </div>
                                 </div>
+                                {fn.coverage_status === 'gap' && (
+                                    <ActOnThisButton
+                                        context={{
+                                            source: 'blueprint',
+                                            entityTitle: fn.name,
+                                            entityDescription: fn.description || `Fill the ${fn.category} gap: ${fn.name}`,
+                                        }}
+                                        variant="subtle"
+                                        label="Create objective"
+                                        className="flex-shrink-0"
+                                    />
+                                )}
                             </motion.div>
                         )
                     })}

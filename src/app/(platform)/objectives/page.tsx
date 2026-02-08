@@ -11,7 +11,13 @@ import { CompanyProfilePrompt } from '@/components/settings/company-profile-prom
 // Revalidate every 60 seconds
 export const revalidate = 60
 
-export default async function ObjectivesPage() {
+interface ObjectivesPageProps {
+    searchParams: Promise<{ prefill?: string }>
+}
+
+export default async function ObjectivesPage({ searchParams }: ObjectivesPageProps) {
+    const params = await searchParams
+    const prefillText = params.prefill || undefined
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
 
@@ -123,7 +129,7 @@ export default async function ObjectivesPage() {
                     <p className="text-muted-foreground mt-1 text-sm font-medium pl-4">High-level goals aligned with your company's purpose</p>
                 </div>
                 <FeatureTipWrapper>
-                    <CreateObjectiveDialog />
+                    <CreateObjectiveDialog prefill={prefillText} />
                 </FeatureTipWrapper>
             </div>
 

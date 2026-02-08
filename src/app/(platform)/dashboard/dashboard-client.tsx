@@ -12,6 +12,7 @@ import { StatsCards } from '@/components/dashboard/stats-cards'
 import { RecommendedForYou } from '@/components/dashboard/recommended-for-you'
 import { MarketplaceSpotlight } from '@/components/dashboard/marketplace-spotlight'
 import { WorkflowTemplatesPreview } from '@/components/dashboard/workflow-templates-preview'
+import { FoundingMemberCard } from '@/components/dashboard/founding-member-card'
 
 interface User {
   id: string
@@ -213,6 +214,7 @@ export function DashboardClient({
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Left Column - Actions & Priority */}
             <div className="lg:col-span-1 space-y-6 order-2 lg:order-1">
+              <FoundingMemberCard />
               <QuickActions foundryId={foundryId} />
               <PriorityQueue
                 myTasks={myTasks}

@@ -22,6 +22,7 @@ import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { toast } from 'sonner'
 import { fillOrgBlueprintGap, getGapMarketplaceListings } from '@/actions/integrations'
+import { ActOnThisButton } from '@/components/smart/act-on-this-button'
 import { cn } from '@/lib/utils'
 
 interface MarketplaceListing {
@@ -267,7 +268,7 @@ export function OrgBlueprintGapCard({
 
       <Separator />
 
-      <CardFooter className="py-3">
+      <CardFooter className="py-3 flex items-center justify-between">
         <Link
           href={searchUrl}
           className="text-xs text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
@@ -275,6 +276,15 @@ export function OrgBlueprintGapCard({
           Browse all providers in marketplace
           <ExternalLink className="h-3 w-3" />
         </Link>
+        <ActOnThisButton
+          context={{
+            source: 'blueprint',
+            entityTitle: functionName,
+            entityDescription: description || `Address the ${category} gap: ${functionName}`,
+          }}
+          variant="subtle"
+          label="Create objective"
+        />
       </CardFooter>
     </Card>
   )

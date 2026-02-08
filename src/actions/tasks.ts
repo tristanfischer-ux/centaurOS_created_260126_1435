@@ -10,6 +10,7 @@ import { getFoundryIdCached } from '@/lib/supabase/foundry-context'
 import { withRetry } from '@/lib/retry'
 import { sanitizeFileName, sanitizeErrorMessage } from '@/lib/security/sanitize'
 import { syncTaskCommentToMessages } from '@/lib/messaging/comment-sync'
+import { syncTaskToCalendar } from '@/actions/google-calendar'
 
 // Nudge cooldown duration (1 hour)
 const NUDGE_COOLDOWN_MS = 60 * 60 * 1000
@@ -308,6 +309,14 @@ export async function createTask(formData: FormData) {
     } catch (error) {
         console.error('Failed to trigger AI worker:', error)
         // Continue - AI worker failure shouldn't fail task creation
+    }
+
+    // Sync to Google Calendar if user has connected their account
+    try {
+        await syncTaskToCalendar(data.id, validatedTitle, startDate || null, deadline || null, validatedDescription)
+    } catch (error) {
+        console.error('Failed to sync task to Google Calendar:', error)
+        // Continue - calendar sync failure shouldn't fail task creation
     }
 
     revalidatePath('/tasks')
@@ -1080,7 +1089,7 @@ export async function updateTaskDates(taskId: string, startDate: string, endDate
         // Verify user has access to the task's foundry
         const { data: task, error: taskFetchError } = await supabase
             .from('tasks')
-            .select('foundry_id')
+            .select('foundry_id, title')
             .eq('id', taskId)
             .single()
 
@@ -1137,6 +1146,15 @@ export async function updateTaskDates(taskId: string, startDate: string, endDate
         } catch (logError) {
             console.error('Failed to log task history:', logError)
         }
+
+        // Sync updated dates to Google Calendar
+        try {
+            await syncTaskToCalendar(taskId, task.title, validatedStartDate || null, validatedEndDate || null)
+        } catch (calError) {
+            console.error('Failed to sync task dates to Google Calendar:', calError)
+            // Continue - calendar sync failure shouldn't fail date update
+        }
+
         revalidatePath('/timeline')
         revalidatePath('/tasks')
         return { success: true }

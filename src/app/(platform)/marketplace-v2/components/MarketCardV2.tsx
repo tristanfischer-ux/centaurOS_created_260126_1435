@@ -26,6 +26,7 @@ import {
 } from 'lucide-react'
 import { saveMarketplaceListing, unsaveMarketplaceListing } from '@/actions/marketplace'
 import { toast } from 'sonner'
+import { ActOnThisButton } from '@/components/smart/act-on-this-button'
 import type { MarketplaceListing } from '@/actions/marketplace'
 
 interface MarketCardV2Props {
@@ -299,18 +300,31 @@ export const MarketCardV2 = memo(function MarketCardV2({
                         )}
                     </div>
 
-                    <Button
-                        size="sm"
-                        variant="default"
-                        className="gap-1.5 shrink-0"
-                        onClick={(e) => {
-                            e.stopPropagation()
-                            onViewDetail(listing)
-                        }}
-                    >
-                        {getCTALabel(listing.category)}
-                        <ArrowRight className="w-3.5 h-3.5" />
-                    </Button>
+                    <div className="flex items-center gap-1.5">
+                        <div onClick={(e) => e.stopPropagation()}>
+                            <ActOnThisButton
+                                context={{
+                                    source: 'marketplace',
+                                    entityTitle: listing.title,
+                                    entityDescription: listing.description || undefined,
+                                }}
+                                variant="subtle"
+                                label="Act"
+                            />
+                        </div>
+                        <Button
+                            size="sm"
+                            variant="default"
+                            className="gap-1.5 shrink-0"
+                            onClick={(e) => {
+                                e.stopPropagation()
+                                onViewDetail(listing)
+                            }}
+                        >
+                            {getCTALabel(listing.category)}
+                            <ArrowRight className="w-3.5 h-3.5" />
+                        </Button>
+                    </div>
                 </div>
             </CardContent>
         </Card>

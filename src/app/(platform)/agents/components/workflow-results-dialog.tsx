@@ -49,6 +49,7 @@ import {
     downloadAsFile,
 } from "../lib/export-markdown"
 import { CATEGORY_ACCENT_COLORS, type PromptCategory } from "../lib/agent-types"
+import { ActOnThisButton } from "@/components/smart/act-on-this-button"
 import type { Node, Edge } from "@xyflow/react"
 
 // ─── Types ───────────────────────────────────────────────────────────
@@ -261,9 +262,21 @@ function ResultStep({
                         </>
                     )}
 
-                    {/* Per-step copy */}
+                    {/* Per-step copy + act on this */}
                     {(hasOutput || isHuman) && (
-                        <div className="flex justify-end">
+                        <div className="flex items-center justify-between">
+                            {hasOutput && !isHuman && (
+                                <ActOnThisButton
+                                    context={{
+                                        source: 'agents',
+                                        entityTitle: data.label || 'Agent Output',
+                                        entityDescription: (data.output || '').slice(0, 500),
+                                    }}
+                                    variant="subtle"
+                                    label="Act on this"
+                                />
+                            )}
+                            <div className="flex-1" />
                             <Button
                                 variant="ghost"
                                 size="sm"

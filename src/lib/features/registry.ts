@@ -54,7 +54,7 @@ export const FEATURE_REGISTRY: Feature[] = [
         route: '/inspiration',
         releasedAt: new Date('2026-02-07'),
         category: 'core',
-        status: 'stable',
+        status: 'beta',
         isVisibleInNav: true,
         changelog: 'Added Manufacturing Techniques Explorer — an interactive encyclopedia of modern manufacturing processes. Browse by category, filter by cost/batch size/material, and click through to detailed technique info with CTAs to find suppliers or start an RFQ. Available under the Techniques tab in Inspiration.'
     },
@@ -66,7 +66,7 @@ export const FEATURE_REGISTRY: Feature[] = [
         route: '/settings',
         releasedAt: new Date('2026-01-31'),
         category: 'integration',
-        status: 'stable',
+        status: 'beta',
         isVisibleInNav: true,
         changelog: 'Added Telegram bot integration. Link your Telegram account in Settings to create objectives via voice or text messages. Smart parsing automatically structures your input into objectives with tasks, dates, and assignees.'
     },
@@ -98,7 +98,7 @@ export const FEATURE_REGISTRY: Feature[] = [
         route: '/retainers',
         releasedAt: new Date('2026-01-25'),
         category: 'marketplace',
-        status: 'stable',
+        status: 'beta',
         isVisibleInNav: true,
         changelog: 'Added retainer management for ongoing service relationships. Track hours, manage timesheets, and handle recurring payments with your service providers.'
     },
@@ -320,6 +320,22 @@ export function getFeatureById(id: string): Feature | undefined {
  */
 export function getNewFeatures(): Feature[] {
     return FEATURE_REGISTRY.filter(f => isFeatureNew(f))
+}
+
+/**
+ * Check if a route's feature is in beta status
+ */
+export function isRouteBeta(route: string): boolean {
+    const feature = FEATURE_REGISTRY.find(f => f.route === route)
+    return feature?.status === 'beta'
+}
+
+/**
+ * Get the feature name for a route (used for feedback context)
+ */
+export function getFeatureNameByRoute(route: string): string | undefined {
+    const feature = FEATURE_REGISTRY.find(f => f.route === route)
+    return feature?.name
 }
 
 /**

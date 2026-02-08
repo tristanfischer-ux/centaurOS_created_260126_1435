@@ -510,16 +510,16 @@ function HeroSection() {
     <section className="relative md:min-h-screen flex flex-col md:flex-row items-center justify-center overflow-hidden bg-background">
       {/* Content */}
       <div className="relative z-10 max-w-5xl mx-auto px-6 text-center pt-8 md:pt-0">
-        {/* System Online Badge - Animated */}
+        {/* Early Access Badge - Animated */}
         <motion.div
           initial="hidden"
           animate="visible"
           variants={fadeInScale}
           className="inline-flex items-center gap-2 mb-6 md:mb-8 px-4 py-2 border bg-card"
         >
-          <span className="w-2 h-2 rounded-full bg-electric-blue animate-pulse" />
-          <span className="text-electric-blue text-xs font-mono uppercase tracking-widest">
-            System Online
+          <span className="w-2 h-2 rounded-full bg-international-orange animate-pulse" />
+          <span className="text-international-orange text-xs font-mono uppercase tracking-widest">
+            Early Access
           </span>
         </motion.div>
 
@@ -549,6 +549,16 @@ function HeroSection() {
           className="text-foreground text-base md:text-xl max-w-3xl mx-auto leading-relaxed"
         >
           &ldquo;Build hardware at software speed. A fraction of the cost. A fraction of the time. A fraction of the headcount.&rdquo;
+        </motion.p>
+
+        {/* Version line */}
+        <motion.p
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 1.2, duration: 0.6 }}
+          className="mt-4 md:mt-6 text-xs text-muted-foreground font-mono tracking-wider"
+        >
+          v0.9 &mdash; Shipping weekly. Shaped by founding members.
         </motion.p>
       </div>
 

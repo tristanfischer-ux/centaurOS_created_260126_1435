@@ -1,9 +1,10 @@
 "use client"
 
+import React from "react"
 import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
-import { Users, CheckSquare, Store, Settings, Target, MoreHorizontal, Lightbulb, Bell, Home, Bot, UserCircle, LogOut, Waypoints } from "lucide-react"
+import { Users, CheckSquare, Store, Settings, Target, MoreHorizontal, Lightbulb, Bell, Home, Bot, UserCircle, LogOut, Waypoints, Plus } from "lucide-react"
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -13,6 +14,9 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { NewBadge } from "@/components/ui/new-badge"
 import { signOut } from "@/actions/auth"
+import { QuickCaptureDialog } from "@/components/smart/quick-capture-dialog"
+
+import type { SmartGoalSuggestion } from "@/actions/smart-goals"
 
 /**
  * Determines if a navigation item should be marked as active
@@ -49,9 +53,30 @@ const accountNavigation = [
 
 export function MobileNav() {
     const pathname = usePathname()
+    const router = useRouter()
+    const [isQuickCaptureOpen, setIsQuickCaptureOpen] = React.useState(false)
+
+    const handleCaptureObjective = (rawIdea: string, suggestion?: SmartGoalSuggestion) => {
+        const prefillText = suggestion?.title || rawIdea
+        router.push(`/new-objectives?prefill=${encodeURIComponent(prefillText)}`)
+    }
+
+    const handleCaptureTask = (rawIdea: string, suggestion?: SmartGoalSuggestion) => {
+        const prefillText = suggestion?.title || rawIdea
+        router.push(`/new-tasks?prefill=${encodeURIComponent(prefillText)}`)
+    }
 
     return (
+        <>
         <div className="fixed bottom-0 left-0 right-0 z-50 bg-card shadow-[0_-4px_12px_-2px_rgba(0,0,0,0.1)] md:hidden pb-safe px-safe">
+            {/* Floating "+" FAB centered above the nav bar */}
+            <button
+                onClick={() => setIsQuickCaptureOpen(true)}
+                className="absolute -top-6 left-1/2 -translate-x-1/2 flex items-center justify-center h-12 w-12 rounded-full bg-international-orange text-background shadow-lg hover:bg-international-orange-hover transition-colors active:scale-95"
+                aria-label="Capture an idea"
+            >
+                <Plus className="h-5 w-5" />
+            </button>
             <div className="flex justify-around items-center h-16">
                 {mainNavigation.map((item) => {
                     const isActive = isRouteActive(pathname, item.href)
@@ -147,5 +172,14 @@ export function MobileNav() {
                 </DropdownMenu>
             </div>
         </div>
+
+        {/* Quick Capture Dialog - Global idea capture for mobile */}
+        <QuickCaptureDialog
+            open={isQuickCaptureOpen}
+            onOpenChange={setIsQuickCaptureOpen}
+            onCreateObjective={handleCaptureObjective}
+            onCreateTask={handleCaptureTask}
+        />
+        </>
     )
 }

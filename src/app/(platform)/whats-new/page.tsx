@@ -35,7 +35,7 @@ import Link from "next/link"
  */
 
 // Keep in sync with package.json
-const APP_VERSION = "1.0.3"
+const APP_VERSION = "0.9.0"
 
 const categoryIcons: Record<FeatureCategory, typeof Globe> = {
     core: Target,
@@ -164,7 +164,7 @@ export default function WhatsNewPage() {
                         </h1>
                     </div>
                     <p className={typography.pageSubtitle}>
-                        Latest features, improvements, and product updates &middot; v{APP_VERSION}
+                        Shipping weekly toward v1.0 &middot; Currently v{APP_VERSION}
                     </p>
                 </div>
             </div>
