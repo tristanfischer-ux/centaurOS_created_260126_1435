@@ -44,6 +44,7 @@ interface Objective {
   end_date: string | null
   created_at: string
   creator?: { id: string; full_name: string | null; avatar_url?: string | null } | null
+  is_strategic_goal?: boolean | null
 }
 
 interface TeamMember {
