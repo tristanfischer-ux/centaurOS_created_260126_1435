@@ -95,7 +95,7 @@ export default async function DashboardPage() {
     supabase
       .from('objectives')
       .select(`
-        id, title, description, status, progress, start_date, end_date, created_at,
+        id, title, description, status, progress, start_date, end_date, created_at, is_strategic_goal,
         creator:profiles!creator_id(id, full_name, avatar_url)
       `)
       .eq('foundry_id', foundryId)

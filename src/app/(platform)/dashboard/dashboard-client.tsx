@@ -13,6 +13,7 @@ import { RecommendedForYou } from '@/components/dashboard/recommended-for-you'
 import { MarketplaceSpotlight } from '@/components/dashboard/marketplace-spotlight'
 import { WorkflowTemplatesPreview } from '@/components/dashboard/workflow-templates-preview'
 import { FoundingMemberCard } from '@/components/dashboard/founding-member-card'
+import { UpcomingEvents } from '@/components/dashboard/upcoming-events'
 
 interface User {
   id: string
@@ -44,6 +45,7 @@ interface Objective {
   end_date: string | null
   created_at: string
   creator?: { id: string; full_name: string | null; avatar_url?: string | null } | null
+  is_strategic_goal?: boolean | null
 }
 
 interface TeamMember {
@@ -238,6 +240,7 @@ export function DashboardClient({
             
             {/* Right Column - Discovery (Revenue) & Team */}
             <div className="lg:col-span-1 space-y-6 order-3">
+              <UpcomingEvents />
               <MarketplaceSpotlight featuredListings={featuredListings} />
               <WorkflowTemplatesPreview templates={workflowTemplates} />
               <TeamPulse teamMembers={teamPresence} />

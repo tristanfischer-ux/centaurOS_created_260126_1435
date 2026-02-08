@@ -2,6 +2,8 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { GuildPageContent } from './guild-page-content'
 
+export const dynamic = 'force-dynamic'
+
 export default async function GuildPage() {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
@@ -31,20 +33,38 @@ export default async function GuildPage() {
         redirect('/dashboard')
     }
 
-    // Fetch guild members for the network tab
+    // Fetch guild members with foundry_id
     const { data: members } = await supabase
         .from('profiles')
-        .select('id, full_name, role, email')
+        .select('id, full_name, role, email, foundry_id')
         .order('full_name', { ascending: true })
         .limit(50)
 
-    // Map members with foundry name (simplified for now)
+    // Resolve foundry names in a single batch query
+    const foundryIds = [...new Set((members || [])
+        .map(m => m.foundry_id)
+        .filter((id): id is string => !!id)
+    )]
+
+    let foundryMap: Record<string, string> = {}
+    if (foundryIds.length > 0) {
+        const { data: foundries } = await supabase
+            .from('foundries')
+            .select('id, name')
+            .in('id', foundryIds)
+        
+        foundryMap = (foundries || []).reduce((acc, f) => {
+            acc[f.id] = f.name
+            return acc
+        }, {} as Record<string, string>)
+    }
+
     const membersWithFoundry = (members || []).map(m => ({
         id: m.id,
         full_name: m.full_name,
         role: m.role,
         email: m.email,
-        foundry_name: undefined
+        foundry_name: m.foundry_id ? foundryMap[m.foundry_id] : undefined,
     }))
 
     return (
@@ -53,6 +73,7 @@ export default async function GuildPage() {
             isApprentice={isApprentice} 
             isExecutive={isExecutive}
             members={membersWithFoundry}
+            currentUserId={user.id}
         />
     )
 }

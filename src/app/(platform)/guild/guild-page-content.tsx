@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { 
     GraduationCap, 
@@ -11,19 +12,22 @@ import {
     Clock,
     Loader2,
     Calendar,
-    Users
+    Users,
+    Plus
 } from "lucide-react"
 import { ApprenticePoolBrowser } from "@/components/guild/ApprenticePoolBrowser"
 import { ProjectAssignmentsList } from "@/components/guild/ProjectAssignmentsList"
 import { GuildTabs } from "./guild-tabs"
+import { CreateEventDialog } from "@/components/guild/create-event-dialog"
 import { getMyAssignments } from "@/actions/project-assignments"
-import { getGuildEvents, type GuildEvent } from "@/actions/guild-events"
+import { getGuildEvents, getEventRSVPStatuses, type GuildEvent } from "@/actions/guild-events"
 import { formatDistanceToNow } from "date-fns"
 
 interface GuildPageContentProps {
     isManager: boolean
     isApprentice: boolean
     isExecutive: boolean
+    currentUserId: string
     members: {
         id: string
         full_name: string | null
@@ -43,34 +47,51 @@ interface MyAssignment {
     assignedByName: string
 }
 
-export function GuildPageContent({ isManager, isApprentice, isExecutive, members }: GuildPageContentProps) {
+export function GuildPageContent({ isManager, isApprentice, isExecutive, currentUserId, members }: GuildPageContentProps) {
     const [myAssignments, setMyAssignments] = useState<MyAssignment[]>([])
     const [events, setEvents] = useState<GuildEvent[]>([])
+    const [rsvpStatuses, setRsvpStatuses] = useState<Record<string, { attending: boolean; count: number }>>({})
     const [loading, setLoading] = useState(true)
+    const [createEventOpen, setCreateEventOpen] = useState(false)
 
-    useEffect(() => {
-        const loadData = async () => {
-            setLoading(true)
+    const loadData = async () => {
+        setLoading(true)
+        
+        // Load events for everyone
+        const eventsResult = await getGuildEvents({ upcoming: true, limit: 10 })
+        if (eventsResult.data) {
+            setEvents(eventsResult.data)
             
-            // Load events for everyone
-            const eventsResult = await getGuildEvents({ upcoming: true, limit: 10 })
-            if (eventsResult.data) {
-                setEvents(eventsResult.data)
-            }
-            
-            // Load assignments for apprentices
-            if (isApprentice) {
-                const result = await getMyAssignments()
-                if (result.assignments) {
-                    setMyAssignments(result.assignments)
+            // Load RSVP statuses for all events
+            const eventIds = eventsResult.data.map(e => e.id)
+            if (eventIds.length > 0) {
+                const rsvpResult = await getEventRSVPStatuses(eventIds)
+                if (rsvpResult.data) {
+                    setRsvpStatuses(rsvpResult.data)
                 }
             }
-            
-            setLoading(false)
         }
         
+        // Load assignments for apprentices
+        if (isApprentice) {
+            const result = await getMyAssignments()
+            if (result.assignments) {
+                setMyAssignments(result.assignments)
+            }
+        }
+        
+        setLoading(false)
+    }
+
+    useEffect(() => {
         loadData()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isApprentice])
+
+    const handleEventCreated = () => {
+        setCreateEventOpen(false)
+        loadData()
+    }
 
     // Manager view - can browse pool and manage assignments
     if (isManager) {
@@ -80,13 +101,19 @@ export function GuildPageContent({ isManager, isApprentice, isExecutive, members
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-muted">
                     <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-3 mb-1">
-                            <div className="h-8 w-1 bg-electric-blue rounded-full shadow-[0_0_8px_rgba(37,99,235,0.6)]" />
+                            <div className="h-8 w-1 bg-international-orange rounded-full" />
                             <h1 className="text-2xl sm:text-3xl font-display font-semibold text-foreground tracking-tight">Guild</h1>
                         </div>
                         <p className="text-muted-foreground mt-1 text-sm font-medium pl-4">
-                            Browse and assign apprentices from the Guild pool to your projects
+                            Manage apprentices, assignments, events, and the Guild community
                         </p>
                     </div>
+                    {isExecutive && (
+                        <Button onClick={() => setCreateEventOpen(true)} className="gap-2">
+                            <Plus className="h-4 w-4" />
+                            Create Event
+                        </Button>
+                    )}
                 </div>
 
                 <Tabs defaultValue="pool" className="space-y-6">
@@ -117,10 +144,17 @@ export function GuildPageContent({ isManager, isApprentice, isExecutive, members
                         <GuildTabs 
                             events={events} 
                             members={members} 
-                            isExecutive={isExecutive} 
+                            isExecutive={isExecutive}
+                            rsvpStatuses={rsvpStatuses}
                         />
                     </TabsContent>
                 </Tabs>
+
+                <CreateEventDialog
+                    open={createEventOpen}
+                    onOpenChange={setCreateEventOpen}
+                    onCreated={handleEventCreated}
+                />
             </div>
         )
     }
@@ -136,7 +170,7 @@ export function GuildPageContent({ isManager, isApprentice, isExecutive, members
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-muted">
                     <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-3 mb-1">
-                            <div className="h-8 w-1 bg-electric-blue rounded-full shadow-[0_0_8px_rgba(37,99,235,0.6)]" />
+                            <div className="h-8 w-1 bg-international-orange rounded-full" />
                             <h1 className="text-2xl sm:text-3xl font-display font-semibold text-foreground tracking-tight">Guild</h1>
                         </div>
                         <p className="text-muted-foreground mt-1 text-sm font-medium pl-4">
@@ -171,7 +205,7 @@ export function GuildPageContent({ isManager, isApprentice, isExecutive, members
                                     <GraduationCap className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
                                     <h3 className="text-lg font-semibold text-foreground mb-2">No Assignments Yet</h3>
                                     <p className="text-muted-foreground">
-                                        You haven't been assigned to any projects yet. Companies can find you in the Guild pool and assign you to their projects.
+                                        You haven&apos;t been assigned to any projects yet. Companies can find you in the Guild pool and assign you to their projects.
                                     </p>
                                 </CardContent>
                             </Card>
@@ -266,7 +300,8 @@ export function GuildPageContent({ isManager, isApprentice, isExecutive, members
                         <GuildTabs 
                             events={events} 
                             members={members} 
-                            isExecutive={isExecutive} 
+                            isExecutive={isExecutive}
+                            rsvpStatuses={rsvpStatuses}
                         />
                     </TabsContent>
                 </Tabs>

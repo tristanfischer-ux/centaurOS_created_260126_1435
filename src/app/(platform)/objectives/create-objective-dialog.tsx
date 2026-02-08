@@ -4,7 +4,9 @@ import { createObjective } from "@/actions/objectives"
 import { getObjectivePacks, ObjectivePack } from "@/actions/packs"
 import { analyzeBusinessPlan, AnalyzedObjective } from "@/actions/analyze"
 import { smartifyGoal } from "@/actions/smart-goals"
+import { generateStrategicPlan, applyStrategicPlan } from "@/actions/strategic-planner"
 import { toast } from "sonner"
+import { useRouter } from "next/navigation"
 import { useEffect, useState, useCallback } from "react"
 import {
     Loader2,
@@ -13,6 +15,8 @@ import {
     Package,
     Upload,
     ArrowLeft,
+    Calendar,
+    Map,
     Check,
     Briefcase,
     Globe,
@@ -64,7 +68,7 @@ import { SmartScoreCard, getOverallScore } from "@/components/smart/smart-score-
 
 import type { SmartScore, SmartGoalSuggestion, SmartGoalContext } from "@/actions/smart-goals"
 
-type CreationMode = 'guided' | 'manual' | 'pack' | 'import'
+type CreationMode = 'guided' | 'manual' | 'pack' | 'import' | 'strategic'
 
 /** Steps for the guided SMART wizard */
 type GuidedStep = 'capture' | 'refine' | 'measure' | 'create'
@@ -455,6 +459,7 @@ export function CreateObjectiveDialog({ children, prefill, prefillContext, exter
             case 'manual': return FileText;
             case 'pack': return Package;
             case 'import': return Upload;
+            case 'strategic': return Map;
         }
     }
 
@@ -476,6 +481,7 @@ export function CreateObjectiveDialog({ children, prefill, prefillContext, exter
                             {mode === 'manual' && "Define Strategic Objective"}
                             {mode === 'pack' && (selectedPack ? "Configure Objective Pack" : "Select Objective Pack")}
                             {mode === 'import' && "Import from Business Plan"}
+                            {mode === 'strategic' && "Create Strategic Goal"}
                         </DialogTitle>
                         <DialogDescription className="text-muted-foreground">
                             {mode === 'guided' && "AI-guided creation to make your objective Specific, Measurable, Achievable, Relevant, and Time-bound."}
@@ -483,6 +489,7 @@ export function CreateObjectiveDialog({ children, prefill, prefillContext, exter
                             {mode === 'pack' && !selectedPack && "Choose a pre-configured template to jumpstart your strategy."}
                             {mode === 'pack' && selectedPack && `Review tasks included in the "${selectedPack.title}" pack.`}
                             {mode === 'import' && "Upload a business plan to automatically generate objectives."}
+                            {mode === 'strategic' && "Define a big goal with a deadline. AI will build a full plan with phases, tasks, dependencies, and resource recommendations."}
                         </DialogDescription>
                     </DialogHeader>
 
@@ -491,7 +498,7 @@ export function CreateObjectiveDialog({ children, prefill, prefillContext, exter
                         "flex items-center gap-2 mt-6 transition-all flex-wrap",
                         ((mode === 'guided' && guidedStep !== 'capture') || (mode === 'pack' && selectedPack) || (mode === 'import' && analyzedObjectives.length > 0)) && "opacity-60 scale-95"
                     )}>
-                        {(['guided', 'manual', 'pack', 'import'] as CreationMode[]).map((m) => {
+                        {(['guided', 'strategic', 'manual', 'pack', 'import'] as CreationMode[]).map((m) => {
                             const Icon = getModeIcon(m)
                             const isDisabled = (mode === 'guided' && guidedStep !== 'capture' && m !== 'guided') ||
                                             (mode === 'pack' && selectedPack && m !== 'pack') || 
@@ -1207,6 +1214,74 @@ export function CreateObjectiveDialog({ children, prefill, prefillContext, exter
                             </div>
                         )}
 
+                        {/* STRATEGIC GOAL MODE */}
+                        {mode === 'strategic' && (
+                            <div className="max-w-2xl mx-auto pt-4 space-y-6">
+                                <div>
+                                    <h3 className="text-lg font-semibold mb-2">
+                                        What big goal do you want to achieve?
+                                    </h3>
+                                    <p className="text-sm text-muted-foreground mb-4">
+                                        Describe your strategic goal. AI will create a full plan with phases,
+                                        tasks, dependencies, and resource recommendations.
+                                    </p>
+                                </div>
+
+                                <div className="space-y-2">
+                                    <Label htmlFor="strategic-goal">
+                                        Goal <span className="text-destructive" aria-label="required">*</span>
+                                    </Label>
+                                    <Textarea
+                                        id="strategic-goal"
+                                        value={title}
+                                        onChange={(e) => {
+                                            setTitle(e.target.value)
+                                            if (titleError) setTitleError(null)
+                                        }}
+                                        placeholder="e.g., Raise 500k seed round, Launch product in 3 markets, Hire 5 key executives..."
+                                        className={cn(titleError && "border-destructive")}
+                                        aria-required
+                                        aria-invalid={!!titleError}
+                                        aria-describedby={titleError ? "strategic-goal-error" : undefined}
+                                    />
+                                    {titleError && (
+                                        <p id="strategic-goal-error" role="alert" className="text-sm text-destructive">{titleError}</p>
+                                    )}
+                                    <p className="text-xs text-muted-foreground">{title.length} / 500 characters</p>
+                                </div>
+
+                                <div className="space-y-2">
+                                    <Label htmlFor="strategic-description">
+                                        Additional context (optional)
+                                    </Label>
+                                    <Textarea
+                                        id="strategic-description"
+                                        value={description}
+                                        onChange={(e) => setDescription(e.target.value)}
+                                        placeholder="Any additional context the AI should know about - your team size, budget, industry constraints..."
+                                    />
+                                </div>
+
+                                <div className="space-y-2">
+                                    <Label htmlFor="strategic-deadline">
+                                        Target deadline <span className="text-destructive" aria-label="required">*</span>
+                                    </Label>
+                                    <div className="flex items-center gap-2">
+                                        <Calendar className="h-4 w-4 text-muted-foreground" />
+                                        <Input
+                                            id="strategic-deadline"
+                                            type="date"
+                                            value={suggestedTimeframe}
+                                            onChange={(e) => setSuggestedTimeframe(e.target.value)}
+                                            className="w-auto"
+                                            aria-required
+                                            min={new Date().toISOString().split('T')[0]}
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
                     </div>
                 </div>
 
@@ -1309,6 +1384,63 @@ export function CreateObjectiveDialog({ children, prefill, prefillContext, exter
                                     )}
                                 </Button>
                             )}
+                        </div>
+                    ) : mode === 'strategic' ? (
+                        /* Strategic mode: generate plan */
+                        <div className="flex w-full items-center justify-between">
+                            <Button variant="secondary" onClick={() => setOpen(false)} disabled={isLoading}>
+                                Cancel
+                            </Button>
+                            <Button
+                                onClick={async () => {
+                                    if (!title.trim()) {
+                                        setTitleError('Please describe your goal')
+                                        return
+                                    }
+                                    if (!suggestedTimeframe) {
+                                        toast.error('Please set a target deadline')
+                                        return
+                                    }
+                                    setIsLoading(true)
+                                    const { plan, error: planError } = await generateStrategicPlan(
+                                        title,
+                                        suggestedTimeframe
+                                    )
+                                    if (planError || !plan) {
+                                        toast.error(planError || 'Failed to generate plan')
+                                        setIsLoading(false)
+                                        return
+                                    }
+                                    const { objectiveId, error: applyError } = await applyStrategicPlan(
+                                        title,
+                                        description,
+                                        suggestedTimeframe,
+                                        plan
+                                    )
+                                    setIsLoading(false)
+                                    if (applyError || !objectiveId) {
+                                        toast.error(applyError || 'Failed to apply plan')
+                                        return
+                                    }
+                                    toast.success('Strategic plan created!')
+                                    setOpen(false)
+                                    window.location.href = `/strategic-planner/${objectiveId}`
+                                }}
+                                disabled={isLoading || !title.trim() || !suggestedTimeframe}
+                                className="min-w-[200px]"
+                            >
+                                {isLoading ? (
+                                    <>
+                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                        AI is building your plan...
+                                    </>
+                                ) : (
+                                    <>
+                                        <Map className="h-4 w-4" />
+                                        Generate Strategic Plan
+                                    </>
+                                )}
+                            </Button>
                         </div>
                     ) : (
                         /* Other modes: original footer */

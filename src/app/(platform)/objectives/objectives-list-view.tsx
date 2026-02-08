@@ -5,7 +5,8 @@ import { useAutoRefresh } from "@/hooks/useAutoRefresh"
 import { useDebounce } from "@/hooks/useDebounce"
 import { RefreshButton } from "@/components/RefreshButton"
 import { SearchInput } from "@/components/ui/search-input"
-import { ChevronDown, ChevronRight, Target, CheckCircle2, Clock, AlertCircle, ArrowRight, Trash, MessageSquare, Paperclip, Loader2, Plus, FileText, Pencil, Lock } from "lucide-react"
+import { ChevronDown, ChevronRight, Target, CheckCircle2, Clock, AlertCircle, ArrowRight, Trash, MessageSquare, Paperclip, Loader2, Plus, FileText, Pencil, Lock, Map } from "lucide-react"
+import Link from "next/link"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
@@ -57,6 +58,7 @@ interface Objective {
     tasks: Task[]
     is_private?: boolean
     creator_id?: string
+    is_strategic_goal?: boolean
 }
 
 interface ObjectivesListViewProps {
@@ -455,6 +457,22 @@ export function ObjectivesListView({ objectives, objectivesForDialog, members, t
                                     <Badge variant="secondary" className="text-xs">
                                         {progress}%
                                     </Badge>
+
+                                    {objective.is_strategic_goal && (
+                                        <Link
+                                            href={`/strategic-planner/${objective.id}`}
+                                            onClick={(e) => e.stopPropagation()}
+                                        >
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                className="h-8 w-8 text-international-orange hover:text-international-orange hover:bg-international-orange/10 active:scale-[0.98] transition-all"
+                                                aria-label="View strategic timeline"
+                                            >
+                                                <Map className="h-4 w-4" />
+                                            </Button>
+                                        </Link>
+                                    )}
 
                                     <Button
                                         variant="ghost"

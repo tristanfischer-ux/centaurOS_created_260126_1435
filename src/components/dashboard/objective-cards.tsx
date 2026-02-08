@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { Target, ChevronRight, Calendar, Lightbulb, Briefcase, ArrowRight } from 'lucide-react'
+import { Target, ChevronRight, Calendar, Lightbulb, Briefcase, ArrowRight, Map } from 'lucide-react'
 import { differenceInDays } from 'date-fns'
 import { cn } from '@/lib/utils'
 import { Progress } from '@/components/ui/progress'
@@ -16,6 +16,7 @@ interface Objective {
   end_date: string | null
   created_at: string
   creator?: { full_name: string | null; avatar_url?: string | null } | null
+  is_strategic_goal?: boolean | null
 }
 
 interface ObjectiveCardsProps {
@@ -171,8 +172,20 @@ function ObjectiveCard({ objective }: { objective: Objective }) {
         </div>
       </Link>
 
+      {/* Strategic goal timeline link */}
+      {objective.is_strategic_goal && (
+        <Link
+          href={`/strategic-planner/${objective.id}`}
+          className="flex items-center gap-2 px-4 py-2.5 border-t bg-international-orange/5 border-international-orange/10 hover:bg-international-orange/10 transition-colors"
+        >
+          <Map className="w-3.5 h-3.5 flex-shrink-0 text-international-orange" />
+          <span className="text-xs text-international-orange font-medium">View strategic timeline</span>
+          <ArrowRight className="w-3 h-3 ml-auto flex-shrink-0 text-international-orange" />
+        </Link>
+      )}
+
       {/* Contextual nudge - subtle, helpful suggestion */}
-      {nudge && (
+      {nudge && !objective.is_strategic_goal && (
         <Link
           href={nudge.href}
           className={cn(
