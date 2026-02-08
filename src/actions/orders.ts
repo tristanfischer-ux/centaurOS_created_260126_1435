@@ -405,7 +405,7 @@ export async function approveCompletion(
       }
     } catch {
       // Notification service not available - skip silently
-      console.log("Notification service not available, skipping invoice notifications")
+      console.warn('[OrderService] Notification service not available, skipping invoice notifications')
     }
   } catch (invoiceErr) {
     console.error("Error generating invoices:", invoiceErr)

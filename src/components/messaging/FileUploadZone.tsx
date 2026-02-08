@@ -119,6 +119,7 @@ export function FileUploadZone({
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
         title="Attach file"
+        aria-label="Attach file"
       >
         <Paperclip className="h-4 w-4" />
       </Button>
@@ -211,6 +212,7 @@ export function FilePreview({
           size="icon"
           onClick={onRemove}
           className="h-6 w-6 flex-shrink-0"
+          aria-label="Remove file"
         >
           <X className="h-3 w-3" />
         </Button>
@@ -260,6 +262,7 @@ export function ImageLightbox({
             size="icon"
             onClick={onClose}
             className="absolute top-4 right-4 bg-background/80 hover:bg-background"
+            aria-label="Close image preview"
           >
             <X className="h-4 w-4" />
           </Button>

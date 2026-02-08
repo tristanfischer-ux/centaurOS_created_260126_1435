@@ -109,6 +109,7 @@ export function BookingIntentBanner({ intents }: BookingIntentBannerProps) {
                 size="icon"
                 className="shrink-0 h-8 w-8 text-orange-400 hover:text-orange-600 hover:bg-orange-100"
                 onClick={() => handleDismiss(intent.id)}
+                aria-label="Dismiss"
               >
                 <X className="h-4 w-4" />
               </Button>

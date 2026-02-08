@@ -538,7 +538,7 @@ async function createApprovalNotification(
     }
   } catch (error) {
     // Notifications table may not exist, silently fail
-    console.log('Could not create notification:', error)
+    console.warn('[OJTTracking] Could not create approval notification:', error instanceof Error ? error.message : error)
   }
 }
 
@@ -569,7 +569,7 @@ async function createRejectionNotification(
       })
     }
   } catch (error) {
-    console.log('Could not create notification:', error)
+    console.warn('[OJTTracking] Could not create rejection notification:', error instanceof Error ? error.message : error)
   }
 }
 

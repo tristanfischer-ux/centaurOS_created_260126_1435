@@ -238,6 +238,7 @@ export function DateSelector({
                             size="icon"
                             onClick={goToPreviousMonth}
                             disabled={disabled}
+                            aria-label="Previous month"
                         >
                             <ChevronLeft className="h-4 w-4" />
                         </Button>
@@ -249,6 +250,7 @@ export function DateSelector({
                             size="icon"
                             onClick={goToNextMonth}
                             disabled={disabled}
+                            aria-label="Next month"
                         >
                             <ChevronRight className="h-4 w-4" />
                         </Button>

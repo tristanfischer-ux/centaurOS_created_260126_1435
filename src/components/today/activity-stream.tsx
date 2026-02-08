@@ -185,6 +185,7 @@ export function ActivityStream({ initialItems, initialCounts, onTaskClick, membe
               size="icon"
               onClick={handleRefresh}
               disabled={isRefreshing || isPending}
+              aria-label="Refresh activity stream"
             >
               <RefreshCw className={cn(
                 "h-4 w-4",

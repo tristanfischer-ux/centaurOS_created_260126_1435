@@ -120,6 +120,7 @@ export function DailyPulseWidget({
                             size="icon"
                             className="h-7 w-7"
                             onClick={fetchReport}
+                            aria-label="Refresh report"
                         >
                             <RefreshCw className="h-3.5 w-3.5" />
                         </Button>

@@ -73,7 +73,7 @@ export function ObjectiveDetailPanel({ objective, onClose }: ObjectiveDetailPane
         <h2 className="text-base font-semibold text-foreground truncate pr-4 min-w-0">
           {objective.title}
         </h2>
-        <Button variant="ghost" size="icon" onClick={onClose} className="flex-shrink-0 h-8 w-8">
+        <Button variant="ghost" size="icon" onClick={onClose} className="flex-shrink-0 h-8 w-8" aria-label="Close panel">
           <X className="h-4 w-4" />
         </Button>
       </div>

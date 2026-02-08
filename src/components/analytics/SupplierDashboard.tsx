@@ -158,6 +158,7 @@ export function SupplierDashboard({
             size="icon"
             onClick={handleRefresh}
             disabled={isRefreshing}
+            aria-label="Refresh dashboard"
           >
             <RefreshCw className={cn("h-4 w-4", isRefreshing && "animate-spin")} />
           </Button>

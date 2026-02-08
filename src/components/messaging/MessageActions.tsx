@@ -61,6 +61,7 @@ export function MessageActions({
           className="h-7 w-7 hover:bg-muted"
           onClick={onReplyInThread}
           title="Reply in thread"
+          aria-label="Reply in thread"
         >
           <MessageSquare className="h-3.5 w-3.5" />
         </Button>
@@ -77,6 +78,7 @@ export function MessageActions({
           )}
           onClick={onToggleStar}
           title={isStarred ? 'Remove star' : 'Star message'}
+          aria-label={isStarred ? 'Remove star' : 'Star message'}
         >
           <Star className={cn('h-3.5 w-3.5', isStarred && 'fill-current')} />
         </Button>
@@ -89,6 +91,7 @@ export function MessageActions({
         className="h-7 w-7 hover:bg-muted"
         onClick={handleCopy}
         title="Copy message"
+        aria-label="Copy message"
       >
         <Copy className="h-3.5 w-3.5" />
       </Button>
@@ -101,6 +104,7 @@ export function MessageActions({
           className="h-7 w-7 hover:bg-muted"
           onClick={onForward}
           title="Forward message"
+          aria-label="Forward message"
         >
           <Forward className="h-3.5 w-3.5" />
         </Button>

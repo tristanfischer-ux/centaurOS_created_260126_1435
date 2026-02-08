@@ -64,7 +64,7 @@ export function TaskDetailPanel({ task, onClose }: TaskDetailPanelProps) {
             {task.title}
           </h2>
         </div>
-        <Button variant="ghost" size="icon" onClick={onClose} className="flex-shrink-0 h-8 w-8">
+        <Button variant="ghost" size="icon" onClick={onClose} className="flex-shrink-0 h-8 w-8" aria-label="Close panel">
           <X className="h-4 w-4" />
         </Button>
       </div>

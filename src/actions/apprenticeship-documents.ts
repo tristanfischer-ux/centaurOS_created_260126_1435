@@ -357,6 +357,6 @@ async function createSignatureNotification(userId: string, documentId: string, d
       })
     }
   } catch (error) {
-    console.log('Could not create notification:', error)
+    console.warn('[ApprenticeshipDocs] Could not create notification:', error instanceof Error ? error.message : error)
   }
 }
