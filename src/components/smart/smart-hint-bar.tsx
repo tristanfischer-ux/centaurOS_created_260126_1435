@@ -8,6 +8,9 @@
  * a brief suggestion and mini score pills. Includes a "Refine with AI"
  * sparkle button to trigger full smartification.
  *
+ * Gracefully degrades when AI is unavailable, slow, or failing: after 2
+ * consecutive failures the bar hides itself so users aren't nagged.
+ *
  * @component
  *
  * @example
@@ -20,11 +23,12 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { Sparkles, Loader2, ChevronRight } from 'lucide-react'
+import { toast } from 'sonner'
 
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { SmartScoreCard } from '@/components/smart/smart-score-card'
-import { smartifyGoal, scoreSmartGoal } from '@/actions/smart-goals'
+import { checkAIAvailable, smartifyGoal, scoreSmartGoal } from '@/actions/smart-goals'
 
 import type { SmartScore, SmartGoalSuggestion, SmartGoalContext } from '@/actions/smart-goals'
 
@@ -44,6 +48,9 @@ interface SmartHintBarProps {
 /** Debounce delay for scoring (ms) */
 const SCORE_DEBOUNCE_MS = 1500
 
+/** Stop auto-scoring after this many consecutive failures */
+const MAX_CONSECUTIVE_FAILURES = 2
+
 export function SmartHintBar({
   text,
   type,
@@ -56,12 +63,29 @@ export function SmartHintBar({
   const [isScoring, setIsScoring] = useState(false)
   const [isRefining, setIsRefining] = useState(false)
   const [refinedSuggestion, setRefinedSuggestion] = useState<SmartGoalSuggestion | null>(null)
+  const [aiAvailable, setAiAvailable] = useState<boolean | null>(null) // null = not yet checked
+  const [disabled, setDisabled] = useState(false)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const lastScoredText = useRef<string>('')
+  const failCountRef = useRef<number>(0)
+
+  // Check AI availability once on mount
+  useEffect(() => {
+    let mounted = true
+    checkAIAvailable().then((available) => {
+      if (mounted) setAiAvailable(available)
+    }).catch(() => {
+      if (mounted) setAiAvailable(false)
+    })
+    return () => { mounted = false }
+  }, [])
 
   // Debounced scoring as user types
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current)
+
+    // Don't attempt scoring if AI is unavailable or disabled after failures
+    if (aiAvailable === false || disabled) return
 
     const trimmed = text.trim()
     if (trimmed.length < 5) {
@@ -76,19 +100,32 @@ export function SmartHintBar({
 
     debounceRef.current = setTimeout(async () => {
       setIsScoring(true)
-      const result = await scoreSmartGoal(trimmed, type)
-      if (result.score) {
-        setScore(result.score)
-        setSuggestions(result.suggestions || [])
-        lastScoredText.current = trimmed
+      try {
+        const result = await scoreSmartGoal(trimmed, type)
+        if (result.score) {
+          setScore(result.score)
+          setSuggestions(result.suggestions || [])
+          lastScoredText.current = trimmed
+          failCountRef.current = 0 // Reset on success
+        } else if (result.error) {
+          failCountRef.current++
+        }
+      } catch {
+        failCountRef.current++
+      } finally {
+        setIsScoring(false)
       }
-      setIsScoring(false)
+
+      // After repeated failures, stop auto-scoring to avoid nagging
+      if (failCountRef.current >= MAX_CONSECUTIVE_FAILURES) {
+        setDisabled(true)
+      }
     }, SCORE_DEBOUNCE_MS)
 
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current)
     }
-  }, [text, type])
+  }, [text, type, aiAvailable, disabled])
 
   // Full AI refinement
   const handleRefine = useCallback(async () => {
@@ -98,18 +135,25 @@ export function SmartHintBar({
     setIsRefining(true)
     setRefinedSuggestion(null)
 
-    const result = await smartifyGoal({
-      rawIdea: trimmed,
-      type,
-      context,
-    })
+    try {
+      const result = await smartifyGoal({
+        rawIdea: trimmed,
+        type,
+        context,
+      })
 
-    if (result.suggestion) {
-      setRefinedSuggestion(result.suggestion)
-      setScore(result.suggestion.smartScore)
-      setSuggestions(result.suggestion.suggestions)
+      if (result.suggestion) {
+        setRefinedSuggestion(result.suggestion)
+        setScore(result.suggestion.smartScore)
+        setSuggestions(result.suggestion.suggestions)
+      } else if (result.error) {
+        toast.error('AI refinement failed. Please try again.')
+      }
+    } catch {
+      toast.error('AI refinement failed. Please try again.')
+    } finally {
+      setIsRefining(false)
     }
-    setIsRefining(false)
   }, [text, type, context, isRefining])
 
   const handleAccept = useCallback(() => {
@@ -121,6 +165,12 @@ export function SmartHintBar({
 
   // Don't render until user has typed enough
   if (text.trim().length < 5) return null
+
+  // Don't render if AI is not available or disabled after failures
+  if (aiAvailable === false || disabled) return null
+
+  // Don't render while still checking availability (avoid flash)
+  if (aiAvailable === null) return null
 
   return (
     <div

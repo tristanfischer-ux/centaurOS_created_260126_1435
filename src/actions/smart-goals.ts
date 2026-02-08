@@ -17,9 +17,26 @@ import { getFoundryIdCached } from '@/lib/supabase/foundry-context'
 import { buildAIContext } from '@/lib/ai-context/builder'
 import { escapeHtml } from '@/lib/security/sanitize'
 
+/** Whether AI features are available (API key is set and not the build placeholder) */
+const AI_ENABLED =
+  !!process.env.OPENAI_API_KEY &&
+  process.env.OPENAI_API_KEY !== 'dummy-key-for-build'
+
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY || 'dummy-key-for-build',
 })
+
+/**
+ * Lightweight check for whether AI features are configured.
+ *
+ * @description Returns true when OPENAI_API_KEY is set to a real value.
+ * Used by SmartHintBar to avoid rendering when AI is unavailable.
+ *
+ * @returns Whether the OpenAI API key is configured
+ */
+export async function checkAIAvailable(): Promise<boolean> {
+  return AI_ENABLED
+}
 
 /** Source page context for pre-filling */
 export interface SmartGoalContext {
@@ -82,6 +99,8 @@ export interface SmartScoreResult {
 export async function smartifyGoal(
   input: SmartGoalInput
 ): Promise<SmartifyResult> {
+  if (!AI_ENABLED) return { error: 'AI not configured' }
+
   // AUTH: Verify user is authenticated
   const supabase = await createClient()
   const {
@@ -224,6 +243,8 @@ export async function scoreSmartGoal(
   text: string,
   type: 'objective' | 'task'
 ): Promise<SmartScoreResult> {
+  if (!AI_ENABLED) return { error: 'AI not configured' }
+
   const trimmed = text?.trim()
   if (!trimmed || trimmed.length < 5) {
     return {

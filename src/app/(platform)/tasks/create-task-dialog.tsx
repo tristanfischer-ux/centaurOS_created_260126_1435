@@ -256,8 +256,11 @@ export function CreateTaskDialog({ objectives, members, teams = [], currentUserI
                 setSubmitError(null)
             }
         } catch (error) {
-            setSubmitError("An unexpected error occurred")
-            toast.error("An unexpected error occurred")
+            console.error('[CreateTask] Submission failed:', {
+                error: error instanceof Error ? error.message : 'Unknown error',
+            })
+            setSubmitError("Failed to create task. Please try again.")
+            toast.error("Failed to create task. Please try again.")
         } finally {
             setIsLoading(false)
         }
