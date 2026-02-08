@@ -20,7 +20,7 @@ import {
   resumeSubscription,
   checkSubscriptionLimit,
 } from '@/lib/billing/subscriptions'
-import type { SubscriptionTier, SubscriptionPlan } from '@/lib/billing/subscriptions'
+import type { SubscriptionTier, SubscriptionPlan } from '@/lib/billing/plans'
 
 /**
  * Get the current user's subscription status
