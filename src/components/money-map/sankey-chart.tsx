@@ -98,29 +98,20 @@ function buildSankeyData(data: MoneyMapData): SankeyData {
     }
   }
 
-  // Links: Cost buckets → Net margin nodes
-  // Aggregate totals per cost bucket to distribute to margin nodes
+  // Links: Revenue → Profit nodes (only the net margin portion)
+  // Cost buckets are terminal — they absorb costs and don't pass them on.
+  // This makes the right-side profit nodes visually smaller than revenue,
+  // correctly showing that costs have been deducted.
   for (let i = 0; i < profitability.length; i++) {
     const p = profitability[i]
     const netNodeIdx = N + 3 + i
 
-    // Revenue that flows through to profit (revenue - total costs)
+    // Only the profit portion flows from revenue to the net node
     const monthlyRevenue = normaliseToMonthly(p.revenue_stream.amount, p.revenue_stream.period)
     const flowToNet = Math.max(monthlyRevenue - p.total_costs, 0)
 
     if (flowToNet > 0) {
       links.push({ source: i, target: netNodeIdx, value: flowToNet })
-    }
-
-    // Costs flow from buckets to net node (representing cost impact)
-    if (p.direct_costs > 0) {
-      links.push({ source: N, target: netNodeIdx, value: p.direct_costs })
-    }
-    if (p.indirect_costs > 0) {
-      links.push({ source: N + 1, target: netNodeIdx, value: p.indirect_costs })
-    }
-    if (p.overhead_costs > 0) {
-      links.push({ source: N + 2, target: netNodeIdx, value: p.overhead_costs })
     }
   }
 

@@ -57,10 +57,30 @@ function parseInputsFromParams(params: URLSearchParams): CostOfDelayInputs {
   }
 }
 
+/** Calculator-specific param keys (excludes page-level params like `tab`). */
+const CALCULATOR_KEYS = new Set(Object.values(PARAM_MAP))
+
 /**
- * Encodes inputs into URL search params.
+ * Merges calculator inputs into existing search params, preserving
+ * non-calculator params like `tab` so the page tab stays intact.
  */
-function encodeInputsToParams(inputs: CostOfDelayInputs): string {
+function mergeInputsIntoParams(
+  inputs: CostOfDelayInputs,
+  existing: URLSearchParams
+): string {
+  const params = new URLSearchParams(existing.toString())
+  params.set(PARAM_MAP.monthlyOverhead, String(inputs.monthlyOverhead))
+  params.set(PARAM_MAP.expectedMonthlyRevenue, String(inputs.expectedMonthlyRevenue))
+  params.set(PARAM_MAP.monthsUntilLaunch, String(inputs.monthsUntilLaunch))
+  params.set(PARAM_MAP.monthsSaved, String(inputs.monthsSaved))
+  params.set(PARAM_MAP.accelerationCost, String(inputs.accelerationCost))
+  return params.toString()
+}
+
+/**
+ * Builds a shareable URL with only calculator params (no page-level params).
+ */
+function encodeInputsToShareableParams(inputs: CostOfDelayInputs): string {
   const params = new URLSearchParams()
   params.set(PARAM_MAP.monthlyOverhead, String(inputs.monthlyOverhead))
   params.set(PARAM_MAP.expectedMonthlyRevenue, String(inputs.expectedMonthlyRevenue))
@@ -68,6 +88,22 @@ function encodeInputsToParams(inputs: CostOfDelayInputs): string {
   params.set(PARAM_MAP.monthsSaved, String(inputs.monthsSaved))
   params.set(PARAM_MAP.accelerationCost, String(inputs.accelerationCost))
   return params.toString()
+}
+
+/**
+ * Checks whether the calculator inputs in the URL match the current state.
+ */
+function calculatorParamsMatch(
+  inputs: CostOfDelayInputs,
+  params: URLSearchParams
+): boolean {
+  return (
+    params.get(PARAM_MAP.monthlyOverhead) === String(inputs.monthlyOverhead) &&
+    params.get(PARAM_MAP.expectedMonthlyRevenue) === String(inputs.expectedMonthlyRevenue) &&
+    params.get(PARAM_MAP.monthsUntilLaunch) === String(inputs.monthsUntilLaunch) &&
+    params.get(PARAM_MAP.monthsSaved) === String(inputs.monthsSaved) &&
+    params.get(PARAM_MAP.accelerationCost) === String(inputs.accelerationCost)
+  )
 }
 
 export function CostOfDelayView(): React.ReactElement {
@@ -78,12 +114,11 @@ export function CostOfDelayView(): React.ReactElement {
     parseInputsFromParams(searchParams)
   )
 
-  // Sync inputs to URL (debounced via effect)
+  // Sync inputs to URL, preserving non-calculator params (e.g. `tab`)
   useEffect(() => {
-    const encoded = encodeInputsToParams(inputs)
-    const current = searchParams.toString()
-    if (encoded !== current) {
-      router.replace(`?${encoded}`, { scroll: false })
+    if (!calculatorParamsMatch(inputs, searchParams)) {
+      const merged = mergeInputsIntoParams(inputs, searchParams)
+      router.replace(`?${merged}`, { scroll: false })
     }
   }, [inputs, router, searchParams])
 
@@ -95,7 +130,8 @@ export function CostOfDelayView(): React.ReactElement {
   const acceleratedLaunchMonth = Math.max(0, inputs.monthsUntilLaunch - inputs.monthsSaved)
 
   const handleShare = useCallback(async () => {
-    const url = `${window.location.origin}${window.location.pathname}?${encodeInputsToParams(inputs)}`
+    // Share URL includes only calculator params (not tab state)
+    const url = `${window.location.origin}/tools/financial?tab=cost-of-delay&${encodeInputsToShareableParams(inputs)}`
     try {
       await navigator.clipboard.writeText(url)
       toast.success("Link copied to clipboard")
