@@ -3,13 +3,9 @@
 import { createClient } from '@/lib/supabase/server'
 import { getFoundryIdCached } from '@/lib/supabase/foundry-context'
 import { z } from 'zod'
+import { FEEDBACK_CATEGORIES } from '@/lib/feedback-categories'
 
-/**
- * Feedback categories for early access users.
- * Each maps to a specific type of insight we want to capture.
- */
-export const FEEDBACK_CATEGORIES = ['bug', 'idea', 'confusion', 'praise'] as const
-export type FeedbackCategory = typeof FEEDBACK_CATEGORIES[number]
+import type { FeedbackCategory } from '@/lib/feedback-categories'
 
 const feedbackSchema = z.object({
     category: z.enum(FEEDBACK_CATEGORIES),

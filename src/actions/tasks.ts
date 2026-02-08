@@ -15,8 +15,10 @@ import { syncTaskToCalendar } from '@/actions/google-calendar'
 // Nudge cooldown duration (1 hour)
 const NUDGE_COOLDOWN_MS = 60 * 60 * 1000
 
-export type TaskStatus = Database["public"]["Enums"]["task_status"]
-export type RiskLevel = Database["public"]["Enums"]["risk_level"]
+// Keep type-only (non-exported) to comply with 'use server' constraint:
+// Next.js requires all exports in a 'use server' file to be async functions.
+type TaskStatus = Database["public"]["Enums"]["task_status"]
+type RiskLevel = Database["public"]["Enums"]["risk_level"]
 
 /**
  * Security helper: Check if user can modify a task

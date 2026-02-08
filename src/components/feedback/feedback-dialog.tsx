@@ -15,7 +15,8 @@ import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { cn } from '@/lib/utils'
-import { submitFeedback, type FeedbackCategory } from '@/actions/feedback'
+import { submitFeedback } from '@/actions/feedback'
+import type { FeedbackCategory } from '@/lib/feedback-categories'
 import { toast } from 'sonner'
 import {
     Bug,
