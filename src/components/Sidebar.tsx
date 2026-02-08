@@ -4,7 +4,7 @@ import React from "react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
-import { Users, CheckSquare, Store, Target, ShieldAlert, Lightbulb, ShoppingBag, Bot, Home, Bell, Sparkles, Waypoints, MessageSquarePlus, Plus, Map } from "lucide-react"
+import { Users, CheckSquare, Store, Target, ShieldAlert, Lightbulb, ShoppingBag, Bot, Home, Bell, Sparkles, Waypoints, MessageSquarePlus, Plus, Map, Calculator } from "lucide-react"
 import { NotificationCenter } from "@/components/NotificationCenter"
 import { UnreadIndicator } from "@/components/today/UnreadIndicator"
 import { FoundrySwitcher } from "@/components/FoundrySwitcher"
@@ -57,6 +57,11 @@ const discoveryNavigation = [
     { name: "Marketplace", href: "/marketplace", icon: Store, tooltip: "Find experts, suppliers, products, and services" },
     { name: "My Orders", href: "/my-orders", icon: ShoppingBag, tooltip: "View and manage your marketplace orders" },
     { name: "What's New", href: "/whats-new", icon: Sparkles, tooltip: "Latest features, improvements, and product updates" },
+]
+
+// Tools: financial calculators and utilities
+const toolsNavigation = [
+    { name: "Cost of Delay", href: "/tools/cost-of-delay", icon: Calculator, tooltip: "Visualize whether spending to ship faster saves you money" },
 ]
 
 // Profile & Settings moved to AccountPopover (accessed via user avatar)
@@ -217,6 +222,12 @@ export function Sidebar({ foundryName, foundryId, userName, userRole, isCompanyA
                             
                             {/* Discovery: Product Map, Marketplace */}
                             {discoveryNavigation.map(renderNavItem)}
+                            
+                            {/* Spacer */}
+                            <div className="my-3 border-t border-slate-100" />
+                            
+                            {/* Tools: Calculators & Utilities */}
+                            {toolsNavigation.map(renderNavItem)}
                         </>
                     )
                 })()}
