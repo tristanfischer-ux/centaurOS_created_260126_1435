@@ -4,20 +4,94 @@ import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 
 /**
- * Get unified profile data for the profile hub.
- * Merges data from profiles, provider_profiles, and marketplace_listings.
+ * Profile hub data shape returned by getProfileHubData.
+ * Used by the my-profile page to render the full profile hub.
  */
-export async function getProfileHubData() {
+export interface ProfileHubData {
+  profile: {
+    id: string
+    email: string
+    full_name: string | null
+    role: string
+    avatar_url: string | null
+    account_type: string | null
+    foundry_id: string | null
+    created_at: string | null
+  } | null
+  providerProfile: {
+    id: string
+    headline: string | null
+    bio: string | null
+    day_rate: number | null
+    hourly_rate: number | null
+    currency: string | null
+    tier: string | null
+    location: string | null
+    years_experience: number | null
+    specializations: string[] | null
+    industries: string[] | null
+    company_stages: string[] | null
+    profile_slug: string | null
+    is_public: boolean | null
+    video_url: string | null
+    linkedin_url: string | null
+    website_url: string | null
+    is_active: boolean | null
+    listing_id: string | null
+    stripe_onboarding_complete: boolean | null
+    max_concurrent_orders: number | null
+    timezone: string | null
+  } | null
+  listing: {
+    id: string
+    title: string | null
+    description: string | null
+    category: string | null
+    subcategory: string | null
+    image_url: string | null
+    approval_status: string | null
+  } | null
+  strength: {
+    score: number
+    sections: Array<{
+      name: string
+      weight: number
+      completed: boolean
+      suggestion: string
+    }>
+  }
+  isProvider: boolean
+  foundryName: string | null
+  stats: {
+    totalTasks: number
+    completedTasks: number
+    objectives: number
+    teamSize: number
+  }
+}
+
+/**
+ * Get unified profile data for the profile hub.
+ *
+ * @description Merges data from profiles, provider_profiles, marketplace_listings,
+ * and aggregates user activity stats (tasks, objectives, team size).
+ *
+ * @returns {Promise<ProfileHubData | null>} Complete profile hub data or null if unauthenticated
+ *
+ * @security Requires authenticated user. Stats scoped to user's foundry.
+ */
+export async function getProfileHubData(): Promise<ProfileHubData | null> {
   const supabase = await createClient()
 
+  // AUTH: Verify user is authenticated
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return null
 
-  // Fetch profile, provider profile, and listing in parallel
+  // Fetch profile, provider profile in parallel
   const [profileResult, providerResult] = await Promise.all([
     supabase
       .from('profiles')
-      .select('id, email, full_name, role, avatar_url, account_type, onboarding_data, created_at')
+      .select('id, email, full_name, role, avatar_url, account_type, foundry_id, created_at')
       .eq('id', user.id)
       .single(),
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -36,19 +110,70 @@ export async function getProfileHubData() {
 
   const profile = profileResult.data
   const providerProfile = providerResult.data
+  const foundryId = profile?.foundry_id
 
-  // Get listing if provider has one
-  let listing = null
-  if (providerProfile?.listing_id) {
-    const { data } = await supabase
-      .from('marketplace_listings')
-      .select('id, title, description, category, subcategory, image_url, approval_status')
-      .eq('id', providerProfile.listing_id)
-      .single()
-    listing = data
+  // Fetch listing, foundry name, and stats in parallel
+  const [listingResult, foundryResult, taskCountResult, completedTaskResult, objectiveCountResult, teamCountResult] = await Promise.all([
+    // Get listing if provider has one
+    providerProfile?.listing_id
+      ? supabase
+          .from('marketplace_listings')
+          .select('id, title, description, category, subcategory, image_url, approval_status')
+          .eq('id', providerProfile.listing_id)
+          .single()
+      : Promise.resolve({ data: null }),
+    // Get foundry name
+    foundryId
+      ? supabase
+          .from('foundries')
+          .select('name')
+          .eq('id', foundryId)
+          .single()
+      : Promise.resolve({ data: null }),
+    // Task counts (scoped to foundry)
+    foundryId
+      ? supabase
+          .from('tasks')
+          .select('id', { count: 'exact', head: true })
+          .eq('foundry_id', foundryId)
+          .eq('assignee_id', user.id)
+      : Promise.resolve({ count: 0 }),
+    foundryId
+      ? supabase
+          .from('tasks')
+          .select('id', { count: 'exact', head: true })
+          .eq('foundry_id', foundryId)
+          .eq('assignee_id', user.id)
+          .eq('status', 'Completed')
+      : Promise.resolve({ count: 0 }),
+    // Objectives count
+    foundryId
+      ? supabase
+          .from('objectives')
+          .select('id', { count: 'exact', head: true })
+          .eq('foundry_id', foundryId)
+          .eq('creator_id', user.id)
+      : Promise.resolve({ count: 0 }),
+    // Team size
+    foundryId
+      ? supabase
+          .from('profiles')
+          .select('id', { count: 'exact', head: true })
+          .eq('foundry_id', foundryId)
+      : Promise.resolve({ count: 0 }),
+  ])
+
+  const listing = listingResult?.data ?? null
+  const foundryName = foundryResult?.data?.name ?? null
+
+  const stats = {
+    totalTasks: taskCountResult?.count ?? 0,
+    completedTasks: completedTaskResult?.count ?? 0,
+    objectives: objectiveCountResult?.count ?? 0,
+    teamSize: teamCountResult?.count ?? 0,
   }
 
-  // Calculate profile strength
+  // Calculate profile strength (only meaningful for providers)
   const strength = calculateProfileStrength(profile, providerProfile, listing)
 
   return {
@@ -57,11 +182,16 @@ export async function getProfileHubData() {
     listing,
     strength,
     isProvider: !!providerProfile,
+    foundryName,
+    stats,
   }
 }
 
 /**
  * Calculate profile strength (0-100) with specific improvement suggestions.
+ *
+ * @description Scores provider profiles based on completeness across 10 dimensions.
+ * Only meaningful for users with a provider profile.
  */
 function calculateProfileStrength(
   profile: Record<string, unknown> | null,
@@ -149,10 +279,19 @@ function calculateProfileStrength(
 
 /**
  * Update the user's marketplace profile information.
+ *
+ * @description Updates or creates a provider profile with the supplied fields.
+ * All fields are optional - only provided values are updated.
+ *
+ * @param {FormData} formData - Form data with profile fields
+ * @returns {Promise<{success: boolean; error?: string}>}
+ *
+ * @security Requires authenticated user. Updates scoped to own profile.
  */
-export async function updateMarketplaceProfile(formData: FormData) {
+export async function updateMarketplaceProfile(formData: FormData): Promise<{ success: boolean; error?: string }> {
   const supabase = await createClient()
 
+  // AUTH: Verify user is authenticated
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { success: false, error: 'Not authenticated' }
 
@@ -168,12 +307,12 @@ export async function updateMarketplaceProfile(formData: FormData) {
   const specializationsRaw = formData.get('specializations') as string | null
   const specializations = specializationsRaw ? specializationsRaw.split(',').map(s => s.trim()).filter(Boolean) : null
 
-  // Validate headline length
+  // VALIDATION: Headline length
   if (headline && headline.length > 100) {
     return { success: false, error: 'Headline must be 100 characters or less' }
   }
 
-  // Validate bio length
+  // VALIDATION: Bio length
   if (bio && bio.length > 2000) {
     return { success: false, error: 'Bio must be 2000 characters or less' }
   }
@@ -208,7 +347,10 @@ export async function updateMarketplaceProfile(formData: FormData) {
       .eq('user_id', user.id)
 
     if (error) {
-      console.error('Failed to update provider profile:', error)
+      console.error('[ProfileHub] Failed to update provider profile:', {
+        userId: user.id,
+        error: error.message,
+      })
       return { success: false, error: 'Failed to update profile' }
     }
   } else {
@@ -237,7 +379,10 @@ export async function updateMarketplaceProfile(formData: FormData) {
       })
 
     if (error) {
-      console.error('Failed to create provider profile:', error)
+      console.error('[ProfileHub] Failed to create provider profile:', {
+        userId: user.id,
+        error: error.message,
+      })
       return { success: false, error: 'Failed to create profile' }
     }
   }
@@ -248,6 +393,9 @@ export async function updateMarketplaceProfile(formData: FormData) {
 
 /**
  * Generate bio suggestions based on role and experience.
+ *
+ * @param {string} role - User's role (Executive, Apprentice, supplier)
+ * @returns {Promise<string>} Bio template string with placeholders
  */
 export async function generateBioTemplate(role: string): Promise<string> {
   const templates: Record<string, string> = {

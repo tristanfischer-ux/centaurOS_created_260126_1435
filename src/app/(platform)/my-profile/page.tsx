@@ -4,10 +4,15 @@ import { getProfileHubData } from '@/actions/profile-hub'
 import { ProfileHubView } from './profile-hub-view'
 
 export const metadata = {
-  title: 'My Profile | ForgeOS',
-  description: 'Manage your marketplace profile and presence',
+  title: 'My Profile | CentaurOS',
+  description: 'Manage your profile and marketplace presence',
 }
 
+/**
+ * MyProfilePage - Server component that fetches profile data and renders the hub.
+ *
+ * @security Requires authenticated user. Redirects to login if unauthenticated.
+ */
 export default async function MyProfilePage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()

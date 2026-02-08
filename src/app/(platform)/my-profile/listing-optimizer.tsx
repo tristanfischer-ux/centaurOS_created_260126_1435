@@ -1,11 +1,23 @@
 'use client'
 
 import { useState } from 'react'
-import { 
-  Package, Image as ImageIcon, Tag, FileText, Lightbulb, CheckCircle2, ArrowRight
+import {
+  Package, Image as ImageIcon, Tag, FileText, Lightbulb,
+  CheckCircle2, ArrowRight
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { StatusBadge } from '@/components/ui/status-badge'
 import { cn } from '@/lib/utils'
+
+/**
+ * ListingOptimizer - Marketplace listing health checker and optimizer.
+ *
+ * @description Shows optimization checks for a provider's marketplace listing,
+ * category-specific tips, description templates, and image guidelines.
+ *
+ * @component
+ */
 
 interface ListingData {
   id: string
@@ -17,7 +29,7 @@ interface ListingData {
   approval_status: string | null
 }
 
-// Category-specific description templates
+/** Category-specific description templates and tips. */
 const CATEGORY_TEMPLATES: Record<string, { title: string; template: string; tips: string[] }> = {
   'People': {
     title: 'Professional Services',
@@ -97,21 +109,25 @@ export function ListingOptimizer({ listing }: { listing: ListingData | null }) {
 
   if (!listing) {
     return (
-      <div className="rounded-lg border bg-white p-6">
-        <h3 className="text-base font-semibold text-foreground flex items-center gap-2 mb-3">
-          <Package className="h-4 w-4 text-international-orange" />
-          Marketplace Listing
-        </h3>
-        <p className="text-sm text-muted-foreground mb-4">
-          You don&apos;t have a marketplace listing yet. Create one to be discoverable by buyers.
-        </p>
-        <Button asChild size="sm" className="bg-international-orange hover:bg-international-orange/90">
-          <a href="/provider-portal/listing">
-            Create Listing
-            <ArrowRight className="h-4 w-4 ml-2" />
-          </a>
-        </Button>
-      </div>
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <Package className="h-4 w-4 text-international-orange" />
+            Marketplace Listing
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground mb-4">
+            You don&apos;t have a marketplace listing yet. Create one to be discoverable by buyers.
+          </p>
+          <Button asChild size="sm" className="bg-international-orange hover:bg-international-orange/90">
+            <a href="/provider-portal/listing">
+              Create Listing
+              <ArrowRight className="h-4 w-4 ml-2" />
+            </a>
+          </Button>
+        </CardContent>
+      </Card>
     )
   }
 
@@ -119,138 +135,144 @@ export function ListingOptimizer({ listing }: { listing: ListingData | null }) {
   const optimizationChecks = getOptimizationChecks(listing)
 
   return (
-    <div className="rounded-lg border bg-white p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <h3 className="text-base font-semibold text-foreground flex items-center gap-2">
-          <Package className="h-4 w-4 text-international-orange" />
-          Listing Optimizer
-        </h3>
-        {listing.approval_status && (
-          <span className={cn(
-            "text-xs font-mono uppercase px-2 py-1 rounded border font-semibold tracking-wide",
-            listing.approval_status === 'approved' 
-              ? 'text-emerald-700 bg-emerald-50 border-emerald-200' 
-              : listing.approval_status === 'pending'
-              ? 'text-amber-700 bg-amber-50 border-amber-200'
-              : 'text-red-700 bg-red-50 border-red-200'
-          )}>
-            {listing.approval_status}
-          </span>
-        )}
-      </div>
-
-      {/* Current listing summary */}
-      <div className="p-4 bg-muted/50 rounded-md">
-        <div className="text-sm font-medium text-foreground">{listing.title || 'Untitled'}</div>
-        <div className="text-xs text-muted-foreground mt-1">
-          {listing.category} / {listing.subcategory}
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-base flex items-center gap-2">
+            <Package className="h-4 w-4 text-international-orange" />
+            Listing Optimizer
+          </CardTitle>
+          {listing.approval_status && (
+            <StatusBadge
+              status={getApprovalStatusType(listing.approval_status)}
+              size="sm"
+            >
+              {listing.approval_status}
+            </StatusBadge>
+          )}
         </div>
-      </div>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        {/* Current listing summary */}
+        <div className="p-4 bg-muted/50 rounded-lg">
+          <div className="text-sm font-medium text-foreground">{listing.title || 'Untitled'}</div>
+          <div className="text-xs text-muted-foreground mt-1">
+            {listing.category}{listing.subcategory ? ` / ${listing.subcategory}` : ''}
+          </div>
+        </div>
 
-      {/* Optimization checks */}
-      <div>
-        <h4 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
-          <Lightbulb className="h-4 w-4 text-amber-500" />
-          Listing Health
-        </h4>
-        <div className="space-y-2">
-          {optimizationChecks.map((check) => (
-            <div key={check.label} className="flex items-start gap-2">
-              <CheckCircle2 className={cn(
-                "h-4 w-4 flex-shrink-0 mt-0.5",
-                check.passed ? "text-emerald-600" : "text-muted-foreground"
-              )} />
-              <div>
-                <span className={cn(
-                  "text-sm",
-                  check.passed ? "text-foreground" : "text-muted-foreground"
-                )}>
-                  {check.label}
-                </span>
-                {!check.passed && check.suggestion && (
-                  <p className="text-xs text-muted-foreground mt-0.5">{check.suggestion}</p>
-                )}
+        {/* Optimization checks */}
+        <div>
+          <h4 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
+            <Lightbulb className="h-4 w-4 text-status-warning" />
+            Listing Health
+          </h4>
+          <div className="space-y-2">
+            {optimizationChecks.map((check) => (
+              <div key={check.label} className="flex items-start gap-2">
+                <CheckCircle2 className={cn(
+                  'h-4 w-4 flex-shrink-0 mt-0.5',
+                  check.passed ? 'text-status-success' : 'text-muted-foreground'
+                )} />
+                <div>
+                  <span className={cn(
+                    'text-sm',
+                    check.passed ? 'text-foreground' : 'text-muted-foreground'
+                  )}>
+                    {check.label}
+                  </span>
+                  {!check.passed && check.suggestion && (
+                    <p className="text-xs text-muted-foreground mt-0.5">{check.suggestion}</p>
+                  )}
+                </div>
               </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Category-specific tips */}
+        <div>
+          <h4 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
+            <Tag className="h-4 w-4 text-international-orange" />
+            Tips for {template.title}
+          </h4>
+          <ul className="space-y-2">
+            {template.tips.map((tip, i) => (
+              <li key={i} className="flex items-start gap-2 text-sm text-muted-foreground">
+                <span className="text-international-orange mt-1">•</span>
+                {tip}
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        {/* Description template */}
+        <div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowTemplate(!showTemplate)}
+            className="mb-3"
+          >
+            <FileText className="h-3.5 w-3.5 mr-1.5" />
+            {showTemplate ? 'Hide' : 'Show'} Description Template
+          </Button>
+
+          {showTemplate && (
+            <pre className="p-4 bg-muted rounded-lg text-sm text-muted-foreground whitespace-pre-wrap font-mono text-xs leading-relaxed">
+              {template.template}
+            </pre>
+          )}
+        </div>
+
+        {/* Image guidance */}
+        <div>
+          <h4 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
+            <ImageIcon className="h-4 w-4 text-international-orange" />
+            Image Best Practices
+          </h4>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="p-3 bg-status-success-light rounded-lg">
+              <div className="text-xs font-semibold text-status-success-dark mb-1">Do</div>
+              <ul className="text-xs text-status-success-dark space-y-1">
+                <li>Use high-resolution images (min 800x600)</li>
+                <li>Show your product/service in action</li>
+                <li>Use consistent, professional lighting</li>
+                <li>Include multiple angles or examples</li>
+              </ul>
             </div>
-          ))}
+            <div className="p-3 bg-status-error-light rounded-lg">
+              <div className="text-xs font-semibold text-status-error-dark mb-1">Avoid</div>
+              <ul className="text-xs text-status-error-dark space-y-1">
+                <li>Stock photos that feel generic</li>
+                <li>Low-resolution or blurry images</li>
+                <li>Text-heavy graphics or watermarks</li>
+                <li>Cluttered backgrounds</li>
+              </ul>
+            </div>
+          </div>
         </div>
-      </div>
 
-      {/* Category-specific tips */}
-      <div>
-        <h4 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
-          <Tag className="h-4 w-4 text-international-orange" />
-          Tips for {template.title}
-        </h4>
-        <ul className="space-y-2">
-          {template.tips.map((tip, i) => (
-            <li key={i} className="flex items-start gap-2 text-sm text-muted-foreground">
-              <span className="text-international-orange mt-1">•</span>
-              {tip}
-            </li>
-          ))}
-        </ul>
-      </div>
-
-      {/* Description template */}
-      <div>
-        <Button 
-          variant="outline" 
-          size="sm" 
-          onClick={() => setShowTemplate(!showTemplate)}
-          className="mb-3"
-        >
-          <FileText className="h-3.5 w-3.5 mr-1.5" />
-          {showTemplate ? 'Hide' : 'Show'} Description Template
+        {/* Edit link */}
+        <Button asChild variant="outline" size="sm" className="w-full">
+          <a href="/provider-portal/listing">
+            Edit Listing
+            <ArrowRight className="h-4 w-4 ml-2" />
+          </a>
         </Button>
-        
-        {showTemplate && (
-          <pre className="p-4 bg-muted rounded-md text-sm text-muted-foreground whitespace-pre-wrap font-mono text-xs leading-relaxed">
-            {template.template}
-          </pre>
-        )}
-      </div>
-
-      {/* Image guidance */}
-      <div>
-        <h4 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
-          <ImageIcon className="h-4 w-4 text-international-orange" />
-          Image Best Practices
-        </h4>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div className="p-3 bg-emerald-50 rounded-md">
-            <div className="text-xs font-semibold text-emerald-700 mb-1">Do</div>
-            <ul className="text-xs text-emerald-700 space-y-1">
-              <li>Use high-resolution images (min 800x600)</li>
-              <li>Show your product/service in action</li>
-              <li>Use consistent, professional lighting</li>
-              <li>Include multiple angles or examples</li>
-            </ul>
-          </div>
-          <div className="p-3 bg-red-50 rounded-md">
-            <div className="text-xs font-semibold text-red-700 mb-1">Avoid</div>
-            <ul className="text-xs text-red-700 space-y-1">
-              <li>Stock photos that feel generic</li>
-              <li>Low-resolution or blurry images</li>
-              <li>Text-heavy graphics or watermarks</li>
-              <li>Cluttered backgrounds</li>
-            </ul>
-          </div>
-        </div>
-      </div>
-
-      {/* Edit link */}
-      <Button asChild variant="outline" size="sm" className="w-full">
-        <a href="/provider-portal/listing">
-          Edit Listing
-          <ArrowRight className="h-4 w-4 ml-2" />
-        </a>
-      </Button>
-    </div>
+      </CardContent>
+    </Card>
   )
 }
 
-function getOptimizationChecks(listing: ListingData) {
+/**
+ * Get optimization checks for a listing.
+ */
+function getOptimizationChecks(listing: ListingData): Array<{
+  label: string
+  passed: boolean
+  suggestion: string
+}> {
   return [
     {
       label: 'Title is descriptive',
@@ -275,9 +297,21 @@ function getOptimizationChecks(listing: ListingData) {
     {
       label: 'Listing is approved',
       passed: listing.approval_status === 'approved',
-      suggestion: listing.approval_status === 'pending' 
+      suggestion: listing.approval_status === 'pending'
         ? 'Your listing is being reviewed. You\'ll be notified once approved.'
         : 'Submit your listing for review to make it visible on the marketplace.',
     },
   ]
+}
+
+/**
+ * Map approval status to StatusBadge status type.
+ */
+function getApprovalStatusType(status: string): 'success' | 'warning' | 'error' | 'info' {
+  switch (status) {
+    case 'approved': return 'success'
+    case 'pending': return 'warning'
+    case 'rejected': return 'error'
+    default: return 'info'
+  }
 }
