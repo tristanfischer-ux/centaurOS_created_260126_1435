@@ -1,9 +1,10 @@
 'use client'
 
+import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import { ProgressRing, getHealthVariant } from '@/components/ui/progress-ring'
 import { Badge } from '@/components/ui/badge'
-import { AlertTriangle, ListChecks } from 'lucide-react'
+import { AlertTriangle, ListChecks, Map } from 'lucide-react'
 import type { ObjectiveWithTasks } from './types'
 
 interface ObjectiveCardProps {
@@ -62,9 +63,22 @@ export function ObjectiveCard({ objective, isSelected, onSelect }: ObjectiveCard
           <h3 className="text-sm font-semibold text-foreground line-clamp-2 leading-snug">
             {title}
           </h3>
-          <Badge variant="outline" className={cn('text-[10px] flex-shrink-0 border', healthInfo.className)}>
-            {healthInfo.text}
-          </Badge>
+          <div className="flex items-center gap-1.5 flex-shrink-0">
+            {objective.is_strategic_goal && (
+              <Link
+                href={`/strategic-planner/${objective.id}`}
+                onClick={(e) => e.stopPropagation()}
+                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-international-orange/10 text-international-orange hover:bg-international-orange/20 transition-colors"
+                title="View AI Plan"
+              >
+                <Map className="h-3 w-3" />
+                AI Plan
+              </Link>
+            )}
+            <Badge variant="outline" className={cn('text-[10px] border', healthInfo.className)}>
+              {healthInfo.text}
+            </Badge>
+          </div>
         </div>
 
         {/* Description */}

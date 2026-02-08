@@ -162,15 +162,25 @@ export interface PlatformFeeConfig {
 // ==========================================
 
 /**
- * Default platform fee percentage for standard orders (8%)
+ * Standard platform fee percentage across all transaction types (10%)
+ *
+ * Standardized to 10% as of Feb 2026 to eliminate pricing confusion
+ * and revenue leakage from inconsistent rates (previously 5-10% varying).
+ * See ship_monetization_now plan for rationale.
  */
-export const DEFAULT_PLATFORM_FEE_PERCENT = 8
+export const DEFAULT_PLATFORM_FEE_PERCENT = 10
 
 /**
  * Platform fee percentage for retainers and bookings (10%)
- * Higher rate includes escrow protection and ongoing management
+ * Same as standard rate -- kept as named export for backward compatibility.
  */
 export const RETAINER_PLATFORM_FEE_PERCENT = 10
+
+/**
+ * Discounted platform fee for apprentice-role users (8%)
+ * Lower rate to encourage hiring junior talent through the platform.
+ */
+export const APPRENTICE_PLATFORM_FEE_PERCENT = 8
 
 /**
  * UK VAT rate (20%)
