@@ -256,11 +256,26 @@ export function CreateTaskDialog({ objectives, members, teams = [], currentUserI
                 setSubmitError(null)
             }
         } catch (error) {
-            console.error('[CreateTask] Submission failed:', {
-                error: error instanceof Error ? error.message : 'Unknown error',
-            })
-            setSubmitError("Failed to create task. Please try again.")
-            toast.error("Failed to create task. Please try again.")
+            // When a server action throws at the framework level (e.g. stale
+            // deployment, action ID mismatch), the error is not an Error instance.
+            // Suggest a page refresh so the browser picks up the latest code.
+            const isFrameworkError = !(error instanceof Error)
+            const message = error instanceof Error
+                ? error.message
+                : typeof error === 'object' && error !== null && 'digest' in error
+                    ? String((error as { digest: string }).digest)
+                    : 'Unknown error'
+
+            console.error('[CreateTask] Submission failed:', { message, isFrameworkError, error })
+
+            if (isFrameworkError) {
+                const refreshMsg = "Something went wrong. Please refresh the page and try again."
+                setSubmitError(refreshMsg)
+                toast.error(refreshMsg)
+            } else {
+                setSubmitError(`Failed to create task: ${message}`)
+                toast.error(`Failed to create task: ${message}`)
+            }
         } finally {
             setIsLoading(false)
         }

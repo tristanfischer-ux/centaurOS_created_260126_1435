@@ -54,7 +54,14 @@ type SubsystemTask = {
  */
 export async function getObjectivePacks(options?: GetObjectivePacksOptions): Promise<{ packs: ObjectivePack[], error?: string }> {
     noStore()
-    const supabase = await createClient()
+    
+    let supabase;
+    try {
+        supabase = await createClient()
+    } catch (clientError) {
+        console.error('[getObjectivePacks] Failed to create Supabase client:', clientError)
+        return { packs: [], error: 'Failed to create database client' }
+    }
 
     // Build query for original objective_packs table
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -68,10 +75,18 @@ export async function getObjectivePacks(options?: GetObjectivePacksOptions): Pro
         originalQuery = originalQuery.eq('product_category', options.productCategory)
     }
     
-    const { data: originalPacks, error: originalError } = await originalQuery.order('title')
+    let originalPacks, originalError;
+    try {
+        const result = await originalQuery.order('title')
+        originalPacks = result.data
+        originalError = result.error
+    } catch (queryError) {
+        console.error('[getObjectivePacks] Query threw exception:', queryError)
+        return { packs: [], error: 'Database query failed' }
+    }
 
     if (originalError) {
-        console.error('Error fetching objective packs:', originalError)
+        console.error('[getObjectivePacks] Error fetching objective packs:', originalError)
         return { packs: [], error: originalError.message }
     }
 
@@ -81,27 +96,32 @@ export async function getObjectivePacks(options?: GetObjectivePacksOptions): Pro
     let subsystemError: Error | null = null
     
     if (!options?.productCategory) {
-        // Fetch from subsystem_objective_packs table with subsystem category
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const result = await (supabase as any)
-            .from('subsystem_objective_packs')
-            .select(`
-                id,
-                title,
-                summary,
-                extended_description,
-                difficulty,
-                estimated_duration,
-                tasks,
-                subsystem:universal_subsystems(category, icon_name)
-            `)
-            .order('title')
-        
-        subsystemPacks = result.data
-        subsystemError = result.error
-        
-        if (subsystemError) {
-            console.error('Error fetching subsystem packs:', subsystemError)
+        try {
+            // Fetch from subsystem_objective_packs table with subsystem category
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const result = await (supabase as any)
+                .from('subsystem_objective_packs')
+                .select(`
+                    id,
+                    title,
+                    summary,
+                    extended_description,
+                    difficulty,
+                    estimated_duration,
+                    tasks,
+                    subsystem:universal_subsystems(category, icon_name)
+                `)
+                .order('title')
+            
+            subsystemPacks = result.data
+            subsystemError = result.error
+            
+            if (subsystemError) {
+                console.error('[getObjectivePacks] Error fetching subsystem packs:', subsystemError)
+                // Don't fail completely, just return original packs
+            }
+        } catch (subsystemQueryError) {
+            console.error('[getObjectivePacks] Subsystem query threw exception:', subsystemQueryError)
             // Don't fail completely, just return original packs
         }
     }
@@ -156,12 +176,18 @@ export async function getObjectivePacks(options?: GetObjectivePacksOptions): Pro
 
     // Combine both sources
     // Cast through unknown to handle the product_category field which may not be in generated types yet
-    const allPacks = [...(originalPacks as unknown as ObjectivePack[]), ...transformedSubsystemPacks]
+    try {
+        const allPacks = [...(originalPacks as unknown as ObjectivePack[]), ...transformedSubsystemPacks]
 
-    // Sort combined results by title
-    allPacks.sort((a, b) => a.title.localeCompare(b.title))
+        // Sort combined results by title
+        allPacks.sort((a, b) => (a.title ?? '').localeCompare(b.title ?? ''))
 
-    return { packs: allPacks }
+        return { packs: allPacks }
+    } catch (combineError) {
+        console.error('[getObjectivePacks] Error combining packs:', combineError)
+        // Fall back to original packs only
+        return { packs: (originalPacks as unknown as ObjectivePack[]) || [] }
+    }
 }
 
 export async function getPackDetails(packId: string): Promise<{ pack: ObjectivePack | null, error?: string }> {
