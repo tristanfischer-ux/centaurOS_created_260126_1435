@@ -22,7 +22,7 @@
 CREATE TABLE IF NOT EXISTS google_oauth_tokens (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-    foundry_id UUID NOT NULL REFERENCES foundries(id) ON DELETE CASCADE,
+    foundry_id TEXT NOT NULL REFERENCES foundries(id) ON DELETE CASCADE,
     access_token TEXT NOT NULL,
     refresh_token TEXT,
     token_expires_at TIMESTAMPTZ NOT NULL,
@@ -56,7 +56,7 @@ CREATE POLICY "Users can delete own Google tokens"
 CREATE TABLE IF NOT EXISTS calendar_sync_mappings (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-    foundry_id UUID NOT NULL REFERENCES foundries(id) ON DELETE CASCADE,
+    foundry_id TEXT NOT NULL REFERENCES foundries(id) ON DELETE CASCADE,
     entity_type TEXT NOT NULL CHECK (entity_type IN ('task', 'discovery_call', 'objective', 'standup')),
     entity_id UUID NOT NULL,
     google_calendar_id TEXT NOT NULL DEFAULT 'primary',

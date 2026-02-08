@@ -48,6 +48,49 @@ export const NEW_FEATURE_THRESHOLD_DAYS = 14
 export const FEATURE_REGISTRY: Feature[] = [
     // === February 2026 Features ===
     {
+        id: 'money-map',
+        name: 'Money Map',
+        description: 'Visualise how you make money, where you spend it, and true profitability by revenue stream',
+        route: '/money-map',
+        releasedAt: new Date('2026-02-08'),
+        category: 'analytics',
+        status: 'beta',
+        isVisibleInNav: true,
+        changelog: 'Added Money Map — a visual financial tool that maps revenue streams, cost centres, and profitability. Allocate costs across revenue streams to see true margins and identify where to focus growth or cut waste.'
+    },
+    {
+        id: 'billing-subscriptions',
+        name: 'Billing & Subscriptions',
+        description: 'Manage your subscription, payment methods, and billing history from Settings',
+        route: '/settings/billing',
+        releasedAt: new Date('2026-02-08'),
+        category: 'admin',
+        status: 'beta',
+        isVisibleInNav: false,
+        changelog: 'Added billing management in Settings. View subscription status, manage payment methods, check account balance, and configure payout preferences for providers.'
+    },
+    {
+        id: 'guild-hiring',
+        name: 'Hire from The Forge Guild',
+        description: 'Find and invite Guild members — Apprentices and Executives — to join your foundry',
+        route: '/team',
+        releasedAt: new Date('2026-02-08'),
+        category: 'marketplace',
+        status: 'beta',
+        isVisibleInNav: false,
+        changelog: 'Solopreneurs can now browse The Forge Guild to find vetted Apprentices and Executives and invite them to join their foundry. Available from the Team page.'
+    },
+    {
+        id: 'foundry-creation',
+        name: 'Create Foundry from Platform',
+        description: 'Spin up a new foundry directly from within the platform without leaving your workflow',
+        releasedAt: new Date('2026-02-08'),
+        category: 'core',
+        status: 'beta',
+        isVisibleInNav: false,
+        changelog: 'You can now create a new foundry directly from the foundry switcher without leaving the platform. Includes guided setup and automatic role assignment.'
+    },
+    {
         id: 'manufacturing-techniques',
         name: 'Manufacturing Techniques Explorer',
         description: 'Browse 80+ manufacturing techniques with detailed specs, pros/cons, and direct links to find suppliers or start an RFQ',
@@ -57,6 +100,17 @@ export const FEATURE_REGISTRY: Feature[] = [
         status: 'beta',
         isVisibleInNav: true,
         changelog: 'Added Manufacturing Techniques Explorer — an interactive encyclopedia of modern manufacturing processes. Browse by category, filter by cost/batch size/material, and click through to detailed technique info with CTAs to find suppliers or start an RFQ. Available under the Techniques tab in Inspiration.'
+    },
+    {
+        id: 'cost-of-delay',
+        name: 'Cost of Delay Calculator',
+        description: 'Interactive tool that visualises whether spending to ship faster saves you money',
+        route: '/tools/cost-of-delay',
+        releasedAt: new Date('2026-02-03'),
+        category: 'analytics',
+        status: 'stable',
+        isVisibleInNav: true,
+        changelog: 'Added Cost of Delay calculator — an interactive financial tool that shows the true cost of delaying a launch. Input your revenue potential, development costs, and acceleration options to see whether spending more now creates net savings.'
     },
     // === January 2026 Features ===
     {
@@ -92,6 +146,17 @@ export const FEATURE_REGISTRY: Feature[] = [
         changelog: 'Applied security hardening across the platform including improved rate limiting, secure webhook handling, and enhanced audit logging.'
     },
     {
+        id: 'strategic-planner',
+        name: 'Strategic Planner',
+        description: 'Backward-plan from goals with AI — map strategic milestones on an interactive timeline',
+        route: '/new-objectives',
+        releasedAt: new Date('2026-01-28'),
+        category: 'strategic',
+        status: 'beta',
+        isVisibleInNav: false,
+        changelog: 'Added Strategic Planner — a timeline-based planning tool that lets you define a goal and work backward to identify milestones, dependencies, and action items. AI assists with generating realistic timelines.'
+    },
+    {
         id: 'retainers',
         name: 'Retainer Management',
         description: 'Manage ongoing service retainers with providers',
@@ -101,6 +166,28 @@ export const FEATURE_REGISTRY: Feature[] = [
         status: 'beta',
         isVisibleInNav: true,
         changelog: 'Added retainer management for ongoing service relationships. Track hours, manage timesheets, and handle recurring payments with your service providers.'
+    },
+    {
+        id: 'canvas',
+        name: 'Canvas',
+        description: 'Visual map of objectives, tasks, and their relationships — includes spatial data canvas and whiteboards',
+        route: '/canvas',
+        releasedAt: new Date('2026-01-22'),
+        category: 'core',
+        status: 'stable',
+        isVisibleInNav: true,
+        changelog: 'Added Canvas — a visual workspace for mapping objectives, tasks, and relationships. Includes a spatial data canvas powered by ReactFlow and freeform whiteboards powered by Excalidraw.'
+    },
+    {
+        id: 'agents',
+        name: 'Agents',
+        description: 'Prompt workflows — build, chain, and copy prompts to automate recurring work',
+        route: '/agents',
+        releasedAt: new Date('2026-01-22'),
+        category: 'core',
+        status: 'beta',
+        isVisibleInNav: true,
+        changelog: 'Added Agents — a prompt workflow builder for automating recurring work. Build reusable prompt chains, share them with your team, and copy them to your clipboard for use with any AI tool.'
     },
     {
         id: 'advisory',
@@ -123,6 +210,17 @@ export const FEATURE_REGISTRY: Feature[] = [
         status: 'stable',
         isVisibleInNav: true,
         changelog: 'Launched the Apprenticeship program for tracking on-the-job training. Manage apprentice progress, competencies, and milestones.'
+    },
+    {
+        id: 'updates',
+        name: 'Updates Feed',
+        description: 'Notes, comments, and changes across your tasks and objectives in one place',
+        route: '/updates',
+        releasedAt: new Date('2026-01-12'),
+        category: 'communication',
+        status: 'stable',
+        isVisibleInNav: true,
+        changelog: 'Added the Updates feed — a unified activity stream showing notes, comments, status changes, and mentions across all your tasks and objectives. Filter by type and mark items as read.'
     },
     {
         id: 'org-blueprint',
@@ -227,6 +325,17 @@ export const FEATURE_REGISTRY: Feature[] = [
     },
     
     // === December 2025 (Foundational) ===
+    {
+        id: 'dashboard',
+        name: 'Dashboard',
+        description: 'Your personalized command center with insights, priority queue, and quick actions',
+        route: '/dashboard',
+        releasedAt: new Date('2025-12-20'),
+        category: 'core',
+        status: 'stable',
+        isVisibleInNav: true,
+        changelog: 'The Dashboard is your daily command center. See your priority queue, objective progress, team pulse, and recent activity — all in one place.'
+    },
     {
         id: 'marketplace',
         name: 'Marketplace',

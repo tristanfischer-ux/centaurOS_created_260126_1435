@@ -37,6 +37,10 @@ export interface ObjectiveWithTasks {
   created_at: string
   updated_at: string
   is_private?: boolean
+  /** Whether this objective has an AI-generated strategic plan */
+  is_strategic_goal?: boolean
+  /** Target deadline for strategic goals */
+  milestone_date?: string | null
   tasks: ObjectiveTask[]
   totalTasks: number
   completedTasks: number

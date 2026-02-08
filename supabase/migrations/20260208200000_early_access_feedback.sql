@@ -25,7 +25,7 @@ END $$;
 CREATE TABLE IF NOT EXISTS early_access_feedback (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  foundry_id UUID NOT NULL,
+  foundry_id TEXT NOT NULL,
   category feedback_category NOT NULL DEFAULT 'idea',
   message TEXT NOT NULL,
   page_route TEXT,
@@ -64,7 +64,7 @@ CREATE POLICY "Admins can view foundry feedback"
     EXISTS (
       SELECT 1 FROM foundry_memberships fm
       WHERE fm.foundry_id = early_access_feedback.foundry_id
-        AND fm.profile_id = auth.uid()
+        AND fm.user_id = auth.uid()
         AND fm.role IN ('Founder', 'Executive')
     )
   );

@@ -14,6 +14,9 @@ import { MarketplaceSpotlight } from '@/components/dashboard/marketplace-spotlig
 import { WorkflowTemplatesPreview } from '@/components/dashboard/workflow-templates-preview'
 import { FoundingMemberCard } from '@/components/dashboard/founding-member-card'
 import { UpcomingEvents } from '@/components/dashboard/upcoming-events'
+import { SolopreneurNudge } from '@/components/dashboard/solopreneur-nudge'
+import { HireFromGuild } from '@/components/team/hire-from-guild'
+import { GrowthMilestones } from '@/components/dashboard/growth-milestones'
 
 interface User {
   id: string
@@ -129,6 +132,10 @@ export interface DashboardClientProps {
   featuredListings: FeaturedListing[]
   workflowTemplates: WorkflowTemplate[]
   dailyFocus: string
+  /** Whether foundry has purpose/canvas data defined (for milestones) */
+  hasPurpose?: boolean
+  /** Whether foundry has revenue entries in Money Map (for milestones) */
+  hasRevenue?: boolean
 }
 
 /**
@@ -165,6 +172,8 @@ export function DashboardClient({
   featuredListings,
   workflowTemplates,
   dailyFocus,
+  hasPurpose = false,
+  hasRevenue = false,
 }: DashboardClientProps) {
   const [selectedView, setSelectedView] = useState<'overview' | 'tasks' | 'team'>('overview')
   
@@ -178,6 +187,9 @@ export function DashboardClient({
   ).length
   const activeObjectives = objectives.filter(o => o.status === 'Active' || o.status === 'In_Progress').length
   const teamOnline = teamPresence.filter(m => m.status === 'online' || m.status === 'focus').length
+
+  // Solopreneur detection: team of 1 means they're running solo
+  const isSolopreneur = teamPresence.length <= 1
   
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-orange-50/30">
@@ -217,6 +229,15 @@ export function DashboardClient({
             {/* Left Column - Actions & Priority */}
             <div className="lg:col-span-1 space-y-6 order-2 lg:order-1">
               <FoundingMemberCard />
+              {isSolopreneur && (
+                <GrowthMilestones
+                  completedTasks={myTasks.filter(t => t.status === 'Completed').length}
+                  objectiveCount={objectives.length}
+                  memberCount={teamPresence.length}
+                  hasRevenue={hasRevenue}
+                  hasPurpose={hasPurpose}
+                />
+              )}
               <QuickActions foundryId={foundryId} />
               <PriorityQueue
                 myTasks={myTasks}
@@ -241,9 +262,21 @@ export function DashboardClient({
             {/* Right Column - Discovery (Revenue) & Team */}
             <div className="lg:col-span-1 space-y-6 order-3">
               <UpcomingEvents />
+              {/* Solopreneur: show hiring nudge + growth tips instead of team pulse */}
+              {isSolopreneur && (
+                <>
+                  <SolopreneurNudge
+                    overdueCount={overdueCount}
+                    totalTasks={totalTasks}
+                  />
+                  <HireFromGuild variant="card" />
+                </>
+              )}
               <MarketplaceSpotlight featuredListings={featuredListings} />
               <WorkflowTemplatesPreview templates={workflowTemplates} />
-              <TeamPulse teamMembers={teamPresence} />
+              {!isSolopreneur && (
+                <TeamPulse teamMembers={teamPresence} />
+              )}
               <ActivityFeed activities={recentActivity} />
             </div>
           </div>

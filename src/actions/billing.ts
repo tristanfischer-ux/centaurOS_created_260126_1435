@@ -584,11 +584,11 @@ export async function getPlatformFeePercent(
     })
     
     if (error || data === null) {
-      // Fall back to default configuration
+      // Fall back to default configuration (standardized to 10%)
       const defaultFee = DEFAULT_FEE_CONFIG[role]?.[orderType] 
         || DEFAULT_FEE_CONFIG[role]?.default 
         || DEFAULT_FEE_CONFIG.default[orderType]
-        || 8
+        || 10
       return { feePercent: defaultFee, error: null }
     }
     
@@ -596,7 +596,7 @@ export async function getPlatformFeePercent(
   } catch (error) {
     console.error('Error in getPlatformFeePercent:', error)
     // Fall back to default
-    return { feePercent: DEFAULT_FEE_CONFIG[role]?.[orderType] || 8, error: null }
+    return { feePercent: DEFAULT_FEE_CONFIG[role]?.[orderType] || 10, error: null }
   }
 }
 

@@ -79,6 +79,7 @@ export async function addTaskDependency(
       return { error: 'Failed to add dependency' }
     }
 
+    revalidatePath('/new-objectives')
     revalidatePath('/strategic-planner')
     return { data: data as TaskDependency }
   }) as Promise<{ data?: TaskDependency; error?: string }>
@@ -109,6 +110,7 @@ export async function removeTaskDependency(
       return { error: 'Failed to remove dependency' }
     }
 
+    revalidatePath('/new-objectives')
     revalidatePath('/strategic-planner')
     return { success: true }
   }) as Promise<{ success?: boolean; error?: string }>
@@ -562,6 +564,7 @@ export async function applyStrategicPlan(
     })
 
     revalidatePath('/objectives')
+    revalidatePath('/new-objectives')
     revalidatePath('/tasks')
     revalidatePath('/strategic-planner')
 
@@ -780,6 +783,7 @@ export async function updateStrategicGoalMeta(
       return { error: 'Failed to update strategic goal' }
     }
 
+    revalidatePath('/new-objectives')
     revalidatePath('/strategic-planner')
     return { success: true }
   }) as Promise<{ success?: boolean; error?: string }>

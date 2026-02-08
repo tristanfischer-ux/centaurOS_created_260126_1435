@@ -227,6 +227,119 @@ export async function getFoundryPurpose(
   }
 }
 
+// --- Create Foundry (Solopreneur Journey) ---
+
+/**
+ * Creates a new foundry for the current user, enabling the transition
+ * from Apprentice/Executive to business owner.
+ * 
+ * @description Allows any authenticated user to create their own foundry (business).
+ * The user becomes the Founder of the new foundry while keeping their existing
+ * memberships (e.g., The Forge Guild). Uses dual membership via foundry_memberships.
+ * 
+ * @param {string} companyName - Name of the new business (required, max 100 chars)
+ * @param {string | null} industry - Business industry category
+ * @param {string | null} stage - Business stage (idea, side_project, full_time, revenue)
+ * 
+ * @returns {Promise<ActionResult>} Success with foundry data { foundry_id, slug, name } or error
+ * 
+ * @throws {Error} If user is not authenticated
+ * @throws {Error} If company name is empty or exceeds 100 chars
+ * @throws {Error} If user already owns 3+ foundries (rate limit)
+ * 
+ * @security Authenticated users only. RPC function validates caller identity.
+ * @audit Logs foundry_created event with foundry_id and created_by
+ * 
+ * @example
+ * const result = await createFoundry('My Startup', 'technology', 'idea')
+ * if (result.success) {
+ *   router.refresh() // Sidebar will show new foundry
+ * }
+ */
+export async function createFoundry(
+  companyName: string,
+  industry: string | null = null,
+  stage: string | null = null
+): Promise<ActionResult> {
+  const supabase = await createClient()
+
+  // AUTH: Verify user is authenticated
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) {
+    return { success: false, error: 'Not authenticated' }
+  }
+
+  // VALIDATION: Company name is required
+  const trimmedName = companyName?.trim()
+  if (!trimmedName || trimmedName.length === 0) {
+    return { success: false, error: 'Company name is required' }
+  }
+
+  // VALIDATION: Company name length
+  if (trimmedName.length > 100) {
+    return { success: false, error: 'Company name must be 100 characters or less' }
+  }
+
+  try {
+    // Call the database function to create foundry atomically
+    // SECURITY: The RPC function validates auth.uid() matches p_user_id
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data, error: rpcError } = await (supabase as any).rpc('create_user_foundry', {
+      p_user_id: user.id,
+      p_company_name: trimmedName,
+      p_industry: industry,
+      p_stage: stage,
+    })
+
+    if (rpcError) {
+      console.error('[FoundryActions] Failed to create foundry:', {
+        userId: user.id,
+        companyName: trimmedName,
+        error: rpcError.message,
+        code: rpcError.code,
+      })
+
+      // Return user-friendly error messages
+      if (rpcError.message?.includes('maximum of 3')) {
+        return { success: false, error: 'You can own a maximum of 3 businesses' }
+      }
+
+      return { success: false, error: 'Failed to create your business. Please try again.' }
+    }
+
+    // AUDIT: Log successful foundry creation
+    console.info('[FoundryActions] Foundry created from platform:', {
+      foundryId: data?.foundry_id,
+      companyName: trimmedName,
+      createdBy: user.id,
+      industry,
+      stage,
+    })
+
+    // Clear the foundry cache so the UI reflects the new foundry
+    const { clearFoundryCache } = await import('@/lib/supabase/foundry-context')
+    clearFoundryCache(user.id)
+
+    // Revalidate all paths since foundry context affects everything
+    revalidatePath('/', 'layout')
+
+    return {
+      success: true,
+      error: null,
+      data,
+    }
+  } catch (error) {
+    console.error('[FoundryActions] Unexpected error creating foundry:', {
+      userId: user.id,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    })
+    return {
+      success: false,
+      error: 'An unexpected error occurred',
+    }
+  }
+}
+
 // --- Company Profile Actions ---
 
 /**

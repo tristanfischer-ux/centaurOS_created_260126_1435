@@ -71,6 +71,8 @@ export default async function DashboardPage() {
     pendingDecisionsResult,
     unreadCountsResult,
     featuredListingsResult,
+    foundryPurposeResult,
+    revenueStreamsResult,
   ] = await Promise.all([
     // My current tasks (primary assignee)
     supabase
@@ -187,6 +189,21 @@ export default async function DashboardPage() {
       .eq('is_verified', true)
       .order('created_at', { ascending: false })
       .limit(3),
+
+    // Foundry purpose data (for growth milestones)
+    supabase
+      .from('foundries')
+      .select('purpose_data')
+      .eq('id', foundryId)
+      .maybeSingle(),
+
+    // Money Map revenue streams (for growth milestones)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (supabase as any)
+      .from('money_map_revenue_streams')
+      .select('id', { count: 'exact', head: true })
+      .eq('foundry_id', foundryId)
+      .eq('is_active', true),
   ])
 
   // Build workflow template previews from the static templates
@@ -262,6 +279,8 @@ export default async function DashboardPage() {
       featuredListings={featuredListingsResult.data || []}
       workflowTemplates={workflowTemplates}
       dailyFocus={dailyFocus}
+      hasPurpose={!!foundryPurposeResult.data?.purpose_data}
+      hasRevenue={(revenueStreamsResult.count || 0) > 0}
     />
   )
 }

@@ -32,14 +32,15 @@ export default async function NewObjectivesPage() {
   // Note: is_private may not be in generated types but exists in DB via migration
   const { data: rawObjectives, error } = await supabase
     .from('objectives')
-    .select('id, title, description, extended_description, status, progress, parent_objective_id, creator_id, foundry_id, created_at, updated_at')
+    .select('id, title, description, extended_description, status, progress, parent_objective_id, creator_id, foundry_id, created_at, updated_at, is_strategic_goal, milestone_date')
     .eq('foundry_id', profile.foundry_id)
     .order('created_at', { ascending: false })
 
   const objectives = (rawObjectives || []) as Array<{
     id: string; title: string; description: string | null; extended_description: string | null;
     status: string | null; progress: number | null; parent_objective_id: string | null;
-    creator_id: string; foundry_id: string; created_at: string; updated_at: string; is_private?: boolean;
+    creator_id: string; foundry_id: string; created_at: string; updated_at: string;
+    is_private?: boolean; is_strategic_goal?: boolean; milestone_date?: string | null;
   }>
 
   if (error) {

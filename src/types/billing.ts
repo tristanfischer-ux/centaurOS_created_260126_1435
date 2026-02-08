@@ -57,34 +57,36 @@ export interface FeeCalculation {
 }
 
 // Default fee percentages (fallbacks if DB not available)
+// Standardized to 10% across all transaction types (Feb 2026)
+// Only apprentice role gets a discount (8%) to encourage junior talent hiring
 export const DEFAULT_FEE_CONFIG: Record<UserRole, Record<FeeOrderType, number>> = {
   default: {
-    people_booking: 8,
-    product_rfq: 8,
-    service: 8,
+    people_booking: 10,
+    product_rfq: 10,
+    service: 10,
     retainer: 10,
-    default: 8,
+    default: 10,
   },
   executive: {
-    people_booking: 8,
-    product_rfq: 8,
-    service: 8,
+    people_booking: 10,
+    product_rfq: 10,
+    service: 10,
     retainer: 10,
-    default: 8,
+    default: 10,
   },
   founder: {
+    people_booking: 10,
+    product_rfq: 10,
+    service: 10,
+    retainer: 10,
+    default: 10,
+  },
+  apprentice: {
     people_booking: 8,
     product_rfq: 8,
     service: 8,
-    retainer: 10,
+    retainer: 8,
     default: 8,
-  },
-  apprentice: {
-    people_booking: 5,
-    product_rfq: 5,
-    service: 5,
-    retainer: 7,
-    default: 5,
   },
 }
 
