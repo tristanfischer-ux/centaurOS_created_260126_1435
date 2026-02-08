@@ -105,6 +105,7 @@ async function logSystemEvent(taskId: string, message: string, userId: string) {
 }
 
 export async function createTask(formData: FormData) {
+  try {
     const supabase = await createClient()
     const foundry_id = await getFoundryIdCached()
     const { data: { user } } = await supabase.auth.getUser()
@@ -321,6 +322,14 @@ export async function createTask(formData: FormData) {
 
     revalidatePath('/tasks')
     return { success: true }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown error'
+    console.error('[CreateTask] Unhandled error in createTask:', {
+      error: message,
+      stack: error instanceof Error ? error.stack : undefined,
+    })
+    return { error: `Failed to create task: ${sanitizeErrorMessage(message)}` }
+  }
 }
 
 export async function acceptTask(taskId: string) {
