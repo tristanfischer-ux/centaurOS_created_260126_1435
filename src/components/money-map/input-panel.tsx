@@ -4,8 +4,10 @@
  * MoneyMapInputPanel — Inline input panel for revenue streams and cost items.
  *
  * @description Displays editable lists of revenue streams and cost items,
- * grouped by type (Direct, Shared, Overhead). Mirrors the Cost of Delay
- * calculator-form pattern: always-visible left panel with instant updates.
+ * grouped by type (Direct, Shared, Overhead). Every item is editable inline:
+ * click the pencil icon to change name/amount, delete to remove.
+ * "Add" buttons are always visible so users can enter their own data
+ * even while sample data is displayed.
  *
  * @component
  * @example
@@ -21,23 +23,24 @@
  * />
  */
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useRef, useEffect } from 'react'
 import {
   DollarSign,
   Receipt,
   Plus,
   Trash2,
+  Pencil,
+  Check,
+  X,
   ChevronDown,
   ChevronRight,
   TrendingUp,
-  Building2,
   Share2,
   Landmark,
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
-import { Label } from '@/components/ui/label'
 import {
   Select,
   SelectContent,
@@ -51,8 +54,6 @@ import { normaliseToMonthly } from '@/lib/money-map/allocation'
 
 import type {
   MoneyMapData,
-  RevenueStream,
-  CostItem,
   RevenueStreamInput,
   CostItemInput,
   RevenueCategory,
@@ -67,7 +68,7 @@ import type {
 interface MoneyMapInputPanelProps {
   /** Current money map data */
   data: MoneyMapData
-  /** Whether showing sample/demo data (read-only) */
+  /** Whether showing sample/demo data */
   isDemo: boolean
   /** Callbacks for revenue stream CRUD */
   onAddRevenue: (input: RevenueStreamInput) => Promise<void>
@@ -79,6 +80,15 @@ interface MoneyMapInputPanelProps {
   onDeleteCost: (id: string) => Promise<void>
   /** Additional CSS classes */
   className?: string
+}
+
+/** Shared shape for items displayed in the panel */
+interface DisplayItem {
+  id: string
+  name: string
+  amount: number
+  period: string
+  category: string
 }
 
 // ============================================================
@@ -115,7 +125,7 @@ const COST_SECTIONS: { type: CostType; label: string; icon: typeof Receipt }[] =
  * Format a monthly amount for compact display.
  *
  * @param value - Monthly amount
- * @returns Formatted string like "£12k/mo"
+ * @returns Formatted string like "£12k"
  */
 function fmtAmount(value: number): string {
   if (value >= 1_000_000) return `£${(value / 1_000_000).toFixed(1)}M`
@@ -211,44 +221,144 @@ function InlineAddForm({
 }
 
 /**
- * A single editable item row (revenue stream or cost item).
+ * A single item row with inline editing support.
+ *
+ * @description Displays name + amount in read mode. Pencil icon (on hover)
+ * switches to edit mode with name/amount inputs. Save commits changes,
+ * cancel reverts. Delete icon removes the item.
  */
 function ItemRow({
   name,
   amount,
   period,
-  isDemo,
+  onUpdate,
   onDelete,
 }: {
   name: string
   amount: number
   period: string
-  isDemo: boolean
+  onUpdate: (newName: string, newAmount: number) => void
   onDelete: () => void
 }): React.ReactElement {
   const monthly = normaliseToMonthly(amount, period as 'monthly' | 'quarterly' | 'annual')
 
+  const [isEditing, setIsEditing] = useState(false)
+  const [editName, setEditName] = useState(name)
+  const [editAmount, setEditAmount] = useState(String(amount))
+  const nameInputRef = useRef<HTMLInputElement>(null)
+
+  // Focus the name input when entering edit mode
+  useEffect(() => {
+    if (isEditing && nameInputRef.current) {
+      nameInputRef.current.focus()
+      nameInputRef.current.select()
+    }
+  }, [isEditing])
+
+  const handleStartEdit = (): void => {
+    setEditName(name)
+    setEditAmount(String(amount))
+    setIsEditing(true)
+  }
+
+  const handleSave = (): void => {
+    const trimmedName = editName.trim()
+    if (!trimmedName) {
+      toast.error('Name cannot be empty')
+      return
+    }
+    const parsedAmount = parseFloat(editAmount)
+    if (isNaN(parsedAmount) || parsedAmount < 0) {
+      toast.error('Please enter a valid amount')
+      return
+    }
+    onUpdate(trimmedName, parsedAmount)
+    setIsEditing(false)
+  }
+
+  const handleCancel = (): void => {
+    setIsEditing(false)
+  }
+
+  const handleKeyDown = (e: React.KeyboardEvent): void => {
+    if (e.key === 'Enter') handleSave()
+    if (e.key === 'Escape') handleCancel()
+  }
+
+  // ---- Edit mode ----
+  if (isEditing) {
+    return (
+      <div className="flex items-center gap-1.5 py-1 px-1">
+        <Input
+          ref={nameInputRef}
+          value={editName}
+          onChange={(e) => setEditName(e.target.value)}
+          onKeyDown={handleKeyDown}
+          className="flex-1 h-7 text-sm"
+        />
+        <div className="relative w-20">
+          <span className="absolute left-1.5 top-1/2 -translate-y-1/2 text-muted-foreground text-xs">£</span>
+          <Input
+            type="number"
+            min={0}
+            step={100}
+            value={editAmount}
+            onChange={(e) => setEditAmount(e.target.value)}
+            onKeyDown={handleKeyDown}
+            className="h-7 text-sm pl-4 w-full"
+          />
+        </div>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-6 w-6 shrink-0"
+          onClick={handleSave}
+          aria-label="Save"
+        >
+          <Check className="h-3.5 w-3.5 text-status-success" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-6 w-6 shrink-0"
+          onClick={handleCancel}
+          aria-label="Cancel"
+        >
+          <X className="h-3.5 w-3.5 text-muted-foreground" />
+        </Button>
+      </div>
+    )
+  }
+
+  // ---- Read mode ----
   return (
     <div className="group flex items-center justify-between py-1.5 px-1 rounded hover:bg-muted/50 transition-colors">
       <span className="text-sm text-foreground truncate flex-1 min-w-0">
         {name}
       </span>
-      <div className="flex items-center gap-1.5 shrink-0">
+      <div className="flex items-center gap-1 shrink-0">
         <span className="text-sm font-medium tabular-nums text-foreground">
           {fmtAmount(monthly)}
         </span>
         <span className="text-xs text-muted-foreground">/mo</span>
-        {!isDemo && (
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
-            onClick={onDelete}
-            aria-label={`Delete ${name}`}
-          >
-            <Trash2 className="h-3 w-3 text-destructive" />
-          </Button>
-        )}
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+          onClick={handleStartEdit}
+          aria-label={`Edit ${name}`}
+        >
+          <Pencil className="h-3 w-3 text-muted-foreground" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+          onClick={onDelete}
+          aria-label={`Delete ${name}`}
+        >
+          <Trash2 className="h-3 w-3 text-destructive" />
+        </Button>
       </div>
     </div>
   )
@@ -262,19 +372,19 @@ function ItemSection({
   icon: Icon,
   items,
   total,
-  isDemo,
   isExpanded,
   onToggle,
+  onUpdate,
   onDelete,
   addForm,
 }: {
   label: string
   icon: typeof Receipt
-  items: Array<{ id: string; name: string; amount: number; period: string }>
+  items: DisplayItem[]
   total: number
-  isDemo: boolean
   isExpanded: boolean
   onToggle: () => void
+  onUpdate: (id: string, name: string, amount: number) => void
   onDelete: (id: string) => void
   addForm: React.ReactNode | null
 }): React.ReactElement {
@@ -311,7 +421,7 @@ function ItemSection({
               name={item.name}
               amount={item.amount}
               period={item.period}
-              isDemo={isDemo}
+              onUpdate={(newName, newAmount) => onUpdate(item.id, newName, newAmount)}
               onDelete={() => onDelete(item.id)}
             />
           ))}
@@ -352,11 +462,12 @@ export function MoneyMapInputPanel({
   }, [])
 
   // ---- Revenue streams ----
-  const revenueItems = data.revenue_streams.map((rs) => ({
+  const revenueItems: DisplayItem[] = data.revenue_streams.map((rs) => ({
     id: rs.id,
     name: rs.name,
     amount: rs.amount,
     period: rs.period,
+    category: rs.category,
   }))
 
   const totalRevenue = data.revenue_streams.reduce(
@@ -364,6 +475,10 @@ export function MoneyMapInputPanel({
     0
   )
 
+  /**
+   * Handle adding a new revenue stream.
+   * Works in both demo and real mode — creates a real DB record.
+   */
   const handleAddRevenue = async (name: string, category: string, amount: number): Promise<void> => {
     try {
       await onAddRevenue({
@@ -379,7 +494,45 @@ export function MoneyMapInputPanel({
     }
   }
 
+  /**
+   * Handle updating or "saving" a revenue stream.
+   * In demo mode, the item doesn't exist in the DB so we create it instead.
+   * In real mode, we update the existing record.
+   */
+  const handleUpdateRevenue = async (id: string, newName: string, newAmount: number): Promise<void> => {
+    // Find the original item to preserve its category
+    const original = data.revenue_streams.find((rs) => rs.id === id)
+    const category = (original?.category ?? 'service') as RevenueCategory
+
+    try {
+      if (isDemo) {
+        // Demo items don't exist in DB — create as a new real record
+        await onAddRevenue({
+          name: newName,
+          category,
+          amount: newAmount,
+          period: 'monthly',
+        })
+      } else {
+        await onUpdateRevenue(id, {
+          name: newName,
+          category,
+          amount: newAmount,
+          period: original?.period ?? 'monthly',
+        })
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to update'
+      toast.error(message)
+    }
+  }
+
   const handleDeleteRevenue = async (id: string): Promise<void> => {
+    // In demo mode, deleting sample items is a no-op (they don't exist in DB)
+    if (isDemo) {
+      toast.info('Add your own items to replace the sample data')
+      return
+    }
     try {
       await onDeleteRevenue(id)
     } catch (error) {
@@ -389,16 +542,25 @@ export function MoneyMapInputPanel({
   }
 
   // ---- Cost items grouped by type ----
-  const costsByType = (type: CostType): Array<{ id: string; name: string; amount: number; period: string }> =>
+  const costsByType = (type: CostType): DisplayItem[] =>
     data.cost_items
       .filter((ci) => ci.cost_type === type)
-      .map((ci) => ({ id: ci.id, name: ci.name, amount: ci.amount, period: ci.period }))
+      .map((ci) => ({
+        id: ci.id,
+        name: ci.name,
+        amount: ci.amount,
+        period: ci.period,
+        category: ci.category,
+      }))
 
   const costTotal = (type: CostType): number =>
     data.cost_items
       .filter((ci) => ci.cost_type === type)
       .reduce((sum, ci) => sum + normaliseToMonthly(ci.amount, ci.period), 0)
 
+  /**
+   * Handle adding a new cost item.
+   */
   const handleAddCost = async (
     costType: CostType,
     name: string,
@@ -420,7 +582,48 @@ export function MoneyMapInputPanel({
     }
   }
 
+  /**
+   * Handle updating or "saving" a cost item.
+   * In demo mode, creates a new real record. In real mode, updates existing.
+   */
+  const handleUpdateCost = async (
+    costType: CostType,
+    id: string,
+    newName: string,
+    newAmount: number
+  ): Promise<void> => {
+    const original = data.cost_items.find((ci) => ci.id === id)
+    const category = (original?.category ?? 'operations') as CostCategory
+
+    try {
+      if (isDemo) {
+        await onAddCost({
+          name: newName,
+          category,
+          amount: newAmount,
+          cost_type: costType,
+          period: 'monthly',
+        })
+      } else {
+        await onUpdateCost(id, {
+          name: newName,
+          category,
+          amount: newAmount,
+          cost_type: original?.cost_type ?? costType,
+          period: original?.period ?? 'monthly',
+        })
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to update'
+      toast.error(message)
+    }
+  }
+
   const handleDeleteCost = async (id: string): Promise<void> => {
+    if (isDemo) {
+      toast.info('Add your own items to replace the sample data')
+      return
+    }
     try {
       await onDeleteCost(id)
     } catch (error) {
@@ -438,6 +641,11 @@ export function MoneyMapInputPanel({
           </div>
           Your Numbers
         </CardTitle>
+        {isDemo && (
+          <p className="text-xs text-muted-foreground mt-1">
+            Edit any value or add your own to replace the sample data.
+          </p>
+        )}
       </CardHeader>
 
       <CardContent className="space-y-4 pt-0">
@@ -474,7 +682,7 @@ export function MoneyMapInputPanel({
                   name={item.name}
                   amount={item.amount}
                   period={item.period}
-                  isDemo={isDemo}
+                  onUpdate={(newName, newAmount) => handleUpdateRevenue(item.id, newName, newAmount)}
                   onDelete={() => handleDeleteRevenue(item.id)}
                 />
               ))}
@@ -514,9 +722,11 @@ export function MoneyMapInputPanel({
               icon={section.icon}
               items={items}
               total={total}
-              isDemo={isDemo}
               isExpanded={expanded[section.type] ?? true}
               onToggle={() => toggleSection(section.type)}
+              onUpdate={(id, newName, newAmount) =>
+                handleUpdateCost(section.type, id, newName, newAmount)
+              }
               onDelete={handleDeleteCost}
               addForm={
                 addingTo === section.type ? (
