@@ -78,7 +78,9 @@ function TaskNodeComponent({ data, selected }: NodeProps) {
           {title}
         </p>
         {isGhost && (
-          <Ghost className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+          <span title="AI suggestion — click to accept or reject">
+            <Ghost className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+          </span>
         )}
         {showOwners && assigneeId && (
           <span
@@ -90,7 +92,9 @@ function TaskNodeComponent({ data, selected }: NodeProps) {
           </span>
         )}
         {isUnlinked && (
-          <Unlink className="h-2.5 w-2.5 text-muted-foreground flex-shrink-0" />
+          <span title="Not linked to a goal — click to connect">
+            <Unlink className="h-2.5 w-2.5 text-muted-foreground flex-shrink-0" />
+          </span>
         )}
       </div>
     </div>

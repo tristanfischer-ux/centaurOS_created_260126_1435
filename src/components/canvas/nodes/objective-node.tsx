@@ -82,7 +82,9 @@ function ObjectiveNodeComponent({ data, selected }: NodeProps) {
           {title}
         </p>
         {isGhost && (
-          <Ghost className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0 mt-0.5" />
+          <span title="AI suggestion — click to accept or reject">
+            <Ghost className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0 mt-0.5" />
+          </span>
         )}
       </div>
 
@@ -103,7 +105,7 @@ function ObjectiveNodeComponent({ data, selected }: NodeProps) {
           </span>
         )}
         {isUnlinked && (
-          <span className="flex items-center gap-0.5 text-[10px] text-muted-foreground">
+          <span className="flex items-center gap-0.5 text-[10px] text-muted-foreground" title="Not linked to a goal — click to connect">
             <Unlink className="h-2.5 w-2.5" />
             unlinked
           </span>

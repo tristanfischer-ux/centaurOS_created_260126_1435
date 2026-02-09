@@ -48,6 +48,11 @@ import {
   Calendar,
   AlertTriangle,
   RefreshCw,
+  HelpCircle,
+  Ghost,
+  Unlink,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react'
 
 import { toast } from 'sonner'
@@ -197,6 +202,109 @@ function NowLine({
         >
           Today
         </span>
+      </div>
+    </Panel>
+  )
+}
+
+// ============================================================================
+// CANVAS LEGEND — explains the visual language to users
+// ============================================================================
+
+/**
+ * Collapsible legend panel that explains node types, ghost/unlinked states,
+ * and how to interact with the canvas. Sits in the top-right of the canvas.
+ */
+function CanvasLegend() {
+  const [isOpen, setIsOpen] = useState(false)
+
+  return (
+    <Panel position="top-right" className="!m-3">
+      <div className="bg-background border rounded-lg shadow-sm overflow-hidden max-w-[260px]">
+        {/* Toggle button */}
+        <button
+          onClick={() => setIsOpen(!isOpen)}
+          className="flex items-center gap-2 px-3 py-2 w-full text-left text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
+        >
+          <HelpCircle className="h-3.5 w-3.5" />
+          <span>How to read this timeline</span>
+          {isOpen ? (
+            <ChevronUp className="h-3 w-3 ml-auto" />
+          ) : (
+            <ChevronDown className="h-3 w-3 ml-auto" />
+          )}
+        </button>
+
+        {/* Legend content */}
+        {isOpen && (
+          <div className="px-3 pb-3 space-y-3 border-t">
+            {/* Reading direction */}
+            <div className="pt-2">
+              <p className="text-[11px] text-muted-foreground leading-relaxed">
+                Read left → right from <strong className="text-foreground">Today</strong> to your{' '}
+                <strong className="text-foreground">Goal</strong> target date.
+                Milestones are checkpoints along the way.
+              </p>
+            </div>
+
+            {/* Node types */}
+            <div className="space-y-1.5">
+              <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                Node types
+              </p>
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <div className="h-3 w-5 rounded border-2 border-international-orange/60 bg-background flex-shrink-0" />
+                  <span className="text-[11px] text-foreground">Goal — your target outcome</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="h-3 w-5 rounded border border-border bg-background flex-shrink-0" />
+                  <span className="text-[11px] text-foreground">Milestone — time checkpoint</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="h-3 w-5 rounded border border-border bg-background flex-shrink-0" />
+                  <span className="text-[11px] text-foreground">Objective — work to do</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="h-2.5 w-5 rounded-sm border border-border bg-background flex-shrink-0" />
+                  <span className="text-[11px] text-foreground">Task — individual action</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Special states */}
+            <div className="space-y-1.5">
+              <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                Special states
+              </p>
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1 flex-shrink-0">
+                    <Ghost className="h-3 w-3 text-muted-foreground" />
+                  </div>
+                  <span className="text-[11px] text-foreground">
+                    <strong>Ghost</strong> — AI suggestion. Click to accept or reject.
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1 flex-shrink-0">
+                    <Unlink className="h-3 w-3 text-muted-foreground" />
+                  </div>
+                  <span className="text-[11px] text-foreground">
+                    <strong>Unlinked</strong> — not connected to a goal. Click to link.
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Interaction hint */}
+            <div className="pt-1 border-t">
+              <p className="text-[10px] text-muted-foreground leading-relaxed">
+                Click any node to view details, edit fields, or change connections.
+              </p>
+            </div>
+          </div>
+        )}
       </div>
     </Panel>
   )
@@ -805,6 +913,9 @@ function StrategicCanvasInner({
 
           {/* "Today" marker line */}
           <NowLine pxPerDay={pxPerDay} rangeStart={rangeStart} />
+
+          {/* Canvas legend */}
+          <CanvasLegend />
         </ReactFlow>
       </div>
 
