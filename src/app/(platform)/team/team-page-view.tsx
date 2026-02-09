@@ -279,6 +279,9 @@ export function TeamPageView({
         }, 0) / humanMembers.length)
         : 100
 
+    // Orbit hero mode — when active, use compact layout with orbit as hero
+    const isOrbitActive = activeTab === 'members' && viewMode === 'orbit'
+
     // ─── Computed orbit data (shared across all views) ────
     const teamData = useTeamData({
         founders: founders.map(m => ({
@@ -840,83 +843,174 @@ export function TeamPageView({
     // ─── Render ─────────────────────────────────
 
     return (
-        <div className="space-y-6">
+        <div className={cn(isOrbitActive ? 'space-y-2' : 'space-y-6')}>
             {/* ── Header ──────────────────────────────────────────── */}
-            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-                <div className="min-w-0 flex-1">
-                    <div className={typography.pageHeader}>
+            {isOrbitActive ? (
+                /* Compact orbit header: title | tabs | controls in one row */
+                <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3 shrink-0">
                         <div className={typography.pageHeaderAccent} />
-                        <h1 className={typography.h1}>Team</h1>
+                        <h1 className="text-xl font-display font-bold text-foreground">Team</h1>
                     </div>
-                    <p className={typography.pageSubtitle}>
-                        Manage your people, build teams, and track performance
-                    </p>
-                </div>
-                <div className="flex items-center gap-2 shrink-0">
-                    <RefreshButton />
-                    {unassignedTasks && unassignedTasks.length > 0 && (
-                        <Button
-                            variant="outline"
-                            onClick={() => setShowQuickAssign(true)}
-                            className="border-status-warning text-status-warning-dark hover:bg-status-warning-light"
+
+                    {/* Center: tabs — Members is always active in orbit mode */}
+                    <div className="flex items-center gap-1 bg-muted/50 p-1 rounded-xl border border-muted">
+                        <button
+                            onClick={() => { setActiveTab('members'); setSearchQuery('') }}
+                            className="px-3 py-1 rounded-lg text-sm font-medium transition-all duration-200 bg-background text-foreground shadow-sm"
                         >
-                            <Zap className="h-4 w-4 mr-2" />
-                            Quick Assign
-                            <Badge variant="secondary" className="ml-1.5 text-[10px] px-1.5 h-4 bg-status-warning-light text-status-warning-dark">
-                                {unassignedTasks.length}
-                            </Badge>
-                        </Button>
-                    )}
-                    <FeatureTip
-                        id="team-invite"
-                        title="Build Your Team"
-                        description="Invite team members by email. Assign roles and they'll join your foundry automatically."
-                        align="right"
-                    >
+                            <Users className="h-3.5 w-3.5 inline mr-1 -mt-0.5" />
+                            Members
+                        </button>
+                        <button
+                            onClick={() => { setActiveTab('workload'); setSearchQuery('') }}
+                            className="px-3 py-1 rounded-lg text-sm font-medium transition-all duration-200 text-muted-foreground hover:text-foreground"
+                        >
+                            <BarChart3 className="h-3.5 w-3.5 inline mr-1 -mt-0.5" />
+                            Workload
+                        </button>
+                        <button
+                            onClick={() => { setActiveTab('teams'); setSearchQuery('') }}
+                            className="px-3 py-1 rounded-lg text-sm font-medium transition-all duration-200 text-muted-foreground hover:text-foreground"
+                        >
+                            <ShieldCheck className="h-3.5 w-3.5 inline mr-1 -mt-0.5" />
+                            Teams
+                        </button>
+                    </div>
+
+                    {/* Right: controls — Orbit is always active in orbit mode */}
+                    <div className="flex items-center gap-2 shrink-0">
+                        <div className="flex bg-muted/50 p-1 rounded-xl border border-muted">
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setViewMode('orbit')}
+                                className="h-7 px-2 rounded-md transition-all duration-200 text-xs font-bold gap-1 bg-international-orange/10 text-international-orange shadow-sm"
+                                aria-label="Orbit view"
+                            >
+                                <Orbit className="h-3.5 w-3.5" />
+                                Orbit
+                            </Button>
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setViewMode('cards')}
+                                className="h-7 w-7 p-0 rounded-md transition-all duration-200 text-muted-foreground hover:text-foreground hover:bg-muted"
+                                aria-label="Cards view"
+                            >
+                                <LayoutGrid className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setViewMode('list')}
+                                className="h-7 w-7 p-0 rounded-md transition-all duration-200 text-muted-foreground hover:text-foreground hover:bg-muted"
+                                aria-label="List view"
+                            >
+                                <List className="h-3.5 w-3.5" />
+                            </Button>
+                        </div>
+                        {foundryId && (
+                            <Button
+                                variant="secondary"
+                                size="sm"
+                                onClick={() => setShowEditFunctions(true)}
+                                className="h-8"
+                            >
+                                <Settings className="h-3.5 w-3.5 mr-1.5" />
+                                Functions
+                            </Button>
+                        )}
+                        <RefreshButton />
                         <InviteMemberDialog />
-                    </FeatureTip>
-                    <Link href="/team/new">
-                        <Button className="bg-international-orange hover:bg-international-orange/90 text-white shadow-sm">
-                            <Plus className="h-4 w-4 mr-2" />
-                            New Team
-                        </Button>
-                    </Link>
+                        <Link href="/team/new">
+                            <Button size="sm" className="bg-international-orange hover:bg-international-orange/90 text-white shadow-sm h-8">
+                                <Plus className="h-3.5 w-3.5 mr-1.5" />
+                                New Team
+                            </Button>
+                        </Link>
+                    </div>
                 </div>
-            </div>
+            ) : (
+                /* Full header for non-orbit views */
+                <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+                    <div className="min-w-0 flex-1">
+                        <div className={typography.pageHeader}>
+                            <div className={typography.pageHeaderAccent} />
+                            <h1 className={typography.h1}>Team</h1>
+                        </div>
+                        <p className={typography.pageSubtitle}>
+                            Manage your people, build teams, and track performance
+                        </p>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                        <RefreshButton />
+                        {unassignedTasks && unassignedTasks.length > 0 && (
+                            <Button
+                                variant="outline"
+                                onClick={() => setShowQuickAssign(true)}
+                                className="border-status-warning text-status-warning-dark hover:bg-status-warning-light"
+                            >
+                                <Zap className="h-4 w-4 mr-2" />
+                                Quick Assign
+                                <Badge variant="secondary" className="ml-1.5 text-[10px] px-1.5 h-4 bg-status-warning-light text-status-warning-dark">
+                                    {unassignedTasks.length}
+                                </Badge>
+                            </Button>
+                        )}
+                        <FeatureTip
+                            id="team-invite"
+                            title="Build Your Team"
+                            description="Invite team members by email. Assign roles and they'll join your foundry automatically."
+                            align="right"
+                        >
+                            <InviteMemberDialog />
+                        </FeatureTip>
+                        <Link href="/team/new">
+                            <Button className="bg-international-orange hover:bg-international-orange/90 text-white shadow-sm">
+                                <Plus className="h-4 w-4 mr-2" />
+                                New Team
+                            </Button>
+                        </Link>
+                    </div>
+                </div>
+            )}
 
-            {/* ── Stats Row ──────────────────────────────────────── */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <div className="bg-card border border-muted rounded-xl p-4 flex items-center gap-3 hover:shadow-sm transition-shadow">
-                    <div className="h-10 w-10 rounded-xl bg-international-orange/10 flex items-center justify-center shrink-0">
-                        <Users className="h-5 w-5 text-international-orange" />
+            {/* ── Stats Row (hidden in orbit mode — shown in bottom bar) ── */}
+            {!isOrbitActive && (
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <div className="bg-card border border-muted rounded-xl p-4 flex items-center gap-3 hover:shadow-sm transition-shadow">
+                        <div className="h-10 w-10 rounded-xl bg-international-orange/10 flex items-center justify-center shrink-0">
+                            <Users className="h-5 w-5 text-international-orange" />
+                        </div>
+                        <div>
+                            <p className="text-2xl font-display font-bold text-foreground">{totalPeople}</p>
+                            <p className="text-xs text-muted-foreground">People</p>
+                        </div>
                     </div>
-                    <div>
-                        <p className="text-2xl font-display font-bold text-foreground">{totalPeople}</p>
-                        <p className="text-xs text-muted-foreground">People</p>
+                    <div className="bg-card border border-muted rounded-xl p-4 flex items-center gap-3 hover:shadow-sm transition-shadow">
+                        <div className="h-10 w-10 rounded-xl bg-electric-blue/10 flex items-center justify-center shrink-0">
+                            <ShieldCheck className="h-5 w-5 text-electric-blue" />
+                        </div>
+                        <div>
+                            <p className="text-2xl font-display font-bold text-foreground">{totalTeams}</p>
+                            <p className="text-xs text-muted-foreground">Teams</p>
+                        </div>
+                    </div>
+                    <div className="bg-card border border-muted rounded-xl p-4 flex items-center gap-3 hover:shadow-sm transition-shadow">
+                        <div className="h-10 w-10 rounded-xl bg-status-success/10 flex items-center justify-center shrink-0">
+                            <BarChart3 className="h-5 w-5 text-status-success" />
+                        </div>
+                        <div>
+                            <p className="text-2xl font-display font-bold text-foreground">{avgCapacity}%</p>
+                            <p className="text-xs text-muted-foreground">Avg Capacity</p>
+                        </div>
                     </div>
                 </div>
-                <div className="bg-card border border-muted rounded-xl p-4 flex items-center gap-3 hover:shadow-sm transition-shadow">
-                    <div className="h-10 w-10 rounded-xl bg-electric-blue/10 flex items-center justify-center shrink-0">
-                        <ShieldCheck className="h-5 w-5 text-electric-blue" />
-                    </div>
-                    <div>
-                        <p className="text-2xl font-display font-bold text-foreground">{totalTeams}</p>
-                        <p className="text-xs text-muted-foreground">Teams</p>
-                    </div>
-                </div>
-                <div className="bg-card border border-muted rounded-xl p-4 flex items-center gap-3 hover:shadow-sm transition-shadow">
-                    <div className="h-10 w-10 rounded-xl bg-status-success/10 flex items-center justify-center shrink-0">
-                        <BarChart3 className="h-5 w-5 text-status-success" />
-                    </div>
-                    <div>
-                        <p className="text-2xl font-display font-bold text-foreground">{avgCapacity}%</p>
-                        <p className="text-xs text-muted-foreground">Avg Capacity</p>
-                    </div>
-                </div>
-            </div>
+            )}
 
-            {/* ── Smart Insights ──────────────────────────────────── */}
-            {insights && (
+            {/* ── Smart Insights (hidden in orbit mode — key items in bottom bar) ── */}
+            {!isOrbitActive && insights && (
                 <SmartInsights
                     insights={insights}
                     onMemberClick={(id) => setSelectedMemberId(id)}
@@ -924,7 +1018,8 @@ export function TeamPageView({
                 />
             )}
 
-            {/* ── Tab Bar + Controls ─────────────────────────────── */}
+            {/* ── Tab Bar + Controls (hidden in orbit mode — integrated in compact header) ── */}
+            {!isOrbitActive && (
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-muted pb-3">
                 {/* Tabs */}
                 <div className="flex items-center gap-1 bg-muted/50 p-1 rounded-xl border border-muted w-fit">
@@ -1045,20 +1140,68 @@ export function TeamPageView({
                     )}
                 </div>
             </div>
+            )}
 
             {/* ── Pending Invitations ─────────────────────────────── */}
-            <PendingInvitations />
+            {!isOrbitActive && <PendingInvitations />}
 
             {/* ── Content ─────────────────────────────────────────── */}
 
-            {/* Members Tab — Orbit View */}
-            {activeTab === 'members' && viewMode === 'orbit' && (
-                <div className="h-[calc(100vh-22rem)] -mx-4 sm:-mx-6 lg:-mx-8 overflow-hidden flex">
-                    <OrbitalView
-                        teamData={teamData}
-                        functions={orbitFunctions}
-                        onViewProfile={setSelectedMemberId}
-                    />
+            {/* Members Tab — Orbit View (hero layout) */}
+            {isOrbitActive && (
+                <div className="relative -mx-4 sm:-mx-6 lg:-mx-8">
+                    <div className="h-[calc(100vh-7rem)] overflow-hidden flex">
+                        <OrbitalView
+                            teamData={teamData}
+                            functions={orbitFunctions}
+                            onViewProfile={setSelectedMemberId}
+                        />
+                    </div>
+                    {/* ── Bottom Info Bar ── */}
+                    <div className="absolute bottom-6 left-0 right-0 flex justify-center pointer-events-none z-10">
+                        <div className="pointer-events-auto flex items-center gap-2.5 bg-background/80 backdrop-blur-sm border border-muted rounded-full px-5 py-2.5 shadow-lg">
+                            <div className="flex items-center gap-1.5">
+                                <Users className="h-3.5 w-3.5 text-international-orange" />
+                                <span className="font-semibold text-foreground text-sm">{totalPeople}</span>
+                                <span className="text-muted-foreground text-xs">People</span>
+                            </div>
+                            <div className="w-px h-4 bg-muted" />
+                            <div className="flex items-center gap-1.5">
+                                <ShieldCheck className="h-3.5 w-3.5 text-electric-blue" />
+                                <span className="font-semibold text-foreground text-sm">{totalTeams}</span>
+                                <span className="text-muted-foreground text-xs">Teams</span>
+                            </div>
+                            <div className="w-px h-4 bg-muted" />
+                            <div className="flex items-center gap-1.5">
+                                <BarChart3 className="h-3.5 w-3.5 text-status-success" />
+                                <span className="font-semibold text-foreground text-sm">{avgCapacity}%</span>
+                                <span className="text-muted-foreground text-xs">Capacity</span>
+                            </div>
+                            {insights && insights.unassignedTaskCount > 0 && (
+                                <>
+                                    <div className="w-px h-4 bg-muted" />
+                                    <button
+                                        onClick={() => setShowQuickAssign(true)}
+                                        className="flex items-center gap-1.5 hover:bg-status-warning-light/50 rounded-full px-2 py-0.5 transition-colors"
+                                    >
+                                        <Zap className="h-3.5 w-3.5 text-status-warning" />
+                                        <span className="font-semibold text-status-warning-dark text-sm">{insights.unassignedTaskCount}</span>
+                                        <span className="text-muted-foreground text-xs">unassigned</span>
+                                    </button>
+                                </>
+                            )}
+                            {insights && insights.overloadedMembers.length > 0 && (
+                                <>
+                                    <div className="w-px h-4 bg-muted" />
+                                    <div className="flex items-center gap-1.5">
+                                        <AlertTriangle className="h-3.5 w-3.5 text-status-error" />
+                                        <span className="font-semibold text-status-error-dark text-sm">{insights.overloadedMembers.length}</span>
+                                        <span className="text-muted-foreground text-xs">overloaded</span>
+                                    </div>
+                                </>
+                            )}
+                        </div>
+                    </div>
                 </div>
             )}
 
