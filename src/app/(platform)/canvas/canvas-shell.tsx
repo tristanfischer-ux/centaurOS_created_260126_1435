@@ -4,27 +4,32 @@
  * @file canvas-shell.tsx
  *
  * @description Client-side shell for the Strategy page. Provides tab switching
- * between Strategy Flow, Strategic Timeline, and Whiteboards.
+ * between Strategy Flow, Strategic Timeline, Whiteboards, Money Map, and Cost of Delay.
  *
  * @related
  * - strategy-flow-view.tsx — Sankey-inspired flow visualization
  * - strategic-canvas-view.tsx — ReactFlow-based timeline
  * - components/whiteboard-list.tsx — whiteboard CRUD list
+ * - money-map-client.tsx — Money Map financial visualization
+ * - cost-of-delay-view.tsx — Cost of Delay calculator
  */
 
-import React, { useState } from 'react'
-import { Waypoints, Pencil, GitBranch } from 'lucide-react'
+import React, { useState, useEffect } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { Waypoints, Pencil, GitBranch, Banknote, Calculator } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 import { StrategyFlowView } from './strategy-flow-view'
 import { StrategicCanvasView } from './strategic-canvas-view'
+import { MoneyMapClient } from '../money-map/money-map-client'
+import { CostOfDelayView } from '@/components/tools/cost-of-delay/cost-of-delay-view'
 import type { StrategicGoal, GoalBundle } from '@/types/canvas'
 
 // ============================================================================
 // TYPES
 // ============================================================================
 
-type CanvasTab = 'flow' | 'timeline' | 'whiteboards'
+type CanvasTab = 'flow' | 'timeline' | 'whiteboards' | 'money-map' | 'cost-of-delay'
 
 interface CanvasShellProps {
   /** Pre-fetched strategic goals from the server component */
@@ -43,6 +48,8 @@ const TABS: { id: CanvasTab; label: string; icon: React.ElementType }[] = [
   { id: 'flow', label: 'Strategy Flow', icon: GitBranch },
   { id: 'timeline', label: 'Strategic Timeline', icon: Waypoints },
   { id: 'whiteboards', label: 'Whiteboards', icon: Pencil },
+  { id: 'money-map', label: 'Money Map', icon: Banknote },
+  { id: 'cost-of-delay', label: 'Cost of Delay', icon: Calculator },
 ]
 
 // ============================================================================
@@ -58,7 +65,22 @@ export function CanvasShell({
   initialBundles,
   whiteboardList,
 }: CanvasShellProps) {
-  const [activeTab, setActiveTab] = useState<CanvasTab>('flow')
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const tabParam = searchParams.get('tab') as CanvasTab | null
+  
+  const [activeTab, setActiveTab] = useState<CanvasTab>(
+    tabParam && TABS.some(t => t.id === tabParam) ? tabParam : 'flow'
+  )
+
+  // Update URL when tab changes
+  useEffect(() => {
+    if (activeTab !== 'flow') {
+      router.replace(`/canvas?tab=${activeTab}`, { scroll: false })
+    } else {
+      router.replace('/canvas', { scroll: false })
+    }
+  }, [activeTab, router])
 
   return (
     <div>
@@ -101,6 +123,12 @@ export function CanvasShell({
       </div>
       <div className={activeTab === 'whiteboards' ? 'block' : 'hidden'}>
         {whiteboardList}
+      </div>
+      <div className={activeTab === 'money-map' ? 'block' : 'hidden'}>
+        <MoneyMapClient hideHeader={true} />
+      </div>
+      <div className={activeTab === 'cost-of-delay' ? 'block' : 'hidden'}>
+        <CostOfDelayView />
       </div>
     </div>
   )

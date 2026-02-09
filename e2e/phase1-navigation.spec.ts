@@ -201,7 +201,7 @@ test.describe('Phase 1: Person/Company Navigation', () => {
 
   test.describe('Full Navigation Click-Through', () => {
     test('Person zone links all load without error', async ({ page }) => {
-      const personRoutes = ['/home', '/marketplace', '/my-orders', '/guild', '/apprenticeship']
+      const personRoutes = ['/home', '/marketplace', '/marketplace-orders', '/guild', '/apprenticeship']
 
       for (const route of personRoutes) {
         await page.goto(route)

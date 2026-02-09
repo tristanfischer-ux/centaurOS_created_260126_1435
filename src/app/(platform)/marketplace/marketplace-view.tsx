@@ -837,9 +837,9 @@ export function MarketplaceView({
                         )}
                     </TabsTrigger>
                     <TabsTrigger value="orders" className="flex-1 gap-2" asChild>
-                        <Link href="/my-orders">
+                        <Link href="/marketplace-orders">
                             <ShoppingBag className="h-4 w-4" />
-                            My Orders
+                            Marketplace Orders
                         </Link>
                     </TabsTrigger>
                 </TabsList>

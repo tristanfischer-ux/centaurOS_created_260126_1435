@@ -62,7 +62,7 @@ export async function createDisputeAction(
 
   revalidatePath("/orders")
   revalidatePath(`/orders/${orderId}`)
-  revalidatePath("/my-orders")
+  revalidatePath("/marketplace-orders")
 
   if (!data) {
     return { data: null, error: 'Failed to create dispute' }

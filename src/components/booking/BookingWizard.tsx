@@ -698,7 +698,7 @@ export function BookingWizard({ listing, provider, onCancel }: BookingWizardProp
                 return confirmation ? (
                     <BookingConfirmation
                         confirmation={confirmation}
-                        onViewOrder={() => router.push(`/my-orders`)}
+                        onViewOrder={() => router.push(`/marketplace-orders`)}
                         onMessageProvider={() => {
                             if (confirmation.conversationId) {
                                 router.push(`/messages/${confirmation.conversationId}`)

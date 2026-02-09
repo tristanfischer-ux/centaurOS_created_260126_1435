@@ -3,13 +3,16 @@
 import { cn } from '@/lib/utils'
 import { ProgressRing, getHealthVariant } from '@/components/ui/progress-ring'
 import { Badge } from '@/components/ui/badge'
-import { AlertTriangle, ListChecks } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { AlertTriangle, ListChecks, Trash, Pencil } from 'lucide-react'
 import type { ObjectiveWithTasks } from './types'
 
 interface ObjectiveCardProps {
   objective: ObjectiveWithTasks
   isSelected: boolean
   onSelect: (id: string) => void
+  onEdit?: (objective: ObjectiveWithTasks) => void
+  onDelete?: (objectiveId: string) => void
 }
 
 const HEALTH_BORDER: Record<string, string> = {
@@ -28,7 +31,7 @@ const HEALTH_LABEL: Record<string, { text: string; className: string }> = {
   'not-started': { text: 'Not Started', className: 'bg-muted text-muted-foreground border-muted-foreground/20' },
 }
 
-export function ObjectiveCard({ objective, isSelected, onSelect }: ObjectiveCardProps) {
+export function ObjectiveCard({ objective, isSelected, onSelect, onEdit, onDelete }: ObjectiveCardProps) {
   const { title, description, progress, health, totalTasks, completedTasks, overdueTasks, tasks } = objective
   const variant = getHealthVariant(progress)
 
@@ -44,19 +47,52 @@ export function ObjectiveCard({ objective, isSelected, onSelect }: ObjectiveCard
   const healthInfo = HEALTH_LABEL[health] || HEALTH_LABEL['not-started']
 
   return (
-    <button
-      onClick={() => onSelect(objective.id)}
+    <div
       className={cn(
-        'w-full text-left rounded-xl border-l-4 border bg-white',
+        'w-full text-left rounded-xl border-l-4 border bg-white group relative',
         'transition-all duration-200 hover:shadow-md hover:-translate-y-0.5',
-        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
         HEALTH_BORDER[health] || 'border-l-muted',
         isSelected
           ? 'ring-2 ring-international-orange/30 shadow-md border-slate-200'
           : 'border-slate-100 hover:border-slate-200'
       )}
     >
-      <div className="p-4 space-y-3">
+      {/* Action buttons - visible on hover */}
+      <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+        {onEdit && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7 bg-white hover:bg-muted"
+            onClick={(e) => {
+              e.stopPropagation()
+              onEdit(objective)
+            }}
+            aria-label="Edit objective"
+          >
+            <Pencil className="h-3.5 w-3.5" />
+          </Button>
+        )}
+        {onDelete && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7 bg-white hover:bg-destructive/10 hover:text-destructive"
+            onClick={(e) => {
+              e.stopPropagation()
+              onDelete(objective.id)
+            }}
+            aria-label="Delete objective"
+          >
+            <Trash className="h-3.5 w-3.5" />
+          </Button>
+        )}
+      </div>
+
+      <button
+        onClick={() => onSelect(objective.id)}
+        className="w-full p-4 space-y-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-xl"
+      >
         {/* Header: Title + Health Badge */}
         <div className="flex items-start justify-between gap-2">
           <h3 className="text-sm font-semibold text-foreground line-clamp-2 leading-snug">
@@ -111,7 +147,7 @@ export function ObjectiveCard({ objective, isSelected, onSelect }: ObjectiveCard
             </div>
           )}
         </div>
-      </div>
-    </button>
+      </button>
+    </div>
   )
 }

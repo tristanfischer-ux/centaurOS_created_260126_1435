@@ -1,13 +1,12 @@
-import { FinancialToolsClient } from './financial-tools-client'
+import { redirect } from 'next/navigation'
 
 /**
- * Financial Tools page -- combines Cost of Delay calculator and
- * Money Map visualiser into a single tabbed view.
+ * Redirect page for legacy /tools/financial route.
+ * Financial tools are now integrated into the Strategy page.
  *
- * @description Reduces sidebar clutter by merging two financial tools
- * into one page. Each tool lives in its own tab and maintains
- * independent state.
+ * @description Money Map and Cost of Delay are now tabs within
+ * the Strategy page (/canvas) for better workflow integration.
  */
-export default function FinancialToolsPage(): React.ReactElement {
-  return <FinancialToolsClient />
+export default function FinancialToolsRedirect() {
+  redirect('/canvas?tab=money-map')
 }

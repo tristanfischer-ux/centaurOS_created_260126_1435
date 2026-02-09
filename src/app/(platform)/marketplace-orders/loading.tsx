@@ -1,6 +1,6 @@
 import { Skeleton } from '@/components/ui/skeleton'
 
-export default function MyOrdersLoading() {
+export default function MarketplaceOrdersLoading() {
     return (
         <div className="container max-w-5xl mx-auto py-8 px-4">
             <div className="mb-8">

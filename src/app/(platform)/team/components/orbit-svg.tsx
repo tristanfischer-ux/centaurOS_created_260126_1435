@@ -12,6 +12,7 @@
  */
 
 import { useState, useMemo } from 'react'
+import { UserAvatar } from '@/components/ui/user-avatar'
 import {
   CX, CY, GAP_DEG, SLICE_DEG,
   FUNC_R1, FUNC_R2, EXEC_R, APPR_R,
@@ -63,18 +64,28 @@ function spreadPos(
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// ROLE-BASED SVG COLOURS (matches UserAvatar component orange hierarchy)
+// HELPERS — map orbit role to UserAvatar role + size
 // ═══════════════════════════════════════════════════════════════════════════════
 
-const SVG_ROLE_COLORS: Record<string, { bg: string; text: string; stroke: string }> = {
-  FOUNDER:    { bg: '#FFEDD5', text: '#C2410C', stroke: '#F97316' },
-  EXECUTIVE:  { bg: '#FFF7ED', text: '#EA580C', stroke: '#FB923C' },
-  APPRENTICE: { bg: '#F1F5F9', text: '#64748B', stroke: '#94A3B8' },
+/** Map orbit's UPPERCASE role to the UserAvatar role prop */
+function toAvatarRole(orbitRole: string): string {
+  switch (orbitRole) {
+    case 'FOUNDER': return 'Founder'
+    case 'EXECUTIVE': return 'Executive'
+    case 'APPRENTICE': return 'Apprentice'
+    default: return 'Apprentice'
+  }
 }
 
-function getRoleSvgColors(role: string) {
-  return SVG_ROLE_COLORS[role] || SVG_ROLE_COLORS.APPRENTICE
+/** Pick a UserAvatar size that fits the slot radius */
+function avatarSizeForR(r: number): 'sm' | 'md' | 'lg' {
+  if (r >= 18) return 'lg'   // 40px — executive slots (r=20)
+  if (r >= 13) return 'md'   // 32px — apprentice slots (r=14)
+  return 'sm'                // 24px
 }
+
+/** Pixel diameter for each UserAvatar size */
+const AVATAR_PX: Record<string, number> = { sm: 24, md: 32, lg: 40 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // SLOT COMPONENTS
@@ -94,8 +105,10 @@ interface OSlotProps {
 function OSlot({ x, y, r, person, isEmpty, isFounder, sc, onClick }: OSlotProps) {
   const [isHovered, setIsHovered] = useState(false)
 
+  // ── Filled slot: real UserAvatar via foreignObject ──────────
   if (person) {
-    const rc = getRoleSvgColors(person.role)
+    const size = avatarSizeForR(r)
+    const px = AVATAR_PX[size]
     return (
       <g
         onClick={onClick}
@@ -103,30 +116,39 @@ function OSlot({ x, y, r, person, isEmpty, isFounder, sc, onClick }: OSlotProps)
         onMouseLeave={() => setIsHovered(false)}
         style={{ cursor: 'pointer' }}
       >
-        <circle cx={x} cy={y} r={r + 3} fill="white" />
-        <circle
-          cx={x} cy={y} r={r}
-          fill={rc.bg} stroke={rc.stroke}
-          strokeWidth={isHovered ? 3 : 2.2}
-          style={{
-            transition: 'all .15s',
-            filter: isHovered ? `drop-shadow(0 2px 8px ${rc.stroke}44)` : 'none',
-          }}
-        />
-        <text
-          x={x} y={y + 1}
-          textAnchor="middle" dominantBaseline="central"
-          fill={rc.text}
-          fontSize={r > 16 ? 12 : 9}
-          fontWeight="800"
+        {/* Hover highlight ring */}
+        {isHovered && (
+          <circle
+            cx={x} cy={y} r={px / 2 + 4}
+            fill="none" stroke="#F97316" strokeWidth="2.5" opacity=".45"
+            style={{ transition: 'all .15s' }}
+          />
+        )}
+
+        {/* Real UserAvatar embedded in SVG */}
+        <foreignObject
+          x={x - px / 2} y={y - px / 2}
+          width={px} height={px}
+          style={{ pointerEvents: 'none', overflow: 'visible' }}
         >
-          {person.initials}
-        </text>
+          <div style={{ width: px, height: px, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <UserAvatar
+              name={person.name}
+              role={toAvatarRole(person.role)}
+              size={size}
+            />
+          </div>
+        </foreignObject>
+
+        {/* Invisible hit area for pointer events */}
+        <circle cx={x} cy={y} r={px / 2} fill="transparent" />
+
+        {/* Tooltip on hover */}
         {isHovered && (
           <g>
-            <rect x={x - 52} y={y - r - 30} width={104} height={24} rx={7} fill="#1E293B" />
+            <rect x={x - 52} y={y - px / 2 - 30} width={104} height={24} rx={7} fill="#1E293B" />
             <text
-              x={x} y={y - r - 15}
+              x={x} y={y - px / 2 - 15}
               textAnchor="middle" dominantBaseline="central"
               fill="white" fontSize="10" fontWeight="600"
             >
@@ -138,8 +160,8 @@ function OSlot({ x, y, r, person, isEmpty, isFounder, sc, onClick }: OSlotProps)
     )
   }
 
+  // ── Founder-covering placeholder (dashed "YOU" circle) ─────
   if (isFounder) {
-    const rc = SVG_ROLE_COLORS.FOUNDER
     return (
       <g
         onClick={onClick}
@@ -150,13 +172,13 @@ function OSlot({ x, y, r, person, isEmpty, isFounder, sc, onClick }: OSlotProps)
         <circle cx={x} cy={y} r={r + 3} fill="white" />
         <circle
           cx={x} cy={y} r={r}
-          fill={isHovered ? rc.bg : '#FFF7ED'}
-          stroke={rc.stroke} strokeWidth="2" strokeDasharray="5 3"
+          fill={isHovered ? '#FFEDD5' : '#FFF7ED'}
+          stroke="#F97316" strokeWidth="2" strokeDasharray="5 3"
         />
         <text
           x={x} y={y}
           textAnchor="middle" dominantBaseline="central"
-          fill={rc.text}
+          fill="#C2410C"
           fontSize={r > 16 ? 10 : 8}
           fontWeight="800"
         >
@@ -178,7 +200,7 @@ function OSlot({ x, y, r, person, isEmpty, isFounder, sc, onClick }: OSlotProps)
     )
   }
 
-  // Empty slot
+  // ── Empty slot (dashed "+") ────────────────────────────────
   return (
     <g
       onClick={onClick}
@@ -501,24 +523,28 @@ export function OrbitSVG({
         FOUNDERS
       </text>
 
-      {/* Founder avatars */}
+      {/* Founder avatars — real UserAvatar via foreignObject */}
       {founders.map((f, fi) => {
-        const fw = 30
+        const avatarPx = 32 // md size
         const fg = 6
-        const totalW = founders.length * fw + (founders.length - 1) * fg
-        const fx = CX - totalW / 2 + fi * (fw + fg) + fw / 2
+        const totalW = founders.length * avatarPx + (founders.length - 1) * fg
+        const fx = CX - totalW / 2 + fi * (avatarPx + fg) + avatarPx / 2
         const fy = CY - 8
         return (
-          <g key={f.id}>
-            <circle cx={fx} cy={fy} r={14} fill="white" stroke="#F97316" strokeWidth="2" />
-            <text
-              x={fx} y={fy + 1}
-              textAnchor="middle" dominantBaseline="central"
-              fill="#F97316" fontSize="9" fontWeight="800"
-            >
-              {f.initials}
-            </text>
-          </g>
+          <foreignObject
+            key={f.id}
+            x={fx - avatarPx / 2} y={fy - avatarPx / 2}
+            width={avatarPx} height={avatarPx}
+            style={{ overflow: 'visible' }}
+          >
+            <div style={{ width: avatarPx, height: avatarPx, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <UserAvatar
+                name={f.name}
+                role="Founder"
+                size="md"
+              />
+            </div>
+          </foreignObject>
         )
       })}
 

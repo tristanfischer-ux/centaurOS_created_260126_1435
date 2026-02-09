@@ -28,7 +28,7 @@ export function ProfileHubView({ data }: { data: ProfileHubData }) {
   const [isWizardOpen, setIsWizardOpen] = useState(false)
 
   return (
-    <div className="max-w-4xl mx-auto space-y-8">
+    <div className="max-w-4xl space-y-8">
       {/* Page Header */}
       <div className="pb-4 border-b border-muted">
         <div className={typography.pageHeader}>

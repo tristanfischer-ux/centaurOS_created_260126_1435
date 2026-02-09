@@ -318,7 +318,7 @@ export async function createBooking(
                 })
         }
 
-        revalidatePath('/my-orders')
+        revalidatePath('/marketplace-orders')
         revalidatePath('/marketplace')
 
         return {
@@ -467,7 +467,7 @@ export async function confirmBookingPayment(
             ]
         }
 
-        revalidatePath('/my-orders')
+        revalidatePath('/marketplace-orders')
 
         return { data: confirmation, error: null }
     } catch (err) {

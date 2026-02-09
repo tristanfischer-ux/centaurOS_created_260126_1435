@@ -7,16 +7,29 @@ import { Button } from '@/components/ui/button'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Input } from '@/components/ui/input'
 import {
-  LayoutGrid, GitBranch, GanttChartSquare, Search, Target, X,
+  LayoutGrid, GitBranch, GanttChartSquare, Search, Target, X, Loader2,
 } from 'lucide-react'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { StrategyHealthBar } from './strategy-health-bar'
 import { ObjectiveCard } from './objective-card'
 import { ObjectiveDetailPanel } from './objective-detail-panel'
 import { ObjectivesTreeView } from './objectives-tree-view'
 import { CreateObjectiveDialog } from '../objectives/create-objective-dialog'
+import { EditObjectiveDialog } from '@/components/objectives/edit-objective-dialog'
 import { ObjectivesGanttView } from './gantt-view'
 import { TaskDetailPanel } from '../new-tasks/task-detail-panel'
 import { CompanyPurposeWrapper } from '@/components/objectives/company-purpose-wrapper'
+import { deleteObjective } from '@/actions/objectives'
+import { toast } from 'sonner'
 import type { FoundryPurposeData } from '@/types/foundry'
 import type { ObjectiveWithTasks, ObjectiveTask, Member, Team } from './types'
 import type { TaskWithData } from '../new-tasks/types'
@@ -92,6 +105,9 @@ export function ObjectivesBoard({
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null)
   const [showSearch, setShowSearch] = useState(false)
   const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1400)
+  const [objectiveToDelete, setObjectiveToDelete] = useState<string | null>(null)
+  const [objectiveToEdit, setObjectiveToEdit] = useState<ObjectiveWithTasks | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
 
   // Track window width for responsive layout
   useEffect(() => {
@@ -166,6 +182,30 @@ export function ObjectivesBoard({
     setSelectedTaskId(prev => prev === taskId ? null : taskId)
   }, [])
 
+  const handleDelete = useCallback(async () => {
+    if (!objectiveToDelete) return
+
+    setIsDeleting(true)
+    try {
+      const result = await deleteObjective(objectiveToDelete)
+
+      if (result?.error) {
+        toast.error(result.error)
+      } else {
+        toast.success('Objective deleted')
+        setObjectiveToDelete(null)
+        // Clear selection if deleted objective was selected
+        if (selectedId === objectiveToDelete) {
+          setSelectedId(null)
+        }
+      }
+    } catch (error) {
+      toast.error('Failed to delete objective')
+    } finally {
+      setIsDeleting(false)
+    }
+  }, [objectiveToDelete, selectedId])
+
   // Find the selected task and its parent objective
   const selectedTaskData: TaskWithData | null = useMemo(() => {
     if (!selectedTaskId) return null
@@ -181,6 +221,68 @@ export function ObjectivesBoard({
 
   return (
     <div className="space-y-6">
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={!!objectiveToDelete} onOpenChange={(open) => !open && setObjectiveToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Objective?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete this objective and all associated tasks.
+              This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive hover:bg-destructive/90 focus:ring-destructive"
+              onClick={handleDelete}
+              disabled={isDeleting}
+            >
+              {isDeleting ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                'Delete'
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Edit Objective Dialog */}
+      {objectiveToEdit && (
+        <EditObjectiveDialog
+          open={!!objectiveToEdit}
+          onOpenChange={(open) => !open && setObjectiveToEdit(null)}
+          objective={{
+            id: objectiveToEdit.id,
+            title: objectiveToEdit.title,
+            description: objectiveToEdit.description,
+            extended_description: objectiveToEdit.extended_description,
+            created_at: objectiveToEdit.created_at,
+            tasks: objectiveToEdit.tasks.map(t => ({
+              id: t.id,
+              title: t.title,
+              description: t.description,
+              task_number: t.task_number,
+              status: t.status,
+              assignee_id: t.assignee_id,
+              end_date: t.end_date,
+              foundry_id: t.foundry_id,
+              assignee: t.assignee,
+            })),
+            is_private: objectiveToEdit.is_private,
+            creator_id: objectiveToEdit.creator_id,
+            is_strategic_goal: objectiveToEdit.is_strategic_goal,
+          }}
+          members={members}
+          teams={teams}
+          currentUserId={currentUserId}
+        />
+      )}
+
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="min-w-0 flex-1">
@@ -281,6 +383,8 @@ export function ObjectivesBoard({
               objectives={filteredObjectives}
               selectedId={selectedId}
               onSelect={handleSelect}
+              onEdit={setObjectiveToEdit}
+              onDelete={setObjectiveToDelete}
             />
           )}
           {viewMode === 'tree' && (
@@ -288,6 +392,8 @@ export function ObjectivesBoard({
               objectives={filteredObjectives}
               selectedId={selectedId}
               onSelect={handleSelect}
+              onEdit={setObjectiveToEdit}
+              onDelete={setObjectiveToDelete}
             />
           )}
           {viewMode === 'timeline' && (
@@ -344,10 +450,14 @@ function BoardView({
   objectives,
   selectedId,
   onSelect,
+  onEdit,
+  onDelete,
 }: {
   objectives: ObjectiveWithTasks[]
   selectedId: string | null
   onSelect: (id: string) => void
+  onEdit?: (objective: ObjectiveWithTasks) => void
+  onDelete?: (objectiveId: string) => void
 }) {
   if (objectives.length === 0) {
     return (
@@ -373,6 +483,8 @@ function BoardView({
           objective={obj}
           isSelected={selectedId === obj.id}
           onSelect={onSelect}
+          onEdit={onEdit}
+          onDelete={onDelete}
         />
       ))}
     </div>

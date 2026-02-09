@@ -55,9 +55,9 @@ export default function OrdersError({
                                     Go back
                                 </Button>
                                 <Button variant="secondary" asChild className="flex-1">
-                                    <Link href="/my-orders">
+                                    <Link href="/marketplace-orders">
                                         <ShoppingBag className="h-4 w-4 mr-2" />
-                                        My Orders
+                                        Marketplace Orders
                                     </Link>
                                 </Button>
                             </div>

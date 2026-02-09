@@ -74,8 +74,7 @@ const companyNavigation = [
     { name: "Tasks", href: "/new-tasks", icon: CheckSquare, tooltip: "Manage and assign actionable items" },
     { name: "Team", href: "/team", icon: Users, tooltip: "Team members, roles, and capacity" },
     { name: "Agents", href: "/agents", icon: Bot, tooltip: "Prompt workflows — build, chain, and copy prompts" },
-    { name: "Financial Tools", href: "/tools/financial", icon: Coins, tooltip: "Money Map and Cost of Delay calculator" },
-    { name: "My Orders", href: "/my-orders", icon: ShoppingBag, tooltip: "View and manage your marketplace orders" },
+    { name: "Marketplace Orders", href: "/marketplace-orders", icon: ShoppingBag, tooltip: "View and manage your marketplace orders" },
     { name: "Settings", href: "/settings", icon: Settings, tooltip: "Company configuration, integrations, and preferences" },
 ]
 
@@ -276,28 +275,6 @@ export function Sidebar({ foundryName, foundryId, userName, userRole, isCompanyA
                 </div>
 
                 {companyNavigation.map(renderNavItem)}
-
-                {/* Company Admin Link — Only visible to Founders/Executives */}
-                {isCompanyAdmin && (
-                    <Link
-                        href="/admin"
-                        className={cn(
-                            isRouteActive(pathname, "/admin")
-                                ? "bg-orange-50 text-international-orange font-semibold"
-                                : "text-muted-foreground hover:bg-muted hover:text-foreground",
-                            "group flex items-center px-3 py-2 text-sm transition-all duration-200 rounded-md"
-                        )}
-                    >
-                        <ShieldAlert
-                            className={cn(
-                                isRouteActive(pathname, "/admin") ? "text-international-orange" : "text-muted-foreground group-hover:text-foreground",
-                                "mr-3 h-4 w-4 flex-shrink-0 transition-colors"
-                            )}
-                            aria-hidden="true"
-                        />
-                        Company Admin
-                    </Link>
-                )}
 
                 {/* ══════════════════════════════════════════════════ */}
                 {/* Zone C: "Network" — Community and discovery        */}

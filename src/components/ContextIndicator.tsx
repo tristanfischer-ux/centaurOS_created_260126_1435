@@ -11,7 +11,7 @@ import { cn } from '@/lib/utils'
 const PERSON_ROUTES = [
   '/home',
   '/marketplace',
-  '/my-orders',
+  '/marketplace-orders',
   '/guild',
   '/apprenticeship',
   '/my-profile',

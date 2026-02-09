@@ -33,7 +33,7 @@ import type { OrderSummary } from '@/types/booking'
 // PROPS
 // ==========================================
 
-interface MyOrdersViewProps {
+interface MarketplaceOrdersViewProps {
     activeOrders: OrderSummary[]
     completedOrders: OrderSummary[]
     cancelledOrders: OrderSummary[]
@@ -44,12 +44,12 @@ interface MyOrdersViewProps {
 // COMPONENT
 // ==========================================
 
-export function MyOrdersView({
+export function MarketplaceOrdersView({
     activeOrders,
     completedOrders,
     cancelledOrders,
     errors = []
-}: MyOrdersViewProps) {
+}: MarketplaceOrdersViewProps) {
     const router = useRouter()
     const [searchQuery, setSearchQuery] = useState('')
     const [sortBy, setSortBy] = useState<'newest' | 'oldest' | 'amount'>('newest')
@@ -302,4 +302,4 @@ export function MyOrdersView({
     )
 }
 
-export default MyOrdersView
+export default MarketplaceOrdersView

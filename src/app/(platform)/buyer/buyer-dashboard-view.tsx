@@ -159,7 +159,7 @@ export function BuyerDashboardView({
                             <Button 
                                 variant="secondary" 
                                 size="sm"
-                                onClick={() => router.push('/my-orders')}
+                                onClick={() => router.push('/marketplace-orders')}
                             >
                                 View All
                                 <ArrowRight className="h-4 w-4 ml-1" />
@@ -253,7 +253,7 @@ export function BuyerDashboardView({
                             <Button 
                                 variant="secondary" 
                                 className="w-full justify-start"
-                                onClick={() => router.push('/my-orders')}
+                                onClick={() => router.push('/marketplace-orders')}
                             >
                                 <ShoppingBag className="h-4 w-4 mr-2" />
                                 View Orders

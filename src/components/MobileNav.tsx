@@ -62,8 +62,7 @@ const companyMoreNavigation = [
     { name: "Objectives", href: "/new-objectives", icon: Target },
     { name: "Team", href: "/team", icon: Users },
     { name: "Agents", href: "/agents", icon: Bot },
-    { name: "Financial Tools", href: "/tools/financial", icon: Coins },
-    { name: "My Orders", href: "/my-orders", icon: ShoppingBag },
+    { name: "Marketplace Orders", href: "/marketplace-orders", icon: ShoppingBag },
     { name: "Settings", href: "/settings", icon: Settings },
 ]
 

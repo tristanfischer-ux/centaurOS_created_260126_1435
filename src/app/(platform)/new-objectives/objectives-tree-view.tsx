@@ -3,14 +3,17 @@
 import { useState } from 'react'
 import { cn } from '@/lib/utils'
 import { ProgressRing, getHealthVariant } from '@/components/ui/progress-ring'
+import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
-import { ChevronRight, ChevronDown, ListChecks, AlertTriangle } from 'lucide-react'
+import { ChevronRight, ChevronDown, ListChecks, AlertTriangle, Pencil, Trash } from 'lucide-react'
 import type { ObjectiveWithTasks } from './types'
 
 interface ObjectivesTreeViewProps {
   objectives: ObjectiveWithTasks[]
   selectedId: string | null
   onSelect: (id: string) => void
+  onEdit?: (objective: ObjectiveWithTasks) => void
+  onDelete?: (objectiveId: string) => void
 }
 
 const HEALTH_DOT: Record<string, string> = {
@@ -53,11 +56,15 @@ function TreeItem({
   depth,
   selectedId,
   onSelect,
+  onEdit,
+  onDelete,
 }: {
   node: TreeNode
   depth: number
   selectedId: string | null
   onSelect: (id: string) => void
+  onEdit?: (objective: ObjectiveWithTasks) => void
+  onDelete?: (objectiveId: string) => void
 }) {
   const [expanded, setExpanded] = useState(true)
   const { objective } = node
@@ -66,7 +73,39 @@ function TreeItem({
   const isSelected = selectedId === objective.id
 
   return (
-    <div>
+    <div className="group relative">
+      {/* Action buttons - visible on hover */}
+      <div className="absolute right-2 top-1/2 -translate-y-1/2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+        {onEdit && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7 bg-white hover:bg-muted"
+            onClick={(e) => {
+              e.stopPropagation()
+              onEdit(objective)
+            }}
+            aria-label="Edit objective"
+          >
+            <Pencil className="h-3.5 w-3.5" />
+          </Button>
+        )}
+        {onDelete && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7 bg-white hover:bg-destructive/10 hover:text-destructive"
+            onClick={(e) => {
+              e.stopPropagation()
+              onDelete(objective.id)
+            }}
+            aria-label="Delete objective"
+          >
+            <Trash className="h-3.5 w-3.5" />
+          </Button>
+        )}
+      </div>
+
       <button
         onClick={() => onSelect(objective.id)}
         className={cn(
@@ -144,6 +183,8 @@ function TreeItem({
               depth={depth + 1}
               selectedId={selectedId}
               onSelect={onSelect}
+              onEdit={onEdit}
+              onDelete={onDelete}
             />
           ))}
         </div>
@@ -152,7 +193,7 @@ function TreeItem({
   )
 }
 
-export function ObjectivesTreeView({ objectives, selectedId, onSelect }: ObjectivesTreeViewProps) {
+export function ObjectivesTreeView({ objectives, selectedId, onSelect, onEdit, onDelete }: ObjectivesTreeViewProps) {
   const tree = buildTree(objectives)
 
   if (tree.length === 0) {
@@ -184,6 +225,8 @@ export function ObjectivesTreeView({ objectives, selectedId, onSelect }: Objecti
           depth={0}
           selectedId={selectedId}
           onSelect={onSelect}
+          onEdit={onEdit}
+          onDelete={onDelete}
         />
       ))}
     </div>

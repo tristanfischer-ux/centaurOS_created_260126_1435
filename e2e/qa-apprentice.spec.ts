@@ -9,7 +9,7 @@ import { APPRENTICE_STORAGE, dismissOnboarding } from './auth-storage'
  *
  * Sections:
  *   1. Core Work Flow (Home, Updates, Objectives, Tasks, Team, Agents)
- *   2. Discovery Flow (Inspiration, Marketplace, My Orders)
+ *   2. Discovery Flow (Inspiration, Marketplace, Marketplace Orders)
  *   3. Profile & Settings
  *   4. Apprentice-specific pages (Apprenticeship, Guild, OTJT)
  *   5. Permission restrictions (no admin, no approvals)
@@ -126,9 +126,9 @@ test.describe('Apprentice — Day in the Life', () => {
       }
     })
 
-    test('My Orders — view orders', async ({ page }) => {
+    test('Marketplace Orders — view orders', async ({ page }) => {
       await page.goto('/dashboard')
-      await navigateViaSidebar(page, 'My Orders', '/my-orders')
+      await navigateViaSidebar(page, 'Marketplace Orders', '/marketplace-orders')
 
       await page.waitForLoadState('networkidle')
       await page.waitForTimeout(1_500)

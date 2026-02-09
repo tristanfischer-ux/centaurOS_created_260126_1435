@@ -260,9 +260,9 @@ export const FEATURE_REGISTRY: Feature[] = [
     },
     {
         id: 'orders-management',
-        name: 'Orders Management',
+        name: 'Marketplace Orders',
         description: 'View and manage marketplace orders',
-        route: '/my-orders',
+        route: '/marketplace-orders',
         releasedAt: new Date('2026-01-10'),
         category: 'marketplace',
         status: 'stable',
