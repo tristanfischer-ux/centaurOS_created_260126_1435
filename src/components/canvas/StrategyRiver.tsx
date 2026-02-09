@@ -30,6 +30,8 @@ export interface RiverTask {
   status: 'done' | 'in_progress' | 'not_started'
   /** 2-char initials e.g. "TF" */
   assignee: string
+  /** User role for avatar coloring (Founder, Executive, Apprentice, AI_Agent) */
+  assigneeRole?: string | null
 }
 
 export interface RiverObjective {
@@ -57,6 +59,12 @@ interface StrategyRiverProps {
   strategicObjectives: RiverStrategicObjective[]
   /** Optional override for "today" (useful for testing) */
   today?: Date
+  /** Called when a task bar/label is clicked */
+  onTaskClick?: (taskId: string) => void
+  /** Called when a milestone node is clicked */
+  onMilestoneClick?: (milestoneId: string) => void
+  /** Called when a strategic goal title/node is clicked */
+  onGoalClick?: (goalId: string) => void
 }
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -68,6 +76,20 @@ const STATUS_MAP = {
   in_progress:  { color: '#EA580C', solid: '#FB923C', bg: '#FFF7ED', label: 'In Progress' },
   not_started:  { color: '#94A3B8', solid: '#CBD5E1', bg: '#F8FAFC', label: 'Not Started' },
 } as const
+
+// Role-based avatar colors matching UserAvatar component (no borders/rings)
+const ROLE_AVATAR_COLORS: Record<string, { bg: string; text: string }> = {
+  Founder:    { bg: '#FED7AA', text: '#C2410C' },   // orange-200, orange-700
+  Executive:  { bg: '#FFF7ED', text: '#EA580C' },   // orange-50, orange-600
+  Apprentice: { bg: '#F1F5F9', text: '#64748B' },   // slate-100, slate-500
+  AI_Agent:   { bg: '#F3E8FF', text: '#9333EA' },   // purple-100, purple-600
+  default:    { bg: '#F1F5F9', text: '#64748B' },   // slate-100, slate-500
+}
+
+function getAvatarColors(role: string | null | undefined): { bg: string; text: string } {
+  if (!role) return ROLE_AVATAR_COLORS.default
+  return ROLE_AVATAR_COLORS[role] ?? ROLE_AVATAR_COLORS.default
+}
 
 const BAND_W = 8
 const LANE_GAP = 34
@@ -95,7 +117,7 @@ function riverSegPath(x1: number, y: number, w1: number, x2: number, w2: number)
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
-const StrategyRiver: FC<StrategyRiverProps> = ({ strategicObjectives, today }) => {
+const StrategyRiver: FC<StrategyRiverProps> = ({ strategicObjectives, today, onTaskClick, onMilestoneClick, onGoalClick }) => {
   const NOW = today ?? new Date()
   const [expandedIds, setExpandedIds] = useState<Set<string>>(() =>
     new Set(strategicObjectives.length > 0 ? [strategicObjectives[0].id] : [])
@@ -389,12 +411,13 @@ const StrategyRiver: FC<StrategyRiverProps> = ({ strategicObjectives, today }) =
                         const st = STATUS_MAP[t.status]
                         const isH = hovTask === t.id
                         const above = t.side === 'above'
+                        const avatarC = getAvatarColors(t.assigneeRole)
                         return (
-                          <g key={`${t.id}-ui`} onMouseEnter={() => setHovTask(t.id)} onMouseLeave={() => setHovTask(null)} style={{ cursor: 'pointer' }}>
+                          <g key={`${t.id}-ui`} onMouseEnter={() => setHovTask(t.id)} onMouseLeave={() => setHovTask(null)} onClick={() => onTaskClick?.(t.id)} style={{ cursor: 'pointer' }}>
                             <line x1={t.sx} y1={t.y} x2={t.ex} y2={t.y} stroke={st.solid} strokeWidth={BAND_W - 1} strokeLinecap="round" opacity={isH ? 0.65 : 0.4} />
                             <line x1={t.sx} y1={t.y} x2={t.ex} y2={t.y} stroke="transparent" strokeWidth={BAND_W + 10} />
-                            <circle cx={t.sx - 13} cy={t.y} r={7} fill={st.bg} stroke={st.color} strokeWidth={1.2} />
-                            <text x={t.sx - 13} y={t.y + 0.5} textAnchor="middle" dominantBaseline="central" fill={st.color} fontSize="5.5" fontFamily={FONT} fontWeight="800">{t.assignee}</text>
+                            <circle cx={t.sx - 13} cy={t.y} r={7} fill={avatarC.bg} />
+                            <text x={t.sx - 13} y={t.y + 0.5} textAnchor="middle" dominantBaseline="central" fill={avatarC.text} fontSize="5.5" fontFamily={FONT} fontWeight="800">{t.assignee}</text>
                             <text x={t.sx + 6} y={t.y + (above ? -9 : 13)} fill={isH ? '#0F172A' : '#64748B'} fontSize="8.5" fontFamily={FONT} fontWeight={isH ? '700' : '600'}>{t.title}</text>
                             {isH && (
                               <g>
@@ -425,7 +448,7 @@ const StrategyRiver: FC<StrategyRiverProps> = ({ strategicObjectives, today }) =
                   const rH = obj.rw / 2
                   const gap = Math.max(rH + 20, 26)
                   return (
-                    <g key={obj.id} onMouseEnter={() => setHovObj(obj.id)} onMouseLeave={() => setHovObj(null)} style={{ cursor: 'pointer' }}>
+                    <g key={obj.id} onMouseEnter={() => setHovObj(obj.id)} onMouseLeave={() => setHovObj(null)} onClick={() => onMilestoneClick?.(obj.id)} style={{ cursor: 'pointer' }}>
                       {past && <circle cx={obj.cx} cy={ry} r={18} fill={so.color} opacity=".07" />}
                       <circle cx={obj.cx} cy={ry} r={isH ? 13 : 10} fill="white" stroke={so.color} strokeWidth={past ? 3 : 2} filter="url(#strategy-ds)" />
                       <circle cx={obj.cx} cy={ry} r={past ? 4 : 2} fill={past ? so.color : '#CBD5E1'} />
@@ -445,16 +468,20 @@ const StrategyRiver: FC<StrategyRiverProps> = ({ strategicObjectives, today }) =
                 <circle cx={eX} cy={ry} r={12} fill={so.color + '08'} stroke={so.color} strokeWidth="2" />
                 <circle cx={eX} cy={ry} r={7} fill="white" stroke={so.color} strokeWidth="1.5" filter="url(#strategy-ds)" />
                 <text x={eX} y={ry + 1} textAnchor="middle" dominantBaseline="central" fill={so.color} fontSize="8" fontFamily={FONT} fontWeight="900">◆</text>
-                <text x={eX} y={ry - 18} textAnchor="middle" fill="#0F172A" fontSize="10" fontFamily={FONT} fontWeight="800">{so.title}</text>
-                <text x={eX} y={ry + 22} textAnchor="middle" fill={so.color} fontSize="9" fontFamily={FONT} fontWeight="700">
-                  {new Date(so.targetDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
-                </text>
+                <g onClick={() => onGoalClick?.(so.id)} style={{ cursor: 'pointer' }}>
+                  <text x={eX} y={ry - 18} textAnchor="middle" fill="#0F172A" fontSize="10" fontFamily={FONT} fontWeight="800">{so.title}</text>
+                  <text x={eX} y={ry + 22} textAnchor="middle" fill={so.color} fontSize="9" fontFamily={FONT} fontWeight="700">
+                    {new Date(so.targetDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                  </text>
+                </g>
 
                 {/* SO title (left column) */}
-                <text x={14} y={ry - 5} fill="#0F172A" fontSize="12" fontFamily={FONT} fontWeight="800">{so.title}</text>
-                <text x={14} y={ry + 9} fill={so.color} fontSize="10" fontFamily={FONT} fontWeight="700">
-                  {pct}% · {new Date(so.targetDate).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })}
-                </text>
+                <g onClick={() => onGoalClick?.(so.id)} style={{ cursor: 'pointer' }}>
+                  <text x={14} y={ry - 5} fill="#0F172A" fontSize="12" fontFamily={FONT} fontWeight="800">{so.title}</text>
+                  <text x={14} y={ry + 9} fill={so.color} fontSize="10" fontFamily={FONT} fontWeight="700">
+                    {pct}% · {new Date(so.targetDate).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })}
+                  </text>
+                </g>
               </g>
             )
           })}

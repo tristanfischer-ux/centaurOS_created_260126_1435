@@ -14,17 +14,19 @@
  * - cost-of-delay-view.tsx — Cost of Delay calculator
  */
 
-import React, { useState, useEffect, useMemo } from 'react'
+import React, { useState, useEffect, useMemo, useCallback } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Waypoints, Pencil, Banknote, Calculator } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 import StrategyRiver from '@/components/canvas/StrategyRiver'
 import { goalBundlesToRiverData } from '@/lib/canvas/strategy-river-adapter'
+import { NodeDetailsDialog } from '@/components/canvas/node-details-dialog'
 import { MoneyMapClient } from '../money-map/money-map-client'
 import { CostOfDelayView } from '@/components/tools/cost-of-delay/cost-of-delay-view'
 import { EmptyState } from '@/components/ui/empty-state'
 import type { GoalBundle } from '@/types/canvas'
+import type { MilestoneOption } from '@/types/canvas'
 
 // ============================================================================
 // TYPES
@@ -70,8 +72,48 @@ export function CanvasShell({
     tabParam && TABS.some((t) => t.id === tabParam) ? tabParam : 'river'
   )
 
+  // ── Node details dialog state ──
+  const [dialogOpen, setDialogOpen] = useState(false)
+  const [dialogNodeType, setDialogNodeType] = useState<'goal' | 'milestone' | 'objective' | 'task'>('task')
+  const [dialogNodeId, setDialogNodeId] = useState('')
+
   // Convert goal bundles to river data format
   const riverData = useMemo(() => goalBundlesToRiverData(initialBundles), [initialBundles])
+
+  // Build milestone options from bundles for the dialog
+  const milestoneOptions: MilestoneOption[] = useMemo(() =>
+    initialBundles.flatMap((bundle) =>
+      bundle.milestones.map((ms) => ({
+        id: ms.id,
+        title: ms.title,
+        goalTitle: bundle.goal.title,
+        milestone_date: ms.milestone_date,
+      }))
+    ), [initialBundles])
+
+  // ── Click handlers for StrategyRiver ──
+  const handleTaskClick = useCallback((taskId: string): void => {
+    setDialogNodeType('task')
+    setDialogNodeId(taskId)
+    setDialogOpen(true)
+  }, [])
+
+  const handleMilestoneClick = useCallback((milestoneId: string): void => {
+    setDialogNodeType('milestone')
+    setDialogNodeId(milestoneId)
+    setDialogOpen(true)
+  }, [])
+
+  const handleGoalClick = useCallback((goalId: string): void => {
+    setDialogNodeType('goal')
+    setDialogNodeId(goalId)
+    setDialogOpen(true)
+  }, [])
+
+  const handleDialogUpdate = useCallback((): void => {
+    // Refresh the page to reload data from server
+    router.refresh()
+  }, [router])
 
   // Update URL when tab changes
   useEffect(() => {
@@ -116,7 +158,12 @@ export function CanvasShell({
             description="Create a strategic objective to see your strategy river — a visual timeline of your goals, milestones, and tasks."
           />
         ) : (
-          <StrategyRiver strategicObjectives={riverData} />
+          <StrategyRiver
+            strategicObjectives={riverData}
+            onTaskClick={handleTaskClick}
+            onMilestoneClick={handleMilestoneClick}
+            onGoalClick={handleGoalClick}
+          />
         )}
       </div>
       <div className={activeTab === 'whiteboards' ? 'block' : 'hidden'}>
@@ -128,6 +175,19 @@ export function CanvasShell({
       <div className={activeTab === 'cost-of-delay' ? 'block' : 'hidden'}>
         <CostOfDelayView />
       </div>
+
+      {/* Node details dialog — shared across all river clicks */}
+      {dialogNodeId && (
+        <NodeDetailsDialog
+          open={dialogOpen}
+          onOpenChange={setDialogOpen}
+          nodeType={dialogNodeType}
+          nodeId={dialogNodeId}
+          isUnlinked={false}
+          milestones={milestoneOptions}
+          onUpdate={handleDialogUpdate}
+        />
+      )}
     </div>
   )
 }

@@ -80,6 +80,7 @@ function bundleToRiverSO(
     msObjectives.forEach((obj) => {
       const objTasks = bundle.tasks.filter((t) => t.objective_id === obj.id)
       objTasks.forEach((task) => {
+        const firstAssignee = task.assignees?.[0] ?? null
         riverTasks.push({
           id: task.id,
           title: task.title,
@@ -88,6 +89,7 @@ function bundleToRiverSO(
           end: task.end_date?.slice(0, 10) ?? milestone.milestone_date?.slice(0, 10) ?? goal.milestone_date?.slice(0, 10) ?? todayISO,
           status: mapStatus(task.status),
           assignee: getInitials(task),
+          assigneeRole: firstAssignee?.role ?? null,
         })
       })
     })
