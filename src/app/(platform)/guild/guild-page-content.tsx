@@ -80,7 +80,7 @@ export function GuildPageContent({ isManager, isApprentice, isExecutive, members
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-muted">
                     <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-3 mb-1">
-                            <div className="h-8 w-1 bg-electric-blue rounded-full shadow-[0_0_8px_rgba(37,99,235,0.6)]" />
+                            <div className="h-8 w-1 bg-international-orange rounded-full shadow-[0_0_8px_rgba(255,69,0,0.4)]" />
                             <h1 className="text-2xl sm:text-3xl font-display font-semibold text-foreground tracking-tight">Guild</h1>
                         </div>
                         <p className="text-muted-foreground mt-1 text-sm font-medium pl-4">
@@ -136,7 +136,7 @@ export function GuildPageContent({ isManager, isApprentice, isExecutive, members
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-muted">
                     <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-3 mb-1">
-                            <div className="h-8 w-1 bg-electric-blue rounded-full shadow-[0_0_8px_rgba(37,99,235,0.6)]" />
+                            <div className="h-8 w-1 bg-international-orange rounded-full shadow-[0_0_8px_rgba(255,69,0,0.4)]" />
                             <h1 className="text-2xl sm:text-3xl font-display font-semibold text-foreground tracking-tight">Guild</h1>
                         </div>
                         <p className="text-muted-foreground mt-1 text-sm font-medium pl-4">
@@ -161,7 +161,7 @@ export function GuildPageContent({ isManager, isApprentice, isExecutive, members
                         {loading ? (
                             <Card className="border">
                                 <CardContent className="p-8 text-center">
-                                    <Loader2 className="h-8 w-8 animate-spin text-electric-blue mx-auto mb-4" />
+                                    <Loader2 className="h-8 w-8 animate-spin text-muted-foreground mx-auto mb-4" />
                                     <p className="text-muted-foreground">Loading your assignments...</p>
                                 </CardContent>
                             </Card>
@@ -246,7 +246,7 @@ export function GuildPageContent({ isManager, isApprentice, isExecutive, members
                                                             variant="outline"
                                                             className={
                                                                 assignment.status === 'completed'
-                                                                    ? 'border text-electric-blue'
+                                                                    ? 'border text-status-info'
                                                                     : 'border-destructive text-destructive'
                                                             }
                                                         >

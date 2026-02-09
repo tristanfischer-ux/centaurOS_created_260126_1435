@@ -1,4 +1,3 @@
-// @ts-nocheck
 'use client'
 
 import { useState } from 'react'
@@ -18,8 +17,7 @@ import {
   CheckCircle2,
   BookOpen,
   Calendar,
-  MessageSquare,
-  ExternalLink
+  MessageSquare
 } from 'lucide-react'
 import { OTJTLoggerDialog } from './otjt-logger-dialog'
 import { ModuleProgressList } from './module-progress-list'
@@ -50,12 +48,17 @@ interface ApprenticeDashboardProps {
   moduleProgress: {
     modules: Array<{
       id: string
-      status: string
+      status: 'locked' | 'available' | 'in_progress' | 'completed' | 'failed'
+      started_at?: string
+      completed_at?: string
+      hours_logged?: number
       module: {
         id: string
         title: string
+        description?: string
         module_type: string
         estimated_hours: number
+        content_type?: string
       }
     }>
     summary: {
@@ -380,10 +383,9 @@ export function ApprenticeDashboard({
             </CardHeader>
             <CardContent className="space-y-2">
               <Button variant="outline" className="w-full justify-start" asChild>
-                <a href="/guild/handbook" target="_blank">
+                <a href="/guild">
                   <BookOpen className="h-4 w-4 mr-2" />
-                  Guild Handbook
-                  <ExternalLink className="h-3 w-3 ml-auto" />
+                  Guild Community
                 </a>
               </Button>
               <Button variant="outline" className="w-full justify-start" onClick={() => setDocumentsOpen(true)}>

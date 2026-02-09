@@ -4,7 +4,7 @@ import React from "react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
-import { Users, CheckSquare, Store, Settings, Target, MoreHorizontal, Lightbulb, Bell, Home, Bot, UserCircle, LogOut, Waypoints, Plus } from "lucide-react"
+import { Users, CheckSquare, Store, Settings, Target, MoreHorizontal, Lightbulb, Bell, Home, Bot, UserCircle, LogOut, Waypoints, Plus, GraduationCap, BookOpen } from "lucide-react"
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -43,6 +43,8 @@ const moreNavigation = [
     { name: "Canvas", href: "/canvas", icon: Waypoints },
     { name: "Inspiration", href: "/inspiration", icon: Lightbulb },
     { name: "Marketplace", href: "/marketplace", icon: Store },
+    { name: "Guild", href: "/guild", icon: GraduationCap },
+    { name: "Apprenticeship", href: "/apprenticeship", icon: BookOpen },
 ]
 
 // Account items - personal profile and settings

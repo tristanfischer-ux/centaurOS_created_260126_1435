@@ -31,10 +31,12 @@ export default async function GuildPage() {
         redirect('/dashboard')
     }
 
-    // Fetch guild members for the network tab
+    // Fetch guild-relevant members for the network tab
+    // Filter to Apprentice, Executive, and Founder roles (guild participants)
     const { data: members } = await supabase
         .from('profiles')
         .select('id, full_name, role, email')
+        .in('role', ['Apprentice', 'Executive', 'Founder'])
         .order('full_name', { ascending: true })
         .limit(50)
 

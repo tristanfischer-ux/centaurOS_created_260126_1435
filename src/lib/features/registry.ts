@@ -272,14 +272,25 @@ export const FEATURE_REGISTRY: Feature[] = [
         changelog: 'Team directory with role management, capacity tracking, and skill tagging.'
     },
     {
+        id: 'guild',
+        name: 'Guild',
+        description: 'Apprentice pool browsing, project assignments, and community events',
+        route: '/guild',
+        releasedAt: new Date('2026-01-15'),
+        category: 'core',
+        status: 'stable',
+        isVisibleInNav: true,
+        changelog: 'The Guild connects executives with apprentices. Browse the apprentice pool, assign apprentices to projects, and attend networking events.'
+    },
+    {
         id: 'today',
         name: 'Today View',
         description: 'Daily focus dashboard with personalized briefing',
         route: '/today',
         releasedAt: new Date('2025-12-05'),
         category: 'core',
-        status: 'stable',
-        isVisibleInNav: true,
+        status: 'deprecated',
+        isVisibleInNav: false,
         changelog: 'Daily focus view with AI-generated briefings, action items, and schedule overview.'
     },
 ]

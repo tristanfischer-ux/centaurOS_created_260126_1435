@@ -12,6 +12,7 @@ import {
     Calendar, 
     Users
 } from "lucide-react"
+import { toast } from "sonner"
 
 interface GuildEvent {
     id: string
@@ -109,7 +110,11 @@ export function GuildTabs({ events, members, isExecutive }: GuildTabsProps) {
                                     </div>
                                     <h3 className="text-lg font-semibold text-foreground mb-2">{event.title}</h3>
                                     <p className="text-muted-foreground text-sm mb-4">{event.description}</p>
-                                    <Button size="sm" variant="default">
+                                    <Button 
+                                        size="sm" 
+                                        variant="default"
+                                        onClick={() => toast.info("RSVP coming soon — we're finalising event bookings.")}
+                                    >
                                         RSVP
                                     </Button>
                                 </div>
