@@ -1,6 +1,5 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import { typography } from '@/lib/design-system'
 import { getStrategicGoals, getGoalBundle } from '@/actions/canvas'
 import { CanvasShell } from './canvas-shell'
 import { WhiteboardList } from './components/whiteboard-list'
@@ -88,20 +87,7 @@ export default async function CanvasPage() {
 
   return (
     <div className="-m-4 sm:-m-6 lg:-m-8 -mb-32 lg:-mb-8">
-      {/* Page header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 px-4 sm:px-6 lg:px-8 pt-4 sm:pt-6 lg:pt-8 pb-4 border-b border-slate-100">
-        <div className="min-w-0 flex-1">
-          <div className={typography.pageHeader}>
-            <div className={typography.pageHeaderAccent} />
-            <h1 className={typography.h1}>Strategy</h1>
-          </div>
-          <p className={typography.pageSubtitle}>
-            Visualise your strategic objectives, milestones, and progress
-          </p>
-        </div>
-      </div>
-
-      {/* Client shell handles tab switching and Strategy River */}
+      {/* Strategy River has its own built-in title bar + stats header */}
       <CanvasShell
         initialBundles={bundles}
         whiteboardList={
