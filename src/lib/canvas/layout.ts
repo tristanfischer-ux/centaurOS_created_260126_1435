@@ -299,9 +299,8 @@ export function goalBundleToElements(
 
     for (let objIdx = 0; objIdx < visibleCount; objIdx++) {
       const obj = msObjectives[objIdx]
-      const objX = obj.milestone_date
-        ? dateToX(obj.milestone_date, pxPerDay, rangeStart)
-        : msX
+      // Pin objective x to parent milestone for clean vertical columns
+      const objX = msX
 
       objectiveNodeMap.set(obj.id, { x: objX, y: objRunningY })
 
@@ -363,11 +362,9 @@ export function goalBundleToElements(
 
       for (let taskIdx = 0; taskIdx < objTasks.length; taskIdx++) {
         const task = objTasks[taskIdx]
-        const taskX = task.start_date
-          ? dateToX(task.start_date, pxPerDay, rangeStart)
-          : task.end_date
-            ? dateToX(task.end_date, pxPerDay, rangeStart)
-            : objPos.x
+        // Pin task x to parent objective to prevent date-based drift
+        // into neighboring milestone columns (visual grouping > date accuracy)
+        const taskX = objPos.x
         const taskY =
           objPos.y +
           OBJECTIVE_TO_TASK_GAP +
