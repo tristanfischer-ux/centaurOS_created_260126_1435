@@ -3,20 +3,16 @@
 /**
  * MoneyMapClient — Main client component for the Money Map page.
  *
- * @description Orchestrates the full Money Map experience: data loading,
- * setup wizard for first-time users, Sankey diagram, summary cards,
- * profitability table, cost breakdown, and snapshot management.
+ * @description Orchestrates the full Money Map experience with a two-column
+ * layout: inline input panel on the left (like Cost of Delay), visualisations
+ * on the right (Sankey, summary cards, profitability, cost breakdown).
  */
 
 import { useState, useEffect, useCallback } from 'react'
 import { toast } from 'sonner'
 import {
-  Plus,
   Camera,
   RefreshCw,
-  Loader2,
-  DollarSign,
-  Receipt,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -28,9 +24,8 @@ import { MoneyMapSankey } from '@/components/money-map/sankey-chart'
 import { MoneyMapSummaryCards } from '@/components/money-map/summary-cards'
 import { ProfitabilityTable } from '@/components/money-map/profitability-table'
 import { CostBreakdownChart } from '@/components/money-map/cost-breakdown-chart'
-import { MoneyMapSetupWizard } from '@/components/money-map/setup-wizard'
+import { MoneyMapInputPanel } from '@/components/money-map/input-panel'
 import { RevenueStreamDialog } from '@/components/money-map/revenue-stream-dialog'
-import { CostItemDialog } from '@/components/money-map/cost-item-dialog'
 import { SnapshotDialog } from '@/components/money-map/snapshot-dialog'
 import { SAMPLE_MONEY_MAP_DATA } from '@/components/money-map/sample-data'
 
@@ -41,6 +36,9 @@ import {
   createRevenueStream,
   createCostItem,
   updateRevenueStream,
+  deleteRevenueStream,
+  deleteCostItem,
+  updateCostItem,
   createSnapshot,
 } from '@/actions/money-map'
 
@@ -64,10 +62,8 @@ export function MoneyMapClient({ hideHeader = false }: MoneyMapClientProps): Rea
   const [selectedSnapshot, setSelectedSnapshot] = useState<MoneyMapSnapshot | null>(null)
   const [isLoading, setIsLoading] = useState(true)
 
-  // Dialog state
-  const [isWizardOpen, setIsWizardOpen] = useState(false)
+  // Dialog state (only for editing streams and snapshots)
   const [isRevenueDialogOpen, setIsRevenueDialogOpen] = useState(false)
-  const [isCostDialogOpen, setIsCostDialogOpen] = useState(false)
   const [isSnapshotDialogOpen, setIsSnapshotDialogOpen] = useState(false)
   const [editingStream, setEditingStream] = useState<RevenueStream | null>(null)
 
@@ -84,7 +80,6 @@ export function MoneyMapClient({ hideHeader = false }: MoneyMapClientProps): Rea
 
       if (mapResult.data) {
         setData(mapResult.data)
-        // Demo mode shows sample data instead of auto-opening wizard
       }
 
       if (snapshotResult.data) {
@@ -104,33 +99,8 @@ export function MoneyMapClient({ hideHeader = false }: MoneyMapClientProps): Rea
   }, [loadData])
 
   // -------------------------------------------------------
-  // Handlers
+  // Revenue stream handlers
   // -------------------------------------------------------
-
-  const handleWizardComplete = async (wizardData: {
-    revenueStreams: RevenueStreamInput[]
-    costItems: CostItemInput[]
-  }): Promise<void> => {
-    // Create all items sequentially to maintain order
-    for (const rs of wizardData.revenueStreams) {
-      const result = await createRevenueStream(rs)
-      if (result.error) {
-        toast.error(`Failed to create "${rs.name}": ${result.error}`)
-        throw new Error(result.error)
-      }
-    }
-
-    for (const ci of wizardData.costItems) {
-      const result = await createCostItem(ci)
-      if (result.error) {
-        toast.error(`Failed to create "${ci.name}": ${result.error}`)
-        throw new Error(result.error)
-      }
-    }
-
-    toast.success('Money Map created successfully')
-    await loadData()
-  }
 
   const handleAddRevenueStream = async (input: RevenueStreamInput): Promise<void> => {
     const result = await createRevenueStream(input)
@@ -141,24 +111,33 @@ export function MoneyMapClient({ hideHeader = false }: MoneyMapClientProps): Rea
     await loadData()
   }
 
-  const handleEditStream = (streamId: string): void => {
-    const stream = data?.revenue_streams.find((rs) => rs.id === streamId)
-    if (stream) {
-      setEditingStream(stream)
-      setIsRevenueDialogOpen(true)
-    }
-  }
-
-  const handleUpdateRevenueStream = async (input: RevenueStreamInput): Promise<void> => {
-    if (!editingStream) return
-    const result = await updateRevenueStream(editingStream.id, input)
+  const handleUpdateRevenueStream = async (id: string, input: RevenueStreamInput): Promise<void> => {
+    const result = await updateRevenueStream(id, input)
     if (result.error) {
       throw new Error(result.error)
     }
-    setEditingStream(null)
     toast.success('Revenue stream updated')
     await loadData()
   }
+
+  const handleEditStreamDialog = async (input: RevenueStreamInput): Promise<void> => {
+    if (!editingStream) return
+    await handleUpdateRevenueStream(editingStream.id, input)
+    setEditingStream(null)
+  }
+
+  const handleDeleteRevenueStream = async (id: string): Promise<void> => {
+    const result = await deleteRevenueStream(id)
+    if (result.error) {
+      throw new Error(result.error)
+    }
+    toast.success('Revenue stream removed')
+    await loadData()
+  }
+
+  // -------------------------------------------------------
+  // Cost item handlers
+  // -------------------------------------------------------
 
   const handleAddCostItem = async (input: CostItemInput): Promise<void> => {
     const result = await createCostItem(input)
@@ -168,6 +147,28 @@ export function MoneyMapClient({ hideHeader = false }: MoneyMapClientProps): Rea
     toast.success('Cost item added')
     await loadData()
   }
+
+  const handleUpdateCostItem = async (id: string, input: CostItemInput): Promise<void> => {
+    const result = await updateCostItem(id, input)
+    if (result.error) {
+      throw new Error(result.error)
+    }
+    toast.success('Cost item updated')
+    await loadData()
+  }
+
+  const handleDeleteCostItem = async (id: string): Promise<void> => {
+    const result = await deleteCostItem(id)
+    if (result.error) {
+      throw new Error(result.error)
+    }
+    toast.success('Cost item removed')
+    await loadData()
+  }
+
+  // -------------------------------------------------------
+  // Snapshot handlers
+  // -------------------------------------------------------
 
   const handleCreateSnapshot = async (name: string, periodLabel: string): Promise<void> => {
     const result = await createSnapshot(name, periodLabel)
@@ -185,6 +186,14 @@ export function MoneyMapClient({ hideHeader = false }: MoneyMapClientProps): Rea
     setSelectedSnapshot(snapshot)
     setIsSnapshotDialogOpen(false)
     toast.success(`Comparing with "${snapshot.name}"`)
+  }
+
+  const handleEditStream = (streamId: string): void => {
+    const stream = data?.revenue_streams.find((rs) => rs.id === streamId)
+    if (stream) {
+      setEditingStream(stream)
+      setIsRevenueDialogOpen(true)
+    }
   }
 
   const handleRefresh = async (): Promise<void> => {
@@ -214,10 +223,12 @@ export function MoneyMapClient({ hideHeader = false }: MoneyMapClientProps): Rea
   }
 
   // -------------------------------------------------------
-  // Empty state (no data, wizard not open)
+  // Data resolution
   // -------------------------------------------------------
 
   const isEmpty = !data || data.revenue_streams.length === 0
+  const displayData = isEmpty ? SAMPLE_MONEY_MAP_DATA : data!
+  const isDemo = isEmpty
 
   // -------------------------------------------------------
   // Render
@@ -238,7 +249,7 @@ export function MoneyMapClient({ hideHeader = false }: MoneyMapClientProps): Rea
           </div>
 
           <div className="flex items-center gap-2">
-            {!isEmpty && (
+            {!isDemo && (
               <>
                 <Button variant="ghost" size="sm" onClick={handleRefresh}>
                   <RefreshCw className="h-4 w-4 mr-1.5" />
@@ -248,25 +259,6 @@ export function MoneyMapClient({ hideHeader = false }: MoneyMapClientProps): Rea
                   <Camera className="h-4 w-4 mr-1.5" />
                   Snapshot
                 </Button>
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => {
-                    setEditingStream(null)
-                    setIsRevenueDialogOpen(true)
-                  }}
-                >
-                  <DollarSign className="h-4 w-4 mr-1.5" />
-                  Add Revenue
-                </Button>
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => setIsCostDialogOpen(true)}
-                >
-                  <Receipt className="h-4 w-4 mr-1.5" />
-                  Add Cost
-                </Button>
               </>
             )}
           </div>
@@ -274,7 +266,7 @@ export function MoneyMapClient({ hideHeader = false }: MoneyMapClientProps): Rea
       )}
 
       {/* Action buttons when header is hidden (embedded mode) */}
-      {hideHeader && !isEmpty && (
+      {hideHeader && !isDemo && (
         <div className="flex items-center justify-end gap-2">
           <Button variant="ghost" size="sm" onClick={handleRefresh}>
             <RefreshCw className="h-4 w-4 mr-1.5" />
@@ -283,25 +275,6 @@ export function MoneyMapClient({ hideHeader = false }: MoneyMapClientProps): Rea
           <Button variant="secondary" size="sm" onClick={() => setIsSnapshotDialogOpen(true)}>
             <Camera className="h-4 w-4 mr-1.5" />
             Snapshot
-          </Button>
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => {
-              setEditingStream(null)
-              setIsRevenueDialogOpen(true)
-            }}
-          >
-            <DollarSign className="h-4 w-4 mr-1.5" />
-            Add Revenue
-          </Button>
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => setIsCostDialogOpen(true)}
-          >
-            <Receipt className="h-4 w-4 mr-1.5" />
-            Add Cost
           </Button>
         </div>
       )}
@@ -319,101 +292,90 @@ export function MoneyMapClient({ hideHeader = false }: MoneyMapClientProps): Rea
         </div>
       )}
 
-      {(() => {
-        // Use real data if available, otherwise sample data for demo mode
-        const displayData = isEmpty ? SAMPLE_MONEY_MAP_DATA : data!
-        const isDemo = isEmpty
+      {/* Demo mode banner */}
+      {isDemo && (
+        <div className="px-5 py-4 rounded-xl bg-electric-blue/5 border border-electric-blue/20">
+          <p className="text-sm font-medium text-foreground">
+            Viewing sample data for a typical consultancy
+          </p>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Add your own revenue streams and costs in the panel on the left to see your real numbers.
+          </p>
+        </div>
+      )}
 
-        return (
-          <div className={spacing.section}>
-            {/* Demo mode banner */}
-            {isDemo && (
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 px-5 py-4 rounded-xl bg-electric-blue/5 border border-electric-blue/20">
-                <div className="min-w-0">
-                  <p className="text-sm font-medium text-foreground">
-                    Viewing sample data for a typical consultancy
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    Set up your own revenue streams and costs to see your real numbers.
-                  </p>
-                </div>
-                <Button size="sm" onClick={() => setIsWizardOpen(true)} className="shrink-0">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Set Up My Money Map
-                </Button>
-              </div>
-            )}
-
-            {/* Summary Cards */}
-            <MoneyMapSummaryCards
-              summary={displayData.summary}
-              previousSummary={!isDemo ? (selectedSnapshot?.snapshot_data?.summary ?? null) : null}
-            />
-
-            {/* Sankey Flow Diagram */}
-            <div>
-              <h2 className="text-lg font-display font-semibold text-foreground mb-4">
-                Money Flow
-              </h2>
-              <MoneyMapSankey data={displayData} className="border rounded-xl p-4 bg-background" />
-            </div>
-
-            {/* Bottom Row: Table + Chart */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <div className="lg:col-span-2">
-                <ProfitabilityTable
-                  profitability={displayData.profitability}
-                  onEditStream={isDemo ? undefined : handleEditStream}
-                />
-              </div>
-              <div>
-                <CostBreakdownChart costItems={displayData.cost_items} />
-              </div>
-            </div>
-
-            {/* Insight callout */}
-            <div className="rounded-xl border bg-muted/30 p-6">
-              <h3 className="text-sm font-semibold text-foreground mb-2">How to read your Money Map</h3>
-              <div className="text-sm text-muted-foreground space-y-2">
-                <p>
-                  <strong className="text-foreground">Summary cards</strong> show your total monthly revenue,
-                  costs, net margin, and margin percentage at a glance.
-                </p>
-                <p>
-                  <strong className="text-foreground">The flow diagram</strong> traces how money moves from
-                  revenue streams through cost categories to your bottom line.
-                </p>
-                <p>
-                  <strong className="text-foreground">The profitability table</strong> reveals your true margin
-                  per revenue stream after allocating shared costs — so you know which streams actually make money.
-                </p>
-              </div>
-            </div>
-          </div>
-        )
-      })()}
-
-      {/* Dialogs */}
-      <MoneyMapSetupWizard
-        open={isWizardOpen}
-        onOpenChange={setIsWizardOpen}
-        onComplete={handleWizardComplete}
+      {/* Summary Cards */}
+      <MoneyMapSummaryCards
+        summary={displayData.summary}
+        previousSummary={!isDemo ? (selectedSnapshot?.snapshot_data?.summary ?? null) : null}
       />
 
+      {/* Main Content: Input Panel + Sankey */}
+      <div className="grid grid-cols-1 lg:grid-cols-[340px_1fr] gap-6">
+        {/* Left: Input Panel */}
+        <div>
+          <MoneyMapInputPanel
+            data={displayData}
+            isDemo={isDemo}
+            onAddRevenue={handleAddRevenueStream}
+            onUpdateRevenue={handleUpdateRevenueStream}
+            onDeleteRevenue={handleDeleteRevenueStream}
+            onAddCost={handleAddCostItem}
+            onUpdateCost={handleUpdateCostItem}
+            onDeleteCost={handleDeleteCostItem}
+          />
+        </div>
+
+        {/* Right: Sankey Flow Diagram */}
+        <div>
+          <h2 className="text-lg font-display font-semibold text-foreground mb-4">
+            Money Flow
+          </h2>
+          <MoneyMapSankey data={displayData} className="border rounded-xl p-4 bg-background" />
+        </div>
+      </div>
+
+      {/* Bottom Row: Table + Chart */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2">
+          <ProfitabilityTable
+            profitability={displayData.profitability}
+            onEditStream={isDemo ? undefined : handleEditStream}
+          />
+        </div>
+        <div>
+          <CostBreakdownChart costItems={displayData.cost_items} />
+        </div>
+      </div>
+
+      {/* Insight callout */}
+      <div className="rounded-xl border bg-muted/30 p-6">
+        <h3 className="text-sm font-semibold text-foreground mb-2">How to read your Money Map</h3>
+        <div className="text-sm text-muted-foreground space-y-2">
+          <p>
+            <strong className="text-foreground">Your Numbers panel</strong> shows all your revenue streams
+            and costs. Add, edit, or remove items to update the visualisations instantly.
+          </p>
+          <p>
+            <strong className="text-foreground">The flow diagram</strong> traces how money moves from
+            revenue streams through cost categories to your bottom line.
+          </p>
+          <p>
+            <strong className="text-foreground">The profitability table</strong> reveals your true margin
+            per revenue stream after allocating shared costs — so you know which streams actually make money.
+          </p>
+        </div>
+      </div>
+
+      {/* Dialogs (only for editing individual streams and managing snapshots) */}
       <RevenueStreamDialog
         open={isRevenueDialogOpen}
         onOpenChange={(open) => {
           setIsRevenueDialogOpen(open)
           if (!open) setEditingStream(null)
         }}
-        onSave={editingStream ? handleUpdateRevenueStream : handleAddRevenueStream}
+        onSave={handleEditStreamDialog}
         initial={editingStream}
-      />
-
-      <CostItemDialog
-        open={isCostDialogOpen}
-        onOpenChange={setIsCostDialogOpen}
-        onSave={handleAddCostItem}
       />
 
       <SnapshotDialog
