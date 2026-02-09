@@ -103,29 +103,62 @@ function bundleToRiverSO(
 
     // Collect all tasks under those objectives
     const riverTasks: RiverTask[] = []
+
+    // Determine the time window for this milestone so we can spread
+    // tasks that lack explicit start/end dates evenly across the period
+    const prevMilestoneDate = bundle.milestones
+      .filter((m) => {
+        const mDate = m.milestone_date ?? ''
+        const thisDate = milestone.milestone_date ?? ''
+        return mDate < thisDate && m.id !== milestone.id
+      })
+      .sort((a, b) => (b.milestone_date ?? '').localeCompare(a.milestone_date ?? ''))
+      [0]?.milestone_date?.slice(0, 10)
+
+    const windowStart = prevMilestoneDate ?? goal.created_at?.slice(0, 10) ?? todayISO
+    const windowEnd = milestone.milestone_date?.slice(0, 10) ?? goal.milestone_date?.slice(0, 10) ?? todayISO
+
+    // Collect raw tasks first to count them for even distribution
+    const rawTasks: { task: CanvasTask; objId: string }[] = []
     msObjectives.forEach((obj) => {
       const objTasks = bundle.tasks.filter((t) => t.objective_id === obj.id)
-      objTasks.forEach((task) => {
-        riverTasks.push({
-          id: task.id,
-          title: task.title,
-          // TaskRow uses start_date / end_date (not due_date)
-          start: task.start_date?.slice(0, 10) ?? task.created_at?.slice(0, 10) ?? milestone.milestone_date?.slice(0, 10) ?? todayISO,
-          end: task.end_date?.slice(0, 10) ?? milestone.milestone_date?.slice(0, 10) ?? goal.milestone_date?.slice(0, 10) ?? todayISO,
-          status: mapStatus(task.status),
-          assignee: getInitials(task),
-        })
+      objTasks.forEach((task) => rawTasks.push({ task, objId: obj.id }))
+    })
+
+    // Spread tasks that lack explicit dates evenly across the milestone window
+    const windowMs = new Date(windowEnd).getTime() - new Date(windowStart).getTime()
+    const taskCount = rawTasks.length || 1
+
+    rawTasks.forEach(({ task }, idx) => {
+      // Compute a spread start if the task has no explicit start_date
+      const spreadStart = task.start_date
+        ? task.start_date.slice(0, 10)
+        : new Date(
+            new Date(windowStart).getTime() + (idx / taskCount) * windowMs * 0.6
+          ).toISOString().slice(0, 10)
+
+      riverTasks.push({
+        id: task.id,
+        title: task.title,
+        start: spreadStart,
+        end: task.end_date?.slice(0, 10) ?? windowEnd,
+        status: mapStatus(task.status),
+        assignee: getInitials(task),
       })
     })
 
     // If no tasks exist yet (milestone has objectives but no tasks),
     // create placeholder tasks from objectives so the river still shows structure
     if (riverTasks.length === 0) {
-      msObjectives.forEach((obj) => {
+      const objCount = msObjectives.length || 1
+      msObjectives.forEach((obj, oIdx) => {
+        const spreadObjStart = new Date(
+          new Date(windowStart).getTime() + (oIdx / objCount) * windowMs * 0.6
+        ).toISOString().slice(0, 10)
         riverTasks.push({
           id: `obj-as-task-${obj.id}`,
           title: obj.title,
-          start: obj.created_at?.slice(0, 10) ?? milestone.milestone_date?.slice(0, 10) ?? todayISO,
+          start: obj.created_at?.slice(0, 10) ?? spreadObjStart,
           end: milestone.milestone_date?.slice(0, 10) ?? goal.milestone_date?.slice(0, 10) ?? todayISO,
           status: mapStatus(obj.status),
           assignee: '—',

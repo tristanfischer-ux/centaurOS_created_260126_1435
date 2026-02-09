@@ -73,8 +73,8 @@ interface StrategyRiverProps {
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
-/** Use the app's Inter font stack for all SVG text */
-const FONT = 'var(--font-inter), system-ui, -apple-system, sans-serif'
+/** Font stack for all SVG text — use literal names, not CSS vars (SVG attribute parsing) */
+const FONT = "'Inter', system-ui, -apple-system, sans-serif"
 
 const STATUS_MAP = {
   done: { color: '#059669', solid: '#34D399', bg: '#ECFDF5', label: 'Done' },
@@ -100,6 +100,12 @@ function dateToX(d: string, s: string, e: string, x0: number, x1: number): numbe
 
 function clamp(v: number, lo: number, hi: number): number {
   return Math.max(lo, Math.min(hi, v))
+}
+
+/** Truncate text to fit within a pixel width (approx 5.5px per char at fontSize 8.5) */
+function truncateLabel(text: string, availablePx: number): string {
+  const maxChars = Math.max(8, Math.floor(availablePx / 5.5))
+  return text.length <= maxChars ? text : text.slice(0, maxChars - 1) + '…'
 }
 
 function tributaryPath(endX: number, taskY: number, confX: number, slotY: number): string {
@@ -544,7 +550,7 @@ const StrategyRiver: FC<StrategyRiverProps> = ({ strategicObjectives, today }) =
                                 fontFamily={FONT}
                                 fontWeight={isH ? '700' : '600'}
                               >
-                                {t.title}
+                                {truncateLabel(t.title, Math.max(60, t.cx - t.sx - 30))}
                               </text>
                               {isH && (
                                 <g>
