@@ -27,11 +27,11 @@ import { normaliseToMonthly } from '@/lib/money-map/allocation'
 
 /** SVG viewBox dimensions */
 const VB_W = 1020
-const VB_H = 520
+const VB_H = 620
 
 /** Main cascade area */
 const FLOW_TOP = 50
-const MAX_BAR_H = 240
+const MAX_BAR_H = 280
 const BAR_W = 20
 
 /** Revenue source bars */
@@ -46,7 +46,7 @@ const COL_OP = 630
 const COL_NP = 840
 
 /** Cost area */
-const COST_Y = 345
+const COST_Y = 395
 const COST_BAR_W = 16
 const COST_BAR_MAX_H = 80
 const COST_X_DC = 260
@@ -371,7 +371,7 @@ export function MoneyMapSankey({ data, className }: MoneyMapSankeyProps): React.
       <svg
         viewBox={`0 0 ${VB_W} ${VB_H}`}
         className="w-full h-auto"
-        style={{ maxHeight: 520 }}
+        style={{ maxHeight: 620 }}
         role="img"
         aria-label="Income statement flow diagram showing revenue, costs, and profit"
       >

@@ -3419,6 +3419,39 @@ export type Database = {
           },
         ]
       }
+      foundry_business_functions: {
+        Row: {
+          created_at: string | null
+          display_order: number
+          foundry_id: string
+          function_id: string
+          id: string
+          label: string
+          short: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          display_order?: number
+          foundry_id: string
+          function_id: string
+          id?: string
+          label: string
+          short: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          display_order?: number
+          foundry_id?: string
+          function_id?: string
+          id?: string
+          label?: string
+          short?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       foundry_function_coverage: {
         Row: {
           assessed_at: string | null

@@ -354,7 +354,7 @@ function generateDailyFocus({
     return 'Your slate is clean. Time to set some objectives and get moving.'
   }
 
-  return `Here's what's happening in your foundry today.`
+  return `Here's what's happening today.`
 }
 
 /**

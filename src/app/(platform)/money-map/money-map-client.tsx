@@ -328,9 +328,6 @@ export function MoneyMapClient({ hideHeader = false }: MoneyMapClientProps): Rea
 
         {/* Right: Sankey Flow Diagram */}
         <div>
-          <h2 className="text-lg font-display font-semibold text-foreground mb-4">
-            Money Flow
-          </h2>
           <MoneyMapSankey data={displayData} className="border rounded-xl p-4 bg-background" />
         </div>
       </div>

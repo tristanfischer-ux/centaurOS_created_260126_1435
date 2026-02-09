@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { TeamPageView } from './team-page-view'
 import { isPast } from 'date-fns'
+import type { BusinessFunction, FunctionId } from './types'
 
 /**
  * Team page — server component that authenticates, fetches foundry data,
@@ -83,19 +84,19 @@ export default async function TeamPage() {
         .order('display_order')
 
     // Build functions array: use custom if exists, otherwise use defaults
-    const DEFAULT_FUNCTIONS = [
-        { id: 'sales', label: 'Sales', short: 'SALES' },
-        { id: 'marketing', label: 'Marketing', short: 'MKTG' },
-        { id: 'finance', label: 'Finance', short: 'FIN' },
-        { id: 'hr', label: 'People & HR', short: 'HR' },
-        { id: 'legal', label: 'Legal & Admin', short: 'LEGAL' },
-        { id: 'operations', label: 'Operations', short: 'OPS' },
-        { id: 'product', label: 'Product', short: 'PROD' },
+    const DEFAULT_FUNCTIONS: BusinessFunction[] = [
+        { id: 'sales' as FunctionId, label: 'Sales', short: 'SALES' },
+        { id: 'marketing' as FunctionId, label: 'Marketing', short: 'MKTG' },
+        { id: 'finance' as FunctionId, label: 'Finance', short: 'FIN' },
+        { id: 'hr' as FunctionId, label: 'People & HR', short: 'HR' },
+        { id: 'legal' as FunctionId, label: 'Legal & Admin', short: 'LEGAL' },
+        { id: 'operations' as FunctionId, label: 'Operations', short: 'OPS' },
+        { id: 'product' as FunctionId, label: 'Product', short: 'PROD' },
     ]
 
-    const orbitFunctions = customFunctions && customFunctions.length === 7
+    const orbitFunctions: BusinessFunction[] = customFunctions && customFunctions.length === 7
         ? customFunctions.map(cf => ({
-            id: cf.function_id,
+            id: cf.function_id as FunctionId,
             label: cf.label,
             short: cf.short,
         }))

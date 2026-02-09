@@ -15,7 +15,7 @@ import { useState, useCallback, useTransition, useMemo } from 'react'
 import {
     Plus, Search, LayoutGrid, List, Users,
     BarChart3, ShieldCheck, Zap, MoreHorizontal, Loader2,
-    AlertTriangle, Check, Store, Orbit
+    AlertTriangle, Check, Store, Orbit, Settings
 } from 'lucide-react'
 import Link from 'next/link'
 import { toast } from 'sonner'
@@ -55,6 +55,7 @@ import { SmartInsights } from './smart-insights'
 import { QuickAssignDialog } from './quick-assign-dialog'
 import { InviteMemberDialog } from './invite-member-dialog'
 import { PendingInvitations } from './pending-invitations'
+import { EditFunctionsDialog } from './components/edit-functions-dialog'
 
 // Shared components
 import { FullProfileView } from '@/components/team/full-profile-view'
@@ -66,7 +67,7 @@ import { TeamMemberCard, type CardSize } from '@/components/team/team-member-car
 import { FeatureTip } from '@/components/onboarding'
 
 import { useTeamData } from './hooks/use-team-data'
-import type { TeamViewMode } from './types'
+import type { TeamViewMode, BusinessFunction } from './types'
 
 // ─── Types ───────────────────────────────────────
 
@@ -182,7 +183,7 @@ interface TeamPageViewProps {
     /** Mapping from business_function.id → category (e.g. 'finance', 'sales') */
     functionCategoryMap?: Record<string, string>
     /** Business function definitions (custom or default) */
-    orbitFunctions?: Array<{ id: string; label: string; short: string }>
+    orbitFunctions?: BusinessFunction[]
     /** Foundry ID for editing functions */
     foundryId?: string
 }
@@ -231,6 +232,9 @@ export function TeamPageView({
 
     // Quick assign
     const [showQuickAssign, setShowQuickAssign] = useState(false)
+
+    // Edit functions dialog
+    const [showEditFunctions, setShowEditFunctions] = useState(false)
 
     // Drag-and-drop state
     const [draggedMemberId, setDraggedMemberId] = useState<string | null>(null)
@@ -1026,6 +1030,19 @@ export function TeamPageView({
                             </Button>
                         </div>
                     )}
+
+                    {/* Edit Functions button (orbit view only) */}
+                    {activeTab === 'members' && viewMode === 'orbit' && foundryId && (
+                        <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={() => setShowEditFunctions(true)}
+                            className="h-9"
+                        >
+                            <Settings className="h-4 w-4 mr-2" />
+                            Edit Functions
+                        </Button>
+                    )}
                 </div>
             </div>
 
@@ -1441,6 +1458,16 @@ export function TeamPageView({
                         activeTasks: m.activeTasks,
                         pendingTasks: m.pendingTasks,
                     }))}
+                />
+            )}
+
+            {/* Edit Functions Dialog */}
+            {foundryId && (
+                <EditFunctionsDialog
+                    isOpen={showEditFunctions}
+                    onClose={() => setShowEditFunctions(false)}
+                    currentFunctions={orbitFunctions}
+                    foundryId={foundryId}
                 />
             )}
         </div>
