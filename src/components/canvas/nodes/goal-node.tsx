@@ -54,7 +54,7 @@ function GoalNodeComponent({ data, selected }: NodeProps) {
   return (
     <div
       className={cn(
-        'rounded-lg border-2 bg-background px-4 py-3 shadow-md transition-shadow',
+        'rounded-lg border-2 bg-background px-4 py-3 shadow-md cursor-pointer transition-all duration-150 hover:shadow-lg hover:border-international-orange active:scale-[0.98]',
         selected
           ? 'border-international-orange shadow-lg ring-2 ring-international-orange/20'
           : 'border-international-orange/60'

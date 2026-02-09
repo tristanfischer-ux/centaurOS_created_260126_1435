@@ -238,7 +238,38 @@ export function goalBundleToElements(
   }
 
   // ----------------------------------------------------------------
-  // (d) OBJECTIVES — below each milestone
+  // (d) PRE-BUILD structured task map so we know task counts BEFORE
+  //     placing objectives (needed for correct vertical spacing).
+  // ----------------------------------------------------------------
+  const structuredTasksByObjective = new Map<string, CanvasTask[]>()
+  for (const task of tasks) {
+    if (!showGhosts && task.is_ghost) continue
+    const objId = task.objective_id
+    if (!objId) continue
+    const existing = structuredTasksByObjective.get(objId) || []
+    existing.push(task)
+    structuredTasksByObjective.set(objId, existing)
+  }
+
+  /**
+   * Compute vertical footprint of a structured objective including its
+   * child tasks so sibling objectives don't overlap.
+   */
+  const structuredFootprint = (objId: string): number => {
+    const taskCount = structuredTasksByObjective.get(objId)?.length ?? 0
+    if (showTasks && taskCount > 0) {
+      return (
+        OBJECTIVE_HEIGHT +
+        OBJECTIVE_TO_TASK_GAP +
+        taskCount * (TASK_HEIGHT + VERTICAL_SPACING) +
+        VERTICAL_SPACING
+      )
+    }
+    return OBJECTIVE_HEIGHT + VERTICAL_SPACING
+  }
+
+  // ----------------------------------------------------------------
+  // (e) OBJECTIVES — below each milestone, with task-aware spacing
   // ----------------------------------------------------------------
 
   // Build milestone → objectives lookup
@@ -263,22 +294,21 @@ export function goalBundleToElements(
     const visibleCount = Math.min(msObjectives.length, MAX_VISIBLE_OBJECTIVES)
     const hasOverflow = msObjectives.length > MAX_VISIBLE_OBJECTIVES
 
+    // Running y-offset accounts for each objective's task footprint
+    let objRunningY = SPINE_Y + MILESTONE_TO_OBJECTIVE_GAP
+
     for (let objIdx = 0; objIdx < visibleCount; objIdx++) {
       const obj = msObjectives[objIdx]
       const objX = obj.milestone_date
         ? dateToX(obj.milestone_date, pxPerDay, rangeStart)
         : msX
-      const objY =
-        SPINE_Y +
-        MILESTONE_TO_OBJECTIVE_GAP +
-        objIdx * (OBJECTIVE_HEIGHT + VERTICAL_SPACING)
 
-      objectiveNodeMap.set(obj.id, { x: objX, y: objY })
+      objectiveNodeMap.set(obj.id, { x: objX, y: objRunningY })
 
       nodes.push({
         id: `objective-${obj.id}`,
         type: 'objective',
-        position: { x: objX, y: objY },
+        position: { x: objX, y: objRunningY },
         data: {
           title: obj.title,
           status: obj.status,
@@ -301,20 +331,19 @@ export function goalBundleToElements(
           stroke: 'hsl(var(--muted-foreground) / 0.25)',
         },
       })
+
+      // Advance running y by this objective's full footprint
+      objRunningY += structuredFootprint(obj.id)
     }
 
     // Overflow "+N more" node
     if (hasOverflow) {
       const overflowCount = msObjectives.length - MAX_VISIBLE_OBJECTIVES
-      const expandY =
-        SPINE_Y +
-        MILESTONE_TO_OBJECTIVE_GAP +
-        visibleCount * (OBJECTIVE_HEIGHT + VERTICAL_SPACING)
 
       nodes.push({
         id: `expand-${ms.id}`,
         type: 'expand',
-        position: { x: msX, y: expandY },
+        position: { x: msX, y: objRunningY },
         data: {
           count: overflowCount,
           milestoneId: ms.id,
@@ -325,21 +354,10 @@ export function goalBundleToElements(
   }
 
   // ----------------------------------------------------------------
-  // (e) TASKS — below each objective (if showTasks)
+  // (f) TASKS — below each objective (if showTasks)
   // ----------------------------------------------------------------
   if (showTasks) {
-    // Build objective → tasks lookup
-    const tasksByObjective = new Map<string, CanvasTask[]>()
-    for (const task of tasks) {
-      if (!showGhosts && task.is_ghost) continue
-      const objId = task.objective_id
-      if (!objId) continue
-      const existing = tasksByObjective.get(objId) || []
-      existing.push(task)
-      tasksByObjective.set(objId, existing)
-    }
-
-    for (const [objId, objTasks] of tasksByObjective) {
+    for (const [objId, objTasks] of structuredTasksByObjective) {
       const objPos = objectiveNodeMap.get(objId)
       if (!objPos) continue
 
@@ -711,11 +729,10 @@ export function unlinkedItemsToElements(
 
       for (let i = 0; i < objTasks.length; i++) {
         const task = objTasks[i]
-        const taskX = task.start_date
-          ? dateToX(task.start_date, pxPerDay, rangeStart)
-          : task.end_date
-            ? dateToX(task.end_date, pxPerDay, rangeStart)
-            : objPos.x
+        // Pin task x to parent objective to prevent date-based drift
+        // into neighboring columns (tasks keep visual grouping in
+        // the unstructured zone; date detail is in the details dialog)
+        const taskX = objPos.x
         const taskY =
           objPos.y + OBJECTIVE_TO_TASK_GAP + i * UNLINKED_TASK_ROW_HEIGHT
 

@@ -60,7 +60,7 @@ function MilestoneNodeComponent({ data, selected }: NodeProps) {
   return (
     <div
       className={cn(
-        'rounded-lg border bg-background px-3 py-2.5 shadow-sm transition-shadow',
+        'rounded-lg border bg-background px-3 py-2.5 shadow-sm cursor-pointer transition-all duration-150 hover:shadow-md hover:border-international-orange/40 active:scale-[0.98]',
         selected
           ? 'border-international-orange shadow-md ring-2 ring-international-orange/20'
           : 'border-border'

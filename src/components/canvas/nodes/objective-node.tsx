@@ -55,7 +55,7 @@ function ObjectiveNodeComponent({ data, selected }: NodeProps) {
   return (
     <div
       className={cn(
-        'rounded-lg border bg-background px-3 py-2.5 shadow-sm transition-shadow',
+        'rounded-lg border bg-background px-3 py-2.5 shadow-sm cursor-pointer transition-all duration-150 hover:shadow-md hover:border-international-orange/40 active:scale-[0.98]',
         isGhost && 'border-dashed opacity-60',
         isUnlinked && 'border-l-[3px] border-l-muted-foreground/30',
         selected
