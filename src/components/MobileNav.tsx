@@ -4,13 +4,35 @@ import React from "react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
-import { Users, CheckSquare, Store, Settings, Target, MoreHorizontal, Lightbulb, Bell, Home, Bot, UserCircle, LogOut, Waypoints, Plus, GraduationCap, BookOpen } from "lucide-react"
+import {
+    Users,
+    CheckSquare,
+    Store,
+    Settings,
+    Target,
+    MoreHorizontal,
+    Lightbulb,
+    Bell,
+    Home,
+    Bot,
+    UserCircle,
+    LogOut,
+    Waypoints,
+    Plus,
+    GraduationCap,
+    BookOpen,
+    LayoutDashboard,
+    ShoppingBag,
+    Map,
+    Coins,
+} from "lucide-react"
 import {
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
     DropdownMenuSeparator,
     DropdownMenuTrigger,
+    DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu"
 import { NewBadge } from "@/components/ui/new-badge"
 import { signOut } from "@/actions/auth"
@@ -19,8 +41,7 @@ import { QuickCaptureDialog } from "@/components/smart/quick-capture-dialog"
 import type { SmartGoalSuggestion } from "@/actions/smart-goals"
 
 /**
- * Determines if a navigation item should be marked as active
- * Uses exact matching for root routes and prefix matching for nested routes
+ * Determines if a navigation item should be marked as active.
  */
 function isRouteActive(pathname: string, href: string): boolean {
     if (pathname === href) return true
@@ -28,31 +49,45 @@ function isRouteActive(pathname: string, href: string): boolean {
     return false
 }
 
-// Simplified navigation - Primary nav items shown in bottom bar
+// Primary nav items shown in the bottom bar
 const mainNavigation = [
-    { name: "Home", shortName: "Home", href: "/dashboard", icon: Home },
-    { name: "Updates", shortName: "Updates", href: "/updates", icon: Bell },
+    { name: "Home", shortName: "Home", href: "/home", icon: Home },
+    { name: "Dashboard", shortName: "Work", href: "/dashboard", icon: LayoutDashboard },
     { name: "Tasks", shortName: "Tasks", href: "/new-tasks", icon: CheckSquare },
 ]
 
-// Items in the "More" dropdown - governance and discovery
-const moreNavigation = [
-    { name: "Team", href: "/team", icon: Users },
-    { name: "Objectives", href: "/new-objectives", icon: Target },
-    { name: "Agents", href: "/agents", icon: Bot },
-    { name: "Canvas", href: "/canvas", icon: Waypoints },
-    { name: "Inspiration", href: "/inspiration", icon: Lightbulb },
+// "More" dropdown — Person section
+const personMoreNavigation = [
     { name: "Marketplace", href: "/marketplace", icon: Store },
+    { name: "My Orders", href: "/my-orders", icon: ShoppingBag },
     { name: "Guild", href: "/guild", icon: GraduationCap },
     { name: "Apprenticeship", href: "/apprenticeship", icon: BookOpen },
 ]
 
-// Account items - personal profile and settings
+// "More" dropdown — Company section
+const companyMoreNavigation = [
+    { name: "Updates", href: "/updates", icon: Bell },
+    { name: "Objectives", href: "/new-objectives", icon: Target },
+    { name: "Team", href: "/team", icon: Users },
+    { name: "Agents", href: "/agents", icon: Bot },
+    { name: "Canvas", href: "/canvas", icon: Waypoints },
+    { name: "Strategy", href: "/strategic-planner", icon: Map },
+    { name: "Inspiration", href: "/inspiration", icon: Lightbulb },
+    { name: "Financial Tools", href: "/tools/financial", icon: Coins },
+]
+
+// Account items
 const accountNavigation = [
     { name: "My Profile", href: "/my-profile", icon: UserCircle },
     { name: "Settings", href: "/settings", icon: Settings },
 ]
 
+/**
+ * MobileNav — Bottom navigation bar for mobile devices with Person/Company split.
+ *
+ * @description Shows Home (Person Hub), Dashboard (Company), Tasks in the main bar.
+ * "More" dropdown groups remaining items into Me, Company, and Account sections.
+ */
 export function MobileNav() {
     const pathname = usePathname()
     const router = useRouter()
@@ -67,6 +102,8 @@ export function MobileNav() {
         const prefillText = suggestion?.title || rawIdea
         router.push(`/new-tasks?prefill=${encodeURIComponent(prefillText)}`)
     }
+
+    const allMoreItems = [...personMoreNavigation, ...companyMoreNavigation, ...accountNavigation]
 
     return (
         <>
@@ -104,17 +141,48 @@ export function MobileNav() {
                         <button
                             className={cn(
                                 "flex flex-col items-center justify-center w-full min-h-[44px] min-w-[44px] h-full space-y-0.5 xs:space-y-1 touch-action-manipulation",
-                                [...moreNavigation, ...accountNavigation].some(item => isRouteActive(pathname, item.href))
+                                allMoreItems.some(item => isRouteActive(pathname, item.href))
                                     ? "text-international-orange" 
                                     : "text-muted-foreground hover:text-foreground"
                             )}
                         >
-                            <MoreHorizontal className={cn("h-5 w-5 shrink-0", [...moreNavigation, ...accountNavigation].some(item => isRouteActive(pathname, item.href)) && "fill-current")} />
+                            <MoreHorizontal className={cn("h-5 w-5 shrink-0", allMoreItems.some(item => isRouteActive(pathname, item.href)) && "fill-current")} />
                             <span className="text-[10px] xs:text-xs font-medium">More</span>
                         </button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" side="top" className="mb-2 mr-safe">
-                        {moreNavigation.map((item) => {
+                    <DropdownMenuContent align="end" side="top" className="mb-2 mr-safe w-56">
+                        {/* Person section */}
+                        <DropdownMenuLabel className="text-[10px] uppercase tracking-widest text-muted-foreground">
+                            Me
+                        </DropdownMenuLabel>
+                        {personMoreNavigation.map((item) => {
+                            const isActive = isRouteActive(pathname, item.href)
+                            return (
+                                <DropdownMenuItem key={item.name} asChild>
+                                    <Link
+                                        href={item.href}
+                                        className={cn(
+                                            "flex items-center justify-between gap-2 cursor-pointer w-full",
+                                            isActive && "text-international-orange"
+                                        )}
+                                    >
+                                        <span className="flex items-center gap-2">
+                                            <item.icon className="h-4 w-4" />
+                                            {item.name}
+                                        </span>
+                                        <NewBadge route={item.href} />
+                                    </Link>
+                                </DropdownMenuItem>
+                            )
+                        })}
+
+                        <DropdownMenuSeparator />
+
+                        {/* Company section */}
+                        <DropdownMenuLabel className="text-[10px] uppercase tracking-widest text-muted-foreground">
+                            Company
+                        </DropdownMenuLabel>
+                        {companyMoreNavigation.map((item) => {
                             const isActive = isRouteActive(pathname, item.href)
                             return (
                                 <DropdownMenuItem key={item.name} asChild>
@@ -175,7 +243,7 @@ export function MobileNav() {
             </div>
         </div>
 
-        {/* Quick Capture Dialog - Global idea capture for mobile */}
+        {/* Quick Capture Dialog — Global idea capture for mobile */}
         <QuickCaptureDialog
             open={isQuickCaptureOpen}
             onOpenChange={setIsQuickCaptureOpen}

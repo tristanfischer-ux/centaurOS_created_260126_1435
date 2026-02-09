@@ -1,5 +1,6 @@
 import { Sidebar } from "@/components/Sidebar";
 import { MobileNav } from "@/components/MobileNav";
+import { ContextIndicator } from "@/components/ContextIndicator";
 import { PWARegister } from "@/components/PWARegister";
 import { DragDropPolyfill } from "@/components/DragDropPolyfill";
 import { CommandPalette } from "@/components/CommandPalette";
@@ -83,6 +84,11 @@ export default async function PlatformLayout({
         }
     }
 
+    // Resolve the active foundry display name from multi-foundry data
+    // This is more reliable than the legacy foundryName for switched workspaces
+    const activeFoundry = userFoundries.find(f => f.isActive)
+    const activeFoundryDisplayName = activeFoundry?.foundryName || foundryName
+
     return (
         <TooltipProvider>
             <PresenceProvider>
@@ -93,6 +99,10 @@ export default async function PlatformLayout({
                         <MobileZoomControl />
                         <Sidebar foundryName={foundryName} foundryId={foundryId} userName={profile?.full_name || user.email || "User"} userRole={profile?.role || "Member"} isCompanyAdmin={profile?.role === "Founder" || profile?.role === "Executive" || hasAdminAccess} userFoundries={userFoundries} />
                         <ZoomableContent className="flex-1 overflow-y-auto bg-background">
+                            <ContextIndicator
+                                foundryName={activeFoundryDisplayName}
+                                userName={profile?.full_name || user.email || "User"}
+                            />
                             <main className="p-4 sm:p-6 lg:p-8 pb-32 lg:pb-8">
                                 <ErrorBoundary>
                                     {children}

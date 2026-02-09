@@ -4,11 +4,30 @@ import React from "react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
-import { Users, CheckSquare, Store, Target, ShieldAlert, Lightbulb, ShoppingBag, Bot, Home, Bell, Sparkles, Waypoints, MessageSquarePlus, Plus, Map, Calculator, Banknote, Coins, GraduationCap, BookOpen } from "lucide-react"
+import {
+    Users,
+    CheckSquare,
+    Store,
+    Target,
+    ShieldAlert,
+    Lightbulb,
+    ShoppingBag,
+    Bot,
+    Home,
+    Bell,
+    Sparkles,
+    Waypoints,
+    MessageSquarePlus,
+    Plus,
+    Map,
+    Coins,
+    GraduationCap,
+    BookOpen,
+    LayoutDashboard,
+} from "lucide-react"
 import { NotificationCenter } from "@/components/NotificationCenter"
 import { UnreadIndicator } from "@/components/today/UnreadIndicator"
 import { FoundrySwitcher } from "@/components/FoundrySwitcher"
-// ThemeToggle removed - ForgeOS enforces light mode per design philosophy
 import { FocusModeToggle } from "@/components/FocusModeToggle"
 import { ZoomControl } from "@/components/ZoomControl"
 import { useZoomContext } from "@/components/ZoomProvider"
@@ -22,51 +41,44 @@ import { isRouteBeta, getFeatureNameByRoute } from "@/lib/features/registry"
 import type { SmartGoalSuggestion } from "@/actions/smart-goals"
 
 /**
- * Determines if a navigation item should be marked as active
- * Uses exact matching for root routes and prefix matching for nested routes
+ * Determines if a navigation item should be marked as active.
+ * Uses exact matching for root routes and prefix matching for nested routes.
  */
 function isRouteActive(pathname: string, href: string): boolean {
-    // Exact match for root-level routes
     if (pathname === href) return true
-
-    // For nested routes, check if pathname starts with href followed by /
-    // This prevents /dashboard from matching /dashboard-settings
     if (pathname.startsWith(href + '/')) return true
-
     return false
 }
 
 // Keep in sync with package.json version
 const APP_VERSION = "0.9.0"
 
-// Work: day-to-day operations
-const workNavigation = [
-    { name: "Home", href: "/dashboard", icon: Home, tooltip: "Your personalized command center with insights and quick actions" },
-    { name: "Updates", href: "/updates", icon: Bell, tooltip: "Notes, comments, and changes across your tasks and objectives" },
+// ─────────────────────────────────────────────────────────────────────────────
+// Zone A: "Me" — Person-level navigation (identity, marketplace, community)
+// ─────────────────────────────────────────────────────────────────────────────
+const personNavigation = [
+    { name: "Home", href: "/home", icon: Home, tooltip: "Your personal hub — switch companies, manage profile" },
+    { name: "Marketplace", href: "/marketplace", icon: Store, tooltip: "Find experts, suppliers, products, and services" },
+    { name: "My Orders", href: "/my-orders", icon: ShoppingBag, tooltip: "View and manage your marketplace orders" },
+    { name: "Guild", href: "/guild", icon: GraduationCap, tooltip: "Community hub — events, networking, opportunities" },
+    { name: "Apprenticeship", href: "/apprenticeship", icon: BookOpen, tooltip: "Track apprenticeship progress, OTJT hours, and learning modules" },
+]
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Zone B: "Company" — Workspace navigation (work, strategy, team)
+// ─────────────────────────────────────────────────────────────────────────────
+const companyNavigation = [
+    { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard, tooltip: "Company command center with insights and quick actions" },
+    { name: "Updates", href: "/updates", icon: Bell, tooltip: "Notes, comments, and changes across tasks and objectives" },
     { name: "Objectives", href: "/new-objectives", icon: Target, tooltip: "Set and track high-level strategic goals" },
     { name: "Tasks", href: "/new-tasks", icon: CheckSquare, tooltip: "Manage and assign actionable items" },
     { name: "Team", href: "/team", icon: Users, tooltip: "Team members, roles, and capacity" },
     { name: "Agents", href: "/agents", icon: Bot, tooltip: "Prompt workflows — build, chain, and copy prompts" },
     { name: "Canvas", href: "/canvas", icon: Waypoints, tooltip: "Visual map of objectives, tasks, and their relationships" },
     { name: "Strategy", href: "/strategic-planner", icon: Map, tooltip: "Strategic timeline planner — backward-plan from goals with AI" },
-]
-
-// Discovery: finding help and resources
-const discoveryNavigation = [
     { name: "Inspiration", href: "/inspiration", icon: Lightbulb, tooltip: "Get ideas on what to do next and discover opportunities" },
-    { name: "Marketplace", href: "/marketplace", icon: Store, tooltip: "Find experts, suppliers, products, and services" },
-    { name: "My Orders", href: "/my-orders", icon: ShoppingBag, tooltip: "View and manage your marketplace orders" },
-    { name: "Guild", href: "/guild", icon: GraduationCap, tooltip: "Browse the apprentice pool and manage project assignments" },
-    { name: "Apprenticeship", href: "/apprenticeship", icon: BookOpen, tooltip: "Track apprenticeship progress, OTJT hours, and learning modules" },
-    { name: "What's New", href: "/whats-new", icon: Sparkles, tooltip: "Latest features, improvements, and product updates" },
+    { name: "Financial Tools", href: "/tools/financial", icon: Coins, tooltip: "Money Map and Cost of Delay calculator" },
 ]
-
-// Tools: financial calculators and utilities
-const toolsNavigation = [
-    { name: "Financial Tools", href: "/tools/financial", icon: Coins, tooltip: "Money Map and Cost of Delay calculator — understand your finances" },
-]
-
-// Profile & Settings moved to AccountPopover (accessed via user avatar)
 
 interface FoundryInfo {
     foundryId: string
@@ -77,7 +89,25 @@ interface FoundryInfo {
     memberCount: number
 }
 
-export function Sidebar({ foundryName, foundryId, userName, userRole, isCompanyAdmin, userFoundries }: { foundryName?: string; foundryId?: string; userName?: string; userRole?: string; isCompanyAdmin?: boolean; userFoundries?: FoundryInfo[] }) {
+interface SidebarProps {
+    foundryName?: string
+    foundryId?: string
+    userName?: string
+    userRole?: string
+    isCompanyAdmin?: boolean
+    userFoundries?: FoundryInfo[]
+}
+
+/**
+ * Sidebar — Main navigation component with Person/Company zone split.
+ *
+ * @description Organizes navigation into two clear zones:
+ * - "Me" zone: person-level pages (Home, Marketplace, Guild)
+ * - Company zone: workspace pages (Dashboard, Tasks, Team, etc.)
+ *
+ * The company zone header doubles as the foundry switcher for multi-foundry users.
+ */
+export function Sidebar({ foundryName, foundryId, userName, userRole, isCompanyAdmin, userFoundries }: SidebarProps) {
     const pathname = usePathname()
     const router = useRouter()
     const { setZoom } = useZoomContext()
@@ -100,12 +130,70 @@ export function Sidebar({ foundryName, foundryId, userName, userRole, isCompanyA
         router.push(`/new-tasks?prefill=${encodeURIComponent(prefillText)}`)
     }
 
+    /**
+     * Renders a single navigation item with optional tooltip and badges.
+     */
+    const renderNavItem = (item: { name: string; href: string; icon: React.ComponentType<{ className?: string }>; tooltip?: string }) => {
+        const isActive = isRouteActive(pathname, item.href)
+        const isBeta = isRouteBeta(item.href)
+
+        let badgeContent = null
+
+        if (isBeta) {
+            const featureName = getFeatureNameByRoute(item.href)
+            badgeContent = <BetaBadge onClick={() => openFeedback(featureName)} />
+        } else if (item.href === '/marketplace') {
+            badgeContent = <NewBadge customText="Demo" />
+        } else if (item.href !== '/objectives' && item.href !== '/settings') {
+            badgeContent = <NewBadge route={item.href} />
+        }
+
+        const navLink = (
+            <Link
+                href={item.href}
+                className={cn(
+                    isActive
+                        ? "bg-orange-50 text-international-orange font-semibold"
+                        : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                    "group flex items-center justify-between px-3 py-2 text-sm transition-all duration-200 rounded-md"
+                )}
+            >
+                <span className="flex items-center">
+                    <item.icon
+                        className={cn(
+                            isActive ? "text-international-orange" : "text-muted-foreground group-hover:text-foreground",
+                            "mr-3 h-4 w-4 flex-shrink-0 transition-colors"
+                        )}
+                        aria-hidden="true"
+                    />
+                    {item.name}
+                </span>
+                {badgeContent}
+            </Link>
+        )
+
+        if (item.tooltip) {
+            return (
+                <Tooltip key={item.name} delayDuration={300}>
+                    <TooltipTrigger asChild>
+                        {navLink}
+                    </TooltipTrigger>
+                    <TooltipContent side="right" className="max-w-[200px]">
+                        <p>{item.tooltip}</p>
+                    </TooltipContent>
+                </Tooltip>
+            )
+        }
+
+        return <div key={item.name}>{navLink}</div>
+    }
+
     return (
         <div className="hidden md:flex h-screen w-64 flex-col bg-background border-r border-slate-100 text-foreground">
-            {/* App Header - Fractional Forge Branding */}
-            <div className="px-5 pt-8 pb-6">
+            {/* App Header — ForgeOS Branding */}
+            <div className="px-5 pt-8 pb-4">
                 <div className="flex items-center justify-between">
-                    <Link href="/dashboard" className="group flex items-center gap-2">
+                    <Link href="/home" className="group flex items-center gap-2">
                         <span className="font-display text-xl font-bold tracking-[0.05em] text-foreground group-hover:text-international-orange transition-colors">
                             ForgeOS
                         </span>
@@ -132,119 +220,55 @@ export function Sidebar({ foundryName, foundryId, userName, userRole, isCompanyA
                 </div>
             </div>
 
-            {/* Foundry & User Info - With Multi-Foundry Switcher */}
-            <FoundrySwitcher
-                foundries={userFoundries || []}
-                currentFoundryId={foundryId}
-                currentFoundryName={foundryName}
-                userName={userName}
-                userRole={userRole}
-            />
             {/* Account menu (My Profile, Settings, Sign Out) */}
-            <div className="px-4 pb-2">
+            <div className="px-4 pb-3">
                 <AccountPopover userName={userName} userRole={userRole} />
             </div>
-            {/* Unread messages indicator */}
-            <div className="px-4 pb-4">
-                <UnreadIndicator />
-            </div>
 
-            <nav className="flex-1 space-y-1.5 px-3 py-3">
-                {/* Helper function to render nav items */}
-                {(() => {
-                    const renderNavItem = (item: { name: string; href: string; icon: React.ComponentType<{ className?: string }>; tooltip?: string }) => {
-                        const isActive = isRouteActive(pathname, item.href)
-                        const isBeta = isRouteBeta(item.href)
-                        
-                        // Determine which badge to show
-                        // Priority: Beta badge > Demo badge > New badge
-                        let badgeContent = null
-                        
-                        if (isBeta) {
-                            // Show beta badge with feedback click handler
-                            const featureName = getFeatureNameByRoute(item.href)
-                            badgeContent = (
-                                <BetaBadge onClick={() => openFeedback(featureName)} />
-                            )
-                        } else if (item.href === '/marketplace') {
-                            // Show "Demo" badge for Marketplace
-                            badgeContent = <NewBadge customText="Demo" />
-                        } else if (item.href !== '/objectives' && item.href !== '/settings') {
-                            // Show "New" badge only for routes other than objectives and settings
-                            badgeContent = <NewBadge route={item.href} />
-                        }
-                        
-                        const navLink = (
-                            <Link
-                                href={item.href}
-                                className={cn(
-                                    isActive
-                                        ? "bg-orange-50 text-international-orange font-semibold"
-                                        : "text-muted-foreground hover:bg-muted hover:text-foreground",
-                                    "group flex items-center justify-between px-3 py-2.5 text-sm transition-all duration-200 rounded-md"
-                                )}
-                            >
-                                <span className="flex items-center">
-                                    <item.icon
-                                        className={cn(
-                                            isActive ? "text-international-orange" : "text-muted-foreground group-hover:text-foreground",
-                                            "mr-3 h-4 w-4 flex-shrink-0 transition-colors"
-                                        )}
-                                        aria-hidden="true"
-                                    />
-                                    {item.name}
-                                </span>
-                                {badgeContent}
-                            </Link>
-                        )
+            {/* Scrollable navigation */}
+            <nav className="flex-1 overflow-y-auto px-3 py-1 space-y-1">
+                {/* ══════════════════════════════════════════════════ */}
+                {/* Zone A: "Me" — Person-level navigation            */}
+                {/* ══════════════════════════════════════════════════ */}
+                <div className="px-3 pt-2 pb-1.5">
+                    <p className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
+                        Me
+                    </p>
+                </div>
+                {personNavigation.map(renderNavItem)}
 
-                        if (item.tooltip) {
-                            return (
-                                <Tooltip key={item.name} delayDuration={300}>
-                                    <TooltipTrigger asChild>
-                                        {navLink}
-                                    </TooltipTrigger>
-                                    <TooltipContent side="right" className="max-w-[200px]">
-                                        <p>{item.tooltip}</p>
-                                    </TooltipContent>
-                                </Tooltip>
-                            )
-                        }
+                {/* ══════════════════════════════════════════════════ */}
+                {/* Zone B: Company — Workspace navigation             */}
+                {/* ══════════════════════════════════════════════════ */}
+                <div className="my-2 border-t border-slate-100" />
 
-                        return <div key={item.name}>{navLink}</div>
-                    }
+                {/* Company section header — doubles as foundry switcher */}
+                <FoundrySwitcher
+                    foundries={userFoundries || []}
+                    currentFoundryId={foundryId}
+                    currentFoundryName={foundryName}
+                    userName={userName}
+                    userRole={userRole}
+                />
 
-                    return (
-                        <>
-                            {/* Work: Home, Objectives, Tasks, Team */}
-                            {workNavigation.map(renderNavItem)}
-                            
-                            {/* Spacer */}
-                            <div className="my-3 border-t border-slate-100" />
-                            
-                            {/* Discovery: Product Map, Marketplace */}
-                            {discoveryNavigation.map(renderNavItem)}
-                            
-                            {/* Spacer */}
-                            <div className="my-3 border-t border-slate-100" />
-                            
-                            {/* Tools: Calculators & Utilities */}
-                            {toolsNavigation.map(renderNavItem)}
-                        </>
-                    )
-                })()}
+                {/* Unread messages indicator */}
+                <div className="px-0 pb-1">
+                    <UnreadIndicator />
+                </div>
 
-                {/* Company Admin Link - Only visible to Founders/Executives */}
+                {companyNavigation.map(renderNavItem)}
+
+                {/* Company Admin Link — Only visible to Founders/Executives */}
                 {isCompanyAdmin && (
                     <>
-                        <div className="my-4 border-t border-slate-100" />
+                        <div className="my-2 border-t border-slate-100" />
                         <Link
                             href="/admin"
                             className={cn(
                                 isRouteActive(pathname, "/admin")
                                     ? "bg-orange-50 text-international-orange font-semibold"
                                     : "text-muted-foreground hover:bg-muted hover:text-foreground",
-                                "group flex items-center px-3 py-2.5 text-sm transition-all duration-200 rounded-md"
+                                "group flex items-center px-3 py-2 text-sm transition-all duration-200 rounded-md"
                             )}
                         >
                             <ShieldAlert
@@ -260,7 +284,23 @@ export function Sidebar({ foundryName, foundryId, userName, userRole, isCompanyA
                 )}
             </nav>
 
-            <div className="p-4 mt-auto space-y-3">
+            {/* Footer — What's New, Zoom, Feedback, Version */}
+            <div className="p-4 mt-auto space-y-3 border-t border-slate-100">
+                {/* What's New link */}
+                <Link
+                    href="/whats-new"
+                    className={cn(
+                        isRouteActive(pathname, "/whats-new")
+                            ? "text-international-orange font-semibold"
+                            : "text-muted-foreground hover:text-foreground",
+                        "flex items-center gap-2 px-2 py-1.5 text-xs transition-colors rounded-md"
+                    )}
+                >
+                    <Sparkles className="h-3.5 w-3.5" />
+                    What&apos;s New
+                    <NewBadge route="/whats-new" />
+                </Link>
+
                 {/* Zoom Control */}
                 <div className="flex justify-center">
                     <ZoomControl onZoomChange={setZoom} />
@@ -268,7 +308,6 @@ export function Sidebar({ foundryName, foundryId, userName, userRole, isCompanyA
 
                 {/* Early Access badge + Feedback + Version */}
                 <div className="space-y-2">
-                    {/* Early Access badge */}
                     <div className="flex items-center justify-center gap-2">
                         <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-international-orange/10 text-international-orange text-[10px] font-semibold tracking-wide">
                             <span className="w-1.5 h-1.5 rounded-full bg-international-orange animate-pulse" />
@@ -278,8 +317,7 @@ export function Sidebar({ foundryName, foundryId, userName, userRole, isCompanyA
                             v{APP_VERSION}
                         </span>
                     </div>
-                    
-                    {/* Feedback + Search shortcuts */}
+
                     <div className="flex items-center justify-center gap-3 text-[10px] text-muted-foreground">
                         <button
                             onClick={() => openFeedback()}
@@ -304,7 +342,7 @@ export function Sidebar({ foundryName, foundryId, userName, userRole, isCompanyA
                 featureName={feedbackFeatureName}
             />
 
-            {/* Quick Capture Dialog - Global idea capture */}
+            {/* Quick Capture Dialog — Global idea capture */}
             <QuickCaptureDialog
                 open={isQuickCaptureOpen}
                 onOpenChange={setIsQuickCaptureOpen}

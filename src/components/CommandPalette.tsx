@@ -25,6 +25,7 @@ import {
   EyeOff,
   Lightbulb,
   Sparkles,
+  Home,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { QuickCaptureDialog } from '@/components/smart/quick-capture-dialog'
@@ -304,6 +305,10 @@ export function CommandPalette() {
 
         {/* Navigation */}
         <CommandGroup heading="Navigation">
+          <CommandItem onSelect={() => { router.push('/home'); setOpen(false) }}>
+            <Home className="mr-2 h-4 w-4" />
+            Home
+          </CommandItem>
           <CommandItem onSelect={() => { router.push('/dashboard'); setOpen(false) }}>
             <LayoutDashboard className="mr-2 h-4 w-4" />
             Dashboard
