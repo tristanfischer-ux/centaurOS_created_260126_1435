@@ -16,11 +16,13 @@ import {
   CX, CY, GAP_DEG, SLICE_DEG,
   FUNC_R1, FUNC_R2, EXEC_R, APPR_R,
   BOUNDARY_R, MKT_R, OUTER_R,
-  FUNCTIONS, TEAM_COVERAGE, FOUNDERS,
-  MARKETPLACE_CANDIDATES, STATUS_COLORS,
+  STATUS_COLORS,
   getCoverageStatus,
 } from '../constants'
-import type { FunctionId, TeamMember, MarketplaceCandidate, StatusColorSet, SliceData } from '../types'
+import type {
+  FunctionId, TeamMember, MarketplaceCandidate,
+  StatusColorSet, SliceData, BusinessFunction, FunctionCoverage,
+} from '../types'
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // GEOMETRY HELPERS
@@ -256,18 +258,33 @@ function OMktSlot({ x, y, r, person, onClick }: OMktSlotProps) {
 interface OrbitSVGProps {
   selected: FunctionId | null
   onSelect: (id: FunctionId) => void
+  /** The 7 business function definitions */
+  functions: BusinessFunction[]
+  /** Coverage data per function id */
+  teamCoverage: Record<string, FunctionCoverage>
+  /** Founders to show in center hub */
+  founders: TeamMember[]
+  /** All marketplace candidates */
+  marketplaceCandidates: MarketplaceCandidate[]
 }
 
-export function OrbitSVG({ selected, onSelect }: OrbitSVGProps) {
+export function OrbitSVG({
+  selected,
+  onSelect,
+  functions,
+  teamCoverage,
+  founders,
+  marketplaceCandidates,
+}: OrbitSVGProps) {
   const [hoveredFn, setHoveredFn] = useState<string | null>(null)
 
   const sliceData: SliceData[] = useMemo(
     () =>
-      FUNCTIONS.map((fn, i) => {
+      functions.map((fn, i) => {
         const s0 = i * (SLICE_DEG + GAP_DEG)
         const s1 = s0 + SLICE_DEG
         const mid = (s0 + s1) / 2
-        const comp = TEAM_COVERAGE[fn.id] || { execs: [], apprentices: [], founderCovering: false }
+        const comp = teamCoverage[fn.id] || { execs: [], apprentices: [], founderCovering: false }
         const status = getCoverageStatus(comp)
         return {
           fn,
@@ -277,10 +294,10 @@ export function OrbitSVG({ selected, onSelect }: OrbitSVGProps) {
           comp,
           hasExec: comp.execs.length > 0,
           status,
-          mktAll: MARKETPLACE_CANDIDATES.filter((m) => m.forFunction === fn.id),
+          mktAll: marketplaceCandidates.filter((m) => m.forFunction === fn.id),
         }
       }),
-    []
+    [functions, teamCoverage, marketplaceCandidates]
   )
 
   return (
@@ -469,10 +486,10 @@ export function OrbitSVG({ selected, onSelect }: OrbitSVGProps) {
       </text>
 
       {/* Founder avatars */}
-      {FOUNDERS.map((f, fi) => {
+      {founders.map((f, fi) => {
         const fw = 30
         const fg = 6
-        const totalW = FOUNDERS.length * fw + (FOUNDERS.length - 1) * fg
+        const totalW = founders.length * fw + (founders.length - 1) * fg
         const fx = CX - totalW / 2 + fi * (fw + fg) + fw / 2
         const fy = CY - 8
         return (

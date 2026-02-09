@@ -82,6 +82,35 @@ export interface StatusColorSet {
   conn: string
 }
 
+// ─── Orbit Data Props (real Supabase data passed through) ────────────────────
+
+/** Real Supabase profile data for orbit consumption */
+export interface OrbitProfile {
+  id: string
+  full_name: string
+  role: string
+  avatar_url?: string | null
+  primary_function_id?: string | null
+  activeTasks: number
+  completedTasks: number
+  pendingTasks: number
+}
+
+/** Marketplace People listing from Supabase */
+export interface MarketplacePersonListing {
+  id: string
+  title: string
+  subcategory: string
+  description: string | null
+  attributes: Record<string, unknown>
+}
+
+/** Coverage summary entry per function category */
+export interface CoverageSummaryEntry {
+  category: string
+  hasPartialOrCovered: boolean
+}
+
 // ─── View State ──────────────────────────────────────────────────────────────
 
 export type TeamViewMode = 'list' | 'orbit'

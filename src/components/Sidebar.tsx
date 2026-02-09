@@ -54,20 +54,17 @@ function isRouteActive(pathname: string, href: string): boolean {
 const APP_VERSION = "0.9.0"
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Zone A: "Me" — Person-level navigation (identity, marketplace, community)
+// Zone A: "Me" — Person-level navigation
 // ─────────────────────────────────────────────────────────────────────────────
 const personNavigation = [
     { name: "Home", href: "/home", icon: Home, tooltip: "Your personal hub — switch companies, manage profile" },
-    { name: "Marketplace", href: "/marketplace", icon: Store, tooltip: "Find experts, suppliers, products, and services" },
-    { name: "My Orders", href: "/my-orders", icon: ShoppingBag, tooltip: "View and manage your marketplace orders" },
-    { name: "Guild", href: "/guild", icon: GraduationCap, tooltip: "Community hub — events, networking, opportunities" },
-    { name: "Apprenticeship", href: "/apprenticeship", icon: BookOpen, tooltip: "Track apprenticeship progress, OTJT hours, and learning modules" },
 ]
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Zone B: "Company" — Workspace navigation (work, strategy, team)
 // ─────────────────────────────────────────────────────────────────────────────
 const companyNavigation = [
+    { name: "My Orders", href: "/my-orders", icon: ShoppingBag, tooltip: "View and manage your marketplace orders" },
     { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard, tooltip: "Company command center with insights and quick actions" },
     { name: "Updates", href: "/updates", icon: Bell, tooltip: "Notes, comments, and changes across tasks and objectives" },
     { name: "Objectives", href: "/new-objectives", icon: Target, tooltip: "Set and track high-level strategic goals" },
@@ -76,8 +73,17 @@ const companyNavigation = [
     { name: "Agents", href: "/agents", icon: Bot, tooltip: "Prompt workflows — build, chain, and copy prompts" },
     { name: "Strategy", href: "/canvas", icon: Waypoints, tooltip: "Strategy flow, timeline, and visual map of your strategic goals" },
     { name: "Strategic Planner", href: "/strategic-planner", icon: Map, tooltip: "Backward-plan from goals with AI — phases, tasks, and dependencies" },
-    { name: "Inspiration", href: "/inspiration", icon: Lightbulb, tooltip: "Get ideas on what to do next and discover opportunities" },
     { name: "Financial Tools", href: "/tools/financial", icon: Coins, tooltip: "Money Map and Cost of Delay calculator" },
+]
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Zone C: "Network" — Community and discovery
+// ─────────────────────────────────────────────────────────────────────────────
+const networkNavigation = [
+    { name: "Marketplace", href: "/marketplace", icon: Store, tooltip: "Find experts, suppliers, products, and services" },
+    { name: "Guild", href: "/guild", icon: GraduationCap, tooltip: "Community hub — events, networking, opportunities" },
+    { name: "Apprenticeship", href: "/apprenticeship", icon: BookOpen, tooltip: "Track apprenticeship progress, OTJT hours, and learning modules" },
+    { name: "Inspiration", href: "/inspiration", icon: Lightbulb, tooltip: "Get ideas on what to do next and discover opportunities" },
 ]
 
 interface FoundryInfo {
@@ -99,11 +105,12 @@ interface SidebarProps {
 }
 
 /**
- * Sidebar — Main navigation component with Person/Company zone split.
+ * Sidebar — Main navigation component with three-zone layout.
  *
- * @description Organizes navigation into two clear zones:
- * - "Me" zone: person-level pages (Home, Marketplace, Guild)
- * - Company zone: workspace pages (Dashboard, Tasks, Team, etc.)
+ * @description Organizes navigation into three clear zones:
+ * - "Me" zone: person-level pages (Home)
+ * - "Company" zone: workspace pages (Orders, Dashboard, Tasks, Team, etc.)
+ * - "Network" zone: community and discovery (Marketplace, Guild, Apprenticeship, Inspiration)
  *
  * The company zone header doubles as the foundry switcher for multi-foundry users.
  */
@@ -260,28 +267,37 @@ export function Sidebar({ foundryName, foundryId, userName, userRole, isCompanyA
 
                 {/* Company Admin Link — Only visible to Founders/Executives */}
                 {isCompanyAdmin && (
-                    <>
-                        <div className="my-2 border-t border-slate-100" />
-                        <Link
-                            href="/admin"
+                    <Link
+                        href="/admin"
+                        className={cn(
+                            isRouteActive(pathname, "/admin")
+                                ? "bg-orange-50 text-international-orange font-semibold"
+                                : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                            "group flex items-center px-3 py-2 text-sm transition-all duration-200 rounded-md"
+                        )}
+                    >
+                        <ShieldAlert
                             className={cn(
-                                isRouteActive(pathname, "/admin")
-                                    ? "bg-orange-50 text-international-orange font-semibold"
-                                    : "text-muted-foreground hover:bg-muted hover:text-foreground",
-                                "group flex items-center px-3 py-2 text-sm transition-all duration-200 rounded-md"
+                                isRouteActive(pathname, "/admin") ? "text-international-orange" : "text-muted-foreground group-hover:text-foreground",
+                                "mr-3 h-4 w-4 flex-shrink-0 transition-colors"
                             )}
-                        >
-                            <ShieldAlert
-                                className={cn(
-                                    isRouteActive(pathname, "/admin") ? "text-international-orange" : "text-muted-foreground group-hover:text-foreground",
-                                    "mr-3 h-4 w-4 flex-shrink-0 transition-colors"
-                                )}
-                                aria-hidden="true"
-                            />
-                            Company Admin
-                        </Link>
-                    </>
+                            aria-hidden="true"
+                        />
+                        Company Admin
+                    </Link>
                 )}
+
+                {/* ══════════════════════════════════════════════════ */}
+                {/* Zone C: "Network" — Community and discovery        */}
+                {/* ══════════════════════════════════════════════════ */}
+                <div className="my-2 border-t border-slate-100" />
+
+                <div className="px-3 pt-2 pb-1.5">
+                    <p className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
+                        Network
+                    </p>
+                </div>
+                {networkNavigation.map(renderNavItem)}
             </nav>
 
             {/* Footer — What's New, Zoom, Feedback, Version */}

@@ -56,24 +56,24 @@ const mainNavigation = [
     { name: "Tasks", shortName: "Tasks", href: "/new-tasks", icon: CheckSquare },
 ]
 
-// "More" dropdown — Person section
-const personMoreNavigation = [
-    { name: "Marketplace", href: "/marketplace", icon: Store },
-    { name: "My Orders", href: "/my-orders", icon: ShoppingBag },
-    { name: "Guild", href: "/guild", icon: GraduationCap },
-    { name: "Apprenticeship", href: "/apprenticeship", icon: BookOpen },
-]
-
 // "More" dropdown — Company section
 const companyMoreNavigation = [
+    { name: "My Orders", href: "/my-orders", icon: ShoppingBag },
     { name: "Updates", href: "/updates", icon: Bell },
     { name: "Objectives", href: "/new-objectives", icon: Target },
     { name: "Team", href: "/team", icon: Users },
     { name: "Agents", href: "/agents", icon: Bot },
     { name: "Strategy", href: "/canvas", icon: Waypoints },
     { name: "Strategic Planner", href: "/strategic-planner", icon: Map },
-    { name: "Inspiration", href: "/inspiration", icon: Lightbulb },
     { name: "Financial Tools", href: "/tools/financial", icon: Coins },
+]
+
+// "More" dropdown — Network section
+const networkMoreNavigation = [
+    { name: "Marketplace", href: "/marketplace", icon: Store },
+    { name: "Guild", href: "/guild", icon: GraduationCap },
+    { name: "Apprenticeship", href: "/apprenticeship", icon: BookOpen },
+    { name: "Inspiration", href: "/inspiration", icon: Lightbulb },
 ]
 
 // Account items
@@ -83,10 +83,10 @@ const accountNavigation = [
 ]
 
 /**
- * MobileNav — Bottom navigation bar for mobile devices with Person/Company split.
+ * MobileNav — Bottom navigation bar for mobile devices.
  *
- * @description Shows Home (Person Hub), Dashboard (Company), Tasks in the main bar.
- * "More" dropdown groups remaining items into Me, Company, and Account sections.
+ * @description Shows Home, Dashboard, Tasks in the main bar.
+ * "More" dropdown groups remaining items into Company, Network, and Account sections.
  */
 export function MobileNav() {
     const pathname = usePathname()
@@ -103,7 +103,7 @@ export function MobileNav() {
         router.push(`/new-tasks?prefill=${encodeURIComponent(prefillText)}`)
     }
 
-    const allMoreItems = [...personMoreNavigation, ...companyMoreNavigation, ...accountNavigation]
+    const allMoreItems = [...companyMoreNavigation, ...networkMoreNavigation, ...accountNavigation]
 
     return (
         <>
@@ -151,11 +151,11 @@ export function MobileNav() {
                         </button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" side="top" className="mb-2 mr-safe w-56">
-                        {/* Person section */}
+                        {/* Company section */}
                         <DropdownMenuLabel className="text-[10px] uppercase tracking-widest text-muted-foreground">
-                            Me
+                            Company
                         </DropdownMenuLabel>
-                        {personMoreNavigation.map((item) => {
+                        {companyMoreNavigation.map((item) => {
                             const isActive = isRouteActive(pathname, item.href)
                             return (
                                 <DropdownMenuItem key={item.name} asChild>
@@ -178,11 +178,11 @@ export function MobileNav() {
 
                         <DropdownMenuSeparator />
 
-                        {/* Company section */}
+                        {/* Network section */}
                         <DropdownMenuLabel className="text-[10px] uppercase tracking-widest text-muted-foreground">
-                            Company
+                            Network
                         </DropdownMenuLabel>
-                        {companyMoreNavigation.map((item) => {
+                        {networkMoreNavigation.map((item) => {
                             const isActive = isRouteActive(pathname, item.href)
                             return (
                                 <DropdownMenuItem key={item.name} asChild>
