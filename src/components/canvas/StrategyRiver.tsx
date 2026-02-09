@@ -119,9 +119,16 @@ function riverSegPath(x1: number, y: number, w1: number, x2: number, w2: number)
 
 const StrategyRiver: FC<StrategyRiverProps> = ({ strategicObjectives, today, onTaskClick, onMilestoneClick, onGoalClick }) => {
   const NOW = today ?? new Date()
-  const [expandedIds, setExpandedIds] = useState<Set<string>>(() =>
-    new Set(strategicObjectives.length > 0 ? [strategicObjectives[0].id] : [])
-  )
+
+  // Per-milestone expansion — clicking a milestone toggles its tasks
+  const [expandedMilestones, setExpandedMilestones] = useState<Set<string>>(() => {
+    // Start with the first SO's milestones expanded
+    if (strategicObjectives.length > 0) {
+      return new Set(strategicObjectives[0].objectives.map((o) => o.id))
+    }
+    return new Set()
+  })
+
   const [hovTask, setHovTask] = useState<string | null>(null)
   const [hovObj, setHovObj] = useState<string | null>(null)
   const [zoom, setZoom] = useState(1)
@@ -160,17 +167,17 @@ const StrategyRiver: FC<StrategyRiverProps> = ({ strategicObjectives, today, onT
     return ticks
   }, [globalStart, globalEnd])
 
-  // ── Layout computation ──
+  // ── Layout computation (per-milestone expansion) ──
   const layout = useMemo(() => {
     let curY = 40
     return strategicObjectives.map((so) => {
-      const expanded = expandedIds.has(so.id)
       const sX = tx(so.startDate), eX = tx(so.targetDate)
 
       let rw = 8
       const objs = so.objectives.map((obj, i) => {
         rw += 2 + obj.tasks.length * 1.5
-        return { ...obj, side: (i % 2 === 0 ? 'above' : 'below') as 'above' | 'below', cx: tx(obj.dueDate), rw }
+        const isExpanded = expandedMilestones.has(obj.id)
+        return { ...obj, side: (i % 2 === 0 ? 'above' : 'below') as 'above' | 'below', cx: tx(obj.dueDate), rw, isExpanded }
       })
 
       let maxA = 0, maxB = 0
@@ -179,21 +186,22 @@ const StrategyRiver: FC<StrategyRiverProps> = ({ strategicObjectives, today, onT
         cx: number; rw: number; sx: number; ex: number;
       }> = []
 
-      if (expanded) {
-        objs.forEach((obj) => {
-          const sorted = [...obj.tasks].sort((a, b) => new Date(a.end).getTime() - new Date(b.end).getTime())
-          const n = sorted.length
-          if (obj.side === 'above') maxA = Math.max(maxA, n)
-          else maxB = Math.max(maxB, n)
-          sorted.forEach((t, i) => tasks.push({
-            ...t, objId: obj.id, side: obj.side, si: i, n,
-            cx: obj.cx, rw: obj.rw, sx: tx(t.start), ex: tx(t.end),
-          }))
-        })
-      }
+      // Only include tasks for individually expanded milestones
+      objs.forEach((obj) => {
+        if (!obj.isExpanded) return
+        const sorted = [...obj.tasks].sort((a, b) => new Date(a.end).getTime() - new Date(b.end).getTime())
+        const n = sorted.length
+        if (obj.side === 'above') maxA = Math.max(maxA, n)
+        else maxB = Math.max(maxB, n)
+        sorted.forEach((t, i) => tasks.push({
+          ...t, objId: obj.id, side: obj.side, si: i, n,
+          cx: obj.cx, rw: obj.rw, sx: tx(t.start), ex: tx(t.end),
+        }))
+      })
 
-      const aH = expanded ? maxA * LANE_GAP + 52 : 0
-      const bH = expanded ? maxB * LANE_GAP + 52 : 0
+      // Space only expands on the side that actually has expanded tasks
+      const aH = maxA > 0 ? maxA * LANE_GAP + 52 : 0
+      const bH = maxB > 0 ? maxB * LANE_GAP + 52 : 0
       const mL = 64
       const topP = aH + mL, botP = bH + mL
       const lH = topP + botP + 10
@@ -227,11 +235,11 @@ const StrategyRiver: FC<StrategyRiverProps> = ({ strategicObjectives, today, onT
         }
       })
 
-      const result = { so, expanded, sX, eX, objs, tPos, ry, lH, bef, aft, yOff: curY }
+      const result = { so, sX, eX, objs, tPos, ry, lH, bef, aft, yOff: curY }
       curY += lH + 24
       return result
     })
-  }, [expandedIds, strategicObjectives])
+  }, [expandedMilestones, strategicObjectives])
 
   const totalH = layout.length > 0
     ? layout[layout.length - 1].yOff + layout[layout.length - 1].lH + 40
@@ -257,10 +265,28 @@ const StrategyRiver: FC<StrategyRiverProps> = ({ strategicObjectives, today, onT
   }
   const onMU = (): void => { dragRef.current = null }
 
-  const toggleExpand = (id: string): void => {
-    setExpandedIds((prev) => {
+  // Toggle ALL milestones within an SO (header button)
+  const toggleExpand = (soId: string): void => {
+    const so = strategicObjectives.find((s) => s.id === soId)
+    if (!so) return
+    const msIds = so.objectives.map((o) => o.id)
+    setExpandedMilestones((prev) => {
       const next = new Set(prev)
-      if (next.has(id)) next.delete(id); else next.add(id)
+      const anyExpanded = msIds.some((id) => next.has(id))
+      if (anyExpanded) {
+        msIds.forEach((id) => next.delete(id))
+      } else {
+        msIds.forEach((id) => next.add(id))
+      }
+      return next
+    })
+  }
+
+  // Toggle a single milestone (clicking a milestone node on the river)
+  const toggleMilestone = (milestoneId: string): void => {
+    setExpandedMilestones((prev) => {
+      const next = new Set(prev)
+      if (next.has(milestoneId)) next.delete(milestoneId); else next.add(milestoneId)
       return next
     })
   }
@@ -310,7 +336,8 @@ const StrategyRiver: FC<StrategyRiverProps> = ({ strategicObjectives, today, onT
 
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' as const }}>
           {strategicObjectives.map((so) => {
-            const isExp = expandedIds.has(so.id)
+            const msIds = so.objectives.map((o) => o.id)
+            const isExp = msIds.some((id) => expandedMilestones.has(id))
             return (
               <button
                 key={so.id}
@@ -368,7 +395,7 @@ const StrategyRiver: FC<StrategyRiverProps> = ({ strategicObjectives, today, onT
 
           {/* ═══ LANES ═══ */}
           {layout.map((lane, laneIdx) => {
-            const { so, expanded, sX, eX, objs, tPos, ry, bef, aft } = lane
+            const { so, sX, eX, objs, tPos, ry, bef, aft } = lane
             const soTotal = so.objectives.reduce((s, o) => s + o.tasks.length, 0)
             const soDone = so.objectives.reduce((s, o) => s + o.tasks.filter((t) => t.status === 'done').length, 0)
             const pct = soTotal > 0 ? Math.round((soDone / soTotal) * 100) : 0
@@ -380,8 +407,8 @@ const StrategyRiver: FC<StrategyRiverProps> = ({ strategicObjectives, today, onT
                     stroke="#E5E7EB" strokeWidth="1" strokeDasharray="4 4" opacity=".5" />
                 )}
 
-                {/* Tributaries */}
-                {expanded && objs.map((obj) => {
+                {/* Tributaries — only for expanded milestones */}
+                {objs.filter((obj) => obj.isExpanded).map((obj) => {
                   const objTasks = tPos.filter((t) => t.objId === obj.id).sort((a, b) => a.si - b.si)
                   const n = objTasks.length
                   const rH = obj.rw / 2
@@ -448,10 +475,10 @@ const StrategyRiver: FC<StrategyRiverProps> = ({ strategicObjectives, today, onT
                   const rH = obj.rw / 2
                   const gap = Math.max(rH + 20, 26)
                   return (
-                    <g key={obj.id} onMouseEnter={() => setHovObj(obj.id)} onMouseLeave={() => setHovObj(null)} onClick={() => onMilestoneClick?.(obj.id)} style={{ cursor: 'pointer' }}>
+                    <g key={obj.id} onMouseEnter={() => setHovObj(obj.id)} onMouseLeave={() => setHovObj(null)} onClick={() => toggleMilestone(obj.id)} style={{ cursor: 'pointer' }}>
                       {past && <circle cx={obj.cx} cy={ry} r={18} fill={so.color} opacity=".07" />}
-                      <circle cx={obj.cx} cy={ry} r={isH ? 13 : 10} fill="white" stroke={so.color} strokeWidth={past ? 3 : 2} filter="url(#strategy-ds)" />
-                      <circle cx={obj.cx} cy={ry} r={past ? 4 : 2} fill={past ? so.color : '#CBD5E1'} />
+                      <circle cx={obj.cx} cy={ry} r={isH ? 13 : 10} fill={obj.isExpanded ? so.color : 'white'} stroke={so.color} strokeWidth={past ? 3 : 2} filter="url(#strategy-ds)" />
+                      <circle cx={obj.cx} cy={ry} r={past ? 4 : 2} fill={obj.isExpanded ? 'white' : (past ? so.color : '#CBD5E1')} />
                       <text x={obj.cx} y={ry + dir * gap} textAnchor="middle" fill={isH ? '#0F172A' : '#475569'} fontSize="10" fontFamily={FONT} fontWeight="800">{obj.title}</text>
                       <text x={obj.cx} y={ry + dir * (gap + 12)} textAnchor="middle" fill="#94A3B8" fontSize="8.5" fontFamily={FONT} fontWeight="600">
                         {new Date(obj.dueDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} · {tp}% · {obj.tasks.length} tasks
