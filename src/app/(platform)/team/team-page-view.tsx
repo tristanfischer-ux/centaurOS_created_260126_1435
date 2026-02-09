@@ -66,7 +66,6 @@ import { TeamMemberCard, type CardSize } from '@/components/team/team-member-car
 import { FeatureTip } from '@/components/onboarding'
 
 import { useTeamData } from './hooks/use-team-data'
-import { FUNCTIONS } from './constants'
 import type { TeamViewMode } from './types'
 
 // ─── Types ───────────────────────────────────────
@@ -182,8 +181,10 @@ interface TeamPageViewProps {
     marketplacePeople?: MarketplacePersonListing[]
     /** Mapping from business_function.id → category (e.g. 'finance', 'sales') */
     functionCategoryMap?: Record<string, string>
-    /** Coverage summary per orbit function category */
-    coverageSummary?: Record<string, CoverageSummaryEntry>
+    /** Business function definitions (custom or default) */
+    orbitFunctions?: Array<{ id: string; label: string; short: string }>
+    /** Foundry ID for editing functions */
+    foundryId?: string
 }
 
 type ActiveTab = 'members' | 'workload' | 'teams'
@@ -201,7 +202,16 @@ export function TeamPageView({
     allTasks,
     marketplacePeople = [],
     functionCategoryMap = {},
-    coverageSummary = {},
+    orbitFunctions = [
+        { id: 'sales', label: 'Sales', short: 'SALES' },
+        { id: 'marketing', label: 'Marketing', short: 'MKTG' },
+        { id: 'finance', label: 'Finance', short: 'FIN' },
+        { id: 'hr', label: 'People & HR', short: 'HR' },
+        { id: 'legal', label: 'Legal & Admin', short: 'LEGAL' },
+        { id: 'operations', label: 'Operations', short: 'OPS' },
+        { id: 'product', label: 'Product', short: 'PROD' },
+    ],
+    foundryId,
 }: TeamPageViewProps) {
     // View state — orbit is the default landing view
     const [viewMode, setViewMode] = useState<TeamViewMode>('orbit')
@@ -299,12 +309,12 @@ export function TeamPageView({
         })),
         marketplacePeople,
         functionCategoryMap,
-        coverageSummary,
+        functions: orbitFunctions,
     })
 
     /** Marketplace candidates visible in orbit, ordered by function */
     const orbitVisibleCandidates = useMemo(() => {
-        return FUNCTIONS.flatMap(fn => {
+        return orbitFunctions.flatMap(fn => {
             const candidates = teamData.marketplaceByFunction[fn.id] || []
             return candidates.slice(0, 4).map(c => ({
                 ...c,
@@ -312,7 +322,7 @@ export function TeamPageView({
                 functionId: fn.id,
             }))
         })
-    }, [teamData.marketplaceByFunction])
+    }, [teamData.marketplaceByFunction, orbitFunctions])
 
     // ─── Search Filter ─────────────────────────
 
@@ -538,8 +548,8 @@ export function TeamPageView({
 
         if (filtered.length === 0 && !sq) return null
 
-        // Group by function (preserving FUNCTIONS order)
-        const byFunction = FUNCTIONS
+        // Group by function (preserving orbitFunctions order)
+        const byFunction = orbitFunctions
             .map(fn => ({
                 fn,
                 items: filtered.filter(c => c.functionId === fn.id),
@@ -1029,6 +1039,7 @@ export function TeamPageView({
                 <div className="h-[calc(100vh-22rem)] -mx-4 sm:-mx-6 lg:-mx-8 overflow-hidden flex">
                     <OrbitalView
                         teamData={teamData}
+                        functions={orbitFunctions}
                         onViewProfile={setSelectedMemberId}
                     />
                 </div>

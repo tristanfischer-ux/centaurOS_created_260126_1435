@@ -725,3 +725,95 @@ export async function getTaskAssignees(taskId: string) {
 
     return { assignees, team }
 }
+
+// ============ FOUNDRY BUSINESS FUNCTIONS ============
+
+/**
+ * Updates foundry-specific business function labels and display order
+ * for the Company Orbit view.
+ * 
+ * @param foundryId - The foundry ID
+ * @param functions - Array of function configurations with IDs, labels, abbreviations, and order
+ * @returns Success status or error message
+ * 
+ * @security Authenticated user in same foundry required
+ * @audit Logs function configuration changes
+ */
+export async function updateFoundryFunctions(
+    foundryId: string,
+    functions: Array<{
+        function_id: string
+        label: string
+        short: string
+        display_order: number
+    }>
+): Promise<{ success: boolean; error?: string }> {
+    const supabase = await createClient()
+
+    // AUTH: Verify user is authenticated
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return { success: false, error: 'Unauthorized' }
+
+    // AUTH: Verify user belongs to this foundry
+    const userFoundryId = await getFoundryIdCached()
+    if (!userFoundryId || userFoundryId !== foundryId) {
+        return { success: false, error: 'Unauthorized: Cannot modify other foundries' }
+    }
+
+    // VALIDATION: Ensure all 7 core functions are present
+    const requiredFunctionIds = ['sales', 'marketing', 'finance', 'hr', 'legal', 'operations', 'product']
+    const providedIds = functions.map(f => f.function_id).sort()
+    const missingIds = requiredFunctionIds.filter(id => !providedIds.includes(id))
+    
+    if (missingIds.length > 0) {
+        return { success: false, error: `Missing required functions: ${missingIds.join(', ')}` }
+    }
+    
+    if (providedIds.length !== 7) {
+        return { success: false, error: 'Must provide exactly 7 functions' }
+    }
+
+    // VALIDATION: Check for duplicate abbreviations
+    const shorts = functions.map(f => f.short)
+    const duplicateShorts = shorts.filter((item, index) => shorts.indexOf(item) !== index)
+    if (duplicateShorts.length > 0) {
+        return { success: false, error: `Duplicate abbreviations: ${duplicateShorts.join(', ')}` }
+    }
+
+    // VALIDATION: Check display_order is 0-6
+    const orders = functions.map(f => f.display_order)
+    const invalidOrders = orders.filter(o => o < 0 || o > 6)
+    if (invalidOrders.length > 0) {
+        return { success: false, error: 'Display order must be between 0 and 6' }
+    }
+
+    // Delete existing custom functions for this foundry
+    const { error: deleteError } = await supabase
+        .from('foundry_business_functions')
+        .delete()
+        .eq('foundry_id', foundryId)
+
+    if (deleteError) {
+        return { success: false, error: sanitizeErrorMessage(deleteError) }
+    }
+
+    // Insert new custom functions
+    const { error: insertError } = await supabase
+        .from('foundry_business_functions')
+        .insert(functions.map(f => ({
+            foundry_id: foundryId,
+            function_id: f.function_id,
+            label: f.label,
+            short: f.short,
+            display_order: f.display_order,
+        })))
+
+    if (insertError) {
+        return { success: false, error: sanitizeErrorMessage(insertError) }
+    }
+
+    // Revalidate team page to show updated function labels
+    revalidatePath('/team')
+
+    return { success: true }
+}

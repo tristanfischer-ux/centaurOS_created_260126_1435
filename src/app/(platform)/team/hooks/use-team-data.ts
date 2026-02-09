@@ -10,7 +10,7 @@
  */
 
 import { useMemo } from 'react'
-import { FUNCTIONS, getCoverageStatus } from '../constants'
+import { getCoverageStatus } from '../constants'
 import type {
   TeamMember,
   MarketplaceCandidate,
@@ -44,8 +44,8 @@ interface UseTeamDataArgs {
   marketplacePeople: MarketplacePersonListing[]
   /** business_function.id → category mapping */
   functionCategoryMap: Record<string, string>
-  /** Coverage summary per category from foundry_function_coverage */
-  coverageSummary: Record<string, CoverageSummaryEntry>
+  /** Business function definitions (custom or default) */
+  functions: BusinessFunction[]
 }
 
 // ─── Output Types ───────────────────────────────────────────────
@@ -158,7 +158,7 @@ export function useTeamData(args: UseTeamDataArgs): TeamDataResult {
     apprentices: rawApprentices,
     marketplacePeople,
     functionCategoryMap,
-    coverageSummary,
+    functions,
   } = args
 
   return useMemo(() => {
@@ -173,7 +173,7 @@ export function useTeamData(args: UseTeamDataArgs): TeamDataResult {
       const cat = functionCategoryMap[profile.primary_function_id]
       if (!cat) return null
       // Validate it's one of the 7 orbit categories
-      if (FUNCTIONS.some((f) => f.id === cat)) return cat as FunctionId
+      if (functions.some((f) => f.id === cat)) return cat as FunctionId
       return null
     }
 
@@ -183,7 +183,7 @@ export function useTeamData(args: UseTeamDataArgs): TeamDataResult {
     const apprenticesByFunction: Record<string, (TeamMember & { functionId: string; functionLabel: string })[]> = {}
 
     // Initialize empty coverage for each function
-    FUNCTIONS.forEach((fn) => {
+    functions.forEach((fn) => {
       coverageByFunction[fn.id] = { execs: [], apprentices: [], founderCovering: false }
       execsByFunction[fn.id] = []
       apprenticesByFunction[fn.id] = []
@@ -196,7 +196,7 @@ export function useTeamData(args: UseTeamDataArgs): TeamDataResult {
     rawExecutives.forEach((exec) => {
       const cat = getCategory(exec)
       if (cat) {
-        const fn = FUNCTIONS.find((f) => f.id === cat)!
+        const fn = functions.find((f) => f.id === cat)!
         const tm = {
           ...profileToTeamMember(exec, 'EXECUTIVE', assignedExecs.length),
           functionId: cat,
@@ -217,7 +217,7 @@ export function useTeamData(args: UseTeamDataArgs): TeamDataResult {
     rawApprentices.forEach((appr) => {
       const cat = getCategory(appr)
       if (cat) {
-        const fn = FUNCTIONS.find((f) => f.id === cat)!
+        const fn = functions.find((f) => f.id === cat)!
         const tm = {
           ...profileToTeamMember(appr, 'APPRENTICE', assignedApprentices.length),
           functionId: cat,
@@ -233,7 +233,7 @@ export function useTeamData(args: UseTeamDataArgs): TeamDataResult {
 
     // ── Auto-distribute unassigned people (round-robin) ───────
     // This ensures the orbit shows real people even before explicit function assignment
-    const functionIds = FUNCTIONS.map((f) => f.id)
+    const functionIds = functions.map((f) => f.id)
     let fnIdx = 0
 
     unassignedExecs.forEach((exec) => {
@@ -246,7 +246,7 @@ export function useTeamData(args: UseTeamDataArgs): TeamDataResult {
         fnIdx++
       }
       const cat = functionIds[targetIdx]
-      const fn = FUNCTIONS.find((f) => f.id === cat)!
+      const fn = functions.find((f) => f.id === cat)!
       const tm = {
         ...profileToTeamMember(exec, 'EXECUTIVE', assignedExecs.length + fnIdx),
         functionId: cat,
@@ -265,7 +265,7 @@ export function useTeamData(args: UseTeamDataArgs): TeamDataResult {
     unassignedApprentices.forEach((appr) => {
       const cat = functionIds[apprFnIdx % functionIds.length]
       apprFnIdx++
-      const fn = FUNCTIONS.find((f) => f.id === cat)!
+      const fn = functions.find((f) => f.id === cat)!
       const tm = {
         ...profileToTeamMember(appr, 'APPRENTICE', assignedApprentices.length + apprFnIdx),
         functionId: cat,
@@ -276,18 +276,18 @@ export function useTeamData(args: UseTeamDataArgs): TeamDataResult {
       coverageByFunction[cat].apprentices.push(tm)
     })
 
-    // ── Set founderCovering from coverage summary ─────────────
-    FUNCTIONS.forEach((fn) => {
-      const summary = coverageSummary[fn.id]
+    // ── Set founderCovering for all gaps ─────────────────────
+    // Founder automatically covers all functions without executives
+    functions.forEach((fn) => {
       const hasExec = coverageByFunction[fn.id].execs.length > 0
-      if (!hasExec && summary?.hasPartialOrCovered) {
+      if (!hasExec) {
         coverageByFunction[fn.id].founderCovering = true
       }
     })
 
     // ── Gaps ──────────────────────────────────────────────────
     const gaps: GapInfo[] = []
-    FUNCTIONS.forEach((fn) => {
+    functions.forEach((fn) => {
       const status = getCoverageStatus(coverageByFunction[fn.id])
       if (status !== 'green') {
         gaps.push({ fn, status: status as 'yellow' | 'red' })
@@ -340,7 +340,7 @@ export function useTeamData(args: UseTeamDataArgs): TeamDataResult {
       marketplaceListingMap,
       stats: {
         totalPeople: allPeople.length,
-        totalFunctions: FUNCTIONS.length,
+        totalFunctions: functions.length,
         avgCapacity: `${avgCap}%`,
         totalIdle,
         gapCount: gaps.length,
@@ -353,6 +353,6 @@ export function useTeamData(args: UseTeamDataArgs): TeamDataResult {
     rawApprentices,
     marketplacePeople,
     functionCategoryMap,
-    coverageSummary,
+    functions,
   ])
 }

@@ -15,19 +15,21 @@ import { useState, useCallback } from 'react'
 import { PanZoomCanvas } from './pan-zoom-canvas'
 import { OrbitSVG } from './orbit-svg'
 import { OrbitSidePanel } from './orbit-side-panel'
-import { FUNCTIONS } from '../constants'
-import type { FunctionId } from '../types'
+import type { FunctionId, BusinessFunction } from '../types'
 import type { TeamDataResult } from '../hooks/use-team-data'
 
 interface OrbitalViewProps {
   /** Pre-computed team data from useTeamData */
   teamData: TeamDataResult
+  /** Business function definitions (custom or default) */
+  functions: BusinessFunction[]
   /** Callback to open real profile modal (for internal members) */
   onViewProfile?: (memberId: string) => void
 }
 
 export function OrbitalView({
   teamData,
+  functions,
   onViewProfile,
 }: OrbitalViewProps) {
   const [selected, setSelected] = useState<FunctionId | null>(null)
@@ -47,7 +49,7 @@ export function OrbitalView({
         <OrbitSVG
           selected={selected}
           onSelect={handleSelect}
-          functions={FUNCTIONS}
+          functions={functions}
           teamCoverage={teamData.coverageByFunction}
           founders={teamData.founders}
           marketplaceCandidates={
@@ -60,7 +62,7 @@ export function OrbitalView({
       <div className="w-[340px] border-l border-border overflow-y-auto bg-muted/30">
         <OrbitSidePanel
           selected={selected}
-          functions={FUNCTIONS}
+          functions={functions}
           teamCoverage={teamData.coverageByFunction}
           marketplaceCandidates={
             Object.values(teamData.marketplaceByFunction).flat()

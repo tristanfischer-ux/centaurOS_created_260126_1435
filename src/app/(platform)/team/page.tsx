@@ -75,6 +75,32 @@ export default async function TeamPage() {
         .from('business_functions')
         .select('id, category, name, display_order')
 
+    // Fetch custom function definitions for this foundry (if any)
+    const { data: customFunctions } = await supabase
+        .from('foundry_business_functions')
+        .select('function_id, label, short, display_order')
+        .eq('foundry_id', foundry_id)
+        .order('display_order')
+
+    // Build functions array: use custom if exists, otherwise use defaults
+    const DEFAULT_FUNCTIONS = [
+        { id: 'sales', label: 'Sales', short: 'SALES' },
+        { id: 'marketing', label: 'Marketing', short: 'MKTG' },
+        { id: 'finance', label: 'Finance', short: 'FIN' },
+        { id: 'hr', label: 'People & HR', short: 'HR' },
+        { id: 'legal', label: 'Legal & Admin', short: 'LEGAL' },
+        { id: 'operations', label: 'Operations', short: 'OPS' },
+        { id: 'product', label: 'Product', short: 'PROD' },
+    ]
+
+    const orbitFunctions = customFunctions && customFunctions.length === 7
+        ? customFunctions.map(cf => ({
+            id: cf.function_id,
+            label: cf.label,
+            short: cf.short,
+        }))
+        : DEFAULT_FUNCTIONS
+
     // Fetch foundry function coverage (for orbit status per function)
     const { data: rawCoverageData } = await supabase
         .from('foundry_function_coverage')
@@ -333,7 +359,8 @@ export default async function TeamPage() {
                 attributes: mp.attributes as Record<string, unknown> || {},
             }))}
             functionCategoryMap={functionCategoryMap}
-            coverageSummary={coverageByCategoryMap}
+            orbitFunctions={orbitFunctions}
+            foundryId={foundry_id}
         />
     )
 }
