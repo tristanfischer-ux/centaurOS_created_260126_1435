@@ -10,7 +10,6 @@ import {
     Building2,
     Clock,
     Loader2,
-    Calendar,
     Users
 } from "lucide-react"
 import { ApprenticePoolBrowser } from "@/components/guild/ApprenticePoolBrowser"
@@ -51,22 +50,25 @@ export function GuildPageContent({ isManager, isApprentice, isExecutive, members
     useEffect(() => {
         const loadData = async () => {
             setLoading(true)
-            
-            // Load events for everyone
-            const eventsResult = await getGuildEvents({ upcoming: true, limit: 10 })
-            if (eventsResult.data) {
-                setEvents(eventsResult.data)
-            }
-            
-            // Load assignments for apprentices
-            if (isApprentice) {
-                const result = await getMyAssignments()
-                if (result.assignments) {
-                    setMyAssignments(result.assignments)
+            try {
+                // Load events for everyone
+                const eventsResult = await getGuildEvents({ upcoming: true, limit: 10 })
+                if (eventsResult.data) {
+                    setEvents(eventsResult.data)
                 }
+                
+                // Load assignments for apprentices
+                if (isApprentice) {
+                    const result = await getMyAssignments()
+                    if (result.assignments) {
+                        setMyAssignments(result.assignments)
+                    }
+                }
+            } catch (error) {
+                console.error('[Guild] Failed to load data:', error instanceof Error ? error.message : 'Unknown error')
+            } finally {
+                setLoading(false)
             }
-            
-            setLoading(false)
         }
         
         loadData()

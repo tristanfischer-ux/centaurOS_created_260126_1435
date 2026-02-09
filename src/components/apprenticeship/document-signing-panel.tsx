@@ -1,4 +1,3 @@
-// @ts-nocheck
 'use client'
 
 import { useState, useEffect, useTransition } from 'react'
@@ -9,12 +8,6 @@ import { Badge } from '@/components/ui/badge'
 import { UserAvatar } from '@/components/ui/user-avatar'
 import { Checkbox } from '@/components/ui/checkbox'
 import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-} from '@/components/ui/sheet'
-import {
   Dialog,
   DialogContent,
   DialogHeader,
@@ -22,6 +15,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog'
+import { ScrollArea } from '@/components/ui/scroll-area'
 import { sanitizeHref } from '@/lib/security/url-validation'
 import { 
   FileSignature, 
@@ -31,8 +25,9 @@ import {
   FolderOpen,
   Shield,
   Award,
-  Medal,
-  File,
+    Medal,
+    GraduationCap,
+    File,
   CheckCircle2,
   Clock,
   AlertCircle,
@@ -67,7 +62,7 @@ const iconMap: Record<string, typeof File> = {
   FolderOpen,
   Shield,
   Award,
-  Medal,
+  GraduationCap,
   File
 }
 
@@ -106,11 +101,16 @@ export function DocumentSigningPanel({ enrollmentId, open, onOpenChange, userRol
 
   async function loadDocuments() {
     setLoading(true)
-    const result = await getEnrollmentDocuments(enrollmentId)
-    if (result.documents) {
-      setDocuments(result.documents)
+    try {
+      const result = await getEnrollmentDocuments(enrollmentId)
+      if (result.documents) {
+        setDocuments(result.documents)
+      }
+    } catch (error) {
+      console.error('[DocumentSigning] Failed to load documents:', error instanceof Error ? error.message : 'Unknown error')
+    } finally {
+      setLoading(false)
     }
-    setLoading(false)
   }
 
   function openSignDialog(doc: ApprenticeshipDocument) {
@@ -146,19 +146,19 @@ export function DocumentSigningPanel({ enrollmentId, open, onOpenChange, userRol
 
   return (
     <>
-      <Sheet open={open} onOpenChange={onOpenChange}>
-        <SheetContent side="right" className="w-full sm:w-[600px] sm:max-w-full overflow-y-auto">
-          <SheetHeader className="pb-4 border-b">
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent size="lg" className="max-h-[90vh]">
+          <DialogHeader>
             <div className="flex items-center gap-2 mb-2">
               <div className="h-1 w-8 bg-international-orange rounded-full" />
             </div>
-            <SheetTitle className="text-xl">Apprenticeship Documents</SheetTitle>
-            <p className="text-sm text-muted-foreground">
+            <DialogTitle className="text-xl">Apprenticeship Documents</DialogTitle>
+            <DialogDescription>
               View, download, and sign your apprenticeship documents
-            </p>
-          </SheetHeader>
+            </DialogDescription>
+          </DialogHeader>
 
-          <div className="py-6 space-y-6">
+          <ScrollArea className="max-h-[65vh]"><div className="space-y-6 pr-4">
             {loading ? (
               <div className="flex items-center justify-center py-12">
                 <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -225,9 +225,9 @@ export function DocumentSigningPanel({ enrollmentId, open, onOpenChange, userRol
                 )}
               </>
             )}
-          </div>
-        </SheetContent>
-      </Sheet>
+          </div></ScrollArea>
+        </DialogContent>
+      </Dialog>
 
       {/* Sign Confirmation Dialog */}
       <Dialog open={signDialogOpen} onOpenChange={setSignDialogOpen}>

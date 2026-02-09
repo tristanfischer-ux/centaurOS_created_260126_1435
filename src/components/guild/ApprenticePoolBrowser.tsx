@@ -55,14 +55,20 @@ export function ApprenticePoolBrowser() {
 
     const loadApprentices = async () => {
         setLoading(true)
-        const result = await getGuildApprentices()
-        if (result.apprentices) {
-            setApprentices(result.apprentices)
+        try {
+            const result = await getGuildApprentices()
+            if (result.apprentices) {
+                setApprentices(result.apprentices)
+            }
+            if (result.error) {
+                toast.error(result.error)
+            }
+        } catch (error) {
+            console.error('[ApprenticePool] Failed to load apprentices:', error instanceof Error ? error.message : 'Unknown error')
+            toast.error('Failed to load apprentice pool')
+        } finally {
+            setLoading(false)
         }
-        if (result.error) {
-            toast.error(result.error)
-        }
-        setLoading(false)
     }
 
     const handleAssign = () => {
@@ -146,10 +152,12 @@ export function ApprenticePoolBrowser() {
                     <div className="relative">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                         <Input
+                            id="search-apprentices"
                             placeholder="Search by name, email, or skills..."
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
                             className="pl-9"
+                            aria-label="Search apprentices by name, email, or skills"
                         />
                     </div>
 
@@ -278,13 +286,14 @@ export function ApprenticePoolBrowser() {
                             <div className="space-y-4">
                                 <div className="space-y-2">
                                     <Label htmlFor="projectName">
-                                        Project Name <span className="text-destructive">*</span>
+                                        Project Name <span className="text-destructive" aria-label="required">*</span>
                                     </Label>
                                     <Input
                                         id="projectName"
                                         placeholder="e.g., MVP Development, Marketing Campaign..."
                                         value={projectName}
                                         onChange={(e) => setProjectName(e.target.value)}
+                                        aria-required="true"
                                     />
                                 </div>
                                 <div className="space-y-2">

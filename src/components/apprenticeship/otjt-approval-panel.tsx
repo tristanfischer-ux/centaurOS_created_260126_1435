@@ -1,4 +1,3 @@
-// @ts-nocheck
 'use client'
 
 import { useState, useEffect, useTransition } from 'react'
@@ -10,18 +9,14 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { UserAvatar } from '@/components/ui/user-avatar'
 import { Textarea } from '@/components/ui/textarea'
 import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-} from '@/components/ui/sheet'
-import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog'
+import { ScrollArea } from '@/components/ui/scroll-area'
 import { 
   Clock, 
   CheckCircle2, 
@@ -108,12 +103,17 @@ export function OTJTApprovalPanel({ open, onOpenChange }: OTJTApprovalPanelProps
 
   async function loadPendingApprovals() {
     setLoading(true)
-    const result = await getPendingOTJTApprovals()
-    if (result.logs) {
-      setLogs(result.logs as PendingLog[])
+    try {
+      const result = await getPendingOTJTApprovals()
+      if (result.logs) {
+        setLogs(result.logs as PendingLog[])
+      }
+      setSelectedLogs(new Set())
+    } catch (error) {
+      console.error('[OTJTApproval] Failed to load pending approvals:', error instanceof Error ? error.message : 'Unknown error')
+    } finally {
+      setLoading(false)
     }
-    setSelectedLogs(new Set())
-    setLoading(false)
   }
 
   function toggleLogSelection(logId: string) {
@@ -228,19 +228,19 @@ export function OTJTApprovalPanel({ open, onOpenChange }: OTJTApprovalPanelProps
 
   return (
     <>
-      <Sheet open={open} onOpenChange={onOpenChange}>
-        <SheetContent side="right" className="w-full sm:w-[600px] sm:max-w-full overflow-y-auto">
-          <SheetHeader className="pb-4 border-b">
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent size="lg" className="max-h-[90vh]">
+          <DialogHeader>
             <div className="flex items-center gap-2 mb-2">
               <div className="h-1 w-8 bg-international-orange rounded-full" />
             </div>
-            <SheetTitle className="text-xl">OTJT Hours Approval</SheetTitle>
-            <p className="text-sm text-muted-foreground">
+            <DialogTitle className="text-xl">OTJT Hours Approval</DialogTitle>
+            <DialogDescription>
               Review and approve off-the-job training hours logged by your apprentices
-            </p>
-          </SheetHeader>
+            </DialogDescription>
+          </DialogHeader>
 
-          <div className="py-6 space-y-6">
+          <ScrollArea className="max-h-[65vh]"><div className="space-y-6 pr-4">
             {loading ? (
               <div className="flex items-center justify-center py-12">
                 <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -260,7 +260,7 @@ export function OTJTApprovalPanel({ open, onOpenChange }: OTJTApprovalPanelProps
                   <div className="flex items-center gap-3">
                     <Checkbox 
                       checked={selectedLogs.size === logs.length && logs.length > 0}
-                      onCheckedChange={selectAll}
+                      onCheckedChange={() => selectAll()}
                       aria-label="Select all logs"
                     />
                     <span className="text-sm text-muted-foreground">
@@ -369,6 +369,7 @@ export function OTJTApprovalPanel({ open, onOpenChange }: OTJTApprovalPanelProps
                                   className="h-8 text-status-success hover:text-status-success hover:bg-status-success-light"
                                   onClick={() => handleApprove(log.id)}
                                   disabled={isPending}
+                                  aria-label="Approve"
                                 >
                                   <CheckCircle2 className="h-4 w-4" />
                                 </Button>
@@ -377,6 +378,7 @@ export function OTJTApprovalPanel({ open, onOpenChange }: OTJTApprovalPanelProps
                                   variant="ghost"
                                   className="h-8 text-status-warning hover:text-status-warning hover:bg-status-warning-light"
                                   onClick={() => openQueryDialog(log)}
+                                  aria-label="Request more info"
                                 >
                                   <MessageSquare className="h-4 w-4" />
                                 </Button>
@@ -385,6 +387,7 @@ export function OTJTApprovalPanel({ open, onOpenChange }: OTJTApprovalPanelProps
                                   variant="ghost"
                                   className="h-8 text-destructive hover:text-destructive hover:bg-status-error-light"
                                   onClick={() => openRejectDialog(log)}
+                                  aria-label="Reject"
                                 >
                                   <XCircle className="h-4 w-4" />
                                 </Button>
@@ -398,9 +401,9 @@ export function OTJTApprovalPanel({ open, onOpenChange }: OTJTApprovalPanelProps
                 </div>
               </>
             )}
-          </div>
-        </SheetContent>
-      </Sheet>
+          </div></ScrollArea>
+        </DialogContent>
+      </Dialog>
 
       {/* Reject/Query Dialog */}
       <Dialog open={actionType !== null} onOpenChange={() => {
@@ -444,12 +447,13 @@ export function OTJTApprovalPanel({ open, onOpenChange }: OTJTApprovalPanelProps
               </div>
               
               <div className="space-y-2">
-                <label className="text-sm font-medium">
+                <label htmlFor="action-reason" className="text-sm font-medium">
                   {actionType === 'reject' 
                     ? 'Reason for rejection (required)' 
                     : 'Question or request (required)'}
                 </label>
                 <Textarea
+                  id="action-reason"
                   placeholder={actionType === 'reject' 
                     ? "Please explain why this entry is being rejected..."
                     : "What additional information do you need?"
@@ -457,6 +461,7 @@ export function OTJTApprovalPanel({ open, onOpenChange }: OTJTApprovalPanelProps
                   value={actionReason}
                   onChange={(e) => setActionReason(e.target.value)}
                   rows={3}
+                  aria-required="true"
                 />
                 {actionType === 'reject' && (
                   <p className="text-xs text-muted-foreground flex items-center gap-1">

@@ -9,7 +9,7 @@ import { NoEnrollmentState } from '@/components/apprenticeship/no-enrollment-sta
 import { redirect } from 'next/navigation'
 
 export const metadata = {
-  title: 'Apprenticeship | ForgeOS',
+  title: 'Apprenticeship | CentaurOS',
   description: 'Your apprenticeship dashboard - track progress, log OTJT hours, and complete learning modules.'
 }
 
@@ -55,14 +55,39 @@ export default async function ApprenticeshipPage() {
       return <div className="p-8 text-center text-muted-foreground">Error loading progress data</div>
     }
     
+    // Transform server action data to match component prop types
+    const safeOtjtProgress = {
+      ...otjtProgress,
+      hoursLogged: otjtProgress.hoursLogged ?? 0,
+    }
+    
+    const safeModuleProgress = {
+      ...moduleProgress,
+      modules: moduleProgress.modules.map((m: Record<string, unknown>) => ({
+        id: m.id as string,
+        status: m.status as 'locked' | 'available' | 'in_progress' | 'completed' | 'failed',
+        started_at: m.started_at as string | undefined,
+        completed_at: m.completed_at as string | undefined,
+        hours_logged: m.hours_logged as number | undefined,
+        module: m.module as { id: string; title: string; description?: string; module_type: string; estimated_hours: number; content_type?: string },
+      })),
+    }
+    
+    const safeUpcomingReviews = (upcomingReviews.reviews || []).map((r: Record<string, unknown>) => ({
+      id: r.id as string,
+      review_type: r.review_type as string,
+      scheduled_date: r.scheduled_date as string,
+      reviewer: r.reviewer as { full_name: string } | undefined,
+    }))
+    
     return (
       <ApprenticeDashboard
         enrollment={enrollment}
         otjtWeeklySummary={otjtSummary}
-        otjtProgress={otjtProgress}
+        otjtProgress={safeOtjtProgress}
         skillsGap={skillsGap}
-        moduleProgress={moduleProgress}
-        upcomingReviews={upcomingReviews.reviews || []}
+        moduleProgress={safeModuleProgress}
+        upcomingReviews={safeUpcomingReviews}
       />
     )
   }

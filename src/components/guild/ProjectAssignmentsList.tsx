@@ -48,27 +48,39 @@ export function ProjectAssignmentsList() {
 
     const loadAssignments = async () => {
         setLoading(true)
-        const result = await getFoundryAssignments()
-        if (result.assignments) {
-            setAssignments(result.assignments)
+        try {
+            const result = await getFoundryAssignments()
+            if (result.assignments) {
+                setAssignments(result.assignments)
+            }
+            if (result.error) {
+                toast.error(result.error)
+            }
+        } catch (error) {
+            console.error('[ProjectAssignments] Failed to load assignments:', error instanceof Error ? error.message : 'Unknown error')
+            toast.error('Failed to load assignments')
+        } finally {
+            setLoading(false)
         }
-        if (result.error) {
-            toast.error(result.error)
-        }
-        setLoading(false)
     }
 
     const handleStatusUpdate = (assignmentId: string, status: 'completed' | 'cancelled') => {
         setActionId(assignmentId)
         startTransition(async () => {
-            const result = await updateAssignmentStatus(assignmentId, status)
-            if (result.success) {
-                toast.success(`Assignment ${status}`)
-                loadAssignments()
-            } else {
-                toast.error(result.error || "Failed to update")
+            try {
+                const result = await updateAssignmentStatus(assignmentId, status)
+                if (result.success) {
+                    toast.success(`Assignment ${status}`)
+                    loadAssignments()
+                } else {
+                    toast.error(result.error || "Failed to update")
+                }
+            } catch (error) {
+                console.error('[ProjectAssignments] Status update failed:', error instanceof Error ? error.message : 'Unknown error')
+                toast.error('Failed to update assignment')
+            } finally {
+                setActionId(null)
             }
-            setActionId(null)
         })
     }
 
@@ -150,7 +162,7 @@ export function ProjectAssignmentsList() {
                                         </Badge>
                                         <DropdownMenu>
                                             <DropdownMenuTrigger asChild>
-                                                <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                                                <Button variant="ghost" size="sm" className="h-8 w-8 p-0" aria-label="Assignment actions">
                                                     {isPending && actionId === assignment.id ? (
                                                         <Loader2 className="h-4 w-4 animate-spin" />
                                                     ) : (

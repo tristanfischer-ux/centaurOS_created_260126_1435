@@ -18,6 +18,7 @@ import {
   FileCheck
 } from 'lucide-react'
 import Link from 'next/link'
+import { toast } from 'sonner'
 
 interface MenteeEnrollment {
   id: string
@@ -57,10 +58,11 @@ export function MentorDashboard({ mentees }: MentorDashboardProps) {
   const { totalPendingApprovals, atRiskCount } = useMemo(() => {
     const pending = mentees.reduce((sum, m) => sum + m.pendingApprovals, 0)
     const atRisk = mentees.filter(m => {
-      const progress = (m.otjt_hours_logged / m.otjt_hours_target) * 100
+      const progress = m.otjt_hours_target > 0 ? (m.otjt_hours_logged / m.otjt_hours_target) * 100 : 0
       const startDate = new Date(m.start_date).getTime()
       const endDate = new Date(m.expected_end_date).getTime()
-      const expectedProgress = ((Date.now() - startDate) / (endDate - startDate)) * 100
+      const timeSpan = endDate - startDate
+      const expectedProgress = timeSpan > 0 ? ((Date.now() - startDate) / timeSpan) * 100 : 0
       return progress < expectedProgress * 0.9
     }).length
     return { totalPendingApprovals: pending, atRiskCount: atRisk }
@@ -166,10 +168,11 @@ export function MentorDashboard({ mentees }: MentorDashboardProps) {
       {/* Mentee Cards */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {mentees.map((mentee) => {
-          const otjtProgress = (mentee.otjt_hours_logged / mentee.otjt_hours_target) * 100
+          const otjtProgress = mentee.otjt_hours_target > 0 ? (mentee.otjt_hours_logged / mentee.otjt_hours_target) * 100 : 0
           const startDate = new Date(mentee.start_date).getTime()
           const endDate = new Date(mentee.expected_end_date).getTime()
-          const expectedProgress = Math.min(100, ((Date.now() - startDate) / (endDate - startDate)) * 100)
+          const timeSpan = endDate - startDate
+          const expectedProgress = timeSpan > 0 ? Math.min(100, ((Date.now() - startDate) / timeSpan) * 100) : 0
           const onTrack = otjtProgress >= expectedProgress * 0.9
           const daysRemaining = Math.ceil((endDate - Date.now()) / (1000 * 60 * 60 * 24))
           
@@ -258,7 +261,11 @@ export function MentorDashboard({ mentees }: MentorDashboardProps) {
                       Review Hours
                     </Button>
                   )}
-                  <Button size="sm" className="flex-1">
+                  <Button 
+                    size="sm" 
+                    className="flex-1"
+                    onClick={() => toast.info("Scheduling coming soon — we're integrating calendar support.")}
+                  >
                     <Calendar className="h-4 w-4 mr-1" />
                     Schedule 1:1
                   </Button>

@@ -1,4 +1,3 @@
-// @ts-nocheck
 'use client'
 
 import { useState } from 'react'
@@ -42,7 +41,7 @@ interface ModuleProgressListProps {
 const MODULE_TYPE_CONFIG: Record<string, { icon: typeof BookOpen; color: string; label: string }> = {
   core: { icon: BookOpen, color: 'text-primary', label: 'Core' },
   functional: { icon: FileText, color: 'text-status-warning', label: 'Functional' },
-  quick_skill: { icon: Sparkles, color: 'text-purple-600', label: 'Quick Skill' },
+  quick_skill: { icon: Sparkles, color: 'text-chart-5', label: 'Quick Skill' },
   ai_readiness: { icon: Sparkles, color: 'text-electric-blue', label: 'AI Readiness' },
   assessment: { icon: CheckCircle2, color: 'text-status-success', label: 'Assessment' },
   project: { icon: Code, color: 'text-status-info', label: 'Project' }

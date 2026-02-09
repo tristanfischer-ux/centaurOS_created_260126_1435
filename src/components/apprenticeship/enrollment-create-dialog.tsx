@@ -1,4 +1,3 @@
-// @ts-nocheck
 'use client'
 
 import { useState, useEffect, useTransition } from 'react'
@@ -52,7 +51,7 @@ interface Programme {
 
 interface Person {
   id: string
-  full_name: string
+  full_name: string | null
   email: string
   avatar_url: string | null
   role?: string

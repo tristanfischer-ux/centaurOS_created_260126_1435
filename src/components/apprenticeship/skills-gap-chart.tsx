@@ -1,4 +1,3 @@
-// @ts-nocheck
 'use client'
 
 import { Badge } from '@/components/ui/badge'
@@ -19,7 +18,7 @@ const CATEGORY_COLORS: Record<string, string> = {
   technical: 'bg-primary',
   professional: 'bg-status-warning',
   ai: 'bg-electric-blue',
-  functional: 'bg-purple-500',
+  functional: 'bg-chart-5',
   leadership: 'bg-status-success'
 }
 
@@ -94,11 +93,13 @@ export function SkillsGapChart({ gaps }: SkillsGapChartProps) {
       })}
       
       {/* Legend */}
-      <div className="flex items-center gap-4 pt-4 border-t text-xs text-muted-foreground">
-        <div className="flex items-center gap-2">
-          <div className="w-3 h-3 bg-primary rounded" />
-          <span>Current Level</span>
-        </div>
+      <div className="flex flex-wrap items-center gap-4 pt-4 border-t text-xs text-muted-foreground">
+        {Object.entries(CATEGORY_COLORS).map(([category, color]) => (
+          <div key={category} className="flex items-center gap-2">
+            <div className={`w-3 h-3 ${color} rounded`} />
+            <span className="capitalize">{category}</span>
+          </div>
+        ))}
         <div className="flex items-center gap-2">
           <div className="w-0.5 h-3 bg-foreground/60" />
           <span>Target Level</span>

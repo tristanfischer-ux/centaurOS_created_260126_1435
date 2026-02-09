@@ -1,4 +1,3 @@
-// @ts-nocheck
 'use client'
 
 import { useState } from 'react'
@@ -45,30 +44,35 @@ export function OTJTLoggerDialog({ enrollmentId, open, onOpenChange }: OTJTLogge
     
     setIsLoading(true)
     
-    const result = await logOTJTTime({
-      enrollmentId,
-      logDate: formData.logDate,
-      hours: parseFloat(formData.hours),
-      activityType: formData.activityType,
-      description: formData.description || undefined,
-      learningOutcomes: formData.learningOutcomes || undefined
-    })
-    
-    setIsLoading(false)
-    
-    if (result.error) {
-      toast.error(result.error)
-    } else {
+    try {
+      const result = await logOTJTTime({
+        enrollmentId,
+        logDate: formData.logDate,
+        hours: parseFloat(formData.hours),
+        activityType: formData.activityType,
+        description: formData.description || undefined,
+        learningOutcomes: formData.learningOutcomes || undefined
+      })
+      
+      if (result.error) {
+        toast.error(result.error)
+        return
+      }
       toast.success('OTJT hours logged! Awaiting mentor approval.')
       onOpenChange(false)
       // Reset form
       setFormData({
         logDate: new Date().toISOString().split('T')[0],
         hours: '',
-        activityType: '',
+        activityType: '' as ActivityType | '',
         description: '',
         learningOutcomes: ''
       })
+    } catch (error) {
+      console.error('[OTJTLogger] Failed to log OTJT time:', error instanceof Error ? error.message : 'Unknown error')
+      toast.error('Failed to log hours. Please try again.')
+    } finally {
+      setIsLoading(false)
     }
   }
   
@@ -76,7 +80,7 @@ export function OTJTLoggerDialog({ enrollmentId, open, onOpenChange }: OTJTLogge
   
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent size="sm">
+      <DialogContent size="md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Clock className="h-5 w-5" />
@@ -130,7 +134,6 @@ export function OTJTLoggerDialog({ enrollmentId, open, onOpenChange }: OTJTLogge
             <Select 
               value={formData.activityType} 
               onValueChange={(value) => setFormData({ ...formData, activityType: value as ActivityType })}
-              required
             >
               <SelectTrigger id="activityType">
                 <SelectValue placeholder="Select activity type" />

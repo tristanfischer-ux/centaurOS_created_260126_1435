@@ -34,15 +34,16 @@ export function AdminDashboard({ enrollments, foundryId, userRole }: AdminDashbo
     const total = enrollments.length
     const active = enrollments.filter(e => e.status === 'active').length
     const atRisk = enrollments.filter(e => {
-      const progress = (e.otjt_hours_logged / e.otjt_hours_target) * 100
+      const progress = e.otjt_hours_target > 0 ? (e.otjt_hours_logged / e.otjt_hours_target) * 100 : 0
       const startDate = new Date(e.start_date).getTime()
       const endDate = new Date(e.expected_end_date).getTime()
-      const expectedProgress = ((Date.now() - startDate) / (endDate - startDate)) * 100
+      const timeSpan = endDate - startDate
+      const expectedProgress = timeSpan > 0 ? ((Date.now() - startDate) / timeSpan) * 100 : 0
       return progress < expectedProgress * 0.8
     }).length
     
     const avg = total > 0
-      ? enrollments.reduce((sum, e) => sum + (e.otjt_hours_logged / e.otjt_hours_target) * 100, 0) / total
+      ? enrollments.reduce((sum, e) => sum + (e.otjt_hours_target > 0 ? (e.otjt_hours_logged / e.otjt_hours_target) * 100 : 0), 0) / total
       : 0
     
     return { totalEnrollments: total, activeCount: active, atRiskCount: atRisk, avgProgress: avg }
@@ -154,10 +155,11 @@ export function AdminDashboard({ enrollments, foundryId, userRole }: AdminDashbo
               {enrollments.map((enrollment) => {
                 if (!enrollment.apprentice || !enrollment.programme) return null
 
-                const progress = (enrollment.otjt_hours_logged / enrollment.otjt_hours_target) * 100
+                const progress = enrollment.otjt_hours_target > 0 ? (enrollment.otjt_hours_logged / enrollment.otjt_hours_target) * 100 : 0
                 const startDate = new Date(enrollment.start_date).getTime()
                 const endDate = new Date(enrollment.expected_end_date).getTime()
-                const expectedProgress = Math.min(100, ((Date.now() - startDate) / (endDate - startDate)) * 100)
+                const timeSpan = endDate - startDate
+                const expectedProgress = timeSpan > 0 ? Math.min(100, ((Date.now() - startDate) / timeSpan) * 100) : 0
                 const onTrack = progress >= expectedProgress * 0.8
                 const daysRemaining = Math.ceil((endDate - Date.now()) / (1000 * 60 * 60 * 24))
                 

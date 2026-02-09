@@ -72,22 +72,25 @@ export function GuildTabs({ events, members, isExecutive }: GuildTabsProps) {
                     <p className="text-sm text-muted-foreground">
                         Offline-to-Online (O2O) networking events and workshops.
                     </p>
-                    <div className="text-xs text-international-orange border border-orange-200 bg-orange-50 px-3 py-1 rounded-full flex items-center gap-1">
+                    <div className="text-xs text-international-orange border border-international-orange/20 bg-international-orange-light px-3 py-1 rounded-full flex items-center gap-1">
                         <MapPin className="h-3 w-3" />
                         Showing events near you
                     </div>
                 </div>
 
                 <div className="grid gap-4">
-                    {events.length === 0 ? (
+                    {/* SECURITY: Filter out executive-only events for non-executives */}
+                    {(() => {
+                        const visibleEvents = events.filter(e => !e.is_executive_only || isExecutive)
+                        return visibleEvents.length === 0 ? (
                         <EmptyState
                             icon={<Calendar className="h-8 w-8" />}
                             title="No Upcoming Events"
                             description="There are no events visible to your tier at this time. Check back soon for new networking opportunities."
-                            className="border-2 border-dashed border-slate-200"
+                            className="border-2 border-dashed border-muted"
                         />
                     ) : (
-                        events.map(event => (
+                        visibleEvents.map(event => (
                             <Card key={event.id} className="bg-card flex flex-col md:flex-row overflow-hidden">
                                 <div className="bg-muted p-6 flex flex-col items-center justify-center min-w-[120px]">
                                     <span className="text-2xl font-bold text-foreground">
@@ -120,7 +123,8 @@ export function GuildTabs({ events, members, isExecutive }: GuildTabsProps) {
                                 </div>
                             </Card>
                         ))
-                    )}
+                    )
+                    })()}
                 </div>
             </TabsContent>
 
@@ -137,7 +141,7 @@ export function GuildTabs({ events, members, isExecutive }: GuildTabsProps) {
                                 icon={<Users className="h-8 w-8" />}
                                 title="No Members Yet"
                                 description="Be the first to join the Guild network."
-                                className="border-2 border-dashed border-slate-200"
+                                className="border-2 border-dashed border-muted"
                             />
                         </div>
                     ) : (
@@ -156,7 +160,7 @@ export function GuildTabs({ events, members, isExecutive }: GuildTabsProps) {
                                         <div className="flex items-center gap-2 mt-1">
                                             <Badge 
                                                 variant="secondary" 
-                                                className={`text-[10px] ${getRoleBadgeClass(member.role)}`}
+                                                className={`text-xs ${getRoleBadgeClass(member.role)}`}
                                             >
                                                 {member.role || "Member"}
                                             </Badge>

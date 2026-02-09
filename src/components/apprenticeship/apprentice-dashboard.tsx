@@ -23,6 +23,8 @@ import { OTJTLoggerDialog } from './otjt-logger-dialog'
 import { ModuleProgressList } from './module-progress-list'
 import { SkillsGapChart } from './skills-gap-chart'
 import { DocumentSigningPanel } from './document-signing-panel'
+import Link from 'next/link'
+import { toast } from 'sonner'
 import type { Enrollment, WeeklySummary } from '@/types/apprenticeship'
 
 interface ApprenticeDashboardProps {
@@ -346,7 +348,7 @@ export function ApprenticeDashboard({
                     <p className="font-medium truncate">{enrollment.senior_mentor.full_name}</p>
                     <p className="text-xs text-muted-foreground">Senior Mentor</p>
                   </div>
-                  <Button size="sm" variant="ghost">
+                  <Button size="sm" variant="ghost" aria-label="Message mentor">
                     <MessageSquare className="h-4 w-4" />
                   </Button>
                 </div>
@@ -366,7 +368,7 @@ export function ApprenticeDashboard({
                     <p className="font-medium truncate">{enrollment.workplace_buddy.full_name}</p>
                     <p className="text-xs text-muted-foreground">Workplace Buddy</p>
                   </div>
-                  <Button size="sm" variant="ghost">
+                  <Button size="sm" variant="ghost" aria-label="Message buddy">
                     <MessageSquare className="h-4 w-4" />
                   </Button>
                 </div>
@@ -383,16 +385,20 @@ export function ApprenticeDashboard({
             </CardHeader>
             <CardContent className="space-y-2">
               <Button variant="outline" className="w-full justify-start" asChild>
-                <a href="/guild">
+                <Link href="/guild">
                   <BookOpen className="h-4 w-4 mr-2" />
                   Guild Community
-                </a>
+                </Link>
               </Button>
               <Button variant="outline" className="w-full justify-start" onClick={() => setDocumentsOpen(true)}>
                 <FileText className="h-4 w-4 mr-2" />
                 View Documents
               </Button>
-              <Button variant="outline" className="w-full justify-start">
+              <Button 
+                variant="outline" 
+                className="w-full justify-start"
+                onClick={() => toast.info("OTJT log history coming soon.")}
+              >
                 <Calendar className="h-4 w-4 mr-2" />
                 OTJT Log History
               </Button>
