@@ -7,9 +7,16 @@ description: Create and apply database migrations to Supabase, verify they succe
 
 This skill handles the complete workflow for creating and applying database migrations to Supabase.
 
-## IMPORTANT: Auto-Apply Policy
+## CRITICAL: Full Auto-Apply Policy — NEVER Ask
 
-**Whenever you create or modify a migration file, ALWAYS run `npx supabase db push` automatically.** Do not wait for the user to ask. The user expects database changes to be applied immediately.
+**Whenever you create or modify a migration file, ALWAYS do ALL of the following automatically — without asking, without offering, without saying "want me to...?":**
+
+1. **Push the migration:** `npx supabase db push`
+2. **Regenerate TypeScript types:** `npx supabase gen types typescript --linked > src/types/database.types.ts`
+3. **Clean up type workarounds:** If you added any `as unknown` casts or removed columns from `.select()` queries because types were stale, go back and remove those workarounds now that the types are fresh.
+4. **Verify the build still compiles:** `npx tsc --noEmit`
+
+The user considers ALL Supabase operations to be the agent's responsibility. Never ask permission, never suggest the user do it themselves, never defer it to later. Just do it.
 
 ## Quick Commands (Use These!)
 
@@ -35,8 +42,10 @@ Migration Progress:
 - [ ] 2. Review SQL for correctness
 - [ ] 3. Apply migration to Supabase (AUTO - npx supabase db push)
 - [ ] 4. Verify migration succeeded
-- [ ] 5. Update TypeScript types if needed
-- [ ] 6. Fix any issues and retry if needed
+- [ ] 5. Regenerate TypeScript types (ALWAYS - npx supabase gen types)
+- [ ] 6. Remove any type workarounds added before types were fresh
+- [ ] 7. Verify build compiles (npx tsc --noEmit)
+- [ ] 8. Fix any issues and retry if needed
 ```
 
 ## Step 1: Create Migration File
@@ -357,13 +366,15 @@ npx supabase migration list
 npx supabase db query "SELECT COUNT(*) FROM public.new_table;"
 ```
 
-## Step 5: Update TypeScript Types (Optional)
+## Step 5: Regenerate TypeScript Types (REQUIRED)
 
-If you added new tables/columns that need type-safe access:
+**ALWAYS regenerate types after any migration.** This is not optional.
 
 ```bash
 npx supabase gen types typescript --linked > src/types/database.types.ts
 ```
+
+After regeneration, go back and remove any type workarounds you may have added (e.g. `as unknown` casts, columns omitted from `.select()` queries, manual interface definitions that duplicate the generated types).
 
 ## Step 6: Fix Migration Errors
 

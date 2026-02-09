@@ -46,6 +46,18 @@ Why plan mode? If your first fix didn't work, your mental model of the problem i
 - Go fix failing CI tests without being told how
 - If you can read the error, you can fix the error
 
+## 4b. Supabase Is Your Job
+
+**ALL Supabase operations are the agent's responsibility. Never ask. Never offer. Just do it.**
+
+When you create or modify a migration:
+1. Push it: `npx supabase db push`
+2. Regenerate types: `npx supabase gen types typescript --linked > src/types/database.types.ts`
+3. Clean up any temporary type workarounds
+4. Verify the build: `npx tsc --noEmit`
+
+This applies in ALL contexts — during feature work, during deploys, during bug fixes. The user should never have to think about Supabase.
+
 ## 5. Session Start
 
 At the start of each session on this project:

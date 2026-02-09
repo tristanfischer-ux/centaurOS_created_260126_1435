@@ -54,10 +54,7 @@ export default async function TeamPage() {
         objectiveMap[obj.id] = obj.title
     }
 
-    // Fetch all profiles for the current foundry
-    // NOTE: primary_function_id is added via migration 20260209200000.
-    // Until the migration is applied and types regenerated, we fetch it
-    // separately to avoid SelectQueryError cascading across the whole file.
+    // Fetch all profiles for the current foundry (include primary_function for orbit view)
     const { data: profiles } = await supabase
         .from('profiles')
         .select(`
@@ -67,33 +64,33 @@ export default async function TeamPage() {
             avatar_url,
             paired_ai_id,
             bio,
+            primary_function_id,
             paired_ai:profiles!paired_ai_id(id, full_name, role, avatar_url)
         `)
         .eq('foundry_id', foundry_id)
         .order('role', { ascending: true })
 
     // Fetch business functions catalog (for orbit function categories)
-    // These tables exist in supabase-generated.ts but not database.types.ts,
-    // so we cast the table name to bypass the typed client's table list.
-    interface BizFuncRow { id: string; category: string; name: string; display_order: number | null }
-    const { data: businessFunctionsRaw } = await (supabase as unknown as { from: (t: string) => ReturnType<typeof supabase.from> })
+    const { data: businessFunctions } = await supabase
         .from('business_functions')
         .select('id, category, name, display_order')
-    const businessFunctions = (businessFunctionsRaw ?? []) as unknown as BizFuncRow[]
 
     // Fetch foundry function coverage (for orbit status per function)
-    interface CoverageBaseRow { id: string; function_id: string; coverage_status: string; covered_by: string | null }
-    const { data: rawCoverageData } = await (supabase as unknown as { from: (t: string) => ReturnType<typeof supabase.from> })
+    const { data: rawCoverageData } = await supabase
         .from('foundry_function_coverage')
         .select('id, function_id, coverage_status, covered_by')
         .eq('foundry_id', foundry_id)
 
     // Enrich coverage rows with function category info via lookup
-    interface CoverageRow extends CoverageBaseRow {
+    interface CoverageRow {
+        id: string
+        function_id: string
+        coverage_status: string
+        covered_by: string | null
         function: { id: string; category: string; name: string } | null
     }
-    const bfMap = new Map(businessFunctions.map(bf => [bf.id, bf]))
-    const rawCoverage: CoverageRow[] = ((rawCoverageData ?? []) as unknown as CoverageBaseRow[]).map(c => {
+    const bfMap = new Map((businessFunctions ?? []).map(bf => [bf.id, bf]))
+    const rawCoverage: CoverageRow[] = (rawCoverageData ?? []).map(c => {
         const bf = bfMap.get(c.function_id)
         return {
             ...c,
@@ -215,9 +212,7 @@ export default async function TeamPage() {
             avatar_url: profile.avatar_url || null,
             paired_ai_id: profile.paired_ai_id,
             bio: profile.bio,
-            // primary_function_id comes from migration 20260209200000.
-            // Until types are regenerated, safely access it via unknown cast.
-            primary_function_id: ((profile as unknown as Record<string, unknown>).primary_function_id as string | null) ?? null,
+            primary_function_id: profile.primary_function_id ?? null,
             pairedAI: profile.paired_ai ? [{
                 id: profile.paired_ai.id,
                 full_name: profile.paired_ai.full_name,

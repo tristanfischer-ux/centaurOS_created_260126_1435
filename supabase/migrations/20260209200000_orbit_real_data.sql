@@ -1,9 +1,149 @@
 -- ============================================================================
 -- Migration: Wire Orbit View to Real Data
--- Purpose: Add primary_function_id to profiles for business function mapping,
+-- Purpose: Ensure business_functions + foundry_function_coverage tables exist,
+--          add primary_function_id to profiles for business function mapping,
 --          seed additional marketplace People listings for underrepresented
 --          functions, and add function_category to existing listing attributes.
 -- ============================================================================
+
+-- 0. Ensure prerequisite tables exist (migration 20260128000001 may have
+--    been recorded but the tables were dropped or never created).
+
+CREATE TABLE IF NOT EXISTS public.business_functions (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    category text NOT NULL CHECK (category IN (
+        'finance', 'legal', 'sales', 'marketing',
+        'product', 'operations', 'people', 'customer', 'strategy'
+    )),
+    name text NOT NULL,
+    description text,
+    typical_roles text[] DEFAULT '{}',
+    is_critical boolean DEFAULT false,
+    display_order integer DEFAULT 0,
+    created_at timestamptz DEFAULT now()
+);
+
+ALTER TABLE public.business_functions ENABLE ROW LEVEL SECURITY;
+
+-- Idempotent policies
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies WHERE tablename = 'business_functions' AND policyname = 'Authenticated users can view business functions'
+  ) THEN
+    CREATE POLICY "Authenticated users can view business functions" ON public.business_functions
+      FOR SELECT USING (auth.role() = 'authenticated');
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies WHERE tablename = 'business_functions' AND policyname = 'Service role can manage business functions'
+  ) THEN
+    CREATE POLICY "Service role can manage business functions" ON public.business_functions
+      FOR ALL USING (auth.role() = 'service_role');
+  END IF;
+END $$;
+
+CREATE INDEX IF NOT EXISTS idx_business_functions_category ON public.business_functions(category);
+CREATE INDEX IF NOT EXISTS idx_business_functions_display_order ON public.business_functions(category, display_order);
+
+-- Seed the catalog if empty
+INSERT INTO public.business_functions (category, name, description, typical_roles, is_critical, display_order)
+SELECT * FROM (VALUES
+  ('finance', 'Bookkeeping', 'Day-to-day recording of financial transactions', ARRAY['Bookkeeper','Accountant','Finance Manager'], true, 1),
+  ('finance', 'Financial Planning & Analysis', 'Budgeting, forecasting, and financial modeling', ARRAY['FP&A Analyst','CFO','Finance Director'], true, 2),
+  ('finance', 'Tax Strategy & Compliance', 'Tax planning, filings, and compliance', ARRAY['Tax Accountant','CPA','Tax Advisor'], true, 3),
+  ('finance', 'Payroll Management', 'Processing compensation and benefits', ARRAY['Payroll Specialist','HR Manager','Accountant'], true, 4),
+  ('finance', 'Invoicing & Accounts Receivable', 'Invoices, payments, and collections', ARRAY['AR Specialist','Billing Coordinator','Finance Clerk'], false, 5),
+  ('finance', 'Cash Flow Management', 'Monitoring cash inflows and outflows', ARRAY['Controller','CFO','Treasury Manager'], true, 6),
+  ('finance', 'Budgeting & Cost Control', 'Setting budgets and monitoring spending', ARRAY['Budget Analyst','Finance Manager','CFO'], false, 7),
+  ('legal', 'Contract Management', 'Drafting, reviewing, managing contracts', ARRAY['General Counsel','Contract Manager','Paralegal'], true, 1),
+  ('legal', 'Intellectual Property Protection', 'Patents, trademarks, copyrights', ARRAY['IP Attorney','Patent Agent','General Counsel'], true, 2),
+  ('legal', 'Regulatory Compliance', 'Industry regulation compliance', ARRAY['Compliance Officer','Regulatory Affairs Manager','Legal Counsel'], true, 3),
+  ('legal', 'Employment Law', 'Employment agreements and workplace compliance', ARRAY['Employment Attorney','HR Director','General Counsel'], true, 4),
+  ('legal', 'Corporate Structure & Governance', 'Entity formation and governance', ARRAY['Corporate Attorney','CFO','General Counsel'], true, 5),
+  ('legal', 'Risk Management', 'Identifying and mitigating risks', ARRAY['Risk Manager','General Counsel','COO'], false, 6),
+  ('legal', 'Data Privacy & Security', 'GDPR, CCPA, data protection', ARRAY['Privacy Officer','DPO','Legal Counsel'], true, 7),
+  ('sales', 'Lead Generation', 'Identifying and qualifying prospects', ARRAY['SDR','BDR','Marketing Manager'], true, 1),
+  ('sales', 'Sales Process & Methodology', 'Executing the sales process', ARRAY['VP Sales','Sales Manager','Account Executive'], true, 2),
+  ('sales', 'Account Management', 'Managing existing customer relationships', ARRAY['Account Manager','CSM','Account Executive'], true, 3),
+  ('sales', 'Pricing Strategy', 'Pricing models and strategies', ARRAY['Pricing Manager','VP Sales','Product Manager'], true, 4),
+  ('sales', 'Sales Operations', 'Sales tools, reporting, enablement', ARRAY['Sales Ops Manager','Revenue Operations','Sales Analyst'], false, 5),
+  ('sales', 'CRM Management', 'Managing CRM systems and data', ARRAY['CRM Admin','Sales Ops','Marketing Ops'], false, 6),
+  ('sales', 'Sales Forecasting', 'Pipeline management and prediction', ARRAY['VP Sales','Sales Manager','Revenue Operations'], false, 7),
+  ('marketing', 'Brand Strategy', 'Brand identity, positioning, voice', ARRAY['Brand Manager','CMO','Creative Director'], true, 1),
+  ('marketing', 'Content Marketing', 'Content to attract and engage audiences', ARRAY['Content Manager','Content Writer','Marketing Manager'], true, 2),
+  ('marketing', 'Digital Marketing', 'SEO, SEM, social media, email', ARRAY['Digital Marketing Manager','Growth Marketer','PPC Specialist'], true, 3),
+  ('marketing', 'PR & Communications', 'Media relations and communications', ARRAY['PR Manager','Communications Director','CMO'], false, 4),
+  ('marketing', 'Market Research', 'Market trends, competitors, insights', ARRAY['Market Research Analyst','PMM','Strategy Analyst'], true, 5),
+  ('marketing', 'Growth Marketing', 'User acquisition and retention', ARRAY['Growth Manager','Growth Hacker','Marketing Manager'], true, 6),
+  ('marketing', 'Event Marketing', 'Events, conferences, webinars', ARRAY['Event Manager','Marketing Manager','Community Manager'], false, 7),
+  ('product', 'Product Management', 'Vision, strategy, roadmap, requirements', ARRAY['Product Manager','VP Product','CPO'], true, 1),
+  ('product', 'Software Development', 'Building software products', ARRAY['Software Engineer','Tech Lead','CTO'], true, 2),
+  ('product', 'Hardware / Manufacturing', 'Physical product design and prototyping', ARRAY['Hardware Engineer','Manufacturing Engineer','Product Designer'], false, 3),
+  ('product', 'QA & Testing', 'Quality assurance and testing', ARRAY['QA Engineer','Test Lead','QA Manager'], true, 4),
+  ('product', 'UX / Design', 'UX/UI design and user research', ARRAY['UX Designer','Product Designer','Design Lead'], true, 5),
+  ('product', 'Technical Architecture', 'System design and infrastructure', ARRAY['Software Architect','CTO','Principal Engineer'], true, 6),
+  ('product', 'DevOps & Infrastructure', 'CI/CD, deployment, monitoring', ARRAY['DevOps Engineer','SRE','Platform Engineer'], true, 7),
+  ('operations', 'Supply Chain Management', 'Suppliers, inventory, logistics', ARRAY['Supply Chain Manager','Procurement Manager','COO'], false, 1),
+  ('operations', 'Manufacturing Operations', 'Production and quality control', ARRAY['Operations Manager','Plant Manager','COO'], false, 2),
+  ('operations', 'Logistics & Fulfillment', 'Shipping, warehousing, order fulfillment', ARRAY['Logistics Manager','Fulfillment Coordinator','Operations Manager'], false, 3),
+  ('operations', 'Procurement & Vendor Management', 'Sourcing and vendor relationships', ARRAY['Procurement Manager','Buyer','Vendor Manager'], false, 4),
+  ('operations', 'Facilities Management', 'Office, equipment, infrastructure', ARRAY['Facilities Manager','Office Manager','Operations Manager'], false, 5),
+  ('operations', 'Process Optimization', 'Efficiency and workflow improvement', ARRAY['Process Engineer','Operations Analyst','COO'], false, 6),
+  ('people', 'Recruiting & Talent Acquisition', 'Sourcing and hiring talent', ARRAY['Recruiter','Talent Acquisition Manager','HR Director'], true, 1),
+  ('people', 'Onboarding', 'New employee orientation and integration', ARRAY['HR Coordinator','Onboarding Specialist','HR Manager'], true, 2),
+  ('people', 'Performance Management', 'Goals, reviews, feedback', ARRAY['HR Manager','People Ops Manager','Department Managers'], true, 3),
+  ('people', 'Culture & Engagement', 'Company culture and employee satisfaction', ARRAY['People Ops','Culture Manager','CEO'], true, 4),
+  ('people', 'Learning & Development', 'Training and professional growth', ARRAY['L&D Manager','Training Coordinator','HR Manager'], false, 5),
+  ('people', 'Compensation & Benefits', 'Salary, benefits, equity programs', ARRAY['Compensation Manager','HR Director','CFO'], true, 6),
+  ('people', 'Employee Relations', 'Conflict resolution and policy', ARRAY['HR Manager','Employee Relations Specialist','General Counsel'], false, 7),
+  ('customer', 'Customer Support', 'Customer inquiries and issues', ARRAY['Support Agent','Support Manager','Customer Service Rep'], true, 1),
+  ('customer', 'Customer Success', 'Ensuring customer outcomes', ARRAY['Customer Success Manager','CSM','Account Manager'], true, 2),
+  ('customer', 'Community Management', 'User communities and forums', ARRAY['Community Manager','Developer Advocate','Marketing Manager'], false, 3),
+  ('customer', 'Voice of Customer', 'Customer feedback and insights', ARRAY['Product Manager','UX Researcher','Customer Insights Analyst'], true, 4),
+  ('customer', 'Customer Education', 'Documentation and training', ARRAY['Technical Writer','Customer Education Manager','Support Lead'], false, 5),
+  ('strategy', 'Vision & Mission', 'Company purpose and direction', ARRAY['CEO','Founder','Board'], true, 1),
+  ('strategy', 'Fundraising & Investor Relations', 'Raising capital', ARRAY['CEO','CFO','Founder'], true, 2),
+  ('strategy', 'Partnerships & Business Development', 'Strategic partnerships', ARRAY['BD Manager','VP Partnerships','CEO'], true, 3),
+  ('strategy', 'Board Relations', 'Board meetings and governance', ARRAY['CEO','CFO','General Counsel'], true, 4),
+  ('strategy', 'Strategic Planning', 'Long-term planning and OKRs', ARRAY['CEO','COO','Strategy Lead'], true, 5),
+  ('strategy', 'M&A Activities', 'Mergers and acquisitions', ARRAY['CEO','CFO','Corporate Development'], false, 6),
+  ('strategy', 'Competitive Intelligence', 'Competitive landscape analysis', ARRAY['Strategy Analyst','Product Marketing','CEO'], false, 7)
+) AS v(category, name, description, typical_roles, is_critical, display_order)
+WHERE NOT EXISTS (SELECT 1 FROM public.business_functions LIMIT 1);
+
+-- Foundry function coverage
+CREATE TABLE IF NOT EXISTS public.foundry_function_coverage (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    foundry_id text NOT NULL,
+    function_id uuid NOT NULL REFERENCES public.business_functions(id) ON DELETE CASCADE,
+    coverage_status text NOT NULL DEFAULT 'gap' CHECK (coverage_status IN ('covered', 'partial', 'gap', 'not_needed')),
+    covered_by text,
+    notes text,
+    assessed_at timestamptz DEFAULT now(),
+    assessed_by uuid REFERENCES public.profiles(id) ON DELETE SET NULL,
+    created_at timestamptz DEFAULT now(),
+    updated_at timestamptz DEFAULT now(),
+    UNIQUE(foundry_id, function_id)
+);
+
+ALTER TABLE public.foundry_function_coverage ENABLE ROW LEVEL SECURITY;
+
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies WHERE tablename = 'foundry_function_coverage' AND policyname = 'Users can view coverage in same foundry'
+  ) THEN
+    CREATE POLICY "Users can view coverage in same foundry" ON public.foundry_function_coverage
+      FOR SELECT USING (foundry_id = (SELECT foundry_id FROM public.profiles WHERE id = auth.uid()));
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies WHERE tablename = 'foundry_function_coverage' AND policyname = 'Users can manage coverage in same foundry'
+  ) THEN
+    CREATE POLICY "Users can manage coverage in same foundry" ON public.foundry_function_coverage
+      FOR ALL USING (foundry_id = (SELECT foundry_id FROM public.profiles WHERE id = auth.uid()));
+  END IF;
+END $$;
+
+CREATE INDEX IF NOT EXISTS idx_foundry_function_coverage_foundry ON public.foundry_function_coverage(foundry_id);
+CREATE INDEX IF NOT EXISTS idx_foundry_function_coverage_status ON public.foundry_function_coverage(coverage_status);
 
 -- 1. Add primary_function_id to profiles
 ALTER TABLE public.profiles
