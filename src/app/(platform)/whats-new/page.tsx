@@ -153,7 +153,7 @@ export default function WhatsNewPage() {
     }, {} as Record<string, Feature[]>)
     
     return (
-        <div className="max-w-4xl mx-auto space-y-6 -mt-2">
+        <div className="max-w-5xl space-y-6 -mt-2">
             {/* Page Header */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-slate-100">
                 <div className="min-w-0 flex-1">

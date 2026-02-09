@@ -27,6 +27,7 @@ import type {
   CanvasTask,
   WorkEdge,
   GoalBundle,
+  UnlinkedItems,
   CreateStrategicGoalInput,
   CreateMilestoneInput,
   CreateCanvasObjectiveInput,
@@ -879,6 +880,235 @@ export async function softDeleteGoal(
       milestonesDeleted: milestoneIds.length,
       objectivesDeleted: objectiveIds.length,
       deletedBy: user.id,
+      foundryId,
+    })
+
+    revalidateCanvas()
+    return { success: true }
+  })
+}
+
+// ============================================================================
+// QUERIES — UNLINKED ITEMS
+// ============================================================================
+
+/**
+ * Fetches objectives and tasks that are not part of any strategic goal hierarchy.
+ *
+ * @description Returns "unlinked" objectives (no parent, not a goal/milestone,
+ * not a ghost) and tasks that belong to those objectives OR have no objective
+ * at all. Includes assignee profiles for each task.
+ *
+ * @returns UnlinkedItems with counts or error
+ *
+ * @security Filters by foundry_id and deleted_at IS NULL
+ */
+export async function getUnlinkedItems(): Promise<
+  { data: UnlinkedItems } | ActionError
+> {
+  return withAuth(async ({ supabase, foundryId }) => {
+    // 1. Count total unlinked objectives (for overflow indicator)
+    const { count: totalObjectives } = await supabase
+      .from('objectives')
+      .select('id', { count: 'exact', head: true })
+      .eq('foundry_id', foundryId)
+      .is('deleted_at', null)
+      .eq('is_ghost', false)
+      .eq('is_strategic_goal', false)
+      .eq('is_milestone', false)
+      .is('parent_objective_id', null)
+
+    // 2. Fetch unlinked objectives (limit 100)
+    const { data: objData, error: objError } = await supabase
+      .from('objectives')
+      .select('*')
+      .eq('foundry_id', foundryId)
+      .is('deleted_at', null)
+      .eq('is_ghost', false)
+      .eq('is_strategic_goal', false)
+      .eq('is_milestone', false)
+      .is('parent_objective_id', null)
+      .order('created_at', { ascending: false })
+      .limit(100)
+
+    if (objError) {
+      console.error('[CanvasService] Failed to fetch unlinked objectives:', {
+        foundryId,
+        error: objError.message,
+      })
+      return { error: objError.message }
+    }
+
+    const objectives = (objData ?? []) as CanvasObjective[]
+    const objectiveIds = objectives.map((o) => o.id)
+
+    // 3. Count total unlinked tasks (orphans + linked-to-unlinked)
+    const { count: orphanTaskCount } = await supabase
+      .from('tasks')
+      .select('id', { count: 'exact', head: true })
+      .eq('foundry_id', foundryId)
+      .is('deleted_at', null)
+      .eq('is_ghost', false)
+      .is('objective_id', null)
+
+    let linkedToUnlinkedCount = 0
+    if (objectiveIds.length > 0) {
+      const { count } = await supabase
+        .from('tasks')
+        .select('id', { count: 'exact', head: true })
+        .eq('foundry_id', foundryId)
+        .is('deleted_at', null)
+        .eq('is_ghost', false)
+        .in('objective_id', objectiveIds)
+
+      linkedToUnlinkedCount = count ?? 0
+    }
+
+    const totalTasks = (orphanTaskCount ?? 0) + linkedToUnlinkedCount
+
+    // 4. Fetch orphan tasks (no objective_id)
+    const { data: orphanTasks, error: orphanError } = await supabase
+      .from('tasks')
+      .select('*')
+      .eq('foundry_id', foundryId)
+      .is('deleted_at', null)
+      .eq('is_ghost', false)
+      .is('objective_id', null)
+      .order('created_at', { ascending: false })
+      .limit(200)
+
+    if (orphanError) {
+      console.error('[CanvasService] Failed to fetch orphan tasks:', {
+        foundryId,
+        error: orphanError.message,
+      })
+      return { error: orphanError.message }
+    }
+
+    // 5. Fetch tasks linked to unlinked objectives
+    let linkedTasks: typeof orphanTasks = []
+    if (objectiveIds.length > 0) {
+      const remainingLimit = 200 - (orphanTasks ?? []).length
+      if (remainingLimit > 0) {
+        const { data: ltData, error: ltError } = await supabase
+          .from('tasks')
+          .select('*')
+          .eq('foundry_id', foundryId)
+          .is('deleted_at', null)
+          .eq('is_ghost', false)
+          .in('objective_id', objectiveIds)
+          .order('created_at', { ascending: false })
+          .limit(remainingLimit)
+
+        if (ltError) {
+          console.error('[CanvasService] Failed to fetch linked unlinked tasks:', {
+            foundryId,
+            error: ltError.message,
+          })
+        } else {
+          linkedTasks = ltData ?? []
+        }
+      }
+    }
+
+    const allTaskData = [...(orphanTasks ?? []), ...(linkedTasks ?? [])]
+
+    // 6. Resolve assignees for tasks
+    const taskIds = allTaskData.map((t) => t.id)
+    const assigneeMap = new Map<string, TaskAssigneeProfile[]>()
+
+    if (taskIds.length > 0) {
+      const { data: assigneeData } = await supabase
+        .from('task_assignees')
+        .select('task_id, profile:profiles(id, full_name, role)')
+        .in('task_id', taskIds)
+
+      if (assigneeData) {
+        for (const row of assigneeData) {
+          const profile = row.profile as unknown as TaskAssigneeProfile | null
+          if (!profile) continue
+          const existing = assigneeMap.get(row.task_id) ?? []
+          existing.push(profile)
+          assigneeMap.set(row.task_id, existing)
+        }
+      }
+    }
+
+    const tasks: CanvasTask[] = allTaskData.map((t) => ({
+      ...t,
+      is_ghost: t.is_ghost ?? false,
+      ghost_source: t.ghost_source ?? null,
+      ghost_rationale: t.ghost_rationale ?? null,
+      assignees: assigneeMap.get(t.id) ?? [],
+    })) as CanvasTask[]
+
+    return {
+      data: {
+        objectives,
+        tasks,
+        totalObjectives: totalObjectives ?? objectives.length,
+        totalTasks,
+      },
+    }
+  })
+}
+
+// ============================================================================
+// MUTATIONS — LINKING
+// ============================================================================
+
+/**
+ * Links an unlinked objective to a milestone by setting parent_objective_id.
+ *
+ * @description Moves an objective from the unstructured zone into the
+ * strategic hierarchy by parenting it to a milestone.
+ *
+ * @param objectiveId - UUID of the objective to link
+ * @param milestoneId - UUID of the target milestone
+ * @returns Success or error
+ *
+ * @security Verifies both objective and milestone belong to user's foundry.
+ * Validates the target is actually a milestone (is_milestone = true).
+ */
+export async function linkObjectiveToMilestone(
+  objectiveId: string,
+  milestoneId: string
+): Promise<{ success: true } | ActionError> {
+  return withAuth(async ({ supabase, foundryId }) => {
+    // SECURITY: Verify milestone exists, is_milestone = true, same foundry
+    const { data: milestone, error: msError } = await supabase
+      .from('objectives')
+      .select('id')
+      .eq('id', milestoneId)
+      .eq('foundry_id', foundryId)
+      .eq('is_milestone', true)
+      .is('deleted_at', null)
+      .single()
+
+    if (msError || !milestone) {
+      return { error: 'Milestone not found' }
+    }
+
+    // SECURITY: Verify objective exists and belongs to same foundry
+    const { error: updateError } = await supabase
+      .from('objectives')
+      .update({ parent_objective_id: milestoneId })
+      .eq('id', objectiveId)
+      .eq('foundry_id', foundryId)
+      .is('deleted_at', null)
+
+    if (updateError) {
+      console.error('[CanvasService] Failed to link objective to milestone:', {
+        objectiveId,
+        milestoneId,
+        error: updateError.message,
+      })
+      return { error: updateError.message }
+    }
+
+    console.info('[CanvasService] Objective linked to milestone:', {
+      objectiveId,
+      milestoneId,
       foundryId,
     })
 

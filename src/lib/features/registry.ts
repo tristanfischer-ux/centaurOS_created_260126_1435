@@ -48,6 +48,28 @@ export const NEW_FEATURE_THRESHOLD_DAYS = 14
 export const FEATURE_REGISTRY: Feature[] = [
     // === February 2026 Features ===
     {
+        id: 'canvas',
+        name: 'Strategic Canvas',
+        description: 'Visual map of objectives, tasks, and their relationships on an interactive timeline',
+        route: '/canvas',
+        releasedAt: new Date('2026-02-09'),
+        category: 'strategic',
+        status: 'beta',
+        isVisibleInNav: true,
+        changelog: 'Added Strategic Canvas — a visual workspace for mapping out your goals and working backwards from deadlines. Plot objectives and tasks on an interactive timeline with drag-and-drop positioning powered by ReactFlow.'
+    },
+    {
+        id: 'financial-tools',
+        name: 'Financial Tools',
+        description: 'Money Map and Cost of Delay calculators to make smarter financial decisions',
+        route: '/tools/financial',
+        releasedAt: new Date('2026-02-08'),
+        category: 'analytics',
+        status: 'beta',
+        isVisibleInNav: true,
+        changelog: 'Added Financial Tools combining Money Map (visualize money flows in your business) and Cost of Delay (quantify the cost of postponing decisions). Available under the Financial Tools tab in the sidebar.'
+    },
+    {
         id: 'manufacturing-techniques',
         name: 'Manufacturing Techniques Explorer',
         description: 'Browse 80+ manufacturing techniques with detailed specs, pros/cons, and direct links to find suppliers or start an RFQ',
@@ -57,6 +79,39 @@ export const FEATURE_REGISTRY: Feature[] = [
         status: 'beta',
         isVisibleInNav: true,
         changelog: 'Added Manufacturing Techniques Explorer — an interactive encyclopedia of modern manufacturing processes. Browse by category, filter by cost/batch size/material, and click through to detailed technique info with CTAs to find suppliers or start an RFQ. Available under the Techniques tab in Inspiration.'
+    },
+    {
+        id: 'strategic-planner',
+        name: 'Strategic Planner',
+        description: 'Set big goals with deadlines and let AI build the full plan with phases and tasks',
+        route: '/strategic-planner',
+        releasedAt: new Date('2026-02-05'),
+        category: 'strategic',
+        status: 'beta',
+        isVisibleInNav: true,
+        changelog: 'Added Strategic Planner — set ambitious goals with target dates and AI generates a structured plan with milestones, phases, and actionable tasks. Track progress with visual indicators and days-remaining counters.'
+    },
+    {
+        id: 'updates-feed',
+        name: 'Updates Feed',
+        description: 'Centralized activity feed for notes, comments, and changes across all your work',
+        route: '/updates',
+        releasedAt: new Date('2026-02-03'),
+        category: 'communication',
+        status: 'stable',
+        isVisibleInNav: true,
+        changelog: 'Added Updates — a unified activity feed showing notes, comments, and changes across your tasks and objectives. Filter by type, view threaded conversations, and mark items as read.'
+    },
+    {
+        id: 'agents',
+        name: 'Prompt Workflows',
+        description: 'Build, chain, and save prompt workflows to automate recurring work',
+        route: '/agents',
+        releasedAt: new Date('2026-02-01'),
+        category: 'core',
+        status: 'beta',
+        isVisibleInNav: true,
+        changelog: 'Added Prompt Workflows (Agents) — create custom prompt chains for recurring tasks. Save workflows, manage API keys, and automate repetitive work with AI-powered automation.'
     },
     // === January 2026 Features ===
     {

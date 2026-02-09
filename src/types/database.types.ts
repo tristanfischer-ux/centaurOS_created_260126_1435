@@ -84,6 +84,55 @@ export type Database = {
           },
         ]
       }
+      activity_events: {
+        Row: {
+          created_at: string
+          event_data: Json | null
+          event_type: string
+          foundry_id: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          event_data?: Json | null
+          event_type: string
+          foundry_id: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          event_data?: Json | null
+          event_type?: string
+          foundry_id?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "activity_events_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "activity_events_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "buyer_stats"
+            referencedColumns: ["buyer_id"]
+          },
+          {
+            foreignKeyName: "activity_events_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       admin_audit_log: {
         Row: {
           action: string
@@ -403,6 +452,239 @@ export type Database = {
           },
         ]
       }
+      agent_custom_prompts: {
+        Row: {
+          category: string
+          created_at: string
+          created_by: string | null
+          default_prompt: string
+          description: string | null
+          foundry_id: string
+          icon: string
+          id: string
+          input_label: string | null
+          output_label: string | null
+          suggested_next: Json
+          tags: Json
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          category?: string
+          created_at?: string
+          created_by?: string | null
+          default_prompt?: string
+          description?: string | null
+          foundry_id: string
+          icon?: string
+          id?: string
+          input_label?: string | null
+          output_label?: string | null
+          suggested_next?: Json
+          tags?: Json
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          created_by?: string | null
+          default_prompt?: string
+          description?: string | null
+          foundry_id?: string
+          icon?: string
+          id?: string
+          input_label?: string | null
+          output_label?: string | null
+          suggested_next?: Json
+          tags?: Json
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_custom_prompts_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "buyer_stats"
+            referencedColumns: ["buyer_id"]
+          },
+          {
+            foreignKeyName: "agent_custom_prompts_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agent_custom_prompts_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      agent_workflows: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          description: string | null
+          edges: Json
+          foundry_id: string
+          id: string
+          is_template: boolean
+          name: string
+          nodes: Json
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          edges?: Json
+          foundry_id: string
+          id?: string
+          is_template?: boolean
+          name?: string
+          nodes?: Json
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          edges?: Json
+          foundry_id?: string
+          id?: string
+          is_template?: boolean
+          name?: string
+          nodes?: Json
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_workflows_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "buyer_stats"
+            referencedColumns: ["buyer_id"]
+          },
+          {
+            foreignKeyName: "agent_workflows_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agent_workflows_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_provider_keys: {
+        Row: {
+          created_at: string
+          encrypted_key: string
+          id: string
+          key_hint: string
+          provider_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          encrypted_key: string
+          id?: string
+          key_hint?: string
+          provider_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          encrypted_key?: string
+          id?: string
+          key_hint?: string
+          provider_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      ai_provider_preferences: {
+        Row: {
+          created_at: string
+          id: string
+          modality: string
+          model_id: string
+          provider_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          modality: string
+          model_id: string
+          provider_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          modality?: string
+          model_id?: string
+          provider_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      ai_spending_caps: {
+        Row: {
+          alert_sent: boolean | null
+          alert_threshold_percent: number
+          created_at: string | null
+          current_month_spending_pence: number
+          current_period_start: string
+          foundry_id: string
+          id: string
+          last_reset_at: string | null
+          monthly_cap_pence: number
+          updated_at: string | null
+        }
+        Insert: {
+          alert_sent?: boolean | null
+          alert_threshold_percent?: number
+          created_at?: string | null
+          current_month_spending_pence?: number
+          current_period_start?: string
+          foundry_id: string
+          id?: string
+          last_reset_at?: string | null
+          monthly_cap_pence?: number
+          updated_at?: string | null
+        }
+        Update: {
+          alert_sent?: boolean | null
+          alert_threshold_percent?: number
+          created_at?: string | null
+          current_month_spending_pence?: number
+          current_period_start?: string
+          foundry_id?: string
+          id?: string
+          last_reset_at?: string | null
+          monthly_cap_pence?: number
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       ai_tools: {
         Row: {
           category: string
@@ -432,6 +714,79 @@ export type Database = {
           typical_monthly_cost?: number | null
         }
         Relationships: []
+      }
+      ai_usage: {
+        Row: {
+          completion_tokens: number
+          created_at: string | null
+          error_message: string | null
+          estimated_cost_pence: number
+          foundry_id: string
+          id: string
+          model: string
+          operation_type: string
+          prompt_tokens: number
+          request_duration_ms: number | null
+          success: boolean | null
+          task_id: string | null
+          total_tokens: number
+          user_id: string | null
+        }
+        Insert: {
+          completion_tokens?: number
+          created_at?: string | null
+          error_message?: string | null
+          estimated_cost_pence?: number
+          foundry_id: string
+          id?: string
+          model: string
+          operation_type: string
+          prompt_tokens?: number
+          request_duration_ms?: number | null
+          success?: boolean | null
+          task_id?: string | null
+          total_tokens?: number
+          user_id?: string | null
+        }
+        Update: {
+          completion_tokens?: number
+          created_at?: string | null
+          error_message?: string | null
+          estimated_cost_pence?: number
+          foundry_id?: string
+          id?: string
+          model?: string
+          operation_type?: string
+          prompt_tokens?: number
+          request_duration_ms?: number | null
+          success?: boolean | null
+          task_id?: string | null
+          total_tokens?: number
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_usage_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_usage_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "buyer_stats"
+            referencedColumns: ["buyer_id"]
+          },
+          {
+            foreignKeyName: "ai_usage_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       apprentice_skill_assessments: {
         Row: {
@@ -1588,6 +1943,56 @@ export type Database = {
           },
         ]
       }
+      calendar_sync_mappings: {
+        Row: {
+          created_at: string
+          entity_id: string
+          entity_type: string
+          foundry_id: string
+          google_calendar_id: string
+          google_event_id: string
+          id: string
+          last_synced_at: string
+          sync_direction: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          entity_id: string
+          entity_type: string
+          foundry_id: string
+          google_calendar_id?: string
+          google_event_id: string
+          id?: string
+          last_synced_at?: string
+          sync_direction?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          entity_id?: string
+          entity_type?: string
+          foundry_id?: string
+          google_calendar_id?: string
+          google_event_id?: string
+          id?: string
+          last_synced_at?: string
+          sync_direction?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "calendar_sync_mappings_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       case_studies: {
         Row: {
           approach: string
@@ -2605,6 +3010,39 @@ export type Database = {
           },
         ]
       }
+      early_access_feedback: {
+        Row: {
+          category: Database["public"]["Enums"]["feedback_category"]
+          created_at: string
+          feature_name: string | null
+          foundry_id: string
+          id: string
+          message: string
+          page_route: string | null
+          user_id: string
+        }
+        Insert: {
+          category?: Database["public"]["Enums"]["feedback_category"]
+          created_at?: string
+          feature_name?: string | null
+          foundry_id: string
+          id?: string
+          message: string
+          page_route?: string | null
+          user_id: string
+        }
+        Update: {
+          category?: Database["public"]["Enums"]["feedback_category"]
+          created_at?: string
+          feature_name?: string | null
+          foundry_id?: string
+          id?: string
+          message?: string
+          page_route?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       escrow_transactions: {
         Row: {
           amount: number
@@ -2646,6 +3084,58 @@ export type Database = {
             columns: ["order_id"]
             isOneToOne: false
             referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      event_attendees: {
+        Row: {
+          checked_in_at: string | null
+          event_id: string
+          id: string
+          rsvp_at: string
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          checked_in_at?: string | null
+          event_id: string
+          id?: string
+          rsvp_at?: string
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          checked_in_at?: string | null
+          event_id?: string
+          id?: string
+          rsvp_at?: string
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_attendees_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "guild_events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_attendees_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "buyer_stats"
+            referencedColumns: ["buyer_id"]
+          },
+          {
+            foreignKeyName: "event_attendees_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -2743,6 +3233,7 @@ export type Database = {
           industry: string | null
           name: string
           owner_id: string | null
+          purpose_data: Json | null
           slug: string | null
           stage: string | null
         }
@@ -2752,6 +3243,7 @@ export type Database = {
           industry?: string | null
           name: string
           owner_id?: string | null
+          purpose_data?: Json | null
           slug?: string | null
           stage?: string | null
         }
@@ -2761,6 +3253,7 @@ export type Database = {
           industry?: string | null
           name?: string
           owner_id?: string | null
+          purpose_data?: Json | null
           slug?: string | null
           stage?: string | null
         }
@@ -2923,6 +3416,72 @@ export type Database = {
         }
         Relationships: []
       }
+      foundry_memberships: {
+        Row: {
+          foundry_id: string
+          id: string
+          invited_by: string | null
+          is_primary: boolean | null
+          joined_at: string | null
+          role: Database["public"]["Enums"]["member_role"]
+          user_id: string
+        }
+        Insert: {
+          foundry_id: string
+          id?: string
+          invited_by?: string | null
+          is_primary?: boolean | null
+          joined_at?: string | null
+          role?: Database["public"]["Enums"]["member_role"]
+          user_id: string
+        }
+        Update: {
+          foundry_id?: string
+          id?: string
+          invited_by?: string | null
+          is_primary?: boolean | null
+          joined_at?: string | null
+          role?: Database["public"]["Enums"]["member_role"]
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "foundry_memberships_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "foundry_memberships_invited_by_fkey"
+            columns: ["invited_by"]
+            isOneToOne: false
+            referencedRelation: "buyer_stats"
+            referencedColumns: ["buyer_id"]
+          },
+          {
+            foreignKeyName: "foundry_memberships_invited_by_fkey"
+            columns: ["invited_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "foundry_memberships_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "buyer_stats"
+            referencedColumns: ["buyer_id"]
+          },
+          {
+            foreignKeyName: "foundry_memberships_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       foundry_offboarding_settings: {
         Row: {
           created_at: string | null
@@ -3050,12 +3609,62 @@ export type Database = {
           },
         ]
       }
+      google_oauth_tokens: {
+        Row: {
+          access_token: string
+          created_at: string
+          foundry_id: string
+          google_email: string
+          id: string
+          refresh_token: string | null
+          scopes: string[]
+          token_expires_at: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          access_token: string
+          created_at?: string
+          foundry_id: string
+          google_email: string
+          id?: string
+          refresh_token?: string | null
+          scopes?: string[]
+          token_expires_at: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          access_token?: string
+          created_at?: string
+          foundry_id?: string
+          google_email?: string
+          id?: string
+          refresh_token?: string | null
+          scopes?: string[]
+          token_expires_at?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "google_oauth_tokens_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       guild_events: {
         Row: {
           created_at: string
           created_by: string | null
           description: string | null
           event_date: string
+          event_format: string
+          event_type: string
+          event_url: string | null
           foundry_id: string | null
           id: string
           is_executive_only: boolean
@@ -3070,6 +3679,9 @@ export type Database = {
           created_by?: string | null
           description?: string | null
           event_date: string
+          event_format?: string
+          event_type?: string
+          event_url?: string | null
           foundry_id?: string | null
           id?: string
           is_executive_only?: boolean
@@ -3084,6 +3696,9 @@ export type Database = {
           created_by?: string | null
           description?: string | null
           event_date?: string
+          event_format?: string
+          event_type?: string
+          event_url?: string | null
           foundry_id?: string | null
           id?: string
           is_executive_only?: boolean
@@ -3918,6 +4533,213 @@ export type Database = {
           },
         ]
       }
+      money_map_cost_items: {
+        Row: {
+          amount: number
+          category: string
+          cost_type: string
+          created_at: string
+          currency: string
+          description: string | null
+          foundry_id: string
+          id: string
+          is_active: boolean
+          name: string
+          period: string
+          sort_order: number
+          source: string
+          updated_at: string
+        }
+        Insert: {
+          amount?: number
+          category?: string
+          cost_type?: string
+          created_at?: string
+          currency?: string
+          description?: string | null
+          foundry_id: string
+          id?: string
+          is_active?: boolean
+          name: string
+          period?: string
+          sort_order?: number
+          source?: string
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          category?: string
+          cost_type?: string
+          created_at?: string
+          currency?: string
+          description?: string | null
+          foundry_id?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          period?: string
+          sort_order?: number
+          source?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "money_map_cost_items_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      money_map_cost_links: {
+        Row: {
+          allocation_method: string
+          allocation_pct: number
+          cost_item_id: string
+          created_at: string
+          id: string
+          revenue_stream_id: string
+          updated_at: string
+        }
+        Insert: {
+          allocation_method?: string
+          allocation_pct?: number
+          cost_item_id: string
+          created_at?: string
+          id?: string
+          revenue_stream_id: string
+          updated_at?: string
+        }
+        Update: {
+          allocation_method?: string
+          allocation_pct?: number
+          cost_item_id?: string
+          created_at?: string
+          id?: string
+          revenue_stream_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "money_map_cost_links_cost_item_id_fkey"
+            columns: ["cost_item_id"]
+            isOneToOne: false
+            referencedRelation: "money_map_cost_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "money_map_cost_links_revenue_stream_id_fkey"
+            columns: ["revenue_stream_id"]
+            isOneToOne: false
+            referencedRelation: "money_map_revenue_streams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      money_map_revenue_streams: {
+        Row: {
+          amount: number
+          auto_source_type: string | null
+          category: string
+          created_at: string
+          currency: string
+          description: string | null
+          foundry_id: string
+          id: string
+          is_active: boolean
+          name: string
+          period: string
+          sort_order: number
+          source: string
+          updated_at: string
+        }
+        Insert: {
+          amount?: number
+          auto_source_type?: string | null
+          category?: string
+          created_at?: string
+          currency?: string
+          description?: string | null
+          foundry_id: string
+          id?: string
+          is_active?: boolean
+          name: string
+          period?: string
+          sort_order?: number
+          source?: string
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          auto_source_type?: string | null
+          category?: string
+          created_at?: string
+          currency?: string
+          description?: string | null
+          foundry_id?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          period?: string
+          sort_order?: number
+          source?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "money_map_revenue_streams_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      money_map_snapshots: {
+        Row: {
+          created_at: string
+          foundry_id: string
+          id: string
+          name: string
+          net_margin_pct: number
+          period_label: string
+          snapshot_data: Json
+          total_costs: number
+          total_revenue: number
+        }
+        Insert: {
+          created_at?: string
+          foundry_id: string
+          id?: string
+          name: string
+          net_margin_pct?: number
+          period_label: string
+          snapshot_data?: Json
+          total_costs?: number
+          total_revenue?: number
+        }
+        Update: {
+          created_at?: string
+          foundry_id?: string
+          id?: string
+          name?: string
+          net_margin_pct?: number
+          period_label?: string
+          snapshot_data?: Json
+          total_costs?: number
+          total_revenue?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "money_map_snapshots_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notification_log: {
         Row: {
           action_url: string | null
@@ -4150,7 +4972,9 @@ export type Database = {
           foundry_id: string
           id: string
           is_system_log: boolean | null
+          message_id: string | null
           objective_id: string
+          synced_from_message: boolean | null
           user_id: string
         }
         Insert: {
@@ -4159,7 +4983,9 @@ export type Database = {
           foundry_id: string
           id?: string
           is_system_log?: boolean | null
+          message_id?: string | null
           objective_id: string
+          synced_from_message?: boolean | null
           user_id: string
         }
         Update: {
@@ -4168,10 +4994,19 @@ export type Database = {
           foundry_id?: string
           id?: string
           is_system_log?: boolean | null
+          message_id?: string | null
           objective_id?: string
+          synced_from_message?: boolean | null
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "objective_comments_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "messages"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "objective_comments_objective_id_fkey"
             columns: ["objective_id"]
@@ -4204,6 +5039,7 @@ export type Database = {
           estimated_duration: string | null
           icon_name: string | null
           id: string
+          product_category: string | null
           title: string
           updated_at: string | null
         }
@@ -4215,6 +5051,7 @@ export type Database = {
           estimated_duration?: string | null
           icon_name?: string | null
           id?: string
+          product_category?: string | null
           title: string
           updated_at?: string | null
         }
@@ -4226,53 +5063,166 @@ export type Database = {
           estimated_duration?: string | null
           icon_name?: string | null
           id?: string
+          product_category?: string | null
           title?: string
           updated_at?: string | null
         }
         Relationships: []
       }
+      objective_shares: {
+        Row: {
+          created_at: string | null
+          id: string
+          objective_id: string
+          shared_by: string
+          shared_with_team_id: string | null
+          shared_with_user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          objective_id: string
+          shared_by: string
+          shared_with_team_id?: string | null
+          shared_with_user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          objective_id?: string
+          shared_by?: string
+          shared_with_team_id?: string | null
+          shared_with_user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "objective_shares_objective_id_fkey"
+            columns: ["objective_id"]
+            isOneToOne: false
+            referencedRelation: "objectives"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "objective_shares_shared_by_fkey"
+            columns: ["shared_by"]
+            isOneToOne: false
+            referencedRelation: "buyer_stats"
+            referencedColumns: ["buyer_id"]
+          },
+          {
+            foreignKeyName: "objective_shares_shared_by_fkey"
+            columns: ["shared_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "objective_shares_shared_with_team_id_fkey"
+            columns: ["shared_with_team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "objective_shares_shared_with_user_id_fkey"
+            columns: ["shared_with_user_id"]
+            isOneToOne: false
+            referencedRelation: "buyer_stats"
+            referencedColumns: ["buyer_id"]
+          },
+          {
+            foreignKeyName: "objective_shares_shared_with_user_id_fkey"
+            columns: ["shared_with_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       objectives: {
         Row: {
+          ai_suggestions: Json | null
           blueprint_id: string | null
           created_at: string | null
           creator_id: string
+          deleted_at: string | null
           description: string | null
           extended_description: string | null
           foundry_id: string
+          ghost_rationale: string | null
+          ghost_source: string | null
+          goal_type: string | null
           id: string
+          is_ghost: boolean
+          is_milestone: boolean
+          is_private: boolean
+          is_strategic_goal: boolean | null
+          milestone_date: string | null
+          milestone_order_index: number
           parent_objective_id: string | null
           progress: number | null
+          resource_suggestions: Json | null
           status: string | null
+          strategic_risks: Json | null
           title: string
           updated_at: string | null
+          workstream: string | null
         }
         Insert: {
+          ai_suggestions?: Json | null
           blueprint_id?: string | null
           created_at?: string | null
           creator_id: string
+          deleted_at?: string | null
           description?: string | null
           extended_description?: string | null
           foundry_id: string
+          ghost_rationale?: string | null
+          ghost_source?: string | null
+          goal_type?: string | null
           id?: string
+          is_ghost?: boolean
+          is_milestone?: boolean
+          is_private?: boolean
+          is_strategic_goal?: boolean | null
+          milestone_date?: string | null
+          milestone_order_index?: number
           parent_objective_id?: string | null
           progress?: number | null
+          resource_suggestions?: Json | null
           status?: string | null
+          strategic_risks?: Json | null
           title: string
           updated_at?: string | null
+          workstream?: string | null
         }
         Update: {
+          ai_suggestions?: Json | null
           blueprint_id?: string | null
           created_at?: string | null
           creator_id?: string
+          deleted_at?: string | null
           description?: string | null
           extended_description?: string | null
           foundry_id?: string
+          ghost_rationale?: string | null
+          ghost_source?: string | null
+          goal_type?: string | null
           id?: string
+          is_ghost?: boolean
+          is_milestone?: boolean
+          is_private?: boolean
+          is_strategic_goal?: boolean | null
+          milestone_date?: string | null
+          milestone_order_index?: number
           parent_objective_id?: string | null
           progress?: number | null
+          resource_suggestions?: Json | null
           status?: string | null
+          strategic_risks?: Json | null
           title?: string
           updated_at?: string | null
+          workstream?: string | null
         }
         Relationships: [
           {
@@ -4780,6 +5730,361 @@ export type Database = {
             columns: ["task_id"]
             isOneToOne: false
             referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      outreach_campaigns: {
+        Row: {
+          case_studies: Json
+          created_at: string
+          created_by: string | null
+          foundry_id: string
+          icp_description: string | null
+          id: string
+          metadata: Json
+          name: string
+          product_context: string | null
+          sequence_length: number
+          status: string
+          tone: string
+          updated_at: string
+          value_props: Json
+        }
+        Insert: {
+          case_studies?: Json
+          created_at?: string
+          created_by?: string | null
+          foundry_id: string
+          icp_description?: string | null
+          id?: string
+          metadata?: Json
+          name?: string
+          product_context?: string | null
+          sequence_length?: number
+          status?: string
+          tone?: string
+          updated_at?: string
+          value_props?: Json
+        }
+        Update: {
+          case_studies?: Json
+          created_at?: string
+          created_by?: string | null
+          foundry_id?: string
+          icp_description?: string | null
+          id?: string
+          metadata?: Json
+          name?: string
+          product_context?: string | null
+          sequence_length?: number
+          status?: string
+          tone?: string
+          updated_at?: string
+          value_props?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "outreach_campaigns_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "buyer_stats"
+            referencedColumns: ["buyer_id"]
+          },
+          {
+            foreignKeyName: "outreach_campaigns_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "outreach_campaigns_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      outreach_contacts: {
+        Row: {
+          campaign_id: string | null
+          company_domain: string | null
+          company_name: string
+          company_size: string | null
+          created_at: string
+          created_by: string | null
+          email: string | null
+          first_name: string
+          foundry_id: string
+          funding_stage: string | null
+          id: string
+          industry: string | null
+          job_title: string | null
+          last_name: string
+          linkedin_url: string | null
+          pain_points: Json
+          recommended_angle: string | null
+          research_brief: string | null
+          score: number | null
+          score_reasoning: string | null
+          signals: Json
+          status: string
+          tech_stack: Json
+          updated_at: string
+        }
+        Insert: {
+          campaign_id?: string | null
+          company_domain?: string | null
+          company_name?: string
+          company_size?: string | null
+          created_at?: string
+          created_by?: string | null
+          email?: string | null
+          first_name?: string
+          foundry_id: string
+          funding_stage?: string | null
+          id?: string
+          industry?: string | null
+          job_title?: string | null
+          last_name?: string
+          linkedin_url?: string | null
+          pain_points?: Json
+          recommended_angle?: string | null
+          research_brief?: string | null
+          score?: number | null
+          score_reasoning?: string | null
+          signals?: Json
+          status?: string
+          tech_stack?: Json
+          updated_at?: string
+        }
+        Update: {
+          campaign_id?: string | null
+          company_domain?: string | null
+          company_name?: string
+          company_size?: string | null
+          created_at?: string
+          created_by?: string | null
+          email?: string | null
+          first_name?: string
+          foundry_id?: string
+          funding_stage?: string | null
+          id?: string
+          industry?: string | null
+          job_title?: string | null
+          last_name?: string
+          linkedin_url?: string | null
+          pain_points?: Json
+          recommended_angle?: string | null
+          research_brief?: string | null
+          score?: number | null
+          score_reasoning?: string | null
+          signals?: Json
+          status?: string
+          tech_stack?: Json
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "outreach_contacts_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "outreach_campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "outreach_contacts_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "buyer_stats"
+            referencedColumns: ["buyer_id"]
+          },
+          {
+            foreignKeyName: "outreach_contacts_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "outreach_contacts_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      outreach_emails: {
+        Row: {
+          body: string
+          campaign_id: string
+          channel: string
+          contact_id: string
+          created_at: string
+          created_by: string | null
+          foundry_id: string
+          id: string
+          opened_at: string | null
+          personalization_data: Json
+          qa_passed: boolean | null
+          qa_report: Json | null
+          replied_at: string | null
+          scheduled_at: string | null
+          send_delay_days: number
+          sent_at: string | null
+          sequence_label: string | null
+          sequence_position: number
+          status: string
+          subject: string
+          subject_variants: Json
+          updated_at: string
+        }
+        Insert: {
+          body?: string
+          campaign_id: string
+          channel?: string
+          contact_id: string
+          created_at?: string
+          created_by?: string | null
+          foundry_id: string
+          id?: string
+          opened_at?: string | null
+          personalization_data?: Json
+          qa_passed?: boolean | null
+          qa_report?: Json | null
+          replied_at?: string | null
+          scheduled_at?: string | null
+          send_delay_days?: number
+          sent_at?: string | null
+          sequence_label?: string | null
+          sequence_position?: number
+          status?: string
+          subject?: string
+          subject_variants?: Json
+          updated_at?: string
+        }
+        Update: {
+          body?: string
+          campaign_id?: string
+          channel?: string
+          contact_id?: string
+          created_at?: string
+          created_by?: string | null
+          foundry_id?: string
+          id?: string
+          opened_at?: string | null
+          personalization_data?: Json
+          qa_passed?: boolean | null
+          qa_report?: Json | null
+          replied_at?: string | null
+          scheduled_at?: string | null
+          send_delay_days?: number
+          sent_at?: string | null
+          sequence_label?: string | null
+          sequence_position?: number
+          status?: string
+          subject?: string
+          subject_variants?: Json
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "outreach_emails_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "outreach_campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "outreach_emails_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "outreach_contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "outreach_emails_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "buyer_stats"
+            referencedColumns: ["buyer_id"]
+          },
+          {
+            foreignKeyName: "outreach_emails_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "outreach_emails_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      outreach_knowledge_base: {
+        Row: {
+          category: string
+          content: string
+          content_type: string
+          created_at: string
+          created_by: string | null
+          foundry_id: string
+          id: string
+          tags: Json
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          category?: string
+          content?: string
+          content_type?: string
+          created_at?: string
+          created_by?: string | null
+          foundry_id: string
+          id?: string
+          tags?: Json
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          category?: string
+          content?: string
+          content_type?: string
+          created_at?: string
+          created_by?: string | null
+          foundry_id?: string
+          id?: string
+          tags?: Json
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "outreach_knowledge_base_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "buyer_stats"
+            referencedColumns: ["buyer_id"]
+          },
+          {
+            foreignKeyName: "outreach_knowledge_base_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "outreach_knowledge_base_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
             referencedColumns: ["id"]
           },
         ]
@@ -5533,6 +6838,7 @@ export type Database = {
       profiles: {
         Row: {
           account_type: Database["public"]["Enums"]["account_type"] | null
+          active_foundry_id: string | null
           availability_hours_per_week: number | null
           availability_type: string | null
           avatar_url: string | null
@@ -5564,6 +6870,7 @@ export type Database = {
         }
         Insert: {
           account_type?: Database["public"]["Enums"]["account_type"] | null
+          active_foundry_id?: string | null
           availability_hours_per_week?: number | null
           availability_type?: string | null
           avatar_url?: string | null
@@ -5595,6 +6902,7 @@ export type Database = {
         }
         Update: {
           account_type?: Database["public"]["Enums"]["account_type"] | null
+          active_foundry_id?: string | null
           availability_hours_per_week?: number | null
           availability_type?: string | null
           avatar_url?: string | null
@@ -5625,6 +6933,13 @@ export type Database = {
           years_experience?: number | null
         }
         Relationships: [
+          {
+            foreignKeyName: "profiles_active_foundry_id_fkey"
+            columns: ["active_foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "profiles_paired_ai_id_fkey"
             columns: ["paired_ai_id"]
@@ -5827,7 +7142,7 @@ export type Database = {
           reviewer_notes: string | null
           status: string | null
           submitted_at: string | null
-          user_id: string
+          user_id: string | null
         }
         Insert: {
           application_data?: Json | null
@@ -5840,7 +7155,7 @@ export type Database = {
           reviewer_notes?: string | null
           status?: string | null
           submitted_at?: string | null
-          user_id: string
+          user_id?: string | null
         }
         Update: {
           application_data?: Json | null
@@ -5853,7 +7168,7 @@ export type Database = {
           reviewer_notes?: string | null
           status?: string | null
           submitted_at?: string | null
-          user_id?: string
+          user_id?: string | null
         }
         Relationships: [
           {
@@ -6060,7 +7375,6 @@ export type Database = {
           auto_response_message: string | null
           avg_response_time_hours: number | null
           bio: string | null
-          forge_discount_percent: number | null
           company_stages: string[] | null
           completion_rate: number | null
           created_at: string | null
@@ -6068,6 +7382,7 @@ export type Database = {
           current_order_count: number | null
           day_rate: number | null
           featured_until: string | null
+          forge_discount_percent: number | null
           headline: string | null
           hourly_rate: number | null
           id: string
@@ -6108,7 +7423,6 @@ export type Database = {
           auto_response_message?: string | null
           avg_response_time_hours?: number | null
           bio?: string | null
-          forge_discount_percent?: number | null
           company_stages?: string[] | null
           completion_rate?: number | null
           created_at?: string | null
@@ -6116,6 +7430,7 @@ export type Database = {
           current_order_count?: number | null
           day_rate?: number | null
           featured_until?: string | null
+          forge_discount_percent?: number | null
           headline?: string | null
           hourly_rate?: number | null
           id?: string
@@ -6156,7 +7471,6 @@ export type Database = {
           auto_response_message?: string | null
           avg_response_time_hours?: number | null
           bio?: string | null
-          forge_discount_percent?: number | null
           company_stages?: string[] | null
           completion_rate?: number | null
           created_at?: string | null
@@ -6164,6 +7478,7 @@ export type Database = {
           current_order_count?: number | null
           day_rate?: number | null
           featured_until?: string | null
+          forge_discount_percent?: number | null
           headline?: string | null
           hourly_rate?: number | null
           id?: string
@@ -6626,6 +7941,110 @@ export type Database = {
           },
         ]
       }
+      review_gates: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          description: string | null
+          foundry_id: string
+          gate_type: string
+          id: string
+          objective_id: string | null
+          required_skills: string[] | null
+          review_notes: string | null
+          reviewed_at: string | null
+          reviewer_id: string | null
+          sector: string | null
+          status: string
+          task_id: string | null
+          title: string
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          foundry_id: string
+          gate_type: string
+          id?: string
+          objective_id?: string | null
+          required_skills?: string[] | null
+          review_notes?: string | null
+          reviewed_at?: string | null
+          reviewer_id?: string | null
+          sector?: string | null
+          status?: string
+          task_id?: string | null
+          title: string
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          foundry_id?: string
+          gate_type?: string
+          id?: string
+          objective_id?: string | null
+          required_skills?: string[] | null
+          review_notes?: string | null
+          reviewed_at?: string | null
+          reviewer_id?: string | null
+          sector?: string | null
+          status?: string
+          task_id?: string | null
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "review_gates_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "buyer_stats"
+            referencedColumns: ["buyer_id"]
+          },
+          {
+            foreignKeyName: "review_gates_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "review_gates_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "review_gates_objective_id_fkey"
+            columns: ["objective_id"]
+            isOneToOne: false
+            referencedRelation: "objectives"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "review_gates_reviewer_id_fkey"
+            columns: ["reviewer_id"]
+            isOneToOne: false
+            referencedRelation: "buyer_stats"
+            referencedColumns: ["buyer_id"]
+          },
+          {
+            foreignKeyName: "review_gates_reviewer_id_fkey"
+            columns: ["reviewer_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "review_gates_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       reviews: {
         Row: {
           comment: string | null
@@ -6859,6 +8278,45 @@ export type Database = {
           },
         ]
       }
+      rfq_templates: {
+        Row: {
+          category: string | null
+          created_at: string | null
+          default_specifications: Json | null
+          description: string | null
+          display_order: number | null
+          id: string
+          is_manufacturing: boolean | null
+          rfq_type: string
+          sector: string | null
+          title: string
+        }
+        Insert: {
+          category?: string | null
+          created_at?: string | null
+          default_specifications?: Json | null
+          description?: string | null
+          display_order?: number | null
+          id?: string
+          is_manufacturing?: boolean | null
+          rfq_type?: string
+          sector?: string | null
+          title: string
+        }
+        Update: {
+          category?: string | null
+          created_at?: string | null
+          default_specifications?: Json | null
+          description?: string | null
+          display_order?: number | null
+          id?: string
+          is_manufacturing?: boolean | null
+          rfq_type?: string
+          sector?: string | null
+          title?: string
+        }
+        Relationships: []
+      }
       rfqs: {
         Row: {
           awarded_to: string | null
@@ -7012,6 +8470,27 @@ export type Database = {
           },
         ]
       }
+      saved_packs: {
+        Row: {
+          created_at: string
+          id: string
+          pack_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          pack_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          pack_id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       saved_payment_methods: {
         Row: {
           billing_email: string | null
@@ -7125,6 +8604,33 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      sector_skills: {
+        Row: {
+          created_at: string | null
+          id: string
+          is_expert_level: boolean | null
+          sector: string
+          skill_category: string
+          skill_name: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          is_expert_level?: boolean | null
+          sector: string
+          skill_category: string
+          skill_name: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          is_expert_level?: boolean | null
+          sector?: string
+          skill_category?: string
+          skill_name?: string
+        }
+        Relationships: []
       }
       security_audit_log: {
         Row: {
@@ -7770,6 +9276,8 @@ export type Database = {
           foundry_id: string
           id: string
           is_system_log: boolean | null
+          message_id: string | null
+          synced_from_message: boolean | null
           task_id: string
           user_id: string
         }
@@ -7779,6 +9287,8 @@ export type Database = {
           foundry_id: string
           id?: string
           is_system_log?: boolean | null
+          message_id?: string | null
+          synced_from_message?: boolean | null
           task_id: string
           user_id: string
         }
@@ -7788,10 +9298,19 @@ export type Database = {
           foundry_id?: string
           id?: string
           is_system_log?: boolean | null
+          message_id?: string | null
+          synced_from_message?: boolean | null
           task_id?: string
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "task_comments_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "messages"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "task_comments_task_id_fkey"
             columns: ["task_id"]
@@ -7815,14 +9334,59 @@ export type Database = {
           },
         ]
       }
+      task_dependencies: {
+        Row: {
+          created_at: string
+          dependency_type: string
+          depends_on_task_id: string
+          foundry_id: string
+          id: string
+          task_id: string
+        }
+        Insert: {
+          created_at?: string
+          dependency_type?: string
+          depends_on_task_id: string
+          foundry_id: string
+          id?: string
+          task_id: string
+        }
+        Update: {
+          created_at?: string
+          dependency_type?: string
+          depends_on_task_id?: string
+          foundry_id?: string
+          id?: string
+          task_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "task_dependencies_depends_on_task_id_fkey"
+            columns: ["depends_on_task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "task_dependencies_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       task_files: {
         Row: {
           created_at: string | null
           file_name: string
           file_path: string
           file_size: number | null
+          google_drive_file_id: string | null
+          google_drive_url: string | null
           id: string
           mime_type: string | null
+          source: string
           task_id: string
           uploaded_by: string | null
         }
@@ -7831,8 +9395,11 @@ export type Database = {
           file_name: string
           file_path: string
           file_size?: number | null
+          google_drive_file_id?: string | null
+          google_drive_url?: string | null
           id?: string
           mime_type?: string | null
+          source?: string
           task_id: string
           uploaded_by?: string | null
         }
@@ -7841,8 +9408,11 @@ export type Database = {
           file_name?: string
           file_path?: string
           file_size?: number | null
+          google_drive_file_id?: string | null
+          google_drive_url?: string | null
           id?: string
           mime_type?: string | null
+          source?: string
           task_id?: string
           uploaded_by?: string | null
         }
@@ -7957,6 +9527,76 @@ export type Database = {
           },
         ]
       }
+      task_shares: {
+        Row: {
+          created_at: string | null
+          id: string
+          shared_by: string
+          shared_with_team_id: string | null
+          shared_with_user_id: string | null
+          task_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          shared_by: string
+          shared_with_team_id?: string | null
+          shared_with_user_id?: string | null
+          task_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          shared_by?: string
+          shared_with_team_id?: string | null
+          shared_with_user_id?: string | null
+          task_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "task_shares_shared_by_fkey"
+            columns: ["shared_by"]
+            isOneToOne: false
+            referencedRelation: "buyer_stats"
+            referencedColumns: ["buyer_id"]
+          },
+          {
+            foreignKeyName: "task_shares_shared_by_fkey"
+            columns: ["shared_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "task_shares_shared_with_team_id_fkey"
+            columns: ["shared_with_team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "task_shares_shared_with_user_id_fkey"
+            columns: ["shared_with_user_id"]
+            isOneToOne: false
+            referencedRelation: "buyer_stats"
+            referencedColumns: ["buyer_id"]
+          },
+          {
+            foreignKeyName: "task_shares_shared_with_user_id_fkey"
+            columns: ["shared_with_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "task_shares_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tasks: {
         Row: {
           amendment_notes: string | null
@@ -7966,12 +9606,17 @@ export type Database = {
           client_visible: boolean | null
           created_at: string | null
           creator_id: string
+          deleted_at: string | null
           description: string | null
           end_date: string | null
           escalation_reason: string | null
           forwarding_history: Json | null
           foundry_id: string
+          ghost_rationale: string | null
+          ghost_source: string | null
           id: string
+          is_ghost: boolean
+          is_private: boolean
           last_nudge_at: string | null
           metadata: Json | null
           nudge_count: number | null
@@ -7983,6 +9628,7 @@ export type Database = {
           task_number: number
           title: string
           updated_at: string | null
+          workstream: string | null
         }
         Insert: {
           amendment_notes?: string | null
@@ -7992,12 +9638,17 @@ export type Database = {
           client_visible?: boolean | null
           created_at?: string | null
           creator_id: string
+          deleted_at?: string | null
           description?: string | null
           end_date?: string | null
           escalation_reason?: string | null
           forwarding_history?: Json | null
           foundry_id: string
+          ghost_rationale?: string | null
+          ghost_source?: string | null
           id?: string
+          is_ghost?: boolean
+          is_private?: boolean
           last_nudge_at?: string | null
           metadata?: Json | null
           nudge_count?: number | null
@@ -8009,6 +9660,7 @@ export type Database = {
           task_number?: number
           title: string
           updated_at?: string | null
+          workstream?: string | null
         }
         Update: {
           amendment_notes?: string | null
@@ -8018,12 +9670,17 @@ export type Database = {
           client_visible?: boolean | null
           created_at?: string | null
           creator_id?: string
+          deleted_at?: string | null
           description?: string | null
           end_date?: string | null
           escalation_reason?: string | null
           forwarding_history?: Json | null
           foundry_id?: string
+          ghost_rationale?: string | null
+          ghost_source?: string | null
           id?: string
+          is_ghost?: boolean
+          is_private?: boolean
           last_nudge_at?: string | null
           metadata?: Json | null
           nudge_count?: number | null
@@ -8035,6 +9692,7 @@ export type Database = {
           task_number?: number
           title?: string
           updated_at?: string | null
+          workstream?: string | null
         }
         Relationships: [
           {
@@ -8169,6 +9827,7 @@ export type Database = {
       teams: {
         Row: {
           created_at: string | null
+          description: string | null
           foundry_id: string
           id: string
           is_auto_generated: boolean | null
@@ -8177,6 +9836,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string | null
+          description?: string | null
           foundry_id: string
           id?: string
           is_auto_generated?: boolean | null
@@ -8185,6 +9845,7 @@ export type Database = {
         }
         Update: {
           created_at?: string | null
+          description?: string | null
           foundry_id?: string
           id?: string
           is_auto_generated?: boolean | null
@@ -8815,8 +10476,116 @@ export type Database = {
           },
         ]
       }
+      whiteboards: {
+        Row: {
+          created_at: string
+          created_by: string
+          foundry_id: string
+          id: string
+          linked_entity_id: string | null
+          linked_entity_type: string | null
+          state: Json
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          foundry_id: string
+          id?: string
+          linked_entity_id?: string | null
+          linked_entity_type?: string | null
+          state?: Json
+          title?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          foundry_id?: string
+          id?: string
+          linked_entity_id?: string | null
+          linked_entity_type?: string | null
+          state?: Json
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whiteboards_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      work_edges: {
+        Row: {
+          created_at: string
+          deleted_at: string | null
+          dep_type: string
+          foundry_id: string
+          from_item_id: string
+          from_item_type: string
+          id: string
+          to_item_id: string
+          to_item_type: string
+        }
+        Insert: {
+          created_at?: string
+          deleted_at?: string | null
+          dep_type?: string
+          foundry_id: string
+          from_item_id: string
+          from_item_type: string
+          id?: string
+          to_item_id: string
+          to_item_type: string
+        }
+        Update: {
+          created_at?: string
+          deleted_at?: string | null
+          dep_type?: string
+          foundry_id?: string
+          from_item_id?: string
+          from_item_type?: string
+          id?: string
+          to_item_id?: string
+          to_item_type?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
+      ai_spending_monthly: {
+        Row: {
+          foundry_id: string | null
+          month: string | null
+          total_cost_gbp: number | null
+          total_cost_pence: number | null
+          total_requests: number | null
+          total_tokens: number | null
+        }
+        Relationships: []
+      }
+      ai_usage_daily_summary: {
+        Row: {
+          avg_duration_ms: number | null
+          failed_requests: number | null
+          foundry_id: string | null
+          model: string | null
+          operation_type: string | null
+          request_count: number | null
+          successful_requests: number | null
+          total_completion_tokens: number | null
+          total_cost_pence: number | null
+          total_prompt_tokens: number | null
+          total_tokens: number | null
+          usage_date: string | null
+        }
+        Relationships: []
+      }
       buyer_stats: {
         Row: {
           average_order_value: number | null
@@ -8904,7 +10673,7 @@ export type Database = {
           avg_rating: number | null
           avg_response_time_hours: number | null
           category: Database["public"]["Enums"]["marketplace_category"] | null
-          forge_discount_percent: number | null
+          centaur_discount_percent: number | null
           completion_rate: number | null
           currency: string | null
           day_rate: number | null
@@ -8969,6 +10738,14 @@ export type Database = {
           success: boolean
         }[]
       }
+      calculate_ai_cost: {
+        Args: {
+          completion_tokens: number
+          model_name: string
+          prompt_tokens: number
+        }
+        Returns: number
+      }
       calculate_blueprint_coverage: {
         Args: { p_blueprint_id: string }
         Returns: {
@@ -8991,6 +10768,7 @@ export type Database = {
         Args: { p_task_id: string; p_user_id: string }
         Returns: boolean
       }
+      check_ai_spending_cap: { Args: { p_foundry_id: string }; Returns: Json }
       check_rate_limit: {
         Args: {
           p_key: string
@@ -9001,6 +10779,7 @@ export type Database = {
         Returns: Json
       }
       cleanup_expired_intents: { Args: never; Returns: number }
+      cleanup_old_activity_events: { Args: never; Returns: number }
       clone_blueprint_from_template: {
         Args: {
           p_created_by?: string
@@ -9050,6 +10829,18 @@ export type Database = {
         }
         Returns: string
       }
+      create_user_foundry: {
+        Args: {
+          p_company_name: string
+          p_industry?: string
+          p_stage?: string
+          p_user_id: string
+        }
+        Returns: Json
+      }
+      debug_check_foundry: { Args: { p_foundry_id: string }; Returns: Json }
+      diagnose_foundry_rls: { Args: never; Returns: Json }
+      ensure_foundry_exists: { Args: { p_foundry_id: string }; Returns: Json }
       escalate_task: {
         Args: { p_reason?: string; p_task_id: string }
         Returns: {
@@ -9060,12 +10851,17 @@ export type Database = {
           client_visible: boolean | null
           created_at: string | null
           creator_id: string
+          deleted_at: string | null
           description: string | null
           end_date: string | null
           escalation_reason: string | null
           forwarding_history: Json | null
           foundry_id: string
+          ghost_rationale: string | null
+          ghost_source: string | null
           id: string
+          is_ghost: boolean
+          is_private: boolean
           last_nudge_at: string | null
           metadata: Json | null
           nudge_count: number | null
@@ -9077,6 +10873,7 @@ export type Database = {
           task_number: number
           title: string
           updated_at: string | null
+          workstream: string | null
         }
         SetofOptions: {
           from: "*"
@@ -9097,6 +10894,7 @@ export type Database = {
         Args: { full_name: string; user_id: string }
         Returns: string
       }
+      get_active_foundry_id: { Args: { p_user_id: string }; Returns: string }
       get_blueprint_tasks: {
         Args: { p_blueprint_id: string }
         Returns: {
@@ -9107,12 +10905,17 @@ export type Database = {
           client_visible: boolean | null
           created_at: string | null
           creator_id: string
+          deleted_at: string | null
           description: string | null
           end_date: string | null
           escalation_reason: string | null
           forwarding_history: Json | null
           foundry_id: string
+          ghost_rationale: string | null
+          ghost_source: string | null
           id: string
+          is_ghost: boolean
+          is_private: boolean
           last_nudge_at: string | null
           metadata: Json | null
           nudge_count: number | null
@@ -9124,6 +10927,7 @@ export type Database = {
           task_number: number
           title: string
           updated_at: string | null
+          workstream: string | null
         }[]
         SetofOptions: {
           from: "*"
@@ -9163,12 +10967,17 @@ export type Database = {
           client_visible: boolean | null
           created_at: string | null
           creator_id: string
+          deleted_at: string | null
           description: string | null
           end_date: string | null
           escalation_reason: string | null
           forwarding_history: Json | null
           foundry_id: string
+          ghost_rationale: string | null
+          ghost_source: string | null
           id: string
+          is_ghost: boolean
+          is_private: boolean
           last_nudge_at: string | null
           metadata: Json | null
           nudge_count: number | null
@@ -9180,6 +10989,7 @@ export type Database = {
           task_number: number
           title: string
           updated_at: string | null
+          workstream: string | null
         }[]
         SetofOptions: {
           from: "*"
@@ -9283,7 +11093,20 @@ export type Database = {
         }[]
       }
       get_unread_message_count: { Args: { user_id: string }; Returns: number }
+      get_user_foundries: {
+        Args: { p_user_id: string }
+        Returns: {
+          foundry_id: string
+          foundry_name: string
+          is_active: boolean
+          is_primary: boolean
+          joined_at: string
+          member_count: number
+          role: Database["public"]["Enums"]["member_role"]
+        }[]
+      }
       get_user_foundry_id: { Args: never; Returns: string }
+      get_user_foundry_ids: { Args: { p_user_id: string }; Returns: string[] }
       get_weekly_otjt_target: {
         Args: { enrollment_id: string }
         Returns: number
@@ -9329,10 +11152,30 @@ export type Database = {
         Args: { conv_id: string }
         Returns: boolean
       }
+      is_foundry_admin: {
+        Args: { p_foundry_id: string; p_user_id: string }
+        Returns: boolean
+      }
       is_otjt_on_track: { Args: { enrollment_id: string }; Returns: boolean }
       mark_conversation_read: {
         Args: { conv_id: string; user_id: string }
         Returns: undefined
+      }
+      record_ai_usage: {
+        Args: {
+          p_completion_tokens: number
+          p_error_message?: string
+          p_foundry_id: string
+          p_model: string
+          p_operation_type: string
+          p_prompt_tokens: number
+          p_request_duration_ms?: number
+          p_success?: boolean
+          p_task_id: string
+          p_total_tokens: number
+          p_user_id: string
+        }
+        Returns: string
       }
       refresh_all_analytics: { Args: never; Returns: undefined }
       refresh_buyer_stats: { Args: never; Returns: undefined }
@@ -9393,10 +11236,23 @@ export type Database = {
           workload_score: number
         }[]
       }
+      switch_active_foundry: {
+        Args: { p_foundry_id: string; p_user_id: string }
+        Returns: boolean
+      }
       update_blueprint_metrics: {
         Args: { p_blueprint_id: string }
         Returns: undefined
       }
+      update_foundry_purpose:
+        | {
+            Args: { p_foundry_id: string; p_purpose_data: Json }
+            Returns: Json
+          }
+        | {
+            Args: { p_foundry_id: string; p_purpose_data: Json }
+            Returns: Json
+          }
       update_trending_searches: { Args: never; Returns: undefined }
       upsert_domain_familiarity: {
         Args: {
@@ -9503,6 +11359,7 @@ export type Database = {
         | "partial_release"
         | "released"
         | "refunded"
+      feedback_category: "bug" | "idea" | "confusion" | "praise"
       funding_stage:
         | "Pre-Seed"
         | "Seed"
@@ -9511,7 +11368,7 @@ export type Database = {
         | "Growth"
         | "Bridge"
       legal_structure: "Ltd" | "Inc" | "LLC" | "GmbH" | "PLC" | "Other"
-      marketplace_category: "People" | "Products" | "Services"
+      marketplace_category: "People" | "Products" | "Services" | "AI"
       member_role: "Executive" | "Apprentice" | "AI_Agent" | "Founder"
       notification_channel: "push" | "email" | "sms" | "in_app"
       notification_priority: "critical" | "high" | "medium" | "low"
@@ -9722,6 +11579,7 @@ export const Constants = {
         "released",
         "refunded",
       ],
+      feedback_category: ["bug", "idea", "confusion", "praise"],
       funding_stage: [
         "Pre-Seed",
         "Seed",
@@ -9731,7 +11589,7 @@ export const Constants = {
         "Bridge",
       ],
       legal_structure: ["Ltd", "Inc", "LLC", "GmbH", "PLC", "Other"],
-      marketplace_category: ["People", "Products", "Services"],
+      marketplace_category: ["People", "Products", "Services", "AI"],
       member_role: ["Executive", "Apprentice", "AI_Agent", "Founder"],
       notification_channel: ["push", "email", "sms", "in_app"],
       notification_priority: ["critical", "high", "medium", "low"],
