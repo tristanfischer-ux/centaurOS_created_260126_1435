@@ -13,7 +13,6 @@ import {
     Lightbulb,
     ShoppingBag,
     Bot,
-    Home,
     Bell,
     Sparkles,
     Waypoints,
@@ -23,6 +22,10 @@ import {
     GraduationCap,
     BookOpen,
     LayoutDashboard,
+    UserCircle,
+    ArrowLeftRight,
+    Settings,
+    LogOut,
 } from "lucide-react"
 import { NotificationCenter } from "@/components/NotificationCenter"
 import { UnreadIndicator } from "@/components/today/UnreadIndicator"
@@ -33,10 +36,10 @@ import { useZoomContext } from "@/components/ZoomProvider"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { NewBadge } from "@/components/ui/new-badge"
 import { BetaBadge } from "@/components/ui/beta-badge"
-import { AccountPopover } from "@/components/account-popover"
 import { FeedbackDialog } from "@/components/feedback/feedback-dialog"
 import { QuickCaptureDialog } from "@/components/smart/quick-capture-dialog"
 import { isRouteBeta, getFeatureNameByRoute } from "@/lib/features/registry"
+import { signOut } from "@/actions/auth"
 import type { SmartGoalSuggestion } from "@/actions/smart-goals"
 
 /**
@@ -56,7 +59,8 @@ const APP_VERSION = "0.9.0"
 // Zone A: "Me" — Person-level navigation
 // ─────────────────────────────────────────────────────────────────────────────
 const personNavigation = [
-    { name: "Home", href: "/home", icon: Home, tooltip: "Your personal hub — switch companies, manage profile" },
+    { name: "My Profile", href: "/my-profile", icon: UserCircle, tooltip: "Your profile, details, and marketplace presence" },
+    { name: "Switch Company", href: "/home", icon: ArrowLeftRight, tooltip: "Switch between your companies" },
 ]
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -72,6 +76,7 @@ const companyNavigation = [
     { name: "Agents", href: "/agents", icon: Bot, tooltip: "Prompt workflows — build, chain, and copy prompts" },
     { name: "Financial Tools", href: "/tools/financial", icon: Coins, tooltip: "Money Map and Cost of Delay calculator" },
     { name: "My Orders", href: "/my-orders", icon: ShoppingBag, tooltip: "View and manage your marketplace orders" },
+    { name: "Settings", href: "/settings", icon: Settings, tooltip: "Company configuration, integrations, and preferences" },
 ]
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -106,8 +111,8 @@ interface SidebarProps {
  * Sidebar — Main navigation component with three-zone layout.
  *
  * @description Organizes navigation into three clear zones:
- * - "Me" zone: person-level pages (Home)
- * - "Company" zone: workspace pages (Orders, Dashboard, Tasks, Team, etc.)
+ * - "Me" zone: person-level pages (My Profile, Switch Company, Sign Out)
+ * - "Company" zone: workspace pages (Dashboard, Tasks, Team, Settings, etc.)
  * - "Network" zone: community and discovery (Marketplace, Guild, Apprenticeship, Inspiration)
  *
  * The company zone header doubles as the foundry switcher for multi-foundry users.
@@ -198,7 +203,7 @@ export function Sidebar({ foundryName, foundryId, userName, userRole, isCompanyA
             {/* App Header — ForgeOS Branding */}
             <div className="px-5 pt-8 pb-4">
                 <div className="flex items-center justify-between">
-                    <Link href="/home" className="group flex items-center gap-2">
+                    <Link href="/dashboard" className="group flex items-center gap-2">
                         <span className="font-display text-xl font-bold tracking-[0.05em] text-foreground group-hover:text-international-orange transition-colors">
                             ForgeOS
                         </span>
@@ -225,11 +230,6 @@ export function Sidebar({ foundryName, foundryId, userName, userRole, isCompanyA
                 </div>
             </div>
 
-            {/* Account menu (My Profile, Settings, Sign Out) */}
-            <div className="px-4 pb-3">
-                <AccountPopover userName={userName} userRole={userRole} />
-            </div>
-
             {/* Scrollable navigation */}
             <nav className="flex-1 overflow-y-auto px-3 py-1 space-y-1">
                 {/* ══════════════════════════════════════════════════ */}
@@ -241,6 +241,20 @@ export function Sidebar({ foundryName, foundryId, userName, userRole, isCompanyA
                     </p>
                 </div>
                 {personNavigation.map(renderNavItem)}
+
+                {/* Sign Out — form action, rendered separately */}
+                <form action={signOut}>
+                    <button
+                        type="submit"
+                        className="group flex items-center w-full px-3 py-2 text-sm text-muted-foreground hover:bg-muted hover:text-foreground transition-all duration-200 rounded-md"
+                    >
+                        <LogOut
+                            className="mr-3 h-4 w-4 flex-shrink-0 text-muted-foreground group-hover:text-foreground transition-colors"
+                            aria-hidden="true"
+                        />
+                        Sign Out
+                    </button>
+                </form>
 
                 {/* ══════════════════════════════════════════════════ */}
                 {/* Zone B: Company — Workspace navigation             */}

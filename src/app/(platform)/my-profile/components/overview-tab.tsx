@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import {
   CheckSquare, Target, Users, Mail, Shield, Building2,
-  ArrowRight, Settings
+  ArrowRight, Settings, UserCircle2
 } from 'lucide-react'
 import Link from 'next/link'
 
@@ -19,12 +19,16 @@ import Link from 'next/link'
  */
 
 interface OverviewTabProps {
+  /** User's full name */
+  fullName: string | null
   /** User's email */
   email: string
   /** User's role */
   role: string
   /** Foundry name */
   foundryName: string | null
+  /** Foundry ID (company identifier) */
+  foundryId: string | null
   /** Platform stats */
   stats: {
     totalTasks: number
@@ -34,9 +38,32 @@ interface OverviewTabProps {
   }
 }
 
-export function OverviewTab({ email, role, foundryName, stats }: OverviewTabProps) {
+export function OverviewTab({ fullName, email, role, foundryName, foundryId, stats }: OverviewTabProps) {
   return (
     <div className="space-y-6">
+      {/* Profile Configuration */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Profile Configuration</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <DetailRow icon={UserCircle2} label="Full Name" value={fullName || 'Not set'} />
+            <DetailRow icon={Mail} label="Email" value={email} />
+            <DetailRow icon={Shield} label="Role" value={role} />
+            <div className="space-y-1">
+              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                <Building2 className="h-3 w-3" />
+                Company ID
+              </span>
+              <p className="text-sm font-medium text-foreground px-3 py-2 bg-muted rounded-lg font-mono">
+                {foundryId || 'Not assigned'}
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Activity Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <StatCard
@@ -94,8 +121,8 @@ export function OverviewTab({ email, role, foundryName, stats }: OverviewTabProp
             <QuickLink
               href="/settings"
               icon={Settings}
-              title="Account Settings"
-              description="Update preferences and integrations"
+              title="Company Settings"
+              description="Company configuration and integrations"
             />
             <QuickLink
               href="/team"

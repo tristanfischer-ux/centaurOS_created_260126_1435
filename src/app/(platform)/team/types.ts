@@ -113,7 +113,7 @@ export interface CoverageSummaryEntry {
 
 // ─── View State ──────────────────────────────────────────────────────────────
 
-export type TeamViewMode = 'list' | 'orbit'
+export type TeamViewMode = 'orbit' | 'cards' | 'list'
 
 // ─── Computed Slice Data (for orbit) ─────────────────────────────────────────
 

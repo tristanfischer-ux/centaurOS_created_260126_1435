@@ -68,9 +68,11 @@ export function ProfileHubView({ data }: { data: ProfileHubData }) {
         {/* Overview Tab */}
         <TabsContent value="overview" className="mt-6">
           <OverviewTab
+            fullName={profile?.full_name ?? null}
             email={profile?.email ?? ''}
             role={profile?.role ?? 'Member'}
             foundryName={foundryName}
+            foundryId={profile?.foundry_id ?? null}
             stats={stats}
           />
         </TabsContent>

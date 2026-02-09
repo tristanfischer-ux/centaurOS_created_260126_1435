@@ -13,7 +13,6 @@ import {
     MoreHorizontal,
     Lightbulb,
     Bell,
-    Home,
     Bot,
     UserCircle,
     LogOut,
@@ -24,6 +23,7 @@ import {
     LayoutDashboard,
     ShoppingBag,
     Coins,
+    ArrowLeftRight,
 } from "lucide-react"
 import {
     DropdownMenu,
@@ -50,7 +50,7 @@ function isRouteActive(pathname: string, href: string): boolean {
 
 // Primary nav items shown in the bottom bar
 const mainNavigation = [
-    { name: "Home", shortName: "Home", href: "/home", icon: Home },
+    { name: "My Profile", shortName: "Profile", href: "/my-profile", icon: UserCircle },
     { name: "Dashboard", shortName: "Work", href: "/dashboard", icon: LayoutDashboard },
     { name: "Tasks", shortName: "Tasks", href: "/new-tasks", icon: CheckSquare },
 ]
@@ -64,6 +64,7 @@ const companyMoreNavigation = [
     { name: "Agents", href: "/agents", icon: Bot },
     { name: "Financial Tools", href: "/tools/financial", icon: Coins },
     { name: "My Orders", href: "/my-orders", icon: ShoppingBag },
+    { name: "Settings", href: "/settings", icon: Settings },
 ]
 
 // "More" dropdown — Network section
@@ -76,14 +77,13 @@ const networkMoreNavigation = [
 
 // Account items
 const accountNavigation = [
-    { name: "My Profile", href: "/my-profile", icon: UserCircle },
-    { name: "Settings", href: "/settings", icon: Settings },
+    { name: "Switch Company", href: "/home", icon: ArrowLeftRight },
 ]
 
 /**
  * MobileNav — Bottom navigation bar for mobile devices.
  *
- * @description Shows Home, Dashboard, Tasks in the main bar.
+ * @description Shows My Profile, Dashboard, Tasks in the main bar.
  * "More" dropdown groups remaining items into Company, Network, and Account sections.
  */
 export function MobileNav() {

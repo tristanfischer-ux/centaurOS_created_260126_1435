@@ -2,7 +2,6 @@ import { createClient } from '@/lib/supabase/server'
 import { createClient as createAdminClient } from '@supabase/supabase-js'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Label } from "@/components/ui/label"
 import { redirect } from 'next/navigation'
 import { TelegramLink } from '@/components/settings/telegram-link'
 import { ReportPreferences } from '@/components/settings/report-preferences'
@@ -59,41 +58,6 @@ export default async function SettingsPage() {
 
     return (
         <div className="space-y-6">
-            <div className="pb-4 border-b border-muted">
-                <div className="flex items-center gap-3 mb-1">
-                    <div className="h-8 w-1 bg-international-orange rounded-full shadow-[0_0_8px_rgba(234,88,12,0.6)]" />
-                    <h1 className="text-2xl sm:text-3xl font-display font-semibold text-foreground tracking-tight">Settings</h1>
-                </div>
-                <p className="text-muted-foreground mt-1 text-sm font-medium pl-4">Configure your profile and preferences</p>
-            </div>
-
-            <Card className="bg-background border-muted shadow-[0_2px_15px_rgba(0,0,0,0.03)]">
-                <CardHeader>
-                    <CardTitle>Profile Configuration</CardTitle>
-                    <CardDescription>Manage your persona and foundry settings.</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <Label>Full Name</Label>
-                            <div className="p-2 bg-muted rounded border border-muted">{profile?.full_name}</div>
-                        </div>
-                        <div>
-                            <Label>Email</Label>
-                            <div className="p-2 bg-muted rounded border border-muted">{profile?.email}</div>
-                        </div>
-                        <div>
-                            <Label>Role</Label>
-                            <div className="p-2 bg-muted rounded border border-muted font-mono text-status-warning">{profile?.role}</div>
-                        </div>
-                        <div>
-                            <Label>Company ID</Label>
-                            <div className="p-2 bg-muted rounded border border-muted font-mono">{profile?.foundry_id}</div>
-                        </div>
-                    </div>
-                </CardContent>
-            </Card>
-
             <CompanyProfileCard
                 companyProfile={companyProfile}
                 foundryId={profile?.foundry_id || ''}

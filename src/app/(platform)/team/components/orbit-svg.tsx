@@ -63,6 +63,20 @@ function spreadPos(
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// ROLE-BASED SVG COLOURS (matches UserAvatar component orange hierarchy)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+const SVG_ROLE_COLORS: Record<string, { bg: string; text: string; stroke: string }> = {
+  FOUNDER:    { bg: '#FFEDD5', text: '#C2410C', stroke: '#F97316' },
+  EXECUTIVE:  { bg: '#FFF7ED', text: '#EA580C', stroke: '#FB923C' },
+  APPRENTICE: { bg: '#F1F5F9', text: '#64748B', stroke: '#94A3B8' },
+}
+
+function getRoleSvgColors(role: string) {
+  return SVG_ROLE_COLORS[role] || SVG_ROLE_COLORS.APPRENTICE
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // SLOT COMPONENTS
 // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -81,6 +95,7 @@ function OSlot({ x, y, r, person, isEmpty, isFounder, sc, onClick }: OSlotProps)
   const [isHovered, setIsHovered] = useState(false)
 
   if (person) {
+    const rc = getRoleSvgColors(person.role)
     return (
       <g
         onClick={onClick}
@@ -91,17 +106,17 @@ function OSlot({ x, y, r, person, isEmpty, isFounder, sc, onClick }: OSlotProps)
         <circle cx={x} cy={y} r={r + 3} fill="white" />
         <circle
           cx={x} cy={y} r={r}
-          fill="white" stroke={sc.arc}
+          fill={rc.bg} stroke={rc.stroke}
           strokeWidth={isHovered ? 3 : 2.2}
           style={{
             transition: 'all .15s',
-            filter: isHovered ? `drop-shadow(0 2px 8px ${sc.arc}44)` : 'none',
+            filter: isHovered ? `drop-shadow(0 2px 8px ${rc.stroke}44)` : 'none',
           }}
         />
         <text
           x={x} y={y + 1}
           textAnchor="middle" dominantBaseline="central"
-          fill={sc.arc}
+          fill={rc.text}
           fontSize={r > 16 ? 12 : 9}
           fontWeight="800"
         >
@@ -124,6 +139,7 @@ function OSlot({ x, y, r, person, isEmpty, isFounder, sc, onClick }: OSlotProps)
   }
 
   if (isFounder) {
+    const rc = SVG_ROLE_COLORS.FOUNDER
     return (
       <g
         onClick={onClick}
@@ -134,13 +150,13 @@ function OSlot({ x, y, r, person, isEmpty, isFounder, sc, onClick }: OSlotProps)
         <circle cx={x} cy={y} r={r + 3} fill="white" />
         <circle
           cx={x} cy={y} r={r}
-          fill={isHovered ? sc.fillH : sc.fill}
-          stroke={sc.arc} strokeWidth="2" strokeDasharray="5 3"
+          fill={isHovered ? rc.bg : '#FFF7ED'}
+          stroke={rc.stroke} strokeWidth="2" strokeDasharray="5 3"
         />
         <text
           x={x} y={y}
           textAnchor="middle" dominantBaseline="central"
-          fill={sc.text}
+          fill={rc.text}
           fontSize={r > 16 ? 10 : 8}
           fontWeight="800"
         >
@@ -152,7 +168,7 @@ function OSlot({ x, y, r, person, isEmpty, isFounder, sc, onClick }: OSlotProps)
             <text
               x={x} y={y - r - 15}
               textAnchor="middle" dominantBaseline="central"
-              fill={sc.conn} fontSize="10" fontWeight="600"
+              fill="#F97316" fontSize="10" fontWeight="600"
             >
               Founder
             </text>
@@ -461,7 +477,7 @@ export function OrbitSVG({
                 person={comp.apprentices[ai] || null}
                 isEmpty={!comp.apprentices[ai]}
                 isFounder={false}
-                sc={comp.apprentices[ai] ? STATUS_COLORS.green : sc}
+                sc={sc}
                 onClick={() => onSelect(fn.id)}
               />
             ))}

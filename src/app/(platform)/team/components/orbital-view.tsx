@@ -5,14 +5,9 @@
  *
  * @description Combines PanZoomCanvas (for drag/zoom interaction),
  * OrbitSVG (the visual diagram), and OrbitSidePanel (details on right).
- * Accepts real Supabase data and transforms it via useTeamData.
+ * Accepts pre-computed teamData from the parent component.
  *
- * @param props.founders - Founder profiles from page
- * @param props.executives - Executive profiles from page
- * @param props.apprentices - Apprentice profiles from page
- * @param props.marketplacePeople - Marketplace People listings
- * @param props.functionCategoryMap - business_function.id → category
- * @param props.coverageSummary - Coverage summary per function category
+ * @param props.teamData - Pre-computed team data from useTeamData hook
  * @param props.onViewProfile - Callback to open profile modal for real members
  */
 
@@ -20,28 +15,19 @@ import { useState, useCallback } from 'react'
 import { PanZoomCanvas } from './pan-zoom-canvas'
 import { OrbitSVG } from './orbit-svg'
 import { OrbitSidePanel } from './orbit-side-panel'
-import { useTeamData } from '../hooks/use-team-data'
 import { FUNCTIONS } from '../constants'
-import type { FunctionId, OrbitProfile, MarketplacePersonListing, CoverageSummaryEntry } from '../types'
+import type { FunctionId } from '../types'
+import type { TeamDataResult } from '../hooks/use-team-data'
 
 interface OrbitalViewProps {
-  founders: OrbitProfile[]
-  executives: OrbitProfile[]
-  apprentices: OrbitProfile[]
-  marketplacePeople: MarketplacePersonListing[]
-  functionCategoryMap: Record<string, string>
-  coverageSummary: Record<string, CoverageSummaryEntry>
+  /** Pre-computed team data from useTeamData */
+  teamData: TeamDataResult
   /** Callback to open real profile modal (for internal members) */
   onViewProfile?: (memberId: string) => void
 }
 
 export function OrbitalView({
-  founders,
-  executives,
-  apprentices,
-  marketplacePeople,
-  functionCategoryMap,
-  coverageSummary,
+  teamData,
   onViewProfile,
 }: OrbitalViewProps) {
   const [selected, setSelected] = useState<FunctionId | null>(null)
@@ -53,16 +39,6 @@ export function OrbitalView({
   const handleDeselect = useCallback(() => {
     setSelected(null)
   }, [])
-
-  // Transform real data into orbit-compatible shape
-  const teamData = useTeamData({
-    founders,
-    executives,
-    apprentices,
-    marketplacePeople,
-    functionCategoryMap,
-    coverageSummary,
-  })
 
   return (
     <div className="flex flex-1 overflow-hidden">

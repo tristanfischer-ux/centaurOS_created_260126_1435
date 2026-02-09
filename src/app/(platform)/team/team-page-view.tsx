@@ -11,11 +11,11 @@
  * is managed here and passed down.
  */
 
-import { useState, useCallback, useTransition } from 'react'
+import { useState, useCallback, useTransition, useMemo } from 'react'
 import {
-    RefreshCw, UserPlus, Plus, Search, LayoutGrid, List, Users,
+    Plus, Search, LayoutGrid, List, Users,
     BarChart3, ShieldCheck, Zap, MoreHorizontal, Loader2,
-    AlertTriangle, Check, Store, Star, ExternalLink, ArrowRight
+    AlertTriangle, Check, Store, Orbit
 } from 'lucide-react'
 import Link from 'next/link'
 import { toast } from 'sonner'
@@ -65,6 +65,8 @@ import { TeamAnalytics } from '@/components/team/team-analytics'
 import { TeamMemberCard, type CardSize } from '@/components/team/team-member-card'
 import { FeatureTip } from '@/components/onboarding'
 
+import { useTeamData } from './hooks/use-team-data'
+import { FUNCTIONS } from './constants'
 import type { TeamViewMode } from './types'
 
 // ─── Types ───────────────────────────────────────
@@ -201,10 +203,9 @@ export function TeamPageView({
     functionCategoryMap = {},
     coverageSummary = {},
 }: TeamPageViewProps) {
-    // View state
-    const [view, setView] = useState<TeamViewMode>('list')
+    // View state — orbit is the default landing view
+    const [viewMode, setViewMode] = useState<TeamViewMode>('orbit')
     const [activeTab, setActiveTab] = useState<ActiveTab>('members')
-    const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
     const [searchQuery, setSearchQuery] = useState('')
 
     // Selection & comparison
@@ -263,6 +264,55 @@ export function TeamPageView({
             return sum + (100 - score)
         }, 0) / humanMembers.length)
         : 100
+
+    // ─── Computed orbit data (shared across all views) ────
+    const teamData = useTeamData({
+        founders: founders.map(m => ({
+            id: m.id,
+            full_name: m.full_name,
+            role: m.role,
+            avatar_url: m.avatar_url ?? null,
+            primary_function_id: m.primary_function_id ?? null,
+            activeTasks: m.activeTasks,
+            completedTasks: m.completedTasks,
+            pendingTasks: m.pendingTasks,
+        })),
+        executives: executives.map(m => ({
+            id: m.id,
+            full_name: m.full_name,
+            role: m.role,
+            avatar_url: m.avatar_url ?? null,
+            primary_function_id: m.primary_function_id ?? null,
+            activeTasks: m.activeTasks,
+            completedTasks: m.completedTasks,
+            pendingTasks: m.pendingTasks,
+        })),
+        apprentices: apprentices.map(m => ({
+            id: m.id,
+            full_name: m.full_name,
+            role: m.role,
+            avatar_url: m.avatar_url ?? null,
+            primary_function_id: m.primary_function_id ?? null,
+            activeTasks: m.activeTasks,
+            completedTasks: m.completedTasks,
+            pendingTasks: m.pendingTasks,
+        })),
+        marketplacePeople,
+        functionCategoryMap,
+        coverageSummary,
+    })
+
+    /** Marketplace candidates visible in orbit, ordered by function */
+    const orbitVisibleCandidates = useMemo(() => {
+        return FUNCTIONS.flatMap(fn => {
+            const candidates = teamData.marketplaceByFunction[fn.id] || []
+            return candidates.slice(0, 4).map(c => ({
+                ...c,
+                functionLabel: fn.label,
+                functionId: fn.id,
+            }))
+        })
+    }, [teamData.marketplaceByFunction])
 
     // ─── Search Filter ─────────────────────────
 
@@ -465,28 +515,36 @@ export function TeamPageView({
         })
     }
 
-    // ─── Marketplace Candidates Section ──────────
+    // ─── Marketplace Candidates Section (by function, matching orbit) ──────
 
-    const MarketplaceCandidatesSection = ({ listings, searchQuery: sq }: {
-        listings: MarketplacePersonListing[]
+    type OrbitCandidate = typeof orbitVisibleCandidates[number]
+
+    const MarketplaceCandidatesSection = ({ candidates, searchQuery: sq, displayMode }: {
+        candidates: OrbitCandidate[]
         searchQuery: string
+        displayMode: 'cards' | 'list'
     }) => {
         const filtered = sq.trim()
-            ? listings.filter(l => {
+            ? candidates.filter(c => {
                 const q = sq.toLowerCase()
-                const attrs = l.attributes || {}
                 return (
-                    l.title.toLowerCase().includes(q) ||
-                    l.subcategory.toLowerCase().includes(q) ||
-                    ((attrs.role as string) || '').toLowerCase().includes(q)
+                    c.name.toLowerCase().includes(q) ||
+                    c.role.toLowerCase().includes(q) ||
+                    c.functionLabel.toLowerCase().includes(q) ||
+                    c.tags.some(t => t.toLowerCase().includes(q))
                 )
             })
-            : listings
-
-        const execListings = filtered.filter(l => l.subcategory === 'Executive')
-        const apprenticeListings = filtered.filter(l => l.subcategory === 'Apprentice')
+            : candidates
 
         if (filtered.length === 0 && !sq) return null
+
+        // Group by function (preserving FUNCTIONS order)
+        const byFunction = FUNCTIONS
+            .map(fn => ({
+                fn,
+                items: filtered.filter(c => c.functionId === fn.id),
+            }))
+            .filter(g => g.items.length > 0)
 
         return (
             <section className="space-y-4">
@@ -505,97 +563,114 @@ export function TeamPageView({
                         description="Try a different search term"
                         className="py-10 bg-muted/20 rounded-xl border border-muted"
                     />
-                ) : (
+                ) : displayMode === 'cards' ? (
                     <div className="space-y-6">
-                        {/* Executive Candidates */}
-                        {execListings.length > 0 && (
-                            <div className="space-y-3">
+                        {byFunction.map(({ fn, items }) => (
+                            <div key={fn.id} className="space-y-3">
                                 <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
-                                    Executive Candidates ({execListings.length})
+                                    {fn.label} ({items.length})
                                 </h3>
                                 <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                                    {execListings.map((listing) => (
-                                        <MarketplaceCard key={listing.id} listing={listing} />
+                                    {items.map((c) => (
+                                        <MarketplaceCandidateCard key={c.id} candidate={c} />
                                     ))}
                                 </div>
                             </div>
-                        )}
-
-                        {/* Apprentice Candidates */}
-                        {apprenticeListings.length > 0 && (
-                            <div className="space-y-3">
-                                <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
-                                    Apprentice Candidates ({apprenticeListings.length})
-                                </h3>
-                                <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                                    {apprenticeListings.map((listing) => (
-                                        <MarketplaceCard key={listing.id} listing={listing} />
-                                    ))}
-                                </div>
-                            </div>
-                        )}
+                        ))}
+                    </div>
+                ) : (
+                    /* List (table) display */
+                    <div className="border border-muted rounded-xl overflow-hidden">
+                        <table className="w-full text-sm text-left">
+                            <thead className="bg-muted/50 text-muted-foreground font-medium border-b border-muted">
+                                <tr>
+                                    <th className="px-4 py-2.5 pl-6 text-xs font-medium uppercase tracking-wider">Candidate</th>
+                                    <th className="px-4 py-2.5 text-xs font-medium uppercase tracking-wider">Function</th>
+                                    <th className="px-4 py-2.5 text-xs font-medium uppercase tracking-wider">Type</th>
+                                    <th className="px-4 py-2.5 text-xs font-medium uppercase tracking-wider">Rate</th>
+                                    <th className="px-4 py-2.5 w-24"></th>
+                                </tr>
+                            </thead>
+                            <tbody className="bg-background">
+                                {byFunction.flatMap(({ items }) => items).map(c => {
+                                    const listing = marketplacePeople.find(mp => mp.id === c.id)
+                                    return (
+                                        <tr
+                                            key={c.id}
+                                            className="group hover:bg-muted/50 transition-colors duration-150 border-b border-muted last:border-0"
+                                        >
+                                            <td className="px-4 py-3 pl-6">
+                                                <div className="flex items-center gap-3">
+                                                    <UserAvatar name={c.name} role={c.type === 'exec' ? 'Executive' : 'Apprentice'} size="sm" />
+                                                    <div>
+                                                        <span className="font-medium text-foreground">{c.name}</span>
+                                                        <div className="text-xs text-muted-foreground">{c.role}</div>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td className="px-4 py-3">
+                                                <Badge variant="secondary" className="text-[10px] font-normal">{c.functionLabel}</Badge>
+                                            </td>
+                                            <td className="px-4 py-3">
+                                                <Badge
+                                                    variant="info"
+                                                    className="text-[10px]"
+                                                >
+                                                    {c.type === 'exec' ? 'Executive' : 'Apprentice'}
+                                                </Badge>
+                                            </td>
+                                            <td className="px-4 py-3 text-muted-foreground text-xs font-medium">
+                                                {c.hourlyRate}
+                                            </td>
+                                            <td className="px-4 py-3 text-right pr-6">
+                                                <Link
+                                                    href={listing ? `/marketplace/${listing.id}` : '/marketplace'}
+                                                    className="text-xs font-semibold text-electric-blue hover:underline"
+                                                >
+                                                    View
+                                                </Link>
+                                            </td>
+                                        </tr>
+                                    )
+                                })}
+                            </tbody>
+                        </table>
                     </div>
                 )}
             </section>
         )
     }
 
-    /** Single marketplace listing card for the card/list view */
-    const MarketplaceCard = ({ listing }: { listing: MarketplacePersonListing }) => {
-        const attrs = listing.attributes || {}
-        const role = (attrs.role as string) || listing.subcategory
-        const rate = (attrs.rate as string) || 'Contact for rate'
-        const skills = ((attrs.expertise || attrs.skills || []) as string[]).slice(0, 3)
-        const isExec = listing.subcategory === 'Executive'
-        const initials = listing.title
-            .split(' ')
-            .map((s) => s[0])
-            .filter(Boolean)
-            .join('')
-            .toUpperCase()
-            .slice(0, 2)
+    /** Single marketplace candidate card for the cards view */
+    const MarketplaceCandidateCard = ({ candidate: c }: { candidate: OrbitCandidate }) => {
+        const listing = marketplacePeople.find(mp => mp.id === c.id)
+        const isExec = c.type === 'exec'
 
         return (
             <div className="bg-card border border-muted rounded-xl p-4 hover:shadow-lg hover:-translate-y-0.5 transition-all group">
                 <div className="flex items-start gap-3 mb-3">
-                    <div
-                        className="w-10 h-10 rounded-full flex items-center justify-center text-xs font-extrabold shrink-0"
-                        style={{
-                            background: isExec ? '#EEF2FF' : '#F5F3FF',
-                            border: `2px solid ${isExec ? '#A5B4FC' : '#C4B5FD'}`,
-                            color: isExec ? '#4F46E5' : '#7C3AED',
-                        }}
-                    >
-                        {initials}
-                    </div>
+                    <UserAvatar name={c.name} role={isExec ? 'Executive' : 'Apprentice'} size="lg" />
                     <div className="flex-1 min-w-0">
-                        <div className="text-sm font-bold text-foreground truncate">{listing.title}</div>
-                        <div className="text-xs text-muted-foreground">{role}</div>
+                        <div className="text-sm font-bold text-foreground truncate">{c.name}</div>
+                        <div className="text-xs text-muted-foreground">{c.role}</div>
                     </div>
-                    <Badge
-                        variant="secondary"
-                        className="text-[9px] shrink-0"
-                        style={{
-                            background: isExec ? '#EEF2FF' : '#F5F3FF',
-                            color: isExec ? '#4F46E5' : '#7C3AED',
-                        }}
-                    >
-                        {isExec ? 'EXEC' : 'APPR'}
+                    <Badge variant="secondary" className="text-[9px] shrink-0">
+                        {c.functionLabel}
                     </Badge>
                 </div>
 
                 {/* Rate */}
-                <div className="text-xs text-foreground font-semibold mb-2">{rate}</div>
+                <div className="text-xs text-foreground font-semibold mb-2">{c.hourlyRate}</div>
 
                 {/* Skills */}
-                {skills.length > 0 && (
+                {c.tags.length > 0 && (
                     <div className="flex flex-wrap gap-1 mb-3">
-                        {skills.map((skill) => (
+                        {c.tags.map((tag) => (
                             <span
-                                key={skill}
+                                key={tag}
                                 className="text-[10px] px-2 py-0.5 rounded-full bg-muted text-muted-foreground font-medium"
                             >
-                                {skill}
+                                {tag}
                             </span>
                         ))}
                     </div>
@@ -604,13 +679,13 @@ export function TeamPageView({
                 {/* Actions */}
                 <div className="flex gap-2 pt-2 border-t border-muted">
                     <Link
-                        href={`/marketplace/${listing.id}`}
+                        href={listing ? `/marketplace/${listing.id}` : '/marketplace'}
                         className="flex-1 text-center text-xs font-semibold text-electric-blue hover:underline py-1.5"
                     >
                         View Profile
                     </Link>
                     <Link
-                        href={`/marketplace/${listing.id}/book`}
+                        href={listing ? `/marketplace/${listing.id}/book` : '/marketplace'}
                         className="flex-1 text-center text-xs font-semibold text-white bg-international-orange hover:bg-international-orange/90 rounded-lg py-1.5 transition-colors"
                     >
                         Onboard
@@ -646,7 +721,7 @@ export function TeamPageView({
                         description={searchQuery ? 'Try a different search term' : `Add ${title.toLowerCase()} to get started.`}
                         className="py-10 bg-muted/20 rounded-xl border border-muted"
                     />
-                ) : viewMode === 'grid' ? (
+                ) : viewMode === 'cards' ? (
                     <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                         {members.map(member => (
                             <div
@@ -893,20 +968,35 @@ export function TeamPageView({
                         />
                     </div>
 
-                    {/* View toggle (members only) */}
+                    {/* 3-way view toggle (members only) */}
                     {activeTab === 'members' && (
                         <div className="flex bg-muted/50 p-1 rounded-xl border border-muted">
                             <Button
                                 variant="ghost"
                                 size="sm"
-                                onClick={() => setViewMode('grid')}
+                                onClick={() => setViewMode('orbit')}
                                 className={cn(
-                                    'h-7 w-7 p-0 rounded-md transition-all duration-200',
-                                    viewMode === 'grid'
+                                    'h-7 px-2 rounded-md transition-all duration-200 text-xs font-bold gap-1',
+                                    viewMode === 'orbit'
                                         ? 'bg-international-orange/10 text-international-orange shadow-sm'
                                         : 'text-muted-foreground hover:text-foreground hover:bg-muted'
                                 )}
-                                aria-label="Grid view"
+                                aria-label="Orbit view"
+                            >
+                                <Orbit className="h-3.5 w-3.5" />
+                                Orbit
+                            </Button>
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setViewMode('cards')}
+                                className={cn(
+                                    'h-7 w-7 p-0 rounded-md transition-all duration-200',
+                                    viewMode === 'cards'
+                                        ? 'bg-international-orange/10 text-international-orange shadow-sm'
+                                        : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                                )}
+                                aria-label="Cards view"
                             >
                                 <LayoutGrid className="h-3.5 w-3.5" />
                             </Button>
@@ -924,22 +1014,6 @@ export function TeamPageView({
                             >
                                 <List className="h-3.5 w-3.5" />
                             </Button>
-
-                            {/* Orbit toggle */}
-                            <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => setView(view === 'orbit' ? 'list' : 'orbit')}
-                                className={cn(
-                                    'h-7 px-2 ml-1 rounded-md transition-all duration-200 text-xs font-bold',
-                                    view === 'orbit'
-                                        ? 'bg-international-orange/10 text-international-orange shadow-sm'
-                                        : 'text-muted-foreground hover:text-foreground hover:bg-muted'
-                                )}
-                                aria-label="Orbit view"
-                            >
-                                ◎ Orbit
-                            </Button>
                         </div>
                     )}
                 </div>
@@ -950,25 +1024,19 @@ export function TeamPageView({
 
             {/* ── Content ─────────────────────────────────────────── */}
 
-            {/* Members Tab with Orbit View */}
-            {activeTab === 'members' && view === 'orbit' && (
+            {/* Members Tab — Orbit View */}
+            {activeTab === 'members' && viewMode === 'orbit' && (
                 <div className="h-[calc(100vh-22rem)] -mx-4 sm:-mx-6 lg:-mx-8 overflow-hidden flex">
                     <OrbitalView
-                        founders={founders}
-                        executives={executives}
-                        apprentices={apprentices}
-                        marketplacePeople={marketplacePeople}
-                        functionCategoryMap={functionCategoryMap}
-                        coverageSummary={coverageSummary}
+                        teamData={teamData}
                         onViewProfile={setSelectedMemberId}
                     />
                 </div>
             )}
 
-            {/* Members Tab with List/Grid View */}
-            {activeTab === 'members' && view !== 'orbit' && (
+            {/* Members Tab — Cards View */}
+            {activeTab === 'members' && viewMode === 'cards' && (
                 <div className="space-y-8">
-                    {/* Team Analytics Charts */}
                     <TeamAnalytics members={allMembers} />
 
                     <MemberSection
@@ -990,11 +1058,47 @@ export function TeamPageView({
                         members={filteredApprentices}
                     />
 
-                    {/* Marketplace Candidates Section */}
-                    {marketplacePeople.length > 0 && (
+                    {/* Marketplace Candidates — same set as orbit, ordered by function */}
+                    {orbitVisibleCandidates.length > 0 && (
                         <MarketplaceCandidatesSection
-                            listings={marketplacePeople}
+                            candidates={orbitVisibleCandidates}
                             searchQuery={searchQuery}
+                            displayMode="cards"
+                        />
+                    )}
+                </div>
+            )}
+
+            {/* Members Tab — List View */}
+            {activeTab === 'members' && viewMode === 'list' && (
+                <div className="space-y-8">
+                    <TeamAnalytics members={allMembers} />
+
+                    <MemberSection
+                        title="Founders"
+                        subtitle="Decision makers"
+                        accentColor="bg-international-orange"
+                        members={filteredFounders}
+                    />
+                    <MemberSection
+                        title="Executives"
+                        subtitle="Evaluators"
+                        accentColor="bg-orange-400"
+                        members={filteredExecutives}
+                    />
+                    <MemberSection
+                        title="Apprentices"
+                        subtitle="Executors"
+                        accentColor="bg-muted-foreground"
+                        members={filteredApprentices}
+                    />
+
+                    {/* Marketplace Candidates — same set as orbit, ordered by function */}
+                    {orbitVisibleCandidates.length > 0 && (
+                        <MarketplaceCandidatesSection
+                            candidates={orbitVisibleCandidates}
+                            searchQuery={searchQuery}
+                            displayMode="list"
                         />
                     )}
                 </div>

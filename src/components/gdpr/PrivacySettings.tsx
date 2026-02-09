@@ -141,7 +141,7 @@ export function PrivacySettings({ initialRequests = [] }: PrivacySettingsProps) 
             Privacy Settings
           </h1>
           <p className="text-muted-foreground mt-1">
-            Manage your data and exercise your privacy rights
+            Manage company data and exercise your privacy rights
           </p>
         </div>
         <Button
@@ -163,12 +163,12 @@ export function PrivacySettings({ initialRequests = [] }: PrivacySettingsProps) 
               <div className="p-2 rounded-lg bg-blue-100 text-electric-blue">
                 <Eye className="h-5 w-5" />
               </div>
-              <CardTitle className="text-base">Access My Data</CardTitle>
+              <CardTitle className="text-base">Access Company Data</CardTitle>
             </div>
           </CardHeader>
           <CardContent>
             <p className="text-sm text-muted-foreground">
-              Request a copy of all personal data we hold about you
+              Request a copy of all company data we hold
             </p>
             {pendingTypes.includes("access") && (
               <Badge variant="warning" className="mt-2">Request Pending</Badge>
@@ -182,12 +182,12 @@ export function PrivacySettings({ initialRequests = [] }: PrivacySettingsProps) 
               <div className="p-2 rounded-lg bg-status-success-light text-status-success">
                 <Download className="h-5 w-5" />
               </div>
-              <CardTitle className="text-base">Export My Data</CardTitle>
+              <CardTitle className="text-base">Export Company Data</CardTitle>
             </div>
           </CardHeader>
           <CardContent>
             <p className="text-sm text-muted-foreground">
-              Download your data in a machine-readable format
+              Download your company data in a machine-readable format
             </p>
             {pendingTypes.includes("export") && (
               <Badge variant="warning" className="mt-2">Request Pending</Badge>
@@ -201,12 +201,12 @@ export function PrivacySettings({ initialRequests = [] }: PrivacySettingsProps) 
               <div className="p-2 rounded-lg bg-orange-100 text-international-orange">
                 <Trash2 className="h-5 w-5" />
               </div>
-              <CardTitle className="text-base">Delete My Account</CardTitle>
+              <CardTitle className="text-base">Delete Company Account</CardTitle>
             </div>
           </CardHeader>
           <CardContent>
             <p className="text-sm text-muted-foreground">
-              Request deletion of your personal data and account
+              Request deletion of your company data and account
             </p>
             {pendingTypes.includes("deletion") && (
               <Badge variant="warning" className="mt-2">Request Pending</Badge>

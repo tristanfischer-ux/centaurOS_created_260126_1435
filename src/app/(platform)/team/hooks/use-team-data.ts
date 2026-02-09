@@ -55,7 +55,7 @@ interface GapInfo {
   status: 'yellow' | 'red'
 }
 
-interface TeamDataResult {
+export interface TeamDataResult {
   founders: TeamMember[]
   allExecs: (TeamMember & { functionId: string; functionLabel: string })[]
   allApprentices: (TeamMember & { functionId: string; functionLabel: string })[]
