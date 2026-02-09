@@ -543,16 +543,57 @@ export function unlinkedItemsToElements(
     }
   }
 
+  // ------------------------------------------------------------------
+  // PRE-BUILD task-by-objective map so we know task counts BEFORE
+  // placing objectives (needed for correct vertical spacing).
+  // ------------------------------------------------------------------
+  const tasksByObjective = new Map<string, CanvasTask[]>()
+  const orphanTasks: CanvasTask[] = []
+  const objectiveIdSet = new Set(objectives.map((o) => o.id))
+
+  for (const task of tasks) {
+    if (task.objective_id && objectiveIdSet.has(task.objective_id)) {
+      const existing = tasksByObjective.get(task.objective_id) ?? []
+      existing.push(task)
+      tasksByObjective.set(task.objective_id, existing)
+    } else {
+      orphanTasks.push(task)
+    }
+  }
+
+  /**
+   * Compute the total vertical footprint of an objective, including
+   * the space needed for its child tasks (when tasks are visible).
+   */
+  const objectiveFootprint = (objId: string): number => {
+    const taskCount = tasksByObjective.get(objId)?.length ?? 0
+    if (showTasks && taskCount > 0) {
+      // objective + gap + tasks + extra breathing room
+      return (
+        OBJECTIVE_HEIGHT +
+        OBJECTIVE_TO_TASK_GAP +
+        taskCount * UNLINKED_TASK_ROW_HEIGHT +
+        VERTICAL_SPACING
+      )
+    }
+    return OBJECTIVE_HEIGHT + VERTICAL_SPACING
+  }
+
   // Track objective positions for task placement
   const objectivePositions = new Map<string, { x: number; y: number }>()
 
-  // Place dated objectives — resolve x-overlaps by stacking into rows
+  // ------------------------------------------------------------------
+  // DATED OBJECTIVES — resolve x-overlaps into rows, then use
+  // task-aware row heights so tasks don't overlap the next row.
+  // ------------------------------------------------------------------
+  type DatedEntry = { obj: CanvasObjective; rawX: number; row: number }
+  const datedEntries: DatedEntry[] = []
   const datedXSlots: { x: number; endX: number; row: number }[] = []
 
   for (const obj of datedObjectives) {
     const rawX = dateToX(obj.milestone_date!, pxPerDay, rangeStart)
 
-    // Find a row where this node doesn't overlap
+    // Find a row where this node doesn't overlap horizontally
     let row = 0
     let placed = false
     while (!placed) {
@@ -570,8 +611,33 @@ export function unlinkedItemsToElements(
     }
 
     datedXSlots.push({ x: rawX, endX: rawX + NODE_WIDTH, row })
+    datedEntries.push({ obj, rawX, row })
+  }
 
-    const objY = contentStartY + row * UNLINKED_ROW_HEIGHT
+  // Compute per-row height as the max footprint of any objective in that row
+  const datedRowMaxFootprint = new Map<number, number>()
+  for (const { obj, row } of datedEntries) {
+    const footprint = objectiveFootprint(obj.id)
+    const current = datedRowMaxFootprint.get(row) ?? 0
+    if (footprint > current) datedRowMaxFootprint.set(row, footprint)
+  }
+
+  // Compute cumulative y-offset per row
+  const datedRowYStart = new Map<number, number>()
+  let datedCumulativeY = contentStartY
+  const maxDatedRow =
+    datedEntries.length > 0
+      ? Math.max(...datedEntries.map((e) => e.row))
+      : -1
+  for (let r = 0; r <= maxDatedRow; r++) {
+    datedRowYStart.set(r, datedCumulativeY)
+    datedCumulativeY +=
+      datedRowMaxFootprint.get(r) ?? UNLINKED_ROW_HEIGHT
+  }
+
+  // Place dated objectives using task-aware row offsets
+  for (const { obj, rawX, row } of datedEntries) {
+    const objY = datedRowYStart.get(row)!
     objectivePositions.set(obj.id, { x: rawX, y: objY })
 
     nodes.push({
@@ -590,16 +656,18 @@ export function unlinkedItemsToElements(
     })
   }
 
-  // Place undated objectives in "No Date" column
-  for (let i = 0; i < undatedObjectives.length; i++) {
-    const obj = undatedObjectives[i]
-    const objY = contentStartY + i * UNLINKED_ROW_HEIGHT
-    objectivePositions.set(obj.id, { x: NO_DATE_X, y: objY })
+  // ------------------------------------------------------------------
+  // UNDATED OBJECTIVES — "No Date" column at x=40.
+  // Running yOffset accounts for each objective's task footprint.
+  // ------------------------------------------------------------------
+  let undatedY = contentStartY
+  for (const obj of undatedObjectives) {
+    objectivePositions.set(obj.id, { x: NO_DATE_X, y: undatedY })
 
     nodes.push({
       id: `objective-${obj.id}`,
       type: 'objective',
-      position: { x: NO_DATE_X, y: objY },
+      position: { x: NO_DATE_X, y: undatedY },
       data: {
         title: obj.title,
         status: obj.status,
@@ -610,13 +678,15 @@ export function unlinkedItemsToElements(
       },
       style: { width: NODE_WIDTH },
     })
+
+    undatedY += objectiveFootprint(obj.id)
   }
 
   // Overflow indicator for objectives
   if (totalObjectives > objectives.length) {
     const overflowCount = totalObjectives - objectives.length
-    const overflowY =
-      contentStartY + objectives.length * UNLINKED_ROW_HEIGHT
+    // Place below whichever column is taller (dated rows vs undated stack)
+    const overflowY = Math.max(undatedY, datedCumulativeY)
 
     nodes.push({
       id: 'expand-unlinked-objectives',
@@ -634,20 +704,6 @@ export function unlinkedItemsToElements(
   // UNLINKED TASKS (below their parent objectives, or orphan section)
   // ----------------------------------------------------------------
   if (showTasks) {
-    // Build objective → tasks map
-    const tasksByObjective = new Map<string, CanvasTask[]>()
-    const orphanTasks: CanvasTask[] = []
-
-    for (const task of tasks) {
-      if (task.objective_id && objectivePositions.has(task.objective_id)) {
-        const existing = tasksByObjective.get(task.objective_id) ?? []
-        existing.push(task)
-        tasksByObjective.set(task.objective_id, existing)
-      } else {
-        orphanTasks.push(task)
-      }
-    }
-
     // Place tasks below their parent objectives
     for (const [objId, objTasks] of tasksByObjective) {
       const objPos = objectivePositions.get(objId)
@@ -700,30 +756,16 @@ export function unlinkedItemsToElements(
       }
     }
 
-    // Place orphan tasks (no objective) in a sub-section below objectives
+    // Place orphan tasks (no objective) below all objectives + their tasks
     if (orphanTasks.length > 0) {
-      // Find the max Y of all objective nodes + their tasks to place orphans below
-      let maxY = contentStartY
-      for (const pos of objectivePositions.values()) {
-        if (pos.y + OBJECTIVE_HEIGHT > maxY) {
-          maxY = pos.y + OBJECTIVE_HEIGHT
-        }
-      }
-      // Account for tasks placed below objectives
-      for (const [, objTasks] of tasksByObjective) {
-        const objPos = objectivePositions.get([...tasksByObjective.keys()].find(
-          (k) => tasksByObjective.get(k) === objTasks
-        ) ?? '')
-        if (objPos) {
-          const taskBottomY =
-            objPos.y +
-            OBJECTIVE_TO_TASK_GAP +
-            objTasks.length * UNLINKED_TASK_ROW_HEIGHT
-          if (taskBottomY > maxY) maxY = taskBottomY
-        }
+      // Compute the bottom of all objective footprints
+      let maxBottomY = contentStartY
+      for (const [objId, pos] of objectivePositions) {
+        const bottom = pos.y + objectiveFootprint(objId)
+        if (bottom > maxBottomY) maxBottomY = bottom
       }
 
-      const orphanStartY = maxY + VERTICAL_SPACING * 3
+      const orphanStartY = maxBottomY + VERTICAL_SPACING * 2
 
       for (let i = 0; i < orphanTasks.length; i++) {
         const task = orphanTasks[i]
