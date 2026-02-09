@@ -46,6 +46,8 @@ export default async function ObjectivesPage({ searchParams }: ObjectivesPagePro
         .from('objectives')
         .select('id, title, description, extended_description, status, progress, parent_objective_id, creator_id, foundry_id, created_at, updated_at, is_private, is_strategic_goal')
         .eq('foundry_id', profile.foundry_id)
+        .eq('is_ghost', false)
+        .is('deleted_at', null)
         .order('created_at', { ascending: false })
 
     if (error) {
@@ -89,6 +91,8 @@ export default async function ObjectivesPage({ searchParams }: ObjectivesPagePro
             task_comments(id, is_system_log),
             task_files(id, file_name, file_size, created_at)
         `)
+        .eq('is_ghost', false)
+        .is('deleted_at', null)
         .not('objective_id', 'is', null)
         .order('end_date', { ascending: true })
 
@@ -105,7 +109,7 @@ export default async function ObjectivesPage({ searchParams }: ObjectivesPagePro
 
     // SECURITY: Fetch data for CreateTaskDialog - filtered by foundry_id
     // Note: Profiles RLS is disabled due to recursion issues, so app-level filtering is CRITICAL
-    const objectivesForDialog = await supabase.from('objectives').select('id, title').eq('foundry_id', profile.foundry_id).then(r => r.data || [])
+    const objectivesForDialog = await supabase.from('objectives').select('id, title').eq('foundry_id', profile.foundry_id).eq('is_ghost', false).is('deleted_at', null).then(r => r.data || [])
     const membersData = await supabase.from('profiles').select('id, full_name, role, email').eq('foundry_id', profile.foundry_id)
     const members = (membersData.data || []).map(p => ({
         id: p.id,

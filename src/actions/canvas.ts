@@ -25,6 +25,8 @@ import type {
   Milestone,
   CanvasObjective,
   CanvasTask,
+  CanvasObjectiveDetails,
+  CanvasTaskDetails,
   WorkEdge,
   GoalBundle,
   UnlinkedItems,
@@ -34,6 +36,8 @@ import type {
   CreateCanvasTaskInput,
   CanvasItemPatch,
   TaskAssigneeProfile,
+  FoundryMember,
+  MilestoneOption,
 } from '@/types/canvas'
 
 // ============================================================================
@@ -249,6 +253,231 @@ export async function getGoalBundle(
     }
 
     return { data: bundle }
+  })
+}
+
+/**
+ * Fetches full details for a single canvas item by type and ID.
+ *
+ * @description Returns the complete row for goals, milestones, objectives,
+ * or tasks. For tasks, also resolves assignees via task_assignees + profiles.
+ *
+ * @param itemType - 'goal' | 'milestone' | 'objective' | 'task'
+ * @param itemId - UUID of the item
+ * @returns The full item row (plus assignees for tasks) or error
+ *
+ * @security Filters by foundry_id and deleted_at IS NULL
+ */
+export async function getCanvasItemDetails(
+  itemType: 'goal' | 'milestone' | 'objective' | 'task',
+  itemId: string
+): Promise<{ data: CanvasObjectiveDetails | CanvasTaskDetails } | ActionError> {
+  return withAuth(async ({ supabase, foundryId }) => {
+    if (itemType === 'task') {
+      // Fetch task row
+      const { data: task, error: taskError } = await supabase
+        .from('tasks')
+        .select('*')
+        .eq('id', itemId)
+        .eq('foundry_id', foundryId)
+        .is('deleted_at', null)
+        .single()
+
+      if (taskError || !task) {
+        console.error('[CanvasService] Failed to fetch task details:', {
+          itemId,
+          error: taskError?.message,
+        })
+        return { error: 'Task not found' }
+      }
+
+      // Resolve assignees
+      const { data: assigneeData } = await supabase
+        .from('task_assignees')
+        .select('task_id, profile:profiles(id, full_name, role)')
+        .eq('task_id', itemId)
+
+      const assignees: TaskAssigneeProfile[] = []
+      if (assigneeData) {
+        for (const row of assigneeData) {
+          const profile = row.profile as unknown as TaskAssigneeProfile | null
+          if (profile) assignees.push(profile)
+        }
+      }
+
+      return {
+        data: {
+          ...task,
+          is_ghost: task.is_ghost ?? false,
+          ghost_source: task.ghost_source ?? null,
+          ghost_rationale: task.ghost_rationale ?? null,
+          assignees,
+        } as CanvasTaskDetails,
+      }
+    }
+
+    // For goal, milestone, objective — all live in the objectives table
+    const { data: obj, error: objError } = await supabase
+      .from('objectives')
+      .select('*')
+      .eq('id', itemId)
+      .eq('foundry_id', foundryId)
+      .is('deleted_at', null)
+      .single()
+
+    if (objError || !obj) {
+      console.error('[CanvasService] Failed to fetch objective details:', {
+        itemType,
+        itemId,
+        error: objError?.message,
+      })
+      return { error: `${itemType} not found` }
+    }
+
+    return {
+      data: {
+        ...obj,
+        is_ghost: obj.is_ghost ?? false,
+        ghost_source: obj.ghost_source ?? null,
+        ghost_rationale: obj.ghost_rationale ?? null,
+      } as CanvasObjectiveDetails,
+    }
+  })
+}
+
+/**
+ * Fetches all milestones with their parent goal titles for dropdown display.
+ *
+ * @description Used in the details dialog to populate the "Link to milestone"
+ * dropdown. Each option shows milestone title + parent goal title.
+ *
+ * @returns Array of MilestoneOption or error
+ *
+ * @security Filters by foundry_id and deleted_at IS NULL
+ */
+export async function getAllMilestones(): Promise<
+  { data: MilestoneOption[] } | ActionError
+> {
+  return withAuth(async ({ supabase, foundryId }) => {
+    // Fetch milestones
+    const { data: milestones, error: msError } = await supabase
+      .from('objectives')
+      .select('id, title, milestone_date, parent_objective_id')
+      .eq('foundry_id', foundryId)
+      .eq('is_milestone', true)
+      .is('deleted_at', null)
+      .order('milestone_date', { ascending: true, nullsFirst: false })
+
+    if (msError) {
+      console.error('[CanvasService] Failed to fetch all milestones:', {
+        foundryId,
+        error: msError.message,
+      })
+      return { error: msError.message }
+    }
+
+    if (!milestones || milestones.length === 0) {
+      return { data: [] }
+    }
+
+    // Collect parent goal IDs and fetch their titles
+    const parentIds = [
+      ...new Set(milestones.map((m) => m.parent_objective_id).filter(Boolean)),
+    ] as string[]
+
+    const goalTitleMap = new Map<string, string>()
+
+    if (parentIds.length > 0) {
+      const { data: goals } = await supabase
+        .from('objectives')
+        .select('id, title')
+        .in('id', parentIds)
+        .eq('is_strategic_goal', true)
+        .is('deleted_at', null)
+
+      if (goals) {
+        for (const g of goals) {
+          goalTitleMap.set(g.id, g.title)
+        }
+      }
+    }
+
+    const options: MilestoneOption[] = milestones.map((ms) => ({
+      id: ms.id,
+      title: ms.title,
+      goalTitle: goalTitleMap.get(ms.parent_objective_id ?? '') ?? 'Unknown Goal',
+      milestone_date: ms.milestone_date,
+    }))
+
+    return { data: options }
+  })
+}
+
+/**
+ * Fetches all team members in the current foundry.
+ *
+ * @description Returns profiles with foundry_id matching the current foundry.
+ * Used for Owner/Assignee dropdowns in the details dialog.
+ *
+ * @returns Array of FoundryMember or error
+ *
+ * @security Filters by foundry_id
+ */
+export async function getFoundryMembers(): Promise<
+  { data: FoundryMember[] } | ActionError
+> {
+  return withAuth(async ({ supabase, foundryId }) => {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('id, full_name, role')
+      .eq('foundry_id', foundryId)
+      .order('full_name', { ascending: true })
+
+    if (error) {
+      console.error('[CanvasService] Failed to fetch foundry members:', {
+        foundryId,
+        error: error.message,
+      })
+      return { error: error.message }
+    }
+
+    return { data: (data ?? []) as FoundryMember[] }
+  })
+}
+
+/**
+ * Fetches all non-ghost, non-deleted objectives in the foundry.
+ *
+ * @description Used for the "Link task to objective" dropdown in the details
+ * dialog. Returns only regular objectives (not goals, not milestones, not ghosts).
+ *
+ * @returns Array of { id, title } or error
+ *
+ * @security Filters by foundry_id and deleted_at IS NULL
+ */
+export async function getObjectivesForLinking(): Promise<
+  { data: Array<{ id: string; title: string }> } | ActionError
+> {
+  return withAuth(async ({ supabase, foundryId }) => {
+    const { data, error } = await supabase
+      .from('objectives')
+      .select('id, title')
+      .eq('foundry_id', foundryId)
+      .eq('is_ghost', false)
+      .eq('is_strategic_goal', false)
+      .eq('is_milestone', false)
+      .is('deleted_at', null)
+      .order('title', { ascending: true })
+
+    if (error) {
+      console.error('[CanvasService] Failed to fetch objectives for linking:', {
+        foundryId,
+        error: error.message,
+      })
+      return { error: error.message }
+    }
+
+    return { data: (data ?? []) as Array<{ id: string; title: string }> }
   })
 }
 
@@ -687,9 +916,11 @@ export async function updateCanvasItem(
       // Build update object with only provided fields
       const updateData: Record<string, unknown> = {}
       if (patch.title !== undefined) updateData.title = patch.title.trim()
+      if (patch.description !== undefined) updateData.description = patch.description.trim() || null
       if (patch.status !== undefined) updateData.status = patch.status
-      if (patch.milestone_date !== undefined) updateData.milestone_date = patch.milestone_date
-      if (patch.workstream !== undefined) updateData.workstream = patch.workstream
+      if (patch.milestone_date !== undefined) updateData.milestone_date = patch.milestone_date || null
+      if (patch.workstream !== undefined) updateData.workstream = patch.workstream || null
+      if (patch.creator_id !== undefined) updateData.creator_id = patch.creator_id
 
       if (Object.keys(updateData).length === 0) {
         return { success: true }
@@ -713,9 +944,13 @@ export async function updateCanvasItem(
       // Task update
       const updateData: Record<string, unknown> = {}
       if (patch.title !== undefined) updateData.title = patch.title.trim()
+      if (patch.description !== undefined) updateData.description = patch.description.trim() || null
       if (patch.status !== undefined) updateData.status = patch.status
-      if (patch.workstream !== undefined) updateData.workstream = patch.workstream
+      if (patch.workstream !== undefined) updateData.workstream = patch.workstream || null
       if (patch.assignee_id !== undefined) updateData.assignee_id = patch.assignee_id
+      if (patch.start_date !== undefined) updateData.start_date = patch.start_date || null
+      if (patch.end_date !== undefined) updateData.end_date = patch.end_date || null
+      if (patch.risk_level !== undefined) updateData.risk_level = patch.risk_level || null
 
       if (Object.keys(updateData).length === 0) {
         return { success: true }
@@ -1109,6 +1344,65 @@ export async function linkObjectiveToMilestone(
     console.info('[CanvasService] Objective linked to milestone:', {
       objectiveId,
       milestoneId,
+      foundryId,
+    })
+
+    revalidateCanvas()
+    return { success: true }
+  })
+}
+
+/**
+ * Links an orphan task to an objective by setting objective_id.
+ *
+ * @description Moves a task from the unstructured zone into the strategic
+ * hierarchy by parenting it to an objective.
+ *
+ * @param taskId - UUID of the task to link
+ * @param objectiveId - UUID of the target objective
+ * @returns Success or error
+ *
+ * @security Verifies both task and objective belong to user's foundry.
+ * Validates the objective exists and is not deleted.
+ */
+export async function linkTaskToObjective(
+  taskId: string,
+  objectiveId: string
+): Promise<{ success: true } | ActionError> {
+  return withAuth(async ({ supabase, foundryId }) => {
+    // SECURITY: Verify objective exists, same foundry, not deleted
+    const { data: objective, error: objError } = await supabase
+      .from('objectives')
+      .select('id')
+      .eq('id', objectiveId)
+      .eq('foundry_id', foundryId)
+      .is('deleted_at', null)
+      .single()
+
+    if (objError || !objective) {
+      return { error: 'Objective not found' }
+    }
+
+    // SECURITY: Update only the task in the user's foundry
+    const { error: updateError } = await supabase
+      .from('tasks')
+      .update({ objective_id: objectiveId })
+      .eq('id', taskId)
+      .eq('foundry_id', foundryId)
+      .is('deleted_at', null)
+
+    if (updateError) {
+      console.error('[CanvasService] Failed to link task to objective:', {
+        taskId,
+        objectiveId,
+        error: updateError.message,
+      })
+      return { error: updateError.message }
+    }
+
+    console.info('[CanvasService] Task linked to objective:', {
+      taskId,
+      objectiveId,
       foundryId,
     })
 

@@ -53,6 +53,8 @@ export default async function CanvasPage() {
       .from('objectives')
       .select('id, title')
       .eq('foundry_id', foundryId)
+      .eq('is_ghost', false)
+      .is('deleted_at', null)
       .order('created_at', { ascending: false }),
   ])
 

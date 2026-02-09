@@ -237,6 +237,8 @@ export function FullProfileView({ open, onOpenChange, memberId, currentUserId }:
                         .select('*')
                         .eq('assignee_id', memberId)
                         .eq('foundry_id', profileData.foundry_id)
+                        .eq('is_ghost', false)
+                        .is('deleted_at', null)
                         .order('created_at', { ascending: false })
                     
                     if (tasksData) {
@@ -272,6 +274,8 @@ export function FullProfileView({ open, onOpenChange, memberId, currentUserId }:
                         .from('tasks')
                         .select('id, title, created_at')
                         .eq('foundry_id', profileData.foundry_id)
+                        .eq('is_ghost', false)
+                        .is('deleted_at', null)
                         .is('assignee_id', null)
                         .order('created_at', { ascending: false })
                         .limit(50)
@@ -290,6 +294,8 @@ export function FullProfileView({ open, onOpenChange, memberId, currentUserId }:
                         .from('tasks')
                         .select('assignee_id, status')
                         .eq('foundry_id', profileData.foundry_id)
+                        .eq('is_ghost', false)
+                        .is('deleted_at', null)
                     
                     // Calculate metrics for all members
                     const allMembersWithMetrics = (allProfiles || []).map(p => {
@@ -490,6 +496,8 @@ export function FullProfileView({ open, onOpenChange, memberId, currentUserId }:
                     .select('*')
                     .eq('assignee_id', profile.id)
                     .eq('foundry_id', profile.foundry_id)
+                    .eq('is_ghost', false)
+                    .is('deleted_at', null)
                     .order('created_at', { ascending: false })
                 
                 if (tasksData) {
@@ -501,6 +509,8 @@ export function FullProfileView({ open, onOpenChange, memberId, currentUserId }:
                     .from('tasks')
                     .select('id, title, created_at')
                     .eq('foundry_id', profile.foundry_id)
+                    .eq('is_ghost', false)
+                    .is('deleted_at', null)
                     .is('assignee_id', null)
                     .order('created_at', { ascending: false })
                     .limit(50)
@@ -534,6 +544,8 @@ export function FullProfileView({ open, onOpenChange, memberId, currentUserId }:
                     .select('*')
                     .eq('assignee_id', profile.id)
                     .eq('foundry_id', profile.foundry_id)
+                    .eq('is_ghost', false)
+                    .is('deleted_at', null)
                     .order('created_at', { ascending: false })
                 
                 if (tasksData) {
@@ -545,6 +557,8 @@ export function FullProfileView({ open, onOpenChange, memberId, currentUserId }:
                     .from('tasks')
                     .select('id, title, created_at')
                     .eq('foundry_id', profile.foundry_id)
+                    .eq('is_ghost', false)
+                    .is('deleted_at', null)
                     .is('assignee_id', null)
                     .order('created_at', { ascending: false })
                     .limit(50)

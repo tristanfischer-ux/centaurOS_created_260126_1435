@@ -132,6 +132,8 @@ export async function getDependenciesForObjective(
       .select('id')
       .or(`id.eq.${objectiveId},parent_objective_id.eq.${objectiveId}`)
       .eq('foundry_id', foundryId)
+      .eq('is_ghost', false)
+      .is('deleted_at', null)
 
     if (!childObjectives || childObjectives.length === 0) {
       return { data: [] }
@@ -145,6 +147,8 @@ export async function getDependenciesForObjective(
       .select('id')
       .in('objective_id', objectiveIds)
       .eq('foundry_id', foundryId)
+      .eq('is_ghost', false)
+      .is('deleted_at', null)
 
     if (!tasks || tasks.length === 0) {
       return { data: [] }
@@ -616,6 +620,8 @@ export async function getStrategicPlanOverview(
       .select('*')
       .eq('parent_objective_id', objectiveId)
       .eq('foundry_id', foundryId)
+      .eq('is_ghost', false)
+      .is('deleted_at', null)
       .order('created_at', { ascending: true })
 
     const phases: StrategicPhaseData[] = []
@@ -638,6 +644,8 @@ export async function getStrategicPlanOverview(
       `)
       .in('objective_id', phaseIds)
       .eq('foundry_id', foundryId)
+      .eq('is_ghost', false)
+      .is('deleted_at', null)
       .order('start_date', { ascending: true })
 
     // 4. Fetch all dependencies for these tasks

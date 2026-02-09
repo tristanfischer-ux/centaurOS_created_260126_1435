@@ -32,6 +32,8 @@ export default async function ProfilePage({ params }: { params: Promise<{ id: st
         .select('*')
         .eq('assignee_id', profile.id)
         .eq('foundry_id', foundry_id)
+        .eq('is_ghost', false)
+        .is('deleted_at', null)
         .order('created_at', { ascending: false })
 
     // Fetch ALL profiles for comparison feature
@@ -45,6 +47,8 @@ export default async function ProfilePage({ params }: { params: Promise<{ id: st
         .from('tasks')
         .select('assignee_id, status')
         .eq('foundry_id', foundry_id)
+        .eq('is_ghost', false)
+        .is('deleted_at', null)
 
     // Calculate metrics for ALL members (for comparison)
     const allMembersWithMetrics = (allProfiles || [])?.map(p => {

@@ -578,6 +578,8 @@ export async function startObjectiveDiscussion(
       .from('tasks')
       .select('assignee_id, creator_id')
       .eq('objective_id', objectiveId)
+      .eq('is_ghost', false)
+      .is('deleted_at', null)
 
     // Build participant list
     const participantIds = new Set<string>()

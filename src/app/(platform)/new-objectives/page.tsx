@@ -34,6 +34,8 @@ export default async function NewObjectivesPage() {
     .from('objectives')
     .select('id, title, description, extended_description, status, progress, parent_objective_id, creator_id, foundry_id, created_at, updated_at')
     .eq('foundry_id', profile.foundry_id)
+    .eq('is_ghost', false)
+    .is('deleted_at', null)
     .order('created_at', { ascending: false })
 
   const objectives = (rawObjectives || []) as Array<{
@@ -81,6 +83,8 @@ export default async function NewObjectivesPage() {
       task_assignees(profile:profiles(id, full_name, role))
     `)
     .eq('foundry_id', profile.foundry_id)
+    .eq('is_ghost', false)
+    .is('deleted_at', null)
     .not('objective_id', 'is', null)
     .order('end_date', { ascending: true })
 

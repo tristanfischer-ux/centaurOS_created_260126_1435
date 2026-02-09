@@ -29,12 +29,16 @@ export default async function TeamPage() {
         .from('tasks')
         .select('id, assignee_id, status, title, end_date, start_date, created_at, objective_id, progress, risk_level')
         .eq('foundry_id', foundry_id)
+        .eq('is_ghost', false)
+        .is('deleted_at', null)
 
     // Fetch objectives for name labels on workload board
     const { data: objectives } = await supabase
         .from('objectives')
         .select('id, title')
         .eq('foundry_id', foundry_id)
+        .eq('is_ghost', false)
+        .is('deleted_at', null)
 
     const objectiveMap: Record<string, string> = {}
     for (const obj of objectives || []) {

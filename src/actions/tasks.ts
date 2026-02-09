@@ -884,6 +884,8 @@ export async function getPendingApprovals() {
             objective:objectives!objective_id(id, title),
             creator:profiles!created_by(id, full_name)
         `)
+        .eq('is_ghost', false)
+        .is('deleted_at', null)
         .in('status', ['Pending_Executive_Approval', 'Amended_Pending_Approval'])
         .order('created_at', { ascending: false })
 

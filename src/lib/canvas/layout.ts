@@ -161,10 +161,33 @@ export function goalBundleToElements(
   // Track placed milestone x-positions for overlap resolution
   const milestoneXPositions: number[] = []
 
-  for (const ms of sortedMilestones) {
-    let msX = ms.milestone_date
-      ? dateToX(ms.milestone_date, pxPerDay, rangeStart)
-      : 0
+  // First pass: compute raw x-positions (null-date milestones get NaN placeholder)
+  const rawMilestoneX: (number | null)[] = sortedMilestones.map((ms) =>
+    ms.milestone_date ? dateToX(ms.milestone_date, pxPerDay, rangeStart) : null
+  )
+
+  // Second pass: fill null-date milestones with midpoint between neighbors
+  for (let i = 0; i < rawMilestoneX.length; i++) {
+    if (rawMilestoneX[i] !== null) continue
+
+    // Find nearest dated neighbor before and after
+    const prevX = rawMilestoneX.slice(0, i).reverse().find((x) => x !== null) ?? null
+    const nextX = rawMilestoneX.slice(i + 1).find((x) => x !== null) ?? null
+
+    if (prevX !== null && nextX !== null) {
+      rawMilestoneX[i] = (prevX + nextX) / 2
+    } else if (prevX !== null) {
+      rawMilestoneX[i] = prevX + NODE_WIDTH + MIN_HORIZONTAL_GAP
+    } else if (nextX !== null) {
+      rawMilestoneX[i] = nextX - NODE_WIDTH - MIN_HORIZONTAL_GAP
+    } else {
+      rawMilestoneX[i] = goalX - NODE_WIDTH - MIN_HORIZONTAL_GAP
+    }
+  }
+
+  for (let msIdx = 0; msIdx < sortedMilestones.length; msIdx++) {
+    const ms = sortedMilestones[msIdx]
+    let msX = rawMilestoneX[msIdx]!
 
     // Resolve overlap: push right if too close to previous milestone
     for (const prevX of milestoneXPositions) {

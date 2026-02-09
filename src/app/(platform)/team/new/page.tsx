@@ -35,6 +35,8 @@ export default async function NewTeamPage() {
         .from('tasks')
         .select('id, assignee_id, status')
         .eq('foundry_id', foundry_id)
+        .eq('is_ghost', false)
+        .is('deleted_at', null)
 
     // Calculate task metrics per member
     const membersWithMetrics = (profiles || []).map(profile => {

@@ -26,6 +26,8 @@ export default async function StrategicPlannerPage() {
     .from('objectives')
     .select('id, title, description, status, progress, milestone_date, created_at')
     .eq('foundry_id', foundryId)
+    .eq('is_ghost', false)
+    .is('deleted_at', null)
     .eq('is_strategic_goal', true)
     .order('created_at', { ascending: false })
 

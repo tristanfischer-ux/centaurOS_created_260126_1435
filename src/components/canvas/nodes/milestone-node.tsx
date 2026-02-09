@@ -88,7 +88,7 @@ function MilestoneNodeComponent({ data, selected }: NodeProps) {
       {/* Title row with status dot */}
       <div className="flex items-start gap-2">
         <span className={cn('mt-1.5 h-2 w-2 rounded-full flex-shrink-0', dotColor)} />
-        <p className="text-sm font-medium text-foreground leading-tight line-clamp-2 flex-1">
+        <p className="text-sm font-medium text-foreground leading-tight line-clamp-2 flex-1" title={title}>
           {title}
         </p>
       </div>

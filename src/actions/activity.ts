@@ -356,6 +356,8 @@ export async function getActivityUnreadCount(): Promise<{
       .from('tasks')
       .select('id')
       .eq('foundry_id', foundryId)
+      .eq('is_ghost', false)
+      .is('deleted_at', null)
       .or(`assignee_id.eq.${user.id},creator_id.eq.${user.id}`)
 
     const myTaskIds = myTasks?.map(t => t.id) || []
@@ -365,6 +367,8 @@ export async function getActivityUnreadCount(): Promise<{
       .from('objectives')
       .select('id')
       .eq('foundry_id', foundryId)
+      .eq('is_ghost', false)
+      .is('deleted_at', null)
       .eq('owner_id', user.id) as { data: Array<{ id: string }> | null }
 
     const myObjectiveIds = myObjectives?.map(o => o.id) || []
@@ -585,6 +589,8 @@ export async function getActivityFeed(options?: {
         .from('tasks')
         .select('id')
         .eq('foundry_id', foundryId)
+        .eq('is_ghost', false)
+        .is('deleted_at', null)
 
       allTaskIds = allTasks?.map(t => t.id) || []
 
@@ -592,7 +598,9 @@ export async function getActivityFeed(options?: {
       const { data: allObjectives } = await (supabase as AnySupabaseClient)
         .from('objectives')
         .select('id')
-        .eq('foundry_id', foundryId) as { data: Array<{ id: string }> | null }
+        .eq('foundry_id', foundryId)
+        .eq('is_ghost', false)
+        .is('deleted_at', null) as { data: Array<{ id: string }> | null }
 
       myObjectiveIds = allObjectives?.map(o => o.id) || []
     } else {
@@ -602,6 +610,8 @@ export async function getActivityFeed(options?: {
         .from('tasks')
         .select('id')
         .eq('foundry_id', foundryId)
+        .eq('is_ghost', false)
+        .is('deleted_at', null)
         .or(`assignee_id.eq.${user.id},creator_id.eq.${user.id}`)
 
       const myTaskIds = myTasks?.map(t => t.id) || []
@@ -620,6 +630,8 @@ export async function getActivityFeed(options?: {
         .from('objectives')
         .select('id')
         .eq('foundry_id', foundryId)
+        .eq('is_ghost', false)
+        .is('deleted_at', null)
         .eq('owner_id', user.id) as { data: Array<{ id: string }> | null }
 
       myObjectiveIds = myObjectives?.map(o => o.id) || []

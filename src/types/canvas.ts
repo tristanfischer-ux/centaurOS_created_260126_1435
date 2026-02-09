@@ -172,11 +172,49 @@ export interface CreateCanvasTaskInput {
 /** Patchable fields for updateCanvasItem */
 export interface CanvasItemPatch {
   title?: string
+  description?: string
   status?: string
   milestone_date?: string
+  start_date?: string
+  end_date?: string
   assignee_id?: string
+  creator_id?: string
   workstream?: string
+  risk_level?: string
 }
+
+// ============================================================================
+// FOUNDRY MEMBER (for dropdowns in dialog)
+// ============================================================================
+
+/** Minimal profile for team-member select dropdowns */
+export interface FoundryMember {
+  id: string
+  full_name: string | null
+  role: string
+}
+
+// ============================================================================
+// MILESTONE OPTION (for linking dropdowns)
+// ============================================================================
+
+/** Milestone option with parent goal context for display in dropdowns */
+export interface MilestoneOption {
+  id: string
+  title: string
+  goalTitle: string
+  milestone_date: string | null
+}
+
+// ============================================================================
+// ITEM DETAILS (fetched for the details dialog)
+// ============================================================================
+
+/** Full details of an objective-type canvas item (all fields from ObjectiveRow + ghost fields) */
+export type CanvasObjectiveDetails = CanvasObjective
+
+/** Full details of a task-type canvas item with assignees (all fields from TaskRow + ghost fields + assignees) */
+export type CanvasTaskDetails = CanvasTask
 
 // ============================================================================
 // UNLINKED ITEMS (objectives/tasks not in any strategic plan)

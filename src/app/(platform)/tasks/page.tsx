@@ -55,6 +55,8 @@ export default async function TasksPage({ searchParams }: TasksPageProps) {
             task_assignees(profile:profiles(id, full_name, role))
         `)
         .eq('foundry_id', foundry_id)
+        .eq('is_ghost', false)
+        .is('deleted_at', null)
         .order('created_at', { ascending: false })
 
     if (error) {
@@ -92,7 +94,7 @@ export default async function TasksPage({ searchParams }: TasksPageProps) {
         { data: membersData },
         { data: teamsData }
     ] = await Promise.all([
-        supabase.from('objectives').select('id, title').eq('foundry_id', foundry_id),
+        supabase.from('objectives').select('id, title').eq('foundry_id', foundry_id).eq('is_ghost', false).is('deleted_at', null),
         supabase.from('profiles').select('id, full_name, role, email').eq('foundry_id', foundry_id),
         supabase.from('teams').select('id, name').eq('foundry_id', foundry_id)
     ])

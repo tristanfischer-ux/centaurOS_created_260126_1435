@@ -212,6 +212,8 @@ export async function updateObjectiveProgress(
       .from('tasks')
       .select('status')
       .eq('objective_id', objectiveId)
+      .eq('is_ghost', false)
+      .is('deleted_at', null)
 
     if (tasksError) {
       return { progress: 0, error: tasksError.message }
@@ -277,6 +279,8 @@ export async function suggestObjectiveLink(
       .from('objectives')
       .select('id, title, description')
       .eq('foundry_id', foundryId)
+      .eq('is_ghost', false)
+      .is('deleted_at', null)
 
     if (objError || !objectives) {
       return { suggestions: [], error: 'Failed to fetch objectives' }

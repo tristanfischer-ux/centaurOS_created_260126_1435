@@ -136,6 +136,8 @@ export function CommandPalette() {
       const { data: tasksData, error: tasksError } = await supabase
         .from('tasks')
         .select('id, title, status')
+        .eq('is_ghost', false)
+        .is('deleted_at', null)
         .order('updated_at', { ascending: false })
         .limit(50)
       if (tasksError) throw tasksError
@@ -145,6 +147,8 @@ export function CommandPalette() {
       const { data: pendingData, error: pendingError } = await supabase
         .from('tasks')
         .select('id')
+        .eq('is_ghost', false)
+        .is('deleted_at', null)
         .in('status', ['Pending_Executive_Approval', 'Amended_Pending_Approval'])
       if (pendingError) throw pendingError
       if (isMounted()) setPendingApprovalCount(pendingData?.length || 0)
@@ -153,6 +157,8 @@ export function CommandPalette() {
       const { data: objectivesData, error: objectivesError } = await supabase
         .from('objectives')
         .select('id, title')
+        .eq('is_ghost', false)
+        .is('deleted_at', null)
         .order('updated_at', { ascending: false })
         .limit(20)
       if (objectivesError) throw objectivesError

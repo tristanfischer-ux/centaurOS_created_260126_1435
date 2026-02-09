@@ -78,6 +78,8 @@ export async function getOffboardingTasks(userId: string): Promise<{
         .select('id, title, status, assignee_id, profiles!tasks_assignee_id_fkey(full_name)')
         .eq('creator_id', userId)
         .eq('foundry_id', foundry_id)
+        .eq('is_ghost', false)
+        .is('deleted_at', null)
     
     // Get tasks assigned to the user (via assignee_id)
     const { data: assignedTasks } = await supabase
@@ -85,6 +87,8 @@ export async function getOffboardingTasks(userId: string): Promise<{
         .select('id, title, status')
         .eq('assignee_id', userId)
         .eq('foundry_id', foundry_id)
+        .eq('is_ghost', false)
+        .is('deleted_at', null)
     
     // Get tasks from task_assignees table
     const { data: taskAssignees } = await supabase

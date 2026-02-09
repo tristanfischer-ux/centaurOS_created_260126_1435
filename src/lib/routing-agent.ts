@@ -122,6 +122,8 @@ export async function getTeamAvailability(): Promise<{
         .from('tasks')
         .select('assignee_id')
         .eq('status', 'Accepted')
+        .eq('is_ghost', false)
+        .is('deleted_at', null)
         .in('assignee_id', memberIds)
 
     // Get pending tasks count
@@ -129,6 +131,8 @@ export async function getTeamAvailability(): Promise<{
         .from('tasks')
         .select('assignee_id')
         .eq('status', 'Pending')
+        .eq('is_ghost', false)
+        .is('deleted_at', null)
         .in('assignee_id', memberIds)
 
     // Get presence

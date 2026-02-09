@@ -153,6 +153,8 @@ export async function createObjectiveFromInput(input: ObjectiveInput) {
         .from('tasks')
         .select('id, assignee_id')
         .eq('objective_id', objective.id)
+        .eq('is_ghost', false)
+        .is('deleted_at', null)
 
     if (createdTasks && createdTasks.length > 0) {
         const assigneeRecords = createdTasks

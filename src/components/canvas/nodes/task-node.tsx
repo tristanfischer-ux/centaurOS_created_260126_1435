@@ -74,7 +74,7 @@ function TaskNodeComponent({ data, selected }: NodeProps) {
       {/* Content row */}
       <div className="flex items-center gap-1.5">
         <span className={cn('h-1.5 w-1.5 rounded-full flex-shrink-0', dotColor)} />
-        <p className="font-medium text-foreground leading-tight line-clamp-1 flex-1">
+        <p className="font-medium text-foreground leading-tight line-clamp-1 flex-1" title={title}>
           {title}
         </p>
         {isGhost && (

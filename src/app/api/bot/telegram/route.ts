@@ -962,11 +962,15 @@ async function handleTodayCommand(chatId: number, profileId: string) {
             const [tasksToday, tasksOverdue, decisions, notifications, objectives, ideas] = await Promise.all([
                 supabase.from('tasks').select('id', { count: 'exact', head: true })
                     .eq('assignee_id', profileId)
+                    .eq('is_ghost', false)
+                    .is('deleted_at', null)
                     .gte('end_date', new Date().toISOString().split('T')[0])
                     .lte('end_date', new Date().toISOString().split('T')[0])
                     .not('status', 'in', '("Completed","Cancelled")'),
                 supabase.from('tasks').select('id', { count: 'exact', head: true })
                     .eq('assignee_id', profileId)
+                    .eq('is_ghost', false)
+                    .is('deleted_at', null)
                     .lt('end_date', new Date().toISOString().split('T')[0])
                     .not('status', 'in', '("Completed","Cancelled")'),
                 supabase.from('telegram_decisions').select('id', { count: 'exact', head: true })
@@ -977,6 +981,8 @@ async function handleTodayCommand(chatId: number, profileId: string) {
                     .eq('is_read', false),
                 supabase.from('objectives').select('id', { count: 'exact', head: true })
                     .eq('creator_id', profileId)
+                    .eq('is_ghost', false)
+                    .is('deleted_at', null)
                     .eq('status', 'In Progress'),
                 supabase.from('telegram_ideas').select('id', { count: 'exact', head: true })
                     .eq('profile_id', profileId)
@@ -1025,6 +1031,8 @@ async function handleTasksCommand(chatId: number, profileId: string) {
                 objectives(title)
             `)
             .eq('assignee_id', profileId)
+            .eq('is_ghost', false)
+            .is('deleted_at', null)
             .not('status', 'in', '("Completed","Cancelled")')
             .order('end_date', { ascending: true, nullsFirst: false })
             .limit(10)
@@ -1603,6 +1611,8 @@ async function handleTasksRefreshCallback(
                 objectives(title)
             `)
             .eq('assignee_id', link.profile_id)
+            .eq('is_ghost', false)
+            .is('deleted_at', null)
             .not('status', 'in', '("Completed","Cancelled")')
             .order('end_date', { ascending: true, nullsFirst: false })
             .limit(10)

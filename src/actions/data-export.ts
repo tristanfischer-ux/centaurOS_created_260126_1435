@@ -121,6 +121,8 @@ async function fetchTableData(
                     assignee:assignee_id(full_name)
                 `)
                 .eq('foundry_id', foundryId)
+                .eq('is_ghost', false)
+                .is('deleted_at', null)
             
             if (dateRange?.from) {
                 query = query.gte('created_at', dateRange.from)
@@ -143,6 +145,8 @@ async function fetchTableData(
                     creator:creator_id(full_name)
                 `)
                 .eq('foundry_id', foundryId)
+                .eq('is_ghost', false)
+                .is('deleted_at', null)
             
             if (dateRange?.from) {
                 query = query.gte('created_at', dateRange.from)

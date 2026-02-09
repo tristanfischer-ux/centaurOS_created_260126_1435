@@ -68,6 +68,8 @@ export async function convertStickyNotesToTasks(
           .from('objectives')
           .select('id')
           .eq('foundry_id', foundryId)
+          .eq('is_ghost', false)
+          .is('deleted_at', null)
           .order('created_at', { ascending: false })
           .limit(1)
           .single()

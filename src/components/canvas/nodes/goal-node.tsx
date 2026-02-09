@@ -78,7 +78,7 @@ function GoalNodeComponent({ data, selected }: NodeProps) {
       </div>
 
       {/* Title */}
-      <p className="text-sm font-semibold text-foreground leading-tight line-clamp-2">
+      <p className="text-sm font-semibold text-foreground leading-tight line-clamp-2" title={title}>
         {title}
       </p>
 

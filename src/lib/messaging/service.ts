@@ -1218,6 +1218,8 @@ export async function findTaskIdsByNumbers(
     .from('tasks')
     .select('id, task_number')
     .eq('foundry_id', foundryId)
+    .eq('is_ghost', false)
+    .is('deleted_at', null)
     .in('task_number', taskNumbers.map(n => parseInt(n, 10)))
   
   if (error) {

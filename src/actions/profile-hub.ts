@@ -136,6 +136,8 @@ export async function getProfileHubData(): Promise<ProfileHubData | null> {
           .from('tasks')
           .select('id', { count: 'exact', head: true })
           .eq('foundry_id', foundryId)
+          .eq('is_ghost', false)
+          .is('deleted_at', null)
           .eq('assignee_id', user.id)
       : Promise.resolve({ count: 0 }),
     foundryId
@@ -143,6 +145,8 @@ export async function getProfileHubData(): Promise<ProfileHubData | null> {
           .from('tasks')
           .select('id', { count: 'exact', head: true })
           .eq('foundry_id', foundryId)
+          .eq('is_ghost', false)
+          .is('deleted_at', null)
           .eq('assignee_id', user.id)
           .eq('status', 'Completed')
       : Promise.resolve({ count: 0 }),
@@ -152,6 +156,8 @@ export async function getProfileHubData(): Promise<ProfileHubData | null> {
           .from('objectives')
           .select('id', { count: 'exact', head: true })
           .eq('foundry_id', foundryId)
+          .eq('is_ghost', false)
+          .is('deleted_at', null)
           .eq('creator_id', user.id)
       : Promise.resolve({ count: 0 }),
     // Team size

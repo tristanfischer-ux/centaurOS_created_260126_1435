@@ -364,11 +364,27 @@ describe('Activity Actions', () => {
 
     it('should filter by type', async () => {
       // Mock empty responses for all tables
+      // Chain supports .eq().eq().is() for ghost/deleted_at filtering added in Phase 7
+      const mockEqChain = () => {
+        const chain: Record<string, jest.Mock> = {}
+        chain.eq = jest.fn().mockReturnValue(chain)
+        chain.is = jest.fn().mockReturnValue(chain)
+        chain.or = jest.fn().mockResolvedValue({ data: [], error: null })
+        chain.neq = jest.fn().mockReturnValue({
+          order: jest.fn().mockReturnValue({
+            limit: jest.fn().mockResolvedValue({ data: [], error: null })
+          })
+        })
+        chain.order = jest.fn().mockReturnValue({
+          limit: jest.fn().mockResolvedValue({ data: [], error: null })
+        })
+        return chain
+      }
       mockSupabaseClient.from.mockImplementation(() => ({
         select: jest.fn().mockReturnValue({
-          eq: jest.fn().mockReturnValue({
-            or: jest.fn().mockResolvedValue({ data: [], error: null }),
-            eq: jest.fn().mockResolvedValue({ data: [], error: null })
+          eq: jest.fn().mockImplementation(() => {
+            const chain = mockEqChain()
+            return chain
           }),
           in: jest.fn().mockReturnValue({
             eq: jest.fn().mockReturnValue({

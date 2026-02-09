@@ -26,6 +26,7 @@ import React, {
 import {
   ReactFlow,
   Background,
+  BackgroundVariant,
   Controls,
   MiniMap,
   Panel,
@@ -45,7 +46,11 @@ import {
   Filter,
   Target,
   Calendar,
+  AlertTriangle,
+  RefreshCw,
 } from 'lucide-react'
+
+import { toast } from 'sonner'
 
 import { Button } from '@/components/ui/button'
 import {
@@ -63,8 +68,9 @@ import {
 import { EmptyState } from '@/components/ui/empty-state'
 import { cn } from '@/lib/utils'
 
-import { getGoalBundle, getStrategicGoals, getUnlinkedItems } from '@/actions/canvas'
+import { getGoalBundle, getStrategicGoals, getUnlinkedItems, getAllMilestones } from '@/actions/canvas'
 import { GoalWizardDialog } from '@/components/canvas/goal-wizard-dialog'
+import { NodeDetailsDialog } from '@/components/canvas/node-details-dialog'
 import {
   goalBundleToElements,
   unlinkedItemsToElements,
@@ -86,7 +92,7 @@ import {
   DividerNode,
 } from '@/components/canvas/nodes'
 
-import type { StrategicGoal, GoalBundle, UnlinkedItems } from '@/types/canvas'
+import type { StrategicGoal, GoalBundle, UnlinkedItems, MilestoneOption } from '@/types/canvas'
 
 // ============================================================================
 // TYPES
@@ -217,7 +223,15 @@ function StrategicCanvasInner({
   const [unlinkedData, setUnlinkedData] = useState<UnlinkedItems | null>(null)
   const [isPending, startTransition] = useTransition()
   const [isWizardOpen, setIsWizardOpen] = useState(false)
+  const [fetchError, setFetchError] = useState<string | null>(null)
   const fitViewScheduled = useRef(false)
+
+  // -- Details dialog state --
+  const [detailsOpen, setDetailsOpen] = useState(false)
+  const [detailsNodeType, setDetailsNodeType] = useState<'goal' | 'milestone' | 'objective' | 'task' | null>(null)
+  const [detailsNodeId, setDetailsNodeId] = useState<string | null>(null)
+  const [detailsIsUnlinked, setDetailsIsUnlinked] = useState(false)
+  const [allMilestones, setAllMilestones] = useState<MilestoneOption[]>([])
 
   // -- Goal wizard created handler: refresh goals list, select the new goal --
   const handleGoalCreated = useCallback(
@@ -236,6 +250,86 @@ function StrategicCanvasInner({
         }
         setSelectedGoalId(newGoalId)
       })
+    },
+    []
+  )
+
+  // -- Fetch milestones list on mount --
+  useEffect(() => {
+    startTransition(async () => {
+      const result = await getAllMilestones()
+      if ('data' in result) {
+        setAllMilestones(result.data)
+      }
+    })
+  }, [])
+
+  // -- Data refresh: called after mutations in the details dialog --
+  const handleDataRefresh = useCallback(() => {
+    startTransition(async () => {
+      const promises: Promise<void>[] = []
+
+      // Refetch goal bundle if a goal is selected
+      if (selectedGoalId) {
+        promises.push(
+          getGoalBundle(selectedGoalId).then((result) => {
+            if ('data' in result) setBundle(result.data)
+          })
+        )
+      }
+
+      // Always refetch unlinked items
+      promises.push(
+        getUnlinkedItems().then((result) => {
+          if ('data' in result) setUnlinkedData(result.data)
+        })
+      )
+
+      // Refetch milestones (in case milestones changed)
+      promises.push(
+        getAllMilestones().then((result) => {
+          if ('data' in result) setAllMilestones(result.data)
+        })
+      )
+
+      // Refetch goals list (in case a goal was deleted)
+      promises.push(
+        getStrategicGoals().then((result) => {
+          if ('data' in result) setGoals(result.data)
+        })
+      )
+
+      await Promise.all(promises)
+    })
+  }, [selectedGoalId])
+
+  // -- Handle node click: open details dialog --
+  // Guard against double-click opening duplicate dialogs
+  const nodeClickRef = useRef(false)
+
+  const handleNodeClick = useCallback(
+    (_event: React.MouseEvent, node: Node) => {
+      // Ignore non-interactive node types
+      const nodeType = node.type as string
+      if (nodeType === 'expand' || nodeType === 'divider') return
+
+      // Prevent double-click from firing twice
+      if (nodeClickRef.current) return
+      nodeClickRef.current = true
+      setTimeout(() => { nodeClickRef.current = false }, 300)
+
+      // Extract the real item ID from the node ID (e.g. "goal-abc123" → "abc123")
+      const prefix = `${nodeType}-`
+      const itemId = node.id.startsWith(prefix)
+        ? node.id.slice(prefix.length)
+        : node.id
+
+      const nodeData = node.data as Record<string, unknown>
+
+      setDetailsNodeType(nodeType as 'goal' | 'milestone' | 'objective' | 'task')
+      setDetailsNodeId(itemId)
+      setDetailsIsUnlinked(nodeData.isUnlinked === true)
+      setDetailsOpen(true)
     },
     []
   )
@@ -318,40 +412,53 @@ function StrategicCanvasInner({
   }, [bundle, unlinkedData, pxPerDay, layers.ghosts, layers.tasks, layers.owners, layers.unlinkedWork, rangeStart, filters.status, filters.workstream])
 
   // -- Data fetching: goal bundle + unlinked items in parallel --
-  useEffect(() => {
+  const fetchCanvasData = useCallback(() => {
+    setFetchError(null)
     startTransition(async () => {
-      const promises: Promise<void>[] = []
+      try {
+        const promises: Promise<void>[] = []
 
-      // Fetch goal bundle if a goal is selected
-      if (selectedGoalId) {
+        // Fetch goal bundle if a goal is selected
+        if (selectedGoalId) {
+          promises.push(
+            getGoalBundle(selectedGoalId).then((result) => {
+              if ('data' in result) {
+                setBundle(result.data)
+              } else {
+                console.error('[StrategicCanvas] Failed to load goal bundle:', result.error)
+                setBundle(null)
+                throw new Error(result.error)
+              }
+            })
+          )
+        } else {
+          setBundle(null)
+        }
+
+        // Always fetch unlinked items
         promises.push(
-          getGoalBundle(selectedGoalId).then((result) => {
+          getUnlinkedItems().then((result) => {
             if ('data' in result) {
-              setBundle(result.data)
+              setUnlinkedData(result.data)
             } else {
-              console.error('[StrategicCanvas] Failed to load goal bundle:', result.error)
-              setBundle(null)
+              console.error('[StrategicCanvas] Failed to load unlinked items:', result.error)
+              throw new Error(result.error)
             }
           })
         )
-      } else {
-        setBundle(null)
+
+        await Promise.all(promises)
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Failed to load canvas data'
+        setFetchError(message)
+        toast.error(message)
       }
-
-      // Always fetch unlinked items
-      promises.push(
-        getUnlinkedItems().then((result) => {
-          if ('data' in result) {
-            setUnlinkedData(result.data)
-          } else {
-            console.error('[StrategicCanvas] Failed to load unlinked items:', result.error)
-          }
-        })
-      )
-
-      await Promise.all(promises)
     })
   }, [selectedGoalId])
+
+  useEffect(() => {
+    fetchCanvasData()
+  }, [fetchCanvasData])
 
   // -- Fit view after nodes change --
   useEffect(() => {
@@ -447,7 +554,9 @@ function StrategicCanvasInner({
           <SelectContent>
             {goals.map((g) => (
               <SelectItem key={g.id} value={g.id}>
-                {formatGoalLabel(g)}
+                <span className="truncate block max-w-[280px]" title={formatGoalLabel(g)}>
+                  {formatGoalLabel(g)}
+                </span>
               </SelectItem>
             ))}
           </SelectContent>
@@ -622,6 +731,25 @@ function StrategicCanvasInner({
           </div>
         )}
 
+        {/* Error state with retry */}
+        {fetchError && !isPending && (
+          <div className="absolute inset-0 z-10 flex items-center justify-center">
+            <div className="flex flex-col items-center gap-4 bg-muted/30 rounded-xl p-10 max-w-sm text-center">
+              <AlertTriangle className="h-10 w-10 text-status-warning" />
+              <div>
+                <p className="text-sm font-medium text-foreground mb-1">
+                  Failed to load canvas
+                </p>
+                <p className="text-sm text-muted-foreground">{fetchError}</p>
+              </div>
+              <Button variant="secondary" onClick={fetchCanvasData} className="gap-1.5">
+                <RefreshCw className="h-4 w-4" />
+                Retry
+              </Button>
+            </div>
+          </div>
+        )}
+
         {/* Empty state: goal selected but no milestones */}
         {selectedGoalId && !isPending && bundle && !hasMilestones && (
           <div className="absolute inset-0 z-10 flex items-center justify-center">
@@ -645,6 +773,7 @@ function StrategicCanvasInner({
           nodes={nodes}
           edges={edges}
           nodeTypes={NODE_TYPES}
+          onNodeClick={handleNodeClick}
           fitView
           minZoom={0.05}
           maxZoom={3}
@@ -656,7 +785,8 @@ function StrategicCanvasInner({
           }}
         >
           <Background
-            gap={24}
+            variant={BackgroundVariant.Dots}
+            gap={20}
             size={1}
             color="hsl(var(--muted-foreground) / 0.1)"
           />
@@ -670,7 +800,7 @@ function StrategicCanvasInner({
             pannable
             zoomable
             maskColor="hsl(var(--background) / 0.8)"
-            className="!shadow-sm !border !rounded-lg"
+            className="!shadow-sm !border !rounded-lg hidden md:block"
           />
 
           {/* "Today" marker line */}
@@ -684,6 +814,19 @@ function StrategicCanvasInner({
         onOpenChange={setIsWizardOpen}
         onGoalCreated={handleGoalCreated}
       />
+
+      {/* Node details dialog */}
+      {detailsNodeType && detailsNodeId && (
+        <NodeDetailsDialog
+          open={detailsOpen}
+          onOpenChange={setDetailsOpen}
+          nodeType={detailsNodeType}
+          nodeId={detailsNodeId}
+          isUnlinked={detailsIsUnlinked}
+          milestones={allMilestones}
+          onUpdate={handleDataRefresh}
+        />
+      )}
     </div>
   )
 }

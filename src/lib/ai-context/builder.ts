@@ -118,6 +118,8 @@ export async function buildAIContext(
         .from('objectives')
         .select('title, progress, status')
         .eq('foundry_id', foundryId)
+        .eq('is_ghost', false)
+        .is('deleted_at', null)
         .in('status', ['In Progress', 'Not Started'])
         .order('created_at', { ascending: false })
         .limit(10)
