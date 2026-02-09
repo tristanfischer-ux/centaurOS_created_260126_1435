@@ -70,8 +70,8 @@ const companyMoreNavigation = [
     { name: "Objectives", href: "/new-objectives", icon: Target },
     { name: "Team", href: "/team", icon: Users },
     { name: "Agents", href: "/agents", icon: Bot },
-    { name: "Canvas", href: "/canvas", icon: Waypoints },
-    { name: "Strategy", href: "/strategic-planner", icon: Map },
+    { name: "Strategy", href: "/canvas", icon: Waypoints },
+    { name: "Strategic Planner", href: "/strategic-planner", icon: Map },
     { name: "Inspiration", href: "/inspiration", icon: Lightbulb },
     { name: "Financial Tools", href: "/tools/financial", icon: Coins },
 ]

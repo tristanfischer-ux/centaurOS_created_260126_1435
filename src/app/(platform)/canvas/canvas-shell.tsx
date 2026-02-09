@@ -3,30 +3,34 @@
 /**
  * @file canvas-shell.tsx
  *
- * @description Client-side shell for the Canvas page. Provides tab switching
- * between the Strategic Timeline and Whiteboards, with consistent navigation.
+ * @description Client-side shell for the Strategy page. Provides tab switching
+ * between Strategy Flow, Strategic Timeline, and Whiteboards.
  *
  * @related
+ * - strategy-flow-view.tsx — Sankey-inspired flow visualization
  * - strategic-canvas-view.tsx — ReactFlow-based timeline
  * - components/whiteboard-list.tsx — whiteboard CRUD list
  */
 
 import React, { useState } from 'react'
-import { Waypoints, Pencil } from 'lucide-react'
+import { Waypoints, Pencil, GitBranch } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
+import { StrategyFlowView } from './strategy-flow-view'
 import { StrategicCanvasView } from './strategic-canvas-view'
-import type { StrategicGoal } from '@/types/canvas'
+import type { StrategicGoal, GoalBundle } from '@/types/canvas'
 
 // ============================================================================
 // TYPES
 // ============================================================================
 
-type CanvasTab = 'timeline' | 'whiteboards'
+type CanvasTab = 'flow' | 'timeline' | 'whiteboards'
 
 interface CanvasShellProps {
   /** Pre-fetched strategic goals from the server component */
   initialGoals: StrategicGoal[]
+  /** Pre-fetched goal bundles (parallel to initialGoals) for flow view */
+  initialBundles: GoalBundle[]
   /** Server-rendered whiteboard list */
   whiteboardList: React.ReactNode
 }
@@ -36,6 +40,7 @@ interface CanvasShellProps {
 // ============================================================================
 
 const TABS: { id: CanvasTab; label: string; icon: React.ElementType }[] = [
+  { id: 'flow', label: 'Strategy Flow', icon: GitBranch },
   { id: 'timeline', label: 'Strategic Timeline', icon: Waypoints },
   { id: 'whiteboards', label: 'Whiteboards', icon: Pencil },
 ]
@@ -45,14 +50,15 @@ const TABS: { id: CanvasTab; label: string; icon: React.ElementType }[] = [
 // ============================================================================
 
 /**
- * @description Shell component that manages the Timeline / Whiteboards tabs
- * and renders the appropriate content for each.
+ * @description Shell component that manages the Strategy Flow / Timeline /
+ * Whiteboards tabs and renders the appropriate content for each.
  */
 export function CanvasShell({
   initialGoals,
+  initialBundles,
   whiteboardList,
 }: CanvasShellProps) {
-  const [activeTab, setActiveTab] = useState<CanvasTab>('timeline')
+  const [activeTab, setActiveTab] = useState<CanvasTab>('flow')
 
   return (
     <div>
@@ -81,6 +87,12 @@ export function CanvasShell({
       </div>
 
       {/* Tab content */}
+      <div className={activeTab === 'flow' ? 'block' : 'hidden'}>
+        <StrategyFlowView
+          initialGoals={initialGoals}
+          initialBundles={initialBundles}
+        />
+      </div>
       <div className={activeTab === 'timeline' ? 'block' : 'hidden'}>
         <StrategicCanvasView
           initialGoals={initialGoals}

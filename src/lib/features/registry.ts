@@ -49,14 +49,14 @@ export const FEATURE_REGISTRY: Feature[] = [
     // === February 2026 Features ===
     {
         id: 'canvas',
-        name: 'Strategic Canvas',
-        description: 'Visual map of objectives, tasks, and their relationships on an interactive timeline',
+        name: 'Strategy',
+        description: 'Strategy flow visualization, timeline, and visual map of strategic goals',
         route: '/canvas',
         releasedAt: new Date('2026-02-09'),
         category: 'strategic',
         status: 'beta',
         isVisibleInNav: true,
-        changelog: 'Added Strategic Canvas — a visual workspace for mapping out your goals and working backwards from deadlines. Plot objectives and tasks on an interactive timeline with drag-and-drop positioning powered by ReactFlow.'
+        changelog: 'Added Strategy — a visual workspace for mapping out your goals with flow visualization, timeline, and working backwards from deadlines. Plot objectives and tasks on an interactive timeline with drag-and-drop positioning.'
     },
     {
         id: 'financial-tools',

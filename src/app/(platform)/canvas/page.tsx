@@ -1,19 +1,22 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { typography } from '@/lib/design-system'
-import { getStrategicGoals } from '@/actions/canvas'
+import { getStrategicGoals, getGoalBundle } from '@/actions/canvas'
 import { CanvasShell } from './canvas-shell'
 import { WhiteboardList } from './components/whiteboard-list'
 import type { WhiteboardRow } from '@/actions/whiteboards'
-import type { StrategicGoal } from '@/types/canvas'
+import type { StrategicGoal, GoalBundle } from '@/types/canvas'
 
 export const dynamic = 'force-dynamic'
 
 /**
- * @description Canvas page — strategic timeline + whiteboards.
+ * @description Strategy page — flow visualization, strategic timeline, and whiteboards.
  *
- * Server component that fetches initial data (strategic goals + whiteboards)
- * and hands them to the client-side CanvasShell for interactive rendering.
+ * Server component that fetches initial data (strategic goals, goal bundles,
+ * whiteboards) and hands them to the client-side CanvasShell for rendering.
+ *
+ * Goal bundles are fetched in parallel for all goals so the Strategy Flow tab
+ * can render immediately without client-side waterfall requests.
  *
  * @security Authenticates user and scopes all queries to their foundry.
  */
@@ -59,12 +62,22 @@ export default async function CanvasPage() {
   ])
 
   if (whiteboardsResult.error) {
-    console.error('[Canvas] Error loading whiteboards:', whiteboardsResult.error)
+    console.error('[Strategy] Error loading whiteboards:', whiteboardsResult.error)
   }
 
   // Extract goals from result
   const goals: StrategicGoal[] =
     goalsResult && 'data' in goalsResult ? goalsResult.data : []
+
+  // Fetch goal bundles in parallel for the Strategy Flow visualization
+  // Each bundle contains milestones, objectives, and tasks for task counting
+  const bundleResults = await Promise.all(
+    goals.map((goal) => getGoalBundle(goal.id))
+  )
+
+  const bundles: GoalBundle[] = bundleResults
+    .map((result) => ('data' in result ? result.data : null))
+    .filter((b): b is GoalBundle => b !== null)
 
   const whiteboards = (whiteboardsResult.data || []) as WhiteboardRow[]
   const objectivesForDialog = (objectivesResult.data || []).map((o) => ({
@@ -79,10 +92,10 @@ export default async function CanvasPage() {
         <div className="min-w-0 flex-1">
           <div className={typography.pageHeader}>
             <div className={typography.pageHeaderAccent} />
-            <h1 className={typography.h1}>Canvas</h1>
+            <h1 className={typography.h1}>Strategy</h1>
           </div>
           <p className={typography.pageSubtitle}>
-            Strategic timeline &mdash; work backwards from your goals
+            Visualise your strategic flow, timeline, and goals
           </p>
         </div>
       </div>
@@ -90,6 +103,7 @@ export default async function CanvasPage() {
       {/* Client shell handles tab switching, toolbar, and ReactFlow */}
       <CanvasShell
         initialGoals={goals}
+        initialBundles={bundles}
         whiteboardList={
           <WhiteboardList
             whiteboards={whiteboards}

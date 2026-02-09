@@ -74,8 +74,8 @@ const companyNavigation = [
     { name: "Tasks", href: "/new-tasks", icon: CheckSquare, tooltip: "Manage and assign actionable items" },
     { name: "Team", href: "/team", icon: Users, tooltip: "Team members, roles, and capacity" },
     { name: "Agents", href: "/agents", icon: Bot, tooltip: "Prompt workflows — build, chain, and copy prompts" },
-    { name: "Canvas", href: "/canvas", icon: Waypoints, tooltip: "Visual map of objectives, tasks, and their relationships" },
-    { name: "Strategy", href: "/strategic-planner", icon: Map, tooltip: "Strategic timeline planner — backward-plan from goals with AI" },
+    { name: "Strategy", href: "/canvas", icon: Waypoints, tooltip: "Strategy flow, timeline, and visual map of your strategic goals" },
+    { name: "Strategic Planner", href: "/strategic-planner", icon: Map, tooltip: "Backward-plan from goals with AI — phases, tasks, and dependencies" },
     { name: "Inspiration", href: "/inspiration", icon: Lightbulb, tooltip: "Get ideas on what to do next and discover opportunities" },
     { name: "Financial Tools", href: "/tools/financial", icon: Coins, tooltip: "Money Map and Cost of Delay calculator" },
 ]
