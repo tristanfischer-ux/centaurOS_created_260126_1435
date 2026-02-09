@@ -23,7 +23,6 @@ import {
     BookOpen,
     LayoutDashboard,
     ShoppingBag,
-    Map,
     Coins,
 } from "lucide-react"
 import {
@@ -58,22 +57,21 @@ const mainNavigation = [
 
 // "More" dropdown — Company section
 const companyMoreNavigation = [
-    { name: "My Orders", href: "/my-orders", icon: ShoppingBag },
     { name: "Updates", href: "/updates", icon: Bell },
+    { name: "Strategy", href: "/canvas", icon: Waypoints },
     { name: "Objectives", href: "/new-objectives", icon: Target },
     { name: "Team", href: "/team", icon: Users },
     { name: "Agents", href: "/agents", icon: Bot },
-    { name: "Strategy", href: "/canvas", icon: Waypoints },
-    { name: "Strategic Planner", href: "/strategic-planner", icon: Map },
     { name: "Financial Tools", href: "/tools/financial", icon: Coins },
+    { name: "My Orders", href: "/my-orders", icon: ShoppingBag },
 ]
 
 // "More" dropdown — Network section
 const networkMoreNavigation = [
+    { name: "Inspiration", href: "/inspiration", icon: Lightbulb },
     { name: "Marketplace", href: "/marketplace", icon: Store },
     { name: "Guild", href: "/guild", icon: GraduationCap },
     { name: "Apprenticeship", href: "/apprenticeship", icon: BookOpen },
-    { name: "Inspiration", href: "/inspiration", icon: Lightbulb },
 ]
 
 // Account items

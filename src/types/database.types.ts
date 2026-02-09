@@ -1943,6 +1943,39 @@ export type Database = {
           },
         ]
       }
+      business_functions: {
+        Row: {
+          category: string
+          created_at: string | null
+          description: string | null
+          display_order: number | null
+          id: string
+          is_critical: boolean | null
+          name: string
+          typical_roles: string[] | null
+        }
+        Insert: {
+          category: string
+          created_at?: string | null
+          description?: string | null
+          display_order?: number | null
+          id?: string
+          is_critical?: boolean | null
+          name: string
+          typical_roles?: string[] | null
+        }
+        Update: {
+          category?: string
+          created_at?: string | null
+          description?: string | null
+          display_order?: number | null
+          id?: string
+          is_critical?: boolean | null
+          name?: string
+          typical_roles?: string[] | null
+        }
+        Relationships: []
+      }
       calendar_sync_mappings: {
         Row: {
           created_at: string
@@ -3382,6 +3415,67 @@ export type Database = {
             columns: ["profile_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      foundry_function_coverage: {
+        Row: {
+          assessed_at: string | null
+          assessed_by: string | null
+          coverage_status: string
+          covered_by: string | null
+          created_at: string | null
+          foundry_id: string
+          function_id: string
+          id: string
+          notes: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          assessed_at?: string | null
+          assessed_by?: string | null
+          coverage_status?: string
+          covered_by?: string | null
+          created_at?: string | null
+          foundry_id: string
+          function_id: string
+          id?: string
+          notes?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          assessed_at?: string | null
+          assessed_by?: string | null
+          coverage_status?: string
+          covered_by?: string | null
+          created_at?: string | null
+          foundry_id?: string
+          function_id?: string
+          id?: string
+          notes?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "foundry_function_coverage_assessed_by_fkey"
+            columns: ["assessed_by"]
+            isOneToOne: false
+            referencedRelation: "buyer_stats"
+            referencedColumns: ["buyer_id"]
+          },
+          {
+            foreignKeyName: "foundry_function_coverage_assessed_by_fkey"
+            columns: ["assessed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "foundry_function_coverage_function_id_fkey"
+            columns: ["function_id"]
+            isOneToOne: false
+            referencedRelation: "business_functions"
             referencedColumns: ["id"]
           },
         ]
@@ -6861,6 +6955,7 @@ export type Database = {
           paired_ai_id: string | null
           phone_number: string | null
           preferred_currency: string | null
+          primary_function_id: string | null
           role: Database["public"]["Enums"]["member_role"]
           skills: string[] | null
           stripe_account_id: string | null
@@ -6893,6 +6988,7 @@ export type Database = {
           paired_ai_id?: string | null
           phone_number?: string | null
           preferred_currency?: string | null
+          primary_function_id?: string | null
           role?: Database["public"]["Enums"]["member_role"]
           skills?: string[] | null
           stripe_account_id?: string | null
@@ -6925,6 +7021,7 @@ export type Database = {
           paired_ai_id?: string | null
           phone_number?: string | null
           preferred_currency?: string | null
+          primary_function_id?: string | null
           role?: Database["public"]["Enums"]["member_role"]
           skills?: string[] | null
           stripe_account_id?: string | null
@@ -6952,6 +7049,13 @@ export type Database = {
             columns: ["paired_ai_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "profiles_primary_function_id_fkey"
+            columns: ["primary_function_id"]
+            isOneToOne: false
+            referencedRelation: "business_functions"
             referencedColumns: ["id"]
           },
         ]

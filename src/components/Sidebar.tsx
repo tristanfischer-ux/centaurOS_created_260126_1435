@@ -19,7 +19,6 @@ import {
     Waypoints,
     MessageSquarePlus,
     Plus,
-    Map,
     Coins,
     GraduationCap,
     BookOpen,
@@ -64,26 +63,25 @@ const personNavigation = [
 // Zone B: "Company" — Workspace navigation (work, strategy, team)
 // ─────────────────────────────────────────────────────────────────────────────
 const companyNavigation = [
-    { name: "My Orders", href: "/my-orders", icon: ShoppingBag, tooltip: "View and manage your marketplace orders" },
     { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard, tooltip: "Company command center with insights and quick actions" },
     { name: "Updates", href: "/updates", icon: Bell, tooltip: "Notes, comments, and changes across tasks and objectives" },
+    { name: "Strategy", href: "/canvas", icon: Waypoints, tooltip: "Strategy flow, timeline, and visual map of your strategic goals" },
     { name: "Objectives", href: "/new-objectives", icon: Target, tooltip: "Set and track high-level strategic goals" },
     { name: "Tasks", href: "/new-tasks", icon: CheckSquare, tooltip: "Manage and assign actionable items" },
     { name: "Team", href: "/team", icon: Users, tooltip: "Team members, roles, and capacity" },
     { name: "Agents", href: "/agents", icon: Bot, tooltip: "Prompt workflows — build, chain, and copy prompts" },
-    { name: "Strategy", href: "/canvas", icon: Waypoints, tooltip: "Strategy flow, timeline, and visual map of your strategic goals" },
-    { name: "Strategic Planner", href: "/strategic-planner", icon: Map, tooltip: "Backward-plan from goals with AI — phases, tasks, and dependencies" },
     { name: "Financial Tools", href: "/tools/financial", icon: Coins, tooltip: "Money Map and Cost of Delay calculator" },
+    { name: "My Orders", href: "/my-orders", icon: ShoppingBag, tooltip: "View and manage your marketplace orders" },
 ]
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Zone C: "Network" — Community and discovery
 // ─────────────────────────────────────────────────────────────────────────────
 const networkNavigation = [
+    { name: "Inspiration", href: "/inspiration", icon: Lightbulb, tooltip: "Get ideas on what to do next and discover opportunities" },
     { name: "Marketplace", href: "/marketplace", icon: Store, tooltip: "Find experts, suppliers, products, and services" },
     { name: "Guild", href: "/guild", icon: GraduationCap, tooltip: "Community hub — events, networking, opportunities" },
     { name: "Apprenticeship", href: "/apprenticeship", icon: BookOpen, tooltip: "Track apprenticeship progress, OTJT hours, and learning modules" },
-    { name: "Inspiration", href: "/inspiration", icon: Lightbulb, tooltip: "Get ideas on what to do next and discover opportunities" },
 ]
 
 interface FoundryInfo {
