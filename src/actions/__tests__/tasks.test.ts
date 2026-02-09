@@ -58,6 +58,16 @@ jest.mock('@/lib/audit', () => ({
     logTaskHistory: jest.fn().mockResolvedValue(undefined)
 }))
 
+// Mock messaging sync
+jest.mock('@/lib/messaging/comment-sync', () => ({
+    syncTaskCommentToMessages: jest.fn().mockResolvedValue({ success: true })
+}))
+
+// Mock Google Calendar sync
+jest.mock('@/actions/google-calendar', () => ({
+    syncTaskToCalendar: jest.fn().mockResolvedValue(undefined)
+}))
+
 // Mock Revalidate
 jest.mock('next/cache', () => ({
     revalidatePath: jest.fn()
