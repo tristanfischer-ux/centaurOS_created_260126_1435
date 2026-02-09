@@ -133,6 +133,31 @@ function fmtAmount(value: number): string {
   return `£${value.toFixed(0)}`
 }
 
+/**
+ * Format a number with comma separators for display in inputs.
+ *
+ * @param value - Numeric string (may already contain commas)
+ * @returns Formatted string like "45,000"
+ */
+function formatWithCommas(value: string): string {
+  // Strip non-numeric chars except decimal point
+  const cleaned = value.replace(/[^0-9.]/g, '')
+  if (!cleaned) return ''
+  const parts = cleaned.split('.')
+  const intPart = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',')
+  return parts.length > 1 ? `${intPart}.${parts[1]}` : intPart
+}
+
+/**
+ * Parse a formatted number string (with commas) to a number.
+ *
+ * @param value - String like "45,000"
+ * @returns Parsed number or NaN
+ */
+function parseFormattedNumber(value: string): number {
+  return parseFloat(value.replace(/,/g, ''))
+}
+
 // ============================================================
 // Sub-components
 // ============================================================
@@ -163,7 +188,7 @@ function InlineAddForm({
       toast.error('Please enter a name')
       return
     }
-    const parsedAmount = parseFloat(amount)
+    const parsedAmount = parseFormattedNumber(amount)
     if (isNaN(parsedAmount) || parsedAmount < 0) {
       toast.error('Please enter a valid amount')
       return
@@ -171,6 +196,10 @@ function InlineAddForm({
     onAdd(trimmedName, category, parsedAmount)
     setName('')
     setAmount('')
+  }
+
+  const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>): void => {
+    setAmount(formatWithCommas(e.target.value))
   }
 
   return (
@@ -184,16 +213,15 @@ function InlineAddForm({
           autoFocus
           onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
         />
-        <div className="relative w-24">
-          <span className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground text-xs">£</span>
+        <div className="relative w-28">
+          <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground text-sm font-medium">£</span>
           <Input
-            type="number"
-            min={0}
-            step={100}
+            type="text"
+            inputMode="numeric"
             value={amount}
-            onChange={(e) => setAmount(e.target.value)}
+            onChange={handleAmountChange}
             placeholder="0"
-            className="h-8 text-sm pl-5 w-full"
+            className="h-8 text-sm font-medium pl-6 w-full tabular-nums"
             onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
           />
         </div>
@@ -244,7 +272,7 @@ function ItemRow({
 
   const [isEditing, setIsEditing] = useState(false)
   const [editName, setEditName] = useState(name)
-  const [editAmount, setEditAmount] = useState(String(amount))
+  const [editAmount, setEditAmount] = useState('')
   const nameInputRef = useRef<HTMLInputElement>(null)
 
   // Focus the name input when entering edit mode
@@ -257,8 +285,13 @@ function ItemRow({
 
   const handleStartEdit = (): void => {
     setEditName(name)
-    setEditAmount(String(amount))
+    // Format with commas for readability (e.g., "45,000" not "45000")
+    setEditAmount(formatWithCommas(String(amount)))
     setIsEditing(true)
+  }
+
+  const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>): void => {
+    setEditAmount(formatWithCommas(e.target.value))
   }
 
   const handleSave = (): void => {
@@ -267,7 +300,7 @@ function ItemRow({
       toast.error('Name cannot be empty')
       return
     }
-    const parsedAmount = parseFloat(editAmount)
+    const parsedAmount = parseFormattedNumber(editAmount)
     if (isNaN(parsedAmount) || parsedAmount < 0) {
       toast.error('Please enter a valid amount')
       return
@@ -288,43 +321,42 @@ function ItemRow({
   // ---- Edit mode ----
   if (isEditing) {
     return (
-      <div className="flex items-center gap-1.5 py-1 px-1">
+      <div className="flex items-center gap-1.5 py-1.5 px-1 rounded bg-muted/30">
         <Input
           ref={nameInputRef}
           value={editName}
           onChange={(e) => setEditName(e.target.value)}
           onKeyDown={handleKeyDown}
-          className="flex-1 h-7 text-sm"
+          className="flex-1 h-8 text-sm font-medium"
         />
-        <div className="relative w-20">
-          <span className="absolute left-1.5 top-1/2 -translate-y-1/2 text-muted-foreground text-xs">£</span>
+        <div className="relative w-28">
+          <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground text-sm font-medium">£</span>
           <Input
-            type="number"
-            min={0}
-            step={100}
+            type="text"
+            inputMode="numeric"
             value={editAmount}
-            onChange={(e) => setEditAmount(e.target.value)}
+            onChange={handleAmountChange}
             onKeyDown={handleKeyDown}
-            className="h-7 text-sm pl-4 w-full"
+            className="h-8 text-sm font-semibold pl-6 w-full tabular-nums"
           />
         </div>
         <Button
           variant="ghost"
           size="icon"
-          className="h-6 w-6 shrink-0"
+          className="h-7 w-7 shrink-0"
           onClick={handleSave}
           aria-label="Save"
         >
-          <Check className="h-3.5 w-3.5 text-status-success" />
+          <Check className="h-4 w-4 text-status-success" />
         </Button>
         <Button
           variant="ghost"
           size="icon"
-          className="h-6 w-6 shrink-0"
+          className="h-7 w-7 shrink-0"
           onClick={handleCancel}
           aria-label="Cancel"
         >
-          <X className="h-3.5 w-3.5 text-muted-foreground" />
+          <X className="h-4 w-4 text-muted-foreground" />
         </Button>
       </div>
     )
