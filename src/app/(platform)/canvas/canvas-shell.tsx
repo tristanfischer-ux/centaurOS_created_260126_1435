@@ -4,37 +4,36 @@
  * @file canvas-shell.tsx
  *
  * @description Client-side shell for the Strategy page. Provides tab switching
- * between Strategy Flow, Strategic Timeline, Whiteboards, Money Map, and Cost of Delay.
+ * between Strategy River, Whiteboards, Money Map, and Cost of Delay.
  *
  * @related
- * - strategy-flow-view.tsx — Sankey-inspired flow visualization
- * - strategic-canvas-view.tsx — ReactFlow-based timeline
+ * - StrategyRiver: src/components/canvas/StrategyRiver.tsx
+ * - Adapter: src/lib/canvas/strategy-river-adapter.ts
  * - components/whiteboard-list.tsx — whiteboard CRUD list
  * - money-map-client.tsx — Money Map financial visualization
  * - cost-of-delay-view.tsx — Cost of Delay calculator
  */
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Waypoints, Pencil, GitBranch, Banknote, Calculator } from 'lucide-react'
+import { Waypoints, Pencil, Banknote, Calculator } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
-import { StrategyFlowView } from './strategy-flow-view'
-import { StrategicCanvasView } from './strategic-canvas-view'
+import StrategyRiver from '@/components/canvas/StrategyRiver'
+import { goalBundlesToRiverData } from '@/lib/canvas/strategy-river-adapter'
 import { MoneyMapClient } from '../money-map/money-map-client'
 import { CostOfDelayView } from '@/components/tools/cost-of-delay/cost-of-delay-view'
-import type { StrategicGoal, GoalBundle } from '@/types/canvas'
+import { EmptyState } from '@/components/ui/empty-state'
+import type { GoalBundle } from '@/types/canvas'
 
 // ============================================================================
 // TYPES
 // ============================================================================
 
-type CanvasTab = 'flow' | 'timeline' | 'whiteboards' | 'money-map' | 'cost-of-delay'
+type CanvasTab = 'river' | 'whiteboards' | 'money-map' | 'cost-of-delay'
 
 interface CanvasShellProps {
-  /** Pre-fetched strategic goals from the server component */
-  initialGoals: StrategicGoal[]
-  /** Pre-fetched goal bundles (parallel to initialGoals) for flow view */
+  /** Pre-fetched goal bundles for the Strategy River */
   initialBundles: GoalBundle[]
   /** Server-rendered whiteboard list */
   whiteboardList: React.ReactNode
@@ -45,8 +44,7 @@ interface CanvasShellProps {
 // ============================================================================
 
 const TABS: { id: CanvasTab; label: string; icon: React.ElementType }[] = [
-  { id: 'flow', label: 'Strategy Flow', icon: GitBranch },
-  { id: 'timeline', label: 'Strategic Timeline', icon: Waypoints },
+  { id: 'river', label: 'Strategy River', icon: Waypoints },
   { id: 'whiteboards', label: 'Whiteboards', icon: Pencil },
   { id: 'money-map', label: 'Money Map', icon: Banknote },
   { id: 'cost-of-delay', label: 'Cost of Delay', icon: Calculator },
@@ -57,25 +55,27 @@ const TABS: { id: CanvasTab; label: string; icon: React.ElementType }[] = [
 // ============================================================================
 
 /**
- * @description Shell component that manages the Strategy Flow / Timeline /
- * Whiteboards tabs and renders the appropriate content for each.
+ * @description Shell component that manages the Strategy River / Whiteboards /
+ * Money Map / Cost of Delay tabs and renders the appropriate content for each.
  */
 export function CanvasShell({
-  initialGoals,
   initialBundles,
   whiteboardList,
 }: CanvasShellProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const tabParam = searchParams.get('tab') as CanvasTab | null
-  
+
   const [activeTab, setActiveTab] = useState<CanvasTab>(
-    tabParam && TABS.some(t => t.id === tabParam) ? tabParam : 'flow'
+    tabParam && TABS.some((t) => t.id === tabParam) ? tabParam : 'river'
   )
+
+  // Convert goal bundles to river data format
+  const riverData = useMemo(() => goalBundlesToRiverData(initialBundles), [initialBundles])
 
   // Update URL when tab changes
   useEffect(() => {
-    if (activeTab !== 'flow') {
+    if (activeTab !== 'river') {
       router.replace(`/canvas?tab=${activeTab}`, { scroll: false })
     } else {
       router.replace('/canvas', { scroll: false })
@@ -109,17 +109,15 @@ export function CanvasShell({
       </div>
 
       {/* Tab content */}
-      <div className={activeTab === 'flow' ? 'block' : 'hidden'}>
-        <StrategyFlowView
-          initialGoals={initialGoals}
-          initialBundles={initialBundles}
-        />
-      </div>
-      <div className={activeTab === 'timeline' ? 'block' : 'hidden'}>
-        <StrategicCanvasView
-          initialGoals={initialGoals}
-          onOpenWhiteboards={() => setActiveTab('whiteboards')}
-        />
+      <div className={activeTab === 'river' ? 'block' : 'hidden'}>
+        {riverData.length === 0 ? (
+          <EmptyState
+            title="No strategic objectives yet"
+            description="Create a strategic objective to see your strategy river — a visual timeline of your goals, milestones, and tasks."
+          />
+        ) : (
+          <StrategyRiver strategicObjectives={riverData} />
+        )}
       </div>
       <div className={activeTab === 'whiteboards' ? 'block' : 'hidden'}>
         {whiteboardList}

@@ -10,12 +10,13 @@ import type { StrategicGoal, GoalBundle } from '@/types/canvas'
 export const dynamic = 'force-dynamic'
 
 /**
- * @description Strategy page — flow visualization, strategic timeline, and whiteboards.
+ * @description Strategy page — river visualization, whiteboards, money map,
+ * and cost of delay tools.
  *
  * Server component that fetches initial data (strategic goals, goal bundles,
  * whiteboards) and hands them to the client-side CanvasShell for rendering.
  *
- * Goal bundles are fetched in parallel for all goals so the Strategy Flow tab
+ * Goal bundles are fetched in parallel for all goals so the Strategy River
  * can render immediately without client-side waterfall requests.
  *
  * @security Authenticates user and scopes all queries to their foundry.
@@ -69,8 +70,8 @@ export default async function CanvasPage() {
   const goals: StrategicGoal[] =
     goalsResult && 'data' in goalsResult ? goalsResult.data : []
 
-  // Fetch goal bundles in parallel for the Strategy Flow visualization
-  // Each bundle contains milestones, objectives, and tasks for task counting
+  // Fetch goal bundles in parallel for the Strategy River visualization
+  // Each bundle contains milestones, objectives, and tasks
   const bundleResults = await Promise.all(
     goals.map((goal) => getGoalBundle(goal.id))
   )
@@ -95,14 +96,13 @@ export default async function CanvasPage() {
             <h1 className={typography.h1}>Strategy</h1>
           </div>
           <p className={typography.pageSubtitle}>
-            Visualise your strategic flow, timeline, and goals
+            Visualise your strategic objectives, milestones, and progress
           </p>
         </div>
       </div>
 
-      {/* Client shell handles tab switching, toolbar, and ReactFlow */}
+      {/* Client shell handles tab switching and Strategy River */}
       <CanvasShell
-        initialGoals={goals}
         initialBundles={bundles}
         whiteboardList={
           <WhiteboardList

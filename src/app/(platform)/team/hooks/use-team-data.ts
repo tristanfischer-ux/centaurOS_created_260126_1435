@@ -285,6 +285,7 @@ export function useTeamData(args: UseTeamDataArgs): TeamDataResult {
       }
     })
 
+
     // ── Gaps ──────────────────────────────────────────────────
     const gaps: GapInfo[] = []
     functions.forEach((fn) => {

@@ -12,7 +12,6 @@
  */
 
 import { useState, useMemo } from 'react'
-import { UserAvatar } from '@/components/ui/user-avatar'
 import {
   CX, CY, GAP_DEG, SLICE_DEG,
   FUNC_R1, FUNC_R2, EXEC_R, APPR_R,
@@ -64,28 +63,18 @@ function spreadPos(
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// HELPERS — map orbit role to UserAvatar role + size
+// ROLE-BASED SVG COLOURS (matches UserAvatar orange hierarchy)
 // ═══════════════════════════════════════════════════════════════════════════════
 
-/** Map orbit's UPPERCASE role to the UserAvatar role prop */
-function toAvatarRole(orbitRole: string): string {
-  switch (orbitRole) {
-    case 'FOUNDER': return 'Founder'
-    case 'EXECUTIVE': return 'Executive'
-    case 'APPRENTICE': return 'Apprentice'
-    default: return 'Apprentice'
-  }
+const SVG_ROLE_COLORS: Record<string, { bg: string; text: string; stroke: string }> = {
+  FOUNDER:    { bg: '#FFEDD5', text: '#C2410C', stroke: '#F97316' },
+  EXECUTIVE:  { bg: '#FFF7ED', text: '#EA580C', stroke: '#FB923C' },
+  APPRENTICE: { bg: '#F1F5F9', text: '#64748B', stroke: '#94A3B8' },
 }
 
-/** Pick a UserAvatar size that fits the slot radius */
-function avatarSizeForR(r: number): 'sm' | 'md' | 'lg' {
-  if (r >= 18) return 'lg'   // 40px — executive slots (r=20)
-  if (r >= 13) return 'md'   // 32px — apprentice slots (r=14)
-  return 'sm'                // 24px
+function getRoleSvgColors(role: string) {
+  return SVG_ROLE_COLORS[role] || SVG_ROLE_COLORS.APPRENTICE
 }
-
-/** Pixel diameter for each UserAvatar size */
-const AVATAR_PX: Record<string, number> = { sm: 24, md: 32, lg: 40 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // SLOT COMPONENTS
@@ -105,10 +94,9 @@ interface OSlotProps {
 function OSlot({ x, y, r, person, isEmpty, isFounder, sc, onClick }: OSlotProps) {
   const [isHovered, setIsHovered] = useState(false)
 
-  // ── Filled slot: real UserAvatar via foreignObject ──────────
+  // ── Filled slot: pure SVG circle with role-based colors ────
   if (person) {
-    const size = avatarSizeForR(r)
-    const px = AVATAR_PX[size]
+    const rc = getRoleSvgColors(person.role)
     return (
       <g
         onClick={onClick}
@@ -116,39 +104,37 @@ function OSlot({ x, y, r, person, isEmpty, isFounder, sc, onClick }: OSlotProps)
         onMouseLeave={() => setIsHovered(false)}
         style={{ cursor: 'pointer' }}
       >
-        {/* Hover highlight ring */}
-        {isHovered && (
-          <circle
-            cx={x} cy={y} r={px / 2 + 4}
-            fill="none" stroke="#F97316" strokeWidth="2.5" opacity=".45"
-            style={{ transition: 'all .15s' }}
-          />
-        )}
+        {/* White background ring */}
+        <circle cx={x} cy={y} r={r + 3} fill="white" />
 
-        {/* Real UserAvatar embedded in SVG */}
-        <foreignObject
-          x={x - px / 2} y={y - px / 2}
-          width={px} height={px}
-          style={{ pointerEvents: 'none', overflow: 'visible' }}
+        {/* Role-colored circle */}
+        <circle
+          cx={x} cy={y} r={r}
+          fill={rc.bg} stroke={rc.stroke}
+          strokeWidth={isHovered ? 3 : 2.2}
+          style={{
+            transition: 'all .15s',
+            filter: isHovered ? `drop-shadow(0 2px 8px ${rc.stroke}44)` : 'none',
+          }}
+        />
+
+        {/* Initials text */}
+        <text
+          x={x} y={y + 1}
+          textAnchor="middle" dominantBaseline="central"
+          fill={rc.text}
+          fontSize={r > 16 ? 12 : 9}
+          fontWeight="800"
         >
-          <div style={{ width: px, height: px, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <UserAvatar
-              name={person.name}
-              role={toAvatarRole(person.role)}
-              size={size}
-            />
-          </div>
-        </foreignObject>
-
-        {/* Invisible hit area for pointer events */}
-        <circle cx={x} cy={y} r={px / 2} fill="transparent" />
+          {person.initials}
+        </text>
 
         {/* Tooltip on hover */}
         {isHovered && (
           <g>
-            <rect x={x - 52} y={y - px / 2 - 30} width={104} height={24} rx={7} fill="#1E293B" />
+            <rect x={x - 52} y={y - r - 30} width={104} height={24} rx={7} fill="#1E293B" />
             <text
-              x={x} y={y - px / 2 - 15}
+              x={x} y={y - r - 15}
               textAnchor="middle" dominantBaseline="central"
               fill="white" fontSize="10" fontWeight="600"
             >
@@ -523,28 +509,26 @@ export function OrbitSVG({
         FOUNDERS
       </text>
 
-      {/* Founder avatars — real UserAvatar via foreignObject */}
+      {/* Founder avatars — pure SVG circles */}
       {founders.map((f, fi) => {
-        const avatarPx = 32 // md size
+        const avatarR = 16
         const fg = 6
-        const totalW = founders.length * avatarPx + (founders.length - 1) * fg
-        const fx = CX - totalW / 2 + fi * (avatarPx + fg) + avatarPx / 2
+        const totalW = founders.length * avatarR * 2 + (founders.length - 1) * fg
+        const fx = CX - totalW / 2 + fi * (avatarR * 2 + fg) + avatarR
         const fy = CY - 8
+        const rc = SVG_ROLE_COLORS.FOUNDER
         return (
-          <foreignObject
-            key={f.id}
-            x={fx - avatarPx / 2} y={fy - avatarPx / 2}
-            width={avatarPx} height={avatarPx}
-            style={{ overflow: 'visible' }}
-          >
-            <div style={{ width: avatarPx, height: avatarPx, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <UserAvatar
-                name={f.name}
-                role="Founder"
-                size="md"
-              />
-            </div>
-          </foreignObject>
+          <g key={f.id}>
+            <circle cx={fx} cy={fy} r={avatarR + 2} fill="white" />
+            <circle cx={fx} cy={fy} r={avatarR} fill={rc.bg} stroke={rc.stroke} strokeWidth="2" />
+            <text
+              x={fx} y={fy + 1}
+              textAnchor="middle" dominantBaseline="central"
+              fill={rc.text} fontSize="10" fontWeight="800"
+            >
+              {f.initials}
+            </text>
+          </g>
         )
       })}
 
