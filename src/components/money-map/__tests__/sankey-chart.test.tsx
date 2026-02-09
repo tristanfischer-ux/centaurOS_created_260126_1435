@@ -332,7 +332,7 @@ describe('MoneyMapSankey', () => {
       )
 
       const svg = container.querySelector('svg')
-      expect(svg?.getAttribute('viewBox')).toBe('0 0 1020 520')
+      expect(svg?.getAttribute('viewBox')).toBe('0 0 1020 620')
     })
 
     it('all flow paths have valid d attribute', () => {
