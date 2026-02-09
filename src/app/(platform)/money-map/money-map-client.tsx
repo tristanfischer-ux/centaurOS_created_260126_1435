@@ -299,7 +299,7 @@ export function MoneyMapClient({ hideHeader = false }: MoneyMapClientProps): Rea
             Viewing sample data for a typical consultancy
           </p>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Add your own revenue streams and costs in the panel on the left to see your real numbers.
+            Use the <strong className="text-foreground">+ Add</strong> buttons in the panel on the left to enter your own numbers. The sample data will be replaced with yours.
           </p>
         </div>
       )}

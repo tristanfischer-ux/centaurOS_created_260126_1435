@@ -485,17 +485,15 @@ export function MoneyMapInputPanel({
                   onCancel={() => setAddingTo(null)}
                 />
               ) : (
-                !isDemo && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-7 text-xs text-muted-foreground mt-1"
-                    onClick={() => setAddingTo('revenue')}
-                  >
-                    <Plus className="h-3 w-3 mr-1" />
-                    Add Stream
-                  </Button>
-                )
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 text-xs text-muted-foreground mt-1"
+                  onClick={() => setAddingTo('revenue')}
+                >
+                  <Plus className="h-3 w-3 mr-1" />
+                  Add Stream
+                </Button>
               )}
             </div>
           )}
@@ -528,17 +526,15 @@ export function MoneyMapInputPanel({
                     onCancel={() => setAddingTo(null)}
                   />
                 ) : (
-                  !isDemo ? (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-7 text-xs text-muted-foreground mt-1"
-                      onClick={() => setAddingTo(section.type)}
-                    >
-                      <Plus className="h-3 w-3 mr-1" />
-                      Add {section.label.replace(' Costs', '')}
-                    </Button>
-                  ) : null
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 text-xs text-muted-foreground mt-1"
+                    onClick={() => setAddingTo(section.type)}
+                  >
+                    <Plus className="h-3 w-3 mr-1" />
+                    Add {section.label.replace(' Costs', '')}
+                  </Button>
                 )
               }
             />
