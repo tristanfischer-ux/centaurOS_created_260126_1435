@@ -321,6 +321,7 @@ export function InspirationPageNew({
   )
 
   const ctx = foundryContext || null
+  const hasContext = !!(ctx?.stage || ctx?.industry || (ctx?.gapCategories && ctx.gapCategories.length > 0))
 
   // Context-aware recommendations with "why" tags
   const recommendedPacks = useMemo(
@@ -465,44 +466,64 @@ export function InspirationPageNew({
       {/* ================================================================== */}
       {activeTab === 'for-you' && (
         <div className="space-y-8">
-          {/* Recommended */}
-          <section>
-            <div className="flex items-center gap-2 mb-1">
-              <Sparkles className="h-5 w-5 text-international-orange" />
-              <h2 className="text-lg font-semibold">Recommended for You</h2>
-            </div>
-            <p className="text-sm text-muted-foreground mb-5">
-              {ctx?.gapCategories && ctx.gapCategories.length > 0
-                ? 'Packs selected based on your industry, company stage, and coverage gaps.'
-                : ctx?.stage || ctx?.industry
-                  ? `Packs tailored to ${[ctx?.stage && `${ctx.stage} stage`, ctx?.industry].filter(Boolean).join(', ')}.`
-                  : 'Curated packs to help you take your next step -- diverse categories, quick wins first.'}
-            </p>
-
-            {recommendedPacks.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                {recommendedPacks.map(({ pack, whyTag }) => (
-                  <PackCard
-                    key={pack.id}
-                    pack={pack}
-                    isSaved={savedPackIds.has(pack.id)}
-                    onSaveToggle={handleSaveToggle}
-                    whyTag={whyTag}
-                    members={members}
-                  />
-                ))}
+          {/* Recommended -- only show when we have company context */}
+          {hasContext ? (
+            <section>
+              <div className="flex items-center gap-2 mb-1">
+                <Sparkles className="h-5 w-5 text-international-orange" />
+                <h2 className="text-lg font-semibold">Recommended for You</h2>
               </div>
-            ) : (
+              <p className="text-sm text-muted-foreground mb-5">
+                {ctx?.gapCategories && ctx.gapCategories.length > 0
+                  ? 'Packs selected based on your industry, company stage, and coverage gaps.'
+                  : `Packs tailored to ${[ctx?.stage && `${ctx.stage} stage`, ctx?.industry].filter(Boolean).join(', ')}.`}
+              </p>
+
+              {recommendedPacks.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                  {recommendedPacks.map(({ pack, whyTag }) => (
+                    <PackCard
+                      key={pack.id}
+                      pack={pack}
+                      isSaved={savedPackIds.has(pack.id)}
+                      onSaveToggle={handleSaveToggle}
+                      whyTag={whyTag}
+                      members={members}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <Card className="border-dashed">
+                  <CardContent className="py-8 text-center">
+                    <Sparkles className="h-8 w-8 text-muted-foreground mx-auto mb-3 opacity-50" />
+                    <p className="text-muted-foreground text-sm">
+                      Browse the other tabs to discover packs and get personalised recommendations.
+                    </p>
+                  </CardContent>
+                </Card>
+              )}
+            </section>
+          ) : (
+            <section>
               <Card className="border-dashed">
                 <CardContent className="py-8 text-center">
                   <Sparkles className="h-8 w-8 text-muted-foreground mx-auto mb-3 opacity-50" />
-                  <p className="text-muted-foreground text-sm">
-                    Browse the other tabs to discover packs and get personalised recommendations.
+                  <h3 className="font-semibold text-sm mb-1">
+                    Tell us about your company first
+                  </h3>
+                  <p className="text-muted-foreground text-sm mb-4 max-w-md mx-auto">
+                    Set your company stage and industry in Settings so we can recommend packs that actually match where you are.
                   </p>
+                  <Button asChild variant="outline" size="sm">
+                    <Link href="/settings">
+                      Go to Settings
+                      <ArrowRight className="h-3.5 w-3.5 ml-1.5" />
+                    </Link>
+                  </Button>
                 </CardContent>
               </Card>
-            )}
-          </section>
+            </section>
+          )}
 
           {/* Marketplace CTA */}
           <Card className="bg-gradient-to-r from-international-orange/5 to-background border-international-orange/20">
