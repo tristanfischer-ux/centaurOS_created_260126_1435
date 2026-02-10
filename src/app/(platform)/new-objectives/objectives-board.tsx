@@ -28,10 +28,8 @@ import { CreateObjectiveDialog } from '../objectives/create-objective-dialog'
 import { EditObjectiveDialog } from '@/components/objectives/edit-objective-dialog'
 import { ObjectivesGanttView } from './gantt-view'
 import { TaskDetailPanel } from '../new-tasks/task-detail-panel'
-import { CompanyPurposeWrapper } from '@/components/objectives/company-purpose-wrapper'
 import { deleteObjective } from '@/actions/objectives'
 import { toast } from 'sonner'
-import type { FoundryPurposeData } from '@/types/foundry'
 import type { ObjectiveWithTasks, ObjectiveTask, Member, Team, StrategicObjective } from './types'
 import type { TaskWithData } from '../new-tasks/types'
 
@@ -80,12 +78,6 @@ interface ObjectivesBoardProps {
   teams: Team[]
   currentUserId: string
   currentUserRole: string | null
-  /** Company purpose data for strategic context display */
-  purposeData?: FoundryPurposeData | null
-  /** Whether current user is a founder (can edit purpose) */
-  isFounder?: boolean
-  /** Foundry ID for purpose editing */
-  foundryId?: string
 }
 
 type ViewMode = 'board' | 'tree' | 'timeline'
@@ -98,9 +90,6 @@ export function ObjectivesBoard({
   teams,
   currentUserId,
   currentUserRole,
-  purposeData,
-  isFounder = false,
-  foundryId,
 }: ObjectivesBoardProps) {
   const [viewMode, setViewMode] = useState<ViewMode>('board')
   const [healthFilter, setHealthFilter] = useState<string | null>(null)
@@ -308,16 +297,6 @@ export function ObjectivesBoard({
           <CreateObjectiveDialog />
         </div>
       </div>
-
-      {/* Company Purpose - provides strategic context for all objectives */}
-      {foundryId && (
-        <CompanyPurposeWrapper
-          purposeData={purposeData ?? null}
-          isFounder={isFounder}
-          foundryId={foundryId}
-          userId={currentUserId}
-        />
-      )}
 
       {/* Strategy Health Bar */}
       <StrategyHealthBar

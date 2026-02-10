@@ -4,8 +4,7 @@ import { CreateObjectiveDialog } from './create-objective-dialog'
 import { ObjectivesListView } from './objectives-list-view'
 import { FeatureTipWrapper } from './feature-tip-wrapper'
 import { TaskStatusLegend } from '@/components/objectives/task-status-legend'
-import { CompanyPurposeWrapper } from '@/components/objectives/company-purpose-wrapper'
-import type { FoundryPurposeData, CompanyProfile } from '@/types/foundry'
+import type { CompanyProfile } from '@/types/foundry'
 import { CompanyProfilePrompt } from '@/components/settings/company-profile-prompt'
 
 // Revalidate every 60 seconds
@@ -136,13 +135,6 @@ export default async function ObjectivesPage({ searchParams }: ObjectivesPagePro
                     <CreateObjectiveDialog prefill={prefillText} />
                 </FeatureTipWrapper>
             </div>
-
-            <CompanyPurposeWrapper
-                purposeData={(foundry as { purpose_data?: FoundryPurposeData | null } | null)?.purpose_data ?? null}
-                isFounder={profile.role === 'Founder'}
-                foundryId={profile.foundry_id}
-                userId={user.id}
-            />
 
             <CompanyProfilePrompt
                 hasCompanyProfile={!!(foundry as { company_profile?: CompanyProfile | null } | null)?.company_profile}

@@ -5,6 +5,7 @@ import { CanvasShell } from './canvas-shell'
 import { WhiteboardList } from './components/whiteboard-list'
 import type { WhiteboardRow } from '@/actions/whiteboards'
 import type { StrategicGoal, GoalBundle } from '@/types/canvas'
+import type { FoundryPurposeData } from '@/types/foundry'
 
 export const dynamic = 'force-dynamic'
 
@@ -34,7 +35,7 @@ export default async function CanvasPage() {
   // AUTH: Resolve foundry context
   const { data: profile } = await supabase
     .from('profiles')
-    .select('id, foundry_id')
+    .select('id, foundry_id, role')
     .eq('id', user.id)
     .single()
 
@@ -43,6 +44,11 @@ export default async function CanvasPage() {
   }
 
   const foundryId = profile.foundry_id
+
+  // Fetch foundry with purpose_data via RPC (bypasses RLS issue on foundries table)
+  const { data: foundry } = await supabase.rpc('ensure_foundry_exists', {
+    p_foundry_id: foundryId,
+  })
 
   // Fetch strategic goals, whiteboards, and objectives in parallel
   const [goalsResult, whiteboardsResult, objectivesResult, strategicObjResult] = await Promise.all([
@@ -135,6 +141,10 @@ export default async function CanvasPage() {
             objectives={objectivesForDialog}
           />
         }
+        purposeData={(foundry as { purpose_data?: FoundryPurposeData | null } | null)?.purpose_data ?? null}
+        isFounder={profile.role === 'Founder'}
+        foundryId={foundryId}
+        userId={user.id}
       />
     </div>
   )

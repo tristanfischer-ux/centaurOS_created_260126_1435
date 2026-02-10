@@ -26,10 +26,12 @@ import { MoneyMapClient } from '../money-map/money-map-client'
 import { CostOfDelayView } from '@/components/tools/cost-of-delay/cost-of-delay-view'
 import { StrategicObjectivesManager } from '../new-objectives/strategic-objectives-manager'
 import { StrategyLinkView } from './strategy-link-view'
+import { CompanyPurposeWrapper } from '@/components/objectives/company-purpose-wrapper'
 import { EmptyState } from '@/components/ui/empty-state'
 import type { GoalBundle } from '@/types/canvas'
 import type { MilestoneOption } from '@/types/canvas'
 import type { StrategicObjective } from '../new-objectives/types'
+import type { FoundryPurposeData } from '@/types/foundry'
 
 // ============================================================================
 // TYPES
@@ -55,6 +57,14 @@ interface CanvasShellProps {
   regularObjectives: RegularObjective[]
   /** Server-rendered whiteboard list */
   whiteboardList: React.ReactNode
+  /** Company purpose data for strategic context display */
+  purposeData: FoundryPurposeData | null
+  /** Whether current user is a founder (can edit purpose) */
+  isFounder: boolean
+  /** Foundry ID for purpose editing */
+  foundryId: string
+  /** Current user ID for purpose editing */
+  userId: string
 }
 
 // ============================================================================
@@ -82,6 +92,10 @@ export function CanvasShell({
   strategicObjectives,
   regularObjectives,
   whiteboardList,
+  purposeData,
+  isFounder,
+  foundryId,
+  userId,
 }: CanvasShellProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -148,6 +162,16 @@ export function CanvasShell({
 
   return (
     <div>
+      {/* Company Purpose — foundational context for strategy */}
+      <div className="px-4 sm:px-6 lg:px-8 pt-4">
+        <CompanyPurposeWrapper
+          purposeData={purposeData}
+          isFounder={isFounder}
+          foundryId={foundryId}
+          userId={userId}
+        />
+      </div>
+
       {/* Strategic Objectives CRUD manager */}
       <div className="px-4 sm:px-6 lg:px-8 pt-4 pb-2">
         <StrategicObjectivesManager

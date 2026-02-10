@@ -1,7 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { ObjectivesBoard } from './objectives-board'
-import type { FoundryPurposeData } from '@/types/foundry'
 
 export const dynamic = 'force-dynamic'
 
@@ -22,11 +21,6 @@ export default async function NewObjectivesPage() {
   if (!profile) {
     redirect('/login')
   }
-
-  // Fetch foundry with purpose_data via RPC (bypasses RLS issue on foundries table)
-  const { data: foundry } = await supabase.rpc('ensure_foundry_exists', {
-    p_foundry_id: profile.foundry_id,
-  })
 
   // Fetch all objectives (strategic + regular) in one query
   // Note: is_private may not be in generated types but exists in DB via migration
@@ -176,9 +170,6 @@ export default async function NewObjectivesPage() {
       teams={teams}
       currentUserId={user.id}
       currentUserRole={profile.role}
-      purposeData={(foundry as { purpose_data?: FoundryPurposeData | null } | null)?.purpose_data ?? null}
-      isFounder={profile.role === 'Founder'}
-      foundryId={profile.foundry_id}
     />
   )
 }
