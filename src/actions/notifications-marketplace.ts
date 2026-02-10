@@ -422,9 +422,9 @@ export async function notifyOrderStatusChange(
  */
 function formatCurrency(amount: number | null): string {
     if (amount === null || amount === undefined) return 'Amount'
-    return new Intl.NumberFormat('en-US', {
+    return new Intl.NumberFormat('en-GB', {
         style: 'currency',
-        currency: 'USD'
+        currency: 'GBP'
     }).format(amount / 100) // Assuming amount is in cents
 }
 

@@ -25,7 +25,7 @@
 
 import { useState, useCallback, useRef, useEffect } from 'react'
 import {
-  DollarSign,
+  PoundSterling,
   Receipt,
   Plus,
   Trash2,
@@ -669,7 +669,7 @@ export function MoneyMapInputPanel({
       <CardHeader className="pb-3">
         <CardTitle className="flex items-center gap-2 text-lg">
           <div className="flex items-center justify-center h-8 w-8 rounded-full bg-international-orange/10">
-            <DollarSign className="h-4 w-4 text-international-orange" />
+            <PoundSterling className="h-4 w-4 text-international-orange" />
           </div>
           Your Numbers
         </CardTitle>

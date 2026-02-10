@@ -138,7 +138,7 @@ function extractPrice(result: SearchResult): number | null {
         return value
       }
       if (typeof value === 'string') {
-        // Try to extract number from string like "£500/day" or "$100"
+        // Try to extract number from string like "£500/day" or "£100"
         const match = value.match(/[\d,]+\.?\d*/)
         if (match) {
           return parseFloat(match[0].replace(/,/g, ''))

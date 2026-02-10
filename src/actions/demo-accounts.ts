@@ -49,7 +49,7 @@ const DEMO_ACCOUNTS: Record<string, DemoAccountData> = {
     password: 'DemoVC2026!',
     fullName: 'Taylor Venture',
     firm: 'Demo Ventures',
-    aum: '$50M - $100M'
+    aum: '£50M - £100M'
   },
   supplier: {
     email: 'demo.supplier@fractionalforge.app',

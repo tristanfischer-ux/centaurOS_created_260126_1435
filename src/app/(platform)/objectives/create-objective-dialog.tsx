@@ -691,7 +691,7 @@ export function CreateObjectiveDialog({ children, prefill, prefillContext, exter
                                             </Label>
                                             <Textarea
                                                 id="guided-measurable"
-                                                placeholder="e.g. 10 paying customers, $5k MRR, MVP shipped and tested by 5 users..."
+                                                placeholder="e.g. 10 paying customers, £5k MRR, MVP shipped and tested by 5 users..."
                                                 value={measurable}
                                                 onChange={(e) => setMeasurable(e.target.value)}
                                                 className="min-h-[80px] resize-none"

@@ -70,15 +70,22 @@ export default defineConfig({
         storageState: path.join(authDir, 'supplier.json'),
       },
     },
+    // Updates page tests (authenticated, uses inline storageState)
+    {
+      name: 'updates',
+      testMatch: /updates\.spec\.ts$/,
+      dependencies: ['auth-setup'],
+      use: { ...devices['Desktop Chrome'] },
+    },
     // General tests (unauthenticated)
     {
       name: 'chromium',
-      testMatch: /(?<!qa-.*|auth\.setup)\.spec\.ts$/,
+      testMatch: /(?<!qa-.*|auth\.setup|updates)\.spec\.ts$/,
       use: { ...devices['Desktop Chrome'] },
     },
     {
       name: 'Mobile Chrome',
-      testMatch: /(?<!qa-.*|auth\.setup)\.spec\.ts$/,
+      testMatch: /(?<!qa-.*|auth\.setup|updates)\.spec\.ts$/,
       use: { ...devices['Pixel 5'] },
     },
   ],

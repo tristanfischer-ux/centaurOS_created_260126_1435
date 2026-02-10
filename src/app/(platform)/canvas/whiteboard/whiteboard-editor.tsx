@@ -6,6 +6,8 @@ import { Save, ArrowLeft, Trash2, Loader2, Pencil, CheckSquare } from "lucide-re
 import { toast } from "sonner"
 import Link from "next/link"
 
+import "@excalidraw/excalidraw/index.css"
+
 import { updateWhiteboard, deleteWhiteboard } from "@/actions/whiteboards"
 import { convertStickyNotesToTasks } from "@/actions/whiteboard-to-task"
 import type { WhiteboardRow } from "@/actions/whiteboards"

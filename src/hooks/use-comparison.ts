@@ -227,8 +227,8 @@ export function extractNumericValue(value: unknown): number | null {
     return isNaN(num) ? null : num
   }
 
-  // Handle currency like "$150/hour" or "$50,000"
-  const currencyMatch = value.match(/\$?([\d,]+(?:\.\d+)?)/i)
+  // Handle currency like "£150/hour" or "£50,000"
+  const currencyMatch = value.match(/[£$€]?([\d,]+(?:\.\d+)?)/i)
   if (currencyMatch) {
     const num = parseFloat(currencyMatch[1].replace(/,/g, ''))
     return isNaN(num) ? null : num

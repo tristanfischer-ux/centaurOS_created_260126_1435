@@ -22,8 +22,6 @@ import {
     BookOpen,
     ShoppingBag,
     ScanSearch,
-    Coins,
-    ArrowLeftRight,
 } from "lucide-react"
 import {
     DropdownMenu,
@@ -75,10 +73,7 @@ const networkMoreNavigation = [
     { name: "Apprenticeship", href: "/apprenticeship", icon: BookOpen },
 ]
 
-// Account items
-const accountNavigation = [
-    { name: "Switch Company", href: "/home", icon: ArrowLeftRight },
-]
+// Switch Company now lives on the My Profile page
 
 /**
  * MobileNav — Bottom navigation bar for mobile devices.
@@ -101,7 +96,7 @@ export function MobileNav() {
         router.push(`/new-tasks?prefill=${encodeURIComponent(prefillText)}`)
     }
 
-    const allMoreItems = [...companyMoreNavigation, ...networkMoreNavigation, ...accountNavigation]
+    const allMoreItems = [...companyMoreNavigation, ...networkMoreNavigation]
 
     return (
         <>
@@ -196,27 +191,6 @@ export function MobileNav() {
                                             {item.name}
                                         </span>
                                         <NewBadge route={item.href} />
-                                    </Link>
-                                </DropdownMenuItem>
-                            )
-                        })}
-
-                        <DropdownMenuSeparator />
-
-                        {/* Account items */}
-                        {accountNavigation.map((item) => {
-                            const isActive = isRouteActive(pathname, item.href)
-                            return (
-                                <DropdownMenuItem key={item.name} asChild>
-                                    <Link
-                                        href={item.href}
-                                        className={cn(
-                                            "flex items-center gap-2 cursor-pointer w-full",
-                                            isActive && "text-international-orange"
-                                        )}
-                                    >
-                                        <item.icon className="h-4 w-4" />
-                                        {item.name}
                                     </Link>
                                 </DropdownMenuItem>
                             )

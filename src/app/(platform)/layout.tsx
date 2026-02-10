@@ -1,6 +1,6 @@
 import { Sidebar } from "@/components/Sidebar";
 import { MobileNav } from "@/components/MobileNav";
-import { ContextIndicator } from "@/components/ContextIndicator";
+// ContextIndicator removed — banners no longer shown at page top
 import { PWARegister } from "@/components/PWARegister";
 import { DragDropPolyfill } from "@/components/DragDropPolyfill";
 import { CommandPalette } from "@/components/CommandPalette";
@@ -99,10 +99,6 @@ export default async function PlatformLayout({
                         <MobileZoomControl />
                         <Sidebar foundryName={foundryName} foundryId={foundryId} userName={profile?.full_name || user.email || "User"} userRole={profile?.role || "Member"} isCompanyAdmin={profile?.role === "Founder" || profile?.role === "Executive" || hasAdminAccess} userFoundries={userFoundries} />
                         <ZoomableContent className="flex-1 overflow-y-auto bg-background">
-                            <ContextIndicator
-                                foundryName={activeFoundryDisplayName}
-                                userName={profile?.full_name || user.email || "User"}
-                            />
                             <main className="p-4 sm:p-6 lg:p-8 pb-32 lg:pb-8">
                                 <ErrorBoundary>
                                     {children}

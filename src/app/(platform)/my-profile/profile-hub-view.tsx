@@ -1,6 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useTransition } from 'react'
+import { useRouter } from 'next/navigation'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { typography } from '@/lib/design-system'
 import { HeroCard } from './components/hero-card'
@@ -9,25 +10,56 @@ import { MarketplaceTab } from './components/marketplace-tab'
 import { LinksTab } from './components/links-tab'
 import { MarketplaceEditWizard } from './components/marketplace-edit-wizard'
 import { EditProfileDialog } from './components/edit-profile-dialog'
+import { CompanySwitcher } from './components/company-switcher'
+import { switchFoundry } from '@/actions/foundry-switching'
 
 import type { ProfileHubData } from '@/actions/profile-hub'
+
+interface FoundryInfo {
+  foundryId: string
+  foundryName: string
+  role: string
+  isPrimary: boolean
+  isActive: boolean
+  memberCount: number
+  joinedAt: string
+}
 
 /**
  * ProfileHubView - Main profile page orchestrator with tabs.
  *
- * @description Renders the profile hub with a hero card, tabbed content
- * (Overview, Marketplace, Links & Social), and edit dialogs.
+ * @description Renders the profile hub with a hero card, company switcher,
+ * tabbed content (Overview, Marketplace, Links & Social), and edit dialogs.
  * Adapts to all user roles: Founders, Executives, and Apprentices.
  *
  * @component
  *
  * @example
- * <ProfileHubView data={profileHubData} />
+ * <ProfileHubView data={profileHubData} foundries={foundries} />
  */
-export function ProfileHubView({ data }: { data: ProfileHubData }) {
+export function ProfileHubView({ data, foundries }: { data: ProfileHubData; foundries: FoundryInfo[] }) {
   const { profile, providerProfile, listing, strength, isProvider, foundryName, stats } = data
   const [isWizardOpen, setIsWizardOpen] = useState(false)
   const [isEditProfileOpen, setIsEditProfileOpen] = useState(false)
+  const router = useRouter()
+  const [isPending, startTransition] = useTransition()
+  const [switchingTo, setSwitchingTo] = useState<string | null>(null)
+
+  /**
+   * Handles clicking a company tile — switches foundry (if needed) and navigates to dashboard.
+   */
+  function handleCompanyClick(foundryId: string): void {
+    const foundry = foundries.find((f) => f.foundryId === foundryId)
+    if (!foundry) return
+
+    setSwitchingTo(foundryId)
+    startTransition(async () => {
+      if (!foundry.isActive) {
+        await switchFoundry(foundryId)
+      }
+      router.push('/updates')
+    })
+  }
 
   // Determine if user is an Apprentice (can access marketplace even without provider profile)
   const isApprentice = profile?.role === 'Apprentice'
@@ -63,6 +95,14 @@ export function ProfileHubView({ data }: { data: ProfileHubData }) {
         profileSlug={providerProfile?.profile_slug ?? null}
         isProvider={isProvider}
         onEditClick={() => setIsEditProfileOpen(true)}
+      />
+
+      {/* Company Switcher */}
+      <CompanySwitcher
+        foundries={foundries}
+        switchingTo={switchingTo}
+        isPending={isPending}
+        onCompanyClick={handleCompanyClick}
       />
 
       {/* Tabbed Content */}

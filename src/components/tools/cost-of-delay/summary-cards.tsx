@@ -19,9 +19,9 @@ interface SummaryCardsProps {
 export function SummaryCards({ metrics }: SummaryCardsProps) {
   const formatCurrency = (value: number): string => {
     const abs = Math.abs(value)
-    if (abs >= 1_000_000) return `${value < 0 ? "-" : ""}$${(abs / 1_000_000).toFixed(1)}M`
-    if (abs >= 1_000) return `${value < 0 ? "-" : ""}$${(abs / 1_000).toFixed(0)}k`
-    return `${value < 0 ? "-" : ""}$${abs.toFixed(0)}`
+    if (abs >= 1_000_000) return `${value < 0 ? "-" : ""}£${(abs / 1_000_000).toFixed(1)}M`
+    if (abs >= 1_000) return `${value < 0 ? "-" : ""}£${(abs / 1_000).toFixed(0)}k`
+    return `${value < 0 ? "-" : ""}£${abs.toFixed(0)}`
   }
 
   const cards = [

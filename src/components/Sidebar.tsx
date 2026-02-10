@@ -9,7 +9,6 @@ import {
     CheckSquare,
     Store,
     Target,
-    ShieldAlert,
     Lightbulb,
     ShoppingBag,
     Bot,
@@ -19,11 +18,9 @@ import {
     ScanSearch,
     MessageSquarePlus,
     Plus,
-    Coins,
     GraduationCap,
     BookOpen,
     UserCircle,
-    ArrowLeftRight,
     Settings,
     LogOut,
 } from "lucide-react"
@@ -59,8 +56,7 @@ const APP_VERSION = "0.9.0"
 // Zone A: "Me" — Person-level navigation
 // ─────────────────────────────────────────────────────────────────────────────
 const personNavigation = [
-    { name: "My Profile", href: "/my-profile", icon: UserCircle, tooltip: "Your profile, details, and marketplace presence" },
-    { name: "Switch Company", href: "/home", icon: ArrowLeftRight, tooltip: "Switch between your companies" },
+    { name: "My Profile", href: "/my-profile", icon: UserCircle, tooltip: "Your profile, companies, and marketplace presence" },
 ]
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -111,11 +107,12 @@ interface SidebarProps {
  * Sidebar — Main navigation component with three-zone layout.
  *
  * @description Organizes navigation into three clear zones:
- * - "Me" zone: person-level pages (My Profile, Switch Company, Sign Out)
- * - "Company" zone: workspace pages (Dashboard, Tasks, Team, Settings, etc.)
+ * - "Me" zone: person-level pages (My Profile)
+ * - "Company" zone: workspace pages (Updates, Tasks, Team, Settings, etc.)
  * - "Network" zone: community and discovery (Marketplace, Guild, Apprenticeship, Inspiration)
  *
- * The company zone header doubles as the foundry switcher for multi-foundry users.
+ * Sign Out lives in the footer below What's New.
+ * Company switching lives on the My Profile page.
  */
 export function Sidebar({ foundryName, foundryId, userName, userRole, isCompanyAdmin, userFoundries }: SidebarProps) {
     const pathname = usePathname()
@@ -240,20 +237,6 @@ export function Sidebar({ foundryName, foundryId, userName, userRole, isCompanyA
                 </div>
                 {personNavigation.map(renderNavItem)}
 
-                {/* Sign Out — form action, rendered separately */}
-                <form action={signOut}>
-                    <button
-                        type="submit"
-                        className="group flex items-center w-full px-3 py-2 text-sm text-muted-foreground hover:bg-muted hover:text-foreground transition-all duration-200 rounded-md"
-                    >
-                        <LogOut
-                            className="mr-3 h-4 w-4 flex-shrink-0 text-muted-foreground group-hover:text-foreground transition-colors"
-                            aria-hidden="true"
-                        />
-                        Sign Out
-                    </button>
-                </form>
-
                 {/* ══════════════════════════════════════════════════ */}
                 {/* Zone B: Company — Workspace navigation             */}
                 {/* ══════════════════════════════════════════════════ */}
@@ -304,6 +287,17 @@ export function Sidebar({ foundryName, foundryId, userName, userRole, isCompanyA
                     What&apos;s New
                     <NewBadge route="/whats-new" />
                 </Link>
+
+                {/* Sign Out */}
+                <form action={signOut}>
+                    <button
+                        type="submit"
+                        className="flex items-center gap-2 w-full px-2 py-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors rounded-md"
+                    >
+                        <LogOut className="h-3.5 w-3.5" aria-hidden="true" />
+                        Sign Out
+                    </button>
+                </form>
 
                 {/* Zoom Control */}
                 <div className="flex justify-center">

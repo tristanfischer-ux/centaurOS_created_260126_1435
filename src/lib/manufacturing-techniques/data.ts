@@ -1039,7 +1039,7 @@ const FORMING: ManufacturingTechnique[] = [
       'High production rates (seconds per part)',
     ],
     cons: [
-      'High tooling cost ($5k-$100k+)',
+      'High tooling cost (£5k-£100k+)',
       'Long lead time for tooling',
       'Design changes require mold modifications',
       'Wall thickness must be uniform',
@@ -1633,7 +1633,7 @@ const CASTING: ManufacturingTechnique[] = [
       'Dies last 100k+ shots',
     ],
     cons: [
-      'Very expensive tooling ($10k-$200k+)',
+      'Very expensive tooling (£10k-£200k+)',
       'Limited to non-ferrous metals',
       'Porosity can occur',
       'Size limited by machine capacity',
@@ -1665,7 +1665,7 @@ const CASTING: ManufacturingTechnique[] = [
     costTier: 'medium',
     leadTime: '5-15 days',
     pros: [
-      'Low tooling cost ($500-$2k per mold)',
+      'Low tooling cost (£500-£2k per mold)',
       'Simulates injection-molded parts',
       'Fast turnaround',
       'Multiple material options',
@@ -2466,7 +2466,7 @@ const COMPOSITE: ManufacturingTechnique[] = [
       'Consistent fiber placement',
     ],
     cons: [
-      'Very expensive equipment ($1M+)',
+      'Very expensive equipment (£1M+)',
       'Programming complexity',
       'Speed limited on tight radii',
     ],

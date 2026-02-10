@@ -9,7 +9,7 @@
  * <MoneyMapSummaryCards summary={data.summary} previousSummary={snapshot?.summary} />
  */
 
-import { TrendingUp, TrendingDown, DollarSign, Receipt, PiggyBank, BarChart3, Layers } from 'lucide-react'
+import { TrendingUp, TrendingDown, PoundSterling, Receipt, PiggyBank, BarChart3, Layers } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
 
@@ -124,7 +124,7 @@ export function MoneyMapSummaryCards({
         label="Monthly Revenue"
         value={formatCurrency(summary.total_revenue)}
         change={revenueChange}
-        icon={DollarSign}
+        icon={PoundSterling}
         accent="revenue"
       />
       <KpiCard

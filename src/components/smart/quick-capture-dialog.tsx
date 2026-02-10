@@ -194,7 +194,7 @@ export function QuickCaptureDialog({
               placeholder={
                 captureType === 'task'
                   ? 'e.g. Research competitor pricing, set up analytics, hire a designer...'
-                  : 'e.g. Launch MVP by Q2, grow revenue to $10k MRR, build advisory board...'
+                  : 'e.g. Launch MVP by Q2, grow revenue to £10k MRR, build advisory board...'
               }
               value={idea}
               onChange={(e) => {

@@ -291,7 +291,7 @@ export default function CaseStudiesPage() {
                                         id="title"
                                         value={formData.title}
                                         onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                                        placeholder="e.g., Scaling B2B Sales from $0 to $5M ARR"
+                                        placeholder="e.g., Scaling B2B Sales from £0 to £5M ARR"
                                     />
                                 </div>
                                 
@@ -406,7 +406,7 @@ export default function CaseStudiesPage() {
                                     <Input
                                         value={newMetric.value}
                                         onChange={(e) => setNewMetric({ ...newMetric, value: e.target.value })}
-                                        placeholder="Value (e.g., $5M)"
+                                        placeholder="Value (e.g., £5M)"
                                         className="w-28"
                                     />
                                     <Input

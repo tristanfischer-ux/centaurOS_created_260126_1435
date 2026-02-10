@@ -109,7 +109,7 @@ const roleConfigs: Record<string, RoleConfig> = {
         isApplication: true,
         additionalFields: [
             { id: "firm", label: "Firm Name", placeholder: "Acme Ventures" },
-            { id: "aum", label: "AUM Range", placeholder: "$10M - $50M" }
+            { id: "aum", label: "AUM Range", placeholder: "£10M - £50M" }
         ]
     },
     factory: {

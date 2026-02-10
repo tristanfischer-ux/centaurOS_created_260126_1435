@@ -14,7 +14,7 @@ const openai = new OpenAI({
 const RFQSchema = z.object({
     title: z.string().describe("A concise title summarizing the RFQ request"),
     specifications: z.string().describe("Detailed specifications including quantity, materials, tolerances, and other technical requirements"),
-    budget_range: z.string().describe("The budget or price range mentioned, formatted as currency (e.g., '$5,000' or '$5,000 - $10,000')"),
+    budget_range: z.string().describe("The budget or price range mentioned, formatted as currency (e.g., '£5,000' or '£5,000 - £10,000')"),
 });
 
 export async function POST(req: NextRequest) {
@@ -105,7 +105,7 @@ Guidelines:
   - Tolerances and quality requirements
   - Dimensions if mentioned
   - Any other technical specifications
-- budget_range: Extract the budget or price range. Format as currency (e.g., "$5,000" or "$5,000 - $10,000"). If no budget is mentioned, use "Not specified".
+- budget_range: Extract the budget or price range. Format as currency (e.g., "£5,000" or "£5,000 - £10,000"). If no budget is mentioned, use "Not specified".
 
 Be precise and comprehensive in extracting specifications.`
                 },

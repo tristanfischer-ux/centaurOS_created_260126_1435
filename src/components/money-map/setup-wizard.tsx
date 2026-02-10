@@ -36,7 +36,7 @@ import {
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import {
-  DollarSign,
+  PoundSterling,
   Receipt,
   Share2,
   Building2,
@@ -67,7 +67,7 @@ import { REVENUE_CATEGORY_LABELS, COST_CATEGORY_LABELS, PERIOD_LABELS } from '@/
 type StepId = 'revenue' | 'direct' | 'shared' | 'overhead' | 'review'
 
 const STEPS: { id: StepId; title: string; icon: React.ComponentType<{ className?: string }> }[] = [
-  { id: 'revenue', title: 'Revenue', icon: DollarSign },
+  { id: 'revenue', title: 'Revenue', icon: PoundSterling },
   { id: 'direct', title: 'Direct Costs', icon: Receipt },
   { id: 'shared', title: 'Shared Costs', icon: Share2 },
   { id: 'overhead', title: 'Overhead', icon: Building2 },

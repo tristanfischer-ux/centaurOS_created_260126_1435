@@ -3,7 +3,7 @@
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { DollarSign, Clock, Rocket, TrendingUp } from "lucide-react"
+import { PoundSterling, Clock, Rocket, TrendingUp } from "lucide-react"
 
 import type { CostOfDelayInputs } from "./types"
 
@@ -30,7 +30,7 @@ export function CalculatorForm({ inputs, onChange }: CalculatorFormProps) {
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-lg">
           <div className="flex items-center justify-center h-8 w-8 rounded-full bg-international-orange/10">
-            <DollarSign className="h-4 w-4 text-international-orange" />
+            <PoundSterling className="h-4 w-4 text-international-orange" />
           </div>
           Your Numbers
         </CardTitle>
@@ -43,7 +43,7 @@ export function CalculatorForm({ inputs, onChange }: CalculatorFormProps) {
             Monthly Overhead (Burn Rate)
           </Label>
           <div className="relative">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">$</span>
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">£</span>
             <Input
               id="monthlyOverhead"
               type="number"
@@ -67,7 +67,7 @@ export function CalculatorForm({ inputs, onChange }: CalculatorFormProps) {
             Expected Monthly Revenue
           </Label>
           <div className="relative">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">$</span>
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">£</span>
             <Input
               id="expectedMonthlyRevenue"
               type="number"
@@ -129,11 +129,11 @@ export function CalculatorForm({ inputs, onChange }: CalculatorFormProps) {
         {/* Acceleration Cost */}
         <div className="space-y-2">
           <Label htmlFor="accelerationCost" className="flex items-center gap-2 text-sm font-medium">
-            <DollarSign className="h-3.5 w-3.5 text-muted-foreground" />
+            <PoundSterling className="h-3.5 w-3.5 text-muted-foreground" />
             Acceleration Cost
           </Label>
           <div className="relative">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">$</span>
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">£</span>
             <Input
               id="accelerationCost"
               type="number"

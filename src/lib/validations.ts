@@ -115,7 +115,7 @@ export const createRFQSchema = z.object({
     .max(5000, 'Specifications must be 5,000 characters or less')
     .optional(),
   budgetRange: z.string()
-    .regex(/^\$?[\d,]+\s*-\s*\$?[\d,]+$|^\$?[\d,]+$/, 'Invalid budget format (e.g., "$500 - $1,000")')
+    .regex(/^[£$€]?[\d,]+\s*-\s*[£$€]?[\d,]+$|^[£$€]?[\d,]+$/, 'Invalid budget format (e.g., "£500 - £1,000")')
     .optional()
 })
 
