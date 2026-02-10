@@ -164,7 +164,7 @@ export function CanvasShell({
   return (
     <div>
       {/* Page header */}
-      <div className="px-4 sm:px-6 lg:px-8 pt-4 pb-4 border-b border-slate-100">
+      <div className="px-4 sm:px-6 lg:px-8 pt-4 sm:pt-6 lg:pt-8 pb-4 border-b border-slate-100">
         <div className={typography.pageHeader}>
           <div className={typography.pageHeaderAccent} />
           <h1 className={typography.h1}>Strategy</h1>
