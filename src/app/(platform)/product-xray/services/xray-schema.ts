@@ -85,14 +85,14 @@ export const ModuleSpecSchema = z.object({
     in: z.array(z.string()).min(1).describe("Input streams/signals"),
     out: z.array(z.string()).min(1).describe("Output streams/signals"),
   }),
-  keyParts: z.array(z.string()).min(1).describe("Major physical components"),
+  keyParts: z.array(z.string()).min(5).describe("Major physical components with specifications"),
   tests: z.array(z.string()).min(1).describe("Key acceptance tests"),
   requirements: z.object({
     leadWeeks: z.number().describe("Estimated lead time in weeks"),
     notes: z.string().describe("Key procurement/design notes"),
   }),
   detail: z.object({
-    whatItIs: z.string().describe("Technical description of the module"),
+    whatItIs: z.string().describe("2-3 sentence technical description including operating principles and material considerations"),
     whyItMatters: z.string().describe("Why this module is critical to the system"),
     commonFailureModes: z.array(z.string()).min(1)
       .describe("Typical failure modes an engineer should watch for"),
@@ -124,10 +124,10 @@ export const XRaySpecSchema = z.object({
   idea: z.string().describe("The original product/machine idea text"),
   function: z.string().describe("One-sentence system function description"),
   assumptions: z.array(z.string()).describe("Key engineering assumptions"),
-  materials: z.array(z.string()).describe("Primary materials involved"),
-  processes: z.array(z.string()).describe("Manufacturing/build processes required"),
+  materials: z.array(z.string()).min(8).describe("Primary materials involved with specifications"),
+  processes: z.array(z.string()).min(6).describe("Manufacturing/build processes required with detail"),
   validation: z.array(z.string()).describe("Key validation/test steps"),
-  modules: z.array(ModuleSpecSchema).min(3).max(8)
+  modules: z.array(ModuleSpecSchema).min(4).max(10)
     .describe("Sub-assemblies that compose the machine"),
   lastScannedAt: z.string().optional(),
   // System-level image
@@ -170,8 +170,8 @@ const AITransformationDiagnosticSchema = z.object({
 export const AIScanOutputSchema = z.object({
   function: z.string().describe("One-sentence system function description"),
   assumptions: z.array(z.string()).min(1).describe("Key engineering assumptions"),
-  materials: z.array(z.string()).min(1).describe("Primary materials involved"),
-  processes: z.array(z.string()).min(1).describe("Manufacturing/build processes required"),
+  materials: z.array(z.string()).min(8).describe("Primary materials involved with specifications"),
+  processes: z.array(z.string()).min(6).describe("Manufacturing/build processes required with detail"),
   validation: z.array(z.string()).min(1).describe("Key validation/test steps"),
   modules: z.array(z.object({
     id: z.string().describe("Unique module identifier (lowercase, no spaces, e.g. 'intake', 'react', 'controls')"),
@@ -181,14 +181,14 @@ export const AIScanOutputSchema = z.object({
       in: z.array(z.string()).min(1).describe("Input streams/signals"),
       out: z.array(z.string()).min(1).describe("Output streams/signals"),
     }),
-    keyParts: z.array(z.string()).min(2).describe("Major physical components"),
+    keyParts: z.array(z.string()).min(5).describe("Major physical components with specifications"),
     tests: z.array(z.string()).min(1).describe("Key acceptance tests"),
     requirements: z.object({
       leadWeeks: z.number().describe("Estimated lead time in weeks"),
       notes: z.string().describe("Key procurement/design notes"),
     }),
     detail: z.object({
-      whatItIs: z.string().describe("Technical description of the module"),
+      whatItIs: z.string().describe("2-3 sentence technical description including operating principles and material considerations"),
       whyItMatters: z.string().describe("Why this module is critical to the system"),
       commonFailureModes: z.array(z.string()).min(2)
         .describe("Typical failure modes"),
@@ -201,7 +201,7 @@ export const AIScanOutputSchema = z.object({
       .describe("True if this is the gating transformation step. Exactly one module must be the gating module."),
     diagnostic: AITransformationDiagnosticSchema.nullable()
       .describe("Only present on the gating module (null for non-gating modules). Contains AI-generated diagnostic questions."),
-  })).min(3).max(8)
+  })).min(4).max(10)
     .describe("Sub-assemblies. Exactly one must have isGatingModule=true with diagnostic questions."),
 })
 

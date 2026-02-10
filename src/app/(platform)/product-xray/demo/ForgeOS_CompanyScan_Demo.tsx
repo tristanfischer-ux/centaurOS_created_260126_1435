@@ -748,10 +748,17 @@ function Schematic({
   const branchA = mid.filter((_, i) => i % 2 === 0)
   const branchB = mid.filter((_, i) => i % 2 === 1)
 
-  const W = 1100, H = 360
-  const x0 = 90, xMerge = W - 260
-  const yTop = 120, yBot = 240
+  // Dynamic sizing based on module count to prevent overlap
+  const minNodeSpacing = 240 // Minimum space per node
+  const maxBranchLength = Math.max(branchA.length, branchB.length)
   const nodeW = 210, nodeH = 64
+  const x0 = 90
+  
+  // Calculate required width to prevent overlap
+  const W = Math.max(1100, x0 + nodeW + (maxBranchLength + 2) * minNodeSpacing + nodeW + 90)
+  const H = 360
+  const xMerge = W - 260
+  const yTop = 120, yBot = 240
 
   const pos: Record<string, { x: number; y: number }> = {}
   pos[start.id] = { x: x0, y: (yTop + yBot) / 2 }
@@ -759,8 +766,11 @@ function Schematic({
 
   const placeBranch = (arr: ModuleSpec[], y: number): void => {
     const span = xMerge - (x0 + nodeW + 40)
-    const step = arr.length > 0 ? span / (arr.length + 1) : span
-    arr.forEach((m, i) => { pos[m.id] = { x: x0 + nodeW + 40 + step * (i + 1), y } })
+    const step = arr.length > 0 ? Math.max(minNodeSpacing, span / (arr.length + 1)) : span
+    arr.forEach((m, i) => { 
+      const xPos = x0 + nodeW + 40 + step * (i + 1)
+      pos[m.id] = { x: Math.min(xPos, xMerge - nodeW - 40), y } 
+    })
   }
   placeBranch(branchA, yTop)
   placeBranch(branchB, yBot)
@@ -1004,6 +1014,7 @@ function XRayView({
   setSpec,
   onScan,
   isScanning,
+  isGeneratingImages,
   onOpenInterview,
   onOpenDiagnostic,
 }: {
@@ -1011,6 +1022,7 @@ function XRayView({
   setSpec: (s: XRaySpec) => void
   onScan: (idea: string) => void
   isScanning: boolean
+  isGeneratingImages: boolean
   onOpenInterview: (m: ModuleSpec) => void
   onOpenDiagnostic: (m: ModuleSpec) => void
 }) {
@@ -1076,6 +1088,18 @@ function XRayView({
 
       {!isScanning && spec.modules.length > 0 && (
         <>
+          {isGeneratingImages && (
+            <Alert>
+              <Loader2 className="h-4 w-4 animate-spin" />
+              <AlertDescription>
+                <div className="flex items-center justify-between">
+                  <span>Generating AI blueprint images for modules...</span>
+                  <span className="text-xs text-muted-foreground">This may take 30-60 seconds</span>
+                </div>
+              </AlertDescription>
+            </Alert>
+          )}
+
           <Schematic spec={spec} onOpenDiagnostic={onOpenDiagnostic} />
 
           <div className="grid lg:grid-cols-2 gap-4">
@@ -1508,6 +1532,7 @@ export default function ForgeOS_CompanyScan_Demo({
   )
   const [scanId, setScanId] = useState<string | null>(initialScanId ?? null)
   const [isScanning, setIsScanning] = useState(false)
+  const [isGeneratingImages, setIsGeneratingImages] = useState(false)
   const [interviewModule, setInterviewModule] = useState<ModuleSpec | null>(null)
   const [diagnosticModule, setDiagnosticModule] = useState<ModuleSpec | null>(null)
 
@@ -1539,15 +1564,31 @@ export default function ForgeOS_CompanyScan_Demo({
       setSpec(result.spec)
       toast.success(`Scan complete: ${result.spec.modules.length} modules identified`)
 
-      // Trigger image generation in background
+      // Trigger image generation in background with user feedback
+      setIsGeneratingImages(true)
+      toast.info("Generating blueprint images...")
       generateImagesAction(result.scanId)
         .then((imgResult) => {
           if ("spec" in imgResult) {
             setSpec(imgResult.spec)
+            const successCount = imgResult.spec.modules.filter(m => m.imageStatus === "complete").length
+            const total = imgResult.spec.modules.length
+            if (successCount > 0) {
+              toast.success(`Generated ${successCount}/${total} module images`)
+            }
+            if (imgResult.spec.systemImageStatus === "complete") {
+              toast.success("System diagram generated")
+            }
+          } else {
+            toast.error(imgResult.error || "Image generation failed")
           }
         })
         .catch((err) => {
-          console.warn("[XRay] Image generation failed:", err instanceof Error ? err.message : "Unknown")
+          toast.error("Image generation failed: " + (err instanceof Error ? err.message : "Unknown error"))
+          console.error("[XRay] Image generation error:", err)
+        })
+        .finally(() => {
+          setIsGeneratingImages(false)
         })
     } catch (error) {
       toast.error("Scan failed. Check that OPENAI_API_KEY is configured.")
@@ -1618,6 +1659,7 @@ export default function ForgeOS_CompanyScan_Demo({
             setSpec={setSpec}
             onScan={onScan}
             isScanning={isScanning}
+            isGeneratingImages={isGeneratingImages}
             onOpenInterview={setInterviewModule}
             onOpenDiagnostic={setDiagnosticModule}
           />

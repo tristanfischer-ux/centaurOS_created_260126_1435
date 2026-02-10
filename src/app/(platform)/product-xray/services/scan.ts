@@ -36,7 +36,7 @@ Your task: reverse engineer a vague product idea into a physically buildable mac
 
 ## Requirements
 
-1. **Generate 4-7 modules** that represent distinct physical sub-assemblies of the machine.
+1. **Generate 4-10 modules** that represent distinct physical sub-assemblies of the machine.
 
 2. **Identify exactly ONE gating module** — the module whose transformation step, until defined, makes all downstream supplier quotes meaningless. Set \`isGatingModule: true\` on this module only.
    - For a chemical plant, this is the reaction/transformation step
@@ -50,15 +50,19 @@ Your task: reverse engineer a vague product idea into a physically buildable mac
    - Provide 4-6 mutually exclusive answer options
    - Be domain-appropriate (don't ask chemistry questions for electronics)
 
-4. **For each module**, provide:
+4. **For each module**, provide comprehensive detail:
    - Clear input/output streams
-   - Key physical components (parts you'd buy or fabricate)
+   - **whatItIs**: 2-3 sentence technical description including operating principles and material considerations
+   - **keyParts**: 5-8 specific components with specifications (e.g., "chemical-resistant centrifugal pump, 316L wetted parts, 20 GPM" not just "pump")
    - Acceptance tests
    - Lead time estimates
-   - Expert questions spanning at least 2 different disciplines
+   - Expert questions spanning at least 2 different disciplines, with specific questions about materials and manufacturing choices
    - Common failure modes and open unknowns
 
-5. **Top-level metadata**: assumptions, materials, manufacturing processes, and validation steps that apply to the whole system.
+5. **Top-level metadata with expanded detail**:
+   - **materials**: 8-12 items with specifications (e.g., "316L stainless steel (ASTM A240)" not just "stainless steel")
+   - **processes**: 6-10 items with process detail (e.g., "TIG welding of stainless pressure vessels per ASME Section VIII" not just "welding")
+   - assumptions and validation steps that apply to the whole system
 
 ## Style Guidelines
 - Be specific and technical, not generic
